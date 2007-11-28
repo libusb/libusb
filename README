@@ -1,0 +1,17 @@
+fpusb
+=====
+
+fpusb is another library for USB device access from Linux userspace.
+It is written in C and licensed under the LGPL-2.1 (see COPYING).
+
+See the homepage for more information:
+http://www.reactivated.net/fprint/wiki/Fpusb
+
+Use the mailing list for questions, comments, etc:
+http://www.reactivated.net/fprint/wiki/Mailing_list
+
+Use the bug tracker for bugs and feature requests:
+http://www.reactivated.net/fprint/bugs/index.php?project=4&switch=1&do=index
+
+- Daniel Drake <dsd@gentoo.org>
+

@@ -1,0 +1,6 @@
+isochronous endpoint I/O
+optional timerfd support (runtime detection)
+API docs
+notifications of hotplugged/unplugged devices
+thread safety
+signalfd emulation through pipes and sigaction() for older kernels

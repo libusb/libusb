@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: fpusb
+Description: C API for USB device access from Linux userspace
+Version: @VERSION@
+Libs: -L${libdir} -lfpusb
+Cflags: -I${includedir}/fpusb
+
