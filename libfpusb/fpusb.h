@@ -186,6 +186,7 @@ void fpusb_urb_handle_free(fpusb_urb_handle *urbh);
 
 int fpusb_poll_timeout(struct timeval *tv);
 int fpusb_poll(void);
+int fpusb_get_pollfd(void);
 
 /* sync I/O */
 

@@ -698,3 +698,8 @@ API_EXPORTED void fpusb_urb_handle_free(struct fpusb_urb_handle *urbh)
 	free(urbh);
 }
 
+API_EXPORTED int fpusb_get_pollfd(void)
+{
+	return sigfd;
+}
+
