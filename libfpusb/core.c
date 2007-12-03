@@ -41,72 +41,107 @@
 static struct list_head usb_devs;
 struct list_head open_devs;
 
-static int parse_descriptor(unsigned char *source, char *descriptor, void *dest)
-{
-	unsigned char *sp = source, *dp = dest;
-	uint16_t w;
-	uint32_t d;
-	char *cp;
-
-	for (cp = descriptor; *cp; cp++) {
-		switch (*cp) {
-			case 'b':	/* 8-bit byte */
-				*dp++ = *sp++;
-				break;
-			case 'w':	/* 16-bit word, convert from little endian to CPU */
-				w = (sp[1] << 8) | sp[0]; sp += 2;
-				dp += ((unsigned long)dp & 1);	/* Align to word boundary */
-				*((uint16_t *)dp) = w; dp += 2;
-				break;
-			case 'd':	/* 32-bit dword, convert from little endian to CPU */
-				d = (sp[3] << 24) | (sp[2] << 16) | (sp[1] << 8) | sp[0]; sp += 4;
-				dp += ((unsigned long)dp & 2);	/* Align to dword boundary */
-				*((uint32_t *)dp) = d; dp += 4;
-				break;
-			case 'W':	/* 16-bit word, keep CPU endianess */
-				dp += ((unsigned long)dp & 1);	/* Align to word boundary */
-				memcpy(dp, sp, 2); sp += 2; dp += 2;
-				break;
-			case 'D':	/* 32-bit dword, keep CPU endianess */
-				dp += ((unsigned long)dp & 2);	/* Align to dword boundary */
-				memcpy(dp, sp, 4); sp += 4; dp += 4;
-				break;
-		}
-	}
-
-	return sp - source;
-}
-
 static int scan_device(char *busdir, const char *devnum)
 {
 	char path[PATH_MAX + 1];
-    unsigned char raw_desc[DEVICE_DESC_LENGTH];
+	unsigned char raw_desc[DEVICE_DESC_LENGTH];
 	struct fpusb_dev *dev = malloc(sizeof(*dev));
-	int fd;
+	int fd = 0;
+	int i;
 	int r;
+	int tmp;
+
+	if (!dev)
+		return -1;
 
 	snprintf(path, PATH_MAX, "%s/%s", busdir, devnum);
 	fp_dbg("%s", path);
 	fd = open(path, O_RDWR);
 	if (!fd) {
 		fp_dbg("open '%s' failed, ret=%d errno=%d", path, fd, errno);
-		return -1;
+		r = -1;
+		goto err;
 	}
 
-    r = read(fd, raw_desc, DEVICE_DESC_LENGTH);
+	r = read(fd, raw_desc, DEVICE_DESC_LENGTH);
 	if (r < 0) {
 		fp_err("read failed ret=%d errno=%d", r, errno);
-		return r;
+		goto err;
 	}
 	/* FIXME: short read handling? */
 
-    parse_descriptor(raw_desc, "bbWbbbbWWWbbbb", &dev->desc);
-	fp_dbg("found device %04x:%04x", dev->desc.idVendor, dev->desc.idProduct);
-	dev->nodepath = strdup(path);
-	list_add(&dev->list, &usb_devs);
+	fpi_parse_descriptor(raw_desc, "bbWbbbbWWWbbbb", &dev->desc);
 
-	close(fd);
-	return 0;
+	/* Now try to fetch the rest of the descriptors */
+	if (dev->desc.bNumConfigurations > USB_MAXCONFIG) {
+		fp_err("too many configurations");
+		r = -1;
+		goto err;
+	}
+
+	if (dev->desc.bNumConfigurations < 1) {
+		fp_dbg("no configurations?");
+		r = -1;
+		goto err;
+	}
+
+	tmp = dev->desc.bNumConfigurations * sizeof(struct usb_config_descriptor);
+	dev->config = malloc(tmp);
+	if (!dev->config) {
+		r = -1;
+		goto err;
+	}
+
+	memset(dev->config, 0, tmp);
+
+	for (i = 0; i < dev->desc.bNumConfigurations; i++) {
+		unsigned char buffer[8], *bigbuffer;
+		struct usb_config_descriptor config;
+
+		/* Get the first 8 bytes to figure out what the total length is */
+		r = read(fd, buffer, sizeof(buffer));
+		if (r < sizeof(buffer)) {
+			fp_err("short descriptor read (%d/%d)", r, sizeof(buffer));
+			goto err;
+		}
+
+		fpi_parse_descriptor(buffer, "bbw", &config);
+
+		bigbuffer = malloc(config.wTotalLength);
+		if (!bigbuffer)
+			goto err;
+
+		/* Read the rest of the config descriptor */
+		memcpy(bigbuffer, buffer, sizeof(buffer));
+
+		tmp = config.wTotalLength - 8;
+		r = read(fd, bigbuffer + 8, tmp);
+		if (r < tmp) {
+			fp_err("short descriptor read (%d/%d)", r, tmp);
+			free(bigbuffer);
+			goto err;
+		}
+
+		r = fpi_parse_configuration(&dev->config[i], bigbuffer);
+		if (r > 0)
+			fp_warn("descriptor data still left\n");
+		free(bigbuffer);
+	}
+
+	dev->nodepath = strdup(path);
+	if (!dev->nodepath)
+		goto err;
+
+	fp_dbg("found device %04x:%04x", dev->desc.idVendor, dev->desc.idProduct);
+	list_add(&dev->list, &usb_devs);
+	r = 0;
+
+err:
+	if (fd)
+		close(fd);
+	if (r < 0 && dev)
+		free(dev);
+	return r;
 }
 
 static int scan_busdir(const char *busnum)
@@ -177,6 +212,12 @@ API_EXPORTED struct usb_dev_descriptor *fpusb_dev_get_descriptor(
 	return &dev->desc;
 }
 
+API_EXPORTED struct usb_config_descriptor *fpusb_dev_get_config(
+	struct fpusb_dev *dev)
+{
+	return dev->config;
+}
+
 API_EXPORTED struct fpusb_dev_handle *fpusb_devh_open(struct fpusb_dev *dev)
 {
 	struct fpusb_dev_handle *devh;
@@ -215,6 +256,11 @@ API_EXPORTED void fpusb_devh_close(struct fpusb_dev_handle *devh)
 	list_del(&devh->list);
 	do_close(devh);
 	free(devh);
+}
+
+API_EXPORTED struct fpusb_dev *fpusb_devh_get_dev(struct fpusb_dev_handle *devh)
+{
+	return devh->dev;
 }
 
 API_EXPORTED int fpusb_devh_claim_intf(struct fpusb_dev_handle *dev,

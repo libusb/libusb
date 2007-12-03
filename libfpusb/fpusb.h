@@ -113,6 +113,58 @@ struct usb_dev_descriptor {
 	uint8_t  bNumConfigurations;
 };
 
+struct usb_endpoint_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint8_t  bEndpointAddress;
+	uint8_t  bmAttributes;
+	uint16_t wMaxPacketSize;
+	uint8_t  bInterval;
+	uint8_t  bRefresh;
+	uint8_t  bSynchAddress;
+
+	unsigned char *extra;	/* Extra descriptors */
+	int extralen;
+};
+
+struct usb_interface_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint8_t  bInterfaceNumber;
+	uint8_t  bAlternateSetting;
+	uint8_t  bNumEndpoints;
+	uint8_t  bInterfaceClass;
+	uint8_t  bInterfaceSubClass;
+	uint8_t  bInterfaceProtocol;
+	uint8_t  iInterface;
+
+	struct usb_endpoint_descriptor *endpoint;
+
+	unsigned char *extra;	/* Extra descriptors */
+	int extralen;
+};
+
+struct usb_interface {
+	struct usb_interface_descriptor *altsetting;
+	int num_altsetting;
+};
+
+struct usb_config_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint16_t wTotalLength;
+	uint8_t  bNumInterfaces;
+	uint8_t  bConfigurationValue;
+	uint8_t  iConfiguration;
+	uint8_t  bmAttributes;
+	uint8_t  MaxPower;
+
+	struct usb_interface *interface;
+
+	unsigned char *extra;	/* Extra descriptors */
+	int extralen;
+};
+
 /* fpusb */
 
 struct fpusb_dev;
@@ -160,10 +212,12 @@ void fpusb_exit(void);
 int fpusb_find_devices(void);
 fpusb_dev *fpusb_get_devices(void);
 struct usb_dev_descriptor *fpusb_dev_get_descriptor(fpusb_dev *dev);
+struct usb_config_descriptor *fpusb_dev_get_config(fpusb_dev *dev);
 fpusb_dev *fpusb_dev_next(fpusb_dev *dev);
 
 fpusb_dev_handle *fpusb_devh_open(fpusb_dev *dev);
 void fpusb_devh_close(fpusb_dev_handle *devh);
+struct fpusb_dev *fpusb_devh_get_dev(fpusb_dev_handle *devh);
 int fpusb_devh_claim_intf(fpusb_dev_handle *dev, int iface);
 int fpusb_devh_release_intf(fpusb_dev_handle *dev, int iface);
 

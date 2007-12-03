@@ -4,3 +4,5 @@ API docs
 notifications of hotplugged/unplugged devices
 thread safety
 signalfd emulation through pipes and sigaction() for older kernels
+signalfd not needed for usbfs? can we poll on the fd?
+use poll() rather than select()?

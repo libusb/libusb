@@ -36,6 +36,10 @@
 #define USBFS_PATH "/dev/bus/usb"
 #define DEVICE_DESC_LENGTH		18
 
+#define USB_MAXENDPOINTS	32
+#define USB_MAXINTERFACES	32
+#define USB_MAXCONFIG		8
+
 struct list_head {
 	struct list_head *prev, *next;
 };
@@ -145,6 +149,7 @@ struct fpusb_dev {
 	struct list_head list;
 	char *nodepath;
 	struct usb_dev_descriptor desc;
+	struct usb_config_descriptor *config;
 };
 
 struct fpusb_dev_handle {
@@ -189,12 +194,22 @@ struct usb_ctrl_setup {
 	uint16_t wLength;
 } __attribute__((packed));
 
+/* All standard descriptors have these 2 fields in common */
+struct usb_descriptor_header {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+};
+
 /* shared data and functions */
 
 extern struct list_head open_devs;
 
 int fpi_io_init(int _signum);
 void fpi_io_exit(void);
+
+int fpi_parse_descriptor(unsigned char *source, char *descriptor, void *dest);
+int fpi_parse_configuration(struct usb_config_descriptor *config,
+		unsigned char *buffer);
 
 #endif
 
