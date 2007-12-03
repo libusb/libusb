@@ -177,7 +177,7 @@ API_EXPORTED struct usb_dev_descriptor *fpusb_dev_get_descriptor(
 	return &dev->desc;
 }
 
-API_EXPORTED struct fpusb_dev_handle *fpusb_dev_open(struct fpusb_dev *dev)
+API_EXPORTED struct fpusb_dev_handle *fpusb_devh_open(struct fpusb_dev *dev)
 {
 	struct fpusb_dev_handle *devh;
 	int fd;
@@ -206,7 +206,7 @@ static void do_close(struct fpusb_dev_handle *devh)
 	close(devh->fd);	
 }
 
-API_EXPORTED void fpusb_dev_close(struct fpusb_dev_handle *devh)
+API_EXPORTED void fpusb_devh_close(struct fpusb_dev_handle *devh)
 {
 	if (!devh)
 		return;
@@ -217,7 +217,7 @@ API_EXPORTED void fpusb_dev_close(struct fpusb_dev_handle *devh)
 	free(devh);
 }
 
-API_EXPORTED int fpusb_dev_claim_intf(struct fpusb_dev_handle *dev,
+API_EXPORTED int fpusb_devh_claim_intf(struct fpusb_dev_handle *dev,
 	int iface)
 {
 	int r;
@@ -229,7 +229,7 @@ API_EXPORTED int fpusb_dev_claim_intf(struct fpusb_dev_handle *dev,
 	return r;
 }
 
-API_EXPORTED int fpusb_dev_release_intf(struct fpusb_dev_handle *dev,
+API_EXPORTED int fpusb_devh_release_intf(struct fpusb_dev_handle *dev,
 	int iface)
 {
 	int r;

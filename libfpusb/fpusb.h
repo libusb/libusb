@@ -162,10 +162,10 @@ fpusb_dev *fpusb_get_devices(void);
 struct usb_dev_descriptor *fpusb_dev_get_descriptor(fpusb_dev *dev);
 fpusb_dev *fpusb_dev_next(fpusb_dev *dev);
 
-fpusb_dev_handle *fpusb_dev_open(fpusb_dev *dev);
-void fpusb_dev_close(fpusb_dev_handle *devh);
-int fpusb_dev_claim_intf(fpusb_dev_handle *dev, int iface);
-int fpusb_dev_release_intf(fpusb_dev_handle *dev, int iface);
+fpusb_dev_handle *fpusb_devh_open(fpusb_dev *dev);
+void fpusb_devh_close(fpusb_dev_handle *devh);
+int fpusb_devh_claim_intf(fpusb_dev_handle *dev, int iface);
+int fpusb_devh_release_intf(fpusb_dev_handle *dev, int iface);
 
 /* async I/O */
 
