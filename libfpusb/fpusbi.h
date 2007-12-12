@@ -175,7 +175,6 @@ struct fpusb_urb_handle {
 	timer_t timer;
 	unsigned char urb_type;
 	unsigned char endpoint;
-	void *msg;
 	int transfer_len;
 	int transferred;
 	unsigned char *buffer;
@@ -185,14 +184,6 @@ struct fpusb_urb_handle {
 };
 
 /* bus structures */
-
-struct usb_ctrl_setup {
-	uint8_t  bRequestType;
-	uint8_t  bRequest;
-	uint16_t wValue;
-	uint16_t wIndex;
-	uint16_t wLength;
-} __attribute__((packed));
 
 /* All standard descriptors have these 2 fields in common */
 struct usb_descriptor_header {

@@ -240,7 +240,6 @@ API_EXPORTED struct fpusb_urb_handle *fpusb_submit_ctrl_msg(
 		memcpy(urbdata + sizeof(struct usb_ctrl_setup), msg->data, msg->length);
 
 	urbh->urb_type = USB_URB_TYPE_CONTROL;
-	urbh->msg = msg;
 	urbh->buffer = urbdata;
 	urbh->transfer_len = urbdata_length;
 
@@ -275,7 +274,6 @@ static struct fpusb_urb_handle *submit_bulk_msg(struct fpusb_dev_handle *devh,
 	urbh->callback = callback;
 	urbh->user_data = user_data;
 	urbh->flags |= FPUSB_URBH_DATA_BELONGS_TO_USER;
-	urbh->msg = msg;
 	urbh->endpoint = msg->endpoint;
 	urbh->urb_type = urbtype;
 	urbh->buffer = msg->data;
@@ -352,15 +350,15 @@ int handle_transfer_completion(struct fpusb_dev_handle *devh,
 	if (urb->type == USB_URB_TYPE_CONTROL) {
 		fpusb_ctrl_cb_fn callback = urbh->callback;
 		if (callback)
-			callback(devh, urbh, urbh->msg, status,
+			callback(devh, urbh, status, urb->buffer,
 				urb->buffer + sizeof(struct usb_ctrl_setup), urbh->transferred,
 				urbh->user_data);
 	} else if (urb->type == USB_URB_TYPE_BULK ||
 			urb->type == USB_URB_TYPE_INTERRUPT) {
 		fpusb_bulk_cb_fn callback = urbh->callback;
 		if (callback)
-			callback(devh, urbh, urbh->msg, status, urbh->transferred,
-				urbh->user_data);
+			callback(devh, urbh, status, urbh->endpoint, urbh->transfer_len,
+				urbh->buffer, urbh->transferred, urbh->user_data);
 	}
 	return 0;
 }
@@ -570,8 +568,8 @@ struct sync_ctrl_handle {
 };
 
 static void ctrl_msg_cb(struct fpusb_dev_handle *devh,
-	struct fpusb_urb_handle *urbh, struct fpusb_ctrl_msg *msg,
-	enum fp_urb_cb_status status, unsigned char *data, int actual_length,
+	struct fpusb_urb_handle *urbh, enum fp_urb_cb_status status,
+	struct usb_ctrl_setup *setup, unsigned char *data, int actual_length,
 	void *user_data)
 {
 	struct sync_ctrl_handle *ctrlh = (struct sync_ctrl_handle *) user_data;
@@ -579,7 +577,7 @@ static void ctrl_msg_cb(struct fpusb_dev_handle *devh,
 
 	if (status == FP_URB_COMPLETED) {
 		/* copy results into user-defined buffer */
-		if (msg->requesttype & USB_ENDPOINT_IN)
+		if (setup->bRequestType & USB_ENDPOINT_IN)
 			memcpy(ctrlh->data, data, actual_length);
 	}
 
@@ -628,8 +626,9 @@ struct sync_bulk_handle {
 };
 
 static void bulk_msg_cb(struct fpusb_dev_handle *devh,
-	struct fpusb_urb_handle *urbh, struct fpusb_bulk_msg *msg,
-	enum fp_urb_cb_status status, int actual_length, void *user_data)
+	struct fpusb_urb_handle *urbh, enum fp_urb_cb_status status,
+	unsigned char endpoint, int rqlength, unsigned char *data,
+	int actual_length, void *user_data)
 {
 	struct sync_bulk_handle *bulkh = (struct sync_bulk_handle *) user_data;
 	fp_dbg("");

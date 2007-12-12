@@ -165,6 +165,16 @@ struct usb_config_descriptor {
 	int extralen;
 };
 
+/* off-the-wire structures */
+
+struct usb_ctrl_setup {
+	uint8_t  bRequestType;
+	uint8_t  bRequest;
+	uint16_t wValue;
+	uint16_t wIndex;
+	uint16_t wLength;
+} __attribute__((packed));
+
 /* fpusb */
 
 struct fpusb_dev;
@@ -193,7 +203,7 @@ struct fpusb_ctrl_msg {
 };
 
 typedef void (*fpusb_ctrl_cb_fn)(fpusb_dev_handle *devh, fpusb_urb_handle *urbh,
-	struct fpusb_ctrl_msg *msg, enum fp_urb_cb_status status,
+	enum fp_urb_cb_status status, struct usb_ctrl_setup *setup,
 	unsigned char *data, int actual_length, void *user_data);
 
 struct fpusb_bulk_msg {
@@ -203,8 +213,8 @@ struct fpusb_bulk_msg {
 };
 
 typedef void (*fpusb_bulk_cb_fn)(fpusb_dev_handle *devh, fpusb_urb_handle *urbh,
-	struct fpusb_bulk_msg *msg, enum fp_urb_cb_status status,
-	int actual_length, void *user_data);
+	enum fp_urb_cb_status status, unsigned char endpoint,
+	int rqlength, unsigned char *data, int actual_length, void *user_data);
 
 int fpusb_init(int signum);
 void fpusb_exit(void);

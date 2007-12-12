@@ -205,8 +205,8 @@ static int set_mode(unsigned char data)
 }
 
 static void cb_mode_changed(struct fpusb_dev_handle *_devh,
-	struct fpusb_urb_handle *urbh, struct fpusb_ctrl_msg *msg,
-	enum fp_urb_cb_status status, unsigned char *data, int actual_length,
+	struct fpusb_urb_handle *urbh, enum fp_urb_cb_status status,
+	struct usb_ctrl_setup *setup, unsigned char *data, int actual_length,
 	void *user_data)
 {
 	if (status != FP_URB_COMPLETED) {
@@ -336,10 +336,10 @@ static int next_state(void)
 }
 
 static void cb_irq(fpusb_dev_handle *_devh, fpusb_urb_handle *urbh,
-	struct fpusb_bulk_msg *msg, enum fp_urb_cb_status status,
-	int actual_length, void *user_data)
+	enum fp_urb_cb_status status, unsigned char endpoint, int rqlength,
+	unsigned char *data, int actual_length, void *user_data)
 {
-	unsigned char irqtype = msg->data[0];
+	unsigned char irqtype = data[0];
 
 	if (status != FP_URB_COMPLETED) {
 		fprintf(stderr, "irq URB status %d?\n", status);
@@ -375,8 +375,8 @@ static void cb_irq(fpusb_dev_handle *_devh, fpusb_urb_handle *urbh,
 }
 
 static void cb_img(fpusb_dev_handle *_devh, fpusb_urb_handle *urbh,
-	struct fpusb_bulk_msg *msg, enum fp_urb_cb_status status,
-	int actual_length, void *user_data)
+	enum fp_urb_cb_status status, unsigned char endpoint, int rqlength,
+	unsigned char *data, int actual_length, void *user_data)
 {
 	if (status != FP_URB_COMPLETED) {
 		fprintf(stderr, "img URB status %d?\n", status);
