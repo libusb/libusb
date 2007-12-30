@@ -41,7 +41,7 @@ AC_ARG_ENABLE([examples-build], [AS_HELP_STRING([--enable-examples-build],
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != "xno"])
 
 AC_DEFINE([API_EXPORTED], [__attribute__((visibility("default")))], [Default visibility])
-AM_CFLAGS="-Werror-implicit-function-declaration -Wimplicit-int -Wunreachable-code -Wunused-function -Wunused-label -Wunused-value -Wunused-variable -Wnonnull -Wreturn-type -Wextra -Wshadow"
+AM_CFLAGS="-std=gnu99 -fgnu89-inline -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration -Wno-pointer-sign -Wshadow"
 AC_SUBST(AM_CFLAGS)
 
 AC_CONFIG_FILES([fpusb.pc] [Makefile] [libfpusb/Makefile] [examples/Makefile])

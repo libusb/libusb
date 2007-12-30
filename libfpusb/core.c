@@ -158,7 +158,7 @@ static int scan_busdir(const char *busnum)
 		return -1;
 	}
 
-	while (entry = readdir(dir)) {
+	while ((entry = readdir(dir))) {
 		if (entry->d_name[0] == '.')
 			continue;
 		/* deliberately ignoring errors due to valid unplug race conditions */
@@ -180,7 +180,7 @@ API_EXPORTED int fpusb_find_devices(void)
 		return -1;
 	}
 
-	while (entry = readdir(busses)) {
+	while ((entry = readdir(busses))) {
 		if (entry->d_name[0] == '.')
 			continue;
 		/* deliberately ignoring errors, valid race conditions exist
