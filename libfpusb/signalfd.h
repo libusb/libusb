@@ -65,7 +65,7 @@ struct signalfd_siginfo {
 	uint32_t ssi_trapno;
 	int32_t ssi_status;
 	int32_t ssi_int;
-	uintptr_t ssi_ptr;
+	uint64_t ssi_ptr;
 	uint64_t ssi_utime;
 	uint64_t ssi_stime;
 	uint64_t ssi_addr;
