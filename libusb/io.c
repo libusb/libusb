@@ -196,14 +196,14 @@ static int submit_urb(struct libusb_dev_handle *devh,
 	return 0;
 }
 
-API_EXPORTED struct libusb_urb_handle *libusb_submit_ctrl_msg(
-	struct libusb_dev_handle *devh, struct libusb_ctrl_msg *msg,
+API_EXPORTED struct libusb_urb_handle *libusb_async_control_transfer(
+	struct libusb_dev_handle *devh, struct libusb_control_transfer *transfer,
 	libusb_ctrl_cb_fn callback, void *user_data, unsigned int timeout)
 {
 	struct libusb_urb_handle *urbh = malloc(sizeof(*urbh));
 	struct libusb_ctrl_setup *setup;
 	unsigned char *urbdata;
-	int urbdata_length = sizeof(struct libusb_ctrl_setup) + msg->length;
+	int urbdata_length = sizeof(struct libusb_ctrl_setup) + transfer->length;
 	int r;
 
 	if (!urbh)
@@ -225,17 +225,19 @@ API_EXPORTED struct libusb_urb_handle *libusb_submit_ctrl_msg(
 	}
 
 	fp_dbg("RQT=%02x RQ=%02x VAL=%04x IDX=%04x length=%d",
-		msg->requesttype, msg->request, msg->value, msg->index, msg->length);
+		transfer->requesttype, transfer->request, transfer->value,
+		transfer->index, transfer->length);
 
 	setup = (struct libusb_ctrl_setup *) urbdata;
-	setup->bRequestType = msg->requesttype;
-	setup->bRequest = msg->request;
-	setup->wValue = cpu_to_le16(msg->value);
-	setup->wIndex = cpu_to_le16(msg->index);
-	setup->wLength = cpu_to_le16(msg->length);
+	setup->bRequestType = transfer->requesttype;
+	setup->bRequest = transfer->request;
+	setup->wValue = cpu_to_le16(transfer->value);
+	setup->wIndex = cpu_to_le16(transfer->index);
+	setup->wLength = cpu_to_le16(transfer->length);
 
-	if ((msg->requesttype & 0x80) == LIBUSB_ENDPOINT_OUT)
-		memcpy(urbdata + sizeof(struct libusb_ctrl_setup), msg->data, msg->length);
+	if ((transfer->requesttype & 0x80) == LIBUSB_ENDPOINT_OUT)
+		memcpy(urbdata + sizeof(struct libusb_ctrl_setup), transfer->data,
+		transfer->length);
 
 	urbh->urb_type = USB_URB_TYPE_CONTROL;
 	urbh->buffer = urbdata;
@@ -251,14 +253,15 @@ API_EXPORTED struct libusb_urb_handle *libusb_submit_ctrl_msg(
 	return urbh;
 }
 
-static struct libusb_urb_handle *submit_bulk_msg(struct libusb_dev_handle *devh,
-	struct libusb_bulk_msg *msg, libusb_bulk_cb_fn callback, void *user_data,
-	unsigned int timeout, unsigned char urbtype)
+static struct libusb_urb_handle *submit_bulk_transfer(
+	struct libusb_dev_handle *devh, struct libusb_bulk_transfer *transfer,
+	libusb_bulk_cb_fn callback, void *user_data, unsigned int timeout,
+	unsigned char urbtype)
 {
 	struct libusb_urb_handle *urbh = malloc(sizeof(*urbh));
 	int r;
 
-	fp_dbg("length %d timeout %d", msg->length, timeout);
+	fp_dbg("length %d timeout %d", transfer->length, timeout);
 
 	if (!urbh)
 		return NULL;
@@ -272,10 +275,10 @@ static struct libusb_urb_handle *submit_bulk_msg(struct libusb_dev_handle *devh,
 	urbh->callback = callback;
 	urbh->user_data = user_data;
 	urbh->flags |= LIBUSB_URBH_DATA_BELONGS_TO_USER;
-	urbh->endpoint = msg->endpoint;
+	urbh->endpoint = transfer->endpoint;
 	urbh->urb_type = urbtype;
-	urbh->buffer = msg->data;
-	urbh->transfer_len = msg->length;
+	urbh->buffer = transfer->data;
+	urbh->transfer_len = transfer->length;
 
 	r = submit_urb(devh, urbh);
 	if (r < 0) {
@@ -286,19 +289,19 @@ static struct libusb_urb_handle *submit_bulk_msg(struct libusb_dev_handle *devh,
 	return urbh;
 }
 
-API_EXPORTED struct libusb_urb_handle *libusb_submit_bulk_msg(
-	struct libusb_dev_handle *devh, struct libusb_bulk_msg *msg,
+API_EXPORTED struct libusb_urb_handle *libusb_async_bulk_transfer(
+	struct libusb_dev_handle *devh, struct libusb_bulk_transfer *transfer,
 	libusb_bulk_cb_fn callback, void *user_data, unsigned int timeout)
 {
-	return submit_bulk_msg(devh, msg, callback, user_data, timeout,
+	return submit_bulk_transfer(devh, transfer, callback, user_data, timeout,
 		USB_URB_TYPE_BULK);
 }
 
-API_EXPORTED struct libusb_urb_handle *libusb_submit_intr_msg(
-	struct libusb_dev_handle *devh, struct libusb_bulk_msg *msg,
+API_EXPORTED struct libusb_urb_handle *libusb_async_interrupt_transfer(
+	struct libusb_dev_handle *devh, struct libusb_bulk_transfer *transfer,
 	libusb_bulk_cb_fn callback, void *user_data, unsigned int timeout)
 {
-	return submit_bulk_msg(devh, msg, callback, user_data, timeout,
+	return submit_bulk_transfer(devh, transfer, callback, user_data, timeout,
 		USB_URB_TYPE_INTERRUPT);
 }
 
@@ -565,7 +568,7 @@ struct sync_ctrl_handle {
 	int actual_length;
 };
 
-static void ctrl_msg_cb(struct libusb_dev_handle *devh,
+static void ctrl_transfer_cb(struct libusb_dev_handle *devh,
 	struct libusb_urb_handle *urbh, enum fp_urb_cb_status status,
 	struct libusb_ctrl_setup *setup, unsigned char *data, int actual_length,
 	void *user_data)
@@ -584,16 +587,17 @@ static void ctrl_msg_cb(struct libusb_dev_handle *devh,
 	/* caller frees urbh */
 }
 
-API_EXPORTED int libusb_ctrl_msg(struct libusb_dev_handle *devh,
-	struct libusb_ctrl_msg *msg, unsigned int timeout)
+API_EXPORTED int libusb_control_transfer(struct libusb_dev_handle *devh,
+	struct libusb_control_transfer *transfer, unsigned int timeout)
 {
 	struct libusb_urb_handle *urbh;
 	struct sync_ctrl_handle ctrlh;
 
 	memset(&ctrlh, 0, sizeof(ctrlh));
-	ctrlh.data = msg->data;
+	ctrlh.data = transfer->data;
 
-	urbh = libusb_submit_ctrl_msg(devh, msg, ctrl_msg_cb, &ctrlh, timeout);
+	urbh = libusb_async_control_transfer(devh, transfer, ctrl_transfer_cb,
+		&ctrlh, timeout);
 	if (!urbh)
 		return -1;
 
@@ -623,7 +627,7 @@ struct sync_bulk_handle {
 	int actual_length;
 };
 
-static void bulk_msg_cb(struct libusb_dev_handle *devh,
+static void bulk_transfer_cb(struct libusb_dev_handle *devh,
 	struct libusb_urb_handle *urbh, enum fp_urb_cb_status status,
 	unsigned char endpoint, int rqlength, unsigned char *data,
 	int actual_length, void *user_data)
@@ -635,16 +639,17 @@ static void bulk_msg_cb(struct libusb_dev_handle *devh,
 	/* caller frees urbh */
 }
 
-static int do_sync_bulk_msg(struct libusb_dev_handle *devh,
-	struct libusb_bulk_msg *msg, int *transferred, unsigned int timeout,
-	unsigned char urbtype)
+static int do_sync_bulk_transfer(struct libusb_dev_handle *devh,
+	struct libusb_bulk_transfer *transfer, int *transferred,
+	unsigned int timeout, unsigned char urbtype)
 {
 	struct libusb_urb_handle *urbh;
 	struct sync_bulk_handle bulkh;
 
 	memset(&bulkh, 0, sizeof(bulkh));
 
-	urbh = submit_bulk_msg(devh, msg, bulk_msg_cb, &bulkh, timeout, urbtype);
+	urbh = submit_bulk_transfer(devh, transfer, bulk_transfer_cb, &bulkh,
+		timeout, urbtype);
 	if (!urbh)
 		return -1;
 
@@ -671,17 +676,19 @@ static int do_sync_bulk_msg(struct libusb_dev_handle *devh,
 	}
 }
 
-API_EXPORTED int libusb_intr_msg(struct libusb_dev_handle *devh,
-	struct libusb_bulk_msg *msg, int *transferred, unsigned int timeout)
+API_EXPORTED int libusb_interrupt_transfer(struct libusb_dev_handle *devh,
+	struct libusb_bulk_transfer *transfer, int *transferred,
+	unsigned int timeout)
 {
-	return do_sync_bulk_msg(devh, msg, transferred, timeout,
+	return do_sync_bulk_transfer(devh, transfer, transferred, timeout,
 		USB_URB_TYPE_INTERRUPT);
 }
 
-API_EXPORTED int libusb_bulk_msg(struct libusb_dev_handle *devh,
-	struct libusb_bulk_msg *msg, int *transferred, unsigned int timeout)
+API_EXPORTED int libusb_bulk_transfer(struct libusb_dev_handle *devh,
+	struct libusb_bulk_transfer *transfer, int *transferred,
+	unsigned int timeout)
 {
-	return do_sync_bulk_msg(devh, msg, transferred, timeout,
+	return do_sync_bulk_transfer(devh, transfer, transferred, timeout,
 		USB_URB_TYPE_BULK);
 }
 

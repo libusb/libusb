@@ -191,7 +191,7 @@ enum fp_urb_cb_status {
 	FP_URB_CANCELLED,
 };
 
-struct libusb_ctrl_msg {
+struct libusb_control_transfer {
 	uint8_t requesttype;
 	uint8_t request;
 	uint16_t value;
@@ -204,7 +204,7 @@ typedef void (*libusb_ctrl_cb_fn)(libusb_dev_handle *devh, libusb_urb_handle *ur
 	enum fp_urb_cb_status status, struct libusb_ctrl_setup *setup,
 	unsigned char *data, int actual_length, void *user_data);
 
-struct libusb_bulk_msg {
+struct libusb_bulk_transfer {
 	unsigned char endpoint;
 	unsigned char *data;
 	int length;
@@ -231,15 +231,15 @@ int libusb_devh_release_intf(libusb_dev_handle *dev, int iface);
 
 /* async I/O */
 
-libusb_urb_handle *libusb_submit_ctrl_msg(libusb_dev_handle *devh,
-	struct libusb_ctrl_msg *msg, libusb_ctrl_cb_fn callback, void *user_data,
-	unsigned int timeout);
-libusb_urb_handle *libusb_submit_bulk_msg(libusb_dev_handle *devh,
-	struct libusb_bulk_msg *msg, libusb_bulk_cb_fn callback, void *user_data,
-	unsigned int timeout);
-libusb_urb_handle *libusb_submit_intr_msg(libusb_dev_handle *devh,
-	struct libusb_bulk_msg *msg, libusb_bulk_cb_fn callback, void *user_data,
-	unsigned int timeout);
+libusb_urb_handle *libusb_async_control_transfer(libusb_dev_handle *devh,
+	struct libusb_control_transfer *transfer, libusb_ctrl_cb_fn callback,
+	void *user_data, unsigned int timeout);
+libusb_urb_handle *libusb_async_bulk_transfer(libusb_dev_handle *devh,
+	struct libusb_bulk_transfer *transfer, libusb_bulk_cb_fn callback,
+	void *user_data, unsigned int timeout);
+libusb_urb_handle *libusb_async_interrupt_transfer(libusb_dev_handle *devh,
+	struct libusb_bulk_transfer *transfer, libusb_bulk_cb_fn callback,
+	void *user_data, unsigned int timeout);
 
 int libusb_urb_handle_cancel(libusb_dev_handle *devh, libusb_urb_handle *urbh);
 int libusb_urb_handle_cancel_sync(libusb_dev_handle *devh,
@@ -252,11 +252,13 @@ int libusb_get_pollfd(void);
 
 /* sync I/O */
 
-int libusb_ctrl_msg(libusb_dev_handle *devh, struct libusb_ctrl_msg *msg,
+int libusb_control_transfer(libusb_dev_handle *devh,
+	struct libusb_control_transfer *transfer, unsigned int timeout);
+int libusb_bulk_transfer(libusb_dev_handle *devh,
+	struct libusb_bulk_transfer *transfer, int *transferred,
 	unsigned int timeout);
-int libusb_bulk_msg(libusb_dev_handle *devh, struct libusb_bulk_msg *msg,
-	int *transferred, unsigned int timeout);
-int libusb_intr_msg(libusb_dev_handle *devh, struct libusb_bulk_msg *msg,
-	int *transferred, unsigned int timeout);
+int libusb_interrupt_transfer(libusb_dev_handle *devh,
+	struct libusb_bulk_transfer *transfer, int *transferred,
+	unsigned int timeout);
 
 #endif

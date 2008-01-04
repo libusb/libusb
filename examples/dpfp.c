@@ -66,13 +66,13 @@ static libusb_urb_handle *irq_urbh = NULL;
 static int img_idx = 0;
 static int do_exit = 0;
 
-static struct libusb_bulk_msg imgmsg = {
+static struct libusb_bulk_transfer imgtrf = {
 	.endpoint = EP_DATA,
 	.data = imgbuf,
 	.length = sizeof(imgbuf),
 };
 
-static struct libusb_bulk_msg irqmsg = {
+static struct libusb_bulk_transfer irqtrf = {
 	.endpoint = EP_INTR,
 	.data = irqbuf,
 	.length = sizeof(irqbuf),
@@ -96,7 +96,7 @@ static struct libusb_dev *find_dpfp_device(void)
 static int print_f0_data(void)
 {
 	unsigned char data[0x10];
-	struct libusb_ctrl_msg msg = {
+	struct libusb_control_transfer transfer = {
 		.requesttype = CTRL_IN,
 		.request = USB_RQ,
 		.value = 0xf0,
@@ -107,7 +107,7 @@ static int print_f0_data(void)
 	int r;
 	unsigned int i;
 
-	r = libusb_ctrl_msg(devh, &msg, 0);
+	r = libusb_control_transfer(devh, &transfer, 0);
 	if (r < 0) {
 		fprintf(stderr, "F0 error %d\n", r);
 		return r;
@@ -126,7 +126,7 @@ static int print_f0_data(void)
 
 static int get_hwstat(unsigned char *status)
 {
-	struct libusb_ctrl_msg msg = {
+	struct libusb_control_transfer transfer = {
 		.requesttype = CTRL_IN,
 		.request = USB_RQ,
 		.value = 0x07,
@@ -136,7 +136,7 @@ static int get_hwstat(unsigned char *status)
 	};
 	int r;
 
-	r = libusb_ctrl_msg(devh, &msg, 0);
+	r = libusb_control_transfer(devh, &transfer, 0);
 	if (r < 0) {
 		fprintf(stderr, "read hwstat error %d\n", r);
 		return r;
@@ -153,7 +153,7 @@ static int get_hwstat(unsigned char *status)
 static int set_hwstat(unsigned char data)
 {
 	int r;
-	struct libusb_ctrl_msg msg = {
+	struct libusb_control_transfer transfer = {
 		.requesttype = CTRL_OUT,
 		.request = USB_RQ,
 		.value = 0x07,
@@ -164,7 +164,7 @@ static int set_hwstat(unsigned char data)
 
 	printf("set hwstat to %02x\n", data);
 
-	r = libusb_ctrl_msg(devh, &msg, 0);
+	r = libusb_control_transfer(devh, &transfer, 0);
 	if (r < 0) {
 		fprintf(stderr, "set hwstat error %d\n", r);
 		return r;
@@ -180,7 +180,7 @@ static int set_hwstat(unsigned char data)
 static int set_mode(unsigned char data)
 {
 	int r;
-	struct libusb_ctrl_msg msg = {
+	struct libusb_control_transfer transfer = {
 		.requesttype = CTRL_OUT,
 		.request = USB_RQ,
 		.value = 0x4e,
@@ -191,7 +191,7 @@ static int set_mode(unsigned char data)
 
 	printf("set mode %02x\n", data);
 
-	r = libusb_ctrl_msg(devh, &msg, 0);
+	r = libusb_control_transfer(devh, &transfer, 0);
 	if (r < 0) {
 		fprintf(stderr, "set mode error %d\n", r);
 		return r;
@@ -222,7 +222,7 @@ static void cb_mode_changed(struct libusb_dev_handle *_devh,
 static int set_mode_async(unsigned char data)
 {
 	libusb_urb_handle *urbh;
-	struct libusb_ctrl_msg msg = {
+	struct libusb_control_transfer transfer = {
 		.requesttype = CTRL_OUT,
 		.request = USB_RQ,
 		.value = 0x4e,
@@ -233,7 +233,8 @@ static int set_mode_async(unsigned char data)
 
 	printf("async set mode %02x\n", data);
 
-	urbh = libusb_submit_ctrl_msg(devh, &msg, cb_mode_changed, NULL, 1000);
+	urbh = libusb_async_control_transfer(devh, &transfer, cb_mode_changed, NULL,
+		1000);
 	if (!urbh) {
 		fprintf(stderr, "set mode submit error\n");
 		return -1;
@@ -244,7 +245,7 @@ static int set_mode_async(unsigned char data)
 
 static int do_sync_intr(unsigned char *data)
 {
-	struct libusb_bulk_msg msg = {
+	struct libusb_bulk_transfer transfer = {
 		.endpoint = EP_INTR,
 		.data = data,
 		.length = INTR_LENGTH,
@@ -252,7 +253,7 @@ static int do_sync_intr(unsigned char *data)
 	int r;
 	int transferred;
 
-	r = libusb_intr_msg(devh, &msg, &transferred, 1000);
+	r = libusb_interrupt_transfer(devh, &transfer, &transferred, 1000);
 	if (r < 0) {
 		fprintf(stderr, "intr error %d\n", r);
 		return r;
@@ -397,14 +398,14 @@ static void cb_img(libusb_dev_handle *_devh, libusb_urb_handle *urbh,
 static int submit_irq_urb(void)
 {
 	libusb_urb_handle_free(irq_urbh);
-	irq_urbh = libusb_submit_intr_msg(devh, &irqmsg, cb_irq, NULL, 0);
+	irq_urbh = libusb_async_interrupt_transfer(devh, &irqtrf, cb_irq, NULL, 0);
 	return irq_urbh != NULL;
 }
 
 static int submit_img_urb(void)
 {
 	libusb_urb_handle_free(img_urbh);
-	img_urbh = libusb_submit_bulk_msg(devh, &imgmsg, cb_img, NULL, 0);
+	img_urbh = libusb_async_bulk_transfer(devh, &imgtrf, cb_img, NULL, 0);
 	return img_urbh != NULL;
 }
 
