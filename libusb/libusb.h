@@ -223,11 +223,11 @@ struct libusb_dev_descriptor *libusb_dev_get_descriptor(libusb_dev *dev);
 struct libusb_config_descriptor *libusb_dev_get_config(libusb_dev *dev);
 libusb_dev *libusb_dev_next(libusb_dev *dev);
 
-libusb_dev_handle *libusb_devh_open(libusb_dev *dev);
-void libusb_devh_close(libusb_dev_handle *devh);
+libusb_dev_handle *libusb_open(libusb_dev *dev);
+void libusb_close(libusb_dev_handle *devh);
 struct libusb_dev *libusb_devh_get_dev(libusb_dev_handle *devh);
-int libusb_devh_claim_intf(libusb_dev_handle *dev, int iface);
-int libusb_devh_release_intf(libusb_dev_handle *dev, int iface);
+int libusb_claim_interface(libusb_dev_handle *dev, int iface);
+int libusb_release_interface(libusb_dev_handle *dev, int iface);
 
 /* async I/O */
 

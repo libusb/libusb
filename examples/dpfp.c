@@ -486,14 +486,14 @@ int main(void)
 	}
 	printf("found device\n");
 
-	devh = libusb_devh_open(dev);
+	devh = libusb_open(dev);
 	if (!devh) {
 		fprintf(stderr, "Could not open device\n");
 		goto out;
 	}
 	printf("opened device\n");
 
-	r = libusb_devh_claim_intf(devh, 0);
+	r = libusb_claim_interface(devh, 0);
 	if (r < 0) {
 		fprintf(stderr, "usb_claim_interface error %d %s\n", r, strerror(-r));
 		goto out;
@@ -548,9 +548,9 @@ out_deinit:
 	set_mode(0);
 	set_hwstat(0x80);
 out_release:
-	libusb_devh_release_intf(devh, 0);
+	libusb_release_interface(devh, 0);
 out:
-	libusb_devh_close(devh);
+	libusb_close(devh);
 	libusb_exit();
 	return r >= 0 ? r : -r;
 }

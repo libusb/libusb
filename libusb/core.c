@@ -216,7 +216,7 @@ API_EXPORTED struct libusb_config_descriptor *libusb_dev_get_config(
 	return dev->config;
 }
 
-API_EXPORTED struct libusb_dev_handle *libusb_devh_open(struct libusb_dev *dev)
+API_EXPORTED struct libusb_dev_handle *libusb_open(struct libusb_dev *dev)
 {
 	struct libusb_dev_handle *devh;
 	int fd;
@@ -245,7 +245,7 @@ static void do_close(struct libusb_dev_handle *devh)
 	close(devh->fd);	
 }
 
-API_EXPORTED void libusb_devh_close(struct libusb_dev_handle *devh)
+API_EXPORTED void libusb_close(struct libusb_dev_handle *devh)
 {
 	if (!devh)
 		return;
@@ -261,7 +261,7 @@ API_EXPORTED struct libusb_dev *libusb_devh_get_dev(struct libusb_dev_handle *de
 	return devh->dev;
 }
 
-API_EXPORTED int libusb_devh_claim_intf(struct libusb_dev_handle *dev,
+API_EXPORTED int libusb_claim_interface(struct libusb_dev_handle *dev,
 	int iface)
 {
 	int r;
@@ -273,7 +273,7 @@ API_EXPORTED int libusb_devh_claim_intf(struct libusb_dev_handle *dev,
 	return r;
 }
 
-API_EXPORTED int libusb_devh_release_intf(struct libusb_dev_handle *dev,
+API_EXPORTED int libusb_release_interface(struct libusb_dev_handle *dev,
 	int iface)
 {
 	int r;
