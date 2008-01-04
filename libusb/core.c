@@ -168,17 +168,17 @@ static int scan_busdir(const char *busnum)
 
 API_EXPORTED int libusb_find_devices(void)
 {
-	DIR *busses;
+	DIR *buses;
 	struct dirent *entry;
 	fp_dbg("");
 
-	busses = opendir(USBFS_PATH);
-	if (!busses) {
-		fp_err("opendir busses failed errno=%d", errno);
+	buses = opendir(USBFS_PATH);
+	if (!buses) {
+		fp_err("opendir buses failed errno=%d", errno);
 		return -1;
 	}
 
-	while ((entry = readdir(busses))) {
+	while ((entry = readdir(buses))) {
 		if (entry->d_name[0] == '.')
 			continue;
 		/* deliberately ignoring errors, valid race conditions exist
