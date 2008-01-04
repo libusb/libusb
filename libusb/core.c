@@ -1,8 +1,6 @@
 /*
- * Core functions for libfpusb
+ * Core functions for libusb
  * Copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
- *
- * Portions based on libusb-0.1
  * Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -35,8 +33,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "fpusb.h"
-#include "fpusbi.h"
+#include "libusb.h"
+#include "libusbi.h"
 
 static struct list_head usb_devs;
 struct list_head open_devs;
@@ -45,7 +43,7 @@ static int scan_device(char *busdir, const char *devnum)
 {
 	char path[PATH_MAX + 1];
 	unsigned char raw_desc[DEVICE_DESC_LENGTH];
-	struct fpusb_dev *dev = malloc(sizeof(*dev));
+	struct libusb_dev *dev = malloc(sizeof(*dev));
 	int fd = 0;
 	int i;
 	int r;
@@ -168,7 +166,7 @@ static int scan_busdir(const char *busnum)
 	return 0;
 }
 
-API_EXPORTED int fpusb_find_devices(void)
+API_EXPORTED int libusb_find_devices(void)
 {
 	DIR *busses;
 	struct dirent *entry;
@@ -191,36 +189,36 @@ API_EXPORTED int fpusb_find_devices(void)
 	return 0;
 }
 
-API_EXPORTED struct fpusb_dev *fpusb_get_devices(void)
+API_EXPORTED struct libusb_dev *libusb_get_devices(void)
 {
 	if (list_empty(&usb_devs))
 		return NULL;
-	return list_entry(usb_devs.next, struct fpusb_dev, list);
+	return list_entry(usb_devs.next, struct libusb_dev, list);
 }
 
-API_EXPORTED struct fpusb_dev *fpusb_dev_next(struct fpusb_dev *dev)
+API_EXPORTED struct libusb_dev *libusb_dev_next(struct libusb_dev *dev)
 {
 	struct list_head *head = &dev->list;
 	if (!head || head->next == &usb_devs)
 		return NULL;
-	return list_entry(head->next, struct fpusb_dev, list);
+	return list_entry(head->next, struct libusb_dev, list);
 }
 
-API_EXPORTED struct usb_dev_descriptor *fpusb_dev_get_descriptor(
-	struct fpusb_dev *dev)
+API_EXPORTED struct usb_dev_descriptor *libusb_dev_get_descriptor(
+	struct libusb_dev *dev)
 {
 	return &dev->desc;
 }
 
-API_EXPORTED struct usb_config_descriptor *fpusb_dev_get_config(
-	struct fpusb_dev *dev)
+API_EXPORTED struct usb_config_descriptor *libusb_dev_get_config(
+	struct libusb_dev *dev)
 {
 	return dev->config;
 }
 
-API_EXPORTED struct fpusb_dev_handle *fpusb_devh_open(struct fpusb_dev *dev)
+API_EXPORTED struct libusb_dev_handle *libusb_devh_open(struct libusb_dev *dev)
 {
-	struct fpusb_dev_handle *devh;
+	struct libusb_dev_handle *devh;
 	int fd;
 	fp_dbg("open %04x:%04x", dev->desc.idVendor, dev->desc.idProduct);
 
@@ -242,12 +240,12 @@ API_EXPORTED struct fpusb_dev_handle *fpusb_devh_open(struct fpusb_dev *dev)
 	return devh;
 }
 
-static void do_close(struct fpusb_dev_handle *devh)
+static void do_close(struct libusb_dev_handle *devh)
 {
 	close(devh->fd);	
 }
 
-API_EXPORTED void fpusb_devh_close(struct fpusb_dev_handle *devh)
+API_EXPORTED void libusb_devh_close(struct libusb_dev_handle *devh)
 {
 	if (!devh)
 		return;
@@ -258,12 +256,12 @@ API_EXPORTED void fpusb_devh_close(struct fpusb_dev_handle *devh)
 	free(devh);
 }
 
-API_EXPORTED struct fpusb_dev *fpusb_devh_get_dev(struct fpusb_dev_handle *devh)
+API_EXPORTED struct libusb_dev *libusb_devh_get_dev(struct libusb_dev_handle *devh)
 {
 	return devh->dev;
 }
 
-API_EXPORTED int fpusb_devh_claim_intf(struct fpusb_dev_handle *dev,
+API_EXPORTED int libusb_devh_claim_intf(struct libusb_dev_handle *dev,
 	int iface)
 {
 	int r;
@@ -275,7 +273,7 @@ API_EXPORTED int fpusb_devh_claim_intf(struct fpusb_dev_handle *dev,
 	return r;
 }
 
-API_EXPORTED int fpusb_devh_release_intf(struct fpusb_dev_handle *dev,
+API_EXPORTED int libusb_devh_release_intf(struct libusb_dev_handle *dev,
 	int iface)
 {
 	int r;
@@ -287,7 +285,7 @@ API_EXPORTED int fpusb_devh_release_intf(struct fpusb_dev_handle *dev,
 	return r;
 }
 
-API_EXPORTED int fpusb_init(int signum)
+API_EXPORTED int libusb_init(int signum)
 {
 	/* FIXME: find correct usb node path */
 	fp_dbg("");
@@ -296,9 +294,9 @@ API_EXPORTED int fpusb_init(int signum)
 	return fpi_io_init(signum);
 }
 
-API_EXPORTED void fpusb_exit(void)
+API_EXPORTED void libusb_exit(void)
 {
-	struct fpusb_dev_handle *devh;
+	struct libusb_dev_handle *devh;
 	fp_dbg("");
 	if (!list_empty(&open_devs)) {
 		fp_dbg("naughty app left some devices open!\n");
@@ -337,7 +335,7 @@ void fpi_log(enum fpi_log_level level, const char *function,
 		break;
 	}
 
-	fprintf(stream, "fpusb:%s [%s] ", prefix, function);
+	fprintf(stream, "libusb:%s [%s] ", prefix, function);
 
 	va_start (args, format);
 	vfprintf(stream, format, args);

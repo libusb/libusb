@@ -20,8 +20,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef __FPUSB_SIGNALFD_H__
-#define __FPUSB_SIGNALFD_H__
+#ifndef __LIBUSB_SIGNALFD_H__
+#define __LIBUSB_SIGNALFD_H__
 
 /* FIXME: in future, remove this and unconditionally use glibc directly when
  * glibc-2.8 is widespread */

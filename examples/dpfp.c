@@ -1,5 +1,5 @@
 /*
- * fpusb example program to manipulate U.are.U 4000B fingerprint scanner.
+ * libusb example program to manipulate U.are.U 4000B fingerprint scanner.
  * Copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
  *
  * Basic image capture program only, does not consider the powerup quirks or
@@ -26,7 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <libfpusb/fpusb.h>
+#include <libusb/libusb.h>
 
 #define EP_INTR			(1 | USB_ENDPOINT_IN)
 #define EP_DATA			(2 | USB_ENDPOINT_IN)
@@ -58,34 +58,34 @@ enum {
 };
 
 static int state = 0;
-static struct fpusb_dev_handle *devh = NULL;
+static struct libusb_dev_handle *devh = NULL;
 static unsigned char imgbuf[0x1b340];
 static unsigned char irqbuf[INTR_LENGTH];
-static fpusb_urb_handle *img_urbh = NULL;
-static fpusb_urb_handle *irq_urbh = NULL;
+static libusb_urb_handle *img_urbh = NULL;
+static libusb_urb_handle *irq_urbh = NULL;
 static int img_idx = 0;
 static int do_exit = 0;
 
-static struct fpusb_bulk_msg imgmsg = {
+static struct libusb_bulk_msg imgmsg = {
 	.endpoint = EP_DATA,
 	.data = imgbuf,
 	.length = sizeof(imgbuf),
 };
 
-static struct fpusb_bulk_msg irqmsg = {
+static struct libusb_bulk_msg irqmsg = {
 	.endpoint = EP_INTR,
 	.data = irqbuf,
 	.length = sizeof(irqbuf),
 };
 
-static struct fpusb_dev *find_dpfp_device(void)
+static struct libusb_dev *find_dpfp_device(void)
 {
-	struct fpusb_dev *dev;
+	struct libusb_dev *dev;
 
-	fpusb_find_devices();
+	libusb_find_devices();
 
-	for (dev = fpusb_get_devices(); dev; dev = fpusb_dev_next(dev)) {
-		struct usb_dev_descriptor *desc = fpusb_dev_get_descriptor(dev);
+	for (dev = libusb_get_devices(); dev; dev = libusb_dev_next(dev)) {
+		struct usb_dev_descriptor *desc = libusb_dev_get_descriptor(dev);
 		if (desc->idVendor == 0x05ba && desc->idProduct == 0x000a)
 			return dev;
 	}
@@ -96,7 +96,7 @@ static struct fpusb_dev *find_dpfp_device(void)
 static int print_f0_data(void)
 {
 	unsigned char data[0x10];
-	struct fpusb_ctrl_msg msg = {
+	struct libusb_ctrl_msg msg = {
 		.requesttype = CTRL_IN,
 		.request = USB_RQ,
 		.value = 0xf0,
@@ -107,7 +107,7 @@ static int print_f0_data(void)
 	int r;
 	unsigned int i;
 
-	r = fpusb_ctrl_msg(devh, &msg, 0);
+	r = libusb_ctrl_msg(devh, &msg, 0);
 	if (r < 0) {
 		fprintf(stderr, "F0 error %d\n", r);
 		return r;
@@ -126,7 +126,7 @@ static int print_f0_data(void)
 
 static int get_hwstat(unsigned char *status)
 {
-	struct fpusb_ctrl_msg msg = {
+	struct libusb_ctrl_msg msg = {
 		.requesttype = CTRL_IN,
 		.request = USB_RQ,
 		.value = 0x07,
@@ -136,7 +136,7 @@ static int get_hwstat(unsigned char *status)
 	};
 	int r;
 
-	r = fpusb_ctrl_msg(devh, &msg, 0);
+	r = libusb_ctrl_msg(devh, &msg, 0);
 	if (r < 0) {
 		fprintf(stderr, "read hwstat error %d\n", r);
 		return r;
@@ -153,7 +153,7 @@ static int get_hwstat(unsigned char *status)
 static int set_hwstat(unsigned char data)
 {
 	int r;
-	struct fpusb_ctrl_msg msg = {
+	struct libusb_ctrl_msg msg = {
 		.requesttype = CTRL_OUT,
 		.request = USB_RQ,
 		.value = 0x07,
@@ -164,7 +164,7 @@ static int set_hwstat(unsigned char data)
 
 	printf("set hwstat to %02x\n", data);
 
-	r = fpusb_ctrl_msg(devh, &msg, 0);
+	r = libusb_ctrl_msg(devh, &msg, 0);
 	if (r < 0) {
 		fprintf(stderr, "set hwstat error %d\n", r);
 		return r;
@@ -180,7 +180,7 @@ static int set_hwstat(unsigned char data)
 static int set_mode(unsigned char data)
 {
 	int r;
-	struct fpusb_ctrl_msg msg = {
+	struct libusb_ctrl_msg msg = {
 		.requesttype = CTRL_OUT,
 		.request = USB_RQ,
 		.value = 0x4e,
@@ -191,7 +191,7 @@ static int set_mode(unsigned char data)
 
 	printf("set mode %02x\n", data);
 
-	r = fpusb_ctrl_msg(devh, &msg, 0);
+	r = libusb_ctrl_msg(devh, &msg, 0);
 	if (r < 0) {
 		fprintf(stderr, "set mode error %d\n", r);
 		return r;
@@ -204,8 +204,8 @@ static int set_mode(unsigned char data)
 	return 0;
 }
 
-static void cb_mode_changed(struct fpusb_dev_handle *_devh,
-	struct fpusb_urb_handle *urbh, enum fp_urb_cb_status status,
+static void cb_mode_changed(struct libusb_dev_handle *_devh,
+	struct libusb_urb_handle *urbh, enum fp_urb_cb_status status,
 	struct usb_ctrl_setup *setup, unsigned char *data, int actual_length,
 	void *user_data)
 {
@@ -221,8 +221,8 @@ static void cb_mode_changed(struct fpusb_dev_handle *_devh,
 
 static int set_mode_async(unsigned char data)
 {
-	fpusb_urb_handle *urbh;
-	struct fpusb_ctrl_msg msg = {
+	libusb_urb_handle *urbh;
+	struct libusb_ctrl_msg msg = {
 		.requesttype = CTRL_OUT,
 		.request = USB_RQ,
 		.value = 0x4e,
@@ -233,7 +233,7 @@ static int set_mode_async(unsigned char data)
 
 	printf("async set mode %02x\n", data);
 
-	urbh = fpusb_submit_ctrl_msg(devh, &msg, cb_mode_changed, NULL, 1000);
+	urbh = libusb_submit_ctrl_msg(devh, &msg, cb_mode_changed, NULL, 1000);
 	if (!urbh) {
 		fprintf(stderr, "set mode submit error\n");
 		return -1;
@@ -244,7 +244,7 @@ static int set_mode_async(unsigned char data)
 
 static int do_sync_intr(unsigned char *data)
 {
-	struct fpusb_bulk_msg msg = {
+	struct libusb_bulk_msg msg = {
 		.endpoint = EP_INTR,
 		.data = data,
 		.length = INTR_LENGTH,
@@ -252,7 +252,7 @@ static int do_sync_intr(unsigned char *data)
 	int r;
 	int transferred;
 
-	r = fpusb_intr_msg(devh, &msg, &transferred, 1000);
+	r = libusb_intr_msg(devh, &msg, &transferred, 1000);
 	if (r < 0) {
 		fprintf(stderr, "intr error %d\n", r);
 		return r;
@@ -335,7 +335,7 @@ static int next_state(void)
 	return 0;
 }
 
-static void cb_irq(fpusb_dev_handle *_devh, fpusb_urb_handle *urbh,
+static void cb_irq(libusb_dev_handle *_devh, libusb_urb_handle *urbh,
 	enum fp_urb_cb_status status, unsigned char endpoint, int rqlength,
 	unsigned char *data, int actual_length, void *user_data)
 {
@@ -374,7 +374,7 @@ static void cb_irq(fpusb_dev_handle *_devh, fpusb_urb_handle *urbh,
 		do_exit = 2;
 }
 
-static void cb_img(fpusb_dev_handle *_devh, fpusb_urb_handle *urbh,
+static void cb_img(libusb_dev_handle *_devh, libusb_urb_handle *urbh,
 	enum fp_urb_cb_status status, unsigned char endpoint, int rqlength,
 	unsigned char *data, int actual_length, void *user_data)
 {
@@ -396,15 +396,15 @@ static void cb_img(fpusb_dev_handle *_devh, fpusb_urb_handle *urbh,
 
 static int submit_irq_urb(void)
 {
-	fpusb_urb_handle_free(irq_urbh);
-	irq_urbh = fpusb_submit_intr_msg(devh, &irqmsg, cb_irq, NULL, 0);
+	libusb_urb_handle_free(irq_urbh);
+	irq_urbh = libusb_submit_intr_msg(devh, &irqmsg, cb_irq, NULL, 0);
 	return irq_urbh != NULL;
 }
 
 static int submit_img_urb(void)
 {
-	fpusb_urb_handle_free(img_urbh);
-	img_urbh = fpusb_submit_bulk_msg(devh, &imgmsg, cb_img, NULL, 0);
+	libusb_urb_handle_free(img_urbh);
+	img_urbh = libusb_submit_bulk_msg(devh, &imgmsg, cb_img, NULL, 0);
 	return img_urbh != NULL;
 }
 
@@ -418,7 +418,7 @@ static int init_capture(void)
 
 	r = submit_img_urb();
 	if (r < 0) {
-		fpusb_urb_handle_cancel_sync(devh, img_urbh);
+		libusb_urb_handle_cancel_sync(devh, img_urbh);
 		return r;
 	}
 
@@ -468,13 +468,13 @@ static void sighandler(int signum)
 
 int main(void)
 {
-	struct fpusb_dev *dev;
+	struct libusb_dev *dev;
 	struct sigaction sigact;
 	int r = 1;
 
-	r = fpusb_init(0);
+	r = libusb_init(0);
 	if (r < 0) {
-		fprintf(stderr, "failed to initialise fpusb\n");
+		fprintf(stderr, "failed to initialise libusb\n");
 		exit(1);
 	}
 
@@ -485,14 +485,14 @@ int main(void)
 	}
 	printf("found device\n");
 
-	devh = fpusb_devh_open(dev);
+	devh = libusb_devh_open(dev);
 	if (!devh) {
 		fprintf(stderr, "Could not open device\n");
 		goto out;
 	}
 	printf("opened device\n");
 
-	r = fpusb_devh_claim_intf(devh, 0);
+	r = libusb_devh_claim_intf(devh, 0);
 	if (r < 0) {
 		fprintf(stderr, "usb_claim_interface error %d %s\n", r, strerror(-r));
 		goto out;
@@ -521,18 +521,18 @@ int main(void)
 	sigaction(SIGQUIT, &sigact, NULL);
 
 	while (!do_exit) {
-		r = fpusb_poll();
+		r = libusb_poll();
 		if (r < 0)
 			goto out_deinit;
 	}
 
 	printf("shutting down...\n");
 
-	r = fpusb_urb_handle_cancel_sync(devh, irq_urbh);
+	r = libusb_urb_handle_cancel_sync(devh, irq_urbh);
 	if (r < 0)
 		goto out_deinit;
 
-	r = fpusb_urb_handle_cancel_sync(devh, img_urbh);
+	r = libusb_urb_handle_cancel_sync(devh, img_urbh);
 	if (r < 0)
 		goto out_deinit;
 	
@@ -542,15 +542,15 @@ int main(void)
 		r = 1;
 
 out_deinit:
-	fpusb_urb_handle_free(img_urbh);
-	fpusb_urb_handle_free(irq_urbh);
+	libusb_urb_handle_free(img_urbh);
+	libusb_urb_handle_free(irq_urbh);
 	set_mode(0);
 	set_hwstat(0x80);
 out_release:
-	fpusb_devh_release_intf(devh, 0);
+	libusb_devh_release_intf(devh, 0);
 out:
-	fpusb_devh_close(devh);
-	fpusb_exit();
+	libusb_devh_close(devh);
+	libusb_exit();
 	return r >= 0 ? r : -r;
 }
 

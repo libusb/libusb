@@ -1,14 +1,14 @@
 AUTOMAKE_OPTIONS = dist-bzip2
-DISTCLEANFILES = ChangeLog fpusb.pc
+DISTCLEANFILES = ChangeLog libusb-1.0.pc
 EXTRA_DIST = TODO
-SUBDIRS = libfpusb
+SUBDIRS = libusb
 
 if BUILD_EXAMPLES
 SUBDIRS += examples
 endif
 
 pkgconfigdir=$(libdir)/pkgconfig
-pkgconfig_DATA=fpusb.pc
+pkgconfig_DATA=libusb-1.0.pc
 
 .PHONY: ChangeLog dist-up
 ChangeLog:

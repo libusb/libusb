@@ -1,8 +1,6 @@
 /*
- * I/O functions for libfpusb
+ * I/O functions for libusb
  * Copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
- *
- * Portions based on libusb-0.1
  * Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -41,7 +39,7 @@
 #include "signalfd.h"
 #endif
 
-#include "fpusbi.h"
+#include "libusbi.h"
 
 static int sigfd;
 static int signum;
@@ -85,7 +83,7 @@ void fpi_io_exit(void)
 	close(sigfd);
 }
 
-static int calculate_timeout(struct fpusb_urb_handle *urbh,
+static int calculate_timeout(struct libusb_urb_handle *urbh,
 	unsigned int timeout)
 {
 	int r;
@@ -133,9 +131,9 @@ static int calculate_timeout(struct fpusb_urb_handle *urbh,
 	return 0;
 }
 
-static void add_to_flying_list(struct fpusb_urb_handle *urbh)
+static void add_to_flying_list(struct libusb_urb_handle *urbh)
 {
-	struct fpusb_urb_handle *cur;
+	struct libusb_urb_handle *cur;
 	struct timespec *timeout = &urbh->timeout;
 
 	/* if we have no other flying urbs, start the list with this one */
@@ -167,8 +165,8 @@ static void add_to_flying_list(struct fpusb_urb_handle *urbh)
 	list_add_tail(&urbh->list, &flying_urbs);
 }
 
-static int submit_urb(struct fpusb_dev_handle *devh,
-	struct fpusb_urb_handle *urbh)
+static int submit_urb(struct libusb_dev_handle *devh,
+	struct libusb_urb_handle *urbh)
 {
 	int r;
 	struct usb_urb *urb = &urbh->urb;
@@ -198,11 +196,11 @@ static int submit_urb(struct fpusb_dev_handle *devh,
 	return 0;
 }
 
-API_EXPORTED struct fpusb_urb_handle *fpusb_submit_ctrl_msg(
-	struct fpusb_dev_handle *devh, struct fpusb_ctrl_msg *msg,
-	fpusb_ctrl_cb_fn callback, void *user_data, unsigned int timeout)
+API_EXPORTED struct libusb_urb_handle *libusb_submit_ctrl_msg(
+	struct libusb_dev_handle *devh, struct libusb_ctrl_msg *msg,
+	libusb_ctrl_cb_fn callback, void *user_data, unsigned int timeout)
 {
-	struct fpusb_urb_handle *urbh = malloc(sizeof(*urbh));
+	struct libusb_urb_handle *urbh = malloc(sizeof(*urbh));
 	struct usb_ctrl_setup *setup;
 	unsigned char *urbdata;
 	int urbdata_length = sizeof(struct usb_ctrl_setup) + msg->length;
@@ -253,11 +251,11 @@ API_EXPORTED struct fpusb_urb_handle *fpusb_submit_ctrl_msg(
 	return urbh;
 }
 
-static struct fpusb_urb_handle *submit_bulk_msg(struct fpusb_dev_handle *devh,
-	struct fpusb_bulk_msg *msg, fpusb_bulk_cb_fn callback, void *user_data,
+static struct libusb_urb_handle *submit_bulk_msg(struct libusb_dev_handle *devh,
+	struct libusb_bulk_msg *msg, libusb_bulk_cb_fn callback, void *user_data,
 	unsigned int timeout, unsigned char urbtype)
 {
-	struct fpusb_urb_handle *urbh = malloc(sizeof(*urbh));
+	struct libusb_urb_handle *urbh = malloc(sizeof(*urbh));
 	int r;
 
 	fp_dbg("length %d timeout %d", msg->length, timeout);
@@ -273,7 +271,7 @@ static struct fpusb_urb_handle *submit_bulk_msg(struct fpusb_dev_handle *devh,
 	urbh->devh = devh;
 	urbh->callback = callback;
 	urbh->user_data = user_data;
-	urbh->flags |= FPUSB_URBH_DATA_BELONGS_TO_USER;
+	urbh->flags |= LIBUSB_URBH_DATA_BELONGS_TO_USER;
 	urbh->endpoint = msg->endpoint;
 	urbh->urb_type = urbtype;
 	urbh->buffer = msg->data;
@@ -288,24 +286,24 @@ static struct fpusb_urb_handle *submit_bulk_msg(struct fpusb_dev_handle *devh,
 	return urbh;
 }
 
-API_EXPORTED struct fpusb_urb_handle *fpusb_submit_bulk_msg(
-	struct fpusb_dev_handle *devh, struct fpusb_bulk_msg *msg,
-	fpusb_bulk_cb_fn callback, void *user_data, unsigned int timeout)
+API_EXPORTED struct libusb_urb_handle *libusb_submit_bulk_msg(
+	struct libusb_dev_handle *devh, struct libusb_bulk_msg *msg,
+	libusb_bulk_cb_fn callback, void *user_data, unsigned int timeout)
 {
 	return submit_bulk_msg(devh, msg, callback, user_data, timeout,
 		USB_URB_TYPE_BULK);
 }
 
-API_EXPORTED struct fpusb_urb_handle *fpusb_submit_intr_msg(
-	struct fpusb_dev_handle *devh, struct fpusb_bulk_msg *msg,
-	fpusb_bulk_cb_fn callback, void *user_data, unsigned int timeout)
+API_EXPORTED struct libusb_urb_handle *libusb_submit_intr_msg(
+	struct libusb_dev_handle *devh, struct libusb_bulk_msg *msg,
+	libusb_bulk_cb_fn callback, void *user_data, unsigned int timeout)
 {
 	return submit_bulk_msg(devh, msg, callback, user_data, timeout,
 		USB_URB_TYPE_INTERRUPT);
 }
 
-API_EXPORTED int fpusb_urb_handle_cancel(struct fpusb_dev_handle *devh,
-	struct fpusb_urb_handle *urbh)
+API_EXPORTED int libusb_urb_handle_cancel(struct libusb_dev_handle *devh,
+	struct libusb_urb_handle *urbh)
 {
 	int r;
 	fp_dbg("");
@@ -315,8 +313,8 @@ API_EXPORTED int fpusb_urb_handle_cancel(struct fpusb_dev_handle *devh,
 	return r;
 }
 
-API_EXPORTED int fpusb_urb_handle_cancel_sync(struct fpusb_dev_handle *devh,
-	struct fpusb_urb_handle *urbh)
+API_EXPORTED int libusb_urb_handle_cancel_sync(struct libusb_dev_handle *devh,
+	struct libusb_urb_handle *urbh)
 {
 	int r;
 	fp_dbg("");
@@ -326,9 +324,9 @@ API_EXPORTED int fpusb_urb_handle_cancel_sync(struct fpusb_dev_handle *devh,
 		return r;
 	}
 
-	urbh->flags |= FPUSB_URBH_SYNC_CANCELLED;
-	while (urbh->flags & FPUSB_URBH_SYNC_CANCELLED) {
-		r = fpusb_poll();
+	urbh->flags |= LIBUSB_URBH_SYNC_CANCELLED;
+	while (urbh->flags & LIBUSB_URBH_SYNC_CANCELLED) {
+		r = libusb_poll();
 		if (r < 0)
 			return r;
 	}
@@ -336,8 +334,8 @@ API_EXPORTED int fpusb_urb_handle_cancel_sync(struct fpusb_dev_handle *devh,
 	return 0;
 }
 
-int handle_transfer_completion(struct fpusb_dev_handle *devh,
-	struct fpusb_urb_handle *urbh, enum fp_urb_cb_status status)
+int handle_transfer_completion(struct libusb_dev_handle *devh,
+	struct libusb_urb_handle *urbh, enum fp_urb_cb_status status)
 {
 	struct usb_urb *urb = &urbh->urb;
 
@@ -348,14 +346,14 @@ int handle_transfer_completion(struct fpusb_dev_handle *devh,
 		return 0;
 
 	if (urb->type == USB_URB_TYPE_CONTROL) {
-		fpusb_ctrl_cb_fn callback = urbh->callback;
+		libusb_ctrl_cb_fn callback = urbh->callback;
 		if (callback)
 			callback(devh, urbh, status, urb->buffer,
 				urb->buffer + sizeof(struct usb_ctrl_setup), urbh->transferred,
 				urbh->user_data);
 	} else if (urb->type == USB_URB_TYPE_BULK ||
 			urb->type == USB_URB_TYPE_INTERRUPT) {
-		fpusb_bulk_cb_fn callback = urbh->callback;
+		libusb_bulk_cb_fn callback = urbh->callback;
 		if (callback)
 			callback(devh, urbh, status, urbh->endpoint, urbh->transfer_len,
 				urbh->buffer, urbh->transferred, urbh->user_data);
@@ -363,21 +361,21 @@ int handle_transfer_completion(struct fpusb_dev_handle *devh,
 	return 0;
 }
 
-static int handle_transfer_cancellation(struct fpusb_dev_handle *devh,
-	struct fpusb_urb_handle *urbh)
+static int handle_transfer_cancellation(struct libusb_dev_handle *devh,
+	struct libusb_urb_handle *urbh)
 {
 	/* if the URB is being cancelled synchronously, raise cancellation
 	 * completion event by unsetting flag, and ensure that user callback does
 	 * not get called.
 	 */
-	if (urbh->flags & FPUSB_URBH_SYNC_CANCELLED) {
-		urbh->flags &= ~FPUSB_URBH_SYNC_CANCELLED;
+	if (urbh->flags & LIBUSB_URBH_SYNC_CANCELLED) {
+		urbh->flags &= ~LIBUSB_URBH_SYNC_CANCELLED;
 		fp_dbg("detected sync. cancel");
 		return handle_transfer_completion(devh, urbh, FP_URB_SILENT_COMPLETION);
 	}
 
 	/* if the URB was cancelled due to timeout, report timeout to the user */
-	if (urbh->flags & FPUSB_URBH_TIMED_OUT) {
+	if (urbh->flags & LIBUSB_URBH_TIMED_OUT) {
 		fp_dbg("detected timeout cancellation");
 		return handle_transfer_completion(devh, urbh, FP_URB_TIMEOUT);
 	}
@@ -386,11 +384,11 @@ static int handle_transfer_cancellation(struct fpusb_dev_handle *devh,
 	return handle_transfer_completion(devh, urbh, FP_URB_CANCELLED);
 }
 
-static int reap_for_devh(struct fpusb_dev_handle *devh)
+static int reap_for_devh(struct libusb_dev_handle *devh)
 {
 	int r;
 	struct usb_urb *urb;
-	struct fpusb_urb_handle *urbh;
+	struct libusb_urb_handle *urbh;
 	int trf_requested;
 
 	r = ioctl(devh->fd, IOCTL_USB_REAPURBNDELAY, &urb);
@@ -401,7 +399,7 @@ static int reap_for_devh(struct fpusb_dev_handle *devh)
 		return r;
 	}
 
-	urbh = container_of(urb, struct fpusb_urb_handle, urb);
+	urbh = container_of(urb, struct libusb_urb_handle, urb);
 
 	fp_dbg("urb type=%d status=%d transferred=%d", urb->type, urb->status,
 		urb->actual_length);
@@ -439,7 +437,7 @@ static int reap_for_devh(struct fpusb_dev_handle *devh)
 	return submit_urb(devh, urbh);
 }
 
-static void handle_timeout(struct fpusb_urb_handle *urbh)
+static void handle_timeout(struct libusb_urb_handle *urbh)
 {
 	/* handling timeouts is tricky, as we may race with the kernel: we may
 	 * detect a timeout racing with the condition that the urb has actually
@@ -449,8 +447,8 @@ static void handle_timeout(struct fpusb_urb_handle *urbh)
 	int r;
 
 
-	urbh->flags |= FPUSB_URBH_TIMED_OUT;
-	r = fpusb_urb_handle_cancel(urbh->devh, urbh);
+	urbh->flags |= LIBUSB_URBH_TIMED_OUT;
+	r = libusb_urb_handle_cancel(urbh->devh, urbh);
 	if (r < 0)
 		fp_warn("async cancel failed %d errno=%d", r, errno);
 }
@@ -458,7 +456,7 @@ static void handle_timeout(struct fpusb_urb_handle *urbh)
 static int handle_timeouts(void)
 {
 	struct timespec systime;
-	struct fpusb_urb_handle *urbh;
+	struct libusb_urb_handle *urbh;
 	int r;
 
 	if (list_empty(&flying_urbs))
@@ -493,7 +491,7 @@ static int handle_timeouts(void)
 
 static int reap(void)
 {
-	struct fpusb_dev_handle *devh;
+	struct libusb_dev_handle *devh;
 	int r;
 
 	list_for_each_entry(devh, &open_devs, list) {
@@ -548,12 +546,12 @@ static int poll_io(struct timeval *tv)
 	return 0;
 }
 
-API_EXPORTED int fpusb_poll_timeout(struct timeval *tv)
+API_EXPORTED int libusb_poll_timeout(struct timeval *tv)
 {
 	return poll_io(tv);
 }
 
-API_EXPORTED int fpusb_poll(void)
+API_EXPORTED int libusb_poll(void)
 {
 	struct timeval tv;
 	tv.tv_sec = 0;
@@ -567,8 +565,8 @@ struct sync_ctrl_handle {
 	int actual_length;
 };
 
-static void ctrl_msg_cb(struct fpusb_dev_handle *devh,
-	struct fpusb_urb_handle *urbh, enum fp_urb_cb_status status,
+static void ctrl_msg_cb(struct libusb_dev_handle *devh,
+	struct libusb_urb_handle *urbh, enum fp_urb_cb_status status,
 	struct usb_ctrl_setup *setup, unsigned char *data, int actual_length,
 	void *user_data)
 {
@@ -586,29 +584,29 @@ static void ctrl_msg_cb(struct fpusb_dev_handle *devh,
 	/* caller frees urbh */
 }
 
-API_EXPORTED int fpusb_ctrl_msg(struct fpusb_dev_handle *devh,
-	struct fpusb_ctrl_msg *msg, unsigned int timeout)
+API_EXPORTED int libusb_ctrl_msg(struct libusb_dev_handle *devh,
+	struct libusb_ctrl_msg *msg, unsigned int timeout)
 {
-	struct fpusb_urb_handle *urbh;
+	struct libusb_urb_handle *urbh;
 	struct sync_ctrl_handle ctrlh;
 
 	memset(&ctrlh, 0, sizeof(ctrlh));
 	ctrlh.data = msg->data;
 
-	urbh = fpusb_submit_ctrl_msg(devh, msg, ctrl_msg_cb, &ctrlh, timeout);
+	urbh = libusb_submit_ctrl_msg(devh, msg, ctrl_msg_cb, &ctrlh, timeout);
 	if (!urbh)
 		return -1;
 
 	while (!ctrlh.status) {
-		int r = fpusb_poll();
+		int r = libusb_poll();
 		if (r < 0) {
-			fpusb_urb_handle_cancel_sync(devh, urbh);
-			fpusb_urb_handle_free(urbh);
+			libusb_urb_handle_cancel_sync(devh, urbh);
+			libusb_urb_handle_free(urbh);
 			return r;
 		}
 	}
 
-	fpusb_urb_handle_free(urbh);
+	libusb_urb_handle_free(urbh);
 	switch (ctrlh.status) {
 	case FP_URB_COMPLETED:
 		return ctrlh.actual_length;
@@ -625,8 +623,8 @@ struct sync_bulk_handle {
 	int actual_length;
 };
 
-static void bulk_msg_cb(struct fpusb_dev_handle *devh,
-	struct fpusb_urb_handle *urbh, enum fp_urb_cb_status status,
+static void bulk_msg_cb(struct libusb_dev_handle *devh,
+	struct libusb_urb_handle *urbh, enum fp_urb_cb_status status,
 	unsigned char endpoint, int rqlength, unsigned char *data,
 	int actual_length, void *user_data)
 {
@@ -637,11 +635,11 @@ static void bulk_msg_cb(struct fpusb_dev_handle *devh,
 	/* caller frees urbh */
 }
 
-static int do_sync_bulk_msg(struct fpusb_dev_handle *devh,
-	struct fpusb_bulk_msg *msg, int *transferred, unsigned int timeout,
+static int do_sync_bulk_msg(struct libusb_dev_handle *devh,
+	struct libusb_bulk_msg *msg, int *transferred, unsigned int timeout,
 	unsigned char urbtype)
 {
-	struct fpusb_urb_handle *urbh;
+	struct libusb_urb_handle *urbh;
 	struct sync_bulk_handle bulkh;
 
 	memset(&bulkh, 0, sizeof(bulkh));
@@ -651,16 +649,16 @@ static int do_sync_bulk_msg(struct fpusb_dev_handle *devh,
 		return -1;
 
 	while (!bulkh.status) {
-		int r = fpusb_poll();
+		int r = libusb_poll();
 		if (r < 0) {
-			fpusb_urb_handle_cancel_sync(devh, urbh);
-			fpusb_urb_handle_free(urbh);
+			libusb_urb_handle_cancel_sync(devh, urbh);
+			libusb_urb_handle_free(urbh);
 			return r;
 		}
 	}
 
 	*transferred = bulkh.actual_length;
-	fpusb_urb_handle_free(urbh);
+	libusb_urb_handle_free(urbh);
 
 	switch (bulkh.status) {
 	case FP_URB_COMPLETED:
@@ -673,31 +671,31 @@ static int do_sync_bulk_msg(struct fpusb_dev_handle *devh,
 	}
 }
 
-API_EXPORTED int fpusb_intr_msg(struct fpusb_dev_handle *devh,
-	struct fpusb_bulk_msg *msg, int *transferred, unsigned int timeout)
+API_EXPORTED int libusb_intr_msg(struct libusb_dev_handle *devh,
+	struct libusb_bulk_msg *msg, int *transferred, unsigned int timeout)
 {
 	return do_sync_bulk_msg(devh, msg, transferred, timeout,
 		USB_URB_TYPE_INTERRUPT);
 }
 
-API_EXPORTED int fpusb_bulk_msg(struct fpusb_dev_handle *devh,
-	struct fpusb_bulk_msg *msg, int *transferred, unsigned int timeout)
+API_EXPORTED int libusb_bulk_msg(struct libusb_dev_handle *devh,
+	struct libusb_bulk_msg *msg, int *transferred, unsigned int timeout)
 {
 	return do_sync_bulk_msg(devh, msg, transferred, timeout,
 		USB_URB_TYPE_BULK);
 }
 
-API_EXPORTED void fpusb_urb_handle_free(struct fpusb_urb_handle *urbh)
+API_EXPORTED void libusb_urb_handle_free(struct libusb_urb_handle *urbh)
 {
 	if (!urbh)
 		return;
 
-	if (!(urbh->flags & FPUSB_URBH_DATA_BELONGS_TO_USER))
+	if (!(urbh->flags & LIBUSB_URBH_DATA_BELONGS_TO_USER))
 		free(urbh->urb.buffer);
 	free(urbh);
 }
 
-API_EXPORTED int fpusb_get_pollfd(void)
+API_EXPORTED int libusb_get_pollfd(void)
 {
 	return sigfd;
 }

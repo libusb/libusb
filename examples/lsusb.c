@@ -1,5 +1,5 @@
 /*
- * fpusb example program to list devices on the bus
+ * libusb example program to list devices on the bus
  * Copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
  *
  * This library is free software; you can redistribute it and/or
@@ -19,28 +19,28 @@
 
 #include <stdio.h>
 
-#include <libfpusb/fpusb.h>
+#include <libusb/libusb.h>
 
-void print_devs(fpusb_dev *devs)
+void print_devs(libusb_dev *devs)
 {
-	fpusb_dev *dev;
+	libusb_dev *dev;
 
-	for (dev = devs; dev; dev = fpusb_dev_next(dev)) {
-		struct usb_dev_descriptor *desc = fpusb_dev_get_descriptor(dev);
+	for (dev = devs; dev; dev = libusb_dev_next(dev)) {
+		struct usb_dev_descriptor *desc = libusb_dev_get_descriptor(dev);
 		printf("%04x:%04x\n", desc->idVendor, desc->idProduct);
 	}
 }
 
 int main(void)
 {
-	fpusb_dev *devs;
-	fpusb_init(0);
-	fpusb_find_devices();
-	devs = fpusb_get_devices();
+	libusb_dev *devs;
+	libusb_init(0);
+	libusb_find_devices();
+	devs = libusb_get_devices();
 
 	print_devs(devs);
 
-	fpusb_exit();
+	libusb_exit();
 	return 0;
 }
 

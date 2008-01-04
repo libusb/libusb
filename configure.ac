@@ -1,6 +1,6 @@
-AC_INIT([fpusb], [0.0])
+AC_INIT([libusb], [0.9.0])
 AM_INIT_AUTOMAKE
-AC_CONFIG_SRCDIR([libfpusb/core.c])
+AC_CONFIG_SRCDIR([libusb/core.c])
 AM_CONFIG_HEADER([config.h])
 
 AC_PREREQ([2.50])
@@ -44,6 +44,6 @@ AC_DEFINE([API_EXPORTED], [__attribute__((visibility("default")))], [Default vis
 AM_CFLAGS="-std=gnu99 -fgnu89-inline -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration -Wno-pointer-sign -Wshadow"
 AC_SUBST(AM_CFLAGS)
 
-AC_CONFIG_FILES([fpusb.pc] [Makefile] [libfpusb/Makefile] [examples/Makefile])
+AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [examples/Makefile])
 AC_OUTPUT
 

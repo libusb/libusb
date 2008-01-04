@@ -1,8 +1,6 @@
 /*
- * USB descriptor handling functions for libfpusb
+ * USB descriptor handling functions for libusb
  * Copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
- *
- * Portions based on libusb-0.1
  * Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -23,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "fpusbi.h"
+#include "libusbi.h"
 
 #define DESC_HEADER_LENGTH		2
 #define DEVICE_DESC_LENGTH		18

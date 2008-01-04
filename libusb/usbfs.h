@@ -1,8 +1,6 @@
 /*
  * usbfs header structures
  * Copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
- *
- * Portions based on libusb-0.1
  * Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -20,8 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef __FPUSB_USBFS_H__
-#define __FPUSB_USBFS_H__
+#ifndef __LIBUSB_USBFS_H__
+#define __LIBUSB_USBFS_H__
 
 struct usb_ctrltransfer {
 	/* keep in sync with usbdevice_fs.h:usbdevfs_ctrltransfer */

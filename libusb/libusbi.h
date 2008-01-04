@@ -1,8 +1,6 @@
 /*
- * Internal header for libfpusb
+ * Internal header for libusb
  * Copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
- *
- * Portions based on libusb-0.1
  * Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -20,8 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef __FPUSBI_H__
-#define __FPUSBI_H__
+#ifndef __LIBUSBI_H__
+#define __LIBUSBI_H__
 
 #include <config.h>
 
@@ -30,7 +28,7 @@
 #include <sys/ioctl.h>
 #include <time.h>
 
-#include <fpusb.h>
+#include <libusb.h>
 #include <usbfs.h>
 
 #define USBFS_PATH "/dev/bus/usb"
@@ -145,30 +143,30 @@ void fpi_log(enum fpi_log_level, const char *function, const char *format, ...);
 #define fp_warn(fmt...) _fpi_log(LOG_LEVEL_WARNING, fmt)
 #define fp_err(fmt...) _fpi_log(LOG_LEVEL_ERROR, fmt)
 
-struct fpusb_dev {
+struct libusb_dev {
 	struct list_head list;
 	char *nodepath;
 	struct usb_dev_descriptor desc;
 	struct usb_config_descriptor *config;
 };
 
-struct fpusb_dev_handle {
+struct libusb_dev_handle {
 	struct list_head list;
-	struct fpusb_dev *dev;
+	struct libusb_dev *dev;
 	int fd;
 };
 
-enum fpusb_urb_type {
-	FPUSB_URB_CONTROL,
-	FPUSB_URB_BULK,
+enum libusb_urb_type {
+	LIBUSB_URB_CONTROL,
+	LIBUSB_URB_BULK,
 };
 
-#define FPUSB_URBH_DATA_BELONGS_TO_USER		(1<<0)
-#define FPUSB_URBH_SYNC_CANCELLED 			(1<<1)
-#define FPUSB_URBH_TIMED_OUT	 			(1<<2)
+#define LIBUSB_URBH_DATA_BELONGS_TO_USER		(1<<0)
+#define LIBUSB_URBH_SYNC_CANCELLED 			(1<<1)
+#define LIBUSB_URBH_TIMED_OUT	 			(1<<2)
 
-struct fpusb_urb_handle {
-	struct fpusb_dev_handle *devh;
+struct libusb_urb_handle {
+	struct libusb_dev_handle *devh;
 	struct usb_urb urb;
 	struct list_head list;
 	struct timespec timeout;

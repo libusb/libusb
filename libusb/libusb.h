@@ -1,8 +1,6 @@
 /*
- * Public libfpusb header file
+ * Public libusb header file
  * Copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
- *
- * Portions based on libusb-0.1
  * Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -20,8 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef __FPUSB_H__
-#define __FPUSB_H__
+#ifndef __LIBUSB_H__
+#define __LIBUSB_H__
 
 #include <stdint.h>
 #include <sys/time.h>
@@ -175,16 +173,16 @@ struct usb_ctrl_setup {
 	uint16_t wLength;
 } __attribute__((packed));
 
-/* fpusb */
+/* libusb */
 
-struct fpusb_dev;
-typedef struct fpusb_dev fpusb_dev;
+struct libusb_dev;
+typedef struct libusb_dev libusb_dev;
 
-struct fpusb_dev_handle;
-typedef struct fpusb_dev_handle fpusb_dev_handle;
+struct libusb_dev_handle;
+typedef struct libusb_dev_handle libusb_dev_handle;
 
-struct fpusb_urb_handle;
-typedef struct fpusb_urb_handle fpusb_urb_handle;
+struct libusb_urb_handle;
+typedef struct libusb_urb_handle libusb_urb_handle;
 
 enum fp_urb_cb_status {
 	FP_URB_SILENT_COMPLETION = 0,
@@ -193,7 +191,7 @@ enum fp_urb_cb_status {
 	FP_URB_CANCELLED,
 };
 
-struct fpusb_ctrl_msg {
+struct libusb_ctrl_msg {
 	uint8_t requesttype;
 	uint8_t request;
 	uint16_t value;
@@ -202,63 +200,63 @@ struct fpusb_ctrl_msg {
 	unsigned char *data;
 };
 
-typedef void (*fpusb_ctrl_cb_fn)(fpusb_dev_handle *devh, fpusb_urb_handle *urbh,
+typedef void (*libusb_ctrl_cb_fn)(libusb_dev_handle *devh, libusb_urb_handle *urbh,
 	enum fp_urb_cb_status status, struct usb_ctrl_setup *setup,
 	unsigned char *data, int actual_length, void *user_data);
 
-struct fpusb_bulk_msg {
+struct libusb_bulk_msg {
 	unsigned char endpoint;
 	unsigned char *data;
 	int length;
 };
 
-typedef void (*fpusb_bulk_cb_fn)(fpusb_dev_handle *devh, fpusb_urb_handle *urbh,
+typedef void (*libusb_bulk_cb_fn)(libusb_dev_handle *devh, libusb_urb_handle *urbh,
 	enum fp_urb_cb_status status, unsigned char endpoint,
 	int rqlength, unsigned char *data, int actual_length, void *user_data);
 
-int fpusb_init(int signum);
-void fpusb_exit(void);
+int libusb_init(int signum);
+void libusb_exit(void);
 
-int fpusb_find_devices(void);
-fpusb_dev *fpusb_get_devices(void);
-struct usb_dev_descriptor *fpusb_dev_get_descriptor(fpusb_dev *dev);
-struct usb_config_descriptor *fpusb_dev_get_config(fpusb_dev *dev);
-fpusb_dev *fpusb_dev_next(fpusb_dev *dev);
+int libusb_find_devices(void);
+libusb_dev *libusb_get_devices(void);
+struct usb_dev_descriptor *libusb_dev_get_descriptor(libusb_dev *dev);
+struct usb_config_descriptor *libusb_dev_get_config(libusb_dev *dev);
+libusb_dev *libusb_dev_next(libusb_dev *dev);
 
-fpusb_dev_handle *fpusb_devh_open(fpusb_dev *dev);
-void fpusb_devh_close(fpusb_dev_handle *devh);
-struct fpusb_dev *fpusb_devh_get_dev(fpusb_dev_handle *devh);
-int fpusb_devh_claim_intf(fpusb_dev_handle *dev, int iface);
-int fpusb_devh_release_intf(fpusb_dev_handle *dev, int iface);
+libusb_dev_handle *libusb_devh_open(libusb_dev *dev);
+void libusb_devh_close(libusb_dev_handle *devh);
+struct libusb_dev *libusb_devh_get_dev(libusb_dev_handle *devh);
+int libusb_devh_claim_intf(libusb_dev_handle *dev, int iface);
+int libusb_devh_release_intf(libusb_dev_handle *dev, int iface);
 
 /* async I/O */
 
-fpusb_urb_handle *fpusb_submit_ctrl_msg(fpusb_dev_handle *devh,
-	struct fpusb_ctrl_msg *msg, fpusb_ctrl_cb_fn callback, void *user_data,
+libusb_urb_handle *libusb_submit_ctrl_msg(libusb_dev_handle *devh,
+	struct libusb_ctrl_msg *msg, libusb_ctrl_cb_fn callback, void *user_data,
 	unsigned int timeout);
-fpusb_urb_handle *fpusb_submit_bulk_msg(fpusb_dev_handle *devh,
-	struct fpusb_bulk_msg *msg, fpusb_bulk_cb_fn callback, void *user_data,
+libusb_urb_handle *libusb_submit_bulk_msg(libusb_dev_handle *devh,
+	struct libusb_bulk_msg *msg, libusb_bulk_cb_fn callback, void *user_data,
 	unsigned int timeout);
-fpusb_urb_handle *fpusb_submit_intr_msg(fpusb_dev_handle *devh,
-	struct fpusb_bulk_msg *msg, fpusb_bulk_cb_fn callback, void *user_data,
+libusb_urb_handle *libusb_submit_intr_msg(libusb_dev_handle *devh,
+	struct libusb_bulk_msg *msg, libusb_bulk_cb_fn callback, void *user_data,
 	unsigned int timeout);
 
-int fpusb_urb_handle_cancel(fpusb_dev_handle *devh, fpusb_urb_handle *urbh);
-int fpusb_urb_handle_cancel_sync(fpusb_dev_handle *devh,
-	fpusb_urb_handle *urbh);
-void fpusb_urb_handle_free(fpusb_urb_handle *urbh);
+int libusb_urb_handle_cancel(libusb_dev_handle *devh, libusb_urb_handle *urbh);
+int libusb_urb_handle_cancel_sync(libusb_dev_handle *devh,
+	libusb_urb_handle *urbh);
+void libusb_urb_handle_free(libusb_urb_handle *urbh);
 
-int fpusb_poll_timeout(struct timeval *tv);
-int fpusb_poll(void);
-int fpusb_get_pollfd(void);
+int libusb_poll_timeout(struct timeval *tv);
+int libusb_poll(void);
+int libusb_get_pollfd(void);
 
 /* sync I/O */
 
-int fpusb_ctrl_msg(fpusb_dev_handle *devh, struct fpusb_ctrl_msg *msg,
+int libusb_ctrl_msg(libusb_dev_handle *devh, struct libusb_ctrl_msg *msg,
 	unsigned int timeout);
-int fpusb_bulk_msg(fpusb_dev_handle *devh, struct fpusb_bulk_msg *msg,
+int libusb_bulk_msg(libusb_dev_handle *devh, struct libusb_bulk_msg *msg,
 	int *transferred, unsigned int timeout);
-int fpusb_intr_msg(fpusb_dev_handle *devh, struct fpusb_bulk_msg *msg,
+int libusb_intr_msg(libusb_dev_handle *devh, struct libusb_bulk_msg *msg,
 	int *transferred, unsigned int timeout);
 
 #endif
