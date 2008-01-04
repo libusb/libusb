@@ -28,10 +28,10 @@
 
 #include <libusb/libusb.h>
 
-#define EP_INTR			(1 | USB_ENDPOINT_IN)
-#define EP_DATA			(2 | USB_ENDPOINT_IN)
-#define CTRL_IN			(USB_TYPE_VENDOR | USB_ENDPOINT_IN)
-#define CTRL_OUT		(USB_TYPE_VENDOR | USB_ENDPOINT_OUT)
+#define EP_INTR			(1 | LIBUSB_ENDPOINT_IN)
+#define EP_DATA			(2 | LIBUSB_ENDPOINT_IN)
+#define CTRL_IN			(LIBUSB_TYPE_VENDOR | LIBUSB_ENDPOINT_IN)
+#define CTRL_OUT		(LIBUSB_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT)
 #define USB_RQ			0x04
 #define INTR_LENGTH		64
 
@@ -85,7 +85,7 @@ static struct libusb_dev *find_dpfp_device(void)
 	libusb_find_devices();
 
 	for (dev = libusb_get_devices(); dev; dev = libusb_dev_next(dev)) {
-		struct usb_dev_descriptor *desc = libusb_dev_get_descriptor(dev);
+		struct libusb_dev_descriptor *desc = libusb_dev_get_descriptor(dev);
 		if (desc->idVendor == 0x05ba && desc->idProduct == 0x000a)
 			return dev;
 	}
@@ -206,7 +206,7 @@ static int set_mode(unsigned char data)
 
 static void cb_mode_changed(struct libusb_dev_handle *_devh,
 	struct libusb_urb_handle *urbh, enum fp_urb_cb_status status,
-	struct usb_ctrl_setup *setup, unsigned char *data, int actual_length,
+	struct libusb_ctrl_setup *setup, unsigned char *data, int actual_length,
 	void *user_data)
 {
 	if (status != FP_URB_COMPLETED) {

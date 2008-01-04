@@ -118,36 +118,36 @@ static inline void list_del(struct list_head *entry)
 
 #define TIMESPEC_IS_SET(ts) ((ts)->tv_sec != 0 || (ts)->tv_nsec != 0)
 
-enum fpi_log_level {
+enum usbi_log_level {
 	LOG_LEVEL_DEBUG,
 	LOG_LEVEL_INFO,
 	LOG_LEVEL_WARNING,
 	LOG_LEVEL_ERROR,
 };
 
-void fpi_log(enum fpi_log_level, const char *function, const char *format, ...);
+void usbi_log(enum usbi_log_level, const char *function, const char *format, ...);
 
 #ifdef ENABLE_LOGGING
-#define _fpi_log(level, fmt...) fpi_log(level, __FUNCTION__, fmt)
+#define _usbi_log(level, fmt...) usbi_log(level, __FUNCTION__, fmt)
 #else
-#define _fpi_log(level, fmt...)
+#define _usbi_log(level, fmt...)
 #endif
 
 #ifdef ENABLE_DEBUG_LOGGING
-#define fp_dbg(fmt...) _fpi_log(LOG_LEVEL_DEBUG, fmt)
+#define fp_dbg(fmt...) _usbi_log(LOG_LEVEL_DEBUG, fmt)
 #else
 #define fp_dbg(fmt...)
 #endif
 
-#define fp_info(fmt...) _fpi_log(LOG_LEVEL_INFO, fmt)
-#define fp_warn(fmt...) _fpi_log(LOG_LEVEL_WARNING, fmt)
-#define fp_err(fmt...) _fpi_log(LOG_LEVEL_ERROR, fmt)
+#define fp_info(fmt...) _usbi_log(LOG_LEVEL_INFO, fmt)
+#define fp_warn(fmt...) _usbi_log(LOG_LEVEL_WARNING, fmt)
+#define fp_err(fmt...) _usbi_log(LOG_LEVEL_ERROR, fmt)
 
 struct libusb_dev {
 	struct list_head list;
 	char *nodepath;
-	struct usb_dev_descriptor desc;
-	struct usb_config_descriptor *config;
+	struct libusb_dev_descriptor desc;
+	struct libusb_config_descriptor *config;
 };
 
 struct libusb_dev_handle {
@@ -193,11 +193,11 @@ struct usb_descriptor_header {
 
 extern struct list_head open_devs;
 
-int fpi_io_init(int _signum);
-void fpi_io_exit(void);
+int usbi_io_init(int _signum);
+void usbi_io_exit(void);
 
-int fpi_parse_descriptor(unsigned char *source, char *descriptor, void *dest);
-int fpi_parse_configuration(struct usb_config_descriptor *config,
+int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest);
+int usbi_parse_configuration(struct libusb_config_descriptor *config,
 		unsigned char *buffer);
 
 #endif

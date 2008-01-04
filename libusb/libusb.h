@@ -27,74 +27,74 @@
 /* standard USB stuff */
 
 /* Device and/or Interface Class codes */
-#define USB_CLASS_PER_INTERFACE		0	/* for DeviceClass */
-#define USB_CLASS_AUDIO				1
-#define USB_CLASS_COMM				2
-#define USB_CLASS_HID				3
-#define USB_CLASS_PRINTER			7
-#define USB_CLASS_PTP				6
-#define USB_CLASS_MASS_STORAGE		8
-#define USB_CLASS_HUB				9
-#define USB_CLASS_DATA				10
-#define USB_CLASS_VENDOR_SPEC		0xff
+#define LIBUSB_CLASS_PER_INTERFACE		0	/* for DeviceClass */
+#define LIBUSB_CLASS_AUDIO				1
+#define LIBUSB_CLASS_COMM				2
+#define LIBUSB_CLASS_HID				3
+#define LIBUSB_CLASS_PRINTER			7
+#define LIBUSB_CLASS_PTP				6
+#define LIBUSB_CLASS_MASS_STORAGE		8
+#define LIBUSB_CLASS_HUB				9
+#define LIBUSB_CLASS_DATA				10
+#define LIBUSB_CLASS_VENDOR_SPEC		0xff
 
 /* Descriptor types */
-#define USB_DT_DEVICE			0x01
-#define USB_DT_CONFIG			0x02
-#define USB_DT_STRING			0x03
-#define USB_DT_INTERFACE		0x04
-#define USB_DT_ENDPOINT			0x05
-#define USB_DT_HID				0x21
-#define USB_DT_REPORT			0x22
-#define USB_DT_PHYSICAL			0x23
-#define USB_DT_HUB				0x29
+#define LIBUSB_DT_DEVICE			0x01
+#define LIBUSB_DT_CONFIG			0x02
+#define LIBUSB_DT_STRING			0x03
+#define LIBUSB_DT_INTERFACE		0x04
+#define LIBUSB_DT_ENDPOINT			0x05
+#define LIBUSB_DT_HID				0x21
+#define LIBUSB_DT_REPORT			0x22
+#define LIBUSB_DT_PHYSICAL			0x23
+#define LIBUSB_DT_HUB				0x29
 
 /* Descriptor sizes per descriptor type */
-#define USB_DT_DEVICE_SIZE			18
-#define USB_DT_CONFIG_SIZE			9
-#define USB_DT_INTERFACE_SIZE		9
-#define USB_DT_ENDPOINT_SIZE		7
-#define USB_DT_ENDPOINT_AUDIO_SIZE	9	/* Audio extension */
-#define USB_DT_HUB_NONVAR_SIZE		7
+#define LIBUSB_DT_DEVICE_SIZE			18
+#define LIBUSB_DT_CONFIG_SIZE			9
+#define LIBUSB_DT_INTERFACE_SIZE		9
+#define LIBUSB_DT_ENDPOINT_SIZE		7
+#define LIBUSB_DT_ENDPOINT_AUDIO_SIZE	9	/* Audio extension */
+#define LIBUSB_DT_HUB_NONVAR_SIZE		7
 
-#define USB_ENDPOINT_ADDRESS_MASK	0x0f    /* in bEndpointAddress */
-#define USB_ENDPOINT_DIR_MASK		0x80
+#define LIBUSB_ENDPOINT_ADDRESS_MASK	0x0f    /* in bEndpointAddress */
+#define LIBUSB_ENDPOINT_DIR_MASK		0x80
 
-#define USB_ENDPOINT_IN			0x80
-#define USB_ENDPOINT_OUT		0x00
+#define LIBUSB_ENDPOINT_IN			0x80
+#define LIBUSB_ENDPOINT_OUT		0x00
 
-#define USB_ENDPOINT_TYPE_MASK			0x03    /* in bmAttributes */
-#define USB_ENDPOINT_TYPE_CONTROL		0
-#define USB_ENDPOINT_TYPE_ISOCHRONOUS	1
-#define USB_ENDPOINT_TYPE_BULK			2
-#define USB_ENDPOINT_TYPE_INTERRUPT		3
+#define LIBUSB_ENDPOINT_TYPE_MASK			0x03    /* in bmAttributes */
+#define LIBUSB_ENDPOINT_TYPE_CONTROL		0
+#define LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS	1
+#define LIBUSB_ENDPOINT_TYPE_BULK			2
+#define LIBUSB_ENDPOINT_TYPE_INTERRUPT		3
 
 /* Standard requests */
-#define USB_REQ_GET_STATUS			0x00
-#define USB_REQ_CLEAR_FEATURE		0x01
+#define LIBUSB_REQ_GET_STATUS			0x00
+#define LIBUSB_REQ_CLEAR_FEATURE		0x01
 /* 0x02 is reserved */
-#define USB_REQ_SET_FEATURE			0x03
+#define LIBUSB_REQ_SET_FEATURE			0x03
 /* 0x04 is reserved */
-#define USB_REQ_SET_ADDRESS			0x05
-#define USB_REQ_GET_DESCRIPTOR		0x06
-#define USB_REQ_SET_DESCRIPTOR		0x07
-#define USB_REQ_GET_CONFIGURATION	0x08
-#define USB_REQ_SET_CONFIGURATION	0x09
-#define USB_REQ_GET_INTERFACE		0x0A
-#define USB_REQ_SET_INTERFACE		0x0B
-#define USB_REQ_SYNCH_FRAME			0x0C
+#define LIBUSB_REQ_SET_ADDRESS			0x05
+#define LIBUSB_REQ_GET_DESCRIPTOR		0x06
+#define LIBUSB_REQ_SET_DESCRIPTOR		0x07
+#define LIBUSB_REQ_GET_CONFIGURATION	0x08
+#define LIBUSB_REQ_SET_CONFIGURATION	0x09
+#define LIBUSB_REQ_GET_INTERFACE		0x0A
+#define LIBUSB_REQ_SET_INTERFACE		0x0B
+#define LIBUSB_REQ_SYNCH_FRAME			0x0C
 
-#define USB_TYPE_STANDARD		(0x00 << 5)
-#define USB_TYPE_CLASS			(0x01 << 5)
-#define USB_TYPE_VENDOR			(0x02 << 5)
-#define USB_TYPE_RESERVED		(0x03 << 5)
+#define LIBUSB_TYPE_STANDARD		(0x00 << 5)
+#define LIBUSB_TYPE_CLASS			(0x01 << 5)
+#define LIBUSB_TYPE_VENDOR			(0x02 << 5)
+#define LIBUSB_TYPE_RESERVED		(0x03 << 5)
 
-#define USB_RECIP_DEVICE		0x00
-#define USB_RECIP_INTERFACE		0x01
-#define USB_RECIP_ENDPOINT		0x02
-#define USB_RECIP_OTHER			0x03
+#define LIBUSB_RECIP_DEVICE		0x00
+#define LIBUSB_RECIP_INTERFACE		0x01
+#define LIBUSB_RECIP_ENDPOINT		0x02
+#define LIBUSB_RECIP_OTHER			0x03
 
-struct usb_dev_descriptor {
+struct libusb_dev_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
 	uint16_t bcdUSB;
@@ -111,7 +111,7 @@ struct usb_dev_descriptor {
 	uint8_t  bNumConfigurations;
 };
 
-struct usb_endpoint_descriptor {
+struct libusb_endpoint_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
 	uint8_t  bEndpointAddress;
@@ -125,7 +125,7 @@ struct usb_endpoint_descriptor {
 	int extralen;
 };
 
-struct usb_interface_descriptor {
+struct libusb_interface_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
 	uint8_t  bInterfaceNumber;
@@ -136,18 +136,18 @@ struct usb_interface_descriptor {
 	uint8_t  bInterfaceProtocol;
 	uint8_t  iInterface;
 
-	struct usb_endpoint_descriptor *endpoint;
+	struct libusb_endpoint_descriptor *endpoint;
 
 	unsigned char *extra;	/* Extra descriptors */
 	int extralen;
 };
 
-struct usb_interface {
-	struct usb_interface_descriptor *altsetting;
+struct libusb_interface {
+	struct libusb_interface_descriptor *altsetting;
 	int num_altsetting;
 };
 
-struct usb_config_descriptor {
+struct libusb_config_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
 	uint16_t wTotalLength;
@@ -157,7 +157,7 @@ struct usb_config_descriptor {
 	uint8_t  bmAttributes;
 	uint8_t  MaxPower;
 
-	struct usb_interface *interface;
+	struct libusb_interface *interface;
 
 	unsigned char *extra;	/* Extra descriptors */
 	int extralen;
@@ -165,7 +165,7 @@ struct usb_config_descriptor {
 
 /* off-the-wire structures */
 
-struct usb_ctrl_setup {
+struct libusb_ctrl_setup {
 	uint8_t  bRequestType;
 	uint8_t  bRequest;
 	uint16_t wValue;
@@ -201,7 +201,7 @@ struct libusb_ctrl_msg {
 };
 
 typedef void (*libusb_ctrl_cb_fn)(libusb_dev_handle *devh, libusb_urb_handle *urbh,
-	enum fp_urb_cb_status status, struct usb_ctrl_setup *setup,
+	enum fp_urb_cb_status status, struct libusb_ctrl_setup *setup,
 	unsigned char *data, int actual_length, void *user_data);
 
 struct libusb_bulk_msg {
@@ -219,8 +219,8 @@ void libusb_exit(void);
 
 int libusb_find_devices(void);
 libusb_dev *libusb_get_devices(void);
-struct usb_dev_descriptor *libusb_dev_get_descriptor(libusb_dev *dev);
-struct usb_config_descriptor *libusb_dev_get_config(libusb_dev *dev);
+struct libusb_dev_descriptor *libusb_dev_get_descriptor(libusb_dev *dev);
+struct libusb_config_descriptor *libusb_dev_get_config(libusb_dev *dev);
 libusb_dev *libusb_dev_next(libusb_dev *dev);
 
 libusb_dev_handle *libusb_devh_open(libusb_dev *dev);

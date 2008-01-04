@@ -68,7 +68,7 @@ static int scan_device(char *busdir, const char *devnum)
 	}
 	/* FIXME: short read handling? */
 
-	fpi_parse_descriptor(raw_desc, "bbWbbbbWWWbbbb", &dev->desc);
+	usbi_parse_descriptor(raw_desc, "bbWbbbbWWWbbbb", &dev->desc);
 
 	/* Now try to fetch the rest of the descriptors */
 	if (dev->desc.bNumConfigurations > USB_MAXCONFIG) {
@@ -83,7 +83,7 @@ static int scan_device(char *busdir, const char *devnum)
 		goto err;
 	}
 
-	tmp = dev->desc.bNumConfigurations * sizeof(struct usb_config_descriptor);
+	tmp = dev->desc.bNumConfigurations * sizeof(struct libusb_config_descriptor);
 	dev->config = malloc(tmp);
 	if (!dev->config) {
 		r = -1;
@@ -94,7 +94,7 @@ static int scan_device(char *busdir, const char *devnum)
 
 	for (i = 0; i < dev->desc.bNumConfigurations; i++) {
 		unsigned char buffer[8], *bigbuffer;
-		struct usb_config_descriptor config;
+		struct libusb_config_descriptor config;
 
 		/* Get the first 8 bytes to figure out what the total length is */
 		r = read(fd, buffer, sizeof(buffer));
@@ -103,7 +103,7 @@ static int scan_device(char *busdir, const char *devnum)
 			goto err;
 		}
 
-		fpi_parse_descriptor(buffer, "bbw", &config);
+		usbi_parse_descriptor(buffer, "bbw", &config);
 
 		bigbuffer = malloc(config.wTotalLength);
 		if (!bigbuffer)
@@ -120,7 +120,7 @@ static int scan_device(char *busdir, const char *devnum)
 			goto err;
 		}
 
-		r = fpi_parse_configuration(&dev->config[i], bigbuffer);
+		r = usbi_parse_configuration(&dev->config[i], bigbuffer);
 		if (r > 0)
 			fp_warn("descriptor data still left\n");
 		free(bigbuffer);
@@ -204,13 +204,13 @@ API_EXPORTED struct libusb_dev *libusb_dev_next(struct libusb_dev *dev)
 	return list_entry(head->next, struct libusb_dev, list);
 }
 
-API_EXPORTED struct usb_dev_descriptor *libusb_dev_get_descriptor(
+API_EXPORTED struct libusb_dev_descriptor *libusb_dev_get_descriptor(
 	struct libusb_dev *dev)
 {
 	return &dev->desc;
 }
 
-API_EXPORTED struct usb_config_descriptor *libusb_dev_get_config(
+API_EXPORTED struct libusb_config_descriptor *libusb_dev_get_config(
 	struct libusb_dev *dev)
 {
 	return dev->config;
@@ -291,7 +291,7 @@ API_EXPORTED int libusb_init(int signum)
 	fp_dbg("");
 	list_init(&usb_devs);
 	list_init(&open_devs);
-	return fpi_io_init(signum);
+	return usbi_io_init(signum);
 }
 
 API_EXPORTED void libusb_exit(void)
@@ -303,10 +303,10 @@ API_EXPORTED void libusb_exit(void)
 		list_for_each_entry(devh, &open_devs, list)
 			do_close(devh);
 	}
-	fpi_io_exit();
+	usbi_io_exit();
 }
 
-void fpi_log(enum fpi_log_level level, const char *function,
+void usbi_log(enum usbi_log_level level, const char *function,
 	const char *format, ...)
 {
 	va_list args;

@@ -30,7 +30,7 @@
 #define ENDPOINT_DESC_LENGTH		7
 #define ENDPOINT_AUDIO_DESC_LENGTH	9
 
-int fpi_parse_descriptor(unsigned char *source, char *descriptor, void *dest)
+int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest)
 {
 	unsigned char *sp = source, *dp = dest;
 	uint16_t w;
@@ -66,7 +66,7 @@ int fpi_parse_descriptor(unsigned char *source, char *descriptor, void *dest)
 	return sp - source;
 }
 
-static int parse_endpoint(struct usb_endpoint_descriptor *endpoint,
+static int parse_endpoint(struct libusb_endpoint_descriptor *endpoint,
 	unsigned char *buffer, int size)
 {
 	struct usb_descriptor_header header;
@@ -74,7 +74,7 @@ static int parse_endpoint(struct usb_endpoint_descriptor *endpoint,
 	int parsed = 0;
 	int len;
 
-	fpi_parse_descriptor(buffer, "bb", &header);
+	usbi_parse_descriptor(buffer, "bb", &header);
 
 	/* Everything should be fine being passed into here, but we sanity */
 	/*  check JIC */
@@ -83,16 +83,16 @@ static int parse_endpoint(struct usb_endpoint_descriptor *endpoint,
 		return -1;
 	}
 
-	if (header.bDescriptorType != USB_DT_ENDPOINT) {
+	if (header.bDescriptorType != LIBUSB_DT_ENDPOINT) {
 		fp_err("unexpected descriptor %x (expected %x)",
-			header.bDescriptorType, USB_DT_ENDPOINT);
+			header.bDescriptorType, LIBUSB_DT_ENDPOINT);
 		return parsed;
 	}
 
 	if (header.bLength >= ENDPOINT_AUDIO_DESC_LENGTH)
-		fpi_parse_descriptor(buffer, "bbbbwbbb", endpoint);
+		usbi_parse_descriptor(buffer, "bbbbwbbb", endpoint);
 	else if (header.bLength >= ENDPOINT_DESC_LENGTH)
-		fpi_parse_descriptor(buffer, "bbbbwb", endpoint);
+		usbi_parse_descriptor(buffer, "bbbbwb", endpoint);
 
 	buffer += header.bLength;
 	size -= header.bLength;
@@ -102,7 +102,7 @@ static int parse_endpoint(struct usb_endpoint_descriptor *endpoint,
 	/*  descriptors */
 	begin = buffer;
 	while (size >= DESC_HEADER_LENGTH) {
-		fpi_parse_descriptor(buffer, "bb", &header);
+		usbi_parse_descriptor(buffer, "bb", &header);
 
 		if (header.bLength < 2) {
 			fp_err("invalid descriptor length %d", header.bLength);
@@ -110,10 +110,10 @@ static int parse_endpoint(struct usb_endpoint_descriptor *endpoint,
 		}
 
 		/* If we find another "proper" descriptor then we're done  */
-		if ((header.bDescriptorType == USB_DT_ENDPOINT) ||
-				(header.bDescriptorType == USB_DT_INTERFACE) ||
-				(header.bDescriptorType == USB_DT_CONFIG) ||
-				(header.bDescriptorType == USB_DT_DEVICE))
+		if ((header.bDescriptorType == LIBUSB_DT_ENDPOINT) ||
+				(header.bDescriptorType == LIBUSB_DT_INTERFACE) ||
+				(header.bDescriptorType == LIBUSB_DT_CONFIG) ||
+				(header.bDescriptorType == LIBUSB_DT_DEVICE))
 			break;
 
 		fp_dbg("skipping descriptor %x", header.bDescriptorType);
@@ -143,7 +143,7 @@ static int parse_endpoint(struct usb_endpoint_descriptor *endpoint,
 	return parsed;
 }
 
-static int parse_interface(struct usb_interface *interface,
+static int parse_interface(struct libusb_interface *interface,
 	unsigned char *buffer, int size)
 {
 	int i;
@@ -152,21 +152,21 @@ static int parse_interface(struct usb_interface *interface,
 	int parsed = 0;
 	int tmp;
 	struct usb_descriptor_header header;
-	struct usb_interface_descriptor *ifp;
+	struct libusb_interface_descriptor *ifp;
 	unsigned char *begin;
 
 	interface->num_altsetting = 0;
 
 	while (size >= INTERFACE_DESC_LENGTH) {
 		interface->altsetting = realloc(interface->altsetting,
-			sizeof(struct usb_interface_descriptor) *
+			sizeof(struct libusb_interface_descriptor) *
 			(interface->num_altsetting + 1));
 		if (!interface->altsetting)
 			return -1;
 
 		ifp = interface->altsetting + interface->num_altsetting;
 		interface->num_altsetting++;
-		fpi_parse_descriptor(buffer, "bbbbbbbbb", ifp);
+		usbi_parse_descriptor(buffer, "bbbbbbbbb", ifp);
 
 		/* Skip over the interface */
 		buffer += ifp->bLength;
@@ -177,17 +177,17 @@ static int parse_interface(struct usb_interface *interface,
 
 		/* Skip over any interface, class or vendor descriptors */
 		while (size >= DESC_HEADER_LENGTH) {
-			fpi_parse_descriptor(buffer, "bb", &header);
+			usbi_parse_descriptor(buffer, "bb", &header);
 			if (header.bLength < 2) {
 				fp_err("invalid descriptor of length %d", header.bLength);
 				return -1;
 			}
 
 			/* If we find another "proper" descriptor then we're done */
-			if ((header.bDescriptorType == USB_DT_INTERFACE) ||
-					(header.bDescriptorType == USB_DT_ENDPOINT) ||
-					(header.bDescriptorType == USB_DT_CONFIG) ||
-					(header.bDescriptorType == USB_DT_DEVICE))
+			if ((header.bDescriptorType == LIBUSB_DT_INTERFACE) ||
+					(header.bDescriptorType == LIBUSB_DT_ENDPOINT) ||
+					(header.bDescriptorType == LIBUSB_DT_CONFIG) ||
+					(header.bDescriptorType == LIBUSB_DT_DEVICE))
 				break;
 
 			buffer += header.bLength;
@@ -213,10 +213,10 @@ static int parse_interface(struct usb_interface *interface,
 		}
 
 		/* Did we hit an unexpected descriptor? */
-		fpi_parse_descriptor(buffer, "bb", &header);
+		usbi_parse_descriptor(buffer, "bb", &header);
 		if ((size >= DESC_HEADER_LENGTH) &&
-				((header.bDescriptorType == USB_DT_CONFIG) ||
-				 (header.bDescriptorType == USB_DT_DEVICE)))
+				((header.bDescriptorType == LIBUSB_DT_CONFIG) ||
+				 (header.bDescriptorType == LIBUSB_DT_DEVICE)))
 			return parsed;
 
 		if (ifp->bNumEndpoints > USB_MAXENDPOINTS) {
@@ -226,7 +226,7 @@ static int parse_interface(struct usb_interface *interface,
 		}
 
 		if (ifp->bNumEndpoints > 0) {
-			tmp = ifp->bNumEndpoints * sizeof(struct usb_endpoint_descriptor);
+			tmp = ifp->bNumEndpoints * sizeof(struct libusb_endpoint_descriptor);
 			ifp->endpoint = malloc(tmp);
 			if (!ifp->endpoint)
 				/* FIXME will leak memory? */
@@ -234,7 +234,7 @@ static int parse_interface(struct usb_interface *interface,
 
 			memset(ifp->endpoint, 0, tmp);
 			for (i = 0; i < ifp->bNumEndpoints; i++) {
-				fpi_parse_descriptor(buffer, "bb", &header);
+				usbi_parse_descriptor(buffer, "bb", &header);
 
 				if (header.bLength > size) {
 					fp_err("ran out of descriptors parsing");
@@ -255,9 +255,9 @@ static int parse_interface(struct usb_interface *interface,
 			ifp->endpoint = NULL;
 
 		/* We check to see if it's an alternate to this one */
-		ifp = (struct usb_interface_descriptor *) buffer;
-		if (size < USB_DT_INTERFACE_SIZE ||
-				ifp->bDescriptorType != USB_DT_INTERFACE ||
+		ifp = (struct libusb_interface_descriptor *) buffer;
+		if (size < LIBUSB_DT_INTERFACE_SIZE ||
+				ifp->bDescriptorType != LIBUSB_DT_INTERFACE ||
 				!ifp->bAlternateSetting)
 			return parsed;
 	}
@@ -265,7 +265,7 @@ static int parse_interface(struct usb_interface *interface,
 	return parsed;
 }
 
-int fpi_parse_configuration(struct usb_config_descriptor *config,
+int usbi_parse_configuration(struct libusb_config_descriptor *config,
 	unsigned char *buffer)
 {
 	int i;
@@ -274,7 +274,7 @@ int fpi_parse_configuration(struct usb_config_descriptor *config,
 	int tmp;
 	struct usb_descriptor_header header;
 
-	fpi_parse_descriptor(buffer, "bbwbbbbb", config);
+	usbi_parse_descriptor(buffer, "bbwbbbbb", config);
 	size = config->wTotalLength;
 
 	if (config->bNumInterfaces > USB_MAXINTERFACES) {
@@ -282,7 +282,7 @@ int fpi_parse_configuration(struct usb_config_descriptor *config,
 		return -1;
 	}
 
-	tmp = config->bNumInterfaces * sizeof(struct usb_interface);
+	tmp = config->bNumInterfaces * sizeof(struct libusb_interface);
 	config->interface = malloc(tmp);
 	if (!config->interface)
 		return -1;      
@@ -302,7 +302,7 @@ int fpi_parse_configuration(struct usb_config_descriptor *config,
 		/*  Specific descriptors */
 		begin = buffer;
 		while (size >= DESC_HEADER_LENGTH) {
-			fpi_parse_descriptor(buffer, "bb", &header);
+			usbi_parse_descriptor(buffer, "bb", &header);
 
 			if ((header.bLength > size) ||
 					(header.bLength < DESC_HEADER_LENGTH)) {
@@ -311,10 +311,10 @@ int fpi_parse_configuration(struct usb_config_descriptor *config,
 			}
 
 			/* If we find another "proper" descriptor then we're done */
-			if ((header.bDescriptorType == USB_DT_ENDPOINT) ||
-					(header.bDescriptorType == USB_DT_INTERFACE) ||
-					(header.bDescriptorType == USB_DT_CONFIG) ||
-					(header.bDescriptorType == USB_DT_DEVICE))
+			if ((header.bDescriptorType == LIBUSB_DT_ENDPOINT) ||
+					(header.bDescriptorType == LIBUSB_DT_INTERFACE) ||
+					(header.bDescriptorType == LIBUSB_DT_CONFIG) ||
+					(header.bDescriptorType == LIBUSB_DT_DEVICE))
 				break;
 
 			fp_dbg("skipping descriptor 0x%x\n", header.bDescriptorType);

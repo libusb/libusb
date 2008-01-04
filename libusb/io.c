@@ -72,13 +72,13 @@ static int setup_signalfd(int _signum)
 	return sigprocmask(SIG_BLOCK, &sigset, NULL);
 }
 
-int fpi_io_init(int _signum)
+int usbi_io_init(int _signum)
 {
 	list_init(&flying_urbs);
 	return setup_signalfd(signum);
 }
 
-void fpi_io_exit(void)
+void usbi_io_exit(void)
 {
 	close(sigfd);
 }
@@ -201,9 +201,9 @@ API_EXPORTED struct libusb_urb_handle *libusb_submit_ctrl_msg(
 	libusb_ctrl_cb_fn callback, void *user_data, unsigned int timeout)
 {
 	struct libusb_urb_handle *urbh = malloc(sizeof(*urbh));
-	struct usb_ctrl_setup *setup;
+	struct libusb_ctrl_setup *setup;
 	unsigned char *urbdata;
-	int urbdata_length = sizeof(struct usb_ctrl_setup) + msg->length;
+	int urbdata_length = sizeof(struct libusb_ctrl_setup) + msg->length;
 	int r;
 
 	if (!urbh)
@@ -227,15 +227,15 @@ API_EXPORTED struct libusb_urb_handle *libusb_submit_ctrl_msg(
 	fp_dbg("RQT=%02x RQ=%02x VAL=%04x IDX=%04x length=%d",
 		msg->requesttype, msg->request, msg->value, msg->index, msg->length);
 
-	setup = (struct usb_ctrl_setup *) urbdata;
+	setup = (struct libusb_ctrl_setup *) urbdata;
 	setup->bRequestType = msg->requesttype;
 	setup->bRequest = msg->request;
 	setup->wValue = cpu_to_le16(msg->value);
 	setup->wIndex = cpu_to_le16(msg->index);
 	setup->wLength = cpu_to_le16(msg->length);
 
-	if ((msg->requesttype & 0x80) == USB_ENDPOINT_OUT)
-		memcpy(urbdata + sizeof(struct usb_ctrl_setup), msg->data, msg->length);
+	if ((msg->requesttype & 0x80) == LIBUSB_ENDPOINT_OUT)
+		memcpy(urbdata + sizeof(struct libusb_ctrl_setup), msg->data, msg->length);
 
 	urbh->urb_type = USB_URB_TYPE_CONTROL;
 	urbh->buffer = urbdata;
@@ -349,7 +349,7 @@ int handle_transfer_completion(struct libusb_dev_handle *devh,
 		libusb_ctrl_cb_fn callback = urbh->callback;
 		if (callback)
 			callback(devh, urbh, status, urb->buffer,
-				urb->buffer + sizeof(struct usb_ctrl_setup), urbh->transferred,
+				urb->buffer + sizeof(struct libusb_ctrl_setup), urbh->transferred,
 				urbh->user_data);
 	} else if (urb->type == USB_URB_TYPE_BULK ||
 			urb->type == USB_URB_TYPE_INTERRUPT) {
@@ -567,7 +567,7 @@ struct sync_ctrl_handle {
 
 static void ctrl_msg_cb(struct libusb_dev_handle *devh,
 	struct libusb_urb_handle *urbh, enum fp_urb_cb_status status,
-	struct usb_ctrl_setup *setup, unsigned char *data, int actual_length,
+	struct libusb_ctrl_setup *setup, unsigned char *data, int actual_length,
 	void *user_data)
 {
 	struct sync_ctrl_handle *ctrlh = (struct sync_ctrl_handle *) user_data;
@@ -575,7 +575,7 @@ static void ctrl_msg_cb(struct libusb_dev_handle *devh,
 
 	if (status == FP_URB_COMPLETED) {
 		/* copy results into user-defined buffer */
-		if (setup->bRequestType & USB_ENDPOINT_IN)
+		if (setup->bRequestType & LIBUSB_ENDPOINT_IN)
 			memcpy(ctrlh->data, data, actual_length);
 	}
 

@@ -26,7 +26,7 @@ void print_devs(libusb_dev *devs)
 	libusb_dev *dev;
 
 	for (dev = devs; dev; dev = libusb_dev_next(dev)) {
-		struct usb_dev_descriptor *desc = libusb_dev_get_descriptor(dev);
+		struct libusb_dev_descriptor *desc = libusb_dev_get_descriptor(dev);
 		printf("%04x:%04x\n", desc->idVendor, desc->idProduct);
 	}
 }
