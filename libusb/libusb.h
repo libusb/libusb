@@ -184,7 +184,7 @@ typedef struct libusb_dev_handle libusb_dev_handle;
 struct libusb_urb_handle;
 typedef struct libusb_urb_handle libusb_urb_handle;
 
-enum fp_urb_cb_status {
+enum libusb_urb_cb_status {
 	FP_URB_SILENT_COMPLETION = 0,
 	FP_URB_COMPLETED,
 	FP_URB_TIMEOUT,
@@ -201,7 +201,7 @@ struct libusb_control_transfer {
 };
 
 typedef void (*libusb_ctrl_cb_fn)(libusb_dev_handle *devh, libusb_urb_handle *urbh,
-	enum fp_urb_cb_status status, struct libusb_ctrl_setup *setup,
+	enum libusb_urb_cb_status status, struct libusb_ctrl_setup *setup,
 	unsigned char *data, int actual_length, void *user_data);
 
 struct libusb_bulk_transfer {
@@ -211,7 +211,7 @@ struct libusb_bulk_transfer {
 };
 
 typedef void (*libusb_bulk_cb_fn)(libusb_dev_handle *devh, libusb_urb_handle *urbh,
-	enum fp_urb_cb_status status, unsigned char endpoint,
+	enum libusb_urb_cb_status status, unsigned char endpoint,
 	int rqlength, unsigned char *data, int actual_length, void *user_data);
 
 int libusb_init(int signum);

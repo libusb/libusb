@@ -79,12 +79,12 @@ static int parse_endpoint(struct libusb_endpoint_descriptor *endpoint,
 	/* Everything should be fine being passed into here, but we sanity */
 	/*  check JIC */
 	if (header.bLength > size) {
-		fp_err("ran out of descriptors parsing");
+		usbi_err("ran out of descriptors parsing");
 		return -1;
 	}
 
 	if (header.bDescriptorType != LIBUSB_DT_ENDPOINT) {
-		fp_err("unexpected descriptor %x (expected %x)",
+		usbi_err("unexpected descriptor %x (expected %x)",
 			header.bDescriptorType, LIBUSB_DT_ENDPOINT);
 		return parsed;
 	}
@@ -105,7 +105,7 @@ static int parse_endpoint(struct libusb_endpoint_descriptor *endpoint,
 		usbi_parse_descriptor(buffer, "bb", &header);
 
 		if (header.bLength < 2) {
-			fp_err("invalid descriptor length %d", header.bLength);
+			usbi_err("invalid descriptor length %d", header.bLength);
 			return -1;
 		}
 
@@ -116,7 +116,7 @@ static int parse_endpoint(struct libusb_endpoint_descriptor *endpoint,
 				(header.bDescriptorType == LIBUSB_DT_DEVICE))
 			break;
 
-		fp_dbg("skipping descriptor %x", header.bDescriptorType);
+		usbi_dbg("skipping descriptor %x", header.bDescriptorType);
 		buffer += header.bLength;
 		size -= header.bLength;
 		parsed += header.bLength;
@@ -179,7 +179,7 @@ static int parse_interface(struct libusb_interface *interface,
 		while (size >= DESC_HEADER_LENGTH) {
 			usbi_parse_descriptor(buffer, "bb", &header);
 			if (header.bLength < 2) {
-				fp_err("invalid descriptor of length %d", header.bLength);
+				usbi_err("invalid descriptor of length %d", header.bLength);
 				return -1;
 			}
 
@@ -220,7 +220,7 @@ static int parse_interface(struct libusb_interface *interface,
 			return parsed;
 
 		if (ifp->bNumEndpoints > USB_MAXENDPOINTS) {
-			fp_err("too many endpoints (%d)", ifp->bNumEndpoints);
+			usbi_err("too many endpoints (%d)", ifp->bNumEndpoints);
 			/* FIXME will leak memory */
 			return -1;
 		}
@@ -237,7 +237,7 @@ static int parse_interface(struct libusb_interface *interface,
 				usbi_parse_descriptor(buffer, "bb", &header);
 
 				if (header.bLength > size) {
-					fp_err("ran out of descriptors parsing");
+					usbi_err("ran out of descriptors parsing");
 					/* FIXME will leak memory */
 					return -1;
 				}
@@ -278,7 +278,7 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 	size = config->wTotalLength;
 
 	if (config->bNumInterfaces > USB_MAXINTERFACES) {
-		fp_err("too many interfaces (%d)", config->bNumInterfaces);
+		usbi_err("too many interfaces (%d)", config->bNumInterfaces);
 		return -1;
 	}
 
@@ -306,7 +306,7 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 
 			if ((header.bLength > size) ||
 					(header.bLength < DESC_HEADER_LENGTH)) {
-				fp_err("invalid descriptor length of %d", header.bLength);
+				usbi_err("invalid descriptor length of %d", header.bLength);
 				return -1;
 			}
 
@@ -317,7 +317,7 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 					(header.bDescriptorType == LIBUSB_DT_DEVICE))
 				break;
 
-			fp_dbg("skipping descriptor 0x%x\n", header.bDescriptorType);
+			usbi_dbg("skipping descriptor 0x%x\n", header.bDescriptorType);
 			buffer += header.bLength;
 			size -= header.bLength;
 		}
