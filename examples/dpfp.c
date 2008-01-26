@@ -205,7 +205,7 @@ static int set_mode(unsigned char data)
 }
 
 static void cb_mode_changed(struct libusb_dev_handle *_devh,
-	struct libusb_urb_handle *urbh, enum fp_urb_cb_status status,
+	struct libusb_urb_handle *urbh, enum libusb_urb_cb_status status,
 	struct libusb_ctrl_setup *setup, unsigned char *data, int actual_length,
 	void *user_data)
 {
@@ -337,7 +337,7 @@ static int next_state(void)
 }
 
 static void cb_irq(libusb_dev_handle *_devh, libusb_urb_handle *urbh,
-	enum fp_urb_cb_status status, unsigned char endpoint, int rqlength,
+	enum libusb_urb_cb_status status, unsigned char endpoint, int rqlength,
 	unsigned char *data, int actual_length, void *user_data)
 {
 	unsigned char irqtype = data[0];
@@ -376,7 +376,7 @@ static void cb_irq(libusb_dev_handle *_devh, libusb_urb_handle *urbh,
 }
 
 static void cb_img(libusb_dev_handle *_devh, libusb_urb_handle *urbh,
-	enum fp_urb_cb_status status, unsigned char endpoint, int rqlength,
+	enum libusb_urb_cb_status status, unsigned char endpoint, int rqlength,
 	unsigned char *data, int actual_length, void *user_data)
 {
 	if (status != FP_URB_COMPLETED) {
