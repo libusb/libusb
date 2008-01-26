@@ -24,6 +24,10 @@
 #include <stdint.h>
 #include <sys/time.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* standard USB stuff */
 
 /* Device and/or Interface Class codes */
@@ -260,5 +264,9 @@ int libusb_bulk_transfer(libusb_dev_handle *devh,
 int libusb_interrupt_transfer(libusb_dev_handle *devh,
 	struct libusb_bulk_transfer *transfer, int *transferred,
 	unsigned int timeout);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
