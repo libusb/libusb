@@ -176,7 +176,6 @@ static int submit_urb(struct libusb_dev_handle *devh,
 	urb->endpoint = urbh->endpoint;
 	urb->buffer = urbh->buffer + urbh->transferred;
 	urb->buffer_length = MIN(to_be_transferred, MAX_URB_BUFFER_LENGTH);
-	urb->signr = signum;
 
 	/* FIXME: for requests that we have to split into multiple URBs, we should
 	 * submit all the URBs instantly: submit, submit, submit, reap, reap, reap
@@ -492,24 +491,6 @@ static int handle_timeouts(void)
 	return 0;
 }
 
-static int reap(void)
-{
-	struct libusb_dev_handle *devh;
-	int r;
-
-	list_for_each_entry(devh, &open_devs, list) {
-		r = reap_for_devh(devh);
-		if (r == -1 && errno == EAGAIN)
-			continue;
-		if (r < 0)
-			return r;
-	}
-
-	r = handle_timeouts();
-
-	return 0;
-}
-
 static int flush_sigfd(void)
 {
 	int r;
@@ -528,24 +509,46 @@ static int flush_sigfd(void)
 
 static int poll_io(struct timeval *tv)
 {
+	struct libusb_dev_handle *devh;
 	int r;
-	fd_set fds;
+	int maxfd = sigfd;
+	fd_set readfds;
+	fd_set writefds;
 
-	FD_ZERO(&fds);
-	FD_SET(sigfd, &fds);
-	r = select(sigfd + 1, &fds, NULL, NULL, tv);
-	if (r == -1 && errno == EINTR)
+	FD_ZERO(&readfds);
+	FD_SET(sigfd, &readfds);
+
+	FD_ZERO(&writefds);
+	list_for_each_entry(devh, &open_devs, list) {
+		int fd = devh->fd;
+		FD_SET(fd, &writefds);
+		if (fd > maxfd)
+			maxfd = fd;
+	}
+
+	r = select(maxfd + 1, &readfds, &writefds, NULL, tv);
+	if (r == 0 || (r == -1 && errno == EINTR)) {
 		return 0;
-	if (r < 0) {
+	} else if (r < 0) {
 		usbi_err("select failed %d err=%d\n", r, errno);
 		return r;
 	}
 
-	if (r > 0) {
+	if (FD_ISSET(sigfd, &readfds))
 		flush_sigfd();
-		return reap();
+
+	list_for_each_entry(devh, &open_devs, list) {
+		if (!FD_ISSET(devh->fd, &writefds))
+			continue;
+		r = reap_for_devh(devh);
+		if (r == -1 && errno == EAGAIN)
+			continue;
+		if (r < 0)
+			return r;
 	}
 
+	/* FIXME check return value? */
+	handle_timeouts();
 	return 0;
 }
 
@@ -702,7 +705,7 @@ API_EXPORTED void libusb_urb_handle_free(struct libusb_urb_handle *urbh)
 	free(urbh);
 }
 
-API_EXPORTED int libusb_get_pollfd(void)
+int usbi_get_signalfd(void)
 {
 	return sigfd;
 }

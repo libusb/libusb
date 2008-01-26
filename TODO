@@ -1,10 +1,9 @@
 isochronous endpoint I/O
 optional timerfd support (runtime detection)
+timer (call me back in 2 seconds) implementation (then remove signalfd)
 API docs
 notifications of hotplugged/unplugged devices
 thread safety
-signalfd emulation through pipes and sigaction() for older kernels
-signalfd not needed for usbfs? can we poll on the fd?
 use poll() rather than select()?
 abstraction for cross-platform-ness
 

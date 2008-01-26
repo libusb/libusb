@@ -235,6 +235,11 @@ int libusb_release_interface(libusb_dev_handle *dev, int iface);
 
 /* async I/O */
 
+struct libusb_pollfd {
+	int fd;
+	short events;
+};
+
 libusb_urb_handle *libusb_async_control_transfer(libusb_dev_handle *devh,
 	struct libusb_control_transfer *transfer, libusb_ctrl_cb_fn callback,
 	void *user_data, unsigned int timeout);
@@ -252,7 +257,7 @@ void libusb_urb_handle_free(libusb_urb_handle *urbh);
 
 int libusb_poll_timeout(struct timeval *tv);
 int libusb_poll(void);
-int libusb_get_pollfd(void);
+size_t libusb_get_pollfds(struct libusb_pollfd **pollfds);
 
 /* sync I/O */
 

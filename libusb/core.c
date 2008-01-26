@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <features.h>
+#include <poll.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -304,6 +305,35 @@ API_EXPORTED void libusb_exit(void)
 			do_close(devh);
 	}
 	usbi_io_exit();
+}
+
+API_EXPORTED size_t libusb_get_pollfds(struct libusb_pollfd **pollfds)
+{
+	struct libusb_dev_handle *devh;
+	struct libusb_pollfd *ret;
+	/* initialise to 1 for signalfd */
+	size_t cnt = 1;
+	size_t i = 0;
+
+	/* count number of open devices */
+	list_for_each_entry(devh, &open_devs, list)
+		cnt++;
+
+	/* create array */
+	ret = calloc(cnt, sizeof(struct libusb_pollfd));
+
+	/* add fds */
+	list_for_each_entry(devh, &open_devs, list) {
+		ret[i++].fd = devh->fd;
+		ret[i].events = POLLOUT;
+	}
+	
+	/* add signalfd */
+	ret[i].fd = usbi_get_signalfd();
+	ret[i].events = POLLIN;
+
+	*pollfds = ret;
+	return cnt;
 }
 
 void usbi_log(enum usbi_log_level level, const char *function,
