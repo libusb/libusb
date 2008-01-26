@@ -40,8 +40,14 @@ AC_ARG_ENABLE([examples-build], [AS_HELP_STRING([--enable-examples-build],
 	[build_examples='no'])
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != "xno"])
 
+# Restore gnu89 inline semantics on gcc 4.3 and newer
+saved_cflags="$CFLAGS"
+CFLAGS="$CFLAGS -fgnu89-inline"
+AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]), inline_cflags="-fgnu89-inline", inline_cflags="")
+CFLAGS="$saved_cflags"
+
 AC_DEFINE([API_EXPORTED], [__attribute__((visibility("default")))], [Default visibility])
-AM_CFLAGS="-std=gnu99 -fgnu89-inline -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration -Wno-pointer-sign -Wshadow"
+AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration -Wno-pointer-sign -Wshadow"
 AC_SUBST(AM_CFLAGS)
 
 AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [examples/Makefile])
