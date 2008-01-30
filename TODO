@@ -1,13 +1,22 @@
-isochronous endpoint I/O
-optional timerfd support (runtime detection)
+high priority
+=============
+cancellation race concerns - better tracking of kernel feedback?
+
+for 1.0
+=======
 API docs
-notifications of hotplugged/unplugged devices
+isochronous endpoint I/O
 thread safety
-use poll() rather than select()?
 abstraction for cross-platform-ness
 
-API style/naming points to reconsider
-=====================================
+for 1.1 or future
+==================
+optional timerfd support (runtime detection)
+notifications of hotplugged/unplugged devices
+use poll() rather than select()?
+
+1.0 API style/naming points to reconsider
+=========================================
 
 struct libusb_(bulk|control)_transfer or parameters?
 devh in general
