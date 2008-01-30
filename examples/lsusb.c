@@ -34,7 +34,12 @@ void print_devs(libusb_dev *devs)
 int main(void)
 {
 	libusb_dev *devs;
-	libusb_init(0);
+	int r;
+
+	r = libusb_init();
+	if (r < 0)
+		return r;
+
 	libusb_find_devices();
 	devs = libusb_get_devices();
 

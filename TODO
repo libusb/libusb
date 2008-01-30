@@ -1,6 +1,5 @@
 isochronous endpoint I/O
 optional timerfd support (runtime detection)
-timer (call me back in 2 seconds) implementation (then remove signalfd)
 API docs
 notifications of hotplugged/unplugged devices
 thread safety

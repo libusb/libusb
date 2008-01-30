@@ -169,8 +169,7 @@ struct libusb_urb_handle {
 	struct libusb_dev_handle *devh;
 	struct usb_urb urb;
 	struct list_head list;
-	struct timespec timeout;
-	timer_t timer;
+	struct timeval timeout;
 	unsigned char urb_type;
 	unsigned char endpoint;
 	int transfer_len;
@@ -193,8 +192,7 @@ struct usb_descriptor_header {
 
 extern struct list_head open_devs;
 
-int usbi_io_init(int _signum);
-void usbi_io_exit(void);
+void usbi_io_init(void);
 
 int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest);
 int usbi_parse_configuration(struct libusb_config_descriptor *config,

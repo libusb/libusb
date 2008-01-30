@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <sys/time.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -218,7 +219,7 @@ typedef void (*libusb_bulk_cb_fn)(libusb_dev_handle *devh, libusb_urb_handle *ur
 	enum libusb_urb_cb_status status, unsigned char endpoint,
 	int rqlength, unsigned char *data, int actual_length, void *user_data);
 
-int libusb_init(int signum);
+int libusb_init(void);
 void libusb_exit(void);
 
 int libusb_find_devices(void);
@@ -257,6 +258,7 @@ void libusb_urb_handle_free(libusb_urb_handle *urbh);
 
 int libusb_poll_timeout(struct timeval *tv);
 int libusb_poll(void);
+int libusb_get_next_timeout(struct timeval *tv);
 size_t libusb_get_pollfds(struct libusb_pollfd **pollfds);
 
 /* sync I/O */

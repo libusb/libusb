@@ -473,7 +473,7 @@ int main(void)
 	struct sigaction sigact;
 	int r = 1;
 
-	r = libusb_init(0);
+	r = libusb_init();
 	if (r < 0) {
 		fprintf(stderr, "failed to initialise libusb\n");
 		exit(1);

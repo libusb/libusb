@@ -286,13 +286,14 @@ API_EXPORTED int libusb_release_interface(struct libusb_dev_handle *dev,
 	return r;
 }
 
-API_EXPORTED int libusb_init(int signum)
+API_EXPORTED int libusb_init(void)
 {
 	/* FIXME: find correct usb node path */
 	usbi_dbg("");
 	list_init(&usb_devs);
 	list_init(&open_devs);
-	return usbi_io_init(signum);
+	usbi_io_init();
+	return 0;
 }
 
 API_EXPORTED void libusb_exit(void)
@@ -304,15 +305,13 @@ API_EXPORTED void libusb_exit(void)
 		list_for_each_entry(devh, &open_devs, list)
 			do_close(devh);
 	}
-	usbi_io_exit();
 }
 
 API_EXPORTED size_t libusb_get_pollfds(struct libusb_pollfd **pollfds)
 {
 	struct libusb_dev_handle *devh;
 	struct libusb_pollfd *ret;
-	/* initialise to 1 for signalfd */
-	size_t cnt = 1;
+	size_t cnt = 0;
 	size_t i = 0;
 
 	/* count number of open devices */
@@ -328,10 +327,6 @@ API_EXPORTED size_t libusb_get_pollfds(struct libusb_pollfd **pollfds)
 		ret[i].events = POLLOUT;
 	}
 	
-	/* add signalfd */
-	ret[i].fd = usbi_get_signalfd();
-	ret[i].events = POLLIN;
-
 	*pollfds = ret;
 	return cnt;
 }

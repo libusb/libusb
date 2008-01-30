@@ -30,19 +30,7 @@
 #include <time.h>
 #include <unistd.h>
 
-/* signalfd() support is present in glibc-2.7 onwards, but glibc-2.7 contains
- * a bug where the header is neither installed or compilable. This will be
- * fixed for glibc-2.8. */
-#if __GLIBC_PREREQ(2, 8)
-#include <sys/signalfd.h>
-#else
-#include "signalfd.h"
-#endif
-
 #include "libusbi.h"
-
-static int sigfd;
-static int signum;
 
 /* this is a list of in-flight rb_handles, sorted by timeout expiration.
  * URBs to timeout the soonest are placed at the beginning of the list, URBs
@@ -50,37 +38,9 @@ static int signum;
  * are always placed at the very end. */
 static struct list_head flying_urbs;
 
-static int setup_signalfd(int _signum)
-{
-	sigset_t sigset;
-	if (_signum == 0)
-		_signum = SIGRTMIN;
-	usbi_dbg("signal %d", _signum);
-
-	sigemptyset(&sigset);
-	sigaddset(&sigset, _signum);
-	sigfd = signalfd(-1, &sigset, 0);
-	if (sigfd < 0) {
-		usbi_err("signalfd failed, code=%d errno=%d", sigfd, errno);
-		return sigfd;
-	}
-	usbi_dbg("got signalfd %d", sigfd);
-	signum = _signum;
-
-	sigemptyset(&sigset);
-	sigaddset(&sigset, _signum);
-	return sigprocmask(SIG_BLOCK, &sigset, NULL);
-}
-
-int usbi_io_init(int _signum)
+void usbi_io_init()
 {
 	list_init(&flying_urbs);
-	return setup_signalfd(signum);
-}
-
-void usbi_io_exit(void)
-{
-	close(sigfd);
 }
 
 static int calculate_timeout(struct libusb_urb_handle *urbh,
@@ -88,12 +48,6 @@ static int calculate_timeout(struct libusb_urb_handle *urbh,
 {
 	int r;
 	struct timespec current_time;
-	struct sigevent sigevt = {
-		.sigev_notify = SIGEV_SIGNAL,
-		.sigev_signo = signum,
-	};
-	struct itimerspec itspec;
-	struct timespec *it_value = &itspec.it_value;
 
 	if (!timeout)
 		return 0;
@@ -104,37 +58,22 @@ static int calculate_timeout(struct libusb_urb_handle *urbh,
 		return r;
 	}
 
-	r = timer_create(CLOCK_MONOTONIC, &sigevt, &urbh->timer);
-	if (r < 0) {
-		usbi_err("failed to create monotonic timer");
-		return r;
+	current_time.tv_sec += timeout / 1000;
+	current_time.tv_nsec += (timeout % 1000) * 1000000;
+
+	if (current_time.tv_nsec > 1000000000) {
+		current_time.tv_nsec -= 1000000000;
+		current_time.tv_sec++;
 	}
 
-	memset(&itspec, 0, sizeof(itspec));
-	it_value->tv_sec = current_time.tv_sec + (timeout / 1000);
-	it_value->tv_nsec = current_time.tv_nsec +
-		((timeout % 1000) * 1000000);
-
-	if (it_value->tv_nsec > 1000000000) {
-		it_value->tv_nsec -= 1000000000;
-		it_value->tv_sec++;
-	}
-
-	r = timer_settime(&urbh->timer, TIMER_ABSTIME, &itspec, NULL);
-	if (r < 0) {
-		usbi_err("failed to arm monotonic timer");
-		return r;
-	}
-
-	urbh->timeout = itspec.it_value;
-
+	TIMESPEC_TO_TIMEVAL(&urbh->timeout, &current_time);
 	return 0;
 }
 
 static void add_to_flying_list(struct libusb_urb_handle *urbh)
 {
 	struct libusb_urb_handle *cur;
-	struct timespec *timeout = &urbh->timeout;
+	struct timeval *timeout = &urbh->timeout;
 
 	/* if we have no other flying urbs, start the list with this one */
 	if (list_empty(&flying_urbs)) {
@@ -143,7 +82,7 @@ static void add_to_flying_list(struct libusb_urb_handle *urbh)
 	}
 
 	/* if we have infinite timeout, append to end of list */
-	if (!TIMESPEC_IS_SET(timeout)) {
+	if (!timerisset(timeout)) {
 		list_add_tail(&urbh->list, &flying_urbs);
 		return;
 	}
@@ -151,11 +90,11 @@ static void add_to_flying_list(struct libusb_urb_handle *urbh)
 	/* otherwise, find appropriate place in list */
 	list_for_each_entry(cur, &flying_urbs, list) {
 		/* find first timeout that occurs after the urbh in question */
-		struct timespec *cur_ts = &cur->timeout;
+		struct timeval *cur_tv = &cur->timeout;
 
-		if (!TIMESPEC_IS_SET(cur_ts) || (cur_ts->tv_sec > timeout->tv_sec) ||
-				(cur_ts->tv_sec == timeout->tv_sec &&
-					cur_ts->tv_nsec > timeout->tv_nsec)) {
+		if (!timerisset(cur_tv) || (cur_tv->tv_sec > timeout->tv_sec) ||
+				(cur_tv->tv_sec == timeout->tv_sec &&
+					cur_tv->tv_usec > timeout->tv_usec)) {
 			list_add_tail(&urbh->list, &cur->list);
 			return;
 		}
@@ -341,9 +280,6 @@ int handle_transfer_completion(struct libusb_dev_handle *devh,
 {
 	struct usb_urb *urb = &urbh->urb;
 
-	if (TIMESPEC_IS_SET(&urbh->timeout))
-		timer_delete(urbh->timer);
-
 	if (status == FP_URB_SILENT_COMPLETION)
 		return 0;
 
@@ -457,7 +393,8 @@ static void handle_timeout(struct libusb_urb_handle *urbh)
 
 static int handle_timeouts(void)
 {
-	struct timespec systime;
+	struct timespec systime_ts;
+	struct timeval systime;
 	struct libusb_urb_handle *urbh;
 	int r;
 
@@ -465,23 +402,29 @@ static int handle_timeouts(void)
 		return 0;
 
 	/* get current time */
-	r = clock_gettime(CLOCK_MONOTONIC, &systime);
+	r = clock_gettime(CLOCK_MONOTONIC, &systime_ts);
 	if (r < 0)
 		return r;
+
+	TIMESPEC_TO_TIMEVAL(&systime, &systime_ts);
 
 	/* iterate through flying urbs list, finding all urbs that have expired
 	 * timeouts */
 	list_for_each_entry(urbh, &flying_urbs, list) {
-		struct timespec *cur_ts = &urbh->timeout;
+		struct timeval *cur_tv = &urbh->timeout;
 
 		/* if we've reached urbs of infinite timeout, we're all done */
-		if (!TIMESPEC_IS_SET(cur_ts))
+		if (!timerisset(cur_tv))
 			return 0;
 
+		/* ignore timeouts we've already handled */
+		if (urbh->flags & LIBUSB_URBH_TIMED_OUT)
+			continue;
+
 		/* if urb has non-expired timeout, nothing more to do */
-		if ((cur_ts->tv_sec > systime.tv_sec) ||
-				(cur_ts->tv_sec == systime.tv_sec &&
-					cur_ts->tv_nsec > systime.tv_nsec))
+		if ((cur_tv->tv_sec > systime.tv_sec) ||
+				(cur_tv->tv_sec == systime.tv_sec &&
+					cur_tv->tv_usec > systime.tv_usec))
 			return 0;
 	
 		/* otherwise, we've got an expired timeout to handle */
@@ -491,32 +434,29 @@ static int handle_timeouts(void)
 	return 0;
 }
 
-static int flush_sigfd(void)
-{
-	int r;
-	struct signalfd_siginfo siginfo;
-	r = read(sigfd, &siginfo, sizeof(siginfo));
-	if (r < 0) {
-		usbi_err("sigfd read failed %d %d", r, errno);
-		return r;
-	}
-	if ((unsigned int) r < sizeof(siginfo)) {
-		usbi_err("sigfd short read (%d/%d)", r, sizeof(siginfo));
-		return -1;
-	}
-	return 0;
-}
-
 static int poll_io(struct timeval *tv)
 {
 	struct libusb_dev_handle *devh;
 	int r;
-	int maxfd = sigfd;
-	fd_set readfds;
+	int maxfd = 0;
 	fd_set writefds;
+	struct timeval select_timeout;
+	struct timeval timeout;
 
-	FD_ZERO(&readfds);
-	FD_SET(sigfd, &readfds);
+	r = libusb_get_next_timeout(&timeout);
+	if (r) {
+		/* timeout already expired? */
+		if (!timerisset(&timeout))
+			return handle_timeouts();
+
+		/* choose the smallest of next URB timeout or user specified timeout */
+		if (timercmp(&timeout, tv, <))
+			select_timeout = timeout;
+		else
+			select_timeout = *tv;
+	} else {
+		select_timeout = *tv;
+	}
 
 	FD_ZERO(&writefds);
 	list_for_each_entry(devh, &open_devs, list) {
@@ -526,16 +466,20 @@ static int poll_io(struct timeval *tv)
 			maxfd = fd;
 	}
 
-	r = select(maxfd + 1, &readfds, &writefds, NULL, tv);
-	if (r == 0 || (r == -1 && errno == EINTR)) {
+	usbi_dbg("select() with timeout in %d.%06ds", select_timeout.tv_sec,
+		select_timeout.tv_usec);
+	r = select(maxfd + 1, NULL, &writefds, NULL, &select_timeout);
+	usbi_dbg("select() returned %d with %d.%06ds remaining", r, select_timeout.tv_sec,
+		select_timeout.tv_usec);
+	if (r == 0) {
+		*tv = select_timeout;
+		return handle_timeouts();
+	} else if (r == -1 && errno == EINTR) {
 		return 0;
 	} else if (r < 0) {
 		usbi_err("select failed %d err=%d\n", r, errno);
 		return r;
 	}
-
-	if (FD_ISSET(sigfd, &readfds))
-		flush_sigfd();
 
 	list_for_each_entry(devh, &open_devs, list) {
 		if (!FD_ISSET(devh->fd, &writefds))
@@ -548,8 +492,7 @@ static int poll_io(struct timeval *tv)
 	}
 
 	/* FIXME check return value? */
-	handle_timeouts();
-	return 0;
+	return handle_timeouts();
 }
 
 API_EXPORTED int libusb_poll_timeout(struct timeval *tv)
@@ -560,9 +503,62 @@ API_EXPORTED int libusb_poll_timeout(struct timeval *tv)
 API_EXPORTED int libusb_poll(void)
 {
 	struct timeval tv;
-	tv.tv_sec = 0;
-	tv.tv_usec = 500000;
+	tv.tv_sec = 2;
+	tv.tv_usec = 0;
 	return poll_io(&tv);
+}
+
+API_EXPORTED int libusb_get_next_timeout(struct timeval *tv)
+{
+	struct libusb_urb_handle *urbh;
+	struct timespec cur_ts;
+	struct timeval cur_tv;
+	struct timeval *next_timeout;
+	int r;
+	int found = 0;
+
+	if (list_empty(&flying_urbs)) {
+		usbi_dbg("no URBs, no timeout!");
+		return 0;
+	}
+
+	/* find next urb which hasn't already been processed as timed out */
+	list_for_each_entry(urbh, &flying_urbs, list) {
+		if (!(urbh->flags & LIBUSB_URBH_TIMED_OUT)) {
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found) {
+		usbi_dbg("all URBs have already been processed for timeouts");
+		return 0;
+	}
+
+	next_timeout = &urbh->timeout;
+
+	/* no timeout for next urb */
+	if (!timerisset(next_timeout)) {
+		usbi_dbg("no URBs with timeouts, no timeout!");
+		return 0;
+	}
+
+	r = clock_gettime(CLOCK_MONOTONIC, &cur_ts);
+	if (r < 0) {
+		usbi_err("failed to read monotonic clock, errno=%d", errno);
+		return r;
+	}
+	TIMESPEC_TO_TIMEVAL(&cur_tv, &cur_ts);
+
+	if (timercmp(&cur_tv, next_timeout, >=)) {
+		usbi_dbg("first timeout already expired");
+		timerclear(tv);
+	} else {
+		timersub(next_timeout, &cur_tv, tv);
+		usbi_dbg("next timeout in %d.%06ds", tv->tv_sec, tv->tv_usec);
+	}
+
+	return 1;
 }
 
 struct sync_ctrl_handle {
@@ -703,10 +699,5 @@ API_EXPORTED void libusb_urb_handle_free(struct libusb_urb_handle *urbh)
 	if (!(urbh->flags & LIBUSB_URBH_DATA_BELONGS_TO_USER))
 		free(urbh->urb.buffer);
 	free(urbh);
-}
-
-int usbi_get_signalfd(void)
-{
-	return sigfd;
 }
 
