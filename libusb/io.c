@@ -38,9 +38,15 @@
  * are always placed at the very end. */
 static struct list_head flying_urbs;
 
+/* user callbacks for pollfd changes */
+static libusb_pollfd_added_cb fd_added_cb = NULL;
+static libusb_pollfd_removed_cb fd_removed_cb = NULL;
+
 void usbi_io_init()
 {
 	list_init(&flying_urbs);
+	fd_added_cb = NULL;
+	fd_removed_cb = NULL;
 }
 
 static int calculate_timeout(struct libusb_urb_handle *urbh,
@@ -275,6 +281,7 @@ API_EXPORTED int libusb_urb_handle_cancel_sync(struct libusb_dev_handle *devh,
 	return 0;
 }
 
+#include <stdio.h>
 int handle_transfer_completion(struct libusb_dev_handle *devh,
 	struct libusb_urb_handle *urbh, enum libusb_urb_cb_status status)
 {
@@ -285,6 +292,11 @@ int handle_transfer_completion(struct libusb_dev_handle *devh,
 
 	if (urb->type == USB_URB_TYPE_CONTROL) {
 		libusb_ctrl_cb_fn callback = urbh->callback;
+		int i;
+		printf("ctrl completed status %d\n", status);
+		for (i = 0; i < urbh->transferred + sizeof(struct libusb_ctrl_setup); i++)
+			printf("%02x ", ((unsigned char *) urb->buffer)[i]);
+		printf("\n");
 		if (callback)
 			callback(devh, urbh, status, urb->buffer,
 				urb->buffer + sizeof(struct libusb_ctrl_setup), urbh->transferred,
@@ -699,5 +711,26 @@ API_EXPORTED void libusb_urb_handle_free(struct libusb_urb_handle *urbh)
 	if (!(urbh->flags & LIBUSB_URBH_DATA_BELONGS_TO_USER))
 		free(urbh->urb.buffer);
 	free(urbh);
+}
+
+API_EXPORTED void libusb_set_pollfd_notifiers(libusb_pollfd_added_cb added_cb,
+	libusb_pollfd_removed_cb removed_cb)
+{
+	fd_added_cb = added_cb;
+	fd_removed_cb = removed_cb;
+}
+
+void usbi_add_pollfd(int fd, short events)
+{
+	usbi_dbg("add fd %d events %d", fd, events);
+	if (fd_added_cb)
+		fd_added_cb(fd, events);
+}
+
+void usbi_remove_pollfd(int fd)
+{
+	usbi_dbg("remove fd %d", fd);
+	if (fd_removed_cb)
+		fd_removed_cb(fd);
 }
 

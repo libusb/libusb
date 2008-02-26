@@ -238,12 +238,14 @@ API_EXPORTED struct libusb_dev_handle *libusb_open(struct libusb_dev *dev)
 	devh->fd = fd;
 	devh->dev = dev;
 	list_add(&devh->list, &open_devs);
+	usbi_add_pollfd(fd, POLLOUT);
 	return devh;
 }
 
 static void do_close(struct libusb_dev_handle *devh)
 {
-	close(devh->fd);	
+	usbi_remove_pollfd(devh->fd);
+	close(devh->fd);
 }
 
 API_EXPORTED void libusb_close(struct libusb_dev_handle *devh)
@@ -320,6 +322,8 @@ API_EXPORTED size_t libusb_get_pollfds(struct libusb_pollfd **pollfds)
 
 	/* create array */
 	ret = calloc(cnt, sizeof(struct libusb_pollfd));
+	if (!ret)
+		return -ENOMEM;
 
 	/* add fds */
 	list_for_each_entry(devh, &open_devs, list) {

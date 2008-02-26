@@ -236,11 +236,6 @@ int libusb_release_interface(libusb_dev_handle *dev, int iface);
 
 /* async I/O */
 
-struct libusb_pollfd {
-	int fd;
-	short events;
-};
-
 libusb_urb_handle *libusb_async_control_transfer(libusb_dev_handle *devh,
 	struct libusb_control_transfer *transfer, libusb_ctrl_cb_fn callback,
 	void *user_data, unsigned int timeout);
@@ -256,11 +251,6 @@ int libusb_urb_handle_cancel_sync(libusb_dev_handle *devh,
 	libusb_urb_handle *urbh);
 void libusb_urb_handle_free(libusb_urb_handle *urbh);
 
-int libusb_poll_timeout(struct timeval *tv);
-int libusb_poll(void);
-int libusb_get_next_timeout(struct timeval *tv);
-size_t libusb_get_pollfds(struct libusb_pollfd **pollfds);
-
 /* sync I/O */
 
 int libusb_control_transfer(libusb_dev_handle *devh,
@@ -271,6 +261,22 @@ int libusb_bulk_transfer(libusb_dev_handle *devh,
 int libusb_interrupt_transfer(libusb_dev_handle *devh,
 	struct libusb_bulk_transfer *transfer, int *transferred,
 	unsigned int timeout);
+
+/* polling and timeouts */
+struct libusb_pollfd {
+	int fd;
+	short events;
+};
+
+int libusb_poll_timeout(struct timeval *tv);
+int libusb_poll(void);
+int libusb_get_next_timeout(struct timeval *tv);
+size_t libusb_get_pollfds(struct libusb_pollfd **pollfds);
+
+typedef void (*libusb_pollfd_added_cb)(int fd, short events);
+typedef void (*libusb_pollfd_removed_cb)(int fd);
+void libusb_set_pollfd_notifiers(libusb_pollfd_added_cb added_cb,
+	libusb_pollfd_removed_cb removed_cb);
 
 #ifdef __cplusplus
 }

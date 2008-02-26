@@ -193,6 +193,8 @@ struct usb_descriptor_header {
 extern struct list_head open_devs;
 
 void usbi_io_init(void);
+void usbi_add_pollfd(int fd, short events);
+void usbi_remove_pollfd(int fd);
 
 int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest);
 int usbi_parse_configuration(struct libusb_config_descriptor *config,

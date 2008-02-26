@@ -23,3 +23,4 @@ devh in general
 urbh in general (should this be a transfer handle?)
 find/get devices API
 config struct/function naming
+typedef _cb or _cb_fn or _cb_t?
