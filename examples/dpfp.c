@@ -21,6 +21,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include <errno.h>
 #include <signal.h>
 #include <string.h>
 #include <stdio.h>
@@ -78,19 +79,38 @@ static struct libusb_bulk_transfer irqtrf = {
 	.length = sizeof(irqbuf),
 };
 
-static struct libusb_dev *find_dpfp_device(void)
+static int find_dpfp_device(void)
 {
-	struct libusb_dev *dev;
+	struct libusb_device *dev;
+	struct libusb_device *found = NULL;
+	struct libusb_device **devs;
+	size_t i = 0;
+	int r;
 
-	libusb_find_devices();
+	r = libusb_get_device_list(&devs);
+	if (r < 0)
+		return r;
 
-	for (dev = libusb_get_devices(); dev; dev = libusb_dev_next(dev)) {
-		struct libusb_dev_descriptor *desc = libusb_dev_get_descriptor(dev);
-		if (desc->idVendor == 0x05ba && desc->idProduct == 0x000a)
-			return dev;
+	while ((dev = devs[i++]) != NULL) {
+		struct libusb_dev_descriptor *desc = libusb_device_get_descriptor(dev);
+		if (desc->idVendor == 0x05ba && desc->idProduct == 0x000a) {
+			found = dev;
+			break;
+		}
 	}
 
-	return NULL;
+	if (!found) {
+		r = -ENODEV;
+		goto out;
+	}
+
+	devh = libusb_open(dev);
+	if (!devh)
+		r = -EIO;
+
+out:
+	libusb_free_device_list(devs, 1);
+	return r;
 }
 
 static int print_f0_data(void)
@@ -469,7 +489,6 @@ static void sighandler(int signum)
 
 int main(void)
 {
-	struct libusb_dev *dev;
 	struct sigaction sigact;
 	int r = 1;
 
@@ -479,19 +498,11 @@ int main(void)
 		exit(1);
 	}
 
-	dev = find_dpfp_device();
-	if (!dev) {
-		fprintf(stderr, "No device found\n");
+	r = find_dpfp_device();
+	if (r < 0) {
+		fprintf(stderr, "Could not find/open device\n");
 		goto out;
 	}
-	printf("found device\n");
-
-	devh = libusb_open(dev);
-	if (!devh) {
-		fprintf(stderr, "Could not open device\n");
-		goto out;
-	}
-	printf("opened device\n");
 
 	r = libusb_claim_interface(devh, 0);
 	if (r < 0) {

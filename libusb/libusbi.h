@@ -143,8 +143,8 @@ void usbi_log(enum usbi_log_level, const char *function, const char *format, ...
 #define usbi_warn(fmt...) _usbi_log(LOG_LEVEL_WARNING, fmt)
 #define usbi_err(fmt...) _usbi_log(LOG_LEVEL_ERROR, fmt)
 
-struct libusb_dev {
-	struct list_head list;
+struct libusb_device {
+	int refcnt;
 	char *nodepath;
 	struct libusb_dev_descriptor desc;
 	struct libusb_config_descriptor *config;
@@ -152,7 +152,7 @@ struct libusb_dev {
 
 struct libusb_dev_handle {
 	struct list_head list;
-	struct libusb_dev *dev;
+	struct libusb_device *dev;
 	int fd;
 };
 

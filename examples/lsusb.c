@@ -21,29 +21,32 @@
 
 #include <libusb/libusb.h>
 
-void print_devs(libusb_dev *devs)
+void print_devs(libusb_device **devs)
 {
-	libusb_dev *dev;
+	libusb_device *dev;
+	int i;
 
-	for (dev = devs; dev; dev = libusb_dev_next(dev)) {
-		struct libusb_dev_descriptor *desc = libusb_dev_get_descriptor(dev);
+	while ((dev = devs[i++]) != NULL) {
+		struct libusb_dev_descriptor *desc = libusb_device_get_descriptor(dev);
 		printf("%04x:%04x\n", desc->idVendor, desc->idProduct);
 	}
 }
 
 int main(void)
 {
-	libusb_dev *devs;
+	libusb_device **devs;
 	int r;
 
 	r = libusb_init();
 	if (r < 0)
 		return r;
 
-	libusb_find_devices();
-	devs = libusb_get_devices();
+	r = libusb_get_device_list(&devs);
+	if (r < 0)
+		return r;
 
 	print_devs(devs);
+	libusb_free_device_list(devs, 1);
 
 	libusb_exit();
 	return 0;

@@ -180,8 +180,8 @@ struct libusb_ctrl_setup {
 
 /* libusb */
 
-struct libusb_dev;
-typedef struct libusb_dev libusb_dev;
+struct libusb_device;
+typedef struct libusb_device libusb_device;
 
 struct libusb_dev_handle;
 typedef struct libusb_dev_handle libusb_dev_handle;
@@ -222,15 +222,16 @@ typedef void (*libusb_bulk_cb_fn)(libusb_dev_handle *devh, libusb_urb_handle *ur
 int libusb_init(void);
 void libusb_exit(void);
 
-int libusb_find_devices(void);
-libusb_dev *libusb_get_devices(void);
-struct libusb_dev_descriptor *libusb_dev_get_descriptor(libusb_dev *dev);
-struct libusb_config_descriptor *libusb_dev_get_config(libusb_dev *dev);
-libusb_dev *libusb_dev_next(libusb_dev *dev);
+int libusb_get_device_list(libusb_device ***list);
+void libusb_free_device_list(libusb_device **list, int unref_devices);
+struct libusb_dev_descriptor *libusb_device_get_descriptor(libusb_device *dev);
+struct libusb_config_descriptor *libusb_device_get_config(libusb_device *dev);
+libusb_device *libusb_device_ref(libusb_device *dev);
+void libusb_device_unref(libusb_device *dev);
 
-libusb_dev_handle *libusb_open(libusb_dev *dev);
+libusb_dev_handle *libusb_open(libusb_device *dev);
 void libusb_close(libusb_dev_handle *devh);
-struct libusb_dev *libusb_devh_get_dev(libusb_dev_handle *devh);
+struct libusb_device *libusb_devh_get_device(libusb_dev_handle *devh);
 int libusb_claim_interface(libusb_dev_handle *dev, int iface);
 int libusb_release_interface(libusb_dev_handle *dev, int iface);
 

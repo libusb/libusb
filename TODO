@@ -8,6 +8,10 @@ API docs
 isochronous endpoint I/O
 thread safety
 abstraction for cross-platform-ness
+fallback on /proc/bus/usb on linux
+error codes
+assign session ID to each libusb_device
+share libusb_device structures in memory between all get_devices callers
 
 for 1.1 or future
 ==================
@@ -21,6 +25,6 @@ use poll() rather than select()?
 struct libusb_(bulk|control)_transfer or parameters?
 devh in general
 urbh in general (should this be a transfer handle?)
-find/get devices API
 config struct/function naming
 typedef _cb or _cb_fn or _cb_t?
+typedef as-is or pointers? libusb_dev_t rather than libusb_dev *?

@@ -37,14 +37,82 @@
 #include "libusb.h"
 #include "libusbi.h"
 
-static struct list_head usb_devs;
 struct list_head open_devs;
 
-static int scan_device(char *busdir, const char *devnum)
+/* we traverse usbfs without knowing how many devices we are going to find.
+ * so we create this discovered_devs model which is similar to a linked-list
+ * which grows when required. it can be freed once discovery has completed,
+ * eliminating the need for a list node in the libusb_device structure
+ * itself. */
+#define DISCOVERED_DEVICES_SIZE_STEP 8
+struct discovered_devs {
+	size_t len;
+	size_t capacity;
+	struct libusb_device *devices[0];
+};
+
+static struct discovered_devs *discovered_devs_alloc(void)
+{
+	struct discovered_devs *ret =
+		malloc(sizeof(*ret) + (sizeof(void *) * DISCOVERED_DEVICES_SIZE_STEP));
+
+	if (ret) {
+		ret->len = 0;
+		ret->capacity = DISCOVERED_DEVICES_SIZE_STEP;
+	}
+	return ret;
+}
+
+/* append a device to the discovered devices collection. may realloc itself,
+ * returning new discdevs. returns NULL on realloc failure. */
+static struct discovered_devs *discovered_devs_append(
+	struct discovered_devs *discdevs, struct libusb_device *dev)
+{
+	size_t len = discdevs->len;
+	size_t capacity;
+
+	/* if there is space, just append the device */
+	if (len < discdevs->capacity) {
+		discdevs->devices[len] = dev;
+		discdevs->len++;
+		return discdevs;
+	}
+
+	/* exceeded capacity, need to grow */
+	usbi_dbg("need to increase capacity");
+	capacity = discdevs->capacity + DISCOVERED_DEVICES_SIZE_STEP;
+	discdevs = realloc(discdevs,
+		sizeof(*discdevs) + (sizeof(void *) * capacity));
+	if (discdevs) {
+		discdevs->capacity = capacity;
+		discdevs->devices[len] = dev;
+		discdevs->len++;
+	}
+
+	return discdevs;
+}
+
+static void discovered_devs_free(struct discovered_devs *discdevs)
+{
+	size_t i;
+
+	for (i = 0; i < discdevs->len; i++)
+		libusb_device_unref(discdevs->devices[i]);
+
+	free(discdevs);
+}
+
+/* open a device file, set up the libusb_device structure for it, and add it to
+ * discdevs. on failure (non-zero return) the pre-existing discdevs should
+ * be destroyed (and devices freed). on success, the new discdevs pointer
+ * should be used it may have been moved. */
+static int scan_device(struct discovered_devs **_discdevs,
+	char *busdir, const char *devnum)
 {
 	char path[PATH_MAX + 1];
 	unsigned char raw_desc[DEVICE_DESC_LENGTH];
-	struct libusb_dev *dev = malloc(sizeof(*dev));
+	struct libusb_device *dev = malloc(sizeof(*dev));
+	struct discovered_devs *discdevs;
 	int fd = 0;
 	int i;
 	int r;
@@ -53,12 +121,18 @@ static int scan_device(char *busdir, const char *devnum)
 	if (!dev)
 		return -1;
 
+	dev->refcnt = 1;
+	dev->nodepath = NULL;
+	dev->config = NULL;
+
 	snprintf(path, PATH_MAX, "%s/%s", busdir, devnum);
 	usbi_dbg("%s", path);
 	fd = open(path, O_RDWR);
 	if (!fd) {
 		usbi_dbg("open '%s' failed, ret=%d errno=%d", path, fd, errno);
 		r = -1;
+		/* FIXME this might not be an error if the file has gone away due
+		 * to unplugging */
 		goto err;
 	}
 
@@ -87,12 +161,11 @@ static int scan_device(char *busdir, const char *devnum)
 	tmp = dev->desc.bNumConfigurations * sizeof(struct libusb_config_descriptor);
 	dev->config = malloc(tmp);
 	if (!dev->config) {
-		r = -1;
+		r = -ENOMEM;
 		goto err;
 	}
 
 	memset(dev->config, 0, tmp);
-
 	for (i = 0; i < dev->desc.bNumConfigurations; i++) {
 		unsigned char buffer[8], *bigbuffer;
 		struct libusb_config_descriptor config;
@@ -132,46 +205,73 @@ static int scan_device(char *busdir, const char *devnum)
 		goto err;
 
 	usbi_dbg("found device %04x:%04x", dev->desc.idVendor, dev->desc.idProduct);
-	list_add(&dev->list, &usb_devs);
-	r = 0;
+	discdevs = discovered_devs_append(*_discdevs, dev);
+	if (discdevs) {
+		*_discdevs = discdevs;
+		return 0;
+	}
 
 err:
 	if (fd)
 		close(fd);
-	if (r < 0 && dev)
+	if (dev->config)
+		free(dev->config);
+	if (dev->nodepath)
+		free(dev->nodepath);
+	if (dev)
 		free(dev);
 	return r;
 }
 
-static int scan_busdir(const char *busnum)
+/* open a bus directory and adds all discovered devices to discdevs. on
+ * failure (non-zero return) the pre-existing discdevs should be destroyed
+ * (and devices freed). on success, the new discdevs pointer should be used
+ * as it may have been moved. */
+static int scan_busdir(struct discovered_devs **_discdevs, const char *busnum)
 {
 	DIR *dir;
 	char dirpath[PATH_MAX + 1];
 	struct dirent *entry;
+	struct discovered_devs *discdevs = *_discdevs;
+	int r = 0;
 
 	snprintf(dirpath, PATH_MAX, "%s/%s", USBFS_PATH, busnum);
 	usbi_dbg("%s", dirpath);
 	dir = opendir(dirpath);
 	if (!dir) {
 		usbi_err("opendir '%s' failed, errno=%d", dirpath, errno);
+		/* FIXME: should handle valid race conditions like hub unplugged
+		 * during directory iteration - this is not an error */
 		return -1;
 	}
 
 	while ((entry = readdir(dir))) {
 		if (entry->d_name[0] == '.')
 			continue;
-		/* deliberately ignoring errors due to valid unplug race conditions */
-		scan_device(dirpath, entry->d_name);
+		r = scan_device(&discdevs, dirpath, entry->d_name);
+		if (r < 0)
+			goto out;
 	}
 
-	return 0;
+	*_discdevs = discdevs;
+out:
+	closedir(dir);
+	return r;
 }
 
-API_EXPORTED int libusb_find_devices(void)
+API_EXPORTED int libusb_get_device_list(struct libusb_device ***list)
 {
 	DIR *buses;
+	struct discovered_devs *discdevs = discovered_devs_alloc();
 	struct dirent *entry;
+	struct libusb_device **ret;
+	int r = 0;
+	size_t i;
+	size_t len;
 	usbi_dbg("");
+
+	if (!discdevs)
+		return -ENOMEM;
 
 	buses = opendir(USBFS_PATH);
 	if (!buses) {
@@ -180,44 +280,87 @@ API_EXPORTED int libusb_find_devices(void)
 	}
 
 	while ((entry = readdir(buses))) {
+		struct discovered_devs *discdevs_new = discdevs;
+
 		if (entry->d_name[0] == '.')
 			continue;
 		/* deliberately ignoring errors, valid race conditions exist
-		 * e.g. unplugging of hubs in the middle of this loop*/
-		scan_busdir(entry->d_name);
+		 * e.g. unplugging of hubs in the middle of this loop */
+		r = scan_busdir(&discdevs_new, entry->d_name);
+		if (r < 0)
+			goto out;
+		discdevs = discdevs_new;
 	}
 
-	return 0;
+	/* convert discovered_devs into a list */
+	len = discdevs->len;
+	ret = malloc(sizeof(void *) * (len + 1));
+	if (!ret)
+		goto out;
+
+	ret[len] = NULL;
+	for (i = 0; i < len; i++) {
+		struct libusb_device *dev = discdevs->devices[i];
+		libusb_device_ref(dev);
+		ret[i] = dev;
+	}
+	*list = ret;
+
+out:
+	discovered_devs_free(discdevs);
+	closedir(buses);
+	return r;
 }
 
-API_EXPORTED struct libusb_dev *libusb_get_devices(void)
+API_EXPORTED void libusb_free_device_list(struct libusb_device **list,
+	int unref_devices)
 {
-	if (list_empty(&usb_devs))
-		return NULL;
-	return list_entry(usb_devs.next, struct libusb_dev, list);
+	if (!list)
+		return;
+
+	if (unref_devices) {
+		int i = 0;
+		struct libusb_device *dev;
+
+		while ((dev = list[i++]) != NULL)
+			libusb_device_unref(dev);
+	}
+	free(list);
 }
 
-API_EXPORTED struct libusb_dev *libusb_dev_next(struct libusb_dev *dev)
+API_EXPORTED struct libusb_device *libusb_device_ref(struct libusb_device *dev)
 {
-	struct list_head *head = &dev->list;
-	if (!head || head->next == &usb_devs)
-		return NULL;
-	return list_entry(head->next, struct libusb_dev, list);
+	dev->refcnt++;
+	return dev;
 }
 
-API_EXPORTED struct libusb_dev_descriptor *libusb_dev_get_descriptor(
-	struct libusb_dev *dev)
+API_EXPORTED void libusb_device_unref(struct libusb_device *dev)
+{
+	if (!dev)
+		return;
+
+	if (--dev->refcnt == 0) {
+		usbi_dbg("destroy device %04x:%04x", dev->desc.idVendor,
+			dev->desc.idProduct);
+		free(dev->config);
+		free(dev->nodepath);
+		free(dev);
+	}
+}
+
+API_EXPORTED struct libusb_dev_descriptor *libusb_device_get_descriptor(
+	struct libusb_device *dev)
 {
 	return &dev->desc;
 }
 
-API_EXPORTED struct libusb_config_descriptor *libusb_dev_get_config(
-	struct libusb_dev *dev)
+API_EXPORTED struct libusb_config_descriptor *libusb_device_get_config(
+	struct libusb_device *dev)
 {
 	return dev->config;
 }
 
-API_EXPORTED struct libusb_dev_handle *libusb_open(struct libusb_dev *dev)
+API_EXPORTED struct libusb_dev_handle *libusb_open(struct libusb_device *dev)
 {
 	struct libusb_dev_handle *devh;
 	int fd;
@@ -236,7 +379,7 @@ API_EXPORTED struct libusb_dev_handle *libusb_open(struct libusb_dev *dev)
 	}
 
 	devh->fd = fd;
-	devh->dev = dev;
+	devh->dev = libusb_device_ref(dev);
 	list_add(&devh->list, &open_devs);
 	usbi_add_pollfd(fd, POLLOUT);
 	return devh;
@@ -246,6 +389,7 @@ static void do_close(struct libusb_dev_handle *devh)
 {
 	usbi_remove_pollfd(devh->fd);
 	close(devh->fd);
+	libusb_device_unref(devh->dev);
 }
 
 API_EXPORTED void libusb_close(struct libusb_dev_handle *devh)
@@ -259,7 +403,8 @@ API_EXPORTED void libusb_close(struct libusb_dev_handle *devh)
 	free(devh);
 }
 
-API_EXPORTED struct libusb_dev *libusb_devh_get_dev(struct libusb_dev_handle *devh)
+API_EXPORTED struct libusb_device *libusb_devh_get_dev(
+	struct libusb_dev_handle *devh)
 {
 	return devh->dev;
 }
@@ -292,7 +437,6 @@ API_EXPORTED int libusb_init(void)
 {
 	/* FIXME: find correct usb node path */
 	usbi_dbg("");
-	list_init(&usb_devs);
 	list_init(&open_devs);
 	usbi_io_init();
 	return 0;
