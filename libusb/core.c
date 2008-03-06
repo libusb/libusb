@@ -385,6 +385,37 @@ API_EXPORTED struct libusb_dev_handle *libusb_open(struct libusb_device *dev)
 	return devh;
 }
 
+/* convenience function for finding a device with a particular vendor/product
+ * combination. has limitations and is hence not intended for use in "real
+ * applications": if multiple devices have the same VID+PID it'll only
+ * give you the first one, etc. */
+API_EXPORTED struct libusb_dev_handle *libusb_open_device_with_vid_pid(
+	uint16_t vendor_id, uint16_t product_id)
+{
+	struct libusb_device **devs;
+	struct libusb_device *found = NULL;
+	struct libusb_device *dev;
+	struct libusb_dev_handle *devh;
+	size_t i = 0;
+
+	if (libusb_get_device_list(&devs) < 0)
+		return NULL;
+
+	while ((dev = devs[i++]) != NULL) {
+		struct libusb_dev_descriptor *desc = libusb_device_get_descriptor(dev);
+		if (desc->idVendor == vendor_id && desc->idProduct == product_id) {
+			found = dev;
+			break;
+		}
+	}
+
+	if (found)
+		devh = libusb_open(found);
+
+	libusb_free_device_list(devs, 1);
+	return devh;
+}
+
 static void do_close(struct libusb_dev_handle *devh)
 {
 	usbi_remove_pollfd(devh->fd);

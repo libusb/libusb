@@ -231,9 +231,12 @@ void libusb_device_unref(libusb_device *dev);
 
 libusb_dev_handle *libusb_open(libusb_device *dev);
 void libusb_close(libusb_dev_handle *devh);
-struct libusb_device *libusb_devh_get_device(libusb_dev_handle *devh);
+libusb_device *libusb_devh_get_device(libusb_dev_handle *devh);
 int libusb_claim_interface(libusb_dev_handle *dev, int iface);
 int libusb_release_interface(libusb_dev_handle *dev, int iface);
+
+libusb_dev_handle *libusb_open_device_with_vid_pid(uint16_t vendor_id,
+	uint16_t product_id);
 
 /* async I/O */
 

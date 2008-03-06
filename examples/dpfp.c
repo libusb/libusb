@@ -81,36 +81,8 @@ static struct libusb_bulk_transfer irqtrf = {
 
 static int find_dpfp_device(void)
 {
-	struct libusb_device *dev;
-	struct libusb_device *found = NULL;
-	struct libusb_device **devs;
-	size_t i = 0;
-	int r;
-
-	r = libusb_get_device_list(&devs);
-	if (r < 0)
-		return r;
-
-	while ((dev = devs[i++]) != NULL) {
-		struct libusb_dev_descriptor *desc = libusb_device_get_descriptor(dev);
-		if (desc->idVendor == 0x05ba && desc->idProduct == 0x000a) {
-			found = dev;
-			break;
-		}
-	}
-
-	if (!found) {
-		r = -ENODEV;
-		goto out;
-	}
-
-	devh = libusb_open(dev);
-	if (!devh)
-		r = -EIO;
-
-out:
-	libusb_free_device_list(devs, 1);
-	return r;
+	devh = libusb_open_device_with_vid_pid(0x05ba, 0x000a);
+	return devh ? 0 : -EIO;
 }
 
 static int print_f0_data(void)
