@@ -8,7 +8,6 @@ API docs
 isochronous endpoint I/O
 thread safety
 abstraction for cross-platform-ness
-fallback on /proc/bus/usb on linux
 error codes
 
 for 1.1 or future
@@ -26,3 +25,4 @@ urbh in general (should this be a transfer handle?)
 config struct/function naming
 typedef _cb or _cb_fn or _cb_t?
 typedef as-is or pointers? libusb_dev_t rather than libusb_dev *?
+FP_ urb status codes

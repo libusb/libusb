@@ -39,6 +39,47 @@
 
 struct list_head usb_devs;
 struct list_head open_devs;
+static const char *usbfs_path = NULL;
+
+static int check_usb_vfs(const char *dirname)
+{
+	DIR *dir;
+	struct dirent *entry;
+	int found = 0;
+
+	dir = opendir(dirname);
+	if (!dir)
+		return 0;
+
+	while ((entry = readdir(dir)) != NULL) {
+		if (entry->d_name[0] == '.')
+			continue;
+
+		/* We assume if we find any files that it must be the right place */
+		found = 1;
+		break;
+	}
+
+	closedir(dir);
+	return found;
+}
+
+static const char *find_usbfs_path(void)
+{
+	const char *path = "/dev/bus/usb";
+	const char *ret = NULL;
+
+	if (check_usb_vfs(path)) {
+		ret = path;
+	} else {
+		path = "/proc/bus/usb";
+		if (check_usb_vfs(path))
+			ret = path;
+	}
+
+	usbi_dbg("found usbfs at %s", ret);
+	return ret;
+}
 
 /* we traverse usbfs without knowing how many devices we are going to find.
  * so we create this discovered_devs model which is similar to a linked-list
@@ -120,7 +161,7 @@ static struct libusb_device *device_new(uint8_t busnum, uint8_t devaddr)
 	dev->nodepath = NULL;
 	dev->config = NULL;
 
-	snprintf(path, PATH_MAX, "/dev/bus/usb/%03d/%03d", busnum, devaddr);
+	snprintf(path, PATH_MAX, "%s/%03d/%03d", usbfs_path, busnum, devaddr);
 	usbi_dbg("%s", path);
 	fd = open(path, O_RDWR);
 	if (!fd) {
@@ -281,7 +322,7 @@ static int scan_busdir(struct discovered_devs **_discdevs, uint8_t busnum)
 	struct discovered_devs *discdevs = *_discdevs;
 	int r = 0;
 
-	snprintf(dirpath, PATH_MAX, "%s/%03d", USBFS_PATH, busnum);
+	snprintf(dirpath, PATH_MAX, "%s/%03d", usbfs_path, busnum);
 	usbi_dbg("%s", dirpath);
 	dir = opendir(dirpath);
 	if (!dir) {
@@ -328,7 +369,7 @@ API_EXPORTED int libusb_get_device_list(struct libusb_device ***list)
 	if (!discdevs)
 		return -ENOMEM;
 
-	buses = opendir(USBFS_PATH);
+	buses = opendir(usbfs_path);
 	if (!buses) {
 		usbi_err("opendir buses failed errno=%d", errno);
 		return -1;
@@ -529,8 +570,13 @@ API_EXPORTED int libusb_release_interface(struct libusb_dev_handle *dev,
 
 API_EXPORTED int libusb_init(void)
 {
-	/* FIXME: find correct usb node path */
 	usbi_dbg("");
+	usbfs_path = find_usbfs_path();
+	if (!usbfs_path) {
+		usbi_err("could not find usbfs");
+		return -ENODEV;
+	}
+
 	list_init(&usb_devs);
 	list_init(&open_devs);
 	usbi_io_init();

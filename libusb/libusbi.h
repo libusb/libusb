@@ -31,7 +31,6 @@
 #include <libusb.h>
 #include <usbfs.h>
 
-#define USBFS_PATH "/dev/bus/usb"
 #define DEVICE_DESC_LENGTH		18
 
 #define USB_MAXENDPOINTS	32
