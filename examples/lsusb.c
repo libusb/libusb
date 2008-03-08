@@ -24,7 +24,7 @@
 void print_devs(libusb_device **devs)
 {
 	libusb_device *dev;
-	int i;
+	int i = 0;
 
 	while ((dev = devs[i++]) != NULL) {
 		struct libusb_dev_descriptor *desc = libusb_device_get_descriptor(dev);
