@@ -9,6 +9,7 @@ isochronous endpoint I/O
 thread safety
 abstraction for cross-platform-ness
 error codes
+fixme review
 
 for 1.1 or future
 ==================
@@ -21,8 +22,8 @@ use poll() rather than select()?
 
 struct libusb_(bulk|control)_transfer or parameters?
 devh in general
-urbh in general (should this be a transfer handle?)
+separate transfer allocation and submission
 config struct/function naming
 typedef _cb or _cb_fn or _cb_t?
 typedef as-is or pointers? libusb_dev_t rather than libusb_dev *?
-FP_ urb status codes
+remove "_transfer" from libusb_{control,bulk}_transfer_request?

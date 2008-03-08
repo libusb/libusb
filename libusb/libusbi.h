@@ -157,16 +157,16 @@ struct libusb_dev_handle {
 	int fd;
 };
 
-enum libusb_urb_type {
-	LIBUSB_URB_CONTROL,
-	LIBUSB_URB_BULK,
+enum libusb_transfer_type {
+	LIBUSB_TRANSFER_CONTROL,
+	LIBUSB_TRANSFER_BULK,
 };
 
-#define LIBUSB_URBH_DATA_BELONGS_TO_USER		(1<<0)
-#define LIBUSB_URBH_SYNC_CANCELLED 			(1<<1)
-#define LIBUSB_URBH_TIMED_OUT	 			(1<<2)
+#define USBI_TRANSFER_DATA_BELONGS_TO_USER	(1<<0)
+#define USBI_TRANSFER_SYNC_CANCELLED 		(1<<1)
+#define USBI_TRANSFER_TIMED_OUT	 			(1<<2)
 
-struct libusb_urb_handle {
+struct libusb_transfer {
 	struct libusb_dev_handle *devh;
 	struct usb_urb urb;
 	struct list_head list;
