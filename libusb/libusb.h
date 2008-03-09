@@ -262,10 +262,8 @@ void libusb_init_transfer(struct libusb_transfer *transfer);
 
 struct libusb_transfer *libusb_alloc_transfer(void);
 int libusb_submit_transfer(struct libusb_transfer *transfer);
-int libusb_cancel_transfer(libusb_device_handle *devh,
-	struct libusb_transfer *transfer);
-int libusb_cancel_transfer_sync(libusb_device_handle *devh,
-	struct libusb_transfer *transfer);
+int libusb_cancel_transfer(struct libusb_transfer *transfer);
+int libusb_cancel_transfer_sync(struct libusb_transfer *transfer);
 void libusb_free_transfer(struct libusb_transfer *transfer);
 
 static inline void libusb_fill_control_transfer(

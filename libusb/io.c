@@ -206,27 +206,25 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 	return submit_transfer(itransfer);
 }
 
-API_EXPORTED int libusb_cancel_transfer(struct libusb_device_handle *devh,
-	struct libusb_transfer *transfer)
+API_EXPORTED int libusb_cancel_transfer(struct libusb_transfer *transfer)
 {
 	struct usbi_transfer *itransfer = TRANSFER_TO_PRIV(transfer);
 	int r;
 
 	usbi_dbg("");
-	r = ioctl(devh->fd, IOCTL_USB_DISCARDURB, &itransfer->urb);
+	r = ioctl(transfer->dev_handle->fd, IOCTL_USB_DISCARDURB, &itransfer->urb);
 	if (r < 0)
 		usbi_err("cancel transfer failed error %d", r);
 	return r;
 }
 
-API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_device_handle *devh,
-	struct libusb_transfer *transfer)
+API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_transfer *transfer)
 {
 	struct usbi_transfer *itransfer = TRANSFER_TO_PRIV(transfer);
 	int r;
 
 	usbi_dbg("");
-	r = ioctl(devh->fd, IOCTL_USB_DISCARDURB, &itransfer->urb);
+	r = ioctl(transfer->dev_handle->fd, IOCTL_USB_DISCARDURB, &itransfer->urb);
 	if (r < 0) {
 		usbi_err("cancel transfer failed error %d", r);
 		return r;
@@ -256,8 +254,7 @@ static void handle_transfer_completion(struct usbi_transfer *itransfer,
 		transfer->callback(transfer);
 }
 
-static void handle_transfer_cancellation(struct libusb_device_handle *devh,
-	struct usbi_transfer *transfer)
+static void handle_transfer_cancellation(struct usbi_transfer *transfer)
 {
 	/* if the URB is being cancelled synchronously, raise cancellation
 	 * completion event by unsetting flag, and ensure that user callback does
@@ -306,7 +303,7 @@ static int reap_for_devh(struct libusb_device_handle *devh)
 	list_del(&itransfer->list);
 
 	if (urb->status == -2) {
-		handle_transfer_cancellation(devh, itransfer);
+		handle_transfer_cancellation(itransfer);
 		return 0;
 	}
 
@@ -356,7 +353,7 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 	int r;
 
 	itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
-	r = libusb_cancel_transfer(transfer->dev_handle, transfer);
+	r = libusb_cancel_transfer(transfer);
 	if (r < 0)
 		usbi_warn("async cancel failed %d errno=%d", r, errno);
 }

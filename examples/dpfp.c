@@ -353,7 +353,7 @@ static int init_capture(void)
 
 	r = submit_img_transfer();
 	if (r < 0) {
-		libusb_cancel_transfer_sync(devh, img_transfer);
+		libusb_cancel_transfer_sync(img_transfer);
 		return r;
 	}
 
@@ -476,11 +476,11 @@ int main(void)
 
 	printf("shutting down...\n");
 
-	r = libusb_cancel_transfer_sync(devh, irq_transfer);
+	r = libusb_cancel_transfer_sync(irq_transfer);
 	if (r < 0)
 		goto out_deinit;
 
-	r = libusb_cancel_transfer_sync(devh, img_transfer);
+	r = libusb_cancel_transfer_sync(img_transfer);
 	if (r < 0)
 		goto out_deinit;
 	
