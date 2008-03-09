@@ -19,12 +19,11 @@
  */
 
 #include <config.h>
-
 #include <errno.h>
 #include <signal.h>
 #include <stdint.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/select.h>
 #include <sys/time.h>
 #include <time.h>
@@ -530,153 +529,6 @@ API_EXPORTED int libusb_get_next_timeout(struct timeval *tv)
 	}
 
 	return 1;
-}
-
-static void ctrl_transfer_cb(struct libusb_transfer *transfer)
-{
-	int *completed = transfer->user_data;
-	*completed = 1;
-	usbi_dbg("actual_length=%d", transfer->actual_length);
-	/* caller interprets result and frees transfer */
-}
-
-API_EXPORTED int libusb_control_transfer(libusb_dev_handle *dev_handle,
-	uint8_t bRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
-	unsigned char *data, uint16_t wLength, unsigned int timeout)
-{
-	struct libusb_transfer *transfer = libusb_alloc_transfer();
-	unsigned char *buffer;
-	int length = wLength + LIBUSB_CONTROL_SETUP_SIZE;
-	int completed = 0;
-	int r;
-
-	if (!transfer)
-		return -ENOMEM;
-	
-	buffer = malloc(length);
-	if (!buffer) {
-		libusb_free_transfer(transfer);
-		return -ENOMEM;
-	}
-
-	libusb_fill_control_setup(buffer, bRequestType, bRequest, wValue, wIndex,
-		wLength);
-	if ((bRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_OUT)
-		memcpy(buffer + LIBUSB_CONTROL_SETUP_SIZE, data, wLength);
-
-	libusb_fill_control_transfer(transfer, dev_handle, buffer, length,
-		ctrl_transfer_cb, &completed, timeout);
-	r = libusb_submit_transfer(transfer);
-	if (r < 0) {
-		libusb_free_transfer(transfer);
-		return r;
-	}
-
-	while (!completed) {
-		r = libusb_poll();
-		if (r < 0) {
-			libusb_cancel_transfer_sync(dev_handle, transfer);
-			libusb_free_transfer(transfer);
-			return r;
-		}
-	}
-
-	if ((bRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN)
-		memcpy(data, libusb_control_transfer_get_data(transfer),
-			transfer->actual_length);
-
-	switch (transfer->status) {
-	case LIBUSB_TRANSFER_COMPLETED:
-		r = transfer->actual_length;
-		break;
-	case LIBUSB_TRANSFER_TIMED_OUT:
-		r = -ETIMEDOUT;
-		break;
-	default:
-		usbi_warn("unrecognised status code %d", transfer->status);
-		r = -1;
-	}
-
-	libusb_free_transfer(transfer);
-	return r;
-}
-
-struct sync_bulk_handle {
-	enum libusb_transfer_status status;
-	int actual_length;
-};
-
-static void bulk_transfer_cb(struct libusb_transfer *transfer)
-{
-	int *completed = transfer->user_data;
-	*completed = 1;
-	usbi_dbg("actual_length=%d", transfer->actual_length);
-	/* caller interprets results and frees transfer */
-}
-
-static int do_sync_bulk_transfer(struct libusb_dev_handle *dev_handle,
-	unsigned char endpoint, unsigned char *buffer, int length,
-	int *transferred, unsigned int timeout, unsigned char endpoint_type)
-{
-	struct libusb_transfer *transfer = libusb_alloc_transfer();
-	int completed = 0;
-	int r;
-
-	if (!transfer)
-		return -ENOMEM;
-
-	libusb_fill_bulk_transfer(transfer, dev_handle, endpoint, buffer, length,
-		bulk_transfer_cb, &completed, timeout);
-	transfer->endpoint_type = endpoint_type;
-
-	r = libusb_submit_transfer(transfer);
-	if (r < 0) {
-		libusb_free_transfer(transfer);
-		return r;
-	}
-
-	while (!completed) {
-		r = libusb_poll();
-		if (r < 0) {
-			libusb_cancel_transfer_sync(dev_handle, transfer);
-			libusb_free_transfer(transfer);
-			return r;
-		}
-	}
-
-	*transferred = transfer->actual_length;
-	switch (transfer->status) {
-	case LIBUSB_TRANSFER_COMPLETED:
-		r = 0;
-		break;
-	case LIBUSB_TRANSFER_TIMED_OUT:
-		r = -ETIMEDOUT;
-		break;
-	default:
-		usbi_warn("unrecognised status code %d", transfer->status);
-		r = -1;
-	}
-
-	libusb_free_transfer(transfer);
-	return r;
-}
-
-/* FIXME: should transferred be the return value? */
-API_EXPORTED int libusb_bulk_transfer(struct libusb_dev_handle *dev_handle,
-	unsigned char endpoint, unsigned char *data, int length, int *transferred,
-	unsigned int timeout)
-{
-	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
-		transferred, timeout, LIBUSB_ENDPOINT_TYPE_BULK);
-}
-
-/* FIXME: do we need an interval param here? usbfs doesn't expose it? */
-API_EXPORTED int libusb_interrupt_transfer(struct libusb_dev_handle *dev_handle,
-	unsigned char endpoint, unsigned char *data, int length, int *transferred,
-	unsigned int timeout)
-{
-	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
-		transferred, timeout, LIBUSB_ENDPOINT_TYPE_INTERRUPT);
 }
 
 API_EXPORTED void libusb_free_transfer(struct libusb_transfer *transfer)
