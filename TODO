@@ -7,16 +7,15 @@ thread safety
 abstraction for cross-platform-ness
 error codes
 fixme review
+review functionality missing over 0.1
 
 add some libusb_transfer flags:
  - treat short transfers as errors
  - unlink behaviour control
- - setup packet prepends data (no copying needed)
  - update timeout with time remaining
 
 1.0 API style/naming points to reconsider
 =========================================
-config struct/function naming
 typedef _cb or _cb_fn or _cb_t?
 typedef as-is or pointers? libusb_dev_t rather than libusb_dev *?
 
@@ -25,3 +24,4 @@ for 1.1 or future
 optional timerfd support (runtime detection)
 notifications of hotplugged/unplugged devices
 use poll() rather than select()?
+offer API to create/destroy handle_events thread

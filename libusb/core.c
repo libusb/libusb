@@ -452,13 +452,13 @@ API_EXPORTED void libusb_device_unref(struct libusb_device *dev)
 	}
 }
 
-API_EXPORTED struct libusb_dev_descriptor *libusb_device_get_descriptor(
+API_EXPORTED struct libusb_device_descriptor *libusb_get_device_descriptor(
 	struct libusb_device *dev)
 {
 	return &dev->desc;
 }
 
-API_EXPORTED struct libusb_config_descriptor *libusb_device_get_config(
+API_EXPORTED struct libusb_config_descriptor *libusb_get_config_descriptor(
 	struct libusb_device *dev)
 {
 	return dev->config;
@@ -506,7 +506,8 @@ API_EXPORTED struct libusb_device_handle *libusb_open_device_with_vid_pid(
 		return NULL;
 
 	while ((dev = devs[i++]) != NULL) {
-		struct libusb_dev_descriptor *desc = libusb_device_get_descriptor(dev);
+		struct libusb_device_descriptor *desc =
+			libusb_get_device_descriptor(dev);
 		if (desc->idVendor == vendor_id && desc->idProduct == product_id) {
 			found = dev;
 			break;

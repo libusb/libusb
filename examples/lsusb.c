@@ -27,7 +27,8 @@ void print_devs(libusb_device **devs)
 	int i = 0;
 
 	while ((dev = devs[i++]) != NULL) {
-		struct libusb_dev_descriptor *desc = libusb_device_get_descriptor(dev);
+		struct libusb_device_descriptor *desc =
+			libusb_get_device_descriptor(dev);
 		printf("%04x:%04x\n", desc->idVendor, desc->idProduct);
 	}
 }

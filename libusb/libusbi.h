@@ -147,7 +147,7 @@ struct libusb_device {
 	int refcnt;
 	unsigned long session_data;
 	char *nodepath;
-	struct libusb_dev_descriptor desc;
+	struct libusb_device_descriptor desc;
 	struct libusb_config_descriptor *config;
 };
 

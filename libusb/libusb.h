@@ -99,7 +99,7 @@ extern "C" {
 #define LIBUSB_RECIP_ENDPOINT		0x02
 #define LIBUSB_RECIP_OTHER			0x03
 
-struct libusb_dev_descriptor {
+struct libusb_device_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
 	uint16_t bcdUSB;
@@ -217,8 +217,10 @@ void libusb_exit(void);
 
 int libusb_get_device_list(libusb_device ***list);
 void libusb_free_device_list(libusb_device **list, int unref_devices);
-struct libusb_dev_descriptor *libusb_device_get_descriptor(libusb_device *dev);
-struct libusb_config_descriptor *libusb_device_get_config(libusb_device *dev);
+struct libusb_device_descriptor *libusb_get_device_descriptor(
+	libusb_device *dev);
+struct libusb_config_descriptor *libusb_get_config_descriptor(
+	libusb_device *dev);
 libusb_device *libusb_device_ref(libusb_device *dev);
 void libusb_device_unref(libusb_device *dev);
 
