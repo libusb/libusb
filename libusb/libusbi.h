@@ -157,27 +157,17 @@ struct libusb_dev_handle {
 	int fd;
 };
 
-enum libusb_transfer_type {
-	LIBUSB_TRANSFER_CONTROL,
-	LIBUSB_TRANSFER_BULK,
-};
+#define USBI_TRANSFER_SYNC_CANCELLED 		(1<<0)
+#define USBI_TRANSFER_TIMED_OUT	 			(1<<1)
 
-#define USBI_TRANSFER_DATA_BELONGS_TO_USER	(1<<0)
-#define USBI_TRANSFER_SYNC_CANCELLED 		(1<<1)
-#define USBI_TRANSFER_TIMED_OUT	 			(1<<2)
+struct usbi_transfer {
+	/* must come first */
+	struct libusb_transfer pub;
 
-struct libusb_transfer {
-	struct libusb_dev_handle *devh;
 	struct usb_urb urb;
 	struct list_head list;
 	struct timeval timeout;
-	unsigned char urb_type;
-	unsigned char endpoint;
-	int transfer_len;
 	int transferred;
-	unsigned char *buffer;
-	void *callback;
-	void *user_data;
 	uint8_t flags;
 };
 

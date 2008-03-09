@@ -32,6 +32,8 @@
 
 #include "libusbi.h"
 
+#define TRANSFER_TO_PRIV(trf) (container_of((trf), struct usbi_transfer, pub))
+
 /* this is a list of in-flight rb_handles, sorted by timeout expiration.
  * URBs to timeout the soonest are placed at the beginning of the list, URBs
  * that will time out later are placed after, and urbs with infinite timeout
@@ -49,11 +51,11 @@ void usbi_io_init()
 	fd_removed_cb = NULL;
 }
 
-static int calculate_timeout(struct libusb_transfer *transfer,
-	unsigned int timeout)
+static int calculate_timeout(struct usbi_transfer *transfer)
 {
 	int r;
 	struct timespec current_time;
+	unsigned int timeout = transfer->pub.timeout;
 
 	if (!timeout)
 		return 0;
@@ -76,9 +78,9 @@ static int calculate_timeout(struct libusb_transfer *transfer,
 	return 0;
 }
 
-static void add_to_flying_list(struct libusb_transfer *transfer)
+static void add_to_flying_list(struct usbi_transfer *transfer)
 {
-	struct libusb_transfer *cur;
+	struct usbi_transfer *cur;
 	struct timeval *timeout = &transfer->timeout;
 
 	/* if we have no other flying transfers, start the list with this one */
@@ -110,16 +112,30 @@ static void add_to_flying_list(struct libusb_transfer *transfer)
 	list_add_tail(&transfer->list, &flying_transfers);
 }
 
-static int submit_transfer(struct libusb_dev_handle *devh,
-	struct libusb_transfer *transfer)
+static int submit_transfer(struct usbi_transfer *itransfer)
 {
 	int r;
-	struct usb_urb *urb = &transfer->urb;
-	int to_be_transferred = transfer->transfer_len - transfer->transferred;
+	struct usb_urb *urb = &itransfer->urb;
+	struct libusb_transfer *transfer = &itransfer->pub;
+	int to_be_transferred = transfer->length - itransfer->transferred;
 
-	urb->type = transfer->urb_type;
+	switch (transfer->endpoint_type) {
+	case LIBUSB_ENDPOINT_TYPE_CONTROL:
+		urb->type = USB_URB_TYPE_CONTROL;
+		break;
+	case LIBUSB_ENDPOINT_TYPE_BULK:
+		urb->type = USB_URB_TYPE_BULK;
+		break;
+	case LIBUSB_ENDPOINT_TYPE_INTERRUPT:
+		urb->type = USB_URB_TYPE_INTERRUPT;
+		break;
+	default:
+		usbi_err("unknown endpoint type %d", transfer->endpoint_type);
+		return -EINVAL;
+	}
+
 	urb->endpoint = transfer->endpoint;
-	urb->buffer = transfer->buffer + transfer->transferred;
+	urb->buffer = transfer->buffer + itransfer->transferred;
 	urb->buffer_length = MIN(to_be_transferred, MAX_URB_BUFFER_LENGTH);
 
 	/* FIXME: for requests that we have to split into multiple URBs, we should
@@ -130,153 +146,95 @@ static int submit_transfer(struct libusb_dev_handle *devh,
 	usbi_dbg("transferring %d from %d bytes", urb->buffer_length,
 		to_be_transferred);
 
-	r = ioctl(devh->fd, IOCTL_USB_SUBMITURB, &transfer->urb);
+	r = ioctl(transfer->dev_handle->fd, IOCTL_USB_SUBMITURB, urb);
 	if (r < 0) {
 		usbi_err("submiturb failed error %d errno=%d", r, errno);
 		return r;
 	}
 
-	add_to_flying_list(transfer);
+	add_to_flying_list(itransfer);
 	return 0;
 }
 
-API_EXPORTED struct libusb_transfer *libusb_async_control_transfer(
-	struct libusb_dev_handle *devh,
-	struct libusb_control_transfer_request *request,
-	libusb_control_cb_fn callback, void *user_data, unsigned int timeout)
+API_EXPORTED size_t libusb_get_transfer_alloc_size(void)
 {
-	struct libusb_transfer *transfer = malloc(sizeof(*transfer));
-	struct libusb_control_setup *setup;
-	unsigned char *urbdata;
-	int urbdata_length = sizeof(struct libusb_control_setup) + request->length;
-	int r;
+	return sizeof(struct usbi_transfer);
+}
 
+void __init_transfer(struct usbi_transfer *transfer)
+{
+	memset(transfer, 0, sizeof(*transfer));
+}
+
+API_EXPORTED void libusb_init_transfer(struct libusb_transfer *transfer)
+{
+	__init_transfer(TRANSFER_TO_PRIV(transfer));
+}
+
+API_EXPORTED struct libusb_transfer *libusb_alloc_transfer(void)
+{
+	struct usbi_transfer *transfer = malloc(sizeof(*transfer));
 	if (!transfer)
 		return NULL;
-	memset(transfer, 0, sizeof(*transfer));
-	transfer->devh = devh;
-	transfer->callback = callback;
-	transfer->user_data = user_data;
-	r = calculate_timeout(transfer, timeout);
-	if (r < 0) {
-		free(transfer);
-		return NULL;
-	}
 
-	urbdata = malloc(urbdata_length);
-	if (!urbdata) {
-		free(transfer);
-		return NULL;
-	}
-
-	usbi_dbg("RQT=%02x RQ=%02x VAL=%04x IDX=%04x length=%d",
-		request->requesttype, request->request, request->value,
-		request->index, request->length);
-
-	setup = (struct libusb_control_setup *) urbdata;
-	setup->bRequestType = request->requesttype;
-	setup->bRequest = request->request;
-	setup->wValue = cpu_to_le16(request->value);
-	setup->wIndex = cpu_to_le16(request->index);
-	setup->wLength = cpu_to_le16(request->length);
-
-	if ((request->requesttype & 0x80) == LIBUSB_ENDPOINT_OUT)
-		memcpy(urbdata + sizeof(struct libusb_control_setup), request->data,
-		request->length);
-
-	transfer->urb_type = USB_URB_TYPE_CONTROL;
-	transfer->buffer = urbdata;
-	transfer->transfer_len = urbdata_length;
-
-	r = submit_transfer(devh, transfer);
-	if (r < 0) {
-		free(transfer);
-		free(urbdata);
-		return NULL;
-	}
-
-	return transfer;
+	__init_transfer(transfer);
+	return &transfer->pub;
 }
 
-static struct libusb_transfer *submit_bulk_transfer(
-	struct libusb_dev_handle *devh,
-	struct libusb_bulk_transfer_request *request,
-	libusb_bulk_cb_fn callback, void *user_data, unsigned int timeout,
-	unsigned char urbtype)
+API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 {
-	struct libusb_transfer *transfer = malloc(sizeof(*transfer));
+	struct usbi_transfer *itransfer = TRANSFER_TO_PRIV(transfer);
 	int r;
 
-	usbi_dbg("length %d timeout %d", request->length, timeout);
+	itransfer->transferred = 0;
+	r = calculate_timeout(itransfer);
+	if (r < 0)
+		return r;
 
-	if (!transfer)
-		return NULL;
-	memset(transfer, 0, sizeof(*transfer));
-	r = calculate_timeout(transfer, timeout);
-	if (r < 0) {
-		free(transfer);
-		return NULL;
-	}
-	transfer->devh = devh;
-	transfer->callback = callback;
-	transfer->user_data = user_data;
-	transfer->flags |= USBI_TRANSFER_DATA_BELONGS_TO_USER;
-	transfer->endpoint = request->endpoint;
-	transfer->urb_type = urbtype;
-	transfer->buffer = request->data;
-	transfer->transfer_len = request->length;
+	if (transfer->endpoint_type == LIBUSB_ENDPOINT_TYPE_CONTROL) {
+		struct libusb_control_setup *setup =
+			(struct libusb_control_setup *) transfer->buffer;
+	
+		usbi_dbg("RQT=%02x RQ=%02x VAL=%04x IDX=%04x length=%d",
+			setup->bRequestType, setup->bRequest, setup->wValue, setup->wIndex,
+			setup->wLength);
 
-	r = submit_transfer(devh, transfer);
-	if (r < 0) {
-		free(transfer);
-		return NULL;
+		setup->wValue = cpu_to_le16(setup->wValue);
+		setup->wIndex = cpu_to_le16(setup->wIndex);
+		setup->wLength = cpu_to_le16(setup->wLength);
 	}
 
-	return transfer;
+	return submit_transfer(itransfer);
 }
 
-API_EXPORTED struct libusb_transfer *libusb_async_bulk_transfer(
-	struct libusb_dev_handle *devh,
-	struct libusb_bulk_transfer_request *request,
-	libusb_bulk_cb_fn callback, void *user_data, unsigned int timeout)
-{
-	return submit_bulk_transfer(devh, request, callback, user_data, timeout,
-		USB_URB_TYPE_BULK);
-}
-
-API_EXPORTED struct libusb_transfer *libusb_async_interrupt_transfer(
-	struct libusb_dev_handle *devh,
-	struct libusb_bulk_transfer_request *request, libusb_bulk_cb_fn callback,
-	void *user_data, unsigned int timeout)
-{
-	return submit_bulk_transfer(devh, request, callback, user_data, timeout,
-		USB_URB_TYPE_INTERRUPT);
-}
-
-API_EXPORTED int libusb_transfer_cancel(struct libusb_dev_handle *devh,
+API_EXPORTED int libusb_cancel_transfer(struct libusb_dev_handle *devh,
 	struct libusb_transfer *transfer)
 {
+	struct usbi_transfer *itransfer = TRANSFER_TO_PRIV(transfer);
 	int r;
+
 	usbi_dbg("");
-	r = ioctl(devh->fd, IOCTL_USB_DISCARDURB, &transfer->urb);
+	r = ioctl(devh->fd, IOCTL_USB_DISCARDURB, &itransfer->urb);
 	if (r < 0)
 		usbi_err("cancel transfer failed error %d", r);
 	return r;
 }
 
-API_EXPORTED int libusb_transfer_cancel_sync(struct libusb_dev_handle *devh,
+API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_dev_handle *devh,
 	struct libusb_transfer *transfer)
 {
+	struct usbi_transfer *itransfer = TRANSFER_TO_PRIV(transfer);
 	int r;
+
 	usbi_dbg("");
-	r = ioctl(devh->fd, IOCTL_USB_DISCARDURB, &transfer->urb);
+	r = ioctl(devh->fd, IOCTL_USB_DISCARDURB, &itransfer->urb);
 	if (r < 0) {
 		usbi_err("cancel transfer failed error %d", r);
 		return r;
 	}
 
-	transfer->flags |= USBI_TRANSFER_SYNC_CANCELLED;
-	while (transfer->flags & USBI_TRANSFER_SYNC_CANCELLED) {
+	itransfer->flags |= USBI_TRANSFER_SYNC_CANCELLED;
+	while (itransfer->flags & USBI_TRANSFER_SYNC_CANCELLED) {
 		r = libusb_poll();
 		if (r < 0)
 			return r;
@@ -285,33 +243,22 @@ API_EXPORTED int libusb_transfer_cancel_sync(struct libusb_dev_handle *devh,
 	return 0;
 }
 
-int handle_transfer_completion(struct libusb_dev_handle *devh,
-	struct libusb_transfer *transfer, enum libusb_transfer_status status)
+static void handle_transfer_completion(struct usbi_transfer *itransfer,
+	enum libusb_transfer_status status)
 {
-	struct usb_urb *urb = &transfer->urb;
+	struct libusb_transfer *transfer = &itransfer->pub;
 
 	if (status == LIBUSB_TRANSFER_SILENT_COMPLETION)
-		return 0;
+		return;
 
-	if (transfer->urb_type == USB_URB_TYPE_CONTROL) {
-		libusb_control_cb_fn callback = transfer->callback;
-		if (callback)
-			callback(devh, transfer, status, urb->buffer,
-				urb->buffer + sizeof(struct libusb_control_setup),
-				transfer->transferred, transfer->user_data);
-	} else if (urb->type == USB_URB_TYPE_BULK ||
-			urb->type == USB_URB_TYPE_INTERRUPT) {
-		libusb_bulk_cb_fn callback = transfer->callback;
-		if (callback)
-			callback(devh, transfer, status, transfer->endpoint,
-				transfer->transfer_len, transfer->buffer,
-				transfer->transferred, transfer->user_data);
-	}
-	return 0;
+	transfer->status = status;
+	transfer->actual_length = itransfer->transferred;
+	if (transfer->callback)
+		transfer->callback(transfer);
 }
 
-static int handle_transfer_cancellation(struct libusb_dev_handle *devh,
-	struct libusb_transfer *transfer)
+static void handle_transfer_cancellation(struct libusb_dev_handle *devh,
+	struct usbi_transfer *transfer)
 {
 	/* if the URB is being cancelled synchronously, raise cancellation
 	 * completion event by unsetting flag, and ensure that user callback does
@@ -320,28 +267,29 @@ static int handle_transfer_cancellation(struct libusb_dev_handle *devh,
 	if (transfer->flags & USBI_TRANSFER_SYNC_CANCELLED) {
 		transfer->flags &= ~USBI_TRANSFER_SYNC_CANCELLED;
 		usbi_dbg("detected sync. cancel");
-		return handle_transfer_completion(devh, transfer,
-			LIBUSB_TRANSFER_SILENT_COMPLETION);
+		handle_transfer_completion(transfer, LIBUSB_TRANSFER_SILENT_COMPLETION);
+		return;
 	}
 
 	/* if the URB was cancelled due to timeout, report timeout to the user */
 	if (transfer->flags & USBI_TRANSFER_TIMED_OUT) {
 		usbi_dbg("detected timeout cancellation");
-		return handle_transfer_completion(devh, transfer,
-			LIBUSB_TRANSFER_TIMED_OUT);
+		handle_transfer_completion(transfer, LIBUSB_TRANSFER_TIMED_OUT);
+		return;
 	}
 
 	/* otherwise its a normal async cancel */
-	return handle_transfer_completion(devh, transfer,
-		LIBUSB_TRANSFER_CANCELLED);
+	handle_transfer_completion(transfer, LIBUSB_TRANSFER_CANCELLED);
 }
 
 static int reap_for_devh(struct libusb_dev_handle *devh)
 {
 	int r;
 	struct usb_urb *urb;
+	struct usbi_transfer *itransfer;
 	struct libusb_transfer *transfer;
 	int trf_requested;
+	int length;
 
 	r = ioctl(devh->fd, IOCTL_USB_REAPURBNDELAY, &urb);
 	if (r == -1 && errno == EAGAIN)
@@ -351,58 +299,65 @@ static int reap_for_devh(struct libusb_dev_handle *devh)
 		return r;
 	}
 
-	transfer = container_of(urb, struct libusb_transfer, urb);
+	itransfer = container_of(urb, struct usbi_transfer, urb);
+	transfer = &itransfer->pub;
 
 	usbi_dbg("urb type=%d status=%d transferred=%d", urb->type, urb->status,
 		urb->actual_length);
-	list_del(&transfer->list);
+	list_del(&itransfer->list);
 
-	if (urb->status == -2)
-		return handle_transfer_cancellation(devh, transfer);
+	if (urb->status == -2) {
+		handle_transfer_cancellation(devh, itransfer);
+		return 0;
+	}
+
 	/* FIXME: research what other status codes may exist */
 	if (urb->status != 0)
 		usbi_warn("unrecognised urb status %d", urb->status);
 
 	/* determine how much data was asked for */
-	trf_requested = MIN(transfer->transfer_len - transfer->transferred,
+	length = transfer->length;
+	if (transfer->endpoint_type == LIBUSB_ENDPOINT_TYPE_CONTROL)
+		length -= LIBUSB_CONTROL_SETUP_SIZE;
+	trf_requested = MIN(length - itransfer->transferred,
 		MAX_URB_BUFFER_LENGTH);
 
-	transfer->transferred += urb->actual_length;	
+	itransfer->transferred += urb->actual_length;
 
 	/* if we were provided less data than requested, then our transfer is
 	 * done */
 	if (urb->actual_length < trf_requested) {
 		usbi_dbg("less data than requested (%d/%d) --> all done",
 			urb->actual_length, trf_requested);
-		return handle_transfer_completion(devh, transfer,
-			LIBUSB_TRANSFER_COMPLETED);
+		handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
+		return 0;
 	}
 
 	/* if we've transferred all data, we're done */
-	if (transfer->transferred == transfer->transfer_len) {
+	if (itransfer->transferred == length) {
 		usbi_dbg("transfer complete --> all done");
-		return handle_transfer_completion(devh, transfer,
-			LIBUSB_TRANSFER_COMPLETED);
+		handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
+		return 0;
 	}
 
 	/* otherwise, we have more data to transfer */
 	usbi_dbg("more data to transfer...");
 	memset(urb, 0, sizeof(*urb));
-	return submit_transfer(devh, transfer);
+	return submit_transfer(itransfer);
 }
 
-static void handle_timeout(struct libusb_transfer *transfer)
+static void handle_timeout(struct usbi_transfer *itransfer)
 {
 	/* handling timeouts is tricky, as we may race with the kernel: we may
 	 * detect a timeout racing with the condition that the urb has actually
 	 * completed. we asynchronously cancel the URB and report timeout
 	 * to the user when the URB cancellation completes (or not at all if the
 	 * URB actually gets delivered as per this race) */
+	struct libusb_transfer *transfer = &itransfer->pub;
 	int r;
 
-
-	transfer->flags |= USBI_TRANSFER_TIMED_OUT;
-	r = libusb_transfer_cancel(transfer->devh, transfer);
+	itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
+	r = libusb_cancel_transfer(transfer->dev_handle, transfer);
 	if (r < 0)
 		usbi_warn("async cancel failed %d errno=%d", r, errno);
 }
@@ -411,7 +366,7 @@ static int handle_timeouts(void)
 {
 	struct timespec systime_ts;
 	struct timeval systime;
-	struct libusb_transfer *transfer;
+	struct usbi_transfer *transfer;
 	int r;
 
 	if (list_empty(&flying_transfers))
@@ -526,7 +481,7 @@ API_EXPORTED int libusb_poll(void)
 
 API_EXPORTED int libusb_get_next_timeout(struct timeval *tv)
 {
-	struct libusb_transfer *transfer;
+	struct usbi_transfer *transfer;
 	struct timespec cur_ts;
 	struct timeval cur_tv;
 	struct timeval *next_timeout;
@@ -577,64 +532,73 @@ API_EXPORTED int libusb_get_next_timeout(struct timeval *tv)
 	return 1;
 }
 
-struct sync_ctrl_handle {
-	enum libusb_transfer_status status;
-	unsigned char *data;
-	int actual_length;
-};
-
-static void ctrl_transfer_cb(struct libusb_dev_handle *devh,
-	struct libusb_transfer *transfer, enum libusb_transfer_status status,
-	struct libusb_control_setup *setup, unsigned char *data, int actual_length,
-	void *user_data)
+static void ctrl_transfer_cb(struct libusb_transfer *transfer)
 {
-	struct sync_ctrl_handle *ctrlh = (struct sync_ctrl_handle *) user_data;
-	usbi_dbg("actual_length=%d", actual_length);
-
-	if (status == LIBUSB_TRANSFER_COMPLETED) {
-		/* copy results into user-defined buffer */
-		if (setup->bRequestType & LIBUSB_ENDPOINT_IN)
-			memcpy(ctrlh->data, data, actual_length);
-	}
-
-	ctrlh->status = status;
-	ctrlh->actual_length = actual_length;
-	/* caller frees transfer */
+	int *completed = transfer->user_data;
+	*completed = 1;
+	usbi_dbg("actual_length=%d", transfer->actual_length);
+	/* caller interprets result and frees transfer */
 }
 
-API_EXPORTED int libusb_control_transfer(struct libusb_dev_handle *devh,
-	struct libusb_control_transfer_request *request, unsigned int timeout)
+API_EXPORTED int libusb_control_transfer(libusb_dev_handle *dev_handle,
+	uint8_t bRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
+	unsigned char *data, uint16_t wLength, unsigned int timeout)
 {
-	struct libusb_transfer *transfer;
-	struct sync_ctrl_handle ctrlh;
+	struct libusb_transfer *transfer = libusb_alloc_transfer();
+	unsigned char *buffer;
+	int length = wLength + LIBUSB_CONTROL_SETUP_SIZE;
+	int completed = 0;
+	int r;
 
-	memset(&ctrlh, 0, sizeof(ctrlh));
-	ctrlh.data = request->data;
-
-	transfer = libusb_async_control_transfer(devh, request, ctrl_transfer_cb,
-		&ctrlh, timeout);
 	if (!transfer)
-		return -1;
+		return -ENOMEM;
+	
+	buffer = malloc(length);
+	if (!buffer) {
+		libusb_free_transfer(transfer);
+		return -ENOMEM;
+	}
 
-	while (!ctrlh.status) {
-		int r = libusb_poll();
+	libusb_fill_control_setup(buffer, bRequestType, bRequest, wValue, wIndex,
+		wLength);
+	if ((bRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_OUT)
+		memcpy(buffer + LIBUSB_CONTROL_SETUP_SIZE, data, wLength);
+
+	libusb_fill_control_transfer(transfer, dev_handle, buffer, length,
+		ctrl_transfer_cb, &completed, timeout);
+	r = libusb_submit_transfer(transfer);
+	if (r < 0) {
+		libusb_free_transfer(transfer);
+		return r;
+	}
+
+	while (!completed) {
+		r = libusb_poll();
 		if (r < 0) {
-			libusb_transfer_cancel_sync(devh, transfer);
-			libusb_transfer_free(transfer);
+			libusb_cancel_transfer_sync(dev_handle, transfer);
+			libusb_free_transfer(transfer);
 			return r;
 		}
 	}
 
-	libusb_transfer_free(transfer);
-	switch (ctrlh.status) {
+	if ((bRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN)
+		memcpy(data, libusb_control_transfer_get_data(transfer),
+			transfer->actual_length);
+
+	switch (transfer->status) {
 	case LIBUSB_TRANSFER_COMPLETED:
-		return ctrlh.actual_length;
+		r = transfer->actual_length;
+		break;
 	case LIBUSB_TRANSFER_TIMED_OUT:
-		return -ETIMEDOUT;
+		r = -ETIMEDOUT;
+		break;
 	default:
-		usbi_warn("unrecognised status code %d", ctrlh.status);
-		return -1;
+		usbi_warn("unrecognised status code %d", transfer->status);
+		r = -1;
 	}
+
+	libusb_free_transfer(transfer);
+	return r;
 }
 
 struct sync_bulk_handle {
@@ -642,79 +606,87 @@ struct sync_bulk_handle {
 	int actual_length;
 };
 
-static void bulk_transfer_cb(struct libusb_dev_handle *devh,
-	struct libusb_transfer *transfer, enum libusb_transfer_status status,
-	unsigned char endpoint, int rqlength, unsigned char *data,
-	int actual_length, void *user_data)
+static void bulk_transfer_cb(struct libusb_transfer *transfer)
 {
-	struct sync_bulk_handle *bulkh = (struct sync_bulk_handle *) user_data;
-	usbi_dbg("");
-	bulkh->status = status;
-	bulkh->actual_length = actual_length;
-	/* caller frees transfer */
+	int *completed = transfer->user_data;
+	*completed = 1;
+	usbi_dbg("actual_length=%d", transfer->actual_length);
+	/* caller interprets results and frees transfer */
 }
 
-static int do_sync_bulk_transfer(struct libusb_dev_handle *devh,
-	struct libusb_bulk_transfer_request *request, int *transferred,
-	unsigned int timeout, unsigned char urbtype)
+static int do_sync_bulk_transfer(struct libusb_dev_handle *dev_handle,
+	unsigned char endpoint, unsigned char *buffer, int length,
+	int *transferred, unsigned int timeout, unsigned char endpoint_type)
 {
-	struct libusb_transfer *transfer;
-	struct sync_bulk_handle bulkh;
+	struct libusb_transfer *transfer = libusb_alloc_transfer();
+	int completed = 0;
+	int r;
 
-	memset(&bulkh, 0, sizeof(bulkh));
-
-	transfer = submit_bulk_transfer(devh, request, bulk_transfer_cb, &bulkh,
-		timeout, urbtype);
 	if (!transfer)
-		return -1;
+		return -ENOMEM;
 
-	while (!bulkh.status) {
-		int r = libusb_poll();
+	libusb_fill_bulk_transfer(transfer, dev_handle, endpoint, buffer, length,
+		bulk_transfer_cb, &completed, timeout);
+	transfer->endpoint_type = endpoint_type;
+
+	r = libusb_submit_transfer(transfer);
+	if (r < 0) {
+		libusb_free_transfer(transfer);
+		return r;
+	}
+
+	while (!completed) {
+		r = libusb_poll();
 		if (r < 0) {
-			libusb_transfer_cancel_sync(devh, transfer);
-			libusb_transfer_free(transfer);
+			libusb_cancel_transfer_sync(dev_handle, transfer);
+			libusb_free_transfer(transfer);
 			return r;
 		}
 	}
 
-	*transferred = bulkh.actual_length;
-	libusb_transfer_free(transfer);
-
-	switch (bulkh.status) {
+	*transferred = transfer->actual_length;
+	switch (transfer->status) {
 	case LIBUSB_TRANSFER_COMPLETED:
-		return 0;
+		r = 0;
+		break;
 	case LIBUSB_TRANSFER_TIMED_OUT:
-		return -ETIMEDOUT;
+		r = -ETIMEDOUT;
+		break;
 	default:
-		usbi_warn("unrecognised status code %d", bulkh.status);
-		return -1;
+		usbi_warn("unrecognised status code %d", transfer->status);
+		r = -1;
 	}
+
+	libusb_free_transfer(transfer);
+	return r;
 }
 
-API_EXPORTED int libusb_interrupt_transfer(struct libusb_dev_handle *devh,
-	struct libusb_bulk_transfer_request *request, int *transferred,
+/* FIXME: should transferred be the return value? */
+API_EXPORTED int libusb_bulk_transfer(struct libusb_dev_handle *dev_handle,
+	unsigned char endpoint, unsigned char *data, int length, int *transferred,
 	unsigned int timeout)
 {
-	return do_sync_bulk_transfer(devh, request, transferred, timeout,
-		USB_URB_TYPE_INTERRUPT);
+	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
+		transferred, timeout, LIBUSB_ENDPOINT_TYPE_BULK);
 }
 
-API_EXPORTED int libusb_bulk_transfer(struct libusb_dev_handle *devh,
-	struct libusb_bulk_transfer_request *request, int *transferred,
+/* FIXME: do we need an interval param here? usbfs doesn't expose it? */
+API_EXPORTED int libusb_interrupt_transfer(struct libusb_dev_handle *dev_handle,
+	unsigned char endpoint, unsigned char *data, int length, int *transferred,
 	unsigned int timeout)
 {
-	return do_sync_bulk_transfer(devh, request, transferred, timeout,
-		USB_URB_TYPE_BULK);
+	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
+		transferred, timeout, LIBUSB_ENDPOINT_TYPE_INTERRUPT);
 }
 
-API_EXPORTED void libusb_transfer_free(struct libusb_transfer *transfer)
+API_EXPORTED void libusb_free_transfer(struct libusb_transfer *transfer)
 {
+	struct usbi_transfer *itransfer;
 	if (!transfer)
 		return;
 
-	if (!(transfer->flags & USBI_TRANSFER_DATA_BELONGS_TO_USER))
-		free(transfer->urb.buffer);
-	free(transfer);
+	itransfer = TRANSFER_TO_PRIV(transfer);
+	free(itransfer);
 }
 
 API_EXPORTED void libusb_set_pollfd_notifiers(libusb_pollfd_added_cb added_cb,

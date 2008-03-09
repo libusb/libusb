@@ -46,8 +46,8 @@ enum {
 };
 
 static int next_state(void);
-static int submit_irq_urb(void);
-static int submit_img_urb(void);
+static int submit_irq_transfer(void);
+static int submit_img_transfer(void);
 
 enum {
 	STATE_AWAIT_MODE_CHANGE_AWAIT_FINGER_ON = 1,
@@ -62,22 +62,10 @@ static int state = 0;
 static struct libusb_dev_handle *devh = NULL;
 static unsigned char imgbuf[0x1b340];
 static unsigned char irqbuf[INTR_LENGTH];
-static libusb_transfer *img_urbh = NULL;
-static libusb_transfer *irq_urbh = NULL;
+static struct libusb_transfer *img_transfer = NULL;
+static struct libusb_transfer *irq_transfer = NULL;
 static int img_idx = 0;
 static int do_exit = 0;
-
-static struct libusb_bulk_transfer_request imgrq = {
-	.endpoint = EP_DATA,
-	.data = imgbuf,
-	.length = sizeof(imgbuf),
-};
-
-static struct libusb_bulk_transfer_request intrrq = {
-	.endpoint = EP_INTR,
-	.data = irqbuf,
-	.length = sizeof(irqbuf),
-};
 
 static int find_dpfp_device(void)
 {
@@ -88,18 +76,11 @@ static int find_dpfp_device(void)
 static int print_f0_data(void)
 {
 	unsigned char data[0x10];
-	struct libusb_control_transfer_request rq = {
-		.requesttype = CTRL_IN,
-		.request = USB_RQ,
-		.value = 0xf0,
-		.index = 0,
-		.length = sizeof(data),
-		.data = data,
-	};
 	int r;
 	unsigned int i;
 
-	r = libusb_control_transfer(devh, &rq, 0);
+	r = libusb_control_transfer(devh, CTRL_IN, USB_RQ, 0xf0, 0, data,
+		sizeof(data), 0);
 	if (r < 0) {
 		fprintf(stderr, "F0 error %d\n", r);
 		return r;
@@ -118,17 +99,9 @@ static int print_f0_data(void)
 
 static int get_hwstat(unsigned char *status)
 {
-	struct libusb_control_transfer_request rq = {
-		.requesttype = CTRL_IN,
-		.request = USB_RQ,
-		.value = 0x07,
-		.index = 0,
-		.length = 1,
-		.data = status,
-	};
 	int r;
 
-	r = libusb_control_transfer(devh, &rq, 0);
+	r = libusb_control_transfer(devh, CTRL_IN, USB_RQ, 0x07, 0, status, 1, 0);
 	if (r < 0) {
 		fprintf(stderr, "read hwstat error %d\n", r);
 		return r;
@@ -145,18 +118,9 @@ static int get_hwstat(unsigned char *status)
 static int set_hwstat(unsigned char data)
 {
 	int r;
-	struct libusb_control_transfer_request rq = {
-		.requesttype = CTRL_OUT,
-		.request = USB_RQ,
-		.value = 0x07,
-		.index = 0,
-		.length = 1,
-		.data = &data,
-	};
 
 	printf("set hwstat to %02x\n", data);
-
-	r = libusb_control_transfer(devh, &rq, 0);
+	r = libusb_control_transfer(devh, CTRL_OUT, USB_RQ, 0x07, 0, &data, 1, 0);
 	if (r < 0) {
 		fprintf(stderr, "set hwstat error %d\n", r);
 		return r;
@@ -172,18 +136,9 @@ static int set_hwstat(unsigned char data)
 static int set_mode(unsigned char data)
 {
 	int r;
-	struct libusb_control_transfer_request rq = {
-		.requesttype = CTRL_OUT,
-		.request = USB_RQ,
-		.value = 0x4e,
-		.index = 0,
-		.length = 1,
-		.data = &data,
-	};
-
 	printf("set mode %02x\n", data);
 
-	r = libusb_control_transfer(devh, &rq, 0);
+	r = libusb_control_transfer(devh, CTRL_OUT, USB_RQ, 0x4e, 0, &data, 1, 0);
 	if (r < 0) {
 		fprintf(stderr, "set mode error %d\n", r);
 		return r;
@@ -196,56 +151,51 @@ static int set_mode(unsigned char data)
 	return 0;
 }
 
-static void cb_mode_changed(struct libusb_dev_handle *_devh,
-	struct libusb_transfer *urbh, enum libusb_transfer_status status,
-	struct libusb_control_setup *setup, unsigned char *data, int actual_length,
-	void *user_data)
+static void cb_mode_changed(struct libusb_transfer *transfer)
 {
-	if (status != LIBUSB_TRANSFER_COMPLETED) {
-		fprintf(stderr, "mode change URB not completed!\n");
+	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
+		fprintf(stderr, "mode change transfer not completed!\n");
 		do_exit = 2;
 	}
 
 	printf("async cb_mode_changed\n");
 	if (next_state() < 0)
 		do_exit = 2;
+	free(transfer->buffer);
+	libusb_free_transfer(transfer);
 }
 
 static int set_mode_async(unsigned char data)
 {
-	libusb_transfer *urbh;
-	struct libusb_control_transfer_request rq = {
-		.requesttype = CTRL_OUT,
-		.request = USB_RQ,
-		.value = 0x4e,
-		.index = 0,
-		.length = 1,
-		.data = &data,
-	};
+	int bufsize = LIBUSB_CONTROL_SETUP_SIZE + 1;
+	unsigned char *buf = malloc(bufsize);
+	struct libusb_transfer *transfer;
 
-	printf("async set mode %02x\n", data);
-
-	urbh = libusb_async_control_transfer(devh, &rq, cb_mode_changed, NULL,
-		1000);
-	if (!urbh) {
-		fprintf(stderr, "set mode submit error\n");
-		return -1;
+	if (!buf)
+		return -ENOMEM;
+	
+	transfer = libusb_alloc_transfer();
+	if (!transfer) {
+		free(buf);
+		return -ENOMEM;
 	}
 
-	return 0;
+	printf("async set mode %02x\n", data);
+	libusb_fill_control_setup(buf, CTRL_OUT, USB_RQ, 0x4e, 0, 1);
+	buf[LIBUSB_CONTROL_SETUP_SIZE] = data;
+	libusb_fill_control_transfer(transfer, devh, buf, bufsize,
+		cb_mode_changed, NULL, 1000);
+
+	return libusb_submit_transfer(transfer);
 }
 
 static int do_sync_intr(unsigned char *data)
 {
-	struct libusb_bulk_transfer_request request = {
-		.endpoint = EP_INTR,
-		.data = data,
-		.length = INTR_LENGTH,
-	};
 	int r;
 	int transferred;
 
-	r = libusb_interrupt_transfer(devh, &request, &transferred, 1000);
+	r = libusb_interrupt_transfer(devh, EP_INTR, data, INTR_LENGTH,
+		&transferred, 1000);
 	if (r < 0) {
 		fprintf(stderr, "intr error %d\n", r);
 		return r;
@@ -328,14 +278,12 @@ static int next_state(void)
 	return 0;
 }
 
-static void cb_irq(libusb_dev_handle *_devh, libusb_transfer *urbh,
-	enum libusb_transfer_status status, unsigned char endpoint, int rqlength,
-	unsigned char *data, int actual_length, void *user_data)
+static void cb_irq(struct libusb_transfer *transfer)
 {
-	unsigned char irqtype = data[0];
+	unsigned char irqtype = transfer->buffer[0];
 
-	if (status != LIBUSB_TRANSFER_COMPLETED) {
-		fprintf(stderr, "irq URB status %d?\n", status);
+	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
+		fprintf(stderr, "irq transfer status %d?\n", transfer->status);
 		do_exit = 2;
 		return;
 	}
@@ -363,16 +311,14 @@ static void cb_irq(libusb_dev_handle *_devh, libusb_transfer *urbh,
 		}
 		break;
 	}
-	if (submit_irq_urb() < 0)
+	if (submit_irq_transfer() < 0)
 		do_exit = 2;
 }
 
-static void cb_img(libusb_dev_handle *_devh, libusb_transfer *urbh,
-	enum libusb_transfer_status status, unsigned char endpoint, int rqlength,
-	unsigned char *data, int actual_length, void *user_data)
+static void cb_img(struct libusb_transfer *transfer)
 {
-	if (status != LIBUSB_TRANSFER_COMPLETED) {
-		fprintf(stderr, "img URB status %d?\n", status);
+	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
+		fprintf(stderr, "img transfer status %d?\n", transfer->status);
 		do_exit = 2;
 		return;
 	}
@@ -383,35 +329,31 @@ static void cb_img(libusb_dev_handle *_devh, libusb_transfer *urbh,
 		do_exit = 2;
 		return;
 	}
-	if (submit_img_urb() < 0)
+	if (submit_img_transfer() < 0)
 		do_exit = 2;
 }
 
-static int submit_irq_urb(void)
+static int submit_irq_transfer(void)
 {
-	libusb_transfer_free(irq_urbh);
-	irq_urbh = libusb_async_interrupt_transfer(devh, &intrrq, cb_irq, NULL, 0);
-	return irq_urbh != NULL;
+	return libusb_submit_transfer(irq_transfer);
 }
 
-static int submit_img_urb(void)
+static int submit_img_transfer(void)
 {
-	libusb_transfer_free(img_urbh);
-	img_urbh = libusb_async_bulk_transfer(devh, &imgrq, cb_img, NULL, 0);
-	return img_urbh != NULL;
+	return libusb_submit_transfer(img_transfer);
 }
 
 static int init_capture(void)
 {
 	int r;
 
-	r = submit_irq_urb();
+	r = submit_irq_transfer();
 	if (r < 0)
 		return r;
 
-	r = submit_img_urb();
+	r = submit_img_transfer();
 	if (r < 0) {
-		libusb_transfer_cancel_sync(devh, img_urbh);
+		libusb_cancel_transfer_sync(devh, img_transfer);
 		return r;
 	}
 
@@ -450,6 +392,24 @@ static int do_init(void)
 	r = sync_intr(0x56);
 	if (r < 0)
 		return r;
+
+	return 0;
+}
+
+static int alloc_transfers(void)
+{
+	img_transfer = libusb_alloc_transfer();
+	if (!img_transfer)
+		return -ENOMEM;
+	
+	irq_transfer = libusb_alloc_transfer();
+	if (!irq_transfer)
+		return -ENOMEM;
+
+	libusb_fill_bulk_transfer(img_transfer, devh, EP_DATA, imgbuf,
+		sizeof(imgbuf), cb_img, NULL, 0);
+	libusb_fill_interrupt_transfer(irq_transfer, devh, EP_INTR, irqbuf,
+		sizeof(irqbuf), cb_irq, NULL, 0);
 
 	return 0;
 }
@@ -493,6 +453,10 @@ int main(void)
 
 	/* async from here onwards */
 
+	r = alloc_transfers();
+	if (r < 0)
+		goto out_deinit;
+
 	r = init_capture();
 	if (r < 0)
 		goto out_deinit;
@@ -512,11 +476,11 @@ int main(void)
 
 	printf("shutting down...\n");
 
-	r = libusb_transfer_cancel_sync(devh, irq_urbh);
+	r = libusb_cancel_transfer_sync(devh, irq_transfer);
 	if (r < 0)
 		goto out_deinit;
 
-	r = libusb_transfer_cancel_sync(devh, img_urbh);
+	r = libusb_cancel_transfer_sync(devh, img_transfer);
 	if (r < 0)
 		goto out_deinit;
 	
@@ -526,8 +490,8 @@ int main(void)
 		r = 1;
 
 out_deinit:
-	libusb_transfer_free(img_urbh);
-	libusb_transfer_free(irq_urbh);
+	libusb_free_transfer(img_transfer);
+	libusb_free_transfer(irq_transfer);
 	set_mode(0);
 	set_hwstat(0x80);
 out_release:
