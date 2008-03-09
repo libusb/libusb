@@ -464,9 +464,9 @@ API_EXPORTED struct libusb_config_descriptor *libusb_device_get_config(
 	return dev->config;
 }
 
-API_EXPORTED struct libusb_dev_handle *libusb_open(struct libusb_device *dev)
+API_EXPORTED struct libusb_device_handle *libusb_open(struct libusb_device *dev)
 {
-	struct libusb_dev_handle *devh;
+	struct libusb_device_handle *devh;
 	int fd;
 	usbi_dbg("open %04x:%04x", dev->desc.idVendor, dev->desc.idProduct);
 
@@ -493,13 +493,13 @@ API_EXPORTED struct libusb_dev_handle *libusb_open(struct libusb_device *dev)
  * combination. has limitations and is hence not intended for use in "real
  * applications": if multiple devices have the same VID+PID it'll only
  * give you the first one, etc. */
-API_EXPORTED struct libusb_dev_handle *libusb_open_device_with_vid_pid(
+API_EXPORTED struct libusb_device_handle *libusb_open_device_with_vid_pid(
 	uint16_t vendor_id, uint16_t product_id)
 {
 	struct libusb_device **devs;
 	struct libusb_device *found = NULL;
 	struct libusb_device *dev;
-	struct libusb_dev_handle *devh;
+	struct libusb_device_handle *devh;
 	size_t i = 0;
 
 	if (libusb_get_device_list(&devs) < 0)
@@ -520,14 +520,14 @@ API_EXPORTED struct libusb_dev_handle *libusb_open_device_with_vid_pid(
 	return devh;
 }
 
-static void do_close(struct libusb_dev_handle *devh)
+static void do_close(struct libusb_device_handle *devh)
 {
 	usbi_remove_pollfd(devh->fd);
 	close(devh->fd);
 	libusb_device_unref(devh->dev);
 }
 
-API_EXPORTED void libusb_close(struct libusb_dev_handle *devh)
+API_EXPORTED void libusb_close(struct libusb_device_handle *devh)
 {
 	if (!devh)
 		return;
@@ -539,12 +539,12 @@ API_EXPORTED void libusb_close(struct libusb_dev_handle *devh)
 }
 
 API_EXPORTED struct libusb_device *libusb_devh_get_dev(
-	struct libusb_dev_handle *devh)
+	struct libusb_device_handle *devh)
 {
 	return devh->dev;
 }
 
-API_EXPORTED int libusb_claim_interface(struct libusb_dev_handle *dev,
+API_EXPORTED int libusb_claim_interface(struct libusb_device_handle *dev,
 	int iface)
 {
 	int r;
@@ -556,7 +556,7 @@ API_EXPORTED int libusb_claim_interface(struct libusb_dev_handle *dev,
 	return r;
 }
 
-API_EXPORTED int libusb_release_interface(struct libusb_dev_handle *dev,
+API_EXPORTED int libusb_release_interface(struct libusb_device_handle *dev,
 	int iface)
 {
 	int r;
@@ -585,7 +585,7 @@ API_EXPORTED int libusb_init(void)
 
 API_EXPORTED void libusb_exit(void)
 {
-	struct libusb_dev_handle *devh;
+	struct libusb_device_handle *devh;
 	usbi_dbg("");
 	if (!list_empty(&open_devs)) {
 		usbi_dbg("naughty app left some devices open!\n");
@@ -596,7 +596,7 @@ API_EXPORTED void libusb_exit(void)
 
 API_EXPORTED size_t libusb_get_pollfds(struct libusb_pollfd **pollfds)
 {
-	struct libusb_dev_handle *devh;
+	struct libusb_device_handle *devh;
 	struct libusb_pollfd *ret;
 	size_t cnt = 0;
 	size_t i = 0;

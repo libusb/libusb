@@ -16,7 +16,6 @@ add some libusb_transfer flags:
 
 1.0 API style/naming points to reconsider
 =========================================
-devh in general
 config struct/function naming
 typedef _cb or _cb_fn or _cb_t?
 typedef as-is or pointers? libusb_dev_t rather than libusb_dev *?

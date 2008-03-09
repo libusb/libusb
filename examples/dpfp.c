@@ -59,7 +59,7 @@ enum {
 };
 
 static int state = 0;
-static struct libusb_dev_handle *devh = NULL;
+static struct libusb_device_handle *devh = NULL;
 static unsigned char imgbuf[0x1b340];
 static unsigned char irqbuf[INTR_LENGTH];
 static struct libusb_transfer *img_transfer = NULL;

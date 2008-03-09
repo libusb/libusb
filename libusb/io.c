@@ -206,7 +206,7 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 	return submit_transfer(itransfer);
 }
 
-API_EXPORTED int libusb_cancel_transfer(struct libusb_dev_handle *devh,
+API_EXPORTED int libusb_cancel_transfer(struct libusb_device_handle *devh,
 	struct libusb_transfer *transfer)
 {
 	struct usbi_transfer *itransfer = TRANSFER_TO_PRIV(transfer);
@@ -219,7 +219,7 @@ API_EXPORTED int libusb_cancel_transfer(struct libusb_dev_handle *devh,
 	return r;
 }
 
-API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_dev_handle *devh,
+API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_device_handle *devh,
 	struct libusb_transfer *transfer)
 {
 	struct usbi_transfer *itransfer = TRANSFER_TO_PRIV(transfer);
@@ -256,7 +256,7 @@ static void handle_transfer_completion(struct usbi_transfer *itransfer,
 		transfer->callback(transfer);
 }
 
-static void handle_transfer_cancellation(struct libusb_dev_handle *devh,
+static void handle_transfer_cancellation(struct libusb_device_handle *devh,
 	struct usbi_transfer *transfer)
 {
 	/* if the URB is being cancelled synchronously, raise cancellation
@@ -281,7 +281,7 @@ static void handle_transfer_cancellation(struct libusb_dev_handle *devh,
 	handle_transfer_completion(transfer, LIBUSB_TRANSFER_CANCELLED);
 }
 
-static int reap_for_devh(struct libusb_dev_handle *devh)
+static int reap_for_devh(struct libusb_device_handle *devh)
 {
 	int r;
 	struct usb_urb *urb;
@@ -406,7 +406,7 @@ static int handle_timeouts(void)
 
 static int poll_io(struct timeval *tv)
 {
-	struct libusb_dev_handle *devh;
+	struct libusb_device_handle *devh;
 	int r;
 	int maxfd = 0;
 	fd_set writefds;

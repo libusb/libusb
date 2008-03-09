@@ -183,8 +183,8 @@ struct libusb_control_setup {
 struct libusb_device;
 typedef struct libusb_device libusb_device;
 
-struct libusb_dev_handle;
-typedef struct libusb_dev_handle libusb_dev_handle;
+struct libusb_device_handle;
+typedef struct libusb_device_handle libusb_device_handle;
 
 enum libusb_transfer_status {
 	LIBUSB_TRANSFER_SILENT_COMPLETION = 0,
@@ -198,7 +198,7 @@ struct libusb_transfer;
 typedef void (*libusb_transfer_cb_fn)(struct libusb_transfer *transfer);
 
 struct libusb_transfer {
-	libusb_dev_handle *dev_handle;
+	libusb_device_handle *dev_handle;
 	unsigned char endpoint;
 	unsigned char endpoint_type;
 	unsigned int timeout;
@@ -222,13 +222,13 @@ struct libusb_config_descriptor *libusb_device_get_config(libusb_device *dev);
 libusb_device *libusb_device_ref(libusb_device *dev);
 void libusb_device_unref(libusb_device *dev);
 
-libusb_dev_handle *libusb_open(libusb_device *dev);
-void libusb_close(libusb_dev_handle *devh);
-libusb_device *libusb_devh_get_device(libusb_dev_handle *devh);
-int libusb_claim_interface(libusb_dev_handle *dev, int iface);
-int libusb_release_interface(libusb_dev_handle *dev, int iface);
+libusb_device_handle *libusb_open(libusb_device *dev);
+void libusb_close(libusb_device_handle *devh);
+libusb_device *libusb_devh_get_device(libusb_device_handle *devh);
+int libusb_claim_interface(libusb_device_handle *dev, int iface);
+int libusb_release_interface(libusb_device_handle *dev, int iface);
 
-libusb_dev_handle *libusb_open_device_with_vid_pid(uint16_t vendor_id,
+libusb_device_handle *libusb_open_device_with_vid_pid(uint16_t vendor_id,
 	uint16_t product_id);
 
 /* async I/O */
@@ -262,14 +262,14 @@ void libusb_init_transfer(struct libusb_transfer *transfer);
 
 struct libusb_transfer *libusb_alloc_transfer(void);
 int libusb_submit_transfer(struct libusb_transfer *transfer);
-int libusb_cancel_transfer(libusb_dev_handle *devh,
+int libusb_cancel_transfer(libusb_device_handle *devh,
 	struct libusb_transfer *transfer);
-int libusb_cancel_transfer_sync(libusb_dev_handle *devh,
+int libusb_cancel_transfer_sync(libusb_device_handle *devh,
 	struct libusb_transfer *transfer);
 void libusb_free_transfer(struct libusb_transfer *transfer);
 
 static inline void libusb_fill_control_transfer(
-	struct libusb_transfer *transfer, libusb_dev_handle *dev_handle,
+	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char *buffer, int length, libusb_transfer_cb_fn callback,
 	void *user_data, unsigned int timeout)
 {
@@ -284,7 +284,7 @@ static inline void libusb_fill_control_transfer(
 }
 
 static inline void libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
-	libusb_dev_handle *dev_handle, unsigned char endpoint,
+	libusb_device_handle *dev_handle, unsigned char endpoint,
 	unsigned char *buffer, int length, libusb_transfer_cb_fn callback,
 	void *user_data, unsigned int timeout)
 {
@@ -299,7 +299,7 @@ static inline void libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
 }
 
 static inline void libusb_fill_interrupt_transfer(
-	struct libusb_transfer *transfer, libusb_dev_handle *dev_handle,
+	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *buffer, int length,
 	libusb_transfer_cb_fn callback, void *user_data, unsigned int timeout)
 {
@@ -315,14 +315,15 @@ static inline void libusb_fill_interrupt_transfer(
 
 /* sync I/O */
 
-int libusb_control_transfer(libusb_dev_handle *dev_handle,
+int libusb_control_transfer(libusb_device_handle *dev_handle,
 	uint8_t request_type, uint8_t request, uint16_t value, uint16_t index,
 	unsigned char *data, uint16_t length, unsigned int timeout);
 
-int libusb_bulk_transfer(libusb_dev_handle *dev_handle, unsigned char endpoint,
-	unsigned char *data, int length, int *actual_length, unsigned int timeout);
+int libusb_bulk_transfer(libusb_device_handle *dev_handle,
+	unsigned char endpoint, unsigned char *data, int length,
+	int *actual_length, unsigned int timeout);
 
-int libusb_interrupt_transfer(libusb_dev_handle *dev_handle,
+int libusb_interrupt_transfer(libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *data, int length,
 	int *actual_length, unsigned int timeout);
 

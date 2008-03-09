@@ -33,7 +33,7 @@ static void ctrl_transfer_cb(struct libusb_transfer *transfer)
 	/* caller interprets result and frees transfer */
 }
 
-API_EXPORTED int libusb_control_transfer(libusb_dev_handle *dev_handle,
+API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 	uint8_t bRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	unsigned char *data, uint16_t wLength, unsigned int timeout)
 {
@@ -102,7 +102,7 @@ static void bulk_transfer_cb(struct libusb_transfer *transfer)
 	/* caller interprets results and frees transfer */
 }
 
-static int do_sync_bulk_transfer(struct libusb_dev_handle *dev_handle,
+static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *buffer, int length,
 	int *transferred, unsigned int timeout, unsigned char endpoint_type)
 {
@@ -150,7 +150,7 @@ static int do_sync_bulk_transfer(struct libusb_dev_handle *dev_handle,
 }
 
 /* FIXME: should transferred be the return value? */
-API_EXPORTED int libusb_bulk_transfer(struct libusb_dev_handle *dev_handle,
+API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *data, int length, int *transferred,
 	unsigned int timeout)
 {
@@ -159,9 +159,9 @@ API_EXPORTED int libusb_bulk_transfer(struct libusb_dev_handle *dev_handle,
 }
 
 /* FIXME: do we need an interval param here? usbfs doesn't expose it? */
-API_EXPORTED int libusb_interrupt_transfer(struct libusb_dev_handle *dev_handle,
-	unsigned char endpoint, unsigned char *data, int length, int *transferred,
-	unsigned int timeout)
+API_EXPORTED int libusb_interrupt_transfer(
+	struct libusb_device_handle *dev_handle, unsigned char endpoint,
+	unsigned char *data, int length, int *transferred, unsigned int timeout)
 {
 	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
 		transferred, timeout, LIBUSB_ENDPOINT_TYPE_INTERRUPT);

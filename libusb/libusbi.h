@@ -151,7 +151,7 @@ struct libusb_device {
 	struct libusb_config_descriptor *config;
 };
 
-struct libusb_dev_handle {
+struct libusb_device_handle {
 	struct list_head list;
 	struct libusb_device *dev;
 	int fd;
