@@ -39,14 +39,13 @@ API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 {
 	struct libusb_transfer *transfer = libusb_alloc_transfer();
 	unsigned char *buffer;
-	int length = wLength + LIBUSB_CONTROL_SETUP_SIZE;
 	int completed = 0;
 	int r;
 
 	if (!transfer)
 		return -ENOMEM;
 	
-	buffer = malloc(length);
+	buffer = malloc(LIBUSB_CONTROL_SETUP_SIZE + wLength);
 	if (!buffer) {
 		libusb_free_transfer(transfer);
 		return -ENOMEM;
@@ -57,7 +56,7 @@ API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 	if ((bRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_OUT)
 		memcpy(buffer + LIBUSB_CONTROL_SETUP_SIZE, data, wLength);
 
-	libusb_fill_control_transfer(transfer, dev_handle, buffer, length,
+	libusb_fill_control_transfer(transfer, dev_handle, buffer,
 		ctrl_transfer_cb, &completed, timeout);
 	r = libusb_submit_transfer(transfer);
 	if (r < 0) {

@@ -270,15 +270,17 @@ void libusb_free_transfer(struct libusb_transfer *transfer);
 
 static inline void libusb_fill_control_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
-	unsigned char *buffer, int length, libusb_transfer_cb_fn callback,
-	void *user_data, unsigned int timeout)
+	unsigned char *buffer, libusb_transfer_cb_fn callback, void *user_data,
+	unsigned int timeout)
 {
+	struct libusb_control_setup *setup = (struct libusb_control_setup *) buffer;
 	transfer->dev_handle = dev_handle;
 	transfer->endpoint = 0;
 	transfer->endpoint_type = LIBUSB_ENDPOINT_TYPE_CONTROL;
 	transfer->timeout = timeout;
 	transfer->buffer = buffer;
-	transfer->length = length;
+	if (setup)
+		transfer->length = LIBUSB_CONTROL_SETUP_SIZE + setup->wLength;
 	transfer->user_data = user_data;
 	transfer->callback = callback;
 }
