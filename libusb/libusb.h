@@ -225,8 +225,8 @@ libusb_device *libusb_device_ref(libusb_device *dev);
 void libusb_device_unref(libusb_device *dev);
 
 libusb_device_handle *libusb_open(libusb_device *dev);
-void libusb_close(libusb_device_handle *devh);
-libusb_device *libusb_devh_get_device(libusb_device_handle *devh);
+void libusb_close(libusb_device_handle *dev_handle);
+libusb_device *libusb_get_device(libusb_device_handle *dev_handle);
 int libusb_claim_interface(libusb_device_handle *dev, int iface);
 int libusb_release_interface(libusb_device_handle *dev, int iface);
 

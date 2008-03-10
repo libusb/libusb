@@ -528,21 +528,21 @@ static void do_close(struct libusb_device_handle *devh)
 	libusb_device_unref(devh->dev);
 }
 
-API_EXPORTED void libusb_close(struct libusb_device_handle *devh)
+API_EXPORTED void libusb_close(struct libusb_device_handle *dev_handle)
 {
-	if (!devh)
+	if (!dev_handle)
 		return;
 	usbi_dbg("");
 
-	list_del(&devh->list);
-	do_close(devh);
-	free(devh);
+	list_del(&dev_handle->list);
+	do_close(dev_handle);
+	free(dev_handle);
 }
 
-API_EXPORTED struct libusb_device *libusb_devh_get_dev(
-	struct libusb_device_handle *devh)
+API_EXPORTED struct libusb_device *libusb_get_device(
+	struct libusb_device_handle *dev_handle)
 {
-	return devh->dev;
+	return dev_handle->dev;
 }
 
 API_EXPORTED int libusb_claim_interface(struct libusb_device_handle *dev,

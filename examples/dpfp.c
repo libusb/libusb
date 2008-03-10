@@ -158,7 +158,8 @@ static void cb_mode_changed(struct libusb_transfer *transfer)
 		do_exit = 2;
 	}
 
-	printf("async cb_mode_changed\n");
+	printf("async cb_mode_changed length=%d actual_length=%d\n",
+		transfer->length, transfer->actual_length);
 	if (next_state() < 0)
 		do_exit = 2;
 	free(transfer->buffer);
