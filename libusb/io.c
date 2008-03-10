@@ -248,10 +248,23 @@ static void handle_transfer_completion(struct usbi_transfer *itransfer,
 	if (status == LIBUSB_TRANSFER_SILENT_COMPLETION)
 		return;
 
+	if (status == LIBUSB_TRANSFER_COMPLETED
+			&& transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) {
+		int rqlen = transfer->length;
+		if (transfer->endpoint_type == LIBUSB_ENDPOINT_TYPE_CONTROL)
+			rqlen -= LIBUSB_CONTROL_SETUP_SIZE;
+		if (rqlen != itransfer->transferred) {
+			usbi_dbg("interpreting short transfer as error");
+			status = LIBUSB_TRANSFER_ERROR;
+		}
+	}
+
 	transfer->status = status;
 	transfer->actual_length = itransfer->transferred;
 	if (transfer->callback)
 		transfer->callback(transfer);
+	if (transfer->flags & LIBUSB_TRANSFER_FREE_TRANSFER)
+		libusb_free_transfer(transfer);
 }
 
 static void handle_transfer_cancellation(struct usbi_transfer *transfer)
@@ -533,6 +546,9 @@ API_EXPORTED void libusb_free_transfer(struct libusb_transfer *transfer)
 	struct usbi_transfer *itransfer;
 	if (!transfer)
 		return;
+
+	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER)
+		free(transfer->buffer);
 
 	itransfer = TRANSFER_TO_PRIV(transfer);
 	free(itransfer);

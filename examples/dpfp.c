@@ -162,8 +162,6 @@ static void cb_mode_changed(struct libusb_transfer *transfer)
 		transfer->length, transfer->actual_length);
 	if (next_state() < 0)
 		do_exit = 2;
-	free(transfer->buffer);
-	libusb_free_transfer(transfer);
 }
 
 static int set_mode_async(unsigned char data)
@@ -186,6 +184,8 @@ static int set_mode_async(unsigned char data)
 	libusb_fill_control_transfer(transfer, devh, buf, cb_mode_changed, NULL,
 		1000);
 
+	transfer->flags = LIBUSB_TRANSFER_SHORT_NOT_OK
+		| LIBUSB_TRANSFER_FREE_BUFFER | LIBUSB_TRANSFER_FREE_TRANSFER;
 	return libusb_submit_transfer(transfer);
 }
 

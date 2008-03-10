@@ -189,9 +189,21 @@ typedef struct libusb_device_handle libusb_device_handle;
 enum libusb_transfer_status {
 	LIBUSB_TRANSFER_SILENT_COMPLETION = 0,
 	LIBUSB_TRANSFER_COMPLETED,
+	LIBUSB_TRANSFER_ERROR,
 	LIBUSB_TRANSFER_TIMED_OUT,
 	LIBUSB_TRANSFER_CANCELLED,
 };
+
+/* libusb_transfer.flags values */
+
+/* report short frames as errors */
+#define LIBUSB_TRANSFER_SHORT_NOT_OK	(1<<0)
+
+/* automatically free() transfer buffer during libusb_free_transfer() */
+#define LIBUSB_TRANSFER_FREE_BUFFER		(1<<1)
+
+/* automatically call libusb_free_transfer() after callback returns */
+#define LIBUSB_TRANSFER_FREE_TRANSFER	(1<<2)
 
 struct libusb_transfer;
 
@@ -199,6 +211,7 @@ typedef void (*libusb_transfer_cb_fn)(struct libusb_transfer *transfer);
 
 struct libusb_transfer {
 	libusb_device_handle *dev_handle;
+	uint8_t flags;
 	unsigned char endpoint;
 	unsigned char endpoint_type;
 	unsigned int timeout;

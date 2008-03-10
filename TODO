@@ -9,11 +9,6 @@ error codes
 fixme review
 review functionality missing over 0.1
 
-add some libusb_transfer flags:
- - treat short transfers as errors
- - unlink behaviour control
- - update timeout with time remaining
-
 1.0 API style/naming points to reconsider
 =========================================
 typedef _cb or _cb_fn or _cb_t?
