@@ -20,6 +20,7 @@
 
 #include <config.h>
 #include <errno.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -39,6 +40,9 @@
  * are always placed at the very end. */
 static struct list_head flying_transfers;
 
+/* list of poll fd's */
+static struct list_head pollfds;
+
 /* user callbacks for pollfd changes */
 static libusb_pollfd_added_cb fd_added_cb = NULL;
 static libusb_pollfd_removed_cb fd_removed_cb = NULL;
@@ -46,6 +50,7 @@ static libusb_pollfd_removed_cb fd_removed_cb = NULL;
 void usbi_io_init()
 {
 	list_init(&flying_transfers);
+	list_init(&pollfds);
 	fd_added_cb = NULL;
 	fd_removed_cb = NULL;
 }
@@ -113,43 +118,9 @@ static void add_to_flying_list(struct usbi_transfer *transfer)
 
 static int submit_transfer(struct usbi_transfer *itransfer)
 {
-	int r;
-	struct usb_urb *urb = &itransfer->urb;
-	struct libusb_transfer *transfer = &itransfer->pub;
-	int to_be_transferred = transfer->length - itransfer->transferred;
-
-	switch (transfer->endpoint_type) {
-	case LIBUSB_ENDPOINT_TYPE_CONTROL:
-		urb->type = USB_URB_TYPE_CONTROL;
-		break;
-	case LIBUSB_ENDPOINT_TYPE_BULK:
-		urb->type = USB_URB_TYPE_BULK;
-		break;
-	case LIBUSB_ENDPOINT_TYPE_INTERRUPT:
-		urb->type = USB_URB_TYPE_INTERRUPT;
-		break;
-	default:
-		usbi_err("unknown endpoint type %d", transfer->endpoint_type);
-		return -EINVAL;
-	}
-
-	urb->endpoint = transfer->endpoint;
-	urb->buffer = transfer->buffer + itransfer->transferred;
-	urb->buffer_length = MIN(to_be_transferred, MAX_URB_BUFFER_LENGTH);
-
-	/* FIXME: for requests that we have to split into multiple URBs, we should
-	 * submit all the URBs instantly: submit, submit, submit, reap, reap, reap
-	 * rather than: submit, reap, submit, reap, submit, reap
-	 * this will improve performance and fix bugs concerning behaviour when
-	 * the user submits two similar multiple-urb requests */
-	usbi_dbg("transferring %d from %d bytes", urb->buffer_length,
-		to_be_transferred);
-
-	r = ioctl(transfer->dev_handle->fd, IOCTL_USB_SUBMITURB, urb);
-	if (r < 0) {
-		usbi_err("submiturb failed error %d errno=%d", r, errno);
+	int r = usbi_backend->submit_transfer(itransfer);
+	if (r < 0)
 		return r;
-	}
 
 	add_to_flying_list(itransfer);
 	return 0;
@@ -157,7 +128,7 @@ static int submit_transfer(struct usbi_transfer *itransfer)
 
 API_EXPORTED size_t libusb_get_transfer_alloc_size(void)
 {
-	return sizeof(struct usbi_transfer);
+	return sizeof(struct usbi_transfer) + usbi_backend->transfer_priv_size;
 }
 
 void __init_transfer(struct usbi_transfer *transfer)
@@ -172,7 +143,8 @@ API_EXPORTED void libusb_init_transfer(struct libusb_transfer *transfer)
 
 API_EXPORTED struct libusb_transfer *libusb_alloc_transfer(void)
 {
-	struct usbi_transfer *transfer = malloc(sizeof(*transfer));
+	struct usbi_transfer *transfer =
+		malloc(sizeof(*transfer) + usbi_backend->transfer_priv_size);
 	if (!transfer)
 		return NULL;
 
@@ -212,7 +184,7 @@ API_EXPORTED int libusb_cancel_transfer(struct libusb_transfer *transfer)
 	int r;
 
 	usbi_dbg("");
-	r = ioctl(transfer->dev_handle->fd, IOCTL_USB_DISCARDURB, &itransfer->urb);
+	r = usbi_backend->cancel_transfer(itransfer);
 	if (r < 0)
 		usbi_err("cancel transfer failed error %d", r);
 	return r;
@@ -224,7 +196,7 @@ API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_transfer *transfer)
 	int r;
 
 	usbi_dbg("");
-	r = ioctl(transfer->dev_handle->fd, IOCTL_USB_DISCARDURB, &itransfer->urb);
+	r = usbi_backend->cancel_transfer(itransfer);
 	if (r < 0) {
 		usbi_err("cancel transfer failed error %d", r);
 		return r;
@@ -240,7 +212,7 @@ API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_transfer *transfer)
 	return 0;
 }
 
-static void handle_transfer_completion(struct usbi_transfer *itransfer,
+void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status)
 {
 	struct libusb_transfer *transfer = &itransfer->pub;
@@ -267,7 +239,7 @@ static void handle_transfer_completion(struct usbi_transfer *itransfer,
 		libusb_free_transfer(transfer);
 }
 
-static void handle_transfer_cancellation(struct usbi_transfer *transfer)
+void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
 {
 	/* if the URB is being cancelled synchronously, raise cancellation
 	 * completion event by unsetting flag, and ensure that user callback does
@@ -276,83 +248,20 @@ static void handle_transfer_cancellation(struct usbi_transfer *transfer)
 	if (transfer->flags & USBI_TRANSFER_SYNC_CANCELLED) {
 		transfer->flags &= ~USBI_TRANSFER_SYNC_CANCELLED;
 		usbi_dbg("detected sync. cancel");
-		handle_transfer_completion(transfer, LIBUSB_TRANSFER_SILENT_COMPLETION);
+		usbi_handle_transfer_completion(transfer,
+			LIBUSB_TRANSFER_SILENT_COMPLETION);
 		return;
 	}
 
 	/* if the URB was cancelled due to timeout, report timeout to the user */
 	if (transfer->flags & USBI_TRANSFER_TIMED_OUT) {
 		usbi_dbg("detected timeout cancellation");
-		handle_transfer_completion(transfer, LIBUSB_TRANSFER_TIMED_OUT);
+		usbi_handle_transfer_completion(transfer, LIBUSB_TRANSFER_TIMED_OUT);
 		return;
 	}
 
 	/* otherwise its a normal async cancel */
-	handle_transfer_completion(transfer, LIBUSB_TRANSFER_CANCELLED);
-}
-
-static int reap_for_devh(struct libusb_device_handle *devh)
-{
-	int r;
-	struct usb_urb *urb;
-	struct usbi_transfer *itransfer;
-	struct libusb_transfer *transfer;
-	int trf_requested;
-	int length;
-
-	r = ioctl(devh->fd, IOCTL_USB_REAPURBNDELAY, &urb);
-	if (r == -1 && errno == EAGAIN)
-		return r;
-	if (r < 0) {
-		usbi_err("reap failed error %d errno=%d", r, errno);
-		return r;
-	}
-
-	itransfer = container_of(urb, struct usbi_transfer, urb);
-	transfer = &itransfer->pub;
-
-	usbi_dbg("urb type=%d status=%d transferred=%d", urb->type, urb->status,
-		urb->actual_length);
-	list_del(&itransfer->list);
-
-	if (urb->status == -2) {
-		handle_transfer_cancellation(itransfer);
-		return 0;
-	}
-
-	/* FIXME: research what other status codes may exist */
-	if (urb->status != 0)
-		usbi_warn("unrecognised urb status %d", urb->status);
-
-	/* determine how much data was asked for */
-	length = transfer->length;
-	if (transfer->endpoint_type == LIBUSB_ENDPOINT_TYPE_CONTROL)
-		length -= LIBUSB_CONTROL_SETUP_SIZE;
-	trf_requested = MIN(length - itransfer->transferred,
-		MAX_URB_BUFFER_LENGTH);
-
-	itransfer->transferred += urb->actual_length;
-
-	/* if we were provided less data than requested, then our transfer is
-	 * done */
-	if (urb->actual_length < trf_requested) {
-		usbi_dbg("less data than requested (%d/%d) --> all done",
-			urb->actual_length, trf_requested);
-		handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
-		return 0;
-	}
-
-	/* if we've transferred all data, we're done */
-	if (itransfer->transferred == length) {
-		usbi_dbg("transfer complete --> all done");
-		handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
-		return 0;
-	}
-
-	/* otherwise, we have more data to transfer */
-	usbi_dbg("more data to transfer...");
-	memset(urb, 0, sizeof(*urb));
-	return submit_transfer(itransfer);
+	usbi_handle_transfer_completion(transfer, LIBUSB_TRANSFER_CANCELLED);
 }
 
 static void handle_timeout(struct usbi_transfer *itransfer)
@@ -416,10 +325,14 @@ static int handle_timeouts(void)
 
 static int poll_io(struct timeval *tv)
 {
-	struct libusb_device_handle *devh;
 	int r;
 	int maxfd = 0;
-	fd_set writefds;
+	fd_set readfds, writefds;
+	fd_set *_readfds = NULL;
+	fd_set *_writefds = NULL;
+	struct usbi_pollfd *ipollfd;
+	int have_readfds = 0;
+	int have_writefds = 0;
 	struct timeval select_timeout;
 	struct timeval timeout;
 
@@ -438,19 +351,33 @@ static int poll_io(struct timeval *tv)
 		select_timeout = *tv;
 	}
 
+	FD_ZERO(&readfds);
 	FD_ZERO(&writefds);
-	list_for_each_entry(devh, &open_devs, list) {
-		int fd = devh->fd;
-		FD_SET(fd, &writefds);
+	list_for_each_entry(ipollfd, &pollfds, list) {
+		struct libusb_pollfd *pollfd = &ipollfd->pollfd;
+		int fd = pollfd->fd;
+		if (pollfd->events & POLLIN) {
+			have_readfds = 1;
+			FD_SET(fd, &readfds);
+		}
+		if (pollfd->events & POLLOUT) {
+			have_writefds = 1;
+			FD_SET(fd, &writefds);
+		}
 		if (fd > maxfd)
 			maxfd = fd;
 	}
 
+	if (have_readfds)
+		_readfds = &readfds;
+	if (have_writefds)
+		_writefds = &writefds;
+
 	usbi_dbg("select() with timeout in %d.%06ds", select_timeout.tv_sec,
 		select_timeout.tv_usec);
-	r = select(maxfd + 1, NULL, &writefds, NULL, &select_timeout);
-	usbi_dbg("select() returned %d with %d.%06ds remaining", r, select_timeout.tv_sec,
-		select_timeout.tv_usec);
+	r = select(maxfd + 1, _readfds, _writefds, NULL, &select_timeout);
+	usbi_dbg("select() returned %d with %d.%06ds remaining",
+		r, select_timeout.tv_sec, select_timeout.tv_usec);
 	if (r == 0) {
 		*tv = select_timeout;
 		return handle_timeouts();
@@ -461,15 +388,9 @@ static int poll_io(struct timeval *tv)
 		return r;
 	}
 
-	list_for_each_entry(devh, &open_devs, list) {
-		if (!FD_ISSET(devh->fd, &writefds))
-			continue;
-		r = reap_for_devh(devh);
-		if (r == -1 && errno == EAGAIN)
-			continue;
-		if (r < 0)
-			return r;
-	}
+	r = usbi_backend->handle_events(_readfds, _writefds);
+	if (r < 0)
+		return r;
 
 	/* FIXME check return value? */
 	return handle_timeouts();
@@ -561,17 +482,63 @@ API_EXPORTED void libusb_set_pollfd_notifiers(libusb_pollfd_added_cb added_cb,
 	fd_removed_cb = removed_cb;
 }
 
-void usbi_add_pollfd(int fd, short events)
+int usbi_add_pollfd(int fd, short events)
 {
+	struct usbi_pollfd *ipollfd = malloc(sizeof(*ipollfd));
+	if (!ipollfd)
+		return -ENOMEM;
+
 	usbi_dbg("add fd %d events %d", fd, events);
+	ipollfd->pollfd.fd = fd;
+	ipollfd->pollfd.events = events;
+	list_add(&ipollfd->list, &pollfds);
+
 	if (fd_added_cb)
 		fd_added_cb(fd, events);
+	return 0;
 }
 
 void usbi_remove_pollfd(int fd)
 {
+	struct usbi_pollfd *ipollfd;
+	int found = 0;
+
 	usbi_dbg("remove fd %d", fd);
+	list_for_each_entry(ipollfd, &pollfds, list)
+		if (ipollfd->pollfd.fd == fd) {
+			found = 1;
+			break;
+		}
+
+	if (!found) {
+		usbi_err("couldn't find fd %d to remove", fd);
+		return;
+	}
+
+	list_del(&ipollfd->list);
+	free(ipollfd);
 	if (fd_removed_cb)
 		fd_removed_cb(fd);
+}
+
+API_EXPORTED struct libusb_pollfd **libusb_get_pollfds(void)
+{
+	struct libusb_pollfd **ret;
+	struct usbi_pollfd *ipollfd;
+	size_t i = 0;
+	size_t cnt = 0;
+
+	list_for_each_entry(ipollfd, &pollfds, list)
+		cnt++;
+
+	ret = calloc(cnt + 1, sizeof(struct libusb_pollfd *));
+	if (!ret)
+		return NULL;
+
+	list_for_each_entry(ipollfd, &pollfds, list)
+		ret[i++] = (struct libusb_pollfd *) ipollfd;
+	ret[cnt] = NULL;
+
+	return ret;
 }
 

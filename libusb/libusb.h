@@ -351,7 +351,7 @@ struct libusb_pollfd {
 int libusb_poll_timeout(struct timeval *tv);
 int libusb_poll(void);
 int libusb_get_next_timeout(struct timeval *tv);
-size_t libusb_get_pollfds(struct libusb_pollfd **pollfds);
+struct libusb_pollfd **libusb_get_pollfds(void);
 
 typedef void (*libusb_pollfd_added_cb)(int fd, short events);
 typedef void (*libusb_pollfd_removed_cb)(int fd);

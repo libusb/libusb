@@ -10,6 +10,20 @@ AC_C_INLINE
 AM_PROG_CC_C_O
 AC_DEFINE([_GNU_SOURCE], [], [Use GNU extensions])
 
+AC_MSG_CHECKING([operating system])
+case $host in
+*-linux*)
+	AC_DEFINE(OS_LINUX, [], [Linux backend])
+	AC_SUBST(OS_LINUX)
+	AC_MSG_RESULT([Linux])
+	backend="linux"
+	;;
+*)
+	AC_MSG_ERROR([unsupported operating system])
+esac
+
+AM_CONDITIONAL([OS_LINUX], [test "x$backend" == "xlinux"])
+
 # Library versioning
 lt_major="0"
 lt_revision="0"

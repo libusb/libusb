@@ -25,11 +25,10 @@
 
 #include <endian.h>
 #include <stddef.h>
-#include <sys/ioctl.h>
+#include <sys/select.h>
 #include <time.h>
 
 #include <libusb.h>
-#include <usbfs.h>
 
 #define DEVICE_DESC_LENGTH		18
 
@@ -146,15 +145,15 @@ struct libusb_device {
 	struct list_head list;
 	int refcnt;
 	unsigned long session_data;
-	char *nodepath;
 	struct libusb_device_descriptor desc;
 	struct libusb_config_descriptor *config;
+	unsigned char os_priv[0];
 };
 
 struct libusb_device_handle {
 	struct list_head list;
 	struct libusb_device *dev;
-	int fd;
+	unsigned char os_priv[0];
 };
 
 #define USBI_TRANSFER_SYNC_CANCELLED 		(1<<0)
@@ -164,11 +163,12 @@ struct usbi_transfer {
 	/* must come first */
 	struct libusb_transfer pub;
 
-	struct usb_urb urb;
 	struct list_head list;
 	struct timeval timeout;
 	int transferred;
 	uint8_t flags;
+
+	unsigned char os_priv[0];
 };
 
 /* bus structures */
@@ -181,15 +181,84 @@ struct usb_descriptor_header {
 
 /* shared data and functions */
 
-extern struct list_head open_devs;
+extern struct list_head usbi_open_devs;
 
 void usbi_io_init(void);
-void usbi_add_pollfd(int fd, short events);
-void usbi_remove_pollfd(int fd);
+
+struct libusb_device *usbi_alloc_device(unsigned long session_id);
+struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id);
+
+void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
+	enum libusb_transfer_status status);
+void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer);
 
 int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest);
 int usbi_parse_configuration(struct libusb_config_descriptor *config,
 		unsigned char *buffer);
+
+/* polling */
+
+struct usbi_pollfd {
+	/* must come first */
+	struct libusb_pollfd pollfd;
+
+	struct list_head list;
+};
+
+int usbi_add_pollfd(int fd, short events);
+void usbi_remove_pollfd(int fd);
+
+/* device discovery */
+
+/* we traverse usbfs without knowing how many devices we are going to find.
+ * so we create this discovered_devs model which is similar to a linked-list
+ * which grows when required. it can be freed once discovery has completed,
+ * eliminating the need for a list node in the libusb_device structure
+ * itself. */
+struct discovered_devs {
+	size_t len;
+	size_t capacity;
+	struct libusb_device *devices[0];
+};
+
+struct discovered_devs *discovered_devs_append(
+	struct discovered_devs *discdevs, struct libusb_device *dev);
+
+/* OS abstraction */
+
+struct usbi_os_backend {
+	const char *name;
+	int (*init)(void);
+	void (*exit)(void);
+
+	int (*get_device_list)(struct discovered_devs *discdevs);
+
+	int (*open)(struct libusb_device_handle *handle);
+	void (*close)(struct libusb_device_handle *handle);
+
+	int (*claim_interface)(struct libusb_device_handle *handle, int iface);
+	int (*release_interface)(struct libusb_device_handle *handle, int iface);
+
+	void (*destroy_device)(struct libusb_device *dev);
+
+	int (*submit_transfer)(struct usbi_transfer *itransfer);
+	int (*cancel_transfer)(struct usbi_transfer *itransfer);
+
+	int (*handle_events)(fd_set *readfds, fd_set *writefds);
+
+	/* number of bytes to reserve for libusb_device.os_priv */
+	size_t device_priv_size;
+
+	/* number of bytes to reserve for libusb_device_handle.os_priv */
+	size_t device_handle_priv_size;
+
+	/* number of bytes to reserve for usbi_transfer.os_priv */
+	size_t transfer_priv_size;
+};
+
+extern const struct usbi_os_backend * const usbi_backend;
+
+extern const struct usbi_os_backend linux_usbfs_backend;
 
 #endif
 

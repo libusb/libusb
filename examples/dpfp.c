@@ -270,7 +270,7 @@ static int next_state(void)
 		printf("unrecognised state %d\n", state);
 	}
 	if (r < 0) {
-		fprintf(stderr, "error detected changing state");
+		fprintf(stderr, "error detected changing state\n");
 		return r;
 	}
 
