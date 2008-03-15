@@ -30,6 +30,11 @@
 #define ENDPOINT_DESC_LENGTH		7
 #define ENDPOINT_AUDIO_DESC_LENGTH	9
 
+/** @defgroup desc USB descriptors
+ * This page details how to examine the various standard USB descriptors
+ * for detected devices
+ */
+
 int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest)
 {
 	unsigned char *sp = source, *dp = dest;
@@ -349,5 +354,27 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 	}
 
 	return size;
+}
+
+/** \ingroup desc
+ * Get the USB device descriptor for a given device.
+ * \param dev the device
+ * \returns the USB device descriptor
+ */
+API_EXPORTED struct libusb_device_descriptor *libusb_get_device_descriptor(
+	struct libusb_device *dev)
+{
+	return &dev->desc;
+}
+
+/** \ingroup desc
+ * Get the USB configuration descriptor for a given device.
+ * \param dev the device
+ * \returns the USB configuration descriptor
+ */
+API_EXPORTED struct libusb_config_descriptor *libusb_get_config_descriptor(
+	struct libusb_device *dev)
+{
+	return dev->config;
 }
 

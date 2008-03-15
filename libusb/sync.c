@@ -25,6 +25,14 @@
 
 #include "libusbi.h"
 
+/**
+ * @defgroup syncio Synchronous device I/O
+ *
+ * This page documents libusb's synchronous (blocking) API for USB device I/O.
+ * This interface is easy to use but has some limitations. More advanced users
+ * may wish to consider using the \ref asyncio "asynchronous I/O API" instead.
+ */
+
 static void ctrl_transfer_cb(struct libusb_transfer *transfer)
 {
 	int *completed = transfer->user_data;
@@ -33,6 +41,27 @@ static void ctrl_transfer_cb(struct libusb_transfer *transfer)
 	/* caller interprets result and frees transfer */
 }
 
+/* FIXME: does this support partial transfers? */
+/** \ingroup syncio
+ * Perform a USB control transfer. The direction of the transfer is inferred
+ * from the bRequestType field of the setup packet.
+ *
+ * \param dev_handle a handle for the device to communicate with
+ * \param bRequestType the request type field for the setup packet
+ * \param bRequest the request field for the setup packet
+ * \param wValue the value field for the setup packet
+ * \param wIndex the index field for the setup packet
+ * \param data a suitably-sized data buffer for either input or output
+ * (depending on direction bits within bRequestType)
+ * \param wLength the length field for the setup packet. The data buffer should
+ * be at least this size.
+ * \param timeout timeout (in millseconds) that this function should wait
+ * before giving up due to no response being received. For no timeout, use
+ * value 0.
+ * \returns 0 on success
+ * \returns -ETIMEDOUT if the transfer timed out
+ * \returns other negative code on error
+ */
 API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 	uint8_t bRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	unsigned char *data, uint16_t wLength, unsigned int timeout)
@@ -148,7 +177,27 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	return r;
 }
 
-/* FIXME: should transferred be the return value? */
+/* FIXME: document timeout handling vs URB splitting */
+/** \ingroup syncio
+ * Perform a USB bulk transfer. The direction of the transfer is inferred from
+ * the direction bits of the endpoint address.
+ *
+ * \param dev_handle a handle for the device to communicate with
+ * \param endpoint the address of a valid endpoint to communicate with
+ * \param data a suitably-sized data buffer for either input or output
+ * (depending on endpoint)
+ * \param length for bulk writes, the number of bytes from data to be sent. for
+ * bulk reads, the maximum number of bytes to receive into the data buffer.
+ * \param transferred output location for the number of bytes actually
+ * transferred.
+ * \param timeout timeout (in millseconds) that this function should wait
+ * before giving up due to no response being received. For no timeout, use
+ * value 0.
+ *
+ * \returns 0 on success (and populates <tt>transferred</tt>)
+ * \returns -ETIMEDOUT if the transfer timed out
+ * \returns other negative code on error
+ */
 API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *data, int length, int *transferred,
 	unsigned int timeout)
@@ -158,6 +207,26 @@ API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
 }
 
 /* FIXME: do we need an interval param here? usbfs doesn't expose it? */
+/** \ingroup syncio
+ * Perform a USB interrupt transfer. The direction of the transfer is inferred
+ * from the direction bits of the endpoint address.
+ *
+ * \param dev_handle a handle for the device to communicate with
+ * \param endpoint the address of a valid endpoint to communicate with
+ * \param data a suitably-sized data buffer for either input or output
+ * (depending on endpoint)
+ * \param length for bulk writes, the number of bytes from data to be sent. for
+ * bulk reads, the maximum number of bytes to receive into the data buffer.
+ * \param transferred output location for the number of bytes actually
+ * transferred.
+ * \param timeout timeout (in millseconds) that this function should wait
+ * before giving up due to no response being received. For no timeout, use
+ * value 0.
+ *
+ * \returns 0 on success (and populates <tt>transferred</tt>)
+ * \returns -ETIMEDOUT if the transfer timed out
+ * \returns other negative code on error
+ */
 API_EXPORTED int libusb_interrupt_transfer(
 	struct libusb_device_handle *dev_handle, unsigned char endpoint,
 	unsigned char *data, int length, int *transferred, unsigned int timeout)

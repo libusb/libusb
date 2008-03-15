@@ -31,28 +31,73 @@ extern "C" {
 
 /* standard USB stuff */
 
-/* Device and/or Interface Class codes */
-#define LIBUSB_CLASS_PER_INTERFACE		0	/* for DeviceClass */
-#define LIBUSB_CLASS_AUDIO				1
-#define LIBUSB_CLASS_COMM				2
-#define LIBUSB_CLASS_HID				3
-#define LIBUSB_CLASS_PRINTER			7
-#define LIBUSB_CLASS_PTP				6
-#define LIBUSB_CLASS_MASS_STORAGE		8
-#define LIBUSB_CLASS_HUB				9
-#define LIBUSB_CLASS_DATA				10
-#define LIBUSB_CLASS_VENDOR_SPEC		0xff
+/** \ingroup desc
+ * Device and/or Interface Class codes */
+enum libusb_class_code {
+	/** In the context of a \ref libusb_device_descriptor "device descriptor",
+	 * this bDeviceClass value indicates that each interface specifies its
+	 * own class information and all interfaces operate independently.
+	 */
+	LIBUSB_CLASS_PER_INTERFACE = 0,
 
-/* Descriptor types */
-#define LIBUSB_DT_DEVICE			0x01
-#define LIBUSB_DT_CONFIG			0x02
-#define LIBUSB_DT_STRING			0x03
-#define LIBUSB_DT_INTERFACE		0x04
-#define LIBUSB_DT_ENDPOINT			0x05
-#define LIBUSB_DT_HID				0x21
-#define LIBUSB_DT_REPORT			0x22
-#define LIBUSB_DT_PHYSICAL			0x23
-#define LIBUSB_DT_HUB				0x29
+	/** Audio class */
+	LIBUSB_CLASS_AUDIO = 1,
+
+	/** Communications class */
+	LIBUSB_CLASS_COMM = 2,
+
+	/** Human Interface Device class */
+	LIBUSB_CLASS_HID = 3,
+
+	/** Printer dclass */
+	LIBUSB_CLASS_PRINTER = 7,
+
+	/** Picture transfer protocol class */
+	LIBUSB_CLASS_PTP = 6,
+
+	/** Mass storage class */
+	LIBUSB_CLASS_MASS_STORAGE = 8,
+
+	/** Hub class */
+	LIBUSB_CLASS_HUB = 9,
+
+	/** Data class */
+	LIBUSB_CLASS_DATA = 10,
+
+	/** Class is vendor-specific */
+	LIBUSB_CLASS_VENDOR_SPEC = 0xff,
+};
+
+/** \ingroup desc
+ * Descriptor types as defined by the USB specification. */
+enum libusb_descriptor_type {
+	/** Device descriptor. See libusb_device_descriptor. */
+	LIBUSB_DT_DEVICE = 0x01,
+
+	/** Configuration descriptor. See libusb_config_descriptor. */
+	LIBUSB_DT_CONFIG = 0x02,
+
+	/** String descriptor */
+	LIBUSB_DT_STRING = 0x03,
+
+	/** Interface descriptor. See libusb_interface_descriptor. */
+	LIBUSB_DT_INTERFACE = 0x04,
+
+	/** Endpoint descriptor. See libusb_endpoint_descriptor. */
+	LIBUSB_DT_ENDPOINT = 0x05,
+
+	/** HID descriptor */
+	LIBUSB_DT_HID = 0x21,
+
+	/** HID report descriptor */
+	LIBUSB_DT_REPORT = 0x22,
+
+	/** Physical descriptor */
+	LIBUSB_DT_PHYSICAL = 0x23,
+
+	/** Hub descriptor */
+	LIBUSB_DT_HUB = 0x29,
+};
 
 /* Descriptor sizes per descriptor type */
 #define LIBUSB_DT_DEVICE_SIZE			18
@@ -65,64 +110,243 @@ extern "C" {
 #define LIBUSB_ENDPOINT_ADDRESS_MASK	0x0f    /* in bEndpointAddress */
 #define LIBUSB_ENDPOINT_DIR_MASK		0x80
 
-#define LIBUSB_ENDPOINT_IN			0x80
-#define LIBUSB_ENDPOINT_OUT		0x00
+/** \ingroup desc
+ * Endpoint direction. Values for bit 7 of the
+ * \ref libusb_endpoint_descriptor::bEndpointAddress "endpoint address" scheme.
+ */
+enum libusb_endpoint_direction {
+	/** In: device-to-host */
+	LIBUSB_ENDPOINT_IN = 0x80,
 
+	/** Out: host-to-device */
+	LIBUSB_ENDPOINT_OUT = 0x00,
+};
+
+/* FIXME: 9.6.6 calls these "transfer types", not endpoint types. */
 #define LIBUSB_ENDPOINT_TYPE_MASK			0x03    /* in bmAttributes */
-#define LIBUSB_ENDPOINT_TYPE_CONTROL		0
-#define LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS	1
-#define LIBUSB_ENDPOINT_TYPE_BULK			2
-#define LIBUSB_ENDPOINT_TYPE_INTERRUPT		3
 
-/* Standard requests */
-#define LIBUSB_REQ_GET_STATUS			0x00
-#define LIBUSB_REQ_CLEAR_FEATURE		0x01
-/* 0x02 is reserved */
-#define LIBUSB_REQ_SET_FEATURE			0x03
-/* 0x04 is reserved */
-#define LIBUSB_REQ_SET_ADDRESS			0x05
-#define LIBUSB_REQ_GET_DESCRIPTOR		0x06
-#define LIBUSB_REQ_SET_DESCRIPTOR		0x07
-#define LIBUSB_REQ_GET_CONFIGURATION	0x08
-#define LIBUSB_REQ_SET_CONFIGURATION	0x09
-#define LIBUSB_REQ_GET_INTERFACE		0x0A
-#define LIBUSB_REQ_SET_INTERFACE		0x0B
-#define LIBUSB_REQ_SYNCH_FRAME			0x0C
+/** \ingroup desc
+ * Endpoint transfer type. Values for bits 0:1 of the
+ * \ref libusb_endpoint_descriptor::bmAttributes "endpoint attributes" field.
+ */
+enum libusb_endpoint_type {
+	/** Control endpoint */
+	LIBUSB_ENDPOINT_TYPE_CONTROL = 0,
 
-#define LIBUSB_TYPE_STANDARD		(0x00 << 5)
-#define LIBUSB_TYPE_CLASS			(0x01 << 5)
-#define LIBUSB_TYPE_VENDOR			(0x02 << 5)
-#define LIBUSB_TYPE_RESERVED		(0x03 << 5)
+	/** Isochronous endpoint */
+	LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS = 1,
 
-#define LIBUSB_RECIP_DEVICE		0x00
-#define LIBUSB_RECIP_INTERFACE		0x01
-#define LIBUSB_RECIP_ENDPOINT		0x02
-#define LIBUSB_RECIP_OTHER			0x03
+	/** Bulk endpoint */
+	LIBUSB_ENDPOINT_TYPE_BULK = 2,
 
+	/** Interrupt endpoint */
+	LIBUSB_ENDPOINT_TYPE_INTERRUPT = 3,
+};
+
+/** Standard requests, as defined in table 9-3 of the USB2 specifications */
+enum libusb_standard_request {
+	/** Request status of the specific recipient */
+	LIBUSB_REQUEST_GET_STATUS = 0x00,
+
+	/** Clear or disable a specific feature */
+	LIBUSB_REQUEST_CLEAR_FEATURE = 0x01,
+
+	/* 0x02 is reserved */
+
+	/** Set or enable a specific feature */
+	LIBUSB_REQUEST_SET_FEATURE = 0x03,
+
+	/* 0x04 is reserved */
+
+	/** Set device address for all future accesses */
+	LIBUSB_REQUEST_SET_ADDRESS = 0x05,
+
+	/** Get the specified descriptor */
+	LIBUSB_REQUEST_GET_DESCRIPTOR = 0x06,
+
+	/** Used to update existing descriptors or add new descriptors */
+	LIBUSB_REQUEST_SET_DESCRIPTOR = 0x07,
+
+	/** Get the current device configuration value */
+	LIBUSB_REQUEST_GET_CONFIGURATION = 0x08,
+
+	/** Set device configuration */
+	LIBUSB_REQUEST_SET_CONFIGURATION = 0x09,
+
+	/** Return the selected alternate setting for the specified interface */
+	LIBUSB_REQUEST_GET_INTERFACE = 0x0A,
+	
+	/** Select an alternate interface for the specified interface */
+	LIBUSB_REQUEST_SET_INTERFACE = 0x0B,
+
+	/** Set then report an endpoint's synchronization frame */
+	LIBUSB_REQUEST_SYNCH_FRAME = 0x0C,
+};
+
+/** \ingroup misc
+ * Request type bits of the
+ * \ref libusb_control_setup::bRequestType "bRequestType" field in control
+ * transfers. */
+enum libusb_request_type {
+	/** Standard */
+	LIBUSB_REQUEST_TYPE_STANDARD = (0x00 << 5),
+
+	/** Class */
+	LIBUSB_REQUEST_TYPE_CLASS = (0x01 << 5),
+
+	/** Vendor */
+	LIBUSB_REQUEST_TYPE_VENDOR = (0x02 << 5),
+
+	/** Reserved */
+	LIBUSB_REQUEST_TYPE_RESERVED = (0x03 << 5),
+};
+
+/** \ingroup misc
+ * Recipient bits of the
+ * \ref libusb_control_setup::bRequestType "bRequestType" field in control
+ * transfers. Values 4 through 31 are reserved. */
+enum libusb_request_recipient {
+	/** Device */
+	LIBUSB_RECIPIENT_DEVICE = 0x00,
+
+	/** Interface */
+	LIBUSB_RECIPIENT_INTERFACE = 0x01,
+
+	/** Endpoint */
+	LIBUSB_RECIPIENT_ENDPOINT = 0x02,
+
+	/** Other */
+	LIBUSB_RECIPIENT_OTHER = 0x03,
+};
+
+#define LIBUSB_ISO_SYNC_TYPE_MASK		0x0C
+
+/** \ingroup desc
+ * Synchronization type for isochronous endpoints. Values for bits 2:3 of the
+ * \ref libusb_endpoint_descriptor::bmAttributes "bmAttributes" field in
+ * libusb_endpoint_descriptor.
+ */
+enum libusb_iso_sync_type {
+	/** No synchronization */
+	LIBUSB_ISO_SYNC_TYPE_NONE = 0,
+
+	/** Asynchronous */
+	LIBUSB_ISO_SYNC_TYPE_ASYNC = 1,
+
+	/** Adaptive */
+	LIBUSB_ISO_SYNC_TYPE_ADAPTIVE = 2,
+
+	/** Synchronous */
+	LIBUSB_ISO_SYNC_TYPE_SYNC = 3,
+};
+
+#define LIBUSB_ISO_USAGE_TYPE_MASK 0x30
+
+/** \ingroup desc
+ * Usage type for isochronous endpoints. Values for bits 4:5 of the
+ * \ref libusb_endpoint_descriptor::bmAttributes "bmAttributes" field in
+ * libusb_endpoint_descriptor.
+ */
+enum libusb_iso_usage_type {
+	/** Data endpoint */
+	LIBUSB_ISO_USAGE_TYPE_DATA = 0,
+
+	/** Feedback endpoint */
+	LIBUSB_ISO_USAGE_TYPE_FEEDBACK = 1,
+
+	/** Implicit feedback Data endpoint */
+	LIBUSB_ISO_USAGE_TYPE_IMPLICIT = 2,
+};
+
+/** \ingroup desc
+ * A structure representing the standard USB device descriptor. This
+ * descriptor is documented in section 9.6.1 of the USB 2.0 specification.
+ * All multiple-byte fields are represented in host-endian format.
+ */
 struct libusb_device_descriptor {
+	/** Size of this descriptor (in bytes) */
 	uint8_t  bLength;
+
+	/** Descriptor type. Will have value
+	 * \ref libusb_descriptor_type::LIBUSB_DT_DEVICE LIBUSB_DT_DEVICE in this
+	 * context. */
 	uint8_t  bDescriptorType;
+
+	/** USB specification release number in binary-coded decimal. A value of
+	 * 0x0200 indicates USB 2.0, 0x0110 indicates USB 1.1, etc. */
 	uint16_t bcdUSB;
+
+	/** USB-IF class code for the device. See \ref libusb_class_code. */
 	uint8_t  bDeviceClass;
+
+	/** USB-IF subclass code for the device, qualified by the bDeviceClass
+	 * value */
 	uint8_t  bDeviceSubClass;
+
+	/** USB-IF protocol code for the device, qualified by the bDeviceClass and
+	 * bDeviceSubClass values */
 	uint8_t  bDeviceProtocol;
+
+	/** Maximum packet size for endpoint 0 */
 	uint8_t  bMaxPacketSize0;
+
+	/** USB-IF vendor ID */
 	uint16_t idVendor;
+
+	/** USB-IF product ID */
 	uint16_t idProduct;
+
+	/** Device release number in binary-coded decimal */
 	uint16_t bcdDevice;
+
+	/** Index of string descriptor describing manufacturer */
 	uint8_t  iManufacturer;
+
+	/** Index of string descriptor describing product */
 	uint8_t  iProduct;
+
+	/** Index of string descriptor containing device serial number */
 	uint8_t  iSerialNumber;
+
+	/** Number of possible configurations */
 	uint8_t  bNumConfigurations;
 };
 
+/** \ingroup desc
+ * A structure representing the standard USB endpoint descriptor. This
+ * descriptor is documented in section 9.6.3 of the USB 2.0 specification.
+ * All multiple-byte fields are represented in host-endian format.
+ */
 struct libusb_endpoint_descriptor {
+	/** Size of this descriptor (in bytes) */
 	uint8_t  bLength;
+
+	/** Descriptor type. Will have value
+	 * \ref libusb_descriptor_type::LIBUSB_DT_ENDPOINT LIBUSB_DT_ENDPOINT in
+	 * this context. */
 	uint8_t  bDescriptorType;
+
+	/** The address of the endpoint described by this descriptor. Bits 0:3 are
+	 * the endpoint number. Bits 4:6 are reserved. Bit 7 indicates direction,
+	 * see \ref libusb_endpoint_direction.
+	 */
 	uint8_t  bEndpointAddress;
+
+	/** Attributes which apply to the endpoint when it is configured using
+	 * the bConfigurationValue. Bits 0:1 determine the transfer type and
+	 * correspond to \ref libusb_endpoint_type. Bits 2:3 are only used for
+	 * isochronous endpoints and correspond to \ref libusb_iso_sync_type.
+	 * Bits 4:5 are also only used for isochronous endpoints and correspond to
+	 * \ref libusb_iso_usage_type. Bits 6:7 are reserved.
+	 */
 	uint8_t  bmAttributes;
+
+	/** Maximum packet size this endpoint is capable of sending/receiving. */
 	uint16_t wMaxPacketSize;
+
+	/** Interval for polling endpoint for data transfers. */
 	uint8_t  bInterval;
+
 	uint8_t  bRefresh;
 	uint8_t  bSynchAddress;
 
@@ -130,49 +354,131 @@ struct libusb_endpoint_descriptor {
 	int extralen;
 };
 
+/** \ingroup desc
+ * A structure representing the standard USB interface descriptor. This
+ * descriptor is documented in section 9.6.5 of the USB 2.0 specification.
+ * All multiple-byte fields are represented in host-endian format.
+ */
 struct libusb_interface_descriptor {
+	/** Size of this descriptor (in bytes) */
 	uint8_t  bLength;
+
+	/** Descriptor type. Will have value
+	 * \ref libusb_descriptor_type::LIBUSB_DT_INTERFACE LIBUSB_DT_INTERFACE
+	 * in this context. */
 	uint8_t  bDescriptorType;
+
+	/** Number of this interface */
 	uint8_t  bInterfaceNumber;
+
+	/** Value used to select this alternate setting for this interface */
 	uint8_t  bAlternateSetting;
+
+	/** Number of endpoints used by this interface (excluding the control
+	 * endpoint). */
 	uint8_t  bNumEndpoints;
+	
+	/** USB-IF class code for this interface. See \ref libusb_class_code. */
 	uint8_t  bInterfaceClass;
+
+	/** USB-IF subclass code for this interface, qualified by the
+	 * bInterfaceClass value */
 	uint8_t  bInterfaceSubClass;
+
+	/** USB-IF protocol code for this interface, qualified by the
+	 * bInterfaceClass and bInterfaceSubClass values */
 	uint8_t  bInterfaceProtocol;
+
+	/** Index of string descriptor describing this interface */
 	uint8_t  iInterface;
 
+	/** Array of endpoint descriptors. This length of this array is determined
+	 * by the bNumEndpoints field. */
 	struct libusb_endpoint_descriptor *endpoint;
 
 	unsigned char *extra;	/* Extra descriptors */
 	int extralen;
 };
 
+/** \ingroup desc
+ * A collection of alternate settings for a particular USB interface.
+ */
 struct libusb_interface {
+	/** Array of interface descriptors. The length of this array is determined
+	 * by the num_altsetting field. */
 	struct libusb_interface_descriptor *altsetting;
+
+	/** The number of alternate settings that belong to this interface */
 	int num_altsetting;
 };
 
+/** \ingroup desc
+ * A structure representing the standard USB configuration descriptor. This
+ * descriptor is documented in section 9.6.3 of the USB 2.0 specification.
+ * All multiple-byte fields are represented in host-endian format.
+ */
 struct libusb_config_descriptor {
+	/** Size of this descriptor (in bytes) */
 	uint8_t  bLength;
+
+	/** Descriptor type. Will have value
+	 * \ref libusb_descriptor_type::LIBUSB_DT_CONFIG LIBUSB_DT_CONFIG
+	 * in this context. */
 	uint8_t  bDescriptorType;
+
+	/** Total length of data returned for this configuration */
 	uint16_t wTotalLength;
+
+	/** Number of interfaces supported by this configuration */
 	uint8_t  bNumInterfaces;
+
+	/** Identifier value for this configuration */
 	uint8_t  bConfigurationValue;
+
+	/** Index of string descriptor describing this configuration */
 	uint8_t  iConfiguration;
+
+	/** Configuration characteristics */
 	uint8_t  bmAttributes;
+
+	/** Maximum power consumption of the USB device from this bus in this
+	 * configuration when the device is fully opreation. Expressed in units
+	 * of 2 mA. */
 	uint8_t  MaxPower;
 
+	/** Array of interfaces supported by this configuration. The length of
+	 * this array is determined by the bNumInterfaces field. */
 	struct libusb_interface *interface;
 
 	unsigned char *extra;	/* Extra descriptors */
 	int extralen;
 };
 
+/** \ingroup asyncio
+ * Setup packet for control transfers. */
 struct libusb_control_setup {
+	/** Request type. Bits 0:4 determine recipient, see
+	 * \ref libusb_request_recipient. Bits 5:6 determine type, see
+	 * \ref libusb_request_type. Bit 7 determines data transfer direction, see
+	 * \ref libusb_endpoint_direction.
+	 */
 	uint8_t  bRequestType;
+
+	/** Request. If the type bits of bRequestType are equal to
+	 * \ref libusb_request_type::LIBUSB_REQUEST_TYPE_STANDARD
+	 * "LIBUSB_REQUEST_TYPE_STANDARD" then this field refers to
+	 * \ref libusb_standard_request. For other cases, use of this field is
+	 * application-specific. */
 	uint8_t  bRequest;
+
+	/** Value. Varies according to request */
 	uint16_t wValue;
+
+	/** Index. Varies according to request, typically used to pass an index
+	 * or offset */
 	uint16_t wIndex;
+
+	/** Number of bytes to transfer */
 	uint16_t wLength;
 } __attribute__((packed));
 
@@ -186,42 +492,84 @@ typedef struct libusb_device libusb_device;
 struct libusb_device_handle;
 typedef struct libusb_device_handle libusb_device_handle;
 
+/** \ingroup asyncio
+ * Transfer status codes */
 enum libusb_transfer_status {
+	/* FIXME: make this internal */
 	LIBUSB_TRANSFER_SILENT_COMPLETION = 0,
+
+	/** Transfer completed without error. Note that this does not indicate
+	 * that the entire amount of requested data was transferred. */
 	LIBUSB_TRANSFER_COMPLETED,
+
+	/** Transfer failed */
 	LIBUSB_TRANSFER_ERROR,
+
+	/** Transfer timed out */
 	LIBUSB_TRANSFER_TIMED_OUT,
+
+	/** Transfer was cancelled */
 	LIBUSB_TRANSFER_CANCELLED,
 };
 
-/* libusb_transfer.flags values */
+/** \ingroup asyncio
+ * libusb_transfer.flags values */
+enum libusb_transfer_flags {
+	/** Report short frames as errors */
+	LIBUSB_TRANSFER_SHORT_NOT_OK = 1<<0,
 
-/* report short frames as errors */
-#define LIBUSB_TRANSFER_SHORT_NOT_OK	(1<<0)
+	/** Automatically free() transfer buffer during libusb_free_transfer() */
+	LIBUSB_TRANSFER_FREE_BUFFER = 1<<1,
 
-/* automatically free() transfer buffer during libusb_free_transfer() */
-#define LIBUSB_TRANSFER_FREE_BUFFER		(1<<1)
-
-/* automatically call libusb_free_transfer() after callback returns */
-#define LIBUSB_TRANSFER_FREE_TRANSFER	(1<<2)
+	/** Automatically call libusb_free_transfer() after callback returns */
+	LIBUSB_TRANSFER_FREE_TRANSFER = 1<<2,
+};
 
 struct libusb_transfer;
 
 typedef void (*libusb_transfer_cb_fn)(struct libusb_transfer *transfer);
 
+/** \ingroup asyncio
+ * The generic USB transfer structure.
+ */
 struct libusb_transfer {
+	/** Handle of the device that this transfer will be submitted to */
 	libusb_device_handle *dev_handle;
+
+	/** A bitwise OR combination of \ref libusb_transfer_flags. */
 	uint8_t flags;
+
+	/** Address of the endpoint where this transfer will be sent. */
 	unsigned char endpoint;
+
+	/* FIXME can this be inferred from endpoint address bits? */
+	/** Type of the endpoint from \ref libusb_endpoint_type */
 	unsigned char endpoint_type;
+
+	/** Timeout for this transfer in millseconds. A value of 0 indicates no
+	 * timeout. */
 	unsigned int timeout;
+
+	/* FIXME: make const? */
+	/** The status of the transfer. Read-only, and only for use within
+	 * transfer callback function. */
 	enum libusb_transfer_status status;
 
+	/** Length of the data buffer */
 	int length;
+
+	/** Actual length of data that was transferred. Read-only, and only for
+	 * use within transfer callback function. */
 	int actual_length;
+
+	/** Callback function. This will be invoked when the transfer completes,
+	 * fails, or is cancelled. */
 	libusb_transfer_cb_fn callback;
+
+	/** User context data to pass to the callback function. */
 	void *user_data;
 
+	/** Data buffer */
 	unsigned char *buffer;
 };
 
@@ -248,18 +596,63 @@ libusb_device_handle *libusb_open_device_with_vid_pid(uint16_t vendor_id,
 
 /* async I/O */
 
+/** \ingroup asyncio
+ * Get the data section of a control transfer. This convenience function is here
+ * to remind you that the data does not start until 8 bytes into the actual
+ * buffer, as the setup packet comes first. 
+ *
+ * Calling this function only makes sense from a transfer callback function,
+ * or situations where you have already allocated a suitably sized buffer at
+ * transfer->buffer.
+ *
+ * \param transfer a transfer
+ * \returns pointer to the first byte of the data section
+ */
 static inline unsigned char *libusb_control_transfer_get_data(
 	struct libusb_transfer *transfer)
 {
 	return transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
 }
 
+/** \ingroup asyncio
+ * Get the control setup packet of a control transfer. This convenience
+ * function is here to remind you that the control setup occupies the first
+ * 8 bytes of the transfer data buffer.
+ *
+ * Calling this function only makes sense from a transfer callback function,
+ * or situations where you have already allocated a suitably sized buffer at
+ * transfer->buffer.
+ *
+ * \param transfer a transfer
+ * \returns a casted pointer to the start of the transfer data buffer
+ */
 static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
 	struct libusb_transfer *transfer)
 {
 	return (struct libusb_control_setup *) transfer->buffer;
 }
 
+/** \ingroup asyncio
+ * Helper function to populate the setup packet (first 8 bytes of the data
+ * buffer) for a control transfer.
+ * 
+ * \param buffer buffer to output the setup packet into
+ * \param bRequestType see the
+ * \ref libusb_control_setup::bRequestType "bRequestType" field of
+ * \ref libusb_control_setup
+ * \param bRequest see the
+ * \ref libusb_control_setup::bRequest "bRequest" field of 
+ * \ref libusb_control_setup
+ * \param wValue see the
+ * \ref libusb_control_setup::wValue "wValue" field of 
+ * \ref libusb_control_setup
+ * \param wIndex see the
+ * \ref libusb_control_setup::wIndex "wIndex" field of 
+ * \ref libusb_control_setup
+ * \param wLength see the
+ * \ref libusb_control_setup::wLength "wLength" field of 
+ * \ref libusb_control_setup
+ */
 static inline void libusb_fill_control_setup(unsigned char *buffer,
 	uint8_t bRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	uint16_t wLength)
@@ -281,6 +674,33 @@ int libusb_cancel_transfer(struct libusb_transfer *transfer);
 int libusb_cancel_transfer_sync(struct libusb_transfer *transfer);
 void libusb_free_transfer(struct libusb_transfer *transfer);
 
+/** \ingroup asyncio
+ * Helper function to populate the required \ref libusb_transfer fields
+ * for a control transfer.
+ *
+ * If you pass a transfer buffer to this function, the first 8 bytes will
+ * be interpreted as a control setup packet, and the wLength field will be
+ * used to automatically populate the \ref libusb_transfer::length "length"
+ * field of the transfer. Therefore the recommended approach is:
+ * -# Allocate a suitably sized data buffer (including space for control setup)
+ * -# Call libusb_fill_control_setup()
+ * -# If this is a host-to-device transfer with a data stage, put the data
+ *    in place after the setup packet
+ * -# Call this function
+ * -# Call libusb_submit_transfer()
+ *
+ * It is also legal to pass a NULL buffer to this function, in which case this
+ * function will not attempt to populate the length field. Remember that you
+ * must populate the buffer and length fields later.
+ *
+ * \param transfer the transfer to populate
+ * \param dev_handle handle of the device that will handle the transfer
+ * \param buffer data buffer. If provided, this function will interpret the
+ * first 8 bytes as a setup packet and infer the transfer length from that.
+ * \param callback callback function to be invoked on transfer completion
+ * \param user_data user data to pass to callback function
+ * \param timeout timeout for the transfer in milliseconds
+ */
 static inline void libusb_fill_control_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char *buffer, libusb_transfer_cb_fn callback, void *user_data,
@@ -298,6 +718,19 @@ static inline void libusb_fill_control_transfer(
 	transfer->callback = callback;
 }
 
+/** \ingroup asyncio
+ * Helper function to populate the required \ref libusb_transfer fields
+ * for a bulk transfer.
+ *
+ * \param transfer the transfer to populate
+ * \param dev_handle handle of the device that will handle the transfer
+ * \param endpoint address of the endpoint where this transfer will be sent
+ * \param buffer data buffer
+ * \param length length of data buffer
+ * \param callback callback function to be invoked on transfer completion
+ * \param user_data user data to pass to callback function
+ * \param timeout timeout for the transfer in milliseconds
+ */
 static inline void libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
 	libusb_device_handle *dev_handle, unsigned char endpoint,
 	unsigned char *buffer, int length, libusb_transfer_cb_fn callback,
@@ -313,6 +746,19 @@ static inline void libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
 	transfer->callback = callback;
 }
 
+/** \ingroup asyncio
+ * Helper function to populate the required \ref libusb_transfer fields
+ * for an interrupt transfer.
+ *
+ * \param transfer the transfer to populate
+ * \param dev_handle handle of the device that will handle the transfer
+ * \param endpoint address of the endpoint where this transfer will be sent
+ * \param buffer data buffer
+ * \param length length of data buffer
+ * \param callback callback function to be invoked on transfer completion
+ * \param user_data user data to pass to callback function
+ * \param timeout timeout for the transfer in milliseconds
+ */
 static inline void libusb_fill_interrupt_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *buffer, int length,
@@ -343,8 +789,18 @@ int libusb_interrupt_transfer(libusb_device_handle *dev_handle,
 	int *actual_length, unsigned int timeout);
 
 /* polling and timeouts */
+
+/** \ingroup poll
+ * File descriptor for polling
+ */
 struct libusb_pollfd {
+	/** Numeric file descriptor */
 	int fd;
+
+	/** Event flags to poll for from <poll.h>. POLLIN indicates that you
+	 * should monitor this file descriptor for becoming ready to read from,
+	 * and POLLOUT indicates that you should monitor this file descriptor for
+	 * nonblocking write readiness. */
 	short events;
 };
 

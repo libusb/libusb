@@ -27,3 +27,4 @@ dpfp
 fpusb-*.tar.bz2
 fpusb-*.tar.gz
 ChangeLog
+doc/html

@@ -1,12 +1,18 @@
 for 1.0
 =======
 cancellation race concerns - better tracking of kernel feedback?
-API docs
 isochronous endpoint I/O
 thread safety
 error codes
 fixme review
 review functionality missing over 0.1
+endianness of control setup, issues when resubmitting transfers
+interpreting transfer flags after callback returns is not safe
+rename poll to handle_events
+make libusb_get_pollfds return const?
+doxygen warnings
+bmRequestType
+make descriptor things const?
 
 1.0 API style/naming points to reconsider
 =========================================
