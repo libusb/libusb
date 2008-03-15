@@ -333,9 +333,10 @@ out:
 	return r;
 }
 
-static int op_get_device_list(struct discovered_devs *discdevs)
+static int op_get_device_list(struct discovered_devs **_discdevs)
 {
 	struct dirent *entry;
+	struct discovered_devs *discdevs = *_discdevs;
 	int r = 0;
 	DIR *buses = opendir(usbfs_path);
 	if (!buses) {
@@ -364,6 +365,7 @@ static int op_get_device_list(struct discovered_devs *discdevs)
 
 out:
 	closedir(buses);
+	*_discdevs = discdevs;
 	return r;
 }
 

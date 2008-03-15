@@ -134,7 +134,7 @@ API_EXPORTED int libusb_get_device_list(struct libusb_device ***list)
 	if (!discdevs)
 		return -ENOMEM;
 
-	r = usbi_backend->get_device_list(discdevs);
+	r = usbi_backend->get_device_list(&discdevs);
 	if (r < 0)
 		goto out;
 

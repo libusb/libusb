@@ -231,7 +231,7 @@ struct usbi_os_backend {
 	int (*init)(void);
 	void (*exit)(void);
 
-	int (*get_device_list)(struct discovered_devs *discdevs);
+	int (*get_device_list)(struct discovered_devs **discdevs);
 
 	int (*open)(struct libusb_device_handle *handle);
 	void (*close)(struct libusb_device_handle *handle);
