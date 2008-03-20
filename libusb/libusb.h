@@ -521,7 +521,10 @@ enum libusb_transfer_flags {
 	/** Automatically free() transfer buffer during libusb_free_transfer() */
 	LIBUSB_TRANSFER_FREE_BUFFER = 1<<1,
 
-	/** Automatically call libusb_free_transfer() after callback returns */
+	/** Automatically call libusb_free_transfer() after callback returns.
+	 * If this flag is set, it is illegal to call libusb_free_transfer() 
+	 * from your transfer callback, as this will result in a double-free
+	 * when this flag is acted upon. */
 	LIBUSB_TRANSFER_FREE_TRANSFER = 1<<2,
 };
 

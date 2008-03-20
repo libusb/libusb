@@ -767,6 +767,7 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status)
 {
 	struct libusb_transfer *transfer = &itransfer->pub;
+	uint8_t flags;
 
 	if (status == LIBUSB_TRANSFER_SILENT_COMPLETION)
 		return;
@@ -782,11 +783,14 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 		}
 	}
 
+	flags = transfer->flags;
 	transfer->status = status;
 	transfer->actual_length = itransfer->transferred;
 	if (transfer->callback)
 		transfer->callback(transfer);
-	if (transfer->flags & LIBUSB_TRANSFER_FREE_TRANSFER)
+	/* transfer might have been freed by the above call, do not use from
+	 * this point. */
+	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER)
 		libusb_free_transfer(transfer);
 }
 
