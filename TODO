@@ -10,7 +10,6 @@ endianness of control setup, issues when resubmitting transfers
 rename poll to handle_events
 make libusb_get_pollfds return const?
 doxygen warnings
-bmRequestType
 make descriptor things const?
 
 1.0 API style/naming points to reconsider

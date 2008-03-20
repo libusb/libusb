@@ -23,7 +23,7 @@
 
 struct usbfs_ctrltransfer {
 	/* keep in sync with usbdevice_fs.h:usbdevfs_ctrltransfer */
-	uint8_t  bRequestType;
+	uint8_t  bmRequestType;
 	uint8_t  bRequest;
 	uint16_t wValue;
 	uint16_t wIndex;

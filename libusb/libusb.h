@@ -185,7 +185,7 @@ enum libusb_standard_request {
 
 /** \ingroup misc
  * Request type bits of the
- * \ref libusb_control_setup::bRequestType "bRequestType" field in control
+ * \ref libusb_control_setup::bmRequestType "bmRequestType" field in control
  * transfers. */
 enum libusb_request_type {
 	/** Standard */
@@ -203,7 +203,7 @@ enum libusb_request_type {
 
 /** \ingroup misc
  * Recipient bits of the
- * \ref libusb_control_setup::bRequestType "bRequestType" field in control
+ * \ref libusb_control_setup::bmRequestType "bmRequestType" field in control
  * transfers. Values 4 through 31 are reserved. */
 enum libusb_request_recipient {
 	/** Device */
@@ -462,9 +462,9 @@ struct libusb_control_setup {
 	 * \ref libusb_request_type. Bit 7 determines data transfer direction, see
 	 * \ref libusb_endpoint_direction.
 	 */
-	uint8_t  bRequestType;
+	uint8_t  bmRequestType;
 
-	/** Request. If the type bits of bRequestType are equal to
+	/** Request. If the type bits of bmRequestType are equal to
 	 * \ref libusb_request_type::LIBUSB_REQUEST_TYPE_STANDARD
 	 * "LIBUSB_REQUEST_TYPE_STANDARD" then this field refers to
 	 * \ref libusb_standard_request. For other cases, use of this field is
@@ -640,8 +640,8 @@ static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
  * buffer) for a control transfer.
  * 
  * \param buffer buffer to output the setup packet into
- * \param bRequestType see the
- * \ref libusb_control_setup::bRequestType "bRequestType" field of
+ * \param bmRequestType see the
+ * \ref libusb_control_setup::bmRequestType "bmRequestType" field of
  * \ref libusb_control_setup
  * \param bRequest see the
  * \ref libusb_control_setup::bRequest "bRequest" field of 
@@ -657,11 +657,11 @@ static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
  * \ref libusb_control_setup
  */
 static inline void libusb_fill_control_setup(unsigned char *buffer,
-	uint8_t bRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
+	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	uint16_t wLength)
 {
 	struct libusb_control_setup *setup = (struct libusb_control_setup *) buffer;
-	setup->bRequestType = bRequestType;
+	setup->bmRequestType = bmRequestType;
 	setup->bRequest = bRequest;
 	setup->wValue = wValue;
 	setup->wIndex = wIndex;

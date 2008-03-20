@@ -44,15 +44,15 @@ static void ctrl_transfer_cb(struct libusb_transfer *transfer)
 /* FIXME: does this support partial transfers? */
 /** \ingroup syncio
  * Perform a USB control transfer. The direction of the transfer is inferred
- * from the bRequestType field of the setup packet.
+ * from the bmRequestType field of the setup packet.
  *
  * \param dev_handle a handle for the device to communicate with
- * \param bRequestType the request type field for the setup packet
+ * \param bmRequestType the request type field for the setup packet
  * \param bRequest the request field for the setup packet
  * \param wValue the value field for the setup packet
  * \param wIndex the index field for the setup packet
  * \param data a suitably-sized data buffer for either input or output
- * (depending on direction bits within bRequestType)
+ * (depending on direction bits within bmRequestType)
  * \param wLength the length field for the setup packet. The data buffer should
  * be at least this size.
  * \param timeout timeout (in millseconds) that this function should wait
@@ -63,7 +63,7 @@ static void ctrl_transfer_cb(struct libusb_transfer *transfer)
  * \returns other negative code on error
  */
 API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
-	uint8_t bRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
+	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	unsigned char *data, uint16_t wLength, unsigned int timeout)
 {
 	struct libusb_transfer *transfer = libusb_alloc_transfer();
@@ -80,9 +80,9 @@ API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 		return -ENOMEM;
 	}
 
-	libusb_fill_control_setup(buffer, bRequestType, bRequest, wValue, wIndex,
+	libusb_fill_control_setup(buffer, bmRequestType, bRequest, wValue, wIndex,
 		wLength);
-	if ((bRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_OUT)
+	if ((bmRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_OUT)
 		memcpy(buffer + LIBUSB_CONTROL_SETUP_SIZE, data, wLength);
 
 	libusb_fill_control_transfer(transfer, dev_handle, buffer,
@@ -102,7 +102,7 @@ API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 		}
 	}
 
-	if ((bRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN)
+	if ((bmRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN)
 		memcpy(data, libusb_control_transfer_get_data(transfer),
 			transfer->actual_length);
 

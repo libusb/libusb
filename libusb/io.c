@@ -693,7 +693,7 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 			(struct libusb_control_setup *) transfer->buffer;
 	
 		usbi_dbg("RQT=%02x RQ=%02x VAL=%04x IDX=%04x length=%d",
-			setup->bRequestType, setup->bRequest, setup->wValue, setup->wIndex,
+			setup->bmRequestType, setup->bRequest, setup->wValue, setup->wIndex,
 			setup->wLength);
 
 		setup->wValue = cpu_to_le16(setup->wValue);
