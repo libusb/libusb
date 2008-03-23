@@ -1,7 +1,7 @@
 AUTOMAKE_OPTIONS = dist-bzip2
 DISTCLEANFILES = ChangeLog libusb-1.0.pc
 EXTRA_DIST = TODO
-SUBDIRS = libusb
+SUBDIRS = libusb doc
 
 if BUILD_EXAMPLES
 SUBDIRS += examples
