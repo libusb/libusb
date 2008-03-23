@@ -408,6 +408,21 @@ static int op_release_interface(struct libusb_device_handle *handle, int iface)
 	return r;
 }
 
+static int op_set_interface(struct libusb_device_handle *handle, int iface,
+	int altsetting)
+{
+	int fd = __device_handle_priv(handle)->fd;
+	struct usbfs_setinterface setintf;
+	int r;
+
+	setintf.interface = iface;
+	setintf.altsetting = altsetting;
+	r = ioctl(fd, IOCTL_USBFS_SETINTF, &setintf);
+	if (r < 0)
+		usbi_err("setintf failed error %d", r);
+	return r;
+}
+
 static void op_destroy_device(struct libusb_device *dev)
 {
 	unsigned char *nodepath = __device_priv(dev)->nodepath;
@@ -571,6 +586,8 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.close = op_close,
 	.claim_interface = op_claim_interface,
 	.release_interface = op_release_interface,
+
+	.set_interface_altsetting = op_set_interface,
 
 	.destroy_device = op_destroy_device,
 

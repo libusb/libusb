@@ -239,6 +239,9 @@ struct usbi_os_backend {
 	int (*claim_interface)(struct libusb_device_handle *handle, int iface);
 	int (*release_interface)(struct libusb_device_handle *handle, int iface);
 
+	int (*set_interface_altsetting)(struct libusb_device_handle *handle,
+		int iface, int altsetting);
+
 	void (*destroy_device)(struct libusb_device *dev);
 
 	int (*submit_transfer)(struct usbi_transfer *itransfer);

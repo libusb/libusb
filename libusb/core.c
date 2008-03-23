@@ -508,6 +508,14 @@ API_EXPORTED int libusb_release_interface(struct libusb_device_handle *dev,
 	return usbi_backend->release_interface(dev, iface);
 }
 
+/* FIXME docs */
+API_EXPORTED int libusb_set_interface_altsetting(
+	struct libusb_device_handle *dev, int iface, int altsetting)
+{
+	usbi_dbg("interface %d altsetting %d", iface, altsetting);
+	return usbi_backend->set_interface_altsetting(dev, iface, altsetting);
+}
+
 /** \ingroup lib
  * Initialize libusb. This function must be called before calling any other
  * libusb function.
