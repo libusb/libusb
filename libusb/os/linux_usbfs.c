@@ -46,10 +46,6 @@ struct linux_device_handle_priv {
 	int fd;
 };
 
-struct linux_transfer_priv {
-	struct usbfs_urb urb;
-};
-
 static struct linux_device_priv *__device_priv(struct libusb_device *dev)
 {
 	return (struct linux_device_priv *) dev->os_priv;
@@ -60,16 +56,6 @@ static struct linux_device_handle_priv *__device_handle_priv(
 {
 	return (struct linux_device_handle_priv *) handle->os_priv;
 }
-
-static struct linux_transfer_priv *__transfer_priv(
-	struct usbi_transfer *transfer)
-{
-	return (struct linux_transfer_priv *) transfer->os_priv;
-}
-
-#define TRANSFER_PRIV_GET_ITRANSFER(tpriv) \
-	((struct usbi_transfer *) \
-		container_of((tpriv), struct usbi_transfer, os_priv))
 
 static int check_usb_vfs(const char *dirname)
 {
@@ -432,15 +418,22 @@ static void op_destroy_device(struct libusb_device *dev)
 
 static int submit_transfer(struct usbi_transfer *itransfer)
 {
-	struct libusb_transfer *transfer = &itransfer->pub;
-	struct usbfs_urb *urb = &__transfer_priv(itransfer)->urb;
+	struct libusb_transfer *transfer =
+		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct usbfs_urb *urb = usbi_transfer_get_os_priv(itransfer);
 	struct linux_device_handle_priv *dpriv =
 		__device_handle_priv(transfer->dev_handle);
 	int to_be_transferred = transfer->length - itransfer->transferred;
 	int r;
 
 	urb->buffer = transfer->buffer + itransfer->transferred;
-	urb->buffer_length = MIN(to_be_transferred, MAX_URB_BUFFER_LENGTH);
+	if (urb->type == USBFS_URB_TYPE_ISO) {
+		/* FIXME: iso stuff needs reworking. if a big transfer is submitted,
+		 * split it up into multiple URBs. */
+		urb->buffer_length = to_be_transferred;
+	} else {
+		urb->buffer_length = MIN(to_be_transferred, MAX_URB_BUFFER_LENGTH);
+	}
 
 	/* FIXME: for requests that we have to split into multiple URBs, we should
 	 * submit all the URBs instantly: submit, submit, submit, reap, reap, reap
@@ -457,12 +450,29 @@ static int submit_transfer(struct usbi_transfer *itransfer)
 	return r;
 }
 
+static void fill_iso_packet_descriptors(struct usbfs_urb *urb,
+	struct usbi_transfer *itransfer)
+{
+	struct libusb_transfer *transfer =
+		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	int i;
+
+	for (i = 0; i < transfer->num_iso_packets; i++) {
+		struct usbfs_iso_packet_desc *urb_desc = &urb->iso_frame_desc[i];
+		struct libusb_iso_packet_descriptor *lib_desc =
+			&transfer->iso_packet_desc[i];
+		urb_desc->length = lib_desc->length;
+	}
+}
+
 static int op_submit_transfer(struct usbi_transfer *itransfer)
 {
-	struct usbfs_urb *urb = &__transfer_priv(itransfer)->urb;
-	struct libusb_transfer *transfer = &itransfer->pub;
+	struct usbfs_urb *urb = usbi_transfer_get_os_priv(itransfer);
+	struct libusb_transfer *transfer =
+		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
 	memset(urb, 0, sizeof(*urb));
+	urb->usercontext = itransfer;
 	switch (transfer->endpoint_type) {
 	case LIBUSB_ENDPOINT_TYPE_CONTROL:
 		urb->type = USBFS_URB_TYPE_CONTROL;
@@ -472,6 +482,13 @@ static int op_submit_transfer(struct usbi_transfer *itransfer)
 		break;
 	case LIBUSB_ENDPOINT_TYPE_INTERRUPT:
 		urb->type = USBFS_URB_TYPE_INTERRUPT;
+		break;
+	case LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS:
+		urb->type = USBFS_URB_TYPE_ISO;
+		/* FIXME: interface for non-ASAP data? */
+		urb->flags = USBFS_URB_ISO_ASAP;
+		fill_iso_packet_descriptors(urb, itransfer);
+		urb->number_of_packets = transfer->num_iso_packets;
 		break;
 	default:
 		usbi_err("unknown endpoint type %d", transfer->endpoint_type);
@@ -484,8 +501,9 @@ static int op_submit_transfer(struct usbi_transfer *itransfer)
 
 static int op_cancel_transfer(struct usbi_transfer *itransfer)
 {
-	struct usbfs_urb *urb = &__transfer_priv(itransfer)->urb;
-	struct libusb_transfer *transfer = &itransfer->pub;
+	struct usbfs_urb *urb = usbi_transfer_get_os_priv(itransfer);
+	struct libusb_transfer *transfer =
+		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct linux_device_handle_priv *dpriv =
 		__device_handle_priv(transfer->dev_handle);
 
@@ -497,7 +515,6 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 	struct linux_device_handle_priv *hpriv = __device_handle_priv(handle);
 	int r;
 	struct usbfs_urb *urb;
-	struct linux_transfer_priv *tpriv;
 	struct usbi_transfer *itransfer;
 	struct libusb_transfer *transfer;
 	int trf_requested;
@@ -511,9 +528,8 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 		return r;
 	}
 
-	tpriv = container_of(urb, struct linux_transfer_priv, urb);
-	itransfer = TRANSFER_PRIV_GET_ITRANSFER(tpriv);
-	transfer = &itransfer->pub;
+	itransfer = urb->usercontext;
+	transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
 	usbi_dbg("urb type=%d status=%d transferred=%d", urb->type, urb->status,
 		urb->actual_length);
@@ -527,6 +543,18 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 	/* FIXME: research what other status codes may exist */
 	if (urb->status != 0)
 		usbi_warn("unrecognised urb status %d", urb->status);
+
+	/* copy isochronous packet results back */
+	if (transfer->endpoint_type == LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS) {
+		int i;
+		for (i = 0; i < urb->number_of_packets; i++) {
+			struct usbfs_iso_packet_desc *urb_desc = &urb->iso_frame_desc[i];
+			struct libusb_iso_packet_descriptor *lib_desc =
+				&transfer->iso_packet_desc[i];
+			lib_desc->status = urb_desc->status;
+			lib_desc->actual_length = urb_desc->actual_length;
+		}
+	}
 
 	/* determine how much data was asked for */
 	length = transfer->length;
@@ -598,6 +626,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 
 	.device_priv_size = sizeof(struct linux_device_priv),
 	.device_handle_priv_size = sizeof(struct linux_device_handle_priv),
-	.transfer_priv_size = sizeof(struct linux_transfer_priv),
+	.transfer_priv_size = sizeof(struct usbfs_urb),
+	.add_iso_packet_size = sizeof(struct usbfs_iso_packet_desc),
 };
 

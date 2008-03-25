@@ -1,7 +1,6 @@
 for 1.0
 =======
 cancellation race concerns - better tracking of kernel feedback?
-isochronous endpoint I/O
 thread safety
 error codes
 fixme review
@@ -11,6 +10,7 @@ rename poll to handle_events
 make libusb_get_pollfds return const?
 doxygen warnings
 make descriptor things const?
+isochronous sync I/O?
 
 1.0 API style/naming points to reconsider
 =========================================

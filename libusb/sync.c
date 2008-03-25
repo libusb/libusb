@@ -66,7 +66,7 @@ API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	unsigned char *data, uint16_t wLength, unsigned int timeout)
 {
-	struct libusb_transfer *transfer = libusb_alloc_transfer();
+	struct libusb_transfer *transfer = libusb_alloc_transfer(0);
 	unsigned char *buffer;
 	int completed = 0;
 	int r;
@@ -134,7 +134,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *buffer, int length,
 	int *transferred, unsigned int timeout, unsigned char endpoint_type)
 {
-	struct libusb_transfer *transfer = libusb_alloc_transfer();
+	struct libusb_transfer *transfer = libusb_alloc_transfer(0);
 	int completed = 0;
 	int r;
 

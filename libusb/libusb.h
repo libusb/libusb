@@ -528,6 +528,19 @@ enum libusb_transfer_flags {
 	LIBUSB_TRANSFER_FREE_TRANSFER = 1<<2,
 };
 
+/** \ingroup asyncio
+ * Isochronous packet descriptor. */
+struct libusb_iso_packet_descriptor {
+	/** Length of data to request in this packet */
+	unsigned int length;
+
+	/** Amount of data that was actually transferred */
+	unsigned int actual_length;
+
+	/** Status code for this packet */
+	enum libusb_transfer_status status;
+};
+
 struct libusb_transfer;
 
 typedef void (*libusb_transfer_cb_fn)(struct libusb_transfer *transfer);
@@ -555,14 +568,20 @@ struct libusb_transfer {
 
 	/* FIXME: make const? */
 	/** The status of the transfer. Read-only, and only for use within
-	 * transfer callback function. */
+	 * transfer callback function.
+	 *
+	 * If this is an isochronous transfer, this field may read COMPLETED even
+	 * if there were errors in the frames. Use the
+	 * \ref libusb_iso_packet_descriptor::status "status" field in each packet
+	 * to determine if errors occurred. */
 	enum libusb_transfer_status status;
 
 	/** Length of the data buffer */
 	int length;
 
 	/** Actual length of data that was transferred. Read-only, and only for
-	 * use within transfer callback function. */
+	 * use within transfer callback function. Not valid for isochronous
+	 * endpoint transfers. */
 	int actual_length;
 
 	/** Callback function. This will be invoked when the transfer completes,
@@ -574,6 +593,13 @@ struct libusb_transfer {
 
 	/** Data buffer */
 	unsigned char *buffer;
+
+	/** Number of isochronous packets. Only used for I/O with isochronous
+	 * endpoints. */
+	int num_iso_packets;
+
+	/** Isochronous packet descriptors, for isochronous transfers only. */
+	struct libusb_iso_packet_descriptor iso_packet_desc[0];
 };
 
 int libusb_init(void);
@@ -674,7 +700,7 @@ static inline void libusb_fill_control_setup(unsigned char *buffer,
 size_t libusb_get_transfer_alloc_size(void);
 void libusb_init_transfer(struct libusb_transfer *transfer);
 
-struct libusb_transfer *libusb_alloc_transfer(void);
+struct libusb_transfer *libusb_alloc_transfer(int iso_packets);
 int libusb_submit_transfer(struct libusb_transfer *transfer);
 int libusb_cancel_transfer(struct libusb_transfer *transfer);
 int libusb_cancel_transfer_sync(struct libusb_transfer *transfer);
@@ -776,6 +802,36 @@ static inline void libusb_fill_interrupt_transfer(
 	transfer->timeout = timeout;
 	transfer->buffer = buffer;
 	transfer->length = length;
+	transfer->user_data = user_data;
+	transfer->callback = callback;
+}
+
+/** \ingroup asyncio
+ * Helper function to populate the required \ref libusb_transfer fields
+ * for an isochronous transfer.
+ *
+ * \param transfer the transfer to populate
+ * \param dev_handle handle of the device that will handle the transfer
+ * \param endpoint address of the endpoint where this transfer will be sent
+ * \param buffer data buffer
+ * \param length length of data buffer
+ * \param num_iso_packets the number of isochronous packets
+ * \param callback callback function to be invoked on transfer completion
+ * \param user_data user data to pass to callback function
+ * \param timeout timeout for the transfer in milliseconds
+ */
+static inline void libusb_fill_iso_transfer(struct libusb_transfer *transfer,
+	libusb_device_handle *dev_handle, unsigned char endpoint,
+	unsigned char *buffer, int length, int num_iso_packets,
+	libusb_transfer_cb_fn callback, void *user_data, unsigned int timeout)
+{
+	transfer->dev_handle = dev_handle;
+	transfer->endpoint = endpoint;
+	transfer->endpoint_type = LIBUSB_ENDPOINT_TYPE_BULK;
+	transfer->timeout = timeout;
+	transfer->buffer = buffer;
+	transfer->length = length;
+	transfer->num_iso_packets = num_iso_packets;
 	transfer->user_data = user_data;
 	transfer->callback = callback;
 }

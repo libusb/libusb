@@ -32,8 +32,6 @@
 
 #include "libusbi.h"
 
-#define TRANSFER_TO_PRIV(trf) (container_of((trf), struct usbi_transfer, pub))
-
 /* this is a list of in-flight rb_handles, sorted by timeout expiration.
  * URBs to timeout the soonest are placed at the beginning of the list, URBs
  * that will time out later are placed after, and urbs with infinite timeout
@@ -215,15 +213,8 @@ if (r == 0 && actual_length == sizeof(data)) {
  * generic transfer object mentioned above. At this stage, the transfer
  * is "blank" with no details about what type of I/O it will be used for.
  *
- * Allocation is done with the libusb_alloc_transfer() function. It is also
- * possible to allocate your own libusb_transfer structure, but only if you
- * take the following into account:
- * -# For implementation reasons, the memory allocated for the transfer must
- * actually be larger than sizeof(struct libusb_transfer). If you wish to
- * allocate your own transfers, you must allocate them with the size
- * determined by libusb_get_transfer_alloc_size().
- * -# After allocating space for a transfer, you must initialize it with
- * libusb_init_transfer().
+ * Allocation is done with the libusb_alloc_transfer() function. You must use
+ * this function rather than allocating your own transfers.
  *
  * \subsection asyncfill Filling
  *
@@ -259,11 +250,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  *
  * When a transfer has completed (i.e. the callback function has been invoked),
  * you are advised to free the transfer (unless you wish to resubmit it, see
- * below).
- *
- * If you allocated the transfer with libusb_alloc_transfer(), deallocate it
- * with libusb_free_transfer(). If you're using your own memory management
- * scheme, free it through your scheme.
+ * below). Transfers are deallocated with libusb_free_transfer().
  *
  * It is undefined behaviour to free a transfer which has not completed.
  *
@@ -341,6 +328,61 @@ if (r == 0 && actual_length == sizeof(data)) {
  * correct offset, you may wish to use the libusb_control_transfer_get_data()
  * and libusb_control_transfer_get_setup() functions within your transfer
  * callback.
+ *
+ * \section asynciso Considerations for isochronous transfers
+ *
+ * As isochronous transfers are more complicated than transfers to
+ * non-isochronous endpoints.
+ *
+ * To perform I/O to an isochronous endpoint, allocate the transfer by calling
+ * libusb_alloc_transfer() with an appropriate number of isochronous packets.
+ *
+ * During filling, set \ref libusb_transfer::endpoint_type "endpoint_type" to
+ * \ref libusb_endpoint_type::LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS
+ * "LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS", and set
+ * \ref libusb_transfer::num_iso_packets "num_iso_packets" to a value less than
+ * or equal to the number of packets you requested during allocation.
+ * libusb_alloc_transfer() does not set either of these fields for you, given
+ * that you might not even use the transfer on an isochronous endpoint.
+ *
+ * Next, populate the length field for the first num_iso_packets entries in
+ * the \ref libusb_transfer::iso_packet_desc "iso_packet_desc" array. Section
+ * 5.6.3 of the USB2 specifications describe how the maximum isochronous
+ * packet length is determined by the endpoint descriptor. FIXME need a helper
+ * function to find this.
+ * FIXME, write a helper function to set the length for all iso packets in an
+ * array
+ *
+ * For outgoing transfers, you'll obviously fill the buffer and populate the
+ * packet descriptors in hope that all the data gets transferred. For incoming
+ * transfers, you must ensure the buffer has sufficient capacity for
+ * the situation where all packets transfer the full amount of requested data.
+ *
+ * Completion handling requires some extra consideration. The
+ * \ref libusb_transfer::actual_length "actual_length" field of the transfer
+ * is meaningless and should not be examined; instead you must refer to the
+ * \ref libusb_iso_packet_descriptor::actual_length "actual_length" field of
+ * each individual packet.
+ *
+ * The \ref libusb_transfer::status "status" field of the transfer is also a
+ * little misleading:
+ *  - If the packets were submitted and the isochronous data microframes
+ *    completed normally, status will have value
+ *    \ref libusb_transfer_status::LIBUSB_TRANSFER_COMPLETED
+ *    "LIBUSB_TRANSFER_COMPLETED". Note that bus errors and software-incurred
+ *    delays are not counted as transfer errors; the transfer.status field may
+ *    indicate COMPLETED even if some or all of the packets failed. Refer to
+ *    the \ref libusb_iso_packet_descriptor::status "status" field of each
+ *    individual packet to determine packet failures.
+ *  - The status field will have value
+ *    \ref libusb_transfer_status::LIBUSB_TRANSFER_ERROR
+ *    "LIBUSB_TRANSFER_ERROR" only when serious errors were encountered.
+ *  - Other transfer status codes occur with normal behaviour.
+ *
+ * The data for each packet will be found at an offset into the buffer that
+ * can be calculated as if each prior packet completed in full. FIXME write
+ * a helper function to determine this, and flesh this description out a bit
+ * more.
  *
  * \section asyncmem Memory caveats
  *
@@ -513,7 +555,8 @@ static int calculate_timeout(struct usbi_transfer *transfer)
 {
 	int r;
 	struct timespec current_time;
-	unsigned int timeout = transfer->pub.timeout;
+	unsigned int timeout =
+		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)->timeout;
 
 	if (!timeout)
 		return 0;
@@ -581,63 +624,44 @@ static int submit_transfer(struct usbi_transfer *itransfer)
 }
 
 /** \ingroup asyncio
- * Obtain the memory-resident size of a transfer structure. Normally, you do
- * not care about this as you will use libusb_alloc_transfer() and
- * libusb_free_transfer() which hide this implementation detail from you.
+ * Allocate a libusb transfer with a specified number of isochronous packet
+ * descriptors. The returned transfer is pre-initialized for you. When the new
+ * transfer is no longer needed, it should be freed with
+ * libusb_free_transfer().
  *
- * This function is useful when you wish to allocate transfers using your
- * own custom memory allocator. libusb's transfer structure is bigger than
- * it appears, so you must use this function to find out how much space is
- * required for each transfer allocation.
+ * Transfers intended for non-isochronous endpoints (e.g. control, bulk,
+ * interrupt) should specify an iso_packets count of zero.
  *
- * If you are allocating your own transfers, remember to initialize them
- * with libusb_init_transfer().
+ * For transfers intended for isochronous endpoints, specify an appropriate
+ * number of packet descriptors to be allocated as part of the transfer.
+ * The returned transfer is not specially initialized for isochronous I/O;
+ * you are still required to set the
+ * \ref libusb_transfer::num_iso_packets "num_iso_packets" and
+ * \ref libusb_transfer::endpoint_type "endpoint_type" fields accordingly.
  *
- * \returns the true size of a libusb_transfer structure
- */
-API_EXPORTED size_t libusb_get_transfer_alloc_size(void)
-{
-	return sizeof(struct usbi_transfer) + usbi_backend->transfer_priv_size;
-}
-
-void __init_transfer(struct usbi_transfer *transfer)
-{
-	memset(transfer, 0, sizeof(*transfer));
-}
-
-/** \ingroup asyncio
- * Initialize a libusb transfer. This function is only for users who allocate
- * their transfers using their own memory allocator. The more standard
- * libusb_alloc_transfer() returns pre-initialized transfers.
- * \param transfer a transfer to initialize
- */
-API_EXPORTED void libusb_init_transfer(struct libusb_transfer *transfer)
-{
-	__init_transfer(TRANSFER_TO_PRIV(transfer));
-}
-
-/** \ingroup asyncio
- * Allocate a libusb transfer using the standard system memory allocator. The
- * returned transfer is pre-initialized for you. When the new transfer is no
- * longer needed, it should be freed with libusb_free_transfer().
+ * It is safe to allocate a transfer with some isochronous packets and then
+ * use it on a non-isochronous endpoint. If you do this, ensure that at time
+ * of submission, num_iso_packets is 0 and that endpoint_type is set
+ * appropriately.
  *
- * \note
- * Instead of using this function, it is legal for you to allocate transfers
- * using a memory allocator of your choosing, but only if you consider the
- * hidden size requirement (see libusb_get_transfer_alloc_size()) and
- * initialize them before use (see libusb_init_transfer()).
- *
+ * \param iso_packets number of isochronous packet descriptors to allocate
  * \returns a newly allocated transfer, or NULL on error
  */
-API_EXPORTED struct libusb_transfer *libusb_alloc_transfer(void)
+API_EXPORTED struct libusb_transfer *libusb_alloc_transfer(int iso_packets)
 {
-	struct usbi_transfer *transfer =
-		malloc(sizeof(*transfer) + usbi_backend->transfer_priv_size);
-	if (!transfer)
+	size_t os_alloc_size = usbi_backend->transfer_priv_size
+		+ (usbi_backend->add_iso_packet_size * iso_packets);
+	int alloc_size = sizeof(struct usbi_transfer)
+		+ sizeof(struct libusb_transfer)
+		+ (sizeof(struct libusb_iso_packet_descriptor) * iso_packets)
+		+ os_alloc_size;
+	struct usbi_transfer *itransfer = malloc(alloc_size);
+	if (!itransfer)
 		return NULL;
 
-	__init_transfer(transfer);
-	return &transfer->pub;
+	memset(itransfer, 0, alloc_size);
+	itransfer->num_iso_packets = iso_packets;
+	return __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 }
 
 /** \ingroup asyncio
@@ -663,7 +687,7 @@ API_EXPORTED void libusb_free_transfer(struct libusb_transfer *transfer)
 	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER && transfer->buffer)
 		free(transfer->buffer);
 
-	itransfer = TRANSFER_TO_PRIV(transfer);
+	itransfer = __LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	free(itransfer);
 }
 
@@ -680,7 +704,8 @@ API_EXPORTED void libusb_free_transfer(struct libusb_transfer *transfer)
  */
 API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 {
-	struct usbi_transfer *itransfer = TRANSFER_TO_PRIV(transfer);
+	struct usbi_transfer *itransfer =
+		__LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
 
 	itransfer->transferred = 0;
@@ -720,7 +745,8 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
  */
 API_EXPORTED int libusb_cancel_transfer(struct libusb_transfer *transfer)
 {
-	struct usbi_transfer *itransfer = TRANSFER_TO_PRIV(transfer);
+	struct usbi_transfer *itransfer =
+		__LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
 
 	usbi_dbg("");
@@ -743,7 +769,8 @@ API_EXPORTED int libusb_cancel_transfer(struct libusb_transfer *transfer)
  */
 API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_transfer *transfer)
 {
-	struct usbi_transfer *itransfer = TRANSFER_TO_PRIV(transfer);
+	struct usbi_transfer *itransfer =
+		__LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
 
 	usbi_dbg("");
@@ -766,7 +793,8 @@ API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_transfer *transfer)
 void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status)
 {
-	struct libusb_transfer *transfer = &itransfer->pub;
+	struct libusb_transfer *transfer =
+		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	uint8_t flags;
 
 	if (status == LIBUSB_TRANSFER_SILENT_COMPLETION)
@@ -826,7 +854,8 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 	 * completed. we asynchronously cancel the URB and report timeout
 	 * to the user when the URB cancellation completes (or not at all if the
 	 * URB actually gets delivered as per this race) */
-	struct libusb_transfer *transfer = &itransfer->pub;
+	struct libusb_transfer *transfer =
+		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	int r;
 
 	itransfer->flags |= USBI_TRANSFER_TIMED_OUT;

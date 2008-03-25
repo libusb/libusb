@@ -159,17 +159,41 @@ struct libusb_device_handle {
 #define USBI_TRANSFER_SYNC_CANCELLED 		(1<<0)
 #define USBI_TRANSFER_TIMED_OUT	 			(1<<1)
 
-struct usbi_transfer {
-	/* must come first */
-	struct libusb_transfer pub;
+/* in-memory transfer layout:
+ *
+ * 1. struct usbi_transfer
+ * 2. struct libusb_transfer (which includes iso packets) [variable size]
+ * 3. os private data [variable size]
+ *
+ * from a libusb_transfer, you can get the usbi_transfer by rewinding the
+ * appropriate number of bytes.
+ * the usbi_transfer includes the number of allocated packets, so you can
+ * determine the size of the transfer and hence the start and length of the
+ * OS-private data.
+ */
 
+struct usbi_transfer {
+	int num_iso_packets;
 	struct list_head list;
 	struct timeval timeout;
 	int transferred;
 	uint8_t flags;
-
-	unsigned char os_priv[0];
 };
+
+#define __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
+	((struct libusb_transfer *)(((void *)(transfer)) \
+		+ sizeof(struct usbi_transfer)))
+#define __LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer) \
+	((struct usbi_transfer *)(((void *)(transfer)) \
+		- sizeof(struct usbi_transfer)))
+
+static inline void *usbi_transfer_get_os_priv(struct usbi_transfer *transfer)
+{
+	return ((void *)transfer) + sizeof(struct usbi_transfer)
+		+ sizeof(struct libusb_transfer)
+		+ (transfer->num_iso_packets
+			* sizeof(struct libusb_iso_packet_descriptor));
+}
 
 /* bus structures */
 
@@ -257,6 +281,9 @@ struct usbi_os_backend {
 
 	/* number of bytes to reserve for usbi_transfer.os_priv */
 	size_t transfer_priv_size;
+
+	/* number of additional bytes for os_priv for each iso packet */
+	size_t add_iso_packet_size;
 };
 
 extern const struct usbi_os_backend * const usbi_backend;
