@@ -469,7 +469,7 @@ int main(void)
 	sigaction(SIGQUIT, &sigact, NULL);
 
 	while (!do_exit) {
-		r = libusb_poll();
+		r = libusb_handle_events();
 		if (r < 0)
 			goto out_deinit;
 	}

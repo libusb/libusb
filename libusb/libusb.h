@@ -866,8 +866,8 @@ struct libusb_pollfd {
 	short events;
 };
 
-int libusb_poll_timeout(struct timeval *tv);
-int libusb_poll(void);
+int libusb_handle_events_timeout(struct timeval *tv);
+int libusb_handle_events(void);
 int libusb_get_next_timeout(struct timeval *tv);
 struct libusb_pollfd **libusb_get_pollfds(void);
 

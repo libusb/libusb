@@ -423,16 +423,17 @@ if (r == 0 && actual_length == sizeof(data)) {
  * points in time - namely processing the results of previously-submitted
  * transfers and invoking the user-supplied callback function.
  *
- * This gives rise to the libusb_poll() function which your
+ * This gives rise to the libusb_handle_events() function which your
  * application must call into when libusb has work do to. This gives libusb
  * the opportunity to reap pending transfers, invoke callbacks, etc.
  *
  * The first issue to discuss here is how your application can figure out
  * when libusb has work to do. In fact, there are two naive options which
  * do not actually require your application to know this:
- * -# Periodically call libusb_poll() in non-blocking mode at fixed short
- *  intervals from your main loop
- * -# Repeatedly call libusb_poll() in blocking mode from a dedicated thread.
+ * -# Periodically call libusb_handle_events() in non-blocking mode at fixed
+ *    short intervals from your main loop
+ * -# Repeatedly call libusb_handle_events() in blocking mode from a dedicated
+ *    thread.
  *
  * The first option is plainly not very nice, and will cause unnecessary 
  * CPU wakeups leading to increased power usage and decreased battery life.
@@ -447,7 +448,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  * button presses, mouse movements, network sockets, etc). You then add
  * libusb's file descriptors to your poll()/select() calls, and when activity
  * is detected on such descriptors you know it is time to call
- * libusb_poll().
+ * libusb_handle_events().
  *
  * There is one final event handling complication. libusb supports
  * asynchronous transfers which time out after a specified time period, and
@@ -492,14 +493,14 @@ if (r == 0 && actual_length == sizeof(data)) {
 // maybe fire off some initial async I/O
 
 while (user_has_not_requested_exit)
-	libusb_poll();
+	libusb_handle_events();
 
 // clean up and exit
 \endcode
  *
  * With such a simple main loop, you do not have to worry about managing
- * sets of file descriptors or handling timeouts. libusb_poll() will handle
- * those details internally.
+ * sets of file descriptors or handling timeouts. libusb_handle_events() will
+ * handle those details internally.
  *
  * \section pollmain The more advanced option
  *
@@ -510,29 +511,30 @@ while (user_has_not_requested_exit)
  *
  * In addition to polling file descriptors for the other event sources, you
  * take a set of file descriptors from libusb and monitor those too. When you
- * detect activity on libusb's file descriptors, you call libusb_poll_timeout()
- * in non-blocking mode.
+ * detect activity on libusb's file descriptors, you call
+ * libusb_handle_events_timeout() in non-blocking mode.
  *
  * You must also consider the fact that libusb sometimes has to handle events
  * at certain known times which do not generate activity on file descriptors.
  * Your main loop must also consider these times, modify it's poll()/select()
- * timeout accordingly, and track time so that libusb_poll_timeout() is called
- * in non-blocking mode when timeouts expire.
+ * timeout accordingly, and track time so that libusb_handle_events_timeout()
+ * is called in non-blocking mode when timeouts expire.
  *
  * In pseudo-code, you want something that looks like:
 \code
 // initialise libusb
 
 libusb_get_pollfds()
-while (user has not requested application exit):
-	libusb_get_next_timeout()
+while (user has not requested application exit) {
+	libusb_get_next_timeout();
 	select(on libusb file descriptors plus any other event sources of interest,
 		using a timeout no larger than the value libusb just suggested)
-	if (select() indicated activity on libusb file descriptors):
-		libusb_poll_timeout(0);
-	if (time has elapsed to or beyond the libusb timeout):
-		libusb_poll_timeout(0);
- 
+	if (select() indicated activity on libusb file descriptors)
+		libusb_handle_events_timeout(0);
+	if (time has elapsed to or beyond the libusb timeout)
+		libusb_handle_events_timeout(0);
+}
+
 // clean up and exit
 \endcode
  *
@@ -782,7 +784,7 @@ API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_transfer *transfer)
 
 	itransfer->flags |= USBI_TRANSFER_SYNC_CANCELLED;
 	while (itransfer->flags & USBI_TRANSFER_SYNC_CANCELLED) {
-		r = libusb_poll();
+		r = libusb_handle_events();
 		if (r < 0)
 			return r;
 	}
@@ -907,7 +909,7 @@ static int handle_timeouts(void)
 	return 0;
 }
 
-static int poll_io(struct timeval *tv)
+static int handle_events(struct timeval *tv)
 {
 	int r;
 	int maxfd = 0;
@@ -999,9 +1001,9 @@ static int poll_io(struct timeval *tv)
  * \returns 0 on success
  * \returns non-zero on error
  */
-API_EXPORTED int libusb_poll_timeout(struct timeval *tv)
+API_EXPORTED int libusb_handle_events_timeout(struct timeval *tv)
 {
-	return poll_io(tv);
+	return handle_events(tv);
 }
 
 /** \ingroup poll
@@ -1009,36 +1011,36 @@ API_EXPORTED int libusb_poll_timeout(struct timeval *tv)
  * timeout is currently hardcoded at 2 seconds but we may change this if we
  * decide other values are more sensible. For finer control over whether this
  * function is blocking or non-blocking, or the maximum timeout, use
- * libusb_poll_timeout() instead.
+ * libusb_handle_events_timeout() instead.
  *
  * \returns 0 on success
  * \returns non-zero on error
  */
-API_EXPORTED int libusb_poll(void)
+API_EXPORTED int libusb_handle_events(void)
 {
 	struct timeval tv;
 	tv.tv_sec = 2;
 	tv.tv_usec = 0;
-	return poll_io(&tv);
+	return handle_events(&tv);
 }
 
 /** \ingroup poll
  * Determine the next internal timeout that libusb needs to handle. You only
  * need to use this function if you are calling poll() or select() or similar
  * on libusb's file descriptors yourself - you do not need to use it if you
- * are calling libusb_poll() or a variant directly.
+ * are calling libusb_handle_events() or a variant directly.
  * 
  * You should call this function in your main loop in order to determine how
  * long to wait for select() or poll() to return results. libusb needs to be
  * called into at this timeout, so you should use it as an upper bound on
  * your select() or poll() call.
  *
- * When the timeout has expired, call into libusb_poll_timeout() (perhaps in 
- * non-blocking mode) so that libusb can handle the timeout.
+ * When the timeout has expired, call into libusb_handle_events_timeout()
+ * (perhaps in non-blocking mode) so that libusb can handle the timeout.
  *
  * This function may return 0 (success) and an all-zero timeval. If this is
  * the case, it indicates that libusb has a timeout that has already expired
- * so you should call libusb_poll_timeout() or similar immediately.
+ * so you should call libusb_handle_events_timeout() or similar immediately.
  *
  * \param tv output location for a relative time against the current
  * clock in which libusb must be called into in order to process timeout events

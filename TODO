@@ -6,7 +6,6 @@ error codes
 fixme review
 review functionality missing over 0.1
 endianness of control setup, issues when resubmitting transfers
-rename poll to handle_events
 make libusb_get_pollfds return const?
 doxygen warnings
 make descriptor things const?
