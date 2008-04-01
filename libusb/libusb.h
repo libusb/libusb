@@ -350,7 +350,7 @@ struct libusb_endpoint_descriptor {
 	uint8_t  bRefresh;
 	uint8_t  bSynchAddress;
 
-	unsigned char *extra;	/* Extra descriptors */
+	const unsigned char *extra;	/* Extra descriptors */
 	int extralen;
 };
 
@@ -394,9 +394,9 @@ struct libusb_interface_descriptor {
 
 	/** Array of endpoint descriptors. This length of this array is determined
 	 * by the bNumEndpoints field. */
-	struct libusb_endpoint_descriptor *endpoint;
+	const struct libusb_endpoint_descriptor *endpoint;
 
-	unsigned char *extra;	/* Extra descriptors */
+	const unsigned char *extra;	/* Extra descriptors */
 	int extralen;
 };
 
@@ -406,7 +406,7 @@ struct libusb_interface_descriptor {
 struct libusb_interface {
 	/** Array of interface descriptors. The length of this array is determined
 	 * by the num_altsetting field. */
-	struct libusb_interface_descriptor *altsetting;
+	const struct libusb_interface_descriptor *altsetting;
 
 	/** The number of alternate settings that belong to this interface */
 	int num_altsetting;
@@ -448,9 +448,9 @@ struct libusb_config_descriptor {
 
 	/** Array of interfaces supported by this configuration. The length of
 	 * this array is determined by the bNumInterfaces field. */
-	struct libusb_interface *interface;
+	const struct libusb_interface *interface;
 
-	unsigned char *extra;	/* Extra descriptors */
+	const unsigned char *extra;	/* Extra descriptors */
 	int extralen;
 };
 
@@ -607,9 +607,9 @@ void libusb_exit(void);
 
 int libusb_get_device_list(libusb_device ***list);
 void libusb_free_device_list(libusb_device **list, int unref_devices);
-struct libusb_device_descriptor *libusb_get_device_descriptor(
+const struct libusb_device_descriptor *libusb_get_device_descriptor(
 	libusb_device *dev);
-struct libusb_config_descriptor *libusb_get_config_descriptor(
+const struct libusb_config_descriptor *libusb_get_config_descriptor(
 	libusb_device *dev);
 libusb_device *libusb_device_ref(libusb_device *dev);
 void libusb_device_unref(libusb_device *dev);
@@ -869,7 +869,7 @@ struct libusb_pollfd {
 int libusb_handle_events_timeout(struct timeval *tv);
 int libusb_handle_events(void);
 int libusb_get_next_timeout(struct timeval *tv);
-struct libusb_pollfd **libusb_get_pollfds(void);
+const struct libusb_pollfd **libusb_get_pollfds(void);
 
 typedef void (*libusb_pollfd_added_cb)(int fd, short events);
 typedef void (*libusb_pollfd_removed_cb)(int fd);

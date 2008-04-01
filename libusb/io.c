@@ -1166,7 +1166,7 @@ void usbi_remove_pollfd(int fd)
  * \returns a NULL-terminated list of libusb_pollfd structures, or NULL on
  * error
  */
-API_EXPORTED struct libusb_pollfd **libusb_get_pollfds(void)
+API_EXPORTED const struct libusb_pollfd **libusb_get_pollfds(void)
 {
 	struct libusb_pollfd **ret;
 	struct usbi_pollfd *ipollfd;
@@ -1184,6 +1184,6 @@ API_EXPORTED struct libusb_pollfd **libusb_get_pollfds(void)
 		ret[i++] = (struct libusb_pollfd *) ipollfd;
 	ret[cnt] = NULL;
 
-	return ret;
+	return (const struct libusb_pollfd **) ret;
 }
 

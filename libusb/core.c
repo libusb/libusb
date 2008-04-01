@@ -424,7 +424,7 @@ API_EXPORTED struct libusb_device_handle *libusb_open_device_with_vid_pid(
 		return NULL;
 
 	while ((dev = devs[i++]) != NULL) {
-		struct libusb_device_descriptor *desc =
+		const struct libusb_device_descriptor *desc =
 			libusb_get_device_descriptor(dev);
 		if (desc->idVendor == vendor_id && desc->idProduct == product_id) {
 			found = dev;

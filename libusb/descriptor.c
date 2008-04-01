@@ -75,6 +75,7 @@ static int parse_endpoint(struct libusb_endpoint_descriptor *endpoint,
 	unsigned char *buffer, int size)
 {
 	struct usb_descriptor_header header;
+	unsigned char *extra;
 	unsigned char *begin;
 	int parsed = 0;
 	int len;
@@ -136,13 +137,14 @@ static int parse_endpoint(struct libusb_endpoint_descriptor *endpoint,
 		return parsed;
 	}
 
-	endpoint->extra = malloc(len);
-	if (!endpoint->extra) {
+	extra = malloc(len);
+	endpoint->extra = extra;
+	if (!extra) {
 		endpoint->extralen = 0;
 		return parsed;
 	}
 
-	memcpy(endpoint->extra, begin, len);
+	memcpy(extra, begin, len);
 	endpoint->extralen = len;
 
 	return parsed;
@@ -163,13 +165,16 @@ static int parse_interface(struct libusb_interface *interface,
 	interface->num_altsetting = 0;
 
 	while (size >= INTERFACE_DESC_LENGTH) {
-		interface->altsetting = realloc(interface->altsetting,
+		struct libusb_interface_descriptor *altsetting =
+			(struct libusb_interface_descriptor *) interface->altsetting;
+		altsetting = realloc(altsetting,
 			sizeof(struct libusb_interface_descriptor) *
 			(interface->num_altsetting + 1));
-		if (!interface->altsetting)
+		if (!altsetting)
 			return -1;
+		interface->altsetting = altsetting;
 
-		ifp = interface->altsetting + interface->num_altsetting;
+		ifp = altsetting + interface->num_altsetting;
 		interface->num_altsetting++;
 		usbi_parse_descriptor(buffer, "bbbbbbbbb", ifp);
 
@@ -207,13 +212,14 @@ static int parse_interface(struct libusb_interface *interface,
 			ifp->extra = NULL;
 			ifp->extralen = 0;
 		} else {
-			ifp->extra = malloc(len);
-			if (!ifp->extra) {
+			unsigned char *extra = malloc(len);
+			ifp->extra = extra;
+			if (!extra) {
 				ifp->extralen = 0;
 				/* FIXME will leak memory */
 				return -1;
 			}
-			memcpy(ifp->extra, begin, len);
+			memcpy(extra, begin, len);
 			ifp->extralen = len;
 		}
 
@@ -231,13 +237,15 @@ static int parse_interface(struct libusb_interface *interface,
 		}
 
 		if (ifp->bNumEndpoints > 0) {
+			struct libusb_endpoint_descriptor *endpoint;
 			tmp = ifp->bNumEndpoints * sizeof(struct libusb_endpoint_descriptor);
-			ifp->endpoint = malloc(tmp);
-			if (!ifp->endpoint)
+			endpoint = malloc(tmp);
+			ifp->endpoint = endpoint;
+			if (!endpoint)
 				/* FIXME will leak memory? */
 				return -1;      
 
-			memset(ifp->endpoint, 0, tmp);
+			memset(endpoint, 0, tmp);
 			for (i = 0; i < ifp->bNumEndpoints; i++) {
 				usbi_parse_descriptor(buffer, "bb", &header);
 
@@ -247,7 +255,7 @@ static int parse_interface(struct libusb_interface *interface,
 					return -1;
 				}
 
-				r = parse_endpoint(ifp->endpoint + i, buffer, size);
+				r = parse_endpoint(endpoint + i, buffer, size);
 				if (r < 0)
 					/* FIXME will leak memory */
 					return r;
@@ -278,6 +286,7 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 	int size;
 	int tmp;
 	struct usb_descriptor_header header;
+	struct libusb_interface *interface;
 
 	usbi_parse_descriptor(buffer, "bbwbbbbb", config);
 	size = config->wTotalLength;
@@ -288,11 +297,12 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 	}
 
 	tmp = config->bNumInterfaces * sizeof(struct libusb_interface);
-	config->interface = malloc(tmp);
+	interface = malloc(tmp);
+	config->interface = interface;
 	if (!config->interface)
 		return -1;      
 
-	memset(config->interface, 0, tmp);
+	memset(interface, 0, tmp);
 	buffer += config->bLength;
 	size -= config->bLength;
 
@@ -333,19 +343,20 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 		if (len) {
 			/* FIXME: We should realloc and append here */
 			if (!config->extralen) {
-				config->extra = malloc(len);
-				if (!config->extra) {
+				unsigned char *extra = malloc(len);
+				config->extra = extra;
+				if (!extra) {
 					config->extralen = 0;
 					/* FIXME will leak memory */
 					return -1;
 				}
 
-				memcpy(config->extra, begin, len);
+				memcpy(extra, begin, len);
 				config->extralen = len;
 			}
 		}
 
-		r = parse_interface(config->interface + i, buffer, size);
+		r = parse_interface(interface + i, buffer, size);
 		if (r < 0)
 			return r;
 
@@ -361,7 +372,7 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
  * \param dev the device
  * \returns the USB device descriptor
  */
-API_EXPORTED struct libusb_device_descriptor *libusb_get_device_descriptor(
+API_EXPORTED const struct libusb_device_descriptor *libusb_get_device_descriptor(
 	struct libusb_device *dev)
 {
 	return &dev->desc;
@@ -372,7 +383,7 @@ API_EXPORTED struct libusb_device_descriptor *libusb_get_device_descriptor(
  * \param dev the device
  * \returns the USB configuration descriptor
  */
-API_EXPORTED struct libusb_config_descriptor *libusb_get_config_descriptor(
+API_EXPORTED const struct libusb_config_descriptor *libusb_get_config_descriptor(
 	struct libusb_device *dev)
 {
 	return dev->config;

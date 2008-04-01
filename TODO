@@ -6,15 +6,12 @@ error codes
 fixme review
 review functionality missing over 0.1
 endianness of control setup, issues when resubmitting transfers
-make libusb_get_pollfds return const?
 doxygen warnings
-make descriptor things const?
 isochronous sync I/O?
 
 1.0 API style/naming points to reconsider
 =========================================
 typedef _cb or _cb_fn or _cb_t?
-typedef as-is or pointers? libusb_dev_t rather than libusb_dev *?
 
 for 1.1 or future
 ==================
