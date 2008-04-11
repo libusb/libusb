@@ -283,6 +283,8 @@ struct usbi_os_backend {
 	size_t transfer_priv_size;
 
 	/* number of additional bytes for os_priv for each iso packet */
+	/* FIXME: linux can't use this any more. if other OS's cannot either,
+	 * then remove this */
 	size_t add_iso_packet_size;
 };
 

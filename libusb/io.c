@@ -799,6 +799,7 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	uint8_t flags;
 
+	list_del(&itransfer->list);
 	if (status == LIBUSB_TRANSFER_SILENT_COMPLETION)
 		return;
 
