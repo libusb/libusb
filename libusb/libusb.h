@@ -827,7 +827,7 @@ static inline void libusb_fill_iso_transfer(struct libusb_transfer *transfer,
 {
 	transfer->dev_handle = dev_handle;
 	transfer->endpoint = endpoint;
-	transfer->endpoint_type = LIBUSB_ENDPOINT_TYPE_BULK;
+	transfer->endpoint_type = LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS;
 	transfer->timeout = timeout;
 	transfer->buffer = buffer;
 	transfer->length = length;
