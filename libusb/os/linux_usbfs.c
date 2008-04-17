@@ -756,7 +756,7 @@ static int cancel_control_transfer(struct usbi_transfer *itransfer)
 
 	tpriv->reap_action = CANCELLED;
 	r = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, tpriv->urbs);
-	if (r == -ENOENT) {
+	if (r == -EINVAL) {
 		usbi_dbg("URB not found --> assuming ready to be reaped");
 		return 0;
 	} else if (r != 0) {
