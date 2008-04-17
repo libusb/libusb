@@ -21,6 +21,7 @@
 #include <config.h>
 #include <errno.h>
 #include <poll.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -32,11 +33,12 @@
 
 #include "libusbi.h"
 
-/* this is a list of in-flight rb_handles, sorted by timeout expiration.
+/* this is a list of in-flight transfer handles, sorted by timeout expiration.
  * URBs to timeout the soonest are placed at the beginning of the list, URBs
  * that will time out later are placed after, and urbs with infinite timeout
  * are always placed at the very end. */
 static struct list_head flying_transfers;
+static pthread_mutex_t flying_transfers_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* list of poll fd's */
 static struct list_head pollfds;
@@ -585,17 +587,19 @@ static void add_to_flying_list(struct usbi_transfer *transfer)
 {
 	struct usbi_transfer *cur;
 	struct timeval *timeout = &transfer->timeout;
+	
+	pthread_mutex_lock(&flying_transfers_lock);
 
 	/* if we have no other flying transfers, start the list with this one */
 	if (list_empty(&flying_transfers)) {
 		list_add(&transfer->list, &flying_transfers);
-		return;
+		goto out;
 	}
 
 	/* if we have infinite timeout, append to end of list */
 	if (!timerisset(timeout)) {
 		list_add_tail(&transfer->list, &flying_transfers);
-		return;
+		goto out;
 	}
 
 	/* otherwise, find appropriate place in list */
@@ -607,12 +611,14 @@ static void add_to_flying_list(struct usbi_transfer *transfer)
 				(cur_tv->tv_sec == timeout->tv_sec &&
 					cur_tv->tv_usec > timeout->tv_usec)) {
 			list_add_tail(&transfer->list, &cur->list);
-			return;
+			goto out;
 		}
 	}
 
 	/* otherwise we need to be inserted at the end */
 	list_add_tail(&transfer->list, &flying_transfers);
+out:
+	pthread_mutex_unlock(&flying_transfers_lock);
 }
 
 static int submit_transfer(struct usbi_transfer *itransfer)
@@ -852,11 +858,6 @@ void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
 
 static void handle_timeout(struct usbi_transfer *itransfer)
 {
-	/* handling timeouts is tricky, as we may race with the kernel: we may
-	 * detect a timeout racing with the condition that the urb has actually
-	 * completed. we asynchronously cancel the URB and report timeout
-	 * to the user when the URB cancellation completes (or not at all if the
-	 * URB actually gets delivered as per this race) */
 	struct libusb_transfer *transfer =
 		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	int r;
@@ -872,15 +873,16 @@ static int handle_timeouts(void)
 	struct timespec systime_ts;
 	struct timeval systime;
 	struct usbi_transfer *transfer;
-	int r;
+	int r = 0;
 
+	pthread_mutex_lock(&flying_transfers_lock);
 	if (list_empty(&flying_transfers))
-		return 0;
+		goto out;
 
 	/* get current time */
 	r = clock_gettime(CLOCK_MONOTONIC, &systime_ts);
 	if (r < 0)
-		return r;
+		goto out;
 
 	TIMESPEC_TO_TIMEVAL(&systime, &systime_ts);
 
@@ -891,7 +893,7 @@ static int handle_timeouts(void)
 
 		/* if we've reached transfers of infinite timeout, we're all done */
 		if (!timerisset(cur_tv))
-			return 0;
+			goto out;
 
 		/* ignore timeouts we've already handled */
 		if (transfer->flags & USBI_TRANSFER_TIMED_OUT)
@@ -901,13 +903,15 @@ static int handle_timeouts(void)
 		if ((cur_tv->tv_sec > systime.tv_sec) ||
 				(cur_tv->tv_sec == systime.tv_sec &&
 					cur_tv->tv_usec > systime.tv_usec))
-			return 0;
+			goto out;
 	
 		/* otherwise, we've got an expired timeout to handle */
 		handle_timeout(transfer);
 	}
 
-	return 0;
+out:
+	pthread_mutex_unlock(&flying_transfers_lock);
+	return r;
 }
 
 static int handle_events(struct timeval *tv)
@@ -1057,7 +1061,9 @@ API_EXPORTED int libusb_get_next_timeout(struct timeval *tv)
 	int r;
 	int found = 0;
 
+	pthread_mutex_lock(&flying_transfers_lock);
 	if (list_empty(&flying_transfers)) {
+		pthread_mutex_unlock(&flying_transfers_lock);
 		usbi_dbg("no URBs, no timeout!");
 		return 0;
 	}
@@ -1069,6 +1075,7 @@ API_EXPORTED int libusb_get_next_timeout(struct timeval *tv)
 			break;
 		}
 	}
+	pthread_mutex_unlock(&flying_transfers_lock);
 
 	if (!found) {
 		usbi_dbg("all URBs have already been processed for timeouts");

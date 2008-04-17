@@ -8,7 +8,7 @@ if OS_LINUX
 OS_SRC = $(LINUX_USBFS_SRC)
 endif
 
-libusb_1_0_la_CFLAGS = -fvisibility=hidden $(AM_CFLAGS)
+libusb_1_0_la_CFLAGS = -fvisibility=hidden $(AM_CFLAGS) -pthread
 libusb_1_0_la_SOURCES = libusbi.h core.c descriptor.c io.c sync.c $(OS_SRC)
 libusb_1_0_la_LIBADD = -lrt
 
