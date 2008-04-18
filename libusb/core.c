@@ -37,7 +37,10 @@ const struct usbi_os_backend * const usbi_backend = &linux_usbfs_backend;
 #endif
 
 static struct list_head usb_devs;
+static pthread_mutex_t usb_devs_lock = PTHREAD_MUTEX_INITIALIZER;
+
 struct list_head usbi_open_devs;
+pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * \mainpage libusb-1.0 API Reference
@@ -237,20 +240,28 @@ struct libusb_device *usbi_alloc_device(unsigned long session_id)
 
 	dev->refcnt = 1;
 	dev->session_data = session_id;
-	list_add(&dev->list, &usb_devs);
 	memset(&dev->os_priv, 0, priv_size);
+
+	pthread_mutex_lock(&usb_devs_lock);
+	list_add(&dev->list, &usb_devs);
+	pthread_mutex_unlock(&usb_devs_lock);
 	return dev;
 }
 
 struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id)
 {
 	struct libusb_device *dev;
+	struct libusb_device *ret = NULL;
 
+	pthread_mutex_lock(&usb_devs_lock);
 	list_for_each_entry(dev, &usb_devs, list)
-		if (dev->session_data == session_id)
-			return dev;
+		if (dev->session_data == session_id) {
+			ret = dev;
+			break;
+		}
+	pthread_mutex_unlock(&usb_devs_lock);
 
-	return NULL;
+	return ret;
 }
 
 /** @ingroup dev
@@ -354,7 +365,10 @@ API_EXPORTED void libusb_device_unref(struct libusb_device *dev)
 		if (usbi_backend->destroy_device)
 			usbi_backend->destroy_device(dev);
 
+		pthread_mutex_lock(&usb_devs_lock);
 		list_del(&dev->list);
+		pthread_mutex_unlock(&usb_devs_lock);
+
 		if (dev->config)
 			free(dev->config);
 		free(dev);
@@ -392,7 +406,9 @@ API_EXPORTED struct libusb_device_handle *libusb_open(struct libusb_device *dev)
 		return NULL;
 	}
 
+	pthread_mutex_lock(&usbi_open_devs_lock);
 	list_add(&handle->list, &usbi_open_devs);
+	pthread_mutex_unlock(&usbi_open_devs_lock);
 	return handle;
 }
 
@@ -460,7 +476,10 @@ API_EXPORTED void libusb_close(struct libusb_device_handle *dev_handle)
 		return;
 	usbi_dbg("");
 
+	pthread_mutex_lock(&usbi_open_devs_lock);
 	list_del(&dev_handle->list);
+	pthread_mutex_unlock(&usbi_open_devs_lock);
+
 	do_close(dev_handle);
 	free(dev_handle);
 }
@@ -545,12 +564,16 @@ API_EXPORTED void libusb_exit(void)
 {
 	struct libusb_device_handle *devh;
 	usbi_dbg("");
+
+	pthread_mutex_lock(&usbi_open_devs_lock);
 	if (!list_empty(&usbi_open_devs)) {
 		usbi_dbg("naughty app left some devices open!\n");
 		list_for_each_entry(devh, &usbi_open_devs, list)
 			do_close(devh);
 		/* FIXME where do the open handles get freed? */
 	}
+	pthread_mutex_unlock(&usbi_open_devs_lock);
+
 	if (usbi_backend->exit)
 		usbi_backend->exit();
 }

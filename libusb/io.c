@@ -624,12 +624,14 @@ out:
 
 static int submit_transfer(struct usbi_transfer *itransfer)
 {
-	int r = usbi_backend->submit_transfer(itransfer);
-	if (r < 0)
-		return r;
-
+	int r;
+	
 	add_to_flying_list(itransfer);
-	return 0;
+	r = usbi_backend->submit_transfer(itransfer);
+	if (r < 0)
+		list_del(&itransfer->list);
+
+	return r;
 }
 
 /** \ingroup asyncio

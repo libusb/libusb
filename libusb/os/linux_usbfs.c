@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1036,8 +1037,9 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 static int op_handle_events(fd_set *readfds, fd_set *writefds)
 {
 	struct libusb_device_handle *handle;
-	int r;
+	int r = 0;
 
+	pthread_mutex_lock(&usbi_open_devs_lock);
 	list_for_each_entry(handle, &usbi_open_devs, list) {
 		struct linux_device_handle_priv *hpriv = __device_handle_priv(handle);
 		if (!FD_ISSET(hpriv->fd, writefds))
@@ -1046,10 +1048,13 @@ static int op_handle_events(fd_set *readfds, fd_set *writefds)
 		if (r == -1 && errno == EAGAIN)
 			continue;
 		if (r < 0)
-			return r;
+			goto out;
 	}
 
-	return 0;
+	r = 0;
+out:
+	pthread_mutex_unlock(&usbi_open_devs_lock);
+	return r;
 }
 
 const struct usbi_os_backend linux_usbfs_backend = {

@@ -24,6 +24,7 @@
 #include <config.h>
 
 #include <endian.h>
+#include <pthread.h>
 #include <stddef.h>
 #include <sys/select.h>
 #include <time.h>
@@ -206,6 +207,7 @@ struct usb_descriptor_header {
 /* shared data and functions */
 
 extern struct list_head usbi_open_devs;
+extern pthread_mutex_t usbi_open_devs_lock;
 
 void usbi_io_init(void);
 
