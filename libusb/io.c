@@ -806,7 +806,10 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	uint8_t flags;
 
+	pthread_mutex_lock(&flying_transfers_lock);
 	list_del(&itransfer->list);
+	pthread_mutex_unlock(&flying_transfers_lock);
+
 	if (status == LIBUSB_TRANSFER_SILENT_COMPLETION)
 		return;
 
