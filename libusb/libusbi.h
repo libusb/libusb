@@ -143,8 +143,12 @@ void usbi_log(enum usbi_log_level, const char *function, const char *format, ...
 #define usbi_err(fmt...) _usbi_log(LOG_LEVEL_ERROR, fmt)
 
 struct libusb_device {
-	struct list_head list;
+	/* lock protects refcnt, everything else is finalized at initialization
+	 * time */
+	pthread_mutex_t lock;
 	int refcnt;
+
+	struct list_head list;
 	unsigned long session_data;
 	struct libusb_device_descriptor desc;
 	struct libusb_config_descriptor *config;

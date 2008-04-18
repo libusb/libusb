@@ -235,7 +235,13 @@ struct libusb_device *usbi_alloc_device(unsigned long session_id)
 {
 	size_t priv_size = usbi_backend->device_priv_size;
 	struct libusb_device *dev = malloc(sizeof(*dev) + priv_size);
+	int r;
+
 	if (!dev)
+		return NULL;
+
+	r = pthread_mutex_init(&dev->lock, NULL);
+	if (r)
 		return NULL;
 
 	dev->refcnt = 1;
@@ -344,7 +350,9 @@ API_EXPORTED void libusb_free_device_list(struct libusb_device **list,
  */
 API_EXPORTED struct libusb_device *libusb_device_ref(struct libusb_device *dev)
 {
+	pthread_mutex_lock(&dev->lock);
 	dev->refcnt++;
+	pthread_mutex_unlock(&dev->lock);
 	return dev;
 }
 
@@ -355,10 +363,16 @@ API_EXPORTED struct libusb_device *libusb_device_ref(struct libusb_device *dev)
  */
 API_EXPORTED void libusb_device_unref(struct libusb_device *dev)
 {
+	int refcnt;
+
 	if (!dev)
 		return;
 
-	if (--dev->refcnt == 0) {
+	pthread_mutex_lock(&dev->lock);
+	refcnt = --dev->refcnt;
+	pthread_mutex_unlock(&dev->lock);
+
+	if (refcnt == 0) {
 		usbi_dbg("destroy device %04x:%04x", dev->desc.idVendor,
 			dev->desc.idProduct);
 
