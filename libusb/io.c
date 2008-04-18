@@ -42,6 +42,7 @@ static pthread_mutex_t flying_transfers_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* list of poll fd's */
 static struct list_head pollfds;
+static pthread_mutex_t pollfds_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* user callbacks for pollfd changes */
 static libusb_pollfd_added_cb fd_added_cb = NULL;
@@ -944,6 +945,7 @@ static int handle_events(struct timeval *tv)
 
 	FD_ZERO(&readfds);
 	FD_ZERO(&writefds);
+	pthread_mutex_lock(&pollfds_lock);
 	list_for_each_entry(ipollfd, &pollfds, list) {
 		struct libusb_pollfd *pollfd = &ipollfd->pollfd;
 		int fd = pollfd->fd;
@@ -958,6 +960,7 @@ static int handle_events(struct timeval *tv)
 		if (fd > maxfd)
 			maxfd = fd;
 	}
+	pthread_mutex_unlock(&pollfds_lock);
 
 	if (have_readfds)
 		_readfds = &readfds;
@@ -1134,7 +1137,9 @@ int usbi_add_pollfd(int fd, short events)
 	usbi_dbg("add fd %d events %d", fd, events);
 	ipollfd->pollfd.fd = fd;
 	ipollfd->pollfd.events = events;
+	pthread_mutex_lock(&pollfds_lock);
 	list_add(&ipollfd->list, &pollfds);
+	pthread_mutex_unlock(&pollfds_lock);
 
 	if (fd_added_cb)
 		fd_added_cb(fd, events);
@@ -1147,6 +1152,7 @@ void usbi_remove_pollfd(int fd)
 	int found = 0;
 
 	usbi_dbg("remove fd %d", fd);
+	pthread_mutex_lock(&pollfds_lock);
 	list_for_each_entry(ipollfd, &pollfds, list)
 		if (ipollfd->pollfd.fd == fd) {
 			found = 1;
@@ -1155,10 +1161,12 @@ void usbi_remove_pollfd(int fd)
 
 	if (!found) {
 		usbi_err("couldn't find fd %d to remove", fd);
+		pthread_mutex_unlock(&pollfds_lock);
 		return;
 	}
 
 	list_del(&ipollfd->list);
+	pthread_mutex_unlock(&pollfds_lock);
 	free(ipollfd);
 	if (fd_removed_cb)
 		fd_removed_cb(fd);
@@ -1176,22 +1184,25 @@ void usbi_remove_pollfd(int fd)
  */
 API_EXPORTED const struct libusb_pollfd **libusb_get_pollfds(void)
 {
-	struct libusb_pollfd **ret;
+	struct libusb_pollfd **ret = NULL;
 	struct usbi_pollfd *ipollfd;
 	size_t i = 0;
 	size_t cnt = 0;
 
+	pthread_mutex_lock(&pollfds_lock);
 	list_for_each_entry(ipollfd, &pollfds, list)
 		cnt++;
 
 	ret = calloc(cnt + 1, sizeof(struct libusb_pollfd *));
 	if (!ret)
-		return NULL;
+		goto out;
 
 	list_for_each_entry(ipollfd, &pollfds, list)
 		ret[i++] = (struct libusb_pollfd *) ipollfd;
 	ret[cnt] = NULL;
 
+out:
+	pthread_mutex_unlock(&pollfds_lock);
 	return (const struct libusb_pollfd **) ret;
 }
 
