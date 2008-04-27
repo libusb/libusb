@@ -993,11 +993,10 @@ static int handle_events(struct timeval *tv)
 	}
 
 	r = usbi_backend->handle_events(_readfds, _writefds);
-	if (r < 0)
-		return r;
+	if (r)
+		usbi_err("backend handle_events failed with error %d", r);
 
-	/* FIXME check return value? */
-	return handle_timeouts();
+	return r;
 }
 
 /** \ingroup poll
