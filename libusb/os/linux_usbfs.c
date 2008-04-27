@@ -731,17 +731,17 @@ static int op_submit_transfer(struct usbi_transfer *itransfer)
 	struct libusb_transfer *transfer =
 		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
-	switch (transfer->endpoint_type) {
-	case LIBUSB_ENDPOINT_TYPE_CONTROL:
+	switch (transfer->type) {
+	case LIBUSB_TRANSFER_TYPE_CONTROL:
 		return submit_control_transfer(itransfer);
-	case LIBUSB_ENDPOINT_TYPE_BULK:
+	case LIBUSB_TRANSFER_TYPE_BULK:
 		return submit_bulk_transfer(itransfer, USBFS_URB_TYPE_BULK);
-	case LIBUSB_ENDPOINT_TYPE_INTERRUPT:
+	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 		return submit_bulk_transfer(itransfer, USBFS_URB_TYPE_INTERRUPT);
-	case LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS:
+	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		return submit_iso_transfer(itransfer);
 	default:
-		usbi_err("unknown endpoint type %d", transfer->endpoint_type);
+		usbi_err("unknown endpoint type %d", transfer->type);
 		return -EINVAL;
 	}
 }
@@ -814,18 +814,18 @@ static int op_cancel_transfer(struct usbi_transfer *itransfer)
 	struct libusb_transfer *transfer =
 		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
-	switch (transfer->endpoint_type) {
-	case LIBUSB_ENDPOINT_TYPE_CONTROL:
+	switch (transfer->type) {
+	case LIBUSB_TRANSFER_TYPE_CONTROL:
 		return cancel_control_transfer(itransfer);
-	case LIBUSB_ENDPOINT_TYPE_BULK:
-	case LIBUSB_ENDPOINT_TYPE_INTERRUPT:
+	case LIBUSB_TRANSFER_TYPE_BULK:
+	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 		cancel_bulk_transfer(itransfer);
 		return 0;
-	case LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS:
+	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		cancel_iso_transfer(itransfer);
 		return 0;
 	default:
-		usbi_err("unknown endpoint type %d", transfer->endpoint_type);
+		usbi_err("unknown endpoint type %d", transfer->type);
 		return -EINVAL;
 	}
 }
@@ -1020,16 +1020,16 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 	usbi_dbg("urb type=%d status=%d transferred=%d", urb->type, urb->status,
 		urb->actual_length);
 
-	switch (transfer->endpoint_type) {
-	case LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS:
+	switch (transfer->type) {
+	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		return handle_iso_completion(itransfer, urb);
-	case LIBUSB_ENDPOINT_TYPE_BULK:
-	case LIBUSB_ENDPOINT_TYPE_INTERRUPT:
+	case LIBUSB_TRANSFER_TYPE_BULK:
+	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 		return handle_bulk_completion(itransfer, urb);
-	case LIBUSB_ENDPOINT_TYPE_CONTROL:
+	case LIBUSB_TRANSFER_TYPE_CONTROL:
 		return handle_control_completion(itransfer, urb);
 	default:
-		usbi_err("unrecognised endpoint type %x", transfer->endpoint_type);
+		usbi_err("unrecognised endpoint type %x", transfer->type);
 		return -EINVAL;
 	}
 }

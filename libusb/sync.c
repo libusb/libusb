@@ -135,7 +135,7 @@ static void bulk_transfer_cb(struct libusb_transfer *transfer)
 
 static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *buffer, int length,
-	int *transferred, unsigned int timeout, unsigned char endpoint_type)
+	int *transferred, unsigned int timeout, unsigned char type)
 {
 	struct libusb_transfer *transfer = libusb_alloc_transfer(0);
 	int completed = 0;
@@ -146,7 +146,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 
 	libusb_fill_bulk_transfer(transfer, dev_handle, endpoint, buffer, length,
 		bulk_transfer_cb, &completed, timeout);
-	transfer->endpoint_type = endpoint_type;
+	transfer->type = type;
 
 	r = libusb_submit_transfer(transfer);
 	if (r < 0) {
@@ -224,7 +224,7 @@ API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
 	unsigned int timeout)
 {
 	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
-		transferred, timeout, LIBUSB_ENDPOINT_TYPE_BULK);
+		transferred, timeout, LIBUSB_TRANSFER_TYPE_BULK);
 }
 
 /** \ingroup syncio
@@ -269,6 +269,6 @@ API_EXPORTED int libusb_interrupt_transfer(
 	unsigned char *data, int length, int *transferred, unsigned int timeout)
 {
 	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
-		transferred, timeout, LIBUSB_ENDPOINT_TYPE_INTERRUPT);
+		transferred, timeout, LIBUSB_TRANSFER_TYPE_INTERRUPT);
 }
 

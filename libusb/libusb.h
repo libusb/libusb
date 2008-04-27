@@ -122,25 +122,24 @@ enum libusb_endpoint_direction {
 	LIBUSB_ENDPOINT_OUT = 0x00,
 };
 
-/* FIXME: 9.6.6 calls these "transfer types", not endpoint types. */
-#define LIBUSB_ENDPOINT_TYPE_MASK			0x03    /* in bmAttributes */
+#define LIBUSB_TRANSFER_TYPE_MASK			0x03    /* in bmAttributes */
 
 /** \ingroup desc
  * Endpoint transfer type. Values for bits 0:1 of the
  * \ref libusb_endpoint_descriptor::bmAttributes "endpoint attributes" field.
  */
-enum libusb_endpoint_type {
+enum libusb_transfer_type {
 	/** Control endpoint */
-	LIBUSB_ENDPOINT_TYPE_CONTROL = 0,
+	LIBUSB_TRANSFER_TYPE_CONTROL = 0,
 
 	/** Isochronous endpoint */
-	LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS = 1,
+	LIBUSB_TRANSFER_TYPE_ISOCHRONOUS = 1,
 
 	/** Bulk endpoint */
-	LIBUSB_ENDPOINT_TYPE_BULK = 2,
+	LIBUSB_TRANSFER_TYPE_BULK = 2,
 
 	/** Interrupt endpoint */
-	LIBUSB_ENDPOINT_TYPE_INTERRUPT = 3,
+	LIBUSB_TRANSFER_TYPE_INTERRUPT = 3,
 };
 
 /** Standard requests, as defined in table 9-3 of the USB2 specifications */
@@ -334,7 +333,7 @@ struct libusb_endpoint_descriptor {
 
 	/** Attributes which apply to the endpoint when it is configured using
 	 * the bConfigurationValue. Bits 0:1 determine the transfer type and
-	 * correspond to \ref libusb_endpoint_type. Bits 2:3 are only used for
+	 * correspond to \ref libusb_transfer_type. Bits 2:3 are only used for
 	 * isochronous endpoints and correspond to \ref libusb_iso_sync_type.
 	 * Bits 4:5 are also only used for isochronous endpoints and correspond to
 	 * \ref libusb_iso_usage_type. Bits 6:7 are reserved.
@@ -555,8 +554,8 @@ struct libusb_transfer {
 	/** Address of the endpoint where this transfer will be sent. */
 	unsigned char endpoint;
 
-	/** Type of the endpoint from \ref libusb_endpoint_type */
-	unsigned char endpoint_type;
+	/** Type of the endpoint from \ref libusb_transfer_type */
+	unsigned char type;
 
 	/** Timeout for this transfer in millseconds. A value of 0 indicates no
 	 * timeout. */
@@ -736,7 +735,7 @@ static inline void libusb_fill_control_transfer(
 	struct libusb_control_setup *setup = (struct libusb_control_setup *) buffer;
 	transfer->dev_handle = dev_handle;
 	transfer->endpoint = 0;
-	transfer->endpoint_type = LIBUSB_ENDPOINT_TYPE_CONTROL;
+	transfer->type = LIBUSB_TRANSFER_TYPE_CONTROL;
 	transfer->timeout = timeout;
 	transfer->buffer = buffer;
 	if (setup)
@@ -765,7 +764,7 @@ static inline void libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
 {
 	transfer->dev_handle = dev_handle;
 	transfer->endpoint = endpoint;
-	transfer->endpoint_type = LIBUSB_ENDPOINT_TYPE_BULK;
+	transfer->type = LIBUSB_TRANSFER_TYPE_BULK;
 	transfer->timeout = timeout;
 	transfer->buffer = buffer;
 	transfer->length = length;
@@ -793,7 +792,7 @@ static inline void libusb_fill_interrupt_transfer(
 {
 	transfer->dev_handle = dev_handle;
 	transfer->endpoint = endpoint;
-	transfer->endpoint_type = LIBUSB_ENDPOINT_TYPE_INTERRUPT;
+	transfer->type = LIBUSB_TRANSFER_TYPE_INTERRUPT;
 	transfer->timeout = timeout;
 	transfer->buffer = buffer;
 	transfer->length = length;
@@ -822,7 +821,7 @@ static inline void libusb_fill_iso_transfer(struct libusb_transfer *transfer,
 {
 	transfer->dev_handle = dev_handle;
 	transfer->endpoint = endpoint;
-	transfer->endpoint_type = LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS;
+	transfer->type = LIBUSB_TRANSFER_TYPE_ISOCHRONOUS;
 	transfer->timeout = timeout;
 	transfer->buffer = buffer;
 	transfer->length = length;

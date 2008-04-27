@@ -345,9 +345,9 @@ if (r == 0 && actual_length == sizeof(data)) {
  * To perform I/O to an isochronous endpoint, allocate the transfer by calling
  * libusb_alloc_transfer() with an appropriate number of isochronous packets.
  *
- * During filling, set \ref libusb_transfer::endpoint_type "endpoint_type" to
- * \ref libusb_endpoint_type::LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS
- * "LIBUSB_ENDPOINT_TYPE_ISOCHRONOUS", and set
+ * During filling, set \ref libusb_transfer::type "type" to
+ * \ref libusb_transfer_type::LIBUSB_TRANSFER_TYPE_ISOCHRONOUS
+ * "LIBUSB_TRANSFER_TYPE_ISOCHRONOUS", and set
  * \ref libusb_transfer::num_iso_packets "num_iso_packets" to a value less than
  * or equal to the number of packets you requested during allocation.
  * libusb_alloc_transfer() does not set either of these fields for you, given
@@ -656,12 +656,11 @@ static int submit_transfer(struct usbi_transfer *itransfer)
  * The returned transfer is not specially initialized for isochronous I/O;
  * you are still required to set the
  * \ref libusb_transfer::num_iso_packets "num_iso_packets" and
- * \ref libusb_transfer::endpoint_type "endpoint_type" fields accordingly.
+ * \ref libusb_transfer::type "type" fields accordingly.
  *
  * It is safe to allocate a transfer with some isochronous packets and then
  * use it on a non-isochronous endpoint. If you do this, ensure that at time
- * of submission, num_iso_packets is 0 and that endpoint_type is set
- * appropriately.
+ * of submission, num_iso_packets is 0 and that type is set appropriately.
  *
  * \param iso_packets number of isochronous packet descriptors to allocate
  * \returns a newly allocated transfer, or NULL on error
@@ -732,7 +731,7 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 	if (r < 0)
 		return r;
 
-	if (transfer->endpoint_type == LIBUSB_ENDPOINT_TYPE_CONTROL) {
+	if (transfer->type == LIBUSB_TRANSFER_TYPE_CONTROL) {
 		struct libusb_control_setup *setup =
 			(struct libusb_control_setup *) transfer->buffer;
 	
@@ -789,7 +788,7 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	if (status == LIBUSB_TRANSFER_COMPLETED
 			&& transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) {
 		int rqlen = transfer->length;
-		if (transfer->endpoint_type == LIBUSB_ENDPOINT_TYPE_CONTROL)
+		if (transfer->type == LIBUSB_TRANSFER_TYPE_CONTROL)
 			rqlen -= LIBUSB_CONTROL_SETUP_SIZE;
 		if (rqlen != itransfer->transferred) {
 			usbi_dbg("interpreting short transfer as error");
