@@ -772,40 +772,6 @@ API_EXPORTED int libusb_cancel_transfer(struct libusb_transfer *transfer)
 	return r;
 }
 
-/** \ingroup asyncio
- * Cancel a transfer and wait for cancellation completion without invoking
- * the transfer callback. This function will block. 
- *
- * It is undefined behaviour to call this function on a transfer that is
- * already being cancelled or has already completed.
- *
- * \param transfer the transfer to cancel
- * \returns 0 on success
- * \returns non-zero on error
- */
-API_EXPORTED int libusb_cancel_transfer_sync(struct libusb_transfer *transfer)
-{
-	struct usbi_transfer *itransfer =
-		__LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
-	int r;
-
-	usbi_dbg("");
-	r = usbi_backend->cancel_transfer(itransfer);
-	if (r < 0) {
-		usbi_err("cancel transfer failed error %d", r);
-		return r;
-	}
-
-	itransfer->flags |= USBI_TRANSFER_SYNC_CANCELLED;
-	while (itransfer->flags & USBI_TRANSFER_SYNC_CANCELLED) {
-		r = libusb_handle_events();
-		if (r < 0)
-			return r;
-	}
-
-	return 0;
-}
-
 void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status)
 {
@@ -816,9 +782,6 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	pthread_mutex_lock(&flying_transfers_lock);
 	list_del(&itransfer->list);
 	pthread_mutex_unlock(&flying_transfers_lock);
-
-	if (status == LIBUSB_TRANSFER_SILENT_COMPLETION)
-		return;
 
 	if (status == LIBUSB_TRANSFER_COMPLETED
 			&& transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) {
@@ -844,18 +807,6 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 
 void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
 {
-	/* if the URB is being cancelled synchronously, raise cancellation
-	 * completion event by unsetting flag, and ensure that user callback does
-	 * not get called.
-	 */
-	if (transfer->flags & USBI_TRANSFER_SYNC_CANCELLED) {
-		transfer->flags &= ~USBI_TRANSFER_SYNC_CANCELLED;
-		usbi_dbg("detected sync. cancel");
-		usbi_handle_transfer_completion(transfer,
-			LIBUSB_TRANSFER_SILENT_COMPLETION);
-		return;
-	}
-
 	/* if the URB was cancelled due to timeout, report timeout to the user */
 	if (transfer->flags & USBI_TRANSFER_TIMED_OUT) {
 		usbi_dbg("detected timeout cancellation");

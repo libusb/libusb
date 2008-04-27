@@ -161,8 +161,7 @@ struct libusb_device_handle {
 	unsigned char os_priv[0];
 };
 
-#define USBI_TRANSFER_SYNC_CANCELLED 		(1<<0)
-#define USBI_TRANSFER_TIMED_OUT	 			(1<<1)
+#define USBI_TRANSFER_TIMED_OUT	 			(1<<0)
 
 /* in-memory transfer layout:
  *

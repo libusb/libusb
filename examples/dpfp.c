@@ -46,8 +46,6 @@ enum {
 };
 
 static int next_state(void);
-static int submit_irq_transfer(void);
-static int submit_img_transfer(void);
 
 enum {
 	STATE_AWAIT_MODE_CHANGE_AWAIT_FINGER_ON = 1,
@@ -285,6 +283,7 @@ static void cb_irq(struct libusb_transfer *transfer)
 	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
 		fprintf(stderr, "irq transfer status %d?\n", transfer->status);
 		do_exit = 2;
+		irq_transfer = NULL;
 		return;
 	}
 
@@ -311,7 +310,7 @@ static void cb_irq(struct libusb_transfer *transfer)
 		}
 		break;
 	}
-	if (submit_irq_transfer() < 0)
+	if (libusb_submit_transfer(irq_transfer) < 0)
 		do_exit = 2;
 }
 
@@ -320,6 +319,7 @@ static void cb_img(struct libusb_transfer *transfer)
 	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
 		fprintf(stderr, "img transfer status %d?\n", transfer->status);
 		do_exit = 2;
+		img_transfer = NULL;
 		return;
 	}
 
@@ -329,31 +329,24 @@ static void cb_img(struct libusb_transfer *transfer)
 		do_exit = 2;
 		return;
 	}
-	if (submit_img_transfer() < 0)
+	if (libusb_submit_transfer(img_transfer) < 0)
 		do_exit = 2;
-}
-
-static int submit_irq_transfer(void)
-{
-	return libusb_submit_transfer(irq_transfer);
-}
-
-static int submit_img_transfer(void)
-{
-	return libusb_submit_transfer(img_transfer);
 }
 
 static int init_capture(void)
 {
 	int r;
 
-	r = submit_irq_transfer();
+	r = libusb_submit_transfer(irq_transfer);
 	if (r < 0)
 		return r;
 
-	r = submit_img_transfer();
+	r = libusb_submit_transfer(img_transfer);
 	if (r < 0) {
-		libusb_cancel_transfer_sync(img_transfer);
+		libusb_cancel_transfer(irq_transfer);
+		while (irq_transfer)
+			if (libusb_handle_events() < 0)
+				break;
 		return r;
 	}
 
@@ -476,13 +469,17 @@ int main(void)
 
 	printf("shutting down...\n");
 
-	r = libusb_cancel_transfer_sync(irq_transfer);
+	r = libusb_cancel_transfer(irq_transfer);
 	if (r < 0)
 		goto out_deinit;
 
-	r = libusb_cancel_transfer_sync(img_transfer);
+	r = libusb_cancel_transfer(img_transfer);
 	if (r < 0)
 		goto out_deinit;
+	
+	while (irq_transfer || img_transfer)
+		if (libusb_handle_events() < 0)
+			break;
 	
 	if (do_exit == 1)
 		r = 0;

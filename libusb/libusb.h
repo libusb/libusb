@@ -495,9 +495,6 @@ typedef struct libusb_device_handle libusb_device_handle;
 /** \ingroup asyncio
  * Transfer status codes */
 enum libusb_transfer_status {
-	/* FIXME: make this internal */
-	LIBUSB_TRANSFER_SILENT_COMPLETION = 0,
-
 	/** Transfer completed without error. Note that this does not indicate
 	 * that the entire amount of requested data was transferred. */
 	LIBUSB_TRANSFER_COMPLETED,
@@ -703,7 +700,6 @@ void libusb_init_transfer(struct libusb_transfer *transfer);
 struct libusb_transfer *libusb_alloc_transfer(int iso_packets);
 int libusb_submit_transfer(struct libusb_transfer *transfer);
 int libusb_cancel_transfer(struct libusb_transfer *transfer);
-int libusb_cancel_transfer_sync(struct libusb_transfer *transfer);
 void libusb_free_transfer(struct libusb_transfer *transfer);
 
 /** \ingroup asyncio
