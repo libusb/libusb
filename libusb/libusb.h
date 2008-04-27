@@ -555,7 +555,6 @@ struct libusb_transfer {
 	/** Address of the endpoint where this transfer will be sent. */
 	unsigned char endpoint;
 
-	/* FIXME can this be inferred from endpoint address bits? */
 	/** Type of the endpoint from \ref libusb_endpoint_type */
 	unsigned char endpoint_type;
 
