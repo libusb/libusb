@@ -177,10 +177,24 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	return r;
 }
 
-/* FIXME: document timeout handling vs URB splitting */
 /** \ingroup syncio
  * Perform a USB bulk transfer. The direction of the transfer is inferred from
  * the direction bits of the endpoint address.
+ *
+ * For bulk reads, the <tt>length</tt> field indicates the maximum length of
+ * data you are expecting to receive. If less data arrives than expected,
+ * this function will return that data, so be sure to check the
+ * <tt>transferred</tt> output parameter.
+ *
+ * You should also check the <tt>transferred</tt> parameter for bulk writes.
+ * Not all of the data may have been written.
+ *
+ * Also check <tt>transferred</tt> when dealing with a timeout error code.
+ * libusb may have to split your transfer into a number of chunks to satisfy
+ * underlying O/S requirements, meaning that the timeout may expire after
+ * the first few chunks have completed. libusb is careful not to lose any data
+ * that may have been transferred; do not assume that timeout conditions
+ * indicate a complete lack of I/O.
  *
  * \param dev_handle a handle for the device to communicate with
  * \param endpoint the address of a valid endpoint to communicate with
@@ -195,7 +209,8 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * value 0.
  *
  * \returns 0 on success (and populates <tt>transferred</tt>)
- * \returns -ETIMEDOUT if the transfer timed out
+ * \returns -ETIMEDOUT if the transfer timed out (and populates
+ * <tt>transferred</tt>)
  * \returns other negative code on error
  */
 API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
@@ -206,10 +221,26 @@ API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
 		transferred, timeout, LIBUSB_ENDPOINT_TYPE_BULK);
 }
 
-/* FIXME: do we need an interval param here? usbfs doesn't expose it? */
 /** \ingroup syncio
  * Perform a USB interrupt transfer. The direction of the transfer is inferred
  * from the direction bits of the endpoint address.
+ *
+ * For interrupt reads, the <tt>length</tt> field indicates the maximum length
+ * of data you are expecting to receive. If less data arrives than expected,
+ * this function will return that data, so be sure to check the
+ * <tt>transferred</tt> output parameter.
+ *
+ * You should also check the <tt>transferred</tt> parameter for interrupt
+ * writes. Not all of the data may have been written.
+ *
+ * Also check <tt>transferred</tt> when dealing with a timeout error code.
+ * libusb may have to split your transfer into a number of chunks to satisfy
+ * underlying O/S requirements, meaning that the timeout may expire after
+ * the first few chunks have completed. libusb is careful not to lose any data
+ * that may have been transferred; do not assume that timeout conditions
+ * indicate a complete lack of I/O.
+ *
+ * The default endpoint bInterval value is used as the polling interval.
  *
  * \param dev_handle a handle for the device to communicate with
  * \param endpoint the address of a valid endpoint to communicate with

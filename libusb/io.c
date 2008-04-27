@@ -332,6 +332,11 @@ if (r == 0 && actual_length == sizeof(data)) {
  * and libusb_control_transfer_get_setup() functions within your transfer
  * callback.
  *
+ * \section asyncintr Considerations for interrupt transfers
+ * 
+ * All interrupt transfers are performed using the polling interval presented
+ * by the bInterval value of the endpoint descriptor.
+ *
  * \section asynciso Considerations for isochronous transfers
  *
  * As isochronous transfers are more complicated than transfers to
