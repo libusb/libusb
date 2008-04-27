@@ -633,8 +633,11 @@ static int submit_transfer(struct usbi_transfer *itransfer)
 	
 	add_to_flying_list(itransfer);
 	r = usbi_backend->submit_transfer(itransfer);
-	if (r < 0)
+	if (r < 0) {
+		pthread_mutex_lock(&flying_transfers_lock);
 		list_del(&itransfer->list);
+		pthread_mutex_unlock(&flying_transfers_lock);
+	}
 
 	return r;
 }
