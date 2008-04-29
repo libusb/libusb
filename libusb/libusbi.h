@@ -224,6 +224,7 @@ void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer);
 int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest);
 int usbi_parse_configuration(struct libusb_config_descriptor *config,
 		unsigned char *buffer);
+void usbi_clear_configurations(struct libusb_device *dev);
 
 /* polling */
 

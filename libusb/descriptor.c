@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -69,6 +70,12 @@ int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest)
 	}
 
 	return sp - source;
+}
+
+static void clear_endpoint(struct libusb_endpoint_descriptor *endpoint)
+{
+	if (endpoint->extra)
+		free((unsigned char *) endpoint->extra);
 }
 
 static int parse_endpoint(struct libusb_endpoint_descriptor *endpoint,
@@ -141,13 +148,37 @@ static int parse_endpoint(struct libusb_endpoint_descriptor *endpoint,
 	endpoint->extra = extra;
 	if (!extra) {
 		endpoint->extralen = 0;
-		return parsed;
+		return -ENOMEM;
 	}
 
 	memcpy(extra, begin, len);
 	endpoint->extralen = len;
 
 	return parsed;
+}
+
+static void clear_interface(struct libusb_interface *interface)
+{
+	int i;
+	int j;
+
+	if (interface->altsetting) {
+		for (i = 0; i < interface->num_altsetting; i++) {
+			struct libusb_interface_descriptor *ifp =
+				(struct libusb_interface_descriptor *)
+				interface->altsetting + i;
+			if (ifp->extra)
+				free((void *) ifp->extra);
+			if (ifp->endpoint) {
+				for (j = 0; j < ifp->bNumEndpoints; j++)
+					clear_endpoint((struct libusb_endpoint_descriptor *)
+						ifp->endpoint + j);
+				free((void *) ifp->endpoint);
+			}
+		}
+		free((void *) interface->altsetting);
+	}
+	
 }
 
 static int parse_interface(struct libusb_interface *interface,
@@ -170,13 +201,18 @@ static int parse_interface(struct libusb_interface *interface,
 		altsetting = realloc(altsetting,
 			sizeof(struct libusb_interface_descriptor) *
 			(interface->num_altsetting + 1));
-		if (!altsetting)
-			return -1;
+		if (!altsetting) {
+			r = -ENOMEM;
+			goto err;
+		}
 		interface->altsetting = altsetting;
 
 		ifp = altsetting + interface->num_altsetting;
 		interface->num_altsetting++;
 		usbi_parse_descriptor(buffer, "bbbbbbbbb", ifp);
+		ifp->extra = NULL;
+		ifp->extralen = 0;
+		ifp->endpoint = NULL;
 
 		/* Skip over the interface */
 		buffer += ifp->bLength;
@@ -190,7 +226,8 @@ static int parse_interface(struct libusb_interface *interface,
 			usbi_parse_descriptor(buffer, "bb", &header);
 			if (header.bLength < 2) {
 				usbi_err("invalid descriptor of length %d", header.bLength);
-				return -1;
+				r = -EINVAL;
+				goto err;
 			}
 
 			/* If we find another "proper" descriptor then we're done */
@@ -208,18 +245,13 @@ static int parse_interface(struct libusb_interface *interface,
 		/* Copy any unknown descriptors into a storage area for */
 		/*  drivers to later parse */
 		len = (int)(buffer - begin);
-		if (!len) {
-			ifp->extra = NULL;
-			ifp->extralen = 0;
-		} else {
-			unsigned char *extra = malloc(len);
-			ifp->extra = extra;
-			if (!extra) {
-				ifp->extralen = 0;
-				/* FIXME will leak memory */
-				return -1;
+		if (len) {
+			ifp->extra = malloc(len);
+			if (!ifp->extra) {
+				r = -ENOMEM;
+				goto err;
 			}
-			memcpy(extra, begin, len);
+			memcpy((unsigned char *) ifp->extra, begin, len);
 			ifp->extralen = len;
 		}
 
@@ -232,8 +264,8 @@ static int parse_interface(struct libusb_interface *interface,
 
 		if (ifp->bNumEndpoints > USB_MAXENDPOINTS) {
 			usbi_err("too many endpoints (%d)", ifp->bNumEndpoints);
-			/* FIXME will leak memory */
-			return -1;
+			r = -EOVERFLOW;
+			goto err;
 		}
 
 		if (ifp->bNumEndpoints > 0) {
@@ -241,9 +273,10 @@ static int parse_interface(struct libusb_interface *interface,
 			tmp = ifp->bNumEndpoints * sizeof(struct libusb_endpoint_descriptor);
 			endpoint = malloc(tmp);
 			ifp->endpoint = endpoint;
-			if (!endpoint)
-				/* FIXME will leak memory? */
-				return -1;      
+			if (!endpoint) {
+				r = -ENOMEM;
+				goto err;
+			}
 
 			memset(endpoint, 0, tmp);
 			for (i = 0; i < ifp->bNumEndpoints; i++) {
@@ -251,21 +284,19 @@ static int parse_interface(struct libusb_interface *interface,
 
 				if (header.bLength > size) {
 					usbi_err("ran out of descriptors parsing");
-					/* FIXME will leak memory */
-					return -1;
+					r = -ENOSPC;
+					goto err;
 				}
 
 				r = parse_endpoint(endpoint + i, buffer, size);
 				if (r < 0)
-					/* FIXME will leak memory */
-					return r;
+					goto err;
 
 				buffer += r;
 				parsed += r;
 				size -= r;
 			}
-		} else
-			ifp->endpoint = NULL;
+		}
 
 		/* We check to see if it's an alternate to this one */
 		ifp = (struct libusb_interface_descriptor *) buffer;
@@ -276,6 +307,29 @@ static int parse_interface(struct libusb_interface *interface,
 	}
 
 	return parsed;
+err:
+	clear_interface(interface);
+	return r;
+}
+
+static void clear_configuration(struct libusb_config_descriptor *config)
+{
+	if (config->interface) {
+		int i;
+		for (i = 0; i < config->bNumInterfaces; i++)
+			clear_interface((struct libusb_interface *)
+				config->interface + i);
+		free((void *) config->interface);
+	}
+	if (config->extra)
+		free((void *) config->extra);
+}
+
+void usbi_clear_configurations(struct libusb_device *dev)
+{
+	int i;
+	for (i = 0; i < dev->desc.bNumConfigurations; i++)
+		clear_configuration(dev->config + i);
 }
 
 int usbi_parse_configuration(struct libusb_config_descriptor *config,
@@ -293,14 +347,14 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 
 	if (config->bNumInterfaces > USB_MAXINTERFACES) {
 		usbi_err("too many interfaces (%d)", config->bNumInterfaces);
-		return -1;
+		return -EOVERFLOW;
 	}
 
 	tmp = config->bNumInterfaces * sizeof(struct libusb_interface);
 	interface = malloc(tmp);
 	config->interface = interface;
 	if (!config->interface)
-		return -1;      
+		return -ENOMEM;
 
 	memset(interface, 0, tmp);
 	buffer += config->bLength;
@@ -322,7 +376,8 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 			if ((header.bLength > size) ||
 					(header.bLength < DESC_HEADER_LENGTH)) {
 				usbi_err("invalid descriptor length of %d", header.bLength);
-				return -1;
+				r = -EIO;
+				goto err;
 			}
 
 			/* If we find another "proper" descriptor then we're done */
@@ -343,28 +398,30 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 		if (len) {
 			/* FIXME: We should realloc and append here */
 			if (!config->extralen) {
-				unsigned char *extra = malloc(len);
-				config->extra = extra;
-				if (!extra) {
-					config->extralen = 0;
-					/* FIXME will leak memory */
-					return -1;
+				config->extra = malloc(len);
+				if (!config->extra) {
+					r = -ENOMEM;
+					goto err;
 				}
 
-				memcpy(extra, begin, len);
+				memcpy((unsigned char *) config->extra, begin, len);
 				config->extralen = len;
 			}
 		}
 
 		r = parse_interface(interface + i, buffer, size);
 		if (r < 0)
-			return r;
+			goto err;
 
 		buffer += r;
 		size -= r;
 	}
 
 	return size;
+
+err:
+	clear_configuration(config);
+	return r;
 }
 
 /** \ingroup desc

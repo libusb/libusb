@@ -383,8 +383,10 @@ API_EXPORTED void libusb_device_unref(struct libusb_device *dev)
 		list_del(&dev->list);
 		pthread_mutex_unlock(&usb_devs_lock);
 
-		if (dev->config)
+		if (dev->config) {
+			usbi_clear_configurations(dev);
 			free(dev->config);
+		}
 		free(dev);
 	}
 }

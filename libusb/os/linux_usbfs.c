@@ -222,9 +222,13 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		}
 
 		r = usbi_parse_configuration(&dev->config[i], bigbuffer);
+		free(bigbuffer);
+		if (r < 0) {
+			usbi_err("parse_configuration failed with code %d", r);
+			goto err;
+		}
 		if (r > 0)
 			usbi_warn("descriptor data still left\n");
-		free(bigbuffer);
 	}
 
 	priv->nodepath = strdup(path);
@@ -240,6 +244,7 @@ err:
 	if (fd)
 		close(fd);
 	if (dev->config) {
+		usbi_clear_configurations(dev);
 		free(dev->config);
 		dev->config = NULL;
 	}
