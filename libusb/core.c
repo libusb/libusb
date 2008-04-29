@@ -282,7 +282,8 @@ struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id)
  *
  * \param list output location for a list of devices. Must be later freed with
  * libusb_free_device_list().
- * \returns the number of devices in the outputted list, or negative on error
+ * \returns the number of devices in the outputted list, or LIBUSB_ERROR_NOMEM
+ * on memory allocation failure.
  */
 API_EXPORTED int libusb_get_device_list(struct libusb_device ***list)
 {
@@ -294,7 +295,7 @@ API_EXPORTED int libusb_get_device_list(struct libusb_device ***list)
 	usbi_dbg("");
 
 	if (!discdevs)
-		return -ENOMEM;
+		return LIBUSB_ERROR_NOMEM;
 
 	r = usbi_backend->get_device_list(&discdevs);
 	if (r < 0)
@@ -304,7 +305,7 @@ API_EXPORTED int libusb_get_device_list(struct libusb_device ***list)
 	len = discdevs->len;
 	ret = malloc(sizeof(void *) * (len + 1));
 	if (!ret) {
-		r = -ENOMEM;
+		r = LIBUSB_ERROR_NOMEM;
 		goto out;
 	}
 
@@ -519,7 +520,7 @@ API_EXPORTED struct libusb_device *libusb_get_device(
  * you wish to use before you can perform I/O on any of the endpoints.
  * \param iface the <tt>bInterfaceNumber</tt> of the interface you wish to claim
  * \param dev a device handle
- * \returns 0 on success, non-zero on error
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
 API_EXPORTED int libusb_claim_interface(struct libusb_device_handle *dev,
 	int iface)
@@ -534,7 +535,7 @@ API_EXPORTED int libusb_claim_interface(struct libusb_device_handle *dev,
  * \param dev a device handle
  * \param iface the <tt>bInterfaceNumber</tt> of the previously-claimed
  * interface
- * \returns 0 on success, non-zero on error
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
 API_EXPORTED int libusb_release_interface(struct libusb_device_handle *dev,
 	int iface)
@@ -554,7 +555,7 @@ API_EXPORTED int libusb_set_interface_altsetting(
 /** \ingroup lib
  * Initialize libusb. This function must be called before calling any other
  * libusb function.
- * \returns 0 on success, non-zero on error
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
 API_EXPORTED int libusb_init(void)
 {
@@ -562,7 +563,7 @@ API_EXPORTED int libusb_init(void)
 
 	if (usbi_backend->init) {
 		int r = usbi_backend->init();
-		if (r < 0)
+		if (r)
 			return r;
 	}
 

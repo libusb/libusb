@@ -627,21 +627,6 @@ out:
 	pthread_mutex_unlock(&flying_transfers_lock);
 }
 
-static int submit_transfer(struct usbi_transfer *itransfer)
-{
-	int r;
-	
-	add_to_flying_list(itransfer);
-	r = usbi_backend->submit_transfer(itransfer);
-	if (r < 0) {
-		pthread_mutex_lock(&flying_transfers_lock);
-		list_del(&itransfer->list);
-		pthread_mutex_unlock(&flying_transfers_lock);
-	}
-
-	return r;
-}
-
 /** \ingroup asyncio
  * Allocate a libusb transfer with a specified number of isochronous packet
  * descriptors. The returned transfer is pre-initialized for you. When the new
@@ -717,8 +702,7 @@ API_EXPORTED void libusb_free_transfer(struct libusb_transfer *transfer)
  * submitted but has not yet completed.
  *
  * \param transfer the transfer to submit
- * \returns 0 on success
- * \returns negative on error
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
 API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 {
@@ -729,7 +713,7 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 	itransfer->transferred = 0;
 	r = calculate_timeout(itransfer);
 	if (r < 0)
-		return r;
+		return LIBUSB_ERROR_OTHER;
 
 	if (transfer->type == LIBUSB_TRANSFER_TYPE_CONTROL) {
 		struct libusb_control_setup *setup =
@@ -743,8 +727,16 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 		setup->wIndex = cpu_to_le16(setup->wIndex);
 		setup->wLength = cpu_to_le16(setup->wLength);
 	}
+	
+	add_to_flying_list(itransfer);
+	r = usbi_backend->submit_transfer(itransfer);
+	if (r) {
+		pthread_mutex_lock(&flying_transfers_lock);
+		list_del(&itransfer->list);
+		pthread_mutex_unlock(&flying_transfers_lock);
+	}
 
-	return submit_transfer(itransfer);
+	return r;
 }
 
 /** \ingroup asyncio
@@ -942,7 +934,7 @@ static int handle_events(struct timeval *tv)
 		return 0;
 	} else if (r < 0) {
 		usbi_err("select failed %d err=%d\n", r, errno);
-		return r;
+		return LIBUSB_ERROR_IO;
 	}
 
 	r = usbi_backend->handle_events(_readfds, _writefds);
@@ -968,8 +960,7 @@ static int handle_events(struct timeval *tv)
  *
  * \param tv the maximum time to block waiting for events, or zero for
  * non-blocking mode
- * \returns 0 on success
- * \returns non-zero on error
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
 API_EXPORTED int libusb_handle_events_timeout(struct timeval *tv)
 {
@@ -983,8 +974,7 @@ API_EXPORTED int libusb_handle_events_timeout(struct timeval *tv)
  * function is blocking or non-blocking, or the maximum timeout, use
  * libusb_handle_events_timeout() instead.
  *
- * \returns 0 on success
- * \returns non-zero on error
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
 API_EXPORTED int libusb_handle_events(void)
 {
@@ -1008,14 +998,15 @@ API_EXPORTED int libusb_handle_events(void)
  * When the timeout has expired, call into libusb_handle_events_timeout()
  * (perhaps in non-blocking mode) so that libusb can handle the timeout.
  *
- * This function may return 0 (success) and an all-zero timeval. If this is
+ * This function may return 1 (success) and an all-zero timeval. If this is
  * the case, it indicates that libusb has a timeout that has already expired
  * so you should call libusb_handle_events_timeout() or similar immediately.
+ * A return code of 0 indicates that there are no pending timeouts.
  *
  * \param tv output location for a relative time against the current
  * clock in which libusb must be called into in order to process timeout events
- * \returns 0 on success
- * \returns non-zero on error
+ * \returns 0 if there are no pending timeouts, 1 if a timeout was returned,
+ * or LIBUSB_ERROR_OTHER on failure
  */
 API_EXPORTED int libusb_get_next_timeout(struct timeval *tv)
 {
@@ -1058,7 +1049,7 @@ API_EXPORTED int libusb_get_next_timeout(struct timeval *tv)
 	r = clock_gettime(CLOCK_MONOTONIC, &cur_ts);
 	if (r < 0) {
 		usbi_err("failed to read monotonic clock, errno=%d", errno);
-		return r;
+		return LIBUSB_ERROR_OTHER;
 	}
 	TIMESPEC_TO_TIMEVAL(&cur_tv, &cur_ts);
 

@@ -128,7 +128,7 @@ static int op_init(void)
 	usbfs_path = find_usbfs_path();
 	if (!usbfs_path) {
 		usbi_err("could not find usbfs");
-		return -ENODEV;
+		return LIBUSB_ERROR_OTHER;
 	}
 	return 0;
 }
@@ -411,18 +411,23 @@ static int op_claim_interface(struct libusb_device_handle *handle, int iface)
 {
 	int fd = __device_handle_priv(handle)->fd;
 	int r = ioctl(fd, IOCTL_USBFS_CLAIMINTF, &iface);
-	if (r < 0)
+	if (r) {
 		usbi_err("claim interface failed, error %d", r);
-	return r;
+		/* FIXME interpret error codes better */
+		return LIBUSB_ERROR_OTHER;
+	}
+	return 0;
 }
 
 static int op_release_interface(struct libusb_device_handle *handle, int iface)
 {
 	int fd = __device_handle_priv(handle)->fd;
 	int r = ioctl(fd, IOCTL_USBFS_RELEASEINTF, &iface);
-	if (r < 0)
+	if (r) {
 		usbi_err("release interface failed, error %d", r);
-	return r;
+		return LIBUSB_ERROR_OTHER;
+	}
+	return 0;
 }
 
 static int op_set_interface(struct libusb_device_handle *handle, int iface,
@@ -435,9 +440,12 @@ static int op_set_interface(struct libusb_device_handle *handle, int iface,
 	setintf.interface = iface;
 	setintf.altsetting = altsetting;
 	r = ioctl(fd, IOCTL_USBFS_SETINTF, &setintf);
-	if (r < 0)
+	if (r) {
 		usbi_err("setintf failed error %d", r);
-	return r;
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	return 0;
 }
 
 static void op_destroy_device(struct libusb_device *dev)
@@ -483,7 +491,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 	alloc_size = num_urbs * sizeof(struct usbfs_urb);
 	urbs = malloc(alloc_size);
 	if (!urbs)
-		return -ENOMEM;
+		return LIBUSB_ERROR_NOMEM;
 	memset(urbs, 0, alloc_size);
 	tpriv->urbs = urbs;
 	tpriv->num_urbs = num_urbs;
@@ -512,7 +520,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 			if (i == 0) {
 				usbi_dbg("first URB failed, easy peasy");
 				free(urbs);
-				return r;
+				return LIBUSB_ERROR_IO;
 			}
 
 			/* if it's not the first URB that failed, the situation is a bit
@@ -588,7 +596,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	alloc_size = num_urbs * sizeof(*urbs);
 	urbs = malloc(alloc_size);
 	if (!urbs)
-		return -ENOMEM;
+		return LIBUSB_ERROR_NOMEM;
 	memset(urbs, 0, alloc_size);
 
 	tpriv->iso_urbs = urbs;
@@ -627,7 +635,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		urb = malloc(alloc_size);
 		if (!urb) {
 			free_iso_urbs(tpriv);
-			return -ENOMEM;
+			return LIBUSB_ERROR_NOMEM;
 		}
 		memset(urb, 0, alloc_size);
 		urbs[i] = urb;
@@ -660,7 +668,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 			if (i == 0) {
 				usbi_dbg("first URB failed, easy peasy");
 				free_iso_urbs(tpriv);
-				return r;
+				return LIBUSB_ERROR_IO;
 			}
 
 			/* if it's not the first URB that failed, the situation is a bit
@@ -708,11 +716,11 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	int r;
 
 	if (transfer->length - LIBUSB_CONTROL_SETUP_SIZE > MAX_CTRL_BUFFER_LENGTH)
-		return -EINVAL;
+		return LIBUSB_ERROR_INVALID_PARAM;
 
 	urb = malloc(sizeof(struct usbfs_urb));
 	if (!urb)
-		return -ENOMEM;
+		return LIBUSB_ERROR_NOMEM;
 	memset(urb, 0, sizeof(struct usbfs_urb));
 	tpriv->urbs = urb;
 	tpriv->reap_action = NORMAL;
@@ -727,8 +735,9 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	if (r < 0) {
 		usbi_err("submiturb failed error %d errno=%d", r, errno);
 		free(urb);
+		return LIBUSB_ERROR_IO;
 	}
-	return r;
+	return 0;
 }
 
 static int op_submit_transfer(struct usbi_transfer *itransfer)
@@ -747,7 +756,7 @@ static int op_submit_transfer(struct usbi_transfer *itransfer)
 		return submit_iso_transfer(itransfer);
 	default:
 		usbi_err("unknown endpoint type %d", transfer->type);
-		return -EINVAL;
+		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 }
 
@@ -765,11 +774,12 @@ static int cancel_control_transfer(struct usbi_transfer *itransfer)
 	if (r == -EINVAL) {
 		usbi_dbg("URB not found --> assuming ready to be reaped");
 		return 0;
-	} else if (r != 0) {
+	} else if (r) {
 		usbi_err("unrecognised DISCARD code %d", r);
+		return LIBUSB_ERROR_OTHER;
 	}
 
-	return r;
+	return 0;
 }
 
 static void cancel_bulk_transfer(struct usbi_transfer *itransfer)
@@ -831,7 +841,7 @@ static int op_cancel_transfer(struct usbi_transfer *itransfer)
 		return 0;
 	default:
 		usbi_err("unknown endpoint type %d", transfer->type);
-		return -EINVAL;
+		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 }
 
@@ -1042,24 +1052,27 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 static int op_handle_events(fd_set *readfds, fd_set *writefds)
 {
 	struct libusb_device_handle *handle;
-	int r = 0;
+	int ret = 0;
 
 	pthread_mutex_lock(&usbi_open_devs_lock);
 	list_for_each_entry(handle, &usbi_open_devs, list) {
 		struct linux_device_handle_priv *hpriv = __device_handle_priv(handle);
+		int r;
+
 		if (!FD_ISSET(hpriv->fd, writefds))
 			continue;
 		r = reap_for_handle(handle);
 		if (r == -1 && errno == EAGAIN)
 			continue;
-		if (r < 0)
+		if (r < 0) {
+			ret = LIBUSB_ERROR_IO;
 			goto out;
+		}
 	}
 
-	r = 0;
 out:
 	pthread_mutex_unlock(&usbi_open_devs_lock);
-	return r;
+	return ret;
 }
 
 const struct usbi_os_backend linux_usbfs_backend = {

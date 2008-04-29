@@ -491,6 +491,15 @@ typedef struct libusb_device libusb_device;
 struct libusb_device_handle;
 typedef struct libusb_device_handle libusb_device_handle;
 
+enum libusb_error {
+	LIBUSB_SUCCESS = 0,
+	LIBUSB_ERROR_IO = -1,
+	LIBUSB_ERROR_INVALID_PARAM = -2,
+	LIBUSB_ERROR_ACCESS = -3,
+	LIBUSB_ERROR_NOMEM = -4,
+	LIBUSB_ERROR_OTHER = -5,
+};
+
 /** \ingroup asyncio
  * Transfer status codes */
 enum libusb_transfer_status {
