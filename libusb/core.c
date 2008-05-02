@@ -79,7 +79,7 @@ pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
  * \code
 // discover devices
 libusb_device **list;
-libusb_device *found;
+libusb_device *found = NULL;
 int cnt = libusb_get_device_list(&list);
 int i = 0;
 if (cnt < 0)
@@ -112,7 +112,7 @@ libusb_free_device_list(list, 1);
  *
  * \section devshandles Devices and device handles
  * libusb has a concept of a USB device, represented by the
- * <tt>libusb_device</tt> opaque type. A device represents a USB device that
+ * \ref libusb_device opaque type. A device represents a USB device that
  * is currently or was previously connected to the system. Using a reference
  * to a device, you can determine certain information about the device (e.g.
  * you can read the descriptor data).
@@ -129,7 +129,7 @@ libusb_free_device_list(list, 1);
  * When you've found a device that you'd like to operate, you must ask
  * libusb to open the device using the libusb_open() function. Assuming
  * success, libusb then returns you a <em>device handle</em>
- * (a <tt>libusb_device_handle</tt> pointer). All "real" I/O operations then
+ * (a \ref libusb_device_handle pointer). All "real" I/O operations then
  * operate on the handle rather than the original device pointer.
  *
  * \section devref Device discovery and reference counting
@@ -163,8 +163,9 @@ libusb_free_device_list(list, 1);
  * freeing the list itself. This combines steps 3 and 4 above.
  *
  * As an implementation detail, libusb_open() actually adds a reference to
- * the device in question. This is because the device is available later
- * through libusb_get_device(). The reference is deleted during libusb_close().
+ * the device in question. This is because the device remains available
+ * through the handle via libusb_get_device(). The reference is deleted during
+ * libusb_close().
  */
 
 /**
@@ -369,7 +370,7 @@ API_EXPORTED uint8_t libusb_get_device_address(libusb_device *dev)
  * \param dev the device to reference
  * \returns the same device
  */
-API_EXPORTED struct libusb_device *libusb_device_ref(libusb_device *dev)
+API_EXPORTED libusb_device *libusb_device_ref(libusb_device *dev)
 {
 	pthread_mutex_lock(&dev->lock);
 	dev->refcnt++;

@@ -486,9 +486,34 @@ struct libusb_control_setup {
 /* libusb */
 
 struct libusb_device;
+struct libusb_device_handle;
+
+/** \ingroup dev
+ * Structure representing a USB device detected on the system. This is an
+ * opaque type for which you are only ever provided with a pointer, usually
+ * originating from libusb_get_device_list().
+ *
+ * Certain operations can be performed on a device, but in order to do any
+ * I/O you will have to first obtain a device handle using libusb_open().
+ *
+ * Devices are reference counted with libusb_device_ref() and
+ * libusb_device_unref(), and are freed when the reference count reaches 0.
+ * New devices presented by libusb_get_device_list() have a reference count of
+ * 1, and libusb_free_device_list() can optionally decrease the reference count
+ * on all devices in the list. libusb_open() adds another reference which is
+ * later destroyed by libusb_close().
+ */
 typedef struct libusb_device libusb_device;
 
-struct libusb_device_handle;
+
+/** \ingroup dev
+ * Structure representing a handle on a USB device. This is an opaque type for
+ * which you are only ever provided with a pointer, usually originating from
+ * libusb_open().
+ *
+ * A device handle is used to perform I/O and other operations. When finished
+ * with a device handle, you should call libusb_close().
+ */
 typedef struct libusb_device_handle libusb_device_handle;
 
 enum libusb_error {
