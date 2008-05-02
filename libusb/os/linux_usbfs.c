@@ -166,7 +166,11 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		usbi_err("read failed ret=%d errno=%d", r, errno);
 		goto err;
 	}
-	/* FIXME: short read handling? */
+	if (r < DEVICE_DESC_LENGTH) {
+		usbi_err("short descriptor read %d/%d", r, DEVICE_DESC_LENGTH);
+		r = -EIO;
+		goto err;
+	}
 
 	usbi_parse_descriptor(raw_desc, "bbWbbbbWWWbbbb", &dev->desc);
 
