@@ -430,7 +430,7 @@ err:
  * \returns the USB device descriptor
  */
 API_EXPORTED const struct libusb_device_descriptor *libusb_get_device_descriptor(
-	struct libusb_device *dev)
+	libusb_device *dev)
 {
 	return &dev->desc;
 }
@@ -441,7 +441,7 @@ API_EXPORTED const struct libusb_device_descriptor *libusb_get_device_descriptor
  * \returns the USB configuration descriptor
  */
 API_EXPORTED const struct libusb_config_descriptor *libusb_get_config_descriptor(
-	struct libusb_device *dev)
+	libusb_device *dev)
 {
 	return dev->config;
 }

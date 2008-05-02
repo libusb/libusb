@@ -285,7 +285,7 @@ struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id)
  * \returns the number of devices in the outputted list, or LIBUSB_ERROR_NOMEM
  * on memory allocation failure.
  */
-API_EXPORTED int libusb_get_device_list(struct libusb_device ***list)
+API_EXPORTED int libusb_get_device_list(libusb_device ***list)
 {
 	struct discovered_devs *discdevs = discovered_devs_alloc();
 	struct libusb_device **ret;
@@ -328,7 +328,7 @@ out:
  * \param list the list to free
  * \param unref_devices whether to unref the devices in the list
  */
-API_EXPORTED void libusb_free_device_list(struct libusb_device **list,
+API_EXPORTED void libusb_free_device_list(libusb_device **list,
 	int unref_devices)
 {
 	if (!list)
@@ -349,7 +349,7 @@ API_EXPORTED void libusb_free_device_list(struct libusb_device **list,
  * \param dev a device
  * \returns the bus number
  */
-API_EXPORTED uint8_t libusb_get_bus_number(struct libusb_device *dev)
+API_EXPORTED uint8_t libusb_get_bus_number(libusb_device *dev)
 {
 	return dev->bus_number;
 }
@@ -359,7 +359,7 @@ API_EXPORTED uint8_t libusb_get_bus_number(struct libusb_device *dev)
  * \param dev a device
  * \returns the device address
  */
-API_EXPORTED uint8_t libusb_get_device_address(struct libusb_device *dev)
+API_EXPORTED uint8_t libusb_get_device_address(libusb_device *dev)
 {
 	return dev->device_address;
 }
@@ -369,7 +369,7 @@ API_EXPORTED uint8_t libusb_get_device_address(struct libusb_device *dev)
  * \param dev the device to reference
  * \returns the same device
  */
-API_EXPORTED struct libusb_device *libusb_device_ref(struct libusb_device *dev)
+API_EXPORTED struct libusb_device *libusb_device_ref(libusb_device *dev)
 {
 	pthread_mutex_lock(&dev->lock);
 	dev->refcnt++;
@@ -382,7 +382,7 @@ API_EXPORTED struct libusb_device *libusb_device_ref(struct libusb_device *dev)
  * causes the reference count to reach zero, the device shall be destroyed.
  * \param dev the device to unreference
  */
-API_EXPORTED void libusb_device_unref(struct libusb_device *dev)
+API_EXPORTED void libusb_device_unref(libusb_device *dev)
 {
 	int refcnt;
 
@@ -423,7 +423,7 @@ API_EXPORTED void libusb_device_unref(struct libusb_device *dev)
  * \param dev the device to open
  * \returns a handle for the device, or NULL on error
  */
-API_EXPORTED struct libusb_device_handle *libusb_open(struct libusb_device *dev)
+API_EXPORTED libusb_device_handle *libusb_open(libusb_device *dev)
 {
 	struct libusb_device_handle *handle;
 	size_t priv_size = usbi_backend->device_handle_priv_size;
@@ -464,7 +464,7 @@ API_EXPORTED struct libusb_device_handle *libusb_open(struct libusb_device *dev)
  * \param product_id the idProduct value to search for
  * \returns a handle for the first found device, or NULL on error or if the
  * device could not be found. */
-API_EXPORTED struct libusb_device_handle *libusb_open_device_with_vid_pid(
+API_EXPORTED libusb_device_handle *libusb_open_device_with_vid_pid(
 	uint16_t vendor_id, uint16_t product_id)
 {
 	struct libusb_device **devs;
@@ -507,7 +507,7 @@ static void do_close(struct libusb_device_handle *dev_handle)
  *
  * \param dev_handle the handle to close
  */
-API_EXPORTED void libusb_close(struct libusb_device_handle *dev_handle)
+API_EXPORTED void libusb_close(libusb_device_handle *dev_handle)
 {
 	if (!dev_handle)
 		return;
@@ -528,8 +528,7 @@ API_EXPORTED void libusb_close(struct libusb_device_handle *dev_handle)
  * \param dev_handle a device handle
  * \returns the underlying device
  */
-API_EXPORTED struct libusb_device *libusb_get_device(
-	struct libusb_device_handle *dev_handle)
+API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
 {
 	return dev_handle->dev;
 }
@@ -542,8 +541,7 @@ API_EXPORTED struct libusb_device *libusb_get_device(
  * \param dev a device handle
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
-API_EXPORTED int libusb_claim_interface(struct libusb_device_handle *dev,
-	int iface)
+API_EXPORTED int libusb_claim_interface(libusb_device_handle *dev, int iface)
 {
 	usbi_dbg("interface %d", iface);
 	return usbi_backend->claim_interface(dev, iface);
@@ -557,16 +555,15 @@ API_EXPORTED int libusb_claim_interface(struct libusb_device_handle *dev,
  * interface
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
-API_EXPORTED int libusb_release_interface(struct libusb_device_handle *dev,
-	int iface)
+API_EXPORTED int libusb_release_interface(libusb_device_handle *dev, int iface)
 {
 	usbi_dbg("interface %d", iface);
 	return usbi_backend->release_interface(dev, iface);
 }
 
 /* FIXME docs */
-API_EXPORTED int libusb_set_interface_altsetting(
-	struct libusb_device_handle *dev, int iface, int altsetting)
+API_EXPORTED int libusb_set_interface_altsetting(libusb_device_handle *dev,
+	int iface, int altsetting)
 {
 	usbi_dbg("interface %d altsetting %d", iface, altsetting);
 	return usbi_backend->set_interface_altsetting(dev, iface, altsetting);
