@@ -148,6 +148,9 @@ struct libusb_device {
 	pthread_mutex_t lock;
 	int refcnt;
 
+	uint8_t bus_number;
+	uint8_t device_address;
+
 	struct list_head list;
 	unsigned long session_data;
 	struct libusb_device_descriptor desc;

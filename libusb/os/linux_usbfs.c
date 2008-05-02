@@ -146,6 +146,8 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 
 	priv->nodepath = NULL;
 	dev->config = NULL;
+	dev->bus_number = busnum;
+	dev->device_address = devaddr;
 
 	snprintf(path, PATH_MAX, "%s/%03d/%03d", usbfs_path, busnum, devaddr);
 	usbi_dbg("%s", path);

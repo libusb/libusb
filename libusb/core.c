@@ -345,6 +345,26 @@ API_EXPORTED void libusb_free_device_list(struct libusb_device **list,
 }
 
 /** \ingroup dev
+ * Get the number of the bus that a device is connected to.
+ * \param dev a device
+ * \returns the bus number
+ */
+API_EXPORTED uint8_t libusb_get_bus_number(struct libusb_device *dev)
+{
+	return dev->bus_number;
+}
+
+/** \ingroup dev
+ * Get the address of the device on the bus it is connected to.
+ * \param dev a device
+ * \returns the device address
+ */
+API_EXPORTED uint8_t libusb_get_device_address(struct libusb_device *dev)
+{
+	return dev->device_address;
+}
+
+/** \ingroup dev
  * Increment the reference count of a device.
  * \param dev the device to reference
  * \returns the same device

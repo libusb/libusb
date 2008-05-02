@@ -617,6 +617,8 @@ const struct libusb_config_descriptor *libusb_get_config_descriptor(
 	libusb_device *dev);
 libusb_device *libusb_device_ref(libusb_device *dev);
 void libusb_device_unref(libusb_device *dev);
+uint8_t libusb_get_bus_number(libusb_device *dev);
+uint8_t libusb_get_device_address(libusb_device *dev);
 
 libusb_device_handle *libusb_open(libusb_device *dev);
 void libusb_close(libusb_device_handle *dev_handle);
