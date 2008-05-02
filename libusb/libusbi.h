@@ -159,6 +159,10 @@ struct libusb_device {
 };
 
 struct libusb_device_handle {
+	/* lock protects claimed_interfaces */
+	pthread_mutex_t lock;
+	unsigned long claimed_interfaces;
+
 	struct list_head list;
 	struct libusb_device *dev;
 	unsigned char os_priv[0];

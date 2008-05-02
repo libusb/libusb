@@ -435,8 +435,14 @@ API_EXPORTED libusb_device_handle *libusb_open(libusb_device *dev)
 	if (!handle)
 		return NULL;
 
+	r = pthread_mutex_init(&handle->lock, NULL);
+	if (r)
+		return NULL;
+
 	handle->dev = libusb_device_ref(dev);
+	handle->claimed_interfaces = 0;
 	memset(&handle->os_priv, 0, priv_size);
+
 	r = usbi_backend->open(handle);
 	if (r < 0) {
 		libusb_device_unref(dev);
@@ -534,40 +540,90 @@ API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
 	return dev_handle->dev;
 }
 
-/* FIXME: what about claiming multiple interfaces? */
 /** \ingroup dev
  * Claim an interface on a given device handle. You must claim the interface
- * you wish to use before you can perform I/O on any of the endpoints.
- * \param iface the <tt>bInterfaceNumber</tt> of the interface you wish to claim
+ * you wish to use before you can perform I/O on any of its endpoints.
+ *
+ * It is legal to attempt to claim an already-claimed interface, in which
+ * case libusb just returns 0 without doing anything.
+ *
  * \param dev a device handle
+ * \param interface_number the <tt>bInterfaceNumber</tt> of the interface you
+ * wish to claim
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
-API_EXPORTED int libusb_claim_interface(libusb_device_handle *dev, int iface)
+API_EXPORTED int libusb_claim_interface(libusb_device_handle *dev,
+	int interface_number)
 {
-	usbi_dbg("interface %d", iface);
-	return usbi_backend->claim_interface(dev, iface);
+	int r = 0;
+
+	usbi_dbg("interface %d", interface_number);
+	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	pthread_mutex_lock(&dev->lock);
+	if (dev->claimed_interfaces & (1 << interface_number))
+		goto out;
+
+	r = usbi_backend->claim_interface(dev, interface_number);
+	if (r == 0)
+		dev->claimed_interfaces |= 1 << interface_number;
+
+out:
+	pthread_mutex_unlock(&dev->lock);
+	return r;
 }
 
 /** \ingroup dev
  * Release an interface previously claimed with libusb_claim_interface(). You
  * should release all claimed interfaces before closing a device handle.
  * \param dev a device handle
- * \param iface the <tt>bInterfaceNumber</tt> of the previously-claimed
- * interface
- * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ * \param interface_number the <tt>bInterfaceNumber</tt> of the
+ * previously-claimed interface
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure.
+ * LIBUSB_ERROR_NOT_FOUND indicates that the interface was not claimed.
  */
-API_EXPORTED int libusb_release_interface(libusb_device_handle *dev, int iface)
+API_EXPORTED int libusb_release_interface(libusb_device_handle *dev,
+	int interface_number)
 {
-	usbi_dbg("interface %d", iface);
-	return usbi_backend->release_interface(dev, iface);
+	int r;
+
+	usbi_dbg("interface %d", interface_number);
+	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	pthread_mutex_lock(&dev->lock);
+	if (!(dev->claimed_interfaces & (1 << interface_number))) {
+		r = LIBUSB_ERROR_NOT_FOUND;
+		goto out;
+	}
+
+	r = usbi_backend->release_interface(dev, interface_number);
+	if (r == 0)
+		dev->claimed_interfaces &= ~(1 << interface_number);
+
+out:
+	pthread_mutex_unlock(&dev->lock);
+	return r;
 }
 
 /* FIXME docs */
 API_EXPORTED int libusb_set_interface_altsetting(libusb_device_handle *dev,
-	int iface, int altsetting)
+	int interface_number, int altsetting)
 {
-	usbi_dbg("interface %d altsetting %d", iface, altsetting);
-	return usbi_backend->set_interface_altsetting(dev, iface, altsetting);
+	usbi_dbg("interface %d altsetting %d", interface_number, altsetting);
+	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	pthread_mutex_lock(&dev->lock);
+	if (!(dev->claimed_interfaces & (1 << interface_number))) {
+		pthread_mutex_unlock(&dev->lock);	
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+	pthread_mutex_unlock(&dev->lock);
+
+	return usbi_backend->set_interface_altsetting(dev, interface_number,
+		altsetting);
 }
 
 /** \ingroup lib

@@ -5,6 +5,8 @@ review functionality missing over 0.1
 endianness of control setup, issues when resubmitting transfers
 doxygen warnings
 serialization of handle_events
+0.1 compat layer
+internal docs for OS porters
 
 1.0 API style/naming points to reconsider
 =========================================
