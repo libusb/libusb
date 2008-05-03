@@ -442,8 +442,12 @@ static int op_claim_interface(struct libusb_device_handle *handle, int iface)
 	int fd = __device_handle_priv(handle)->fd;
 	int r = ioctl(fd, IOCTL_USBFS_CLAIMINTF, &iface);
 	if (r) {
-		usbi_err("claim interface failed, error %d", r);
-		/* FIXME interpret error codes better */
+		if (errno == ENOENT)
+			return LIBUSB_ERROR_NOT_FOUND;
+		else if (errno == EBUSY)
+			return LIBUSB_ERROR_BUSY;
+
+		usbi_err("claim interface failed, error %d errno %d", r, errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 	return 0;
@@ -454,7 +458,7 @@ static int op_release_interface(struct libusb_device_handle *handle, int iface)
 	int fd = __device_handle_priv(handle)->fd;
 	int r = ioctl(fd, IOCTL_USBFS_RELEASEINTF, &iface);
 	if (r) {
-		usbi_err("release interface failed, error %d", r);
+		usbi_err("release interface failed, error %d errno %d", r, errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 	return 0;
@@ -471,7 +475,10 @@ static int op_set_interface(struct libusb_device_handle *handle, int iface,
 	setintf.altsetting = altsetting;
 	r = ioctl(fd, IOCTL_USBFS_SETINTF, &setintf);
 	if (r) {
-		usbi_err("setintf failed error %d", r);
+		if (errno == EINVAL)
+			return LIBUSB_ERROR_NOT_FOUND;
+
+		usbi_err("setintf failed error %d errno %d", r, errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 

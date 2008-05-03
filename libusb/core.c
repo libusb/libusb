@@ -575,7 +575,11 @@ API_EXPORTED int libusb_set_configuration(libusb_device_handle *dev,
  * \param dev a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the interface you
  * wish to claim
- * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if the requested interface does not exist
+ * \returns LIBUSB_ERROR_BUSY if another program or driver has claimed the
+ * interface
+ * \returns a LIBUSB_ERROR code on other failure
  */
 API_EXPORTED int libusb_claim_interface(libusb_device_handle *dev,
 	int interface_number)
@@ -632,11 +636,24 @@ out:
 	return r;
 }
 
-/* FIXME docs */
-API_EXPORTED int libusb_set_interface_altsetting(libusb_device_handle *dev,
-	int interface_number, int altsetting)
+/** \ingroup dev
+ * Activate an alternate setting for an interface. The interface must have
+ * been previously claimed with libusb_claim_interface().
+ *
+ * \param dev a device handle
+ * \param interface_number the <tt>bInterfaceNumber</tt> of the
+ * previously-claimed interface
+ * \param altsetting the <tt>bAlternateSetting</tt> of the alternate setting
+ * to activate
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if the interface was not claimed, or the
+ * requested alternate setting does not exist
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+API_EXPORTED int libusb_set_interface_alt_setting(libusb_device_handle *dev,
+	int interface_number, int alternate_setting)
 {
-	usbi_dbg("interface %d altsetting %d", interface_number, altsetting);
+	usbi_dbg("interface %d altsetting %d", interface_number, alternate_setting);
 	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -648,7 +665,7 @@ API_EXPORTED int libusb_set_interface_altsetting(libusb_device_handle *dev,
 	pthread_mutex_unlock(&dev->lock);
 
 	return usbi_backend->set_interface_altsetting(dev, interface_number,
-		altsetting);
+		alternate_setting);
 }
 
 /** \ingroup lib
