@@ -541,6 +541,31 @@ API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
 }
 
 /** \ingroup dev
+ * Set the active configuration for a device. The operating system may have
+ * already set an active configuration on the device, but for portability
+ * reasons you should use this function to select the configuration you want
+ * before claiming any interfaces.
+ *
+ * If you wish to change to another configuration at some later time, you
+ * must release all claimed interfaces using libusb_release_interface() before
+ * setting a new active configuration.
+ *
+ * \param dev a device handle
+ * \param configuration the bConfigurationValue of the configuration you
+ * wish to activate
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if the requested configuration does not exist
+ * \returns LIBUSB_ERROR_BUSY if interfaces are currently claimed
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+API_EXPORTED int libusb_set_configuration(libusb_device_handle *dev,
+	int configuration)
+{
+	usbi_dbg("configuration %d", configuration);
+	return usbi_backend->set_configuration(dev, configuration);
+}
+
+/** \ingroup dev
  * Claim an interface on a given device handle. You must claim the interface
  * you wish to use before you can perform I/O on any of its endpoints.
  *

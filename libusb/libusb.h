@@ -522,8 +522,9 @@ enum libusb_error {
 	LIBUSB_ERROR_INVALID_PARAM = -2,
 	LIBUSB_ERROR_ACCESS = -3,
 	LIBUSB_ERROR_NOT_FOUND = -4,
-	LIBUSB_ERROR_NO_MEM = -5,
-	LIBUSB_ERROR_OTHER = -6,
+	LIBUSB_ERROR_BUSY = -5,
+	LIBUSB_ERROR_NO_MEM = -6,
+	LIBUSB_ERROR_OTHER = -7,
 };
 
 /** \ingroup asyncio
@@ -648,11 +649,14 @@ uint8_t libusb_get_device_address(libusb_device *dev);
 libusb_device_handle *libusb_open(libusb_device *dev);
 void libusb_close(libusb_device_handle *dev_handle);
 libusb_device *libusb_get_device(libusb_device_handle *dev_handle);
+
+int libusb_set_configuration(libusb_device_handle *dev, int configuration);
 int libusb_claim_interface(libusb_device_handle *dev, int iface);
 int libusb_release_interface(libusb_device_handle *dev, int iface);
 
 libusb_device_handle *libusb_open_device_with_vid_pid(uint16_t vendor_id,
 	uint16_t product_id);
+
 
 int libusb_set_interface_altsetting(libusb_device_handle *dev, int iface,
 	int altsetting);

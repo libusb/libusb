@@ -273,6 +273,8 @@ struct usbi_os_backend {
 	int (*open)(struct libusb_device_handle *handle);
 	void (*close)(struct libusb_device_handle *handle);
 
+	int (*set_configuration)(struct libusb_device_handle *handle, int config);
+
 	int (*claim_interface)(struct libusb_device_handle *handle, int iface);
 	int (*release_interface)(struct libusb_device_handle *handle, int iface);
 

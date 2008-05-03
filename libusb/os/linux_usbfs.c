@@ -421,6 +421,22 @@ static void op_close(struct libusb_device_handle *dev_handle)
 	close(fd);
 }
 
+static int op_set_configuration(struct libusb_device_handle *handle, int config)
+{
+	int fd = __device_handle_priv(handle)->fd;
+	int r = ioctl(fd, IOCTL_USBFS_SETCONFIG, &config);
+	if (r) {
+		if (errno == EINVAL)
+			return LIBUSB_ERROR_NOT_FOUND;
+		else if (errno == EBUSY)
+			return LIBUSB_ERROR_BUSY;
+
+		usbi_err("failed, error %d errno %d", r, errno);
+		return LIBUSB_ERROR_OTHER;
+	}
+	return 0;
+}
+
 static int op_claim_interface(struct libusb_device_handle *handle, int iface)
 {
 	int fd = __device_handle_priv(handle)->fd;
@@ -1096,6 +1112,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.get_device_list = op_get_device_list,
 	.open = op_open,
 	.close = op_close,
+	.set_configuration = op_set_configuration,
 	.claim_interface = op_claim_interface,
 	.release_interface = op_release_interface,
 
