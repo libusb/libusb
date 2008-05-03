@@ -399,8 +399,16 @@ static int op_open(struct libusb_device_handle *handle)
 
 	hpriv->fd = open(dpriv->nodepath, O_RDWR);
 	if (hpriv->fd < 0) {
-		usbi_err("open failed, code %d errno %d", hpriv->fd, errno);
-		return -EIO;
+		if (errno == EACCES) {
+			fprintf(stderr, "libusb couldn't open USB device %s: "
+				"Permission denied.\n"
+				"libusb requires write access to USB device nodes.\n",
+				dpriv->nodepath);
+			return -EACCES;
+		} else {
+			usbi_err("open failed, code %d errno %d", hpriv->fd, errno);
+			return -EIO;
+		}
 	}
 
 	return usbi_add_pollfd(hpriv->fd, POLLOUT);
