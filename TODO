@@ -7,6 +7,7 @@ doxygen warnings
 serialization of handle_events
 0.1 compat layer
 internal docs for OS porters
+passing of "access denied" error code from op_open
 
 1.0 API style/naming points to reconsider
 =========================================

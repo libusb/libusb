@@ -151,8 +151,8 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 
 	snprintf(path, PATH_MAX, "%s/%03d/%03d", usbfs_path, busnum, devaddr);
 	usbi_dbg("%s", path);
-	fd = open(path, O_RDWR);
-	if (!fd) {
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
 		usbi_dbg("open '%s' failed, ret=%d errno=%d", path, fd, errno);
 		/* FIXME this might not be an error if the file has gone away due
 		 * to unplugging */
