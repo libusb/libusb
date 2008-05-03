@@ -307,7 +307,7 @@ static int scan_device(struct discovered_devs **_discdevs, uint8_t busnum,
 
 out:
 	if (need_unref)
-		libusb_device_unref(dev);
+		libusb_unref_device(dev);
 	return r;
 }
 

@@ -145,7 +145,7 @@ libusb_free_device_list(list, 1);
  *
  * New devices presented by the libusb_get_device_list() function all have a
  * reference count of 1. You can increase and decrease reference count using
- * libusb_device_ref() and libusb_device_unref(). A device is destroyed when
+ * libusb_ref_device() and libusb_unref_device(). A device is destroyed when
  * it's reference count reaches 0.
  *
  * With the above information in mind, the process of opening a device can
@@ -203,7 +203,7 @@ struct discovered_devs *discovered_devs_append(
 
 	/* if there is space, just append the device */
 	if (len < discdevs->capacity) {
-		discdevs->devices[len] = libusb_device_ref(dev);
+		discdevs->devices[len] = libusb_ref_device(dev);
 		discdevs->len++;
 		return discdevs;
 	}
@@ -215,7 +215,7 @@ struct discovered_devs *discovered_devs_append(
 		sizeof(*discdevs) + (sizeof(void *) * capacity));
 	if (discdevs) {
 		discdevs->capacity = capacity;
-		discdevs->devices[len] = libusb_device_ref(dev);
+		discdevs->devices[len] = libusb_ref_device(dev);
 		discdevs->len++;
 	}
 
@@ -227,7 +227,7 @@ static void discovered_devs_free(struct discovered_devs *discdevs)
 	size_t i;
 
 	for (i = 0; i < discdevs->len; i++)
-		libusb_device_unref(discdevs->devices[i]);
+		libusb_unref_device(discdevs->devices[i]);
 
 	free(discdevs);
 }
@@ -313,7 +313,7 @@ API_EXPORTED int libusb_get_device_list(libusb_device ***list)
 	ret[len] = NULL;
 	for (i = 0; i < len; i++) {
 		struct libusb_device *dev = discdevs->devices[i];
-		ret[i] = libusb_device_ref(dev);
+		ret[i] = libusb_ref_device(dev);
 	}
 	*list = ret;
 
@@ -340,7 +340,7 @@ API_EXPORTED void libusb_free_device_list(libusb_device **list,
 		struct libusb_device *dev;
 
 		while ((dev = list[i++]) != NULL)
-			libusb_device_unref(dev);
+			libusb_unref_device(dev);
 	}
 	free(list);
 }
@@ -370,7 +370,7 @@ API_EXPORTED uint8_t libusb_get_device_address(libusb_device *dev)
  * \param dev the device to reference
  * \returns the same device
  */
-API_EXPORTED libusb_device *libusb_device_ref(libusb_device *dev)
+API_EXPORTED libusb_device *libusb_ref_device(libusb_device *dev)
 {
 	pthread_mutex_lock(&dev->lock);
 	dev->refcnt++;
@@ -383,7 +383,7 @@ API_EXPORTED libusb_device *libusb_device_ref(libusb_device *dev)
  * causes the reference count to reach zero, the device shall be destroyed.
  * \param dev the device to unreference
  */
-API_EXPORTED void libusb_device_unref(libusb_device *dev)
+API_EXPORTED void libusb_unref_device(libusb_device *dev)
 {
 	int refcnt;
 
@@ -439,13 +439,13 @@ API_EXPORTED libusb_device_handle *libusb_open(libusb_device *dev)
 	if (r)
 		return NULL;
 
-	handle->dev = libusb_device_ref(dev);
+	handle->dev = libusb_ref_device(dev);
 	handle->claimed_interfaces = 0;
 	memset(&handle->os_priv, 0, priv_size);
 
 	r = usbi_backend->open(handle);
 	if (r < 0) {
-		libusb_device_unref(dev);
+		libusb_unref_device(dev);
 		free(handle);
 		return NULL;
 	}
@@ -502,7 +502,7 @@ API_EXPORTED libusb_device_handle *libusb_open_device_with_vid_pid(
 static void do_close(struct libusb_device_handle *dev_handle)
 {
 	usbi_backend->close(dev_handle);
-	libusb_device_unref(dev_handle->dev);
+	libusb_unref_device(dev_handle->dev);
 }
 
 /** \ingroup dev
