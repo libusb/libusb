@@ -80,8 +80,8 @@ pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
 // discover devices
 libusb_device **list;
 libusb_device *found = NULL;
-int cnt = libusb_get_device_list(&list);
-int i = 0;
+size_t cnt = libusb_get_device_list(&list);
+size_t i = 0;
 if (cnt < 0)
 	error();
 
@@ -281,12 +281,16 @@ struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id)
  * not to unreference a device you are about to open until after you have
  * opened it.
  *
+ * This return value of this function indicates the number of devices in
+ * the resultant list. The list is actually one element larger, as it is
+ * NULL-terminated.
+ *
  * \param list output location for a list of devices. Must be later freed with
  * libusb_free_device_list().
  * \returns the number of devices in the outputted list, or LIBUSB_ERROR_NO_MEM
  * on memory allocation failure.
  */
-API_EXPORTED int libusb_get_device_list(libusb_device ***list)
+API_EXPORTED size_t libusb_get_device_list(libusb_device ***list)
 {
 	struct discovered_devs *discdevs = discovered_devs_alloc();
 	struct libusb_device **ret;
@@ -299,14 +303,16 @@ API_EXPORTED int libusb_get_device_list(libusb_device ***list)
 		return LIBUSB_ERROR_NO_MEM;
 
 	r = usbi_backend->get_device_list(&discdevs);
-	if (r < 0)
+	if (r < 0) {
+		len = r;
 		goto out;
+	}
 
 	/* convert discovered_devs into a list */
 	len = discdevs->len;
 	ret = malloc(sizeof(void *) * (len + 1));
 	if (!ret) {
-		r = LIBUSB_ERROR_NO_MEM;
+		len = LIBUSB_ERROR_NO_MEM;
 		goto out;
 	}
 
@@ -319,7 +325,7 @@ API_EXPORTED int libusb_get_device_list(libusb_device ***list)
 
 out:
 	discovered_devs_free(discdevs);
-	return r;
+	return len;
 }
 
 /** \ingroup dev

@@ -39,14 +39,15 @@ int main(void)
 {
 	libusb_device **devs;
 	int r;
+	size_t cnt;
 
 	r = libusb_init();
 	if (r < 0)
 		return r;
 
-	r = libusb_get_device_list(&devs);
-	if (r < 0)
-		return r;
+	cnt = libusb_get_device_list(&devs);
+	if (cnt < 0)
+		return (int) cnt;
 
 	print_devs(devs);
 	libusb_free_device_list(devs, 1);
