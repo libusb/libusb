@@ -505,7 +505,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 	alloc_size = num_urbs * sizeof(struct usbfs_urb);
 	urbs = malloc(alloc_size);
 	if (!urbs)
-		return LIBUSB_ERROR_NOMEM;
+		return LIBUSB_ERROR_NO_MEM;
 	memset(urbs, 0, alloc_size);
 	tpriv->urbs = urbs;
 	tpriv->num_urbs = num_urbs;
@@ -610,7 +610,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	alloc_size = num_urbs * sizeof(*urbs);
 	urbs = malloc(alloc_size);
 	if (!urbs)
-		return LIBUSB_ERROR_NOMEM;
+		return LIBUSB_ERROR_NO_MEM;
 	memset(urbs, 0, alloc_size);
 
 	tpriv->iso_urbs = urbs;
@@ -649,7 +649,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		urb = malloc(alloc_size);
 		if (!urb) {
 			free_iso_urbs(tpriv);
-			return LIBUSB_ERROR_NOMEM;
+			return LIBUSB_ERROR_NO_MEM;
 		}
 		memset(urb, 0, alloc_size);
 		urbs[i] = urb;
@@ -734,7 +734,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 
 	urb = malloc(sizeof(struct usbfs_urb));
 	if (!urb)
-		return LIBUSB_ERROR_NOMEM;
+		return LIBUSB_ERROR_NO_MEM;
 	memset(urb, 0, sizeof(struct usbfs_urb));
 	tpriv->urbs = urb;
 	tpriv->reap_action = NORMAL;

@@ -522,7 +522,7 @@ enum libusb_error {
 	LIBUSB_ERROR_INVALID_PARAM = -2,
 	LIBUSB_ERROR_ACCESS = -3,
 	LIBUSB_ERROR_NOT_FOUND = -4,
-	LIBUSB_ERROR_NOMEM = -5,
+	LIBUSB_ERROR_NO_MEM = -5,
 	LIBUSB_ERROR_OTHER = -6,
 };
 
@@ -596,7 +596,6 @@ struct libusb_transfer {
 	 * timeout. */
 	unsigned int timeout;
 
-	/* FIXME: make const? */
 	/** The status of the transfer. Read-only, and only for use within
 	 * transfer callback function.
 	 *

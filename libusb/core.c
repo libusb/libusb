@@ -283,7 +283,7 @@ struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id)
  *
  * \param list output location for a list of devices. Must be later freed with
  * libusb_free_device_list().
- * \returns the number of devices in the outputted list, or LIBUSB_ERROR_NOMEM
+ * \returns the number of devices in the outputted list, or LIBUSB_ERROR_NO_MEM
  * on memory allocation failure.
  */
 API_EXPORTED int libusb_get_device_list(libusb_device ***list)
@@ -296,7 +296,7 @@ API_EXPORTED int libusb_get_device_list(libusb_device ***list)
 	usbi_dbg("");
 
 	if (!discdevs)
-		return LIBUSB_ERROR_NOMEM;
+		return LIBUSB_ERROR_NO_MEM;
 
 	r = usbi_backend->get_device_list(&discdevs);
 	if (r < 0)
@@ -306,7 +306,7 @@ API_EXPORTED int libusb_get_device_list(libusb_device ***list)
 	len = discdevs->len;
 	ret = malloc(sizeof(void *) * (len + 1));
 	if (!ret) {
-		r = LIBUSB_ERROR_NOMEM;
+		r = LIBUSB_ERROR_NO_MEM;
 		goto out;
 	}
 
