@@ -694,6 +694,28 @@ API_EXPORTED int libusb_clear_halt(libusb_device_handle *dev,
 	return usbi_backend->clear_halt(dev, endpoint);
 }
 
+/** \ingroup dev
+ * Perform a USB port reset to reinitialize a device. The system will attempt
+ * to restore the previous configuration and alternate settings after the
+ * reset has completed.
+ *
+ * If the reset fails, the descriptors change, or the previous state cannot be
+ * restored, the device will appear to be disconnected and reconnected. This
+ * means that the device handle is no longer valid (you should close it) and
+ * rediscover the device. A return code of LIBUSB_ERROR_NOT_FOUND indicates
+ * when this is the case.
+ *
+ * \param dev a handle of the device to reset
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if re-enumeration is required
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+API_EXPORTED int libusb_reset_device(libusb_device_handle *dev)
+{
+	usbi_dbg("");
+	return usbi_backend->reset_device(dev);
+}
+
 /** \ingroup lib
  * Initialize libusb. This function must be called before calling any other
  * libusb function.
