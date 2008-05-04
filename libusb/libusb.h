@@ -657,9 +657,9 @@ int libusb_release_interface(libusb_device_handle *dev, int iface);
 libusb_device_handle *libusb_open_device_with_vid_pid(uint16_t vendor_id,
 	uint16_t product_id);
 
-
 int libusb_set_interface_alt_setting(libusb_device_handle *dev,
 	int interface_number, int alternate_setting);
+int libusb_clear_halt(libusb_device_handle *dev, unsigned char endpoint);
 
 /* async I/O */
 

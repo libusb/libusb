@@ -280,6 +280,8 @@ struct usbi_os_backend {
 
 	int (*set_interface_altsetting)(struct libusb_device_handle *handle,
 		int iface, int altsetting);
+	int (*clear_halt)(struct libusb_device_handle *handle,
+		unsigned char endpoint);
 
 	void (*destroy_device)(struct libusb_device *dev);
 

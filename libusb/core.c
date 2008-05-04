@@ -674,6 +674,26 @@ API_EXPORTED int libusb_set_interface_alt_setting(libusb_device_handle *dev,
 		alternate_setting);
 }
 
+/** \ingroup dev
+ * Clear the halt/stall condition for an endpoint. Endpoints with halt status
+ * are unable to receive or transmit data until the halt condition is stalled.
+ *
+ * You should cancel all pending transfers before attempting to clear the halt
+ * condition.
+ *
+ * \param dev a device handle
+ * \param endpoint the endpoint to clear halt status
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+API_EXPORTED int libusb_clear_halt(libusb_device_handle *dev,
+	unsigned char endpoint)
+{
+	usbi_dbg("endpoint %x", endpoint);
+	return usbi_backend->clear_halt(dev, endpoint);
+}
+
 /** \ingroup lib
  * Initialize libusb. This function must be called before calling any other
  * libusb function.

@@ -485,6 +485,22 @@ static int op_set_interface(struct libusb_device_handle *handle, int iface,
 	return 0;
 }
 
+static int op_clear_halt(struct libusb_device_handle *handle,
+	unsigned char endpoint)
+{
+	int fd = __device_handle_priv(handle)->fd;
+	int r = ioctl(fd, IOCTL_USBFS_CLEAR_HALT, &endpoint);
+	if (r) {
+		if (errno == ENOENT)
+			return LIBUSB_ERROR_NOT_FOUND;
+
+		usbi_err("clear_halt failed error %d errno %d", r, errno);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	return 0;
+}
+
 static void op_destroy_device(struct libusb_device *dev)
 {
 	unsigned char *nodepath = __device_priv(dev)->nodepath;
@@ -1124,6 +1140,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.release_interface = op_release_interface,
 
 	.set_interface_altsetting = op_set_interface,
+	.clear_halt = op_clear_halt,
 
 	.destroy_device = op_destroy_device,
 
