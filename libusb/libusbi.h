@@ -284,6 +284,12 @@ struct usbi_os_backend {
 		unsigned char endpoint);
 	int (*reset_device)(struct libusb_device_handle *handle);
 
+	/* optional */
+	int (*kernel_driver_active)(struct libusb_device_handle *handle,
+		int interface);
+	int (*detach_kernel_driver)(struct libusb_device_handle *handle,
+		int interface);
+
 	void (*destroy_device)(struct libusb_device *dev);
 
 	int (*submit_transfer)(struct usbi_transfer *itransfer);

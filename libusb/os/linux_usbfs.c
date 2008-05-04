@@ -516,6 +516,51 @@ static int op_reset_device(struct libusb_device_handle *handle)
 	return 0;
 }
 
+static int op_kernel_driver_active(struct libusb_device_handle *handle,
+	int interface)
+{
+	int fd = __device_handle_priv(handle)->fd;
+	struct usbfs_getdriver getdrv;
+	int r;
+
+	getdrv.interface = interface;
+	r = ioctl(fd, IOCTL_USBFS_GETDRIVER, &getdrv);
+	if (r) {
+		if (errno == ENODATA)
+			return 0;
+
+		usbi_err("get driver failed error %d errno %d", r, errno);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	return 1;
+}
+
+static int op_detach_kernel_driver(struct libusb_device_handle *handle,
+	int interface)
+{
+	int fd = __device_handle_priv(handle)->fd;
+	struct usbfs_ioctl command;
+	int r;
+
+	command.ifno = interface;
+	command.ioctl_code = IOCTL_USBFS_DISCONNECT;
+	command.data = NULL;
+
+	r = ioctl(fd, IOCTL_USBFS_IOCTL, &command);
+	if (r) {
+		if (errno == ENODATA)
+			return LIBUSB_ERROR_NOT_FOUND;
+		else if (errno == EINVAL)
+			return LIBUSB_ERROR_INVALID_PARAM;
+
+		usbi_err("detach failed error %d errno %d", r, errno);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	return 0;
+}
+
 static void op_destroy_device(struct libusb_device *dev)
 {
 	unsigned char *nodepath = __device_priv(dev)->nodepath;
@@ -1157,6 +1202,9 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.set_interface_altsetting = op_set_interface,
 	.clear_halt = op_clear_halt,
 	.reset_device = op_reset_device,
+
+	.kernel_driver_active = op_kernel_driver_active,
+	.detach_kernel_driver = op_detach_kernel_driver,
 
 	.destroy_device = op_destroy_device,
 

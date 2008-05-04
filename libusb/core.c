@@ -716,6 +716,50 @@ API_EXPORTED int libusb_reset_device(libusb_device_handle *dev)
 	return usbi_backend->reset_device(dev);
 }
 
+/** \ingroup dev
+ * Determine if a kernel driver is active on an interface. If a kernel driver
+ * is active, you cannot claim the interface, and libusb will be unable to
+ * perform I/O.
+ *
+ * \param dev a device handle
+ * \param interface the interface to check
+ * \returns 0 if no kernel driver is active
+ * \returns 1 if a kernel driver is active
+ * \returns LIBUSB_ERROR code on failure
+ * \see libusb_detach_kernel_driver
+ */
+API_EXPORTED int libusb_kernel_driver_active(libusb_device_handle *dev,
+	int interface)
+{
+	usbi_dbg("interface %d", interface);
+	if (usbi_backend->kernel_driver_active)
+		return usbi_backend->kernel_driver_active(dev, interface);
+	else
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+/** \ingroup dev
+ * Detach a kernel driver from an interface. If successful, you will then be
+ * able to claim the interface and perform I/O.
+ *
+ * \param dev a device handle
+ * \param interface the interface to detach the driver from
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
+ * \returns LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
+ * \returns another LIBUSB_ERROR code on other failure
+ * \see libusb_kernel_driver_active
+ */
+API_EXPORTED int libusb_detach_kernel_driver(libusb_device_handle *dev,
+	int interface)
+{
+	usbi_dbg("interface %d", interface);
+	if (usbi_backend->detach_kernel_driver)
+		return usbi_backend->detach_kernel_driver(dev, interface);
+	else
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 /** \ingroup lib
  * Initialize libusb. This function must be called before calling any other
  * libusb function.

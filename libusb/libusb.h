@@ -525,7 +525,8 @@ enum libusb_error {
 	LIBUSB_ERROR_BUSY = -5,
 	LIBUSB_ERROR_TIMEOUT = -6,
 	LIBUSB_ERROR_NO_MEM = -7,
-	LIBUSB_ERROR_OTHER = -8,
+	LIBUSB_ERROR_NOT_SUPPORTED = -8,
+	LIBUSB_ERROR_OTHER = -9,
 };
 
 /** \ingroup asyncio
@@ -662,6 +663,9 @@ int libusb_set_interface_alt_setting(libusb_device_handle *dev,
 	int interface_number, int alternate_setting);
 int libusb_clear_halt(libusb_device_handle *dev, unsigned char endpoint);
 int libusb_reset_device(libusb_device_handle *dev);
+
+int libusb_kernel_driver_active(libusb_device_handle *dev, int interface);
+int libusb_detach_kernel_driver(libusb_device_handle *dev, int interface);
 
 /* async I/O */
 
