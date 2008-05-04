@@ -446,3 +446,60 @@ API_EXPORTED const struct libusb_config_descriptor *libusb_get_config_descriptor
 	return dev->config;
 }
 
+/** \ingroup desc
+ * Retrieve a string descriptor in C style ASCII.
+ *
+ * Wrapper around libusb_get_string_descriptor(). Uses the first language 
+ * supported by the device.
+ *
+ * \param dev a device handle
+ * \param desc_index the index of the descriptor to retrieve
+ * \param data output buffer for ASCII string descriptor
+ * \param length size of data buffer
+ * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
+ */
+API_EXPORTED int libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
+	uint8_t desc_index, unsigned char *data, int length)
+{
+	unsigned char tbuf[255]; /* Some devices choke on size > 255 */
+	int r, langid, si, di;
+
+	/* Asking for the zero'th index is special - it returns a string
+	 * descriptor that contains all the language IDs supported by the device.
+	 * Typically there aren't many - often only one. The language IDs are 16
+	 * bit numbers, and they start at the third byte in the descriptor. See
+	 * USB 2.0 specification section 9.6.7 for more information. */
+	r = libusb_get_string_descriptor(dev, 0, 0, tbuf, sizeof(tbuf));
+	if (r < 0)
+		return r;
+
+	if (r < 4)
+		return LIBUSB_ERROR_IO;
+
+	langid = tbuf[2] | (tbuf[3] << 8);
+
+	r = libusb_get_string_descriptor(dev, desc_index, langid, tbuf,
+		sizeof(tbuf));
+	if (r < 0)
+		return r;
+
+	if (tbuf[1] != LIBUSB_DT_STRING)
+		return LIBUSB_ERROR_IO;
+
+	if (tbuf[0] > r)
+		return LIBUSB_ERROR_IO;
+
+	for (di = 0, si = 2; si < tbuf[0]; si += 2) {
+		if (di >= (length - 1))
+			break;
+
+		if (tbuf[si + 1]) /* high byte */
+			data[di++] = '?';
+		else
+			data[di++] = tbuf[si];
+	}
+
+	data[di] = 0;
+	return di;
+}
+

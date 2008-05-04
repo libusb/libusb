@@ -883,6 +883,51 @@ int libusb_interrupt_transfer(libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *data, int length,
 	int *actual_length, unsigned int timeout);
 
+/** \ingroup desc
+ * Retrieve a descriptor from the default control pipe.
+ * This is a convenience function which formulates the appropriate control
+ * message to retrieve the descriptor.
+ *
+ * \param dev a device handle
+ * \param desc_type the descriptor type, see \ref libusb_descriptor_type
+ * \param desc_index the index of the descriptor to retrieve
+ * \param data output buffer for descriptor
+ * \param length size of data buffer
+ * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
+ */
+static inline int libusb_get_descriptor(libusb_device_handle *dev,
+	uint8_t desc_type, uint8_t desc_index, unsigned char *data, int length)
+{
+	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
+		LIBUSB_REQUEST_GET_DESCRIPTOR, (desc_type << 8) | desc_index, 0, data,
+		length, 1000);
+}
+
+/** \ingroup desc
+ * Retrieve a descriptor from a device.
+ * This is a convenience function which formulates the appropriate control
+ * message to retrieve the descriptor. The string returned is Unicode, as
+ * detailed in the USB specifications.
+ *
+ * \param dev a device handle
+ * \param desc_index the index of the descriptor to retrieve
+ * \param langid the language ID for the string descriptor
+ * \param data output buffer for descriptor
+ * \param length size of data buffer
+ * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
+ * \see libusb_get_string_descriptor_ascii
+ */
+static inline int libusb_get_string_descriptor(libusb_device_handle *dev,
+	uint8_t desc_index, uint16_t langid, unsigned char *data, int length)
+{
+	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
+		LIBUSB_REQUEST_GET_DESCRIPTOR, (LIBUSB_DT_STRING << 8) | desc_index,
+		langid, data, length, 1000);
+}
+
+int libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
+	uint8_t index, unsigned char *data, int length);
+
 /* polling and timeouts */
 
 /** \ingroup poll
