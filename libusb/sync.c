@@ -59,8 +59,8 @@ static void ctrl_transfer_cb(struct libusb_transfer *transfer)
  * before giving up due to no response being received. For no timeout, use
  * value 0.
  * \returns 0 on success
- * \returns -ETIMEDOUT if the transfer timed out
- * \returns other negative code on error
+ * \returns LIBUSB_ERROR_TIMEOUT if the transfer timed out
+ * \returns another LIBUSB_ERROR code on other failures
  */
 API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
@@ -72,12 +72,12 @@ API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 	int r;
 
 	if (!transfer)
-		return -ENOMEM;
+		return LIBUSB_ERROR_NO_MEM;
 	
 	buffer = malloc(LIBUSB_CONTROL_SETUP_SIZE + wLength);
 	if (!buffer) {
 		libusb_free_transfer(transfer);
-		return -ENOMEM;
+		return LIBUSB_ERROR_NO_MEM;
 	}
 
 	libusb_fill_control_setup(buffer, bmRequestType, bRequest, wValue, wIndex,
@@ -114,11 +114,11 @@ API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 		r = transfer->actual_length;
 		break;
 	case LIBUSB_TRANSFER_TIMED_OUT:
-		r = -ETIMEDOUT;
+		r = LIBUSB_ERROR_TIMEOUT;
 		break;
 	default:
 		usbi_warn("unrecognised status code %d", transfer->status);
-		r = -1;
+		r = LIBUSB_ERROR_OTHER;
 	}
 
 	libusb_free_transfer(transfer);
@@ -142,7 +142,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	int r;
 
 	if (!transfer)
-		return -ENOMEM;
+		return LIBUSB_ERROR_NO_MEM;
 
 	libusb_fill_bulk_transfer(transfer, dev_handle, endpoint, buffer, length,
 		bulk_transfer_cb, &completed, timeout);
@@ -172,11 +172,11 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 		r = 0;
 		break;
 	case LIBUSB_TRANSFER_TIMED_OUT:
-		r = -ETIMEDOUT;
+		r = LIBUSB_ERROR_TIMEOUT;
 		break;
 	default:
 		usbi_warn("unrecognised status code %d", transfer->status);
-		r = -1;
+		r = LIBUSB_ERROR_OTHER;
 	}
 
 	libusb_free_transfer(transfer);
@@ -215,9 +215,9 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * value 0.
  *
  * \returns 0 on success (and populates <tt>transferred</tt>)
- * \returns -ETIMEDOUT if the transfer timed out (and populates
+ * \returns LIBUSB_ERROR_TIMEOUT if the transfer timed out (and populates
  * <tt>transferred</tt>)
- * \returns other negative code on error
+ * \returns another LIBUSB_ERROR code on other failures
  */
 API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *data, int length, int *transferred,
@@ -261,8 +261,8 @@ API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
  * value 0.
  *
  * \returns 0 on success (and populates <tt>transferred</tt>)
- * \returns -ETIMEDOUT if the transfer timed out
- * \returns other negative code on error
+ * \returns LIBUSB_ERROR_TIMEOUT if the transfer timed out
+ * \returns another LIBUSB_ERROR code on other error
  */
 API_EXPORTED int libusb_interrupt_transfer(
 	struct libusb_device_handle *dev_handle, unsigned char endpoint,
