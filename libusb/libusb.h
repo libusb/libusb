@@ -652,6 +652,7 @@ libusb_device *libusb_ref_device(libusb_device *dev);
 void libusb_unref_device(libusb_device *dev);
 uint8_t libusb_get_bus_number(libusb_device *dev);
 uint8_t libusb_get_device_address(libusb_device *dev);
+int libusb_get_max_packet_size(libusb_device *dev, unsigned char endpoint);
 
 libusb_device_handle *libusb_open(libusb_device *dev);
 void libusb_close(libusb_device_handle *dev_handle);
@@ -878,6 +879,81 @@ static inline void libusb_fill_iso_transfer(struct libusb_transfer *transfer,
 	transfer->callback = callback;
 }
 
+/** \ingroup asyncio
+ * Convenience function to set the length of all packets in an isochronous
+ * transfer, based on the num_iso_packets field in the transfer structure.
+ *
+ * \param transfer a transfer
+ * \param length the length to set in each isochronous packet descriptor
+ * \see libusb_get_max_packet_size()
+ */
+static inline void libusb_set_iso_packet_lengths(
+	struct libusb_transfer *transfer, unsigned int length)
+{
+	int i;
+	for (i = 0; i < transfer->num_iso_packets; i++)
+		transfer->iso_packet_desc[i].length = length;
+}
+
+/** \ingroup asyncio
+ * Convenience function to locate the position of an isochronous packet
+ * within the buffer of an isochronous transfer.
+ *
+ * This is a thorough function which loops through all preceding packets,
+ * accumulating their lengths to find the position of the specified packet.
+ * Typically you will assign equal lengths to each packet in the transfer,
+ * and hence the above method is sub-optimal. You may wish to use
+ * libusb_get_iso_packet_buffer_simple() instead.
+ * 
+ * \param transfer a transfer
+ * \param packet the packet to return the address of
+ * \returns the base address of the packet buffer inside the transfer buffer,
+ * or NULL if the packet does not exist.
+ * \see libusb_get_iso_packet_buffer_simple()
+ */
+static inline unsigned char *libusb_get_iso_packet_buffer(
+	struct libusb_transfer *transfer, unsigned int packet)
+{
+	int i;
+	size_t offset = 0;
+
+	if (packet >= transfer->num_iso_packets)
+		return NULL;
+
+	for (i = 0; i < packet; i++)
+		offset += transfer->iso_packet_desc[i].length;
+
+	return transfer->buffer + offset;
+}
+
+/** \ingroup asyncio
+ * Convenience function to locate the position of an isochronous packet
+ * within the buffer of an isochronous transfer, for transfers where each
+ * packet is of identical size.
+ *
+ * This function relies on the assumption that every packet within the transfer
+ * is of identical size to the first packet. Calculating the location of
+ * the packet buffer is then just a simple calculation:
+ * <tt>buffer + (packet_size * packet)</tt>
+ *
+ * Do not use this function on transfers other than those that have identical
+ * packet lengths for each packet.
+ *
+ * \param transfer a transfer
+ * \param packet the packet to return the address of
+ * \returns the base address of the packet buffer inside the transfer buffer,
+ * or NULL if the packet does not exist.
+ * \see libusb_get_iso_packet_buffer()
+ */
+static inline unsigned char *libusb_get_iso_packet_buffer_simple(
+	struct libusb_transfer *transfer, unsigned int packet)
+{
+	if (packet >= transfer->num_iso_packets)
+		return NULL;
+	
+	return transfer->buffer + (transfer->iso_packet_desc[0].length * packet);
+}
+
 /* sync I/O */
 
 int libusb_control_transfer(libusb_device_handle *dev_handle,
@@ -924,7 +1000,7 @@ static inline int libusb_get_descriptor(libusb_device_handle *dev,
  * \param data output buffer for descriptor
  * \param length size of data buffer
  * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
- * \see libusb_get_string_descriptor_ascii
+ * \see libusb_get_string_descriptor_ascii()
  */
 static inline int libusb_get_string_descriptor(libusb_device_handle *dev,
 	uint8_t desc_index, uint16_t langid, unsigned char *data, int length)
@@ -964,7 +1040,7 @@ const struct libusb_pollfd **libusb_get_pollfds(void);
  * \param fd the new file descriptor
  * \param events events to monitor for, see \ref libusb_pollfd for a
  * description
- * \see libusb_set_pollfd_notifiers
+ * \see libusb_set_pollfd_notifiers()
  */
 typedef void (*libusb_pollfd_added_cb)(int fd, short events);
 
@@ -973,7 +1049,7 @@ typedef void (*libusb_pollfd_added_cb)(int fd, short events);
  * the set of file descriptors being monitored for events. After returning
  * from this callback, do not use that file descriptor again.
  * \param fd the file descriptor to stop monitoring
- * \see libusb_set_pollfd_notifiers
+ * \see libusb_set_pollfd_notifiers()
  */
 typedef void (*libusb_pollfd_removed_cb)(int fd);
 void libusb_set_pollfd_notifiers(libusb_pollfd_added_cb added_cb,

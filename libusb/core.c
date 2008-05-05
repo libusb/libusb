@@ -464,6 +464,43 @@ API_EXPORTED uint8_t libusb_get_device_address(libusb_device *dev)
 }
 
 /** \ingroup dev
+ * Convenience function to retrieve the wMaxPacketSize value for a particular
+ * endpoint. This is useful for setting up isochronous transfers.
+ *
+ * \param dev a device
+ * \returns the wMaxPacketSize value, or LIBUSB_ERROR_NOT_FOUND if the endpoint
+ * does not exist.
+ */
+API_EXPORTED int libusb_get_max_packet_size(libusb_device *dev,
+	unsigned char endpoint)
+{
+	int iface_idx;
+	/* FIXME: active config considerations? */
+	struct libusb_config_descriptor *config = dev->config;
+
+	for (iface_idx = 0; iface_idx < config->bNumInterfaces; iface_idx++) {
+		const struct libusb_interface *iface = &config->interface[iface_idx];
+		int altsetting_idx;
+
+		for (altsetting_idx = 0; altsetting_idx < iface->num_altsetting;
+				altsetting_idx++) {
+			const struct libusb_interface_descriptor *altsetting
+				= &iface->altsetting[altsetting_idx];
+			int ep_idx;
+
+			for (ep_idx = 0; ep_idx < altsetting->bNumEndpoints; ep_idx++) {
+				const struct libusb_endpoint_descriptor *ep =
+					&altsetting->endpoint[ep_idx];
+				if (ep->bEndpointAddress == endpoint)
+					return ep->wMaxPacketSize;
+			}
+		}
+	}
+
+	return LIBUSB_ERROR_NOT_FOUND;
+}
+
+/** \ingroup dev
  * Increment the reference count of a device.
  * \param dev the device to reference
  * \returns the same device
@@ -818,7 +855,7 @@ API_EXPORTED int libusb_reset_device(libusb_device_handle *dev)
  * \returns 0 if no kernel driver is active
  * \returns 1 if a kernel driver is active
  * \returns LIBUSB_ERROR code on failure
- * \see libusb_detach_kernel_driver
+ * \see libusb_detach_kernel_driver()
  */
 API_EXPORTED int libusb_kernel_driver_active(libusb_device_handle *dev,
 	int interface)
@@ -840,7 +877,7 @@ API_EXPORTED int libusb_kernel_driver_active(libusb_device_handle *dev,
  * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
  * \returns LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
  * \returns another LIBUSB_ERROR code on other failure
- * \see libusb_kernel_driver_active
+ * \see libusb_kernel_driver_active()
  */
 API_EXPORTED int libusb_detach_kernel_driver(libusb_device_handle *dev,
 	int interface)

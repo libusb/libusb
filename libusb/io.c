@@ -343,7 +343,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  *
  * \section asynciso Considerations for isochronous transfers
  *
- * As isochronous transfers are more complicated than transfers to
+ * Isochronous transfers are more complicated than transfers to
  * non-isochronous endpoints.
  *
  * To perform I/O to an isochronous endpoint, allocate the transfer by calling
@@ -360,10 +360,13 @@ if (r == 0 && actual_length == sizeof(data)) {
  * Next, populate the length field for the first num_iso_packets entries in
  * the \ref libusb_transfer::iso_packet_desc "iso_packet_desc" array. Section
  * 5.6.3 of the USB2 specifications describe how the maximum isochronous
- * packet length is determined by the endpoint descriptor. FIXME need a helper
- * function to find this.
- * FIXME, write a helper function to set the length for all iso packets in an
- * array
+ * packet length is determined by wMaxPacketSize field in the endpoint
+ * descriptor. Two functions can help you here:
+ *
+ * - libusb_get_max_packet_size() is an easy way to determine the max
+ *   packet size for an endpoint.
+ * - libusb_set_iso_packet_lengths() assigns the same length to all packets
+ *   within a transfer, which is usually what you want.
  *
  * For outgoing transfers, you'll obviously fill the buffer and populate the
  * packet descriptors in hope that all the data gets transferred. For incoming
@@ -392,9 +395,9 @@ if (r == 0 && actual_length == sizeof(data)) {
  *  - Other transfer status codes occur with normal behaviour.
  *
  * The data for each packet will be found at an offset into the buffer that
- * can be calculated as if each prior packet completed in full. FIXME write
- * a helper function to determine this, and flesh this description out a bit
- * more.
+ * can be calculated as if each prior packet completed in full. The
+ * libusb_get_iso_packet_offset() and libusb_get_iso_packet_offset_simple()
+ * functions may help you here.
  *
  * \section asyncmem Memory caveats
  *
