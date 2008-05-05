@@ -283,7 +283,7 @@ static int scan_device(struct discovered_devs **_discdevs, uint8_t busnum,
 			busnum, devaddr, session_id);
 		dev = usbi_alloc_device(session_id);
 		if (!dev) {
-			r = -ENOMEM;
+			r = LIBUSB_ERROR_NO_MEM;
 			goto out;
 		}
 		need_unref = 1;
@@ -297,7 +297,7 @@ static int scan_device(struct discovered_devs **_discdevs, uint8_t busnum,
 
 	discdevs = discovered_devs_append(*_discdevs, dev);
 	if (!discdevs)
-		r = -ENOMEM;
+		r = LIBUSB_ERROR_NO_MEM;
 	else
 		*_discdevs = discdevs;
 
@@ -400,10 +400,10 @@ static int op_open(struct libusb_device_handle *handle)
 				"Permission denied.\n"
 				"libusb requires write access to USB device nodes.\n",
 				dpriv->nodepath);
-			return -EACCES;
+			return LIBUSB_ERROR_ACCESS;
 		} else {
 			usbi_err("open failed, code %d errno %d", hpriv->fd, errno);
-			return -EIO;
+			return LIBUSB_ERROR_IO;
 		}
 	}
 
@@ -1043,7 +1043,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	}
 	if (urb_idx == 0) {
 		usbi_err("could not locate urb!");
-		return -EIO;
+		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
 	usbi_dbg("handling completion status %d of iso urb %d/%d", urb->status,
@@ -1173,7 +1173,7 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 		return handle_control_completion(itransfer, urb);
 	default:
 		usbi_err("unrecognised endpoint type %x", transfer->type);
-		return -EINVAL;
+		return LIBUSB_ERROR_OTHER;
 	}
 }
 

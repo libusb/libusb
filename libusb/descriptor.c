@@ -148,7 +148,7 @@ static int parse_endpoint(struct libusb_endpoint_descriptor *endpoint,
 	endpoint->extra = extra;
 	if (!extra) {
 		endpoint->extralen = 0;
-		return -ENOMEM;
+		return LIBUSB_ERROR_NO_MEM;
 	}
 
 	memcpy(extra, begin, len);
@@ -202,7 +202,7 @@ static int parse_interface(struct libusb_interface *interface,
 			sizeof(struct libusb_interface_descriptor) *
 			(interface->num_altsetting + 1));
 		if (!altsetting) {
-			r = -ENOMEM;
+			r = LIBUSB_ERROR_NO_MEM;
 			goto err;
 		}
 		interface->altsetting = altsetting;
@@ -226,7 +226,7 @@ static int parse_interface(struct libusb_interface *interface,
 			usbi_parse_descriptor(buffer, "bb", &header);
 			if (header.bLength < 2) {
 				usbi_err("invalid descriptor of length %d", header.bLength);
-				r = -EINVAL;
+				r = LIBUSB_ERROR_IO;
 				goto err;
 			}
 
@@ -248,7 +248,7 @@ static int parse_interface(struct libusb_interface *interface,
 		if (len) {
 			ifp->extra = malloc(len);
 			if (!ifp->extra) {
-				r = -ENOMEM;
+				r = LIBUSB_ERROR_NO_MEM;
 				goto err;
 			}
 			memcpy((unsigned char *) ifp->extra, begin, len);
@@ -264,7 +264,7 @@ static int parse_interface(struct libusb_interface *interface,
 
 		if (ifp->bNumEndpoints > USB_MAXENDPOINTS) {
 			usbi_err("too many endpoints (%d)", ifp->bNumEndpoints);
-			r = -EOVERFLOW;
+			r = LIBUSB_ERROR_IO;
 			goto err;
 		}
 
@@ -274,7 +274,7 @@ static int parse_interface(struct libusb_interface *interface,
 			endpoint = malloc(tmp);
 			ifp->endpoint = endpoint;
 			if (!endpoint) {
-				r = -ENOMEM;
+				r = LIBUSB_ERROR_NO_MEM;
 				goto err;
 			}
 
@@ -284,7 +284,7 @@ static int parse_interface(struct libusb_interface *interface,
 
 				if (header.bLength > size) {
 					usbi_err("ran out of descriptors parsing");
-					r = -ENOSPC;
+					r = LIBUSB_ERROR_IO;
 					goto err;
 				}
 
@@ -347,14 +347,14 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 
 	if (config->bNumInterfaces > USB_MAXINTERFACES) {
 		usbi_err("too many interfaces (%d)", config->bNumInterfaces);
-		return -EOVERFLOW;
+		return LIBUSB_ERROR_IO;
 	}
 
 	tmp = config->bNumInterfaces * sizeof(struct libusb_interface);
 	interface = malloc(tmp);
 	config->interface = interface;
 	if (!config->interface)
-		return -ENOMEM;
+		return LIBUSB_ERROR_NO_MEM;
 
 	memset(interface, 0, tmp);
 	buffer += config->bLength;
@@ -376,7 +376,7 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 			if ((header.bLength > size) ||
 					(header.bLength < DESC_HEADER_LENGTH)) {
 				usbi_err("invalid descriptor length of %d", header.bLength);
-				r = -EIO;
+				r = LIBUSB_ERROR_IO;
 				goto err;
 			}
 
@@ -400,7 +400,7 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 			if (!config->extralen) {
 				config->extra = malloc(len);
 				if (!config->extra) {
-					r = -ENOMEM;
+					r = LIBUSB_ERROR_NO_MEM;
 					goto err;
 				}
 

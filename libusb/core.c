@@ -279,13 +279,13 @@ int usbi_discover_device(struct libusb_device *dev)
 
 	if (dev->desc.bNumConfigurations > USB_MAXCONFIG) {
 		usbi_err("too many configurations");
-		r = -EINVAL;
+		r = LIBUSB_ERROR_IO;
 		goto err;
 	}
 
 	if (dev->desc.bNumConfigurations < 1) {
 		usbi_dbg("no configurations?");
-		r = -EINVAL;
+		r = LIBUSB_ERROR_IO;
 		goto err;
 	}
 

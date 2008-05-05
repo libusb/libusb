@@ -1092,7 +1092,7 @@ int usbi_add_pollfd(int fd, short events)
 {
 	struct usbi_pollfd *ipollfd = malloc(sizeof(*ipollfd));
 	if (!ipollfd)
-		return -ENOMEM;
+		return LIBUSB_ERROR_NO_MEM;
 
 	usbi_dbg("add fd %d events %d", fd, events);
 	ipollfd->pollfd.fd = fd;
