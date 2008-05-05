@@ -232,6 +232,7 @@ static void discovered_devs_free(struct discovered_devs *discdevs)
 	free(discdevs);
 }
 
+/* allocate a new device with reference count 1 */
 struct libusb_device *usbi_alloc_device(unsigned long session_id)
 {
 	size_t priv_size = usbi_backend->device_priv_size;
@@ -253,6 +254,97 @@ struct libusb_device *usbi_alloc_device(unsigned long session_id)
 	list_add(&dev->list, &usb_devs);
 	pthread_mutex_unlock(&usb_devs_lock);
 	return dev;
+}
+
+/* call the OS discovery routines to populate descriptors etc */
+int usbi_discover_device(struct libusb_device *dev)
+{
+	int r;
+	int i;
+	void *user_data;
+	unsigned char raw_desc[DEVICE_DESC_LENGTH];
+	size_t alloc_size;
+
+	dev->config = NULL;
+
+	r = usbi_backend->begin_discovery(dev, &user_data);
+	if (r < 0)
+		return r;
+	
+	r = usbi_backend->get_device_descriptor(dev, raw_desc, user_data);
+	if (r < 0)
+		goto err;
+
+	usbi_parse_descriptor(raw_desc, "bbWbbbbWWWbbbb", &dev->desc);
+
+	if (dev->desc.bNumConfigurations > USB_MAXCONFIG) {
+		usbi_err("too many configurations");
+		r = -EINVAL;
+		goto err;
+	}
+
+	if (dev->desc.bNumConfigurations < 1) {
+		usbi_dbg("no configurations?");
+		r = -EINVAL;
+		goto err;
+	}
+
+	alloc_size = dev->desc.bNumConfigurations
+		* sizeof(struct libusb_config_descriptor);
+	dev->config = malloc(alloc_size);
+	if (!dev->config) {
+		r = LIBUSB_ERROR_NO_MEM;
+		goto err;
+	}
+
+	memset(dev->config, 0, alloc_size);
+	for (i = 0; i < dev->desc.bNumConfigurations; i++) {
+		unsigned char tmp[8];
+		unsigned char *bigbuffer;
+		struct libusb_config_descriptor config;
+
+		r = usbi_backend->get_config_descriptor(dev, i, tmp, sizeof(tmp),
+			user_data);
+		if (r < 0)
+			goto err;
+
+		usbi_parse_descriptor(tmp, "bbw", &config);
+
+		bigbuffer = malloc(config.wTotalLength);
+		if (!bigbuffer) {
+			r = LIBUSB_ERROR_NO_MEM;
+			goto err;
+		}
+
+		r = usbi_backend->get_config_descriptor(dev, i, bigbuffer,
+			config.wTotalLength, user_data);
+		if (r < 0) {
+			free(bigbuffer);
+			goto err;
+		}
+
+		r = usbi_parse_configuration(&dev->config[i], bigbuffer);
+		free(bigbuffer);
+		if (r < 0) {
+			usbi_err("parse_configuration failed with code %d", r);
+			goto err;
+		} else if (r > 0) {
+			usbi_warn("descriptor data still left\n");
+		}
+	}
+
+	usbi_backend->end_discovery(dev, user_data);
+	return 0;
+
+err:
+	if (dev->config) {
+		usbi_clear_configurations(dev);
+		free(dev->config);
+		dev->config = NULL;
+	}
+
+	usbi_backend->end_discovery(dev, user_data);
+	return r;
 }
 
 struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id)

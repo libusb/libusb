@@ -133,132 +133,125 @@ static int op_init(void)
 	return 0;
 }
 
+struct discovery_data {
+	int fd;
+};
+
+static int op_begin_discovery(struct libusb_device *dev, void **user_data)
+{
+	struct linux_device_priv *priv = __device_priv(dev);
+	struct discovery_data *ddata = malloc(sizeof(*ddata));
+	if (!ddata)
+		return LIBUSB_ERROR_NO_MEM;
+
+	ddata->fd = open(priv->nodepath, O_RDONLY);
+	if (ddata->fd < 0) {
+		usbi_dbg("open '%s' failed, ret=%d errno=%d", priv->nodepath,
+			ddata->fd, errno);
+		free(ddata);
+		return LIBUSB_ERROR_IO;
+	}
+
+	*user_data = ddata;
+	return 0;
+}
+
+static int op_get_device_descriptor(struct libusb_device *device,
+	unsigned char *buffer, void *user_data)
+{
+	struct discovery_data *ddata = user_data;
+	int r = read(ddata->fd, buffer, DEVICE_DESC_LENGTH);
+	if (r < 0) {
+		usbi_err("read failed ret=%d errno=%d", r, errno);
+		return LIBUSB_ERROR_IO;
+	} else if (r < DEVICE_DESC_LENGTH) {
+		usbi_err("short descriptor read %d/%d", r, DEVICE_DESC_LENGTH);
+		return LIBUSB_ERROR_IO;
+	}
+
+	return 0;
+}
+
+static int op_get_config_descriptor(struct libusb_device *device,
+	int config_index, unsigned char *buffer, size_t len, void *user_data)
+{
+	struct discovery_data *ddata = user_data;
+	off_t off;
+	ssize_t r;
+	int fd = ddata->fd;
+
+	off = lseek(fd, DEVICE_DESC_LENGTH, SEEK_SET);
+	if (off < 0) {
+		usbi_err("seek failed ret=%d errno=%d", off, errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	/* might need to skip some configuration descriptors to reach the
+	 * requested index */
+	while (config_index > 0) {
+		unsigned char tmp[8];
+		struct libusb_config_descriptor config;
+
+		/* read first 8 bytes of descriptor */
+		r = read(fd, tmp, sizeof(tmp));
+		if (r < 0) {
+			usbi_err("read failed ret=%d errno=%d", r, errno);
+			return LIBUSB_ERROR_IO;
+		} else if (r < sizeof(tmp)) {
+			usbi_err("short descriptor read %d/%d", r, sizeof(tmp));
+			return LIBUSB_ERROR_IO;
+		}
+	
+		usbi_parse_descriptor(buffer, "bbw", &config);
+
+		/* seek forward to end of config */
+		off = lseek(fd, config.wTotalLength - sizeof(tmp), SEEK_CUR);
+		if (off < 0) {
+			usbi_err("seek failed ret=%d errno=%d", off, errno);
+			return LIBUSB_ERROR_IO;
+		}
+
+		config_index--;
+	}
+
+	/* read the actual config */
+	r = read(fd, buffer, len);
+	if (r < 0) {
+		usbi_err("read failed ret=%d errno=%d", r, errno);
+		return LIBUSB_ERROR_IO;
+	} else if (r < len) {
+		usbi_err("short descriptor read %d/%d", r, len);
+		return LIBUSB_ERROR_IO;
+	}
+
+	return 0;
+}
+
+static void op_end_discovery(struct libusb_device *device, void *user_data)
+{
+	struct discovery_data *ddata = user_data;
+	close(ddata->fd);
+	free(ddata);
+}
+
 static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	uint8_t devaddr)
 {
 	struct linux_device_priv *priv = __device_priv(dev);
 	char path[PATH_MAX + 1];
-	unsigned char raw_desc[DEVICE_DESC_LENGTH];
-	int fd = 0;
-	int i;
-	int r;
-	int tmp;
 
 	priv->nodepath = NULL;
-	dev->config = NULL;
 	dev->bus_number = busnum;
 	dev->device_address = devaddr;
 
 	snprintf(path, PATH_MAX, "%s/%03d/%03d", usbfs_path, busnum, devaddr);
 	usbi_dbg("%s", path);
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		usbi_dbg("open '%s' failed, ret=%d errno=%d", path, fd, errno);
-		/* FIXME this might not be an error if the file has gone away due
-		 * to unplugging */
-		r = -EIO;
-		goto err;
-	}
-
-	/* FIXME: move config parsing into main lib */
-	r = read(fd, raw_desc, DEVICE_DESC_LENGTH);
-	if (r < 0) {
-		usbi_err("read failed ret=%d errno=%d", r, errno);
-		goto err;
-	}
-	if (r < DEVICE_DESC_LENGTH) {
-		usbi_err("short descriptor read %d/%d", r, DEVICE_DESC_LENGTH);
-		r = -EIO;
-		goto err;
-	}
-
-	usbi_parse_descriptor(raw_desc, "bbWbbbbWWWbbbb", &dev->desc);
-
-	/* Now try to fetch the rest of the descriptors */
-	if (dev->desc.bNumConfigurations > USB_MAXCONFIG) {
-		usbi_err("too many configurations");
-		r = -EINVAL;
-		goto err;
-	}
-
-	if (dev->desc.bNumConfigurations < 1) {
-		usbi_dbg("no configurations?");
-		r = -EINVAL;
-		goto err;
-	}
-
-	tmp = dev->desc.bNumConfigurations * sizeof(struct libusb_config_descriptor);
-	dev->config = malloc(tmp);
-	if (!dev->config) {
-		r = -ENOMEM;
-		goto err;
-	}
-
-	memset(dev->config, 0, tmp);
-	for (i = 0; i < dev->desc.bNumConfigurations; i++) {
-		unsigned char buffer[8], *bigbuffer;
-		struct libusb_config_descriptor config;
-
-		/* Get the first 8 bytes to figure out what the total length is */
-		r = read(fd, buffer, sizeof(buffer));
-		if (r < sizeof(buffer)) {
-			usbi_err("short descriptor read (%d/%d)", r, sizeof(buffer));
-			r = -EIO;
-			goto err;
-		}
-
-		usbi_parse_descriptor(buffer, "bbw", &config);
-
-		bigbuffer = malloc(config.wTotalLength);
-		if (!bigbuffer) {
-			r = -ENOMEM;
-			goto err;
-		}
-
-		/* Read the rest of the config descriptor */
-		memcpy(bigbuffer, buffer, sizeof(buffer));
-
-		tmp = config.wTotalLength - 8;
-		r = read(fd, bigbuffer + 8, tmp);
-		if (r < tmp) {
-			usbi_err("short descriptor read (%d/%d)", r, tmp);
-			free(bigbuffer);
-			r = -EIO;
-			goto err;
-		}
-
-		r = usbi_parse_configuration(&dev->config[i], bigbuffer);
-		free(bigbuffer);
-		if (r < 0) {
-			usbi_err("parse_configuration failed with code %d", r);
-			goto err;
-		}
-		if (r > 0)
-			usbi_warn("descriptor data still left\n");
-	}
 
 	priv->nodepath = strdup(path);
-	if (!priv->nodepath) {
-		r = -ENOMEM;
-		goto err;
-	}
+	if (!priv->nodepath)
+		return LIBUSB_ERROR_NO_MEM;
 
-	close(fd);
 	return 0;
-
-err:
-	if (fd)
-		close(fd);
-	if (dev->config) {
-		usbi_clear_configurations(dev);
-		free(dev->config);
-		dev->config = NULL;
-	}
-	if (priv->nodepath) {
-		free(priv->nodepath);
-		priv->nodepath = NULL;
-	}
-	return r;
 }
 
 /* open a device file, set up the libusb_device structure for it, and add it to
@@ -295,6 +288,9 @@ static int scan_device(struct discovered_devs **_discdevs, uint8_t busnum,
 		}
 		need_unref = 1;
 		r = initialize_device(dev, busnum, devaddr);
+		if (r < 0)
+			goto out;
+		r = usbi_discover_device(dev);
 		if (r < 0)
 			goto out;
 	}
@@ -1212,6 +1208,11 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.init = op_init,
 	.exit = NULL,
 	.get_device_list = op_get_device_list,
+	.begin_discovery = op_begin_discovery,
+	.get_device_descriptor = op_get_device_descriptor,
+	.get_config_descriptor = op_get_config_descriptor,
+	.end_discovery = op_end_discovery,
+
 	.open = op_open,
 	.close = op_close,
 	.set_configuration = op_set_configuration,

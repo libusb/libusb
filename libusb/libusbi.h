@@ -223,6 +223,7 @@ void usbi_io_init(void);
 
 struct libusb_device *usbi_alloc_device(unsigned long session_id);
 struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id);
+int usbi_discover_device(struct libusb_device *dev);
 
 void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
@@ -272,6 +273,13 @@ struct usbi_os_backend {
 
 	int (*open)(struct libusb_device_handle *handle);
 	void (*close)(struct libusb_device_handle *handle);
+
+	int (*begin_discovery)(struct libusb_device *device, void **user_data);
+	int (*get_device_descriptor)(struct libusb_device *device,
+		unsigned char *buffer, void *user_data);
+	int (*get_config_descriptor)(struct libusb_device *device, int index,
+		unsigned char *buffer, size_t len, void *user_data);
+	void (*end_discovery)(struct libusb_device *device, void *user_data);
 
 	int (*set_configuration)(struct libusb_device_handle *handle, int config);
 
