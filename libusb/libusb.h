@@ -524,9 +524,10 @@ enum libusb_error {
 	LIBUSB_ERROR_NOT_FOUND = -4,
 	LIBUSB_ERROR_BUSY = -5,
 	LIBUSB_ERROR_TIMEOUT = -6,
-	LIBUSB_ERROR_NO_MEM = -7,
-	LIBUSB_ERROR_NOT_SUPPORTED = -8,
-	LIBUSB_ERROR_OTHER = -9,
+	LIBUSB_ERROR_PIPE = -7,
+	LIBUSB_ERROR_NO_MEM = -8,
+	LIBUSB_ERROR_NOT_SUPPORTED = -9,
+	LIBUSB_ERROR_OTHER = -10,
 };
 
 /** \ingroup asyncio
@@ -544,6 +545,10 @@ enum libusb_transfer_status {
 
 	/** Transfer was cancelled */
 	LIBUSB_TRANSFER_CANCELLED,
+
+	/** For bulk/interrupt endpoints: halt condition detected (endpoint
+	 * stalled). For control endpoints: control request not supported. */
+	LIBUSB_TRANSFER_STALL,
 };
 
 /** \ingroup asyncio

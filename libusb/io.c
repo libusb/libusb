@@ -332,6 +332,10 @@ if (r == 0 && actual_length == sizeof(data)) {
  * and libusb_control_transfer_get_setup() functions within your transfer
  * callback.
  *
+ * Even though control endpoints do not halt, a completed control transfer
+ * may have a LIBUSB_TRANSFER_STALL status code. This indicates the control
+ * request was not supported.
+ *
  * \section asyncintr Considerations for interrupt transfers
  * 
  * All interrupt transfers are performed using the polling interval presented

@@ -60,6 +60,8 @@ static void ctrl_transfer_cb(struct libusb_transfer *transfer)
  * value 0.
  * \returns 0 on success
  * \returns LIBUSB_ERROR_TIMEOUT if the transfer timed out
+ * \returns LIBUSB_ERROR_PIPE if the control request was not supported by the
+ * device
  * \returns another LIBUSB_ERROR code on other failures
  */
 API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
@@ -115,6 +117,9 @@ API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 		break;
 	case LIBUSB_TRANSFER_TIMED_OUT:
 		r = LIBUSB_ERROR_TIMEOUT;
+		break;
+	case LIBUSB_TRANSFER_STALL:
+		r = LIBUSB_ERROR_PIPE;
 		break;
 	default:
 		usbi_warn("unrecognised status code %d", transfer->status);
@@ -174,6 +179,9 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	case LIBUSB_TRANSFER_TIMED_OUT:
 		r = LIBUSB_ERROR_TIMEOUT;
 		break;
+	case LIBUSB_TRANSFER_STALL:
+		r = LIBUSB_ERROR_PIPE;
+		break;
 	default:
 		usbi_warn("unrecognised status code %d", transfer->status);
 		r = LIBUSB_ERROR_OTHER;
@@ -217,6 +225,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \returns 0 on success (and populates <tt>transferred</tt>)
  * \returns LIBUSB_ERROR_TIMEOUT if the transfer timed out (and populates
  * <tt>transferred</tt>)
+ * \returns LIBUSB_ERROR_PIPE if the endpoint halted
  * \returns another LIBUSB_ERROR code on other failures
  */
 API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
@@ -262,6 +271,7 @@ API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
  *
  * \returns 0 on success (and populates <tt>transferred</tt>)
  * \returns LIBUSB_ERROR_TIMEOUT if the transfer timed out
+ * \returns LIBUSB_ERROR_PIPE if the endpoint halted
  * \returns another LIBUSB_ERROR code on other error
  */
 API_EXPORTED int libusb_interrupt_transfer(

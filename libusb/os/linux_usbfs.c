@@ -1006,9 +1006,13 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		return 0;
 	}
 
-	/* FIXME: research what other status codes may exist */
-	if (urb->status != 0)
+	if (urb->status == -EPIPE) {
+		usbi_dbg("detected endpoint stall");
+		usbi_handle_transfer_completion(itransfer, LIBUSB_TRANSFER_STALL);
+		return 0;
+	} else if (urb->status != 0) {
 		usbi_warn("unrecognised urb status %d", urb->status);
+	}
 
 	/* if we're the last urb or we got less data than requested then we're
 	 * done */
@@ -1090,7 +1094,6 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		return 0;
 	}
 
-	/* FIXME: research what other status codes may exist */
 	if (urb->status != 0)
 		usbi_warn("unrecognised urb status %d", urb->status);
 
@@ -1109,6 +1112,8 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	struct usbfs_urb *urb)
 {
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
+	int status;
+
 	usbi_dbg("handling completion status %d", urb->status);
 
 	if (urb->status == 0)
@@ -1122,13 +1127,21 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 		return 0;
 	}
 
-	/* FIXME: research what other status codes may exist */
-	if (urb->status != 0)
+	if (urb->status == -EPIPE) {
+		usbi_dbg("unsupported control request");
+		status = LIBUSB_TRANSFER_STALL;
+		goto out;
+	} else if (urb->status != 0) {
 		usbi_warn("unrecognised urb status %d", urb->status);
+		status = LIBUSB_TRANSFER_ERROR;
+		goto out;
+	}
 
 	itransfer->transferred = urb->actual_length;
+	status = LIBUSB_TRANSFER_COMPLETED;
+out:
 	free(tpriv->urbs);
-	usbi_handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
+	usbi_handle_transfer_completion(itransfer, status);
 	return 0;
 }
 
