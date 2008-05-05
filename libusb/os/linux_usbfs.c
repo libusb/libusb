@@ -19,6 +19,7 @@
  */
 
 #include <config.h>
+#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -38,9 +39,11 @@
 #include "linux_usbfs.h"
 
 static const char *usbfs_path = NULL;
+static int have_sysfs;
 
 struct linux_device_priv {
-	char *nodepath;	
+	char *nodepath;
+	char sysfs_dir[SYSFS_DIR_LENGTH];
 };
 
 struct linux_device_handle_priv {
@@ -125,11 +128,24 @@ static const char *find_usbfs_path(void)
 
 static int op_init(void)
 {
+	struct stat statbuf;
+	int r;
+
 	usbfs_path = find_usbfs_path();
 	if (!usbfs_path) {
 		usbi_err("could not find usbfs");
 		return LIBUSB_ERROR_OTHER;
 	}
+
+	r = stat(SYSFS_DEVICE_PATH, &statbuf);
+	if (r == 0 && S_ISDIR(statbuf.st_mode)) {
+		usbi_dbg("found usb devices in sysfs");
+		have_sysfs = 1;
+	} else {
+		usbi_dbg("sysfs usb info not available");
+		have_sysfs = 0;
+	}
+
 	return 0;
 }
 
@@ -144,7 +160,15 @@ static int op_begin_discovery(struct libusb_device *dev, void **user_data)
 	if (!ddata)
 		return LIBUSB_ERROR_NO_MEM;
 
-	ddata->fd = open(priv->nodepath, O_RDONLY);
+	if (have_sysfs) {
+		char filename[PATH_MAX + 1];
+		snprintf(filename, PATH_MAX, "%s/%s/descriptors",
+			SYSFS_DEVICE_PATH, priv->sysfs_dir);
+		ddata->fd = open(filename, O_RDONLY);
+	} else {
+		ddata->fd = open(priv->nodepath, O_RDONLY);
+	}
+
 	if (ddata->fd < 0) {
 		usbi_dbg("open '%s' failed, ret=%d errno=%d", priv->nodepath,
 			ddata->fd, errno);
@@ -235,7 +259,7 @@ static void op_end_discovery(struct libusb_device *device, void *user_data)
 }
 
 static int initialize_device(struct libusb_device *dev, uint8_t busnum,
-	uint8_t devaddr)
+	uint8_t devaddr, const char *sysfs_dir)
 {
 	struct linux_device_priv *priv = __device_priv(dev);
 	char path[PATH_MAX + 1];
@@ -247,6 +271,9 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	snprintf(path, PATH_MAX, "%s/%03d/%03d", usbfs_path, busnum, devaddr);
 	usbi_dbg("%s", path);
 
+	if (sysfs_dir)
+		strncpy(priv->sysfs_dir, sysfs_dir, SYSFS_DIR_LENGTH);
+
 	priv->nodepath = strdup(path);
 	if (!priv->nodepath)
 		return LIBUSB_ERROR_NO_MEM;
@@ -254,17 +281,13 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	return 0;
 }
 
-/* open a device file, set up the libusb_device structure for it, and add it to
- * discdevs. on failure (non-zero return) the pre-existing discdevs should
- * be destroyed (and devices freed). on success, the new discdevs pointer
- * should be used it may have been moved. */
-static int scan_device(struct discovered_devs **_discdevs, uint8_t busnum,
-	uint8_t devaddr)
+static int enumerate_device(struct discovered_devs **_discdevs,
+	uint8_t busnum, uint8_t devaddr, const char *sysfs_dir)
 {
 	struct discovered_devs *discdevs;
 	unsigned long session_id;
-	struct libusb_device *dev;
 	int need_unref = 0;
+	struct libusb_device *dev;
 	int r = 0;
 
 	/* FIXME: session ID is not guaranteed unique as addresses can wrap and
@@ -282,12 +305,10 @@ static int scan_device(struct discovered_devs **_discdevs, uint8_t busnum,
 		usbi_dbg("allocating new device for %d/%d (session %ld)",
 			busnum, devaddr, session_id);
 		dev = usbi_alloc_device(session_id);
-		if (!dev) {
-			r = LIBUSB_ERROR_NO_MEM;
-			goto out;
-		}
+		if (!dev)
+			return LIBUSB_ERROR_NO_MEM;
 		need_unref = 1;
-		r = initialize_device(dev, busnum, devaddr);
+		r = initialize_device(dev, busnum, devaddr, sysfs_dir);
 		if (r < 0)
 			goto out;
 		r = usbi_discover_device(dev);
@@ -311,7 +332,7 @@ out:
  * failure (non-zero return) the pre-existing discdevs should be destroyed
  * (and devices freed). on success, the new discdevs pointer should be used
  * as it may have been moved. */
-static int scan_busdir(struct discovered_devs **_discdevs, uint8_t busnum)
+static int usbfs_scan_busdir(struct discovered_devs **_discdevs, uint8_t busnum)
 {
 	DIR *dir;
 	char dirpath[PATH_MAX + 1];
@@ -326,7 +347,7 @@ static int scan_busdir(struct discovered_devs **_discdevs, uint8_t busnum)
 		usbi_err("opendir '%s' failed, errno=%d", dirpath, errno);
 		/* FIXME: should handle valid race conditions like hub unplugged
 		 * during directory iteration - this is not an error */
-		return -1;
+		return LIBUSB_ERROR_IO;
 	}
 
 	while ((entry = readdir(dir))) {
@@ -341,7 +362,7 @@ static int scan_busdir(struct discovered_devs **_discdevs, uint8_t busnum)
 			continue;
 		}
 
-		r = scan_device(&discdevs, busnum, (uint8_t) devaddr);
+		r = enumerate_device(&discdevs, busnum, (uint8_t) devaddr, NULL);
 		if (r < 0)
 			goto out;
 	}
@@ -352,15 +373,16 @@ out:
 	return r;
 }
 
-static int op_get_device_list(struct discovered_devs **_discdevs)
+static int usbfs_get_device_list(struct discovered_devs **_discdevs)
 {
 	struct dirent *entry;
+	DIR *buses = opendir(usbfs_path);
 	struct discovered_devs *discdevs = *_discdevs;
 	int r = 0;
-	DIR *buses = opendir(usbfs_path);
+
 	if (!buses) {
 		usbi_err("opendir buses failed errno=%d", errno);
-		return -1;
+		return LIBUSB_ERROR_IO;
 	}
 
 	while ((entry = readdir(buses))) {
@@ -376,7 +398,7 @@ static int op_get_device_list(struct discovered_devs **_discdevs)
 			continue;
 		}
 
-		r = scan_busdir(&discdevs_new, busnum);
+		r = usbfs_scan_busdir(&discdevs_new, busnum);
 		if (r < 0)
 			goto out;
 		discdevs = discdevs_new;
@@ -386,6 +408,96 @@ out:
 	closedir(buses);
 	*_discdevs = discdevs;
 	return r;
+
+}
+
+static int sysfs_scan_device(struct discovered_devs **_discdevs,
+	const char *devname)
+{
+	int r = 0;
+	FILE *fd;
+	char filename[PATH_MAX + 1];
+	int busnum;
+	int devaddr;
+
+	usbi_dbg("scan %s", devname);
+
+	snprintf(filename, PATH_MAX, "%s/%s/busnum", SYSFS_DEVICE_PATH, devname);
+	fd = fopen(filename, "r");
+	if (!fd) {
+		usbi_err("open busnum failed, errno=%d", errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	r = fscanf(fd, "%d", &busnum);
+	fclose(fd);
+	if (r != 1) {
+		usbi_err("fscanf busnum returned %d, errno=%d", r, errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	snprintf(filename, PATH_MAX, "%s/%s/devnum", SYSFS_DEVICE_PATH, devname);
+	fd = fopen(filename, "r");
+	if (!fd) {
+		usbi_err("open devnum failed, errno=%d", errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	r = fscanf(fd, "%d", &devaddr);
+	fclose(fd);
+	if (r != 1) {
+		usbi_err("fscanf devnum returned %d, errno=%d", r, errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	usbi_dbg("bus=%d dev=%d", busnum, devaddr);
+	if (busnum > 255 || devaddr > 255)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	return enumerate_device(_discdevs, busnum & 0xff, devaddr & 0xff, devname);
+}
+
+static int sysfs_get_device_list(struct discovered_devs **_discdevs)
+{
+	struct discovered_devs *discdevs = *_discdevs;
+	DIR *devices = opendir(SYSFS_DEVICE_PATH);
+	struct dirent *entry;
+	int r = 0;
+
+	if (!devices) {
+		usbi_err("opendir devices failed errno=%d", errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	while ((entry = readdir(devices))) {
+		struct discovered_devs *discdevs_new = discdevs;
+
+		if ((!isdigit(entry->d_name[0]) && strncmp(entry->d_name, "usb", 3))
+				|| strchr(entry->d_name, ':'))
+			continue;
+
+		r = sysfs_scan_device(&discdevs_new, entry->d_name);
+		if (r < 0)
+			goto out;
+		discdevs = discdevs_new;
+	}	
+
+out:
+	closedir(devices);
+	*_discdevs = discdevs;
+	return r;
+}
+
+static int op_get_device_list(struct discovered_devs **_discdevs)
+{
+	/* we can retrieve device list and descriptors from sysfs or usbfs.
+	 * sysfs is preferable, because if we use usbfs we end up resuming
+	 * any autosuspended USB devices. however, sysfs is not available
+	 * everywhere, so we need a usbfs fallback too */
+	if (have_sysfs)
+		return sysfs_get_device_list(_discdevs);
+	else
+		return usbfs_get_device_list(_discdevs);
 }
 
 static int op_open(struct libusb_device_handle *handle)

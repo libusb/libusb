@@ -21,6 +21,9 @@
 #ifndef __LIBUSB_USBFS_H__
 #define __LIBUSB_USBFS_H__
 
+#define SYSFS_DEVICE_PATH "/sys/bus/usb/devices"
+#define SYSFS_DIR_LENGTH 8 /* xxx-xxx\0 */
+
 struct usbfs_ctrltransfer {
 	/* keep in sync with usbdevice_fs.h:usbdevfs_ctrltransfer */
 	uint8_t  bmRequestType;
