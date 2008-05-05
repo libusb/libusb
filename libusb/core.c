@@ -879,15 +879,19 @@ API_EXPORTED int libusb_init(void)
  */
 API_EXPORTED void libusb_exit(void)
 {
-	struct libusb_device_handle *devh;
 	usbi_dbg("");
 
 	pthread_mutex_lock(&usbi_open_devs_lock);
 	if (!list_empty(&usbi_open_devs)) {
-		usbi_dbg("naughty app left some devices open!\n");
-		list_for_each_entry(devh, &usbi_open_devs, list)
+		struct libusb_device_handle *devh;
+		struct libusb_device_handle *tmp;
+
+		usbi_dbg("naughty app left some devices open!");
+		list_for_each_entry_safe(devh, tmp, &usbi_open_devs, list) {
+			list_del(&devh->list);
 			do_close(devh);
-		/* FIXME where do the open handles get freed? */
+			free(devh);
+		}
 	}
 	pthread_mutex_unlock(&usbi_open_devs_lock);
 
