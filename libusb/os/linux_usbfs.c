@@ -598,7 +598,13 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 	 * into smaller units to meet such restriction, then fire off all the
 	 * units at once. it would be simpler if we just fired one unit at a time,
 	 * but there is a big performance gain through doing it this way. */
-	int num_urbs = (transfer->length / MAX_BULK_BUFFER_LENGTH) + 1;
+	int num_urbs = transfer->length / MAX_BULK_BUFFER_LENGTH;
+	int last_urb_partial = 0;
+
+	if ((transfer->length % MAX_BULK_BUFFER_LENGTH) > 0) {
+		last_urb_partial = 1;
+		num_urbs++;
+	}
 	usbi_dbg("need %d urbs for new transfer with length %d", num_urbs,
 		transfer->length);
 	alloc_size = num_urbs * sizeof(struct usbfs_urb);
@@ -618,7 +624,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 		urb->type = urb_type;
 		urb->endpoint = transfer->endpoint;
 		urb->buffer = transfer->buffer + (i * MAX_BULK_BUFFER_LENGTH);
-		if (i == num_urbs - 1)
+		if (i == num_urbs - 1 && last_urb_partial)
 			urb->buffer_length = transfer->length % MAX_BULK_BUFFER_LENGTH;
 		else
 			urb->buffer_length = MAX_BULK_BUFFER_LENGTH;
