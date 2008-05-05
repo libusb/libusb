@@ -3,7 +3,6 @@ for 1.0
 fixme review
 review functionality missing over 0.1
 endianness of control setup, issues when resubmitting transfers
-doxygen warnings
 serialization of handle_events
 internal docs for OS porters
 

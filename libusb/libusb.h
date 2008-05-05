@@ -142,7 +142,8 @@ enum libusb_transfer_type {
 	LIBUSB_TRANSFER_TYPE_INTERRUPT = 3,
 };
 
-/** Standard requests, as defined in table 9-3 of the USB2 specifications */
+/** \ingroup misc
+ * Standard requests, as defined in table 9-3 of the USB2 specifications */
 enum libusb_standard_request {
 	/** Request status of the specific recipient */
 	LIBUSB_REQUEST_GET_STATUS = 0x00,
@@ -346,11 +347,19 @@ struct libusb_endpoint_descriptor {
 	/** Interval for polling endpoint for data transfers. */
 	uint8_t  bInterval;
 
+	/** For audio devices only: the rate at which synchronization feedback
+	 * is provided. */
 	uint8_t  bRefresh;
+
+	/** For audio devices only: the address if the synch endpoint */
 	uint8_t  bSynchAddress;
 
-	const unsigned char *extra;	/* Extra descriptors */
-	int extralen;
+	/** Extra descriptors. If libusb encounters unknown endpoint descriptors,
+	 * it will store them here, should you wish to parse them. */
+	const unsigned char *extra;
+
+	/** Length of the extra descriptors, in bytes. */
+	int extra_length;
 };
 
 /** \ingroup desc
@@ -395,8 +404,12 @@ struct libusb_interface_descriptor {
 	 * by the bNumEndpoints field. */
 	const struct libusb_endpoint_descriptor *endpoint;
 
-	const unsigned char *extra;	/* Extra descriptors */
-	int extralen;
+	/** Extra descriptors. If libusb encounters unknown interface descriptors,
+	 * it will store them here, should you wish to parse them. */
+	const unsigned char *extra;
+
+	/** Length of the extra descriptors, in bytes. */
+	int extra_length;
 };
 
 /** \ingroup desc
@@ -449,8 +462,12 @@ struct libusb_config_descriptor {
 	 * this array is determined by the bNumInterfaces field. */
 	const struct libusb_interface *interface;
 
-	const unsigned char *extra;	/* Extra descriptors */
-	int extralen;
+	/** Extra descriptors. If libusb encounters unknown configuration
+	 * descriptors, it will store them here, should you wish to parse them. */
+	const unsigned char *extra;
+
+	/** Length of the extra descriptors, in bytes. */
+	int extra_length;
 };
 
 /** \ingroup asyncio

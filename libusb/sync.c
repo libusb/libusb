@@ -41,7 +41,6 @@ static void ctrl_transfer_cb(struct libusb_transfer *transfer)
 	/* caller interprets result and frees transfer */
 }
 
-/* FIXME: does this support partial transfers? */
 /** \ingroup syncio
  * Perform a USB control transfer. The direction of the transfer is inferred
  * from the bmRequestType field of the setup packet.
@@ -58,7 +57,7 @@ static void ctrl_transfer_cb(struct libusb_transfer *transfer)
  * \param timeout timeout (in millseconds) that this function should wait
  * before giving up due to no response being received. For no timeout, use
  * value 0.
- * \returns 0 on success
+ * \returns on success, the number of bytes actually transferred
  * \returns LIBUSB_ERROR_TIMEOUT if the transfer timed out
  * \returns LIBUSB_ERROR_PIPE if the control request was not supported by the
  * device

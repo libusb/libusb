@@ -140,19 +140,19 @@ static int parse_endpoint(struct libusb_endpoint_descriptor *endpoint,
 	len = (int)(buffer - begin);
 	if (!len) {
 		endpoint->extra = NULL;
-		endpoint->extralen = 0;
+		endpoint->extra_length = 0;
 		return parsed;
 	}
 
 	extra = malloc(len);
 	endpoint->extra = extra;
 	if (!extra) {
-		endpoint->extralen = 0;
+		endpoint->extra_length = 0;
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
 	memcpy(extra, begin, len);
-	endpoint->extralen = len;
+	endpoint->extra_length = len;
 
 	return parsed;
 }
@@ -211,7 +211,7 @@ static int parse_interface(struct libusb_interface *interface,
 		interface->num_altsetting++;
 		usbi_parse_descriptor(buffer, "bbbbbbbbb", ifp);
 		ifp->extra = NULL;
-		ifp->extralen = 0;
+		ifp->extra_length = 0;
 		ifp->endpoint = NULL;
 
 		/* Skip over the interface */
@@ -252,7 +252,7 @@ static int parse_interface(struct libusb_interface *interface,
 				goto err;
 			}
 			memcpy((unsigned char *) ifp->extra, begin, len);
-			ifp->extralen = len;
+			ifp->extra_length = len;
 		}
 
 		/* Did we hit an unexpected descriptor? */
@@ -361,7 +361,7 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 	size -= config->bLength;
 
 	config->extra = NULL;
-	config->extralen = 0;
+	config->extra_length = 0;
 
 	for (i = 0; i < config->bNumInterfaces; i++) {
 		int len;
@@ -397,7 +397,7 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 		len = (int)(buffer - begin);
 		if (len) {
 			/* FIXME: We should realloc and append here */
-			if (!config->extralen) {
+			if (!config->extra_length) {
 				config->extra = malloc(len);
 				if (!config->extra) {
 					r = LIBUSB_ERROR_NO_MEM;
@@ -405,7 +405,7 @@ int usbi_parse_configuration(struct libusb_config_descriptor *config,
 				}
 
 				memcpy((unsigned char *) config->extra, begin, len);
-				config->extralen = len;
+				config->extra_length = len;
 			}
 		}
 

@@ -468,6 +468,7 @@ API_EXPORTED uint8_t libusb_get_device_address(libusb_device *dev)
  * endpoint. This is useful for setting up isochronous transfers.
  *
  * \param dev a device
+ * \param endpoint address of the endpoint in question
  * \returns the wMaxPacketSize value, or LIBUSB_ERROR_NOT_FOUND if the endpoint
  * does not exist.
  */
@@ -778,8 +779,8 @@ out:
  * \param dev a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the
  * previously-claimed interface
- * \param altsetting the <tt>bAlternateSetting</tt> of the alternate setting
- * to activate
+ * \param alternate_setting the <tt>bAlternateSetting</tt> of the alternate
+ * setting to activate
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the interface was not claimed, or the
  * requested alternate setting does not exist

@@ -396,7 +396,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  *
  * The data for each packet will be found at an offset into the buffer that
  * can be calculated as if each prior packet completed in full. The
- * libusb_get_iso_packet_offset() and libusb_get_iso_packet_offset_simple()
+ * libusb_get_iso_packet_buffer() and libusb_get_iso_packet_buffer_simple()
  * functions may help you here.
  *
  * \section asyncmem Memory caveats
