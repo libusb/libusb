@@ -53,6 +53,53 @@ pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
  * this documentation, feedback and questions can be sent to the
  * <a href="http://sourceforge.net/mail/?group_id=1674">libusb-devel mailing
  * list</a>.
+ *
+ * This documentation assumes knowledge of how to operate USB devices from
+ * a software standpoint (descriptors, configurations, interfaces, endpoints,
+ * control/bulk/interrupt/isochronous transfers, etc). Full information
+ * can be found in the <a href="http://www.usb.org/developers/docs/">USB 2.0
+ * Specification</a> which is available for free download. You can probably
+ * find less verbose introductions by searching the web.
+ *
+ * To begin reading the API documentation, start with the Modules page which
+ * links to the different categories of libusb's functionality.
+ *
+ * libusb does have imperfections. The \ref caveats "caveats" page attempts
+ * to document these.
+ */
+
+/**
+ * \page caveats Caveats
+ *
+ * \section devresets Device resets
+ *
+ * The libusb_reset_device() function allows you to reset a device. If your
+ * program has to call such a function, it should obviously be aware that
+ * the reset will cause device state to change (e.g. register values may be
+ * reset).
+ *
+ * The problem is that any other program could reset the device your program
+ * is working with, at any time. libusb does not offer a mechanism to inform
+ * you when this has happened, so it will not be clear to your own program
+ * why the device state has changed.
+ *
+ * Ultimately, this is a limitation of writing drivers in userspace.
+ * Separation from the USB stack in the underlying kernel makes it difficult
+ * for the operating system to deliver such notifications to your program.
+ * The Linux kernel USB stack allows such reset notifications to be delivered
+ * to in-kernel USB drivers, but it is not clear how such notifications could
+ * be delivered to second-class drivers that live in userspace.
+ *
+ * \section blockonly Blocking-only functionality
+ *
+ * The functionality listed below is only available through synchronous,
+ * blocking functions. There are no asynchronous/non-blocking alternatives,
+ * and no clear ways of implementing these.
+ *
+ * - Configuration activation (libusb_set_configuration())
+ * - Interface/alternate setting activation (libusb_set_interface_alt_setting())
+ * - Clearing of halt/stall condition (libusb_clear_halt())
+ * - Device resets (libusb_reset_device())
  */
 
 /**
@@ -557,6 +604,8 @@ API_EXPORTED void libusb_unref_device(libusb_device *dev)
  * available to you through libusb_get_device(). This reference is removed
  * during libusb_close().
  *
+ * This is a non-blocking function; no requests are sent over the bus.
+ *
  * \param dev the device to open
  * \returns a handle for the device, or NULL on error
  */
@@ -648,6 +697,8 @@ static void do_close(struct libusb_device_handle *dev_handle)
  * Internally, this function destroys the reference that was added by
  * libusb_open() on the given device.
  *
+ * This is a non-blocking function; no requests are sent over the bus.
+ *
  * \param dev_handle the handle to close
  */
 API_EXPORTED void libusb_close(libusb_device_handle *dev_handle)
@@ -686,6 +737,12 @@ API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
  * must release all claimed interfaces using libusb_release_interface() before
  * setting a new active configuration.
  *
+ * You should always use this function rather than formulating your own
+ * SET_CONFIGURATION control request. This is because the underlying operating
+ * system needs to know when such changes happen.
+ *
+ * This is a blocking function.
+ *
  * \param dev a device handle
  * \param configuration the bConfigurationValue of the configuration you
  * wish to activate
@@ -707,6 +764,13 @@ API_EXPORTED int libusb_set_configuration(libusb_device_handle *dev,
  *
  * It is legal to attempt to claim an already-claimed interface, in which
  * case libusb just returns 0 without doing anything.
+ *
+ * Claiming of interfaces is a purely logical operation; it does not cause
+ * any requests to be sent over the bus. Interface claiming is used to
+ * instruct the underlying operating system that your application wishes
+ * to take ownership of the interface.
+ *
+ * This is a non-blocking function.
  *
  * \param dev a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the interface you
@@ -742,6 +806,9 @@ out:
 /** \ingroup dev
  * Release an interface previously claimed with libusb_claim_interface(). You
  * should release all claimed interfaces before closing a device handle.
+ *
+ * This is a non-blocking function which does not generate any bus requests.
+ *
  * \param dev a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the
  * previously-claimed interface
@@ -775,6 +842,12 @@ out:
 /** \ingroup dev
  * Activate an alternate setting for an interface. The interface must have
  * been previously claimed with libusb_claim_interface().
+ *
+ * You should always use this function rather than formulating your own
+ * SET_INTERFACE control request. This is because the underlying operating
+ * system needs to know when such changes happen.
+ *
+ * This is a blocking function.
  *
  * \param dev a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the
@@ -811,6 +884,8 @@ API_EXPORTED int libusb_set_interface_alt_setting(libusb_device_handle *dev,
  * You should cancel all pending transfers before attempting to clear the halt
  * condition.
  *
+ * This is a blocking function.
+ *
  * \param dev a device handle
  * \param endpoint the endpoint to clear halt status
  * \returns 0 on success
@@ -834,6 +909,8 @@ API_EXPORTED int libusb_clear_halt(libusb_device_handle *dev,
  * means that the device handle is no longer valid (you should close it) and
  * rediscover the device. A return code of LIBUSB_ERROR_NOT_FOUND indicates
  * when this is the case.
+ *
+ * This is a blocking function which usually incurs a noticeable delay.
  *
  * \param dev a handle of the device to reset
  * \returns 0 on success

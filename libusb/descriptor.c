@@ -426,6 +426,9 @@ err:
 
 /** \ingroup desc
  * Get the USB device descriptor for a given device.
+ *
+ * This is a non-blocking function; the device descriptor is cached in memory.
+ *
  * \param dev the device
  * \returns the USB device descriptor
  */
