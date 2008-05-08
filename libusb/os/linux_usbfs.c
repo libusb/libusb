@@ -597,7 +597,8 @@ static int op_clear_halt(struct libusb_device_handle *handle,
 	unsigned char endpoint)
 {
 	int fd = __device_handle_priv(handle)->fd;
-	int r = ioctl(fd, IOCTL_USBFS_CLEAR_HALT, &endpoint);
+	unsigned int _endpoint = endpoint;
+	int r = ioctl(fd, IOCTL_USBFS_CLEAR_HALT, &_endpoint);
 	if (r) {
 		if (errno == ENOENT)
 			return LIBUSB_ERROR_NOT_FOUND;
