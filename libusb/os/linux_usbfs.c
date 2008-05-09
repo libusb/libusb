@@ -56,9 +56,6 @@ static int have_sysfs;
  */
 
 struct linux_device_priv {
-	/* FIXME remove this, infer from dev->busnum etc */
-	char *nodepath;
-
 	union {
 		char sysfs_dir[SYSFS_DIR_LENGTH];
 		struct {
@@ -96,6 +93,12 @@ struct linux_transfer_priv {
 	/* next iso packet in user-supplied transfer to be populated */
 	int iso_packet_offset;
 };
+
+static void __get_usbfs_path(struct libusb_device *dev, char *path)
+{
+	snprintf(path, PATH_MAX, "%s/%03d/%03d", usbfs_path, dev->bus_number,
+		dev->device_address);
+}
 
 static struct linux_device_priv *__device_priv(struct libusb_device *dev)
 {
@@ -380,17 +383,17 @@ static int get_config_descriptor(int fd, int bConfigurationValue,
 static int op_get_config_descriptor(struct libusb_device *dev, uint8_t config,
 	unsigned char *buffer, size_t len)
 {
-	struct linux_device_priv *priv = __device_priv(dev);
+	char filename[PATH_MAX + 1];
 	int fd;
 	int r;
 
 	/* always read from usbfs: sysfs only has the active descriptor
 	 * this will involve waking the device up, but oh well! */
 
-	fd = open(priv->nodepath, O_RDONLY);
+	__get_usbfs_path(dev, filename);
+	fd = open(filename, O_RDONLY);
 	if (fd < 0) {
-		usbi_err("open '%s' failed, ret=%d errno=%d",
-			priv->nodepath, fd, errno);
+		usbi_err("open '%s' failed, ret=%d errno=%d", filename, fd, errno);
 		return LIBUSB_ERROR_IO;
 	}
 
@@ -437,11 +440,10 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	struct linux_device_priv *priv = __device_priv(dev);
 	char path[PATH_MAX + 1];
 
-	priv->nodepath = NULL;
 	dev->bus_number = busnum;
 	dev->device_address = devaddr;
 
-	snprintf(path, PATH_MAX, "%s/%03d/%03d", usbfs_path, busnum, devaddr);
+	__get_usbfs_path(dev, path);
 	usbi_dbg("%s", path);
 
 	if (!have_sysfs) {
@@ -522,10 +524,6 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 
 	if (sysfs_dir)
 		strncpy(priv->sysfs_dir, sysfs_dir, SYSFS_DIR_LENGTH);
-
-	priv->nodepath = strdup(path);
-	if (!priv->nodepath)
-		return LIBUSB_ERROR_NO_MEM;
 
 	return 0;
 }
@@ -751,16 +749,17 @@ static int op_get_device_list(struct discovered_devs **_discdevs)
 
 static int op_open(struct libusb_device_handle *handle)
 {
-	struct linux_device_priv *dpriv = __device_priv(handle->dev);
 	struct linux_device_handle_priv *hpriv = __device_handle_priv(handle);
+	char filename[PATH_MAX + 1];
 
-	hpriv->fd = open(dpriv->nodepath, O_RDWR);
+	__get_usbfs_path(handle->dev, filename);
+	hpriv->fd = open(filename, O_RDWR);
 	if (hpriv->fd < 0) {
 		if (errno == EACCES) {
 			fprintf(stderr, "libusb couldn't open USB device %s: "
 				"Permission denied.\n"
 				"libusb requires write access to USB device nodes.\n",
-				dpriv->nodepath);
+				filename);
 			return LIBUSB_ERROR_ACCESS;
 		} else {
 			usbi_err("open failed, code %d errno %d", hpriv->fd, errno);
@@ -930,9 +929,6 @@ static int op_detach_kernel_driver(struct libusb_device_handle *handle,
 static void op_destroy_device(struct libusb_device *dev)
 {
 	struct linux_device_priv *priv = __device_priv(dev);
-	if (priv->nodepath)
-		free(priv->nodepath);
-
 	if (!have_sysfs) {
 		if (priv->dev_descriptor)
 			free(priv->dev_descriptor);
