@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include "libusb.h"
 #include "libusbi.h"
@@ -429,13 +430,13 @@ struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id)
  * \returns the number of devices in the outputted list, or LIBUSB_ERROR_NO_MEM
  * on memory allocation failure.
  */
-API_EXPORTED size_t libusb_get_device_list(libusb_device ***list)
+API_EXPORTED ssize_t libusb_get_device_list(libusb_device ***list)
 {
 	struct discovered_devs *discdevs = discovered_devs_alloc();
 	struct libusb_device **ret;
 	int r = 0;
 	size_t i;
-	size_t len;
+	ssize_t len;
 	usbi_dbg("");
 
 	if (!discdevs)

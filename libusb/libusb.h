@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <time.h>
 
 #ifdef __cplusplus
@@ -659,7 +660,7 @@ struct libusb_transfer {
 int libusb_init(void);
 void libusb_exit(void);
 
-size_t libusb_get_device_list(libusb_device ***list);
+ssize_t libusb_get_device_list(libusb_device ***list);
 void libusb_free_device_list(libusb_device **list, int unref_devices);
 const struct libusb_device_descriptor *libusb_get_device_descriptor(
 	libusb_device *dev);

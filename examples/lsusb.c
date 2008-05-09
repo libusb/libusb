@@ -18,6 +18,7 @@
  */
 
 #include <stdio.h>
+#include <sys/types.h>
 
 #include <libusb/libusb.h>
 
@@ -39,7 +40,7 @@ int main(void)
 {
 	libusb_device **devs;
 	int r;
-	size_t cnt;
+	ssize_t cnt;
 
 	r = libusb_init();
 	if (r < 0)
