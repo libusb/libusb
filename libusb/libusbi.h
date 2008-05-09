@@ -153,8 +153,6 @@ struct libusb_device {
 
 	struct list_head list;
 	unsigned long session_data;
-	struct libusb_device_descriptor desc;
-	struct libusb_config_descriptor *config;
 	unsigned char os_priv[0];
 };
 
@@ -223,16 +221,13 @@ void usbi_io_init(void);
 
 struct libusb_device *usbi_alloc_device(unsigned long session_id);
 struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id);
-int usbi_discover_device(struct libusb_device *dev);
+int usbi_sanitize_device(struct libusb_device *dev);
 
 void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
 void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer);
 
 int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest);
-int usbi_parse_configuration(struct libusb_config_descriptor *config,
-		unsigned char *buffer);
-void usbi_clear_configurations(struct libusb_device *dev);
 
 /* polling */
 
@@ -274,12 +269,12 @@ struct usbi_os_backend {
 	int (*open)(struct libusb_device_handle *handle);
 	void (*close)(struct libusb_device_handle *handle);
 
-	int (*begin_discovery)(struct libusb_device *device, void **user_data);
 	int (*get_device_descriptor)(struct libusb_device *device,
-		unsigned char *buffer, void *user_data);
-	int (*get_config_descriptor)(struct libusb_device *device, int index,
-		unsigned char *buffer, size_t len, void *user_data);
-	void (*end_discovery)(struct libusb_device *device, void *user_data);
+		unsigned char *buffer);
+	int (*get_active_config_descriptor)(struct libusb_device *device,
+		unsigned char *buffer, size_t len);
+	int (*get_config_descriptor)(struct libusb_device *device, uint8_t config,
+		unsigned char *buffer, size_t len);
 
 	int (*set_configuration)(struct libusb_device_handle *handle, int config);
 

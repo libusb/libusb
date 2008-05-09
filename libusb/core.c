@@ -304,95 +304,28 @@ struct libusb_device *usbi_alloc_device(unsigned long session_id)
 	return dev;
 }
 
-/* call the OS discovery routines to populate descriptors etc */
-int usbi_discover_device(struct libusb_device *dev)
+/* to be called by OS implementations when a new device is ready for final
+ * sanitization and checking before being returned in a device list. */
+int usbi_sanitize_device(struct libusb_device *dev)
 {
 	int r;
-	int i;
-	void *user_data;
 	unsigned char raw_desc[DEVICE_DESC_LENGTH];
-	size_t alloc_size;
+	uint8_t num_configurations;
 
-	dev->config = NULL;
-
-	r = usbi_backend->begin_discovery(dev, &user_data);
+	r = usbi_backend->get_device_descriptor(dev, raw_desc);
 	if (r < 0)
 		return r;
-	
-	r = usbi_backend->get_device_descriptor(dev, raw_desc, user_data);
-	if (r < 0)
-		goto err;
 
-	usbi_parse_descriptor(raw_desc, "bbWbbbbWWWbbbb", &dev->desc);
-
-	if (dev->desc.bNumConfigurations > USB_MAXCONFIG) {
+	num_configurations = raw_desc[DEVICE_DESC_LENGTH - 1];
+	if (num_configurations > USB_MAXCONFIG) {
 		usbi_err("too many configurations");
-		r = LIBUSB_ERROR_IO;
-		goto err;
-	}
-
-	if (dev->desc.bNumConfigurations < 1) {
+		return LIBUSB_ERROR_IO;
+	} else if (num_configurations < 1) {
 		usbi_dbg("no configurations?");
-		r = LIBUSB_ERROR_IO;
-		goto err;
+		return LIBUSB_ERROR_IO;
 	}
 
-	alloc_size = dev->desc.bNumConfigurations
-		* sizeof(struct libusb_config_descriptor);
-	dev->config = malloc(alloc_size);
-	if (!dev->config) {
-		r = LIBUSB_ERROR_NO_MEM;
-		goto err;
-	}
-
-	memset(dev->config, 0, alloc_size);
-	for (i = 0; i < dev->desc.bNumConfigurations; i++) {
-		unsigned char tmp[8];
-		unsigned char *bigbuffer;
-		struct libusb_config_descriptor config;
-
-		r = usbi_backend->get_config_descriptor(dev, i, tmp, sizeof(tmp),
-			user_data);
-		if (r < 0)
-			goto err;
-
-		usbi_parse_descriptor(tmp, "bbw", &config);
-
-		bigbuffer = malloc(config.wTotalLength);
-		if (!bigbuffer) {
-			r = LIBUSB_ERROR_NO_MEM;
-			goto err;
-		}
-
-		r = usbi_backend->get_config_descriptor(dev, i, bigbuffer,
-			config.wTotalLength, user_data);
-		if (r < 0) {
-			free(bigbuffer);
-			goto err;
-		}
-
-		r = usbi_parse_configuration(&dev->config[i], bigbuffer);
-		free(bigbuffer);
-		if (r < 0) {
-			usbi_err("parse_configuration failed with code %d", r);
-			goto err;
-		} else if (r > 0) {
-			usbi_warn("descriptor data still left\n");
-		}
-	}
-
-	usbi_backend->end_discovery(dev, user_data);
 	return 0;
-
-err:
-	if (dev->config) {
-		usbi_clear_configurations(dev);
-		free(dev->config);
-		dev->config = NULL;
-	}
-
-	usbi_backend->end_discovery(dev, user_data);
-	return r;
 }
 
 struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id)
@@ -513,19 +446,27 @@ API_EXPORTED uint8_t libusb_get_device_address(libusb_device *dev)
 
 /** \ingroup dev
  * Convenience function to retrieve the wMaxPacketSize value for a particular
- * endpoint. This is useful for setting up isochronous transfers.
+ * endpoint in the active device configuration. This is useful for setting up
+ * isochronous transfers.
  *
  * \param dev a device
  * \param endpoint address of the endpoint in question
- * \returns the wMaxPacketSize value, or LIBUSB_ERROR_NOT_FOUND if the endpoint
- * does not exist.
+ * \returns the wMaxPacketSize value
+ * \returns LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
+ * \returns LIBUSB_ERROR_OTHER on other failure
  */
 API_EXPORTED int libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint)
 {
 	int iface_idx;
-	/* FIXME: active config considerations? */
-	struct libusb_config_descriptor *config = dev->config;
+	struct libusb_config_descriptor *config =
+		libusb_get_active_config_descriptor(dev);
+	int r = LIBUSB_ERROR_NOT_FOUND;
+
+	if (!config) {
+		usbi_err("could not retrieve active config descriptor");
+		return LIBUSB_ERROR_OTHER;
+	}
 
 	for (iface_idx = 0; iface_idx < config->bNumInterfaces; iface_idx++) {
 		const struct libusb_interface *iface = &config->interface[iface_idx];
@@ -540,13 +481,17 @@ API_EXPORTED int libusb_get_max_packet_size(libusb_device *dev,
 			for (ep_idx = 0; ep_idx < altsetting->bNumEndpoints; ep_idx++) {
 				const struct libusb_endpoint_descriptor *ep =
 					&altsetting->endpoint[ep_idx];
-				if (ep->bEndpointAddress == endpoint)
-					return ep->wMaxPacketSize;
+				if (ep->bEndpointAddress == endpoint) {
+					r = ep->wMaxPacketSize;
+					goto out;
+				}
 			}
 		}
 	}
 
-	return LIBUSB_ERROR_NOT_FOUND;
+out:
+	libusb_free_config_descriptor(config);
+	return r;
 }
 
 /** \ingroup dev
@@ -579,8 +524,7 @@ API_EXPORTED void libusb_unref_device(libusb_device *dev)
 	pthread_mutex_unlock(&dev->lock);
 
 	if (refcnt == 0) {
-		usbi_dbg("destroy device %04x:%04x", dev->desc.idVendor,
-			dev->desc.idProduct);
+		usbi_dbg("destroy device %d.%d", dev->bus_number, dev->device_address);
 
 		if (usbi_backend->destroy_device)
 			usbi_backend->destroy_device(dev);
@@ -589,10 +533,6 @@ API_EXPORTED void libusb_unref_device(libusb_device *dev)
 		list_del(&dev->list);
 		pthread_mutex_unlock(&usb_devs_lock);
 
-		if (dev->config) {
-			usbi_clear_configurations(dev);
-			free(dev->config);
-		}
 		free(dev);
 	}
 }
@@ -615,7 +555,7 @@ API_EXPORTED libusb_device_handle *libusb_open(libusb_device *dev)
 	struct libusb_device_handle *handle;
 	size_t priv_size = usbi_backend->device_handle_priv_size;
 	int r;
-	usbi_dbg("open %04x:%04x", dev->desc.idVendor, dev->desc.idProduct);
+	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
 
 	handle = malloc(sizeof(*handle) + priv_size);
 	if (!handle)
@@ -670,9 +610,11 @@ API_EXPORTED libusb_device_handle *libusb_open_device_with_vid_pid(
 		return NULL;
 
 	while ((dev = devs[i++]) != NULL) {
-		const struct libusb_device_descriptor *desc =
-			libusb_get_device_descriptor(dev);
-		if (desc->idVendor == vendor_id && desc->idProduct == product_id) {
+		struct libusb_device_descriptor desc;
+		int r = libusb_get_device_descriptor(dev, &desc);
+		if (r < 0)
+			goto out;
+		if (desc.idVendor == vendor_id && desc.idProduct == product_id) {
 			found = dev;
 			break;
 		}
@@ -681,6 +623,7 @@ API_EXPORTED libusb_device_handle *libusb_open_device_with_vid_pid(
 	if (found)
 		handle = libusb_open(found);
 
+out:
 	libusb_free_device_list(devs, 1);
 	return handle;
 }

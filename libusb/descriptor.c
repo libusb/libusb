@@ -325,14 +325,7 @@ static void clear_configuration(struct libusb_config_descriptor *config)
 		free((void *) config->extra);
 }
 
-void usbi_clear_configurations(struct libusb_device *dev)
-{
-	int i;
-	for (i = 0; i < dev->desc.bNumConfigurations; i++)
-		clear_configuration(dev->config + i);
-}
-
-int usbi_parse_configuration(struct libusb_config_descriptor *config,
+static int parse_configuration(struct libusb_config_descriptor *config,
 	unsigned char *buffer)
 {
 	int i;
@@ -430,23 +423,149 @@ err:
  * This is a non-blocking function; the device descriptor is cached in memory.
  *
  * \param dev the device
- * \returns the USB device descriptor
+ * \param desc output location for the descriptor data
+ * \returns 0 on success or a LIBUSB_ERROR code on failure
  */
-API_EXPORTED const struct libusb_device_descriptor *libusb_get_device_descriptor(
-	libusb_device *dev)
+API_EXPORTED int libusb_get_device_descriptor(libusb_device *dev,
+	struct libusb_device_descriptor *desc)
 {
-	return &dev->desc;
+	unsigned char raw_desc[DEVICE_DESC_LENGTH];
+	int r;
+
+	r = usbi_backend->get_device_descriptor(dev, raw_desc);
+	if (r < 0)
+		return r;
+
+	usbi_parse_descriptor(raw_desc, "bbWbbbbWWWbbbb", desc);
+	return 0;
 }
 
 /** \ingroup desc
- * Get the USB configuration descriptor for a given device.
- * \param dev the device
- * \returns the USB configuration descriptor
+ * Get the USB configuration descriptor for the currently active configuration.
+ * This is a non-blocking function which does not involve any requests being
+ * sent to the device.
+ *
+ * \param dev a device
+ * \returns the USB configuration descriptor which must be freed with
+ * libusb_free_config_descriptor() when done
+ * \returns NULL on error
+ * \see libusb_get_config_descriptor
  */
-API_EXPORTED const struct libusb_config_descriptor *libusb_get_config_descriptor(
+API_EXPORTED
+struct libusb_config_descriptor *libusb_get_active_config_descriptor(
 	libusb_device *dev)
 {
-	return dev->config;
+	struct libusb_config_descriptor *config = malloc(sizeof(*config));
+	unsigned char tmp[8];
+	unsigned char *buf = NULL;
+	int r;
+
+	if (!config)
+		return NULL;
+
+	r = usbi_backend->get_active_config_descriptor(dev, tmp, sizeof(tmp));
+	if (r < 0)
+		goto err;
+
+	usbi_parse_descriptor(tmp, "bbw", &config);
+	buf = malloc(config->wTotalLength);
+	if (!buf)
+		goto err;
+
+	r = usbi_backend->get_active_config_descriptor(dev, buf,
+		config->wTotalLength);
+	if (r < 0)
+		goto err;
+
+	r = parse_configuration(config, buf);
+	if (r < 0) {
+		usbi_err("parse_configuration failed with error %d", r);
+		goto err;
+	} else if (r > 0) {
+		usbi_warn("descriptor data still left");
+	}
+
+	return config;
+
+err:
+	free(config);
+	if (buf)
+		free(buf);
+	return NULL;
+}
+
+/** \ingroup desc
+ * Get the USB configuration descriptor for the currently active configuration.
+ * This is a non-blocking function which does not involve any requests being
+ * sent to the device.
+ *
+ * \param dev a device
+ * \param bConfigurationValue the bConfigurationValue of the configuration
+ * you wish to retreive
+ * \returns the USB configuration descriptor which must be freed with
+ * libusb_free_config_descriptor() when done
+ * \returns NULL on error
+ * \see libusb_get_active_config_descriptor()
+ */
+API_EXPORTED struct libusb_config_descriptor *libusb_get_config_descriptor(
+	libusb_device *dev, uint8_t bConfigurationValue)
+{
+	struct libusb_config_descriptor *config = malloc(sizeof(*config));
+	unsigned char tmp[8];
+	unsigned char *buf = NULL;
+	int r;
+
+	if (!config)
+		return NULL;
+
+	r = usbi_backend->get_config_descriptor(dev, bConfigurationValue, tmp,
+		sizeof(tmp));
+	if (r < 0)
+		goto err;
+
+	usbi_parse_descriptor(tmp, "bbw", &config);
+	buf = malloc(config->wTotalLength);
+	if (!buf)
+		goto err;
+
+	r = usbi_backend->get_config_descriptor(dev, bConfigurationValue, buf,
+		config->wTotalLength);
+	if (r < 0)
+		goto err;
+
+	r = parse_configuration(config, buf);
+	if (r < 0) {
+		usbi_err("parse_configuration failed with error %d", r);
+		goto err;
+	} else if (r > 0) {
+		usbi_warn("descriptor data still left");
+	}
+
+	return config;
+
+err:
+	free(config);
+	if (buf)
+		free(buf);
+	return NULL;
+}
+
+/** \ingroup desc
+ * Free a configuration descriptor obtained from
+ * libusb_get_active_config_descriptor() or libusb_get_config_descriptor().
+ * It is safe to call this function with a NULL config parameter, in which
+ * case the function simply returns.
+ *
+ * \param config the configuration descriptor to free
+ */
+API_EXPORTED void libusb_free_config_descriptor(
+	struct libusb_config_descriptor *config)
+{
+	if (!config)
+		return;
+
+	clear_configuration(config);
+	free(config);
 }
 
 /** \ingroup desc

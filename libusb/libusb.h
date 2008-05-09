@@ -662,12 +662,16 @@ void libusb_exit(void);
 
 ssize_t libusb_get_device_list(libusb_device ***list);
 void libusb_free_device_list(libusb_device **list, int unref_devices);
-const struct libusb_device_descriptor *libusb_get_device_descriptor(
-	libusb_device *dev);
-const struct libusb_config_descriptor *libusb_get_config_descriptor(
-	libusb_device *dev);
 libusb_device *libusb_ref_device(libusb_device *dev);
 void libusb_unref_device(libusb_device *dev);
+
+int libusb_get_device_descriptor(libusb_device *dev,
+	struct libusb_device_descriptor *desc);
+struct libusb_config_descriptor *libusb_get_active_config_descriptor(
+	libusb_device *dev);
+struct libusb_config_descriptor *libusb_get_config_descriptor(
+	libusb_device *dev, uint8_t config);
+void libusb_free_config_descriptor(struct libusb_config_descriptor *config);
 uint8_t libusb_get_bus_number(libusb_device *dev);
 uint8_t libusb_get_device_address(libusb_device *dev);
 int libusb_get_max_packet_size(libusb_device *dev, unsigned char endpoint);

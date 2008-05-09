@@ -7,6 +7,7 @@ serialization of handle_events
 internal docs for OS porters
 configuration handling
 check which messages are sent during open, claim interface, close, release
+unconfigured devices
 
 1.0 API style/naming points to reconsider
 =========================================
