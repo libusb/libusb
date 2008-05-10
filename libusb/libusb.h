@@ -667,12 +667,12 @@ void libusb_unref_device(libusb_device *dev);
 
 int libusb_get_device_descriptor(libusb_device *dev,
 	struct libusb_device_descriptor *desc);
-struct libusb_config_descriptor *libusb_get_active_config_descriptor(
-	libusb_device *dev);
-struct libusb_config_descriptor *libusb_get_config_descriptor(
-	libusb_device *dev, uint8_t config_index);
-struct libusb_config_descriptor *libusb_get_config_descriptor_by_value(
-	libusb_device *dev, uint8_t bConfigurationValue);
+int libusb_get_active_config_descriptor(libusb_device *dev,
+	struct libusb_config_descriptor **config);
+int libusb_get_config_descriptor(libusb_device *dev, uint8_t config_index,
+	struct libusb_config_descriptor **config);
+int libusb_get_config_descriptor_by_value(libusb_device *dev,
+	uint8_t bConfigurationValue, struct libusb_config_descriptor **config);
 void libusb_free_config_descriptor(struct libusb_config_descriptor *config);
 uint8_t libusb_get_bus_number(libusb_device *dev);
 uint8_t libusb_get_device_address(libusb_device *dev);

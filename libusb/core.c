@@ -460,15 +460,16 @@ API_EXPORTED int libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint)
 {
 	int iface_idx;
-	struct libusb_config_descriptor *config =
-		libusb_get_active_config_descriptor(dev);
-	int r = LIBUSB_ERROR_NOT_FOUND;
-
-	if (!config) {
+	struct libusb_config_descriptor *config;
+	int r;
+	
+	r = libusb_get_active_config_descriptor(dev, &config);
+	if (r < 0) {
 		usbi_err("could not retrieve active config descriptor");
 		return LIBUSB_ERROR_OTHER;
 	}
 
+	r = LIBUSB_ERROR_NOT_FOUND;
 	for (iface_idx = 0; iface_idx < config->bNumInterfaces; iface_idx++) {
 		const struct libusb_interface *iface = &config->interface[iface_idx];
 		int altsetting_idx;
@@ -682,6 +683,10 @@ API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
  * must release all claimed interfaces using libusb_release_interface() before
  * setting a new active configuration.
  *
+ * A configuration value of -1 will put the device in unconfigured state.
+ * The USB specifications state that a configuration value of 0 does this,
+ * however buggy devices exist which actually have a configuration 0.
+ *
  * You should always use this function rather than formulating your own
  * SET_CONFIGURATION control request. This is because the underlying operating
  * system needs to know when such changes happen.
@@ -690,7 +695,7 @@ API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
  *
  * \param dev a device handle
  * \param configuration the bConfigurationValue of the configuration you
- * wish to activate
+ * wish to activate, or -1 if you wish to put the device in unconfigured state
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the requested configuration does not exist
  * \returns LIBUSB_ERROR_BUSY if interfaces are currently claimed

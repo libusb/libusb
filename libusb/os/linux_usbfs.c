@@ -249,6 +249,9 @@ static int usbfs_get_active_config_descriptor(struct libusb_device *dev,
 	unsigned char *buffer, size_t len)
 {
 	struct linux_device_priv *priv = __device_priv(dev);
+	if (!priv->config_descriptor)
+		return LIBUSB_ERROR_NOT_FOUND; /* device is unconfigured */
+
 	/* retrieve cached copy */
 	memcpy(buffer, priv->config_descriptor, len);
 	return 0;
@@ -280,6 +283,9 @@ static int sysfs_get_active_config_descriptor(struct libusb_device *dev,
 	if (r < 0) {
 		usbi_err("read failed, ret=%d errno=%d", fd, errno);
 		return LIBUSB_ERROR_IO;
+	} else if (r == 0) {
+		usbi_dbg("device is unconfigured");
+		return LIBUSB_ERROR_NOT_FOUND;
 	} else if (r < len) {
 		usbi_err("short read %d/%d", r, len);
 		return LIBUSB_ERROR_IO;
@@ -416,7 +422,7 @@ static int cache_active_config(struct libusb_device *dev, int fd,
 }
 
 /* read the bConfigurationValue for a device */
-static int sysfs_get_active_config(struct libusb_device *dev)
+static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 {
 	char *endptr;
 	char tmp[4] = {0, 0, 0, 0};
@@ -435,8 +441,9 @@ static int sysfs_get_active_config(struct libusb_device *dev)
 			r, errno);
 		return LIBUSB_ERROR_IO;
 	} else if (r == 0) {
-		usbi_err("short bConfigurationValue read");
-		return LIBUSB_ERROR_IO;
+		usbi_err("device unconfigured");
+		*config = -1;
+		return 0;
 	}
 
 	if (tmp[sizeof(tmp) - 1] != 0) {
@@ -453,7 +460,8 @@ static int sysfs_get_active_config(struct libusb_device *dev)
 		return LIBUSB_ERROR_IO;
 	}
 
-	return (int) num;
+	*config = (int) num;
+	return 0;
 }
 
 /* send a control message to retrieve active configuration */
@@ -489,6 +497,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	char path[PATH_MAX + 1];
 	int fd;
 	int active_config = 0;
+	int device_configured = 1;
 	ssize_t r;
 
 	dev->bus_number = busnum;
@@ -507,9 +516,11 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	priv->config_descriptor = NULL;
 
 	if (sysfs_can_relate_devices) {
-		active_config = sysfs_get_active_config(dev);
-		if (active_config < 0)
-			return active_config;
+		int tmp = sysfs_get_active_config(dev, &active_config);
+		if (tmp < 0)
+			return tmp;
+		if (active_config == -1)
+			device_configured = 0;
 	}
 
 	__get_usbfs_path(dev, path);
@@ -539,6 +550,14 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 			if (active_config < 0) {
 				close(fd);
 				return active_config;
+			} else if (active_config == 0) {
+				/* some buggy devices have a configuration 0, but we're
+				 * reaching into the corner of a corner case here, so let's
+				 * not support buggy devices in these circumstances.
+				 * stick to the specs: a configuration value of 0 means
+				 * unconfigured. */
+				usbi_dbg("assuming unconfigured device");
+				device_configured = 0;
 			}
 		}
 	}
@@ -562,13 +581,20 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		return LIBUSB_ERROR_IO;
 	}
 
-	r = cache_active_config(dev, fd, active_config);
-	close(fd);
-	if (r < 0) {
-		free(dev_buf);
-		return r;
+	/* bit of a hack: set num_configurations now because cache_active_config()
+	 * calls usbi_get_config_index_by_value() which uses it */
+	dev->num_configurations = dev_buf[DEVICE_DESC_LENGTH - 1];
+
+	if (device_configured) {
+		r = cache_active_config(dev, fd, active_config);
+		if (r < 0) {
+			close(fd);
+			free(dev_buf);
+			return r;
+		}
 	}
 
+	close(fd);
 	priv->dev_descriptor = dev_buf;
 	return 0;
 }
@@ -745,6 +771,8 @@ static int sysfs_scan_device(struct discovered_devs **_discdevs,
 		return LIBUSB_ERROR_IO;
 	}
 
+	sysfs_can_relate_devices = 1;
+
 	r = fscanf(fd, "%d", &busnum);
 	fclose(fd);
 	if (r != 1) {
@@ -859,6 +887,7 @@ static void op_close(struct libusb_device_handle *dev_handle)
 
 static int op_set_configuration(struct libusb_device_handle *handle, int config)
 {
+	struct linux_device_priv *priv = __device_priv(handle->dev);
 	int fd = __device_handle_priv(handle)->fd;
 	int r = ioctl(fd, IOCTL_USBFS_SETCONFIG, &config);
 	if (r) {
@@ -873,9 +902,17 @@ static int op_set_configuration(struct libusb_device_handle *handle, int config)
 
 	if (!sysfs_has_descriptors) {
 		/* update our cached active config descriptor */
-		r = cache_active_config(handle->dev, fd, config);
-		if (r < 0)
-			usbi_warn("failed to update cached config descriptor, error %d", r);
+		if (config == -1) {
+			if (priv->config_descriptor) {
+				free(priv->config_descriptor);
+				priv->config_descriptor = NULL;
+			}
+		} else {
+			r = cache_active_config(handle->dev, fd, config);
+			if (r < 0)
+				usbi_warn("failed to update cached config descriptor, "
+					"error %d", r);
+		}
 	}
 
 	return 0;
