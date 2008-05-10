@@ -5,7 +5,6 @@ review functionality missing over 0.1
 endianness of control setup, issues when resubmitting transfers
 serialization of handle_events
 internal docs for OS porters
-configuration handling
 check which messages are sent during open, claim interface, close, release
 unconfigured devices
 

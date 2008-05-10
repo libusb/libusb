@@ -229,6 +229,8 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer);
 
 int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest);
+int usbi_get_config_index_by_value(struct libusb_device *dev,
+	uint8_t bConfigurationValue, int *idx);
 
 /* polling */
 

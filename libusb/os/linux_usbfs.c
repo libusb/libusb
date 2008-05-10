@@ -383,10 +383,16 @@ static int cache_active_config(struct libusb_device *dev, int fd,
 	struct libusb_config_descriptor config;
 	unsigned char tmp[8];
 	unsigned char *buf;
+	int idx;
 	int r;
 
-	/* FIXME */
-	r = get_config_descriptor(fd, active_config, tmp, sizeof(tmp));
+	r = usbi_get_config_index_by_value(dev, active_config, &idx);
+	if (r < 0)
+		return r;
+	if (idx == -1)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	r = get_config_descriptor(fd, idx, tmp, sizeof(tmp));
 	if (r < 0) {
 		usbi_err("first read error %d", r);
 		return r;
@@ -397,7 +403,7 @@ static int cache_active_config(struct libusb_device *dev, int fd,
 	if (!buf)
 		return LIBUSB_ERROR_NO_MEM;
 
-	r = get_config_descriptor(fd, active_config, buf, config.wTotalLength);
+	r = get_config_descriptor(fd, idx, buf, config.wTotalLength);
 	if (r < 0) {
 		free(buf);
 		return r;

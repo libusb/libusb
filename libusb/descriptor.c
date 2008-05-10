@@ -557,6 +557,32 @@ err:
 	return NULL;
 }
 
+/* iterate through all configurations, returning the index of the configuration
+ * matching a specific bConfigurationValue in the idx output parameter, or -1
+ * if the config was not found.
+ * returns 0 or a LIBUSB_ERROR code
+ */
+int usbi_get_config_index_by_value(struct libusb_device *dev,
+	uint8_t bConfigurationValue, int *idx)
+{
+	int i;
+
+	usbi_dbg("value %d", bConfigurationValue);
+	for (i = 0; i < dev->num_configurations; i++) {
+		unsigned char tmp[6];
+		int r = usbi_backend->get_config_descriptor(dev, i, tmp, sizeof(tmp));
+		if (r < 0)
+			return r;
+		if (tmp[5] == bConfigurationValue) {
+			*idx = i;
+			return 0;
+		}
+	}
+
+	*idx = -1;
+	return 0;
+}
+
 /** \ingroup desc
  * Get a USB configuration descriptor with a specific bConfigurationValue.
  * This is a non-blocking function which does not involve any requests being
@@ -575,26 +601,12 @@ API_EXPORTED
 struct libusb_config_descriptor *libusb_get_config_descriptor_by_value(
 	libusb_device *dev, uint8_t bConfigurationValue)
 {
-	int i;
-	int r;
-	int found = -1;
-
-	usbi_dbg("value %d", bConfigurationValue);
-	for (i = 0; i < dev->num_configurations; i++) {
-		unsigned char tmp[6];
-		r = usbi_backend->get_config_descriptor(dev, i, tmp, sizeof(tmp));
-		if (r < 0)
-			return NULL;
-		if (tmp[5] == bConfigurationValue) {
-			found = 1;
-			break;
-		}
-	}
-
-	if (!found)
+	int idx;
+	int r = usbi_get_config_index_by_value(dev, bConfigurationValue, &idx);
+	if (r < 0 || idx == -1)
 		return NULL;
 	else
-		return libusb_get_config_descriptor(dev, i);
+		return libusb_get_config_descriptor(dev, idx);
 }
 
 /** \ingroup desc
