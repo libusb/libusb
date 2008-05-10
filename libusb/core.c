@@ -325,6 +325,7 @@ int usbi_sanitize_device(struct libusb_device *dev)
 		return LIBUSB_ERROR_IO;
 	}
 
+	dev->num_configurations = num_configurations;
 	return 0;
 }
 

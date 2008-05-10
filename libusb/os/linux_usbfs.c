@@ -301,49 +301,22 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 /* takes a usbfs fd, attempts to find the requested config and copy a certain
  * amount of it into an output buffer. a bConfigurationValue of -1 indicates
  * that the first config should be retreived. */
-static int get_config_descriptor(int fd, int bConfigurationValue,
+static int get_config_descriptor(int fd, uint8_t config_index,
 	unsigned char *buffer, size_t len)
 {
 	unsigned char tmp[8];
-	uint8_t num_configurations;
 	off_t off;
 	ssize_t r;
 
-	if (bConfigurationValue == -1) {
-		/* read first configuration */
-		off = lseek(fd, DEVICE_DESC_LENGTH, SEEK_SET);
-		if (off < 0) {
-			usbi_err("seek failed, ret=%d errno=%d", off, errno);
-			return LIBUSB_ERROR_IO;
-		}
-		r = read(fd, buffer, len);
-		if (r < 0) {
-			usbi_err("read failed ret=%d errno=%d", r, errno);
-			return LIBUSB_ERROR_IO;
-		} else if (r < len) {
-			usbi_err("short output read %d/%d", r, len);
-			return LIBUSB_ERROR_IO;
-		}
-		return 0;
-	}
-
-	/* seek to last byte of device descriptor to determine number of
-	 * configurations */
-	off = lseek(fd, DEVICE_DESC_LENGTH - 1, SEEK_SET);
+	off = lseek(fd, DEVICE_DESC_LENGTH, SEEK_SET);
 	if (off < 0) {
-		usbi_err("seek failed, ret=%d errno=%d", off, errno);
-		return LIBUSB_ERROR_IO;
-	}
-
-	r = read(fd, &num_configurations, 1);
-	if (r < 0) {
-		usbi_err("read num_configurations failed, ret=%d errno=%d", off, errno);
+		usbi_err("seek failed ret=%d errno=%d", off, errno);
 		return LIBUSB_ERROR_IO;
 	}
 
 	/* might need to skip some configuration descriptors to reach the
 	 * requested configuration */
-	while (num_configurations) {
+	while (config_index) {
 		struct libusb_config_descriptor config;
 
 		/* read first 8 bytes of descriptor */
@@ -357,8 +330,6 @@ static int get_config_descriptor(int fd, int bConfigurationValue,
 		}
 
 		usbi_parse_descriptor(tmp, "bbwbb", &config);
-		if (config.bConfigurationValue == bConfigurationValue)
-			break;
 
 		/* seek forward to end of config */
 		off = lseek(fd, config.wTotalLength - sizeof(tmp), SEEK_CUR);
@@ -367,21 +338,15 @@ static int get_config_descriptor(int fd, int bConfigurationValue,
 			return LIBUSB_ERROR_IO;
 		}
 
-		num_configurations--;
+		config_index--;
 	}
 
-	if (num_configurations == 0)
-		return LIBUSB_ERROR_NOT_FOUND;
-
-	/* copy config-so-far */
-	memcpy(buffer, tmp, sizeof(tmp));
-
 	/* read the rest of the descriptor */
-	r = read(fd, buffer + sizeof(tmp), len - sizeof(tmp));
+	r = read(fd, buffer, len);
 	if (r < 0) {
 		usbi_err("read failed ret=%d errno=%d", r, errno);
 		return LIBUSB_ERROR_IO;
-	} else if (r < (len - sizeof(tmp))) {
+	} else if (r < len) {
 		usbi_err("short output read %d/%d", r, len);
 		return LIBUSB_ERROR_IO;
 	}
@@ -389,8 +354,8 @@ static int get_config_descriptor(int fd, int bConfigurationValue,
 	return 0;
 }
 
-static int op_get_config_descriptor(struct libusb_device *dev, uint8_t config,
-	unsigned char *buffer, size_t len)
+static int op_get_config_descriptor(struct libusb_device *dev,
+	uint8_t config_index, unsigned char *buffer, size_t len)
 {
 	char filename[PATH_MAX + 1];
 	int fd;
@@ -406,7 +371,7 @@ static int op_get_config_descriptor(struct libusb_device *dev, uint8_t config,
 		return LIBUSB_ERROR_IO;
 	}
 
-	r = get_config_descriptor(fd, config, buffer, len);
+	r = get_config_descriptor(fd, config_index, buffer, len);
 	close(fd);
 	return r;
 }
@@ -420,6 +385,7 @@ static int cache_active_config(struct libusb_device *dev, int fd,
 	unsigned char *buf;
 	int r;
 
+	/* FIXME */
 	r = get_config_descriptor(fd, active_config, tmp, sizeof(tmp));
 	if (r < 0) {
 		usbi_err("first read error %d", r);

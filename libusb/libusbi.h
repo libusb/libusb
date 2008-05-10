@@ -150,6 +150,7 @@ struct libusb_device {
 
 	uint8_t bus_number;
 	uint8_t device_address;
+	uint8_t num_configurations;
 
 	struct list_head list;
 	unsigned long session_data;
@@ -273,8 +274,8 @@ struct usbi_os_backend {
 		unsigned char *buffer);
 	int (*get_active_config_descriptor)(struct libusb_device *device,
 		unsigned char *buffer, size_t len);
-	int (*get_config_descriptor)(struct libusb_device *device, uint8_t config,
-		unsigned char *buffer, size_t len);
+	int (*get_config_descriptor)(struct libusb_device *device,
+		uint8_t config_index, unsigned char *buffer, size_t len);
 
 	int (*set_configuration)(struct libusb_device_handle *handle, int config);
 

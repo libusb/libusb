@@ -432,6 +432,7 @@ API_EXPORTED int libusb_get_device_descriptor(libusb_device *dev,
 	unsigned char raw_desc[DEVICE_DESC_LENGTH];
 	int r;
 
+	usbi_dbg("");
 	r = usbi_backend->get_device_descriptor(dev, raw_desc);
 	if (r < 0)
 		return r;
@@ -460,6 +461,7 @@ struct libusb_config_descriptor *libusb_get_active_config_descriptor(
 	unsigned char *buf = NULL;
 	int r;
 
+	usbi_dbg("");
 	if (!config)
 		return NULL;
 
@@ -467,7 +469,7 @@ struct libusb_config_descriptor *libusb_get_active_config_descriptor(
 	if (r < 0)
 		goto err;
 
-	usbi_parse_descriptor(tmp, "bbw", &config);
+	usbi_parse_descriptor(tmp, "bbw", config);
 	buf = malloc(config->wTotalLength);
 	if (!buf)
 		goto err;
@@ -495,40 +497,45 @@ err:
 }
 
 /** \ingroup desc
- * Get the USB configuration descriptor for the currently active configuration.
+ * Get a USB configuration descriptor based on its index.
  * This is a non-blocking function which does not involve any requests being
  * sent to the device.
  *
  * \param dev a device
- * \param bConfigurationValue the bConfigurationValue of the configuration
- * you wish to retreive
+ * \param config_index the index of the configuration you wish to retrieve
  * \returns the USB configuration descriptor which must be freed with
  * libusb_free_config_descriptor() when done
  * \returns NULL on error
  * \see libusb_get_active_config_descriptor()
+ * \see libusb_get_config_descriptor_by_value()
  */
 API_EXPORTED struct libusb_config_descriptor *libusb_get_config_descriptor(
-	libusb_device *dev, uint8_t bConfigurationValue)
+	libusb_device *dev, uint8_t config_index)
 {
-	struct libusb_config_descriptor *config = malloc(sizeof(*config));
+	struct libusb_config_descriptor *config;
 	unsigned char tmp[8];
 	unsigned char *buf = NULL;
 	int r;
 
+	usbi_dbg("index %d", config_index);
+	if (config_index >= dev->num_configurations)
+		return NULL;
+
+	config = malloc(sizeof(*config));
 	if (!config)
 		return NULL;
 
-	r = usbi_backend->get_config_descriptor(dev, bConfigurationValue, tmp,
+	r = usbi_backend->get_config_descriptor(dev, config_index, tmp,
 		sizeof(tmp));
 	if (r < 0)
 		goto err;
 
-	usbi_parse_descriptor(tmp, "bbw", &config);
+	usbi_parse_descriptor(tmp, "bbw", config);
 	buf = malloc(config->wTotalLength);
 	if (!buf)
 		goto err;
 
-	r = usbi_backend->get_config_descriptor(dev, bConfigurationValue, buf,
+	r = usbi_backend->get_config_descriptor(dev, config_index, buf,
 		config->wTotalLength);
 	if (r < 0)
 		goto err;
@@ -548,6 +555,46 @@ err:
 	if (buf)
 		free(buf);
 	return NULL;
+}
+
+/** \ingroup desc
+ * Get a USB configuration descriptor with a specific bConfigurationValue.
+ * This is a non-blocking function which does not involve any requests being
+ * sent to the device.
+ *
+ * \param dev a device
+ * \param bConfigurationValue the bConfigurationValue of the configuration you
+ * wish to retrieve
+ * \returns the USB configuration descriptor which must be freed with
+ * libusb_free_config_descriptor() when done
+ * \returns NULL on error
+ * \see libusb_get_active_config_descriptor()
+ * \see libusb_get_config_descriptor()
+ */
+API_EXPORTED
+struct libusb_config_descriptor *libusb_get_config_descriptor_by_value(
+	libusb_device *dev, uint8_t bConfigurationValue)
+{
+	int i;
+	int r;
+	int found = -1;
+
+	usbi_dbg("value %d", bConfigurationValue);
+	for (i = 0; i < dev->num_configurations; i++) {
+		unsigned char tmp[6];
+		r = usbi_backend->get_config_descriptor(dev, i, tmp, sizeof(tmp));
+		if (r < 0)
+			return NULL;
+		if (tmp[5] == bConfigurationValue) {
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found)
+		return NULL;
+	else
+		return libusb_get_config_descriptor(dev, i);
 }
 
 /** \ingroup desc
