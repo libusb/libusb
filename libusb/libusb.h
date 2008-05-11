@@ -564,17 +564,42 @@ typedef struct libusb_device libusb_device;
  */
 typedef struct libusb_device_handle libusb_device_handle;
 
+/** \ingroup misc
+ * Error codes. Most libusb functions return 0 on success or one of these
+ * codes on failure.
+ */
 enum libusb_error {
+	/** Success (no error) */
 	LIBUSB_SUCCESS = 0,
+
+	/** Input/output error */
 	LIBUSB_ERROR_IO = -1,
+
+	/** Invalid parameter */
 	LIBUSB_ERROR_INVALID_PARAM = -2,
+
+	/** Access denied (insufficient permissions) */
 	LIBUSB_ERROR_ACCESS = -3,
+
+	/** Entity not found */
 	LIBUSB_ERROR_NOT_FOUND = -4,
+
+	/** Resource busy */
 	LIBUSB_ERROR_BUSY = -5,
+
+	/** Operation timed out */
 	LIBUSB_ERROR_TIMEOUT = -6,
+
+	/** Pipe error */
 	LIBUSB_ERROR_PIPE = -7,
+
+	/** Insufficient memory */
 	LIBUSB_ERROR_NO_MEM = -8,
+
+	/** Operation not supported or unimplemented on this platform */
 	LIBUSB_ERROR_NOT_SUPPORTED = -9,
+
+	/** Other error */
 	LIBUSB_ERROR_OTHER = -10,
 };
 

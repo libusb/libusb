@@ -45,6 +45,9 @@ pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * \mainpage libusb-1.0 API Reference
+ *
+ * \section intro Introduction
+ *
  * libusb is an open source library that allows you to communicate with USB
  * devices from userspace. For more info, see the
  * <a href="http://libusb.sourceforge.net">libusb homepage</a>.
@@ -62,8 +65,37 @@ pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
  * Specification</a> which is available for free download. You can probably
  * find less verbose introductions by searching the web.
  *
+ * \section features Library features
+ *
+ * - All transfer types supported (control/bulk/interrupt/isochronous)
+ * - 2 transfer interfaces:
+ *    -# Synchronous (simple)
+ *    -# Asynchronous (more complicated, but more powerful)
+ * - Thread safe (although the asynchronous interface means that you
+ *   usually won't need to thread)
+ * - Lightweight with lean API
+ * - Compatible with libusb-0.1 through the libusb-compat-0.1 translation layer
+ *
+ * \section gettingstarted Getting Started
+ *
  * To begin reading the API documentation, start with the Modules page which
  * links to the different categories of libusb's functionality.
+ *
+ * One decision you will have to make is whether to use the synchronous
+ * or the asynchronous data transfer interface. The \ref io documentation
+ * provides some insight into this topic.
+ *
+ * Some example programs can be found in the libusb source distribution under
+ * the "examples" subdirectory. The libusb homepage includes a list of
+ * real-life project examples which use libusb.
+ *
+ * \section errorhandling Error handling
+ *
+ * libusb functions typically return 0 on success or a negative error code
+ * on failure. These negative error codes relate to LIBUSB_ERROR constants
+ * which are listed on the \ref misc "miscellaneous" documentation page.
+ *
+ * \section remarks Other remarks
  *
  * libusb does have imperfections. The \ref caveats "caveats" page attempts
  * to document these.
@@ -81,8 +113,8 @@ pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
  *
  * The problem is that any other program could reset the device your program
  * is working with, at any time. libusb does not offer a mechanism to inform
- * you when this has happened, so it will not be clear to your own program
- * why the device state has changed.
+ * you when this has happened, so if someone else resets your device it will
+ * not be clear to your own program why the device state has changed.
  *
  * Ultimately, this is a limitation of writing drivers in userspace.
  * Separation from the USB stack in the underlying kernel makes it difficult
@@ -99,8 +131,15 @@ pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
  *
  * - Configuration activation (libusb_set_configuration())
  * - Interface/alternate setting activation (libusb_set_interface_alt_setting())
+ * - Releasing of interfaces (libusb_release_interface())
  * - Clearing of halt/stall condition (libusb_clear_halt())
  * - Device resets (libusb_reset_device())
+ *
+ * \section nohotplug No hotplugging
+ *
+ * libusb-1.0 lacks functionality for providing notifications of when devices
+ * are added or removed. This functionality is planned to be implemented
+ * for libusb-1.1.
  */
 
 /**

@@ -3,6 +3,7 @@ for 1.0
 review functionality missing over 0.1
 serialization of handle_events
 internal docs for OS porters
+hot-unplugging
 
 1.0 API style/naming points to reconsider
 =========================================
