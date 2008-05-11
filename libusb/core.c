@@ -757,7 +757,8 @@ out:
  * Release an interface previously claimed with libusb_claim_interface(). You
  * should release all claimed interfaces before closing a device handle.
  *
- * This is a non-blocking function which does not generate any bus requests.
+ * This is a blocking function. A SET_INTERFACE control request will be sent
+ * to the device, resetting interface state to the first alternate setting.
  *
  * \param dev a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the
