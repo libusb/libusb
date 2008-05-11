@@ -315,6 +315,12 @@ if (r == 0 && actual_length == sizeof(data)) {
  *     packet.
  * -# Submit the transfer.
  *
+ * The multi-byte control setup fields (wValue, wIndex and wLength) must
+ * be given in little-endian byte order (the endianness of the USB bus).
+ * Endianness conversion is transparently handled by
+ * libusb_fill_control_setup() which is documented to accept host-endian
+ * values.
+ *
  * Further considerations are needed when handling transfer completion in
  * your callback function:
  * - As you might expect, the setup packet will still be sitting at the start
@@ -722,19 +728,6 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 	if (r < 0)
 		return LIBUSB_ERROR_OTHER;
 
-	if (transfer->type == LIBUSB_TRANSFER_TYPE_CONTROL) {
-		struct libusb_control_setup *setup =
-			(struct libusb_control_setup *) transfer->buffer;
-	
-		usbi_dbg("RQT=%02x RQ=%02x VAL=%04x IDX=%04x length=%d",
-			setup->bmRequestType, setup->bRequest, setup->wValue, setup->wIndex,
-			setup->wLength);
-
-		setup->wValue = cpu_to_le16(setup->wValue);
-		setup->wIndex = cpu_to_le16(setup->wIndex);
-		setup->wLength = cpu_to_le16(setup->wLength);
-	}
-	
 	add_to_flying_list(itransfer);
 	r = usbi_backend->submit_transfer(itransfer);
 	if (r) {

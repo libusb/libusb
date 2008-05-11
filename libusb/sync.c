@@ -42,8 +42,13 @@ static void ctrl_transfer_cb(struct libusb_transfer *transfer)
 }
 
 /** \ingroup syncio
- * Perform a USB control transfer. The direction of the transfer is inferred
- * from the bmRequestType field of the setup packet.
+ * Perform a USB control transfer.
+ *
+ * The direction of the transfer is inferred from the bmRequestType field of
+ * the setup packet.
+ *
+ * The wValue, wIndex and wLength fields values should be given in host-endian
+ * byte order.
  *
  * \param dev_handle a handle for the device to communicate with
  * \param bmRequestType the request type field for the setup packet

@@ -21,10 +21,40 @@
 #ifndef __LIBUSB_H__
 #define __LIBUSB_H__
 
+#include <endian.h>
 #include <stdint.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
+
+#define bswap16(x) (((x & 0xff) << 8) | (x >> 8))
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+#define libusb_cpu_to_le16(x) (x)
+#define libusb_le16_to_cpu(x) (x)
+#elif __BYTE_ORDER == __BIG_ENDIAN
+#define libusb_le16_to_cpu(x) bswap16(x)
+#define libusb_cpu_to_le16(x) bswap16(x)
+#else
+#error "Unrecognized endianness"
+#endif
+
+/** \def libusb_cpu_to_le16
+ * \ingroup misc
+ * Convert a 16-bit value from host-endian to little-endian format. On
+ * little endian systems, this function does nothing. On big endian systems,
+ * the bytes are swapped.
+ * \param x the host-endian value to convert
+ * \returns the value in little-endian byte order
+ */
+
+/** \def libusb_le16_to_cpu
+ * \ingroup misc
+ * Convert a 16-bit value from little-endian to host-endian format. On
+ * little endian systems, this function does nothing. On big endian systems,
+ * the bytes are swapped.
+ * \param x the little-endian value to convert
+ * \returns the value in host-endian byte order
+ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -497,7 +527,7 @@ struct libusb_control_setup {
 
 	/** Number of bytes to transfer */
 	uint16_t wLength;
-} __attribute__((packed));
+};
 
 #define LIBUSB_CONTROL_SETUP_SIZE (sizeof(struct libusb_control_setup))
 
@@ -737,7 +767,8 @@ static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
 
 /** \ingroup asyncio
  * Helper function to populate the setup packet (first 8 bytes of the data
- * buffer) for a control transfer.
+ * buffer) for a control transfer. The wIndex, wValue and wLength values should
+ * be given in host-endian byte order.
  * 
  * \param buffer buffer to output the setup packet into
  * \param bmRequestType see the
@@ -763,9 +794,9 @@ static inline void libusb_fill_control_setup(unsigned char *buffer,
 	struct libusb_control_setup *setup = (struct libusb_control_setup *) buffer;
 	setup->bmRequestType = bmRequestType;
 	setup->bRequest = bRequest;
-	setup->wValue = wValue;
-	setup->wIndex = wIndex;
-	setup->wLength = wLength;
+	setup->wValue = libusb_cpu_to_le16(wValue);
+	setup->wIndex = libusb_cpu_to_le16(wIndex);
+	setup->wLength = libusb_cpu_to_le16(wLength);
 }
 
 struct libusb_transfer *libusb_alloc_transfer(int iso_packets);
@@ -790,7 +821,7 @@ void libusb_free_transfer(struct libusb_transfer *transfer);
  *
  * It is also legal to pass a NULL buffer to this function, in which case this
  * function will not attempt to populate the length field. Remember that you
- * must populate the buffer and length fields later.
+ * must then populate the buffer and length fields later.
  *
  * \param transfer the transfer to populate
  * \param dev_handle handle of the device that will handle the transfer
@@ -812,7 +843,8 @@ static inline void libusb_fill_control_transfer(
 	transfer->timeout = timeout;
 	transfer->buffer = buffer;
 	if (setup)
-		transfer->length = LIBUSB_CONTROL_SETUP_SIZE + setup->wLength;
+		transfer->length = LIBUSB_CONTROL_SETUP_SIZE
+			+ libusb_le16_to_cpu(setup->wLength);
 	transfer->user_data = user_data;
 	transfer->callback = callback;
 }

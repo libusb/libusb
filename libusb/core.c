@@ -216,11 +216,7 @@ libusb_free_device_list(list, 1);
  * libusb_close().
  */
 
-/**
- * @defgroup misc Miscellaneous structures and constants
- * This page documents structures and constants that don't belong anywhere
- * else
- */
+/** @defgroup misc Miscellaneous */
 
 /* we traverse usbfs without knowing how many devices we are going to find.
  * so we create this discovered_devs model which is similar to a linked-list

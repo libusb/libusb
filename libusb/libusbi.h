@@ -23,7 +23,6 @@
 
 #include <config.h>
 
-#include <endian.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <sys/select.h>
@@ -100,17 +99,6 @@ static inline void list_del(struct list_head *entry)
 #define container_of(ptr, type, member) ({                      \
         const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
         (type *)( (char *)__mptr - offsetof(type,member) );})
-
-#define bswap16(x) (((x & 0xff) << 8) | (x >> 8))
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-#define cpu_to_le16(x) (x)
-#define le16_to_cpu(x) (x)
-#elif __BYTE_ORDER == __BIG_ENDIAN
-#define le16_to_cpu(x) bswap16(x)
-#define cpu_to_le16(x) bswap16(x)
-#else
-#error "Unrecognized endianness"
-#endif
 
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
 #define MAX(a, b)	((a) > (b) ? (a) : (b))
