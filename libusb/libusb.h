@@ -581,26 +581,32 @@ enum libusb_error {
 	/** Access denied (insufficient permissions) */
 	LIBUSB_ERROR_ACCESS = -3,
 
+	/** No such device (it may have been disconnected) */
+	LIBUSB_ERROR_NO_DEVICE = -4,
+
 	/** Entity not found */
-	LIBUSB_ERROR_NOT_FOUND = -4,
+	LIBUSB_ERROR_NOT_FOUND = -5,
 
 	/** Resource busy */
-	LIBUSB_ERROR_BUSY = -5,
+	LIBUSB_ERROR_BUSY = -6,
 
 	/** Operation timed out */
-	LIBUSB_ERROR_TIMEOUT = -6,
+	LIBUSB_ERROR_TIMEOUT = -7,
 
 	/** Pipe error */
-	LIBUSB_ERROR_PIPE = -7,
+	LIBUSB_ERROR_PIPE = -8,
+
+	/** System call interrupted (perhaps due to signal) */
+	LIBUSB_ERROR_INTERRUPTED = -9,
 
 	/** Insufficient memory */
-	LIBUSB_ERROR_NO_MEM = -8,
+	LIBUSB_ERROR_NO_MEM = -10,
 
 	/** Operation not supported or unimplemented on this platform */
-	LIBUSB_ERROR_NOT_SUPPORTED = -9,
+	LIBUSB_ERROR_NOT_SUPPORTED = -11,
 
 	/** Other error */
-	LIBUSB_ERROR_OTHER = -10,
+	LIBUSB_ERROR_OTHER = -12,
 };
 
 /** \ingroup asyncio
@@ -622,6 +628,9 @@ enum libusb_transfer_status {
 	/** For bulk/interrupt endpoints: halt condition detected (endpoint
 	 * stalled). For control endpoints: control request not supported. */
 	LIBUSB_TRANSFER_STALL,
+
+	/** Device was disconnected */
+	LIBUSB_TRANSFER_NO_DEVICE,
 };
 
 /** \ingroup asyncio

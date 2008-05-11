@@ -283,6 +283,7 @@ static void cb_irq(struct libusb_transfer *transfer)
 	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
 		fprintf(stderr, "irq transfer status %d?\n", transfer->status);
 		do_exit = 2;
+		libusb_free_transfer(transfer);
 		irq_transfer = NULL;
 		return;
 	}
@@ -319,6 +320,7 @@ static void cb_img(struct libusb_transfer *transfer)
 	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
 		fprintf(stderr, "img transfer status %d?\n", transfer->status);
 		do_exit = 2;
+		libusb_free_transfer(transfer);
 		img_transfer = NULL;
 		return;
 	}
@@ -431,7 +433,7 @@ int main(void)
 
 	r = libusb_claim_interface(devh, 0);
 	if (r < 0) {
-		fprintf(stderr, "usb_claim_interface error %d %s\n", r, strerror(-r));
+		fprintf(stderr, "usb_claim_interface error %d\n", r);
 		goto out;
 	}
 	printf("claimed interface\n");
@@ -468,14 +470,18 @@ int main(void)
 	}
 
 	printf("shutting down...\n");
+	
+	if (irq_transfer) {
+		r = libusb_cancel_transfer(irq_transfer);
+		if (r < 0)
+			goto out_deinit;
+	}
 
-	r = libusb_cancel_transfer(irq_transfer);
-	if (r < 0)
-		goto out_deinit;
-
-	r = libusb_cancel_transfer(img_transfer);
-	if (r < 0)
-		goto out_deinit;
+	if (img_transfer) {
+		r = libusb_cancel_transfer(img_transfer);
+		if (r < 0)
+			goto out_deinit;
+	}
 	
 	while (irq_transfer || img_transfer)
 		if (libusb_handle_events() < 0)

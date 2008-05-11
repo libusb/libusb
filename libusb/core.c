@@ -140,6 +140,13 @@ pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
  * libusb-1.0 lacks functionality for providing notifications of when devices
  * are added or removed. This functionality is planned to be implemented
  * for libusb-1.1.
+ *
+ * That said, there is basic disconnection handling for open device handles:
+ *  - If there are ongoing transfers, libusb's handle_events loop will detect
+ *    disconnections and complete ongoing transfers with the
+ *    LIBUSB_TRANSFER_NO_DEVICE status code.
+ *  - Many functions such as libusb_set_configuration() return the special
+ *    LIBUSB_ERROR_NO_DEVICE error code when the device has been disconnected.
  */
 
 /**
@@ -734,6 +741,7 @@ API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the requested configuration does not exist
  * \returns LIBUSB_ERROR_BUSY if interfaces are currently claimed
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
 API_EXPORTED int libusb_set_configuration(libusb_device_handle *dev,
@@ -764,6 +772,7 @@ API_EXPORTED int libusb_set_configuration(libusb_device_handle *dev,
  * \returns LIBUSB_ERROR_NOT_FOUND if the requested interface does not exist
  * \returns LIBUSB_ERROR_BUSY if another program or driver has claimed the
  * interface
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns a LIBUSB_ERROR code on other failure
  */
 API_EXPORTED int libusb_claim_interface(libusb_device_handle *dev,
@@ -798,8 +807,10 @@ out:
  * \param dev a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the
  * previously-claimed interface
- * \returns 0 on success, or a LIBUSB_ERROR code on failure.
- * LIBUSB_ERROR_NOT_FOUND indicates that the interface was not claimed.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if the interface was not claimed
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns another LIBUSB_ERROR code on other failure
  */
 API_EXPORTED int libusb_release_interface(libusb_device_handle *dev,
 	int interface_number)
@@ -843,6 +854,7 @@ out:
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the interface was not claimed, or the
  * requested alternate setting does not exist
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
 API_EXPORTED int libusb_set_interface_alt_setting(libusb_device_handle *dev,
@@ -876,6 +888,7 @@ API_EXPORTED int libusb_set_interface_alt_setting(libusb_device_handle *dev,
  * \param endpoint the endpoint to clear halt status
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
 API_EXPORTED int libusb_clear_halt(libusb_device_handle *dev,
@@ -900,7 +913,8 @@ API_EXPORTED int libusb_clear_halt(libusb_device_handle *dev,
  *
  * \param dev a handle of the device to reset
  * \returns 0 on success
- * \returns LIBUSB_ERROR_NOT_FOUND if re-enumeration is required
+ * \returns LIBUSB_ERROR_NOT_FOUND if re-enumeration is required, or if the
+ * device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
 API_EXPORTED int libusb_reset_device(libusb_device_handle *dev)
@@ -918,7 +932,8 @@ API_EXPORTED int libusb_reset_device(libusb_device_handle *dev)
  * \param interface the interface to check
  * \returns 0 if no kernel driver is active
  * \returns 1 if a kernel driver is active
- * \returns LIBUSB_ERROR code on failure
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_detach_kernel_driver()
  */
 API_EXPORTED int libusb_kernel_driver_active(libusb_device_handle *dev,
@@ -940,6 +955,7 @@ API_EXPORTED int libusb_kernel_driver_active(libusb_device_handle *dev,
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
  * \returns LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_kernel_driver_active()
  */

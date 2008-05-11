@@ -26,7 +26,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/select.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
@@ -715,7 +714,9 @@ API_EXPORTED void libusb_free_transfer(struct libusb_transfer *transfer)
  * submitted but has not yet completed.
  *
  * \param transfer the transfer to submit
- * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns another LIBUSB_ERROR code on other failure
  */
 API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 {
@@ -751,7 +752,7 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
  *
  * \param transfer the transfer to cancel
  * \returns 0 on success
- * \returns non-zero on error
+ * \returns a LIBUSB_ERROR code on failure
  */
 API_EXPORTED int libusb_cancel_transfer(struct libusb_transfer *transfer)
 {
@@ -873,15 +874,13 @@ out:
 static int handle_events(struct timeval *tv)
 {
 	int r;
-	int maxfd = 0;
-	fd_set readfds, writefds;
-	fd_set *_readfds = NULL;
-	fd_set *_writefds = NULL;
 	struct usbi_pollfd *ipollfd;
-	int have_readfds = 0;
-	int have_writefds = 0;
-	struct timeval select_timeout;
 	struct timeval timeout;
+	struct timeval poll_timeout;
+	nfds_t nfds = 0;
+	struct pollfd *fds;
+	int i = -1;
+	int timeout_ms;
 
 	r = libusb_get_next_timeout(&timeout);
 	if (r) {
@@ -891,53 +890,46 @@ static int handle_events(struct timeval *tv)
 
 		/* choose the smallest of next URB timeout or user specified timeout */
 		if (timercmp(&timeout, tv, <))
-			select_timeout = timeout;
+			poll_timeout = timeout;
 		else
-			select_timeout = *tv;
+			poll_timeout = *tv;
 	} else {
-		select_timeout = *tv;
+		poll_timeout = *tv;
 	}
 
-	FD_ZERO(&readfds);
-	FD_ZERO(&writefds);
 	pthread_mutex_lock(&pollfds_lock);
+	list_for_each_entry(ipollfd, &pollfds, list)
+		nfds++;
+
+	/* TODO: malloc when number of fd's changes, not on every poll */
+	fds = malloc(sizeof(*fds) * nfds);
+	if (!fds)
+		return LIBUSB_ERROR_NO_MEM;
+
 	list_for_each_entry(ipollfd, &pollfds, list) {
 		struct libusb_pollfd *pollfd = &ipollfd->pollfd;
 		int fd = pollfd->fd;
-		if (pollfd->events & POLLIN) {
-			have_readfds = 1;
-			FD_SET(fd, &readfds);
-		}
-		if (pollfd->events & POLLOUT) {
-			have_writefds = 1;
-			FD_SET(fd, &writefds);
-		}
-		if (fd > maxfd)
-			maxfd = fd;
+		i++;
+		fds[i].fd = fd;
+		fds[i].events = pollfd->events;
+		fds[i].revents = 0;
 	}
 	pthread_mutex_unlock(&pollfds_lock);
 
-	if (have_readfds)
-		_readfds = &readfds;
-	if (have_writefds)
-		_writefds = &writefds;
-
-	usbi_dbg("select() with timeout in %d.%06ds", select_timeout.tv_sec,
-		select_timeout.tv_usec);
-	r = select(maxfd + 1, _readfds, _writefds, NULL, &select_timeout);
-	usbi_dbg("select() returned %d with %d.%06ds remaining",
-		r, select_timeout.tv_sec, select_timeout.tv_usec);
+	timeout_ms = (poll_timeout.tv_sec * 1000) + (poll_timeout.tv_usec / 1000);
+	usbi_dbg("poll() %d fds with timeout in %dms", nfds, timeout_ms);
+	r = poll(fds, nfds, timeout_ms);
+	usbi_dbg("poll() returned %d", r);
 	if (r == 0) {
-		*tv = select_timeout;
 		return handle_timeouts();
 	} else if (r == -1 && errno == EINTR) {
-		return 0;
+		return LIBUSB_ERROR_INTERRUPTED;
 	} else if (r < 0) {
-		usbi_err("select failed %d err=%d\n", r, errno);
+		usbi_err("poll failed %d err=%d\n", r, errno);
 		return LIBUSB_ERROR_IO;
 	}
 
-	r = usbi_backend->handle_events(_readfds, _writefds);
+	r = usbi_backend->handle_events(fds, nfds, r);
 	if (r)
 		usbi_err("backend handle_events failed with error %d", r);
 
@@ -1113,7 +1105,7 @@ void usbi_remove_pollfd(int fd)
 		}
 
 	if (!found) {
-		usbi_err("couldn't find fd %d to remove", fd);
+		usbi_dbg("couldn't find fd %d to remove", fd);
 		pthread_mutex_unlock(&pollfds_lock);
 		return;
 	}
@@ -1157,5 +1149,45 @@ API_EXPORTED const struct libusb_pollfd **libusb_get_pollfds(void)
 out:
 	pthread_mutex_unlock(&pollfds_lock);
 	return (const struct libusb_pollfd **) ret;
+}
+
+void usbi_handle_disconnect(struct libusb_device_handle *handle)
+{
+	struct usbi_transfer *cur;
+	struct usbi_transfer *to_cancel;
+
+	usbi_dbg("device %d.%d",
+		handle->dev->bus_number, handle->dev->device_address);
+
+	/* terminate all pending transfers with the LIBUSB_TRANSFER_NO_DEVICE
+	 * status code.
+	 * 
+	 * this is a bit tricky because:
+	 * 1. we can't do transfer completion while holding flying_transfers_lock
+	 * 2. the transfers list can change underneath us - if we were to build a
+	 *    list of transfers to complete (while holding look), the situation
+	 *    might be different by the time we come to free them
+	 *
+	 * so we resort to a loop-based approach as below
+	 * FIXME: is this still potentially racy?
+	 */
+
+	while (1) {
+		pthread_mutex_lock(&flying_transfers_lock);
+		to_cancel = NULL;
+		list_for_each_entry(cur, &flying_transfers, list)
+			if (__USBI_TRANSFER_TO_LIBUSB_TRANSFER(cur)->dev_handle == handle) {
+				to_cancel = cur;
+				break;
+			}
+		pthread_mutex_unlock(&flying_transfers_lock);
+
+		if (!to_cancel)
+			break;
+
+		usbi_backend->clear_transfer_priv(to_cancel);
+		usbi_handle_transfer_completion(to_cancel, LIBUSB_TRANSFER_NO_DEVICE);
+	}
+
 }
 

@@ -3,7 +3,6 @@ for 1.0
 review functionality missing over 0.1
 serialization of handle_events
 internal docs for OS porters
-hot-unplugging
 
 1.0 API style/naming points to reconsider
 =========================================
@@ -13,6 +12,5 @@ for 1.1 or future
 ==================
 optional timerfd support (runtime detection)
 notifications of hotplugged/unplugged devices
-use poll() rather than select()?
 offer API to create/destroy handle_events thread
 isochronous sync I/O?

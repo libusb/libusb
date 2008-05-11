@@ -23,9 +23,9 @@
 
 #include <config.h>
 
+#include <poll.h>
 #include <pthread.h>
 #include <stddef.h>
-#include <sys/select.h>
 #include <time.h>
 
 #include <libusb.h>
@@ -211,6 +211,7 @@ void usbi_io_init(void);
 struct libusb_device *usbi_alloc_device(unsigned long session_id);
 struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id);
 int usbi_sanitize_device(struct libusb_device *dev);
+void usbi_handle_disconnect(struct libusb_device_handle *handle);
 
 void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
@@ -288,8 +289,9 @@ struct usbi_os_backend {
 
 	int (*submit_transfer)(struct usbi_transfer *itransfer);
 	int (*cancel_transfer)(struct usbi_transfer *itransfer);
+	void (*clear_transfer_priv)(struct usbi_transfer *itransfer);
 
-	int (*handle_events)(fd_set *readfds, fd_set *writefds);
+	int (*handle_events)(struct pollfd *fds, nfds_t nfds, int num_ready);
 
 	/* number of bytes to reserve for libusb_device.os_priv */
 	size_t device_priv_size;
