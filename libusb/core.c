@@ -40,6 +40,7 @@ const struct usbi_os_backend * const usbi_backend = &linux_usbfs_backend;
 static struct list_head usb_devs;
 static pthread_mutex_t usb_devs_lock = PTHREAD_MUTEX_INITIALIZER;
 
+/* A list of open handles. Backends are free to traverse this if required. */
 struct list_head usbi_open_devs;
 pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -322,7 +323,8 @@ static void discovered_devs_free(struct discovered_devs *discdevs)
 	free(discdevs);
 }
 
-/* allocate a new device with reference count 1 */
+/* Allocate a new device with a specific session ID. The returned device has
+ * a reference count of 1. */
 struct libusb_device *usbi_alloc_device(unsigned long session_id)
 {
 	size_t priv_size = usbi_backend->device_priv_size;
@@ -346,8 +348,9 @@ struct libusb_device *usbi_alloc_device(unsigned long session_id)
 	return dev;
 }
 
-/* to be called by OS implementations when a new device is ready for final
- * sanitization and checking before being returned in a device list. */
+/* Perform some final sanity checks on a newly discovered device. If this
+ * function fails (negative return code), the device should not be added
+ * to the discovered device list. */
 int usbi_sanitize_device(struct libusb_device *dev)
 {
 	int r;
@@ -371,6 +374,9 @@ int usbi_sanitize_device(struct libusb_device *dev)
 	return 0;
 }
 
+/* Examine libusb's internal list of known devices, looking for one with
+ * a specific session ID. Returns the matching device if it was found, and
+ * NULL otherwise. */
 struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id)
 {
 	struct libusb_device *dev;

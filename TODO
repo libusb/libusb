@@ -2,11 +2,6 @@ for 1.0
 =======
 review functionality missing over 0.1
 serialization of handle_events
-internal docs for OS porters
-
-1.0 API style/naming points to reconsider
-=========================================
-typedef _cb or _cb_fn or _cb_t?
 
 for 1.1 or future
 ==================

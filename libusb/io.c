@@ -767,6 +767,11 @@ API_EXPORTED int libusb_cancel_transfer(struct libusb_transfer *transfer)
 	return r;
 }
 
+/* Handle completion of a transfer (completion might be an error condition).
+ * This will invoke the user-supplied callback function, which may end up
+ * freeing the transfer. Therefore you cannot use the transfer structure
+ * after calling this function, and you should free all backend-specific
+ * data before calling it. */
 void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status)
 {
@@ -800,6 +805,10 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 		libusb_free_transfer(transfer);
 }
 
+/* Similar to usbi_handle_transfer_completion() but exclusively for transfers
+ * that were asynchronously cancelled. The same concerns w.r.t. freeing of
+ * transfers exist here.
+ */
 void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
 {
 	/* if the URB was cancelled due to timeout, report timeout to the user */
@@ -1073,6 +1082,9 @@ API_EXPORTED void libusb_set_pollfd_notifiers(libusb_pollfd_added_cb added_cb,
 	fd_removed_cb = removed_cb;
 }
 
+/* Add a file descriptor to the list of file descriptors to be monitored.
+ * events should be specified as a bitmask of events passed to poll(), e.g.
+ * POLLIN and/or POLLOUT. */
 int usbi_add_pollfd(int fd, short events)
 {
 	struct usbi_pollfd *ipollfd = malloc(sizeof(*ipollfd));
@@ -1091,6 +1103,7 @@ int usbi_add_pollfd(int fd, short events)
 	return 0;
 }
 
+/* Remove a file descriptor from the list of file descriptors to be polled. */
 void usbi_remove_pollfd(int fd)
 {
 	struct usbi_pollfd *ipollfd;
@@ -1151,6 +1164,9 @@ out:
 	return (const struct libusb_pollfd **) ret;
 }
 
+/* Backends call this from handle_events to report disconnection of a device.
+ * The transfers get cancelled appropriately.
+ */
 void usbi_handle_disconnect(struct libusb_device_handle *handle)
 {
 	struct usbi_transfer *cur;
