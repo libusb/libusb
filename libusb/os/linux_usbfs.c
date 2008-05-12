@@ -384,6 +384,8 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 	return r;
 }
 
+/* cache the active config descriptor in memory. a value of -1 means that
+ * we aren't sure which one is active, so just assume the first one. */
 static int cache_active_config(struct libusb_device *dev, int fd,
 	int active_config)
 {
@@ -394,11 +396,15 @@ static int cache_active_config(struct libusb_device *dev, int fd,
 	int idx;
 	int r;
 
-	r = usbi_get_config_index_by_value(dev, active_config, &idx);
-	if (r < 0)
-		return r;
-	if (idx == -1)
-		return LIBUSB_ERROR_NOT_FOUND;
+	if (active_config == -1) {
+		idx = 0;
+	} else {
+		r = usbi_get_config_index_by_value(dev, active_config, &idx);
+		if (r < 0)
+			return r;
+		if (idx == -1)
+			return LIBUSB_ERROR_NOT_FOUND;
+	}
 
 	r = get_config_descriptor(fd, idx, tmp, sizeof(tmp));
 	if (r < 0) {
