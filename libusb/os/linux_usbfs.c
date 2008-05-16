@@ -239,12 +239,14 @@ static int sysfs_get_device_descriptor(struct libusb_device *dev,
 }
 
 static int op_get_device_descriptor(struct libusb_device *dev,
-	unsigned char *buffer)
+	unsigned char *buffer, int *host_endian)
 {
-	if (sysfs_has_descriptors)
+	if (sysfs_has_descriptors) {
 		return sysfs_get_device_descriptor(dev, buffer);
-	else
+	} else {
+		*host_endian = 1;
 		return usbfs_get_device_descriptor(dev, buffer);
+	}
 }
 
 static int usbfs_get_active_config_descriptor(struct libusb_device *dev,
@@ -297,12 +299,14 @@ static int sysfs_get_active_config_descriptor(struct libusb_device *dev,
 }
 
 static int op_get_active_config_descriptor(struct libusb_device *dev,
-	unsigned char *buffer, size_t len)
+	unsigned char *buffer, size_t len, int *host_endian)
 {
-	if (sysfs_has_descriptors)
+	if (sysfs_has_descriptors) {
 		return sysfs_get_active_config_descriptor(dev, buffer, len);
-	else
+	} else {
+		*host_endian = 1;
 		return usbfs_get_active_config_descriptor(dev, buffer, len);
+	}
 }
 
 
@@ -337,7 +341,7 @@ static int get_config_descriptor(int fd, uint8_t config_index,
 			return LIBUSB_ERROR_IO;
 		}
 
-		usbi_parse_descriptor(tmp, "bbwbb", &config);
+		usbi_parse_descriptor(tmp, "bbwbb", &config, 1);
 
 		/* seek forward to end of config */
 		off = lseek(fd, config.wTotalLength - sizeof(tmp), SEEK_CUR);
@@ -363,7 +367,7 @@ static int get_config_descriptor(int fd, uint8_t config_index,
 }
 
 static int op_get_config_descriptor(struct libusb_device *dev,
-	uint8_t config_index, unsigned char *buffer, size_t len)
+	uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
 {
 	char filename[PATH_MAX + 1];
 	int fd;
@@ -381,11 +385,13 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 
 	r = get_config_descriptor(fd, config_index, buffer, len);
 	close(fd);
+	*host_endian = 1;
 	return r;
 }
 
 /* cache the active config descriptor in memory. a value of -1 means that
- * we aren't sure which one is active, so just assume the first one. */
+ * we aren't sure which one is active, so just assume the first one. 
+ * only for usbfs. */
 static int cache_active_config(struct libusb_device *dev, int fd,
 	int active_config)
 {
@@ -412,7 +418,7 @@ static int cache_active_config(struct libusb_device *dev, int fd,
 		return r;
 	}
 
-	usbi_parse_descriptor(tmp, "bbw", &config);
+	usbi_parse_descriptor(tmp, "bbw", &config, 1);
 	buf = malloc(config.wTotalLength);
 	if (!buf)
 		return LIBUSB_ERROR_NO_MEM;

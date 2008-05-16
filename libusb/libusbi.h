@@ -217,7 +217,8 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
 void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer);
 
-int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest);
+int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest,
+	int host_endian);
 int usbi_get_config_index_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, int *idx);
 
@@ -378,10 +379,14 @@ struct usbi_os_backend {
 	 * it to the list of discovered devices, and also when the user requests
 	 * to read the device descriptor.
 	 *
+	 * This function is expected to return the descriptor in bus-endian format
+	 * (LE). If it returns the multi-byte values in host-endian format,
+	 * set the host_endian output parameter to "1".
+	 *
 	 * Return 0 on success or a LIBUSB_ERROR code on failure.
 	 */
 	int (*get_device_descriptor)(struct libusb_device *device,
-		unsigned char *buffer);
+		unsigned char *buffer, int *host_endian);
 
 	/* Get the ACTIVE configuration descriptor for a device.
 	 *
@@ -394,13 +399,17 @@ struct usbi_os_backend {
 	 * is guaranteed to be big enough. If you can only do a partial write,
 	 * return an error code.
 	 *
+	 * This function is expected to return the descriptor in bus-endian format
+	 * (LE). If it returns the multi-byte values in host-endian format,
+	 * set the host_endian output parameter to "1".
+	 *
 	 * Return:
 	 * - 0 on success
 	 * - LIBUSB_ERROR_NOT_FOUND if the device is in unconfigured state
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*get_active_config_descriptor)(struct libusb_device *device,
-		unsigned char *buffer, size_t len);
+		unsigned char *buffer, size_t len, int *host_endian);
 
 	/* Get a specific configuration descriptor for a device.
 	 *
@@ -417,10 +426,15 @@ struct usbi_os_backend {
 	 * is guaranteed to be big enough. If you can only do a partial write,
 	 * return an error code.
 	 *
+	 * This function is expected to return the descriptor in bus-endian format
+	 * (LE). If it returns the multi-byte values in host-endian format,
+	 * set the host_endian output parameter to "1".
+	 *
 	 * Return 0 on success or a LIBUSB_ERROR code on failure.
 	 */
 	int (*get_config_descriptor)(struct libusb_device *device,
-		uint8_t config_index, unsigned char *buffer, size_t len);
+		uint8_t config_index, unsigned char *buffer, size_t len,
+		int *host_endian);
 
 	/* Set the active configuration for a device.
 	 *

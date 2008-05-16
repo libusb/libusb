@@ -356,8 +356,9 @@ int usbi_sanitize_device(struct libusb_device *dev)
 	int r;
 	unsigned char raw_desc[DEVICE_DESC_LENGTH];
 	uint8_t num_configurations;
+	int host_endian;
 
-	r = usbi_backend->get_device_descriptor(dev, raw_desc);
+	r = usbi_backend->get_device_descriptor(dev, raw_desc, &host_endian);
 	if (r < 0)
 		return r;
 
