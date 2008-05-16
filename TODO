@@ -1,6 +1,5 @@
 for 1.0
 =======
-review functionality missing over 0.1
 serialization of handle_events
 
 for 1.1 or future
@@ -9,3 +8,4 @@ optional timerfd support (runtime detection)
 notifications of hotplugged/unplugged devices
 offer API to create/destroy handle_events thread
 isochronous sync I/O?
+exposing of parent-child device relationships

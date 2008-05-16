@@ -742,7 +742,7 @@ uint8_t libusb_get_bus_number(libusb_device *dev);
 uint8_t libusb_get_device_address(libusb_device *dev);
 int libusb_get_max_packet_size(libusb_device *dev, unsigned char endpoint);
 
-libusb_device_handle *libusb_open(libusb_device *dev);
+int libusb_open(libusb_device *dev, libusb_device_handle **handle);
 void libusb_close(libusb_device_handle *dev_handle);
 libusb_device *libusb_get_device(libusb_device_handle *dev_handle);
 

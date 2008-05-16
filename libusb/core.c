@@ -599,38 +599,45 @@ API_EXPORTED void libusb_unref_device(libusb_device *dev)
  * This is a non-blocking function; no requests are sent over the bus.
  *
  * \param dev the device to open
- * \returns a handle for the device, or NULL on error
+ * \param output location for the returned device handle pointer. Only
+ * populated when the return code is 0.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NO_MEM on memory allocation failure
+ * \returns LIBUSB_ERROR_ACCESS if the user has insufficient permissions
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns another LIBUSB_ERROR code on other failure
  */
-API_EXPORTED libusb_device_handle *libusb_open(libusb_device *dev)
+API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 {
-	struct libusb_device_handle *handle;
+	struct libusb_device_handle *_handle;
 	size_t priv_size = usbi_backend->device_handle_priv_size;
 	int r;
 	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
 
-	handle = malloc(sizeof(*handle) + priv_size);
-	if (!handle)
-		return NULL;
+	_handle = malloc(sizeof(*_handle) + priv_size);
+	if (!_handle)
+		return LIBUSB_ERROR_NO_MEM;
 
-	r = pthread_mutex_init(&handle->lock, NULL);
+	r = pthread_mutex_init(&_handle->lock, NULL);
 	if (r)
-		return NULL;
+		return LIBUSB_ERROR_OTHER;
 
-	handle->dev = libusb_ref_device(dev);
-	handle->claimed_interfaces = 0;
-	memset(&handle->os_priv, 0, priv_size);
+	_handle->dev = libusb_ref_device(dev);
+	_handle->claimed_interfaces = 0;
+	memset(&_handle->os_priv, 0, priv_size);
 
-	r = usbi_backend->open(handle);
+	r = usbi_backend->open(_handle);
 	if (r < 0) {
 		libusb_unref_device(dev);
-		free(handle);
-		return NULL;
+		free(_handle);
+		return r;
 	}
 
 	pthread_mutex_lock(&usbi_open_devs_lock);
-	list_add(&handle->list, &usbi_open_devs);
+	list_add(&_handle->list, &usbi_open_devs);
 	pthread_mutex_unlock(&usbi_open_devs_lock);
-	return handle;
+	*handle = _handle;
+	return 0;
 }
 
 /** \ingroup dev
@@ -656,13 +663,14 @@ API_EXPORTED libusb_device_handle *libusb_open_device_with_vid_pid(
 	struct libusb_device *dev;
 	struct libusb_device_handle *handle = NULL;
 	size_t i = 0;
+	int r;
 
 	if (libusb_get_device_list(&devs) < 0)
 		return NULL;
 
 	while ((dev = devs[i++]) != NULL) {
 		struct libusb_device_descriptor desc;
-		int r = libusb_get_device_descriptor(dev, &desc);
+		r = libusb_get_device_descriptor(dev, &desc);
 		if (r < 0)
 			goto out;
 		if (desc.idVendor == vendor_id && desc.idProduct == product_id) {
@@ -671,8 +679,11 @@ API_EXPORTED libusb_device_handle *libusb_open_device_with_vid_pid(
 		}
 	}
 
-	if (found)
-		handle = libusb_open(found);
+	if (found) {
+		r = libusb_open(found, &handle);
+		if (r < 0)
+			handle = NULL;
+	}
 
 out:
 	libusb_free_device_list(devs, 1);
