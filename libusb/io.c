@@ -930,10 +930,13 @@ static int handle_events(struct timeval *tv)
 	r = poll(fds, nfds, timeout_ms);
 	usbi_dbg("poll() returned %d", r);
 	if (r == 0) {
+		free(fds);
 		return handle_timeouts();
 	} else if (r == -1 && errno == EINTR) {
+		free(fds);
 		return LIBUSB_ERROR_INTERRUPTED;
 	} else if (r < 0) {
+		free(fds);
 		usbi_err("poll failed %d err=%d\n", r, errno);
 		return LIBUSB_ERROR_IO;
 	}
@@ -942,6 +945,7 @@ static int handle_events(struct timeval *tv)
 	if (r)
 		usbi_err("backend handle_events failed with error %d", r);
 
+	free(fds);
 	return r;
 }
 
