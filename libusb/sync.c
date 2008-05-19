@@ -94,6 +94,7 @@ API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 
 	libusb_fill_control_transfer(transfer, dev_handle, buffer,
 		ctrl_transfer_cb, &completed, timeout);
+	transfer->flags = LIBUSB_TRANSFER_FREE_BUFFER;
 	r = libusb_submit_transfer(transfer);
 	if (r < 0) {
 		libusb_free_transfer(transfer);
