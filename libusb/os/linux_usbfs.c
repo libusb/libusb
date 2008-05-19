@@ -1186,7 +1186,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 				int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &urbs[j]);
 				if (tmp == 0)
 					tpriv->awaiting_discard++;
-				else if (tmp == -EINVAL)
+				else if (errno == EINVAL)
 					tpriv->awaiting_reap++;
 				else
 					usbi_warn("unrecognised discard return %d", tmp);
@@ -1340,7 +1340,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 				int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, urbs[j]);
 				if (tmp == 0)
 					tpriv->awaiting_discard++;
-				else if (tmp == -EINVAL)
+				else if (errno == EINVAL)
 					tpriv->awaiting_reap++;
 				else
 					usbi_warn("unrecognised discard return %d", tmp);
@@ -1425,12 +1425,14 @@ static int cancel_control_transfer(struct usbi_transfer *itransfer)
 
 	tpriv->reap_action = CANCELLED;
 	r = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, tpriv->urbs);
-	if (r == -EINVAL) {
-		usbi_dbg("URB not found --> assuming ready to be reaped");
-		return 0;
-	} else if (r) {
-		usbi_err("unrecognised DISCARD code %d", r);
-		return LIBUSB_ERROR_OTHER;
+	if(r) {
+		if (errno == EINVAL) {
+			usbi_dbg("URB not found --> assuming ready to be reaped");
+			return 0;
+		} else {
+			usbi_err("unrecognised DISCARD code %d", errno);
+			return LIBUSB_ERROR_OTHER;
+		}
 	}
 
 	return 0;
@@ -1450,10 +1452,10 @@ static void cancel_bulk_transfer(struct usbi_transfer *itransfer)
 		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
 		if (tmp == 0)
 			tpriv->awaiting_discard++;
-		else if (tmp == -EINVAL)
+		else if (errno == EINVAL)
 			tpriv->awaiting_reap++;
 		else
-			usbi_warn("unrecognised discard return %d", tmp);
+			usbi_warn("unrecognised discard return %d", errno);
 	}
 }
 
@@ -1471,10 +1473,10 @@ static void cancel_iso_transfer(struct usbi_transfer *itransfer)
 		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, tpriv->iso_urbs[i]);
 		if (tmp == 0)
 			tpriv->awaiting_discard++;
-		else if (tmp == -EINVAL)
+		else if (errno == EINVAL)
 			tpriv->awaiting_reap++;
 		else
-			usbi_warn("unrecognised discard return %d", tmp);
+			usbi_warn("unrecognised discard return %d", errno);
 	}
 }
 
@@ -1603,10 +1605,10 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 			int r = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
 			if (r == 0)
 				tpriv->awaiting_discard++;
-			else if (r == -EINVAL)
+			else if (errno == EINVAL)
 				tpriv->awaiting_reap++;
 			else
-				usbi_warn("unrecognised discard return %d", r);
+				usbi_warn("unrecognised discard return %d", errno);
 		}
 		return 0;
 	} else {
