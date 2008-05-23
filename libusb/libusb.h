@@ -1106,6 +1106,19 @@ int libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
 
 /* polling and timeouts */
 
+int libusb_try_lock_events(void);
+void libusb_lock_events(void);
+void libusb_unlock_events(void);
+int libusb_event_handler_active(void);
+void libusb_lock_event_waiters(void);
+void libusb_unlock_event_waiters(void);
+int libusb_wait_for_event(struct timeval *tv);
+
+int libusb_handle_events_timeout(struct timeval *tv);
+int libusb_handle_events(void);
+int libusb_handle_events_locked(struct timeval *tv);
+int libusb_get_next_timeout(struct timeval *tv);
+
 /** \ingroup poll
  * File descriptor for polling
  */
@@ -1119,11 +1132,6 @@ struct libusb_pollfd {
 	 * nonblocking write readiness. */
 	short events;
 };
-
-int libusb_handle_events_timeout(struct timeval *tv);
-int libusb_handle_events(void);
-int libusb_get_next_timeout(struct timeval *tv);
-const struct libusb_pollfd **libusb_get_pollfds(void);
 
 /** \ingroup poll
  * Callback function, invoked when a new file descriptor should be added
@@ -1143,6 +1151,8 @@ typedef void (*libusb_pollfd_added_cb)(int fd, short events);
  * \see libusb_set_pollfd_notifiers()
  */
 typedef void (*libusb_pollfd_removed_cb)(int fd);
+
+const struct libusb_pollfd **libusb_get_pollfds(void);
 void libusb_set_pollfd_notifiers(libusb_pollfd_added_cb added_cb,
 	libusb_pollfd_removed_cb removed_cb);
 

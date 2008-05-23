@@ -47,6 +47,17 @@ static pthread_mutex_t pollfds_lock = PTHREAD_MUTEX_INITIALIZER;
 static libusb_pollfd_added_cb fd_added_cb = NULL;
 static libusb_pollfd_removed_cb fd_removed_cb = NULL;
 
+/* this lock ensures that only one thread is handling events at any one time */
+static pthread_mutex_t events_lock = PTHREAD_MUTEX_INITIALIZER;
+
+/* used to see if there is an active thread doing event handling */
+static int event_handler_active = 0;
+
+/* used to wait for event completion in threads other than the one that is
+ * event handling */
+static pthread_mutex_t event_waiters_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t event_waiters_cond = PTHREAD_COND_INITIALIZER;
+
 /**
  * \page io Synchronous and asynchronous device I/O
  *
@@ -563,6 +574,237 @@ while (user has not requested application exit) {
  * call libusb_get_pollfds(), you can set up notification functions for when
  * the file descriptor set changes using libusb_set_pollfd_notifiers().
  *
+ * \section mtissues Multi-threaded considerations
+ *
+ * Unfortunately, the situation is complicated further when multiple threads
+ * come into play. If two threads are monitoring the same file descriptors,
+ * the fact that only one thread will be woken up when an event occurs causes
+ * some headaches.
+ *
+ * The events lock, event waiters lock, and libusb_handle_events_locked()
+ * entities are added to solve these problems. You do not need to be concerned
+ * with these entities otherwise.
+ *
+ * See the extra documentation: \ref mtasync
+ */
+
+/** \page mtasync Multi-threaded applications and asynchronous I/O
+ *
+ * libusb is a thread-safe library, but extra considerations must be applied
+ * to applications which interact with libusb from multiple threads.
+ *
+ * The underlying issue that must be addressed is that all libusb I/O
+ * revolves around monitoring file descriptors through the poll()/select()
+ * system calls. This is directly exposed at the
+ * \ref asyncio "asynchronous interface" but it is important to note that the
+ * \ref syncio "synchronous interface" is implemented on top of the
+ * asynchonrous interface, therefore the same considerations apply.
+ *
+ * The issue is that if two or more threads are concurrently calling poll()
+ * or select() on libusb's file descriptors then only one of those threads
+ * will be woken up when an event arrives. The others will be completely
+ * oblivious that anything has happened.
+ *
+ * Consider the following pseudo-code, which submits an asynchronous transfer
+ * then waits for its completion. This style is one way you could implement a
+ * synchronous interface on top of the asynchronous interface (and libusb
+ * does something similar, albeit more advanced due to the complications
+ * explained on this page).
+ *
+\code
+void cb(struct libusb_transfer *transfer)
+{
+	int *completed = transfer->user_data;
+	*completed = 1;
+}
+
+void myfunc() {
+	const struct timeval timeout = { 120, 0 };
+	struct libusb_transfer *transfer;
+	unsigned char buffer[LIBUSB_CONTROL_SETUP_SIZE];
+	int completed = 0;
+
+	transfer = libusb_alloc_transfer(0);
+	libusb_fill_control_setup(buffer,
+		LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT, 0x04, 0x01, 0, 0);
+	libusb_fill_control_transfer(transfer, dev, buffer, cb, &completed, 1000);
+	libusb_submit_transfer(transfer);
+
+	while (!completed) {
+		poll(libusb file descriptors, 120*1000);
+		if (poll indicates activity)
+			libusb_handle_events_timeout(0);
+	}
+	printf("completed!");
+	// other code here
+}
+\endcode
+ *
+ * Here we are <em>serializing</em> completion of an asynchronous event
+ * against a condition - the condition being completion of a specific transfer.
+ * The poll() loop has a long timeout to minimize CPU usage during situations
+ * when nothing is happening (it could reasonably be unlimited).
+ *
+ * If this is the only thread that is polling libusb's file descriptors, there
+ * is no problem: there is no danger that another thread will swallow up the
+ * event that we are interested in. On the other hand, if there is another
+ * thread polling the same descriptors, there is a chance that it will receive
+ * the event that we were interested in. In this situation, <tt>myfunc()</tt>
+ * will only realise that the transfer has completed on the next iteration of
+ * the loop, <em>up to 120 seconds later.</em> Clearly a two-minute delay is
+ * undesirable, and don't even think about using short timeouts to circumvent
+ * this issue!
+ * 
+ * The solution here is to ensure that no two threads are ever polling the
+ * file descriptors at the same time. A naive implementation of this would
+ * impact the capabilities of the library, so libusb offers the scheme
+ * documented below to ensure no loss of functionality.
+ *
+ * Before we go any further, it is worth mentioning that all libusb-wrapped
+ * event handling procedures fully adhere to the scheme documented below.
+ * This includes libusb_handle_events() and all the synchronous I/O functions - 
+ * libusb hides this headache from you. You do not need to worry about any
+ * of these issues if you stick to that level.
+ *
+ * The problem is when we consider the fact that libusb exposes file
+ * descriptors to allow for you to integrate asynchronous USB I/O into
+ * existing main loops, effectively allowing you to do some work behind
+ * libusb's back. If you do take libusb's file descriptors and pass them to
+ * poll()/select() yourself, you need to be aware of the associated issues.
+ *
+ * \section eventlock The events lock
+ *
+ * The first concept to be introduced is the events lock. The events lock
+ * is used to serialize threads that want to handle events, such that only
+ * one thread is handling events at any one time.
+ *
+ * You must take the events lock before polling libusb file descriptors,
+ * using libusb_lock_events(). You must release the lock as soon as you have
+ * aborted your poll()/select() loop, using libusb_unlock_events().
+ *
+ * \section threadwait Letting other threads do the work for you
+ *
+ * Although the events lock is a critical part of the solution, it is not
+ * enough on it's own. You might wonder if the following is sufficient...
+\code
+	libusb_lock_events();
+	while (!completed) {
+		poll(libusb file descriptors, 120*1000);
+		if (poll indicates activity)
+			libusb_handle_events_timeout(0);
+	}
+	libusb_lock_events();
+\endcode
+ * ...and the answer is that it is not. This is because the transfer in the
+ * code shown above may take a long time (say 30 seconds) to complete, and
+ * the lock is not released until the transfer is completed.
+ *
+ * Another thread with similar code that wants to do event handling may be
+ * working with a transfer that completes after a few milliseconds. Despite
+ * having such a quick completion time, the other thread cannot check that
+ * status of its transfer until the code above has finished (30 seconds later)
+ * due to contention on the lock.
+ *
+ * To solve this, libusb offers you a mechanism to determine when another
+ * thread is handling events. It also offers a mechanism to block your thread
+ * until the event handling thread has completed an event (and this mechanism
+ * does not involve polling of file descriptors).
+ *
+ * After determining that another thread is currently handling events, you
+ * obtain the <em>event waiters</em> lock using libusb_lock_event_waiters().
+ * You then re-check that some other thread is still handling events, and if
+ * so, you call libusb_wait_for_event().
+ *
+ * libusb_wait_for_event() puts your application to sleep until an event
+ * occurs, or until a thread releases the events lock. When either of these
+ * things happen, your thread is woken up, and should re-check the condition
+ * it was waiting on. It should also re-check that another thread is handling
+ * events, and if not, it should start handling events itself.
+ *
+ * This looks like the following, as pseudo-code:
+\code
+retry:
+if (libusb_try_lock_events() == 0) {
+	// we obtained the event lock: do our own event handling
+	libusb_lock_events();
+	while (!completed) {
+		poll(libusb file descriptors, 120*1000);
+		if (poll indicates activity)
+			libusb_handle_events_locked(0);
+	}
+	libusb_unlock_events();
+} else {
+	// another thread is doing event handling. wait for it to signal us that
+	// an event has completed
+	libusb_lock_event_waiters();
+
+	while (!completed) {
+		// now that we have the event waiters lock, double check that another
+		// thread is still handling events for us. (it may have ceased handling
+		// events in the time it took us to reach this point)
+		if (!libusb_event_handler_active()) {
+			// whoever was handling events is no longer doing so, try again
+			libusb_unlock_event_waiters();
+			goto retry;
+		}
+	
+		libusb_wait_for_event();
+	}
+	libusb_unlock_event_waiters();
+}
+printf("completed!\n");
+\endcode
+ *
+ * We have now implemented code which can dynamically handle situations where
+ * nobody is handling events (so we should do it ourselves), and it can also
+ * handle situations where another thread is doing event handling (so we can
+ * piggyback onto them). It is also equipped to handle a combination of
+ * the two, for example, another thread is doing event handling, but for
+ * whatever reason it stops doing so before our condition is met, so we take
+ * over the event handling.
+ *
+ * Three functions were introduced in the above pseudo-code. Their importance
+ * should be apparent from the code shown above.
+ * -# libusb_try_lock_events() is a non-blocking function which attempts
+ *    to acquire the events lock but returns a failure code if it is contended.
+ * -# libusb_handle_events_locked() is a variant of
+ *    libusb_handle_events_timeout() that you can call while holding the
+ *    events lock. libusb_handle_events_timeout() itself implements similar
+ *    logic to the above, so be sure not to call it when you are
+ *    "working behind libusb's back", as is the case here.
+ * -# libusb_event_handler_active() determines if someone is currently
+ *    holding the events lock
+ *
+ * You might be wondering why there is no function to wake up all threads
+ * blocked on libusb_wait_for_event(). This is because libusb can do this
+ * internally: it will wake up all such threads when someone calls
+ * libusb_unlock_events() or when a transfer completes (at the point after its
+ * callback has returned).
+ *
+ * \subsection concl Closing remarks
+ *
+ * The above may seem a little complicated, but hopefully I have made it clear
+ * why such complications are necessary. Also, do not forget that this only
+ * applies to applications that take libusb's file descriptors and integrate
+ * them into their own polling loops.
+ *
+ * You may decide that it is OK for your multi-threaded application to ignore
+ * some of the rules and locks detailed above, because you don't think that
+ * two threads can ever be polling the descriptors at the same time. If that
+ * is the case, then that's good news for you because you don't have to worry.
+ * But be careful here; remember that the synchronous I/O functions do event
+ * handling internally. If you have one thread doing event handling in a loop
+ * (without implementing the rules and locking semantics documented above)
+ * and another trying to send a synchronous USB transfer, you will end up with
+ * two threads monitoring the same descriptors, and the above-described
+ * undesirable behaviour occuring. The solution is for your polling thread to
+ * play by the rules; the synchronous I/O functions do so, and this will result
+ * in them getting along in perfect harmony.
+ *
+ * If you do have a dedicated thread doing event handling, it is perfectly
+ * legal for it to take the event handling lock and never release it. Any
+ * synchronous I/O functions you call from other threads will transparently
+ * fall back to the "event waiters" mechanism detailed above.
  */
 
 void usbi_io_init()
@@ -803,6 +1045,7 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	 * this point. */
 	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER)
 		libusb_free_transfer(transfer);
+	pthread_cond_broadcast(&event_waiters_cond);
 }
 
 /* Similar to usbi_handle_transfer_completion() but exclusively for transfers
@@ -820,6 +1063,171 @@ void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
 
 	/* otherwise its a normal async cancel */
 	usbi_handle_transfer_completion(transfer, LIBUSB_TRANSFER_CANCELLED);
+}
+
+/** \ingroup poll
+ * Attempt to acquire the event handling lock. This lock is used to ensure that
+ * only one thread is monitoring libusb event sources at any one time.
+ *
+ * You only need to use this lock if you are developing an application
+ * which calls poll() or select() on libusb's file descriptors directly.
+ * If you stick to libusb's event handling loop functions (e.g.
+ * libusb_handle_events()) then you do not need to be concerned with this
+ * locking.
+ *
+ * While holding this lock, you are trusted to actually be handling events.
+ * If you are no longer handling events, you must call libusb_unlock_events()
+ * as soon as possible.
+ *
+ * \returns 0 if the lock was obtained successfully
+ * \returns 1 if the lock was not obtained (i.e. another thread holds the lock)
+ * \see \ref mtasync
+ */
+API_EXPORTED int libusb_try_lock_events(void)
+{
+	int r = pthread_mutex_trylock(&events_lock);
+	if (r)
+		return 1;
+
+	event_handler_active = 1;	
+	return 0;
+}
+
+/** \ingroup poll
+ * Acquire the event handling lock, blocking until successful acquisition if
+ * it is contended. This lock is used to ensure that only one thread is
+ * monitoring libusb event sources at any one time.
+ *
+ * You only need to use this lock if you are developing an application
+ * which calls poll() or select() on libusb's file descriptors directly.
+ * If you stick to libusb's event handling loop functions (e.g.
+ * libusb_handle_events()) then you do not need to be concerned with this
+ * locking.
+ *
+ * While holding this lock, you are trusted to actually be handling events.
+ * If you are no longer handling events, you must call libusb_unlock_events()
+ * as soon as possible.
+ *
+ * \see \ref mtasync
+ */
+API_EXPORTED void libusb_lock_events(void)
+{
+	pthread_mutex_lock(&events_lock);
+	event_handler_active = 1;
+}
+
+/** \ingroup poll
+ * Release the lock previously acquired with libusb_try_lock_events() or
+ * libusb_lock_events(). Releasing this lock will wake up any threads blocked
+ * on libusb_wait_for_event().
+ *
+ * \see \ref mtasync
+ */
+API_EXPORTED void libusb_unlock_events(void)
+{
+	event_handler_active = 0;
+	pthread_mutex_unlock(&events_lock);
+
+	pthread_mutex_lock(&event_waiters_lock);
+	pthread_cond_broadcast(&event_waiters_cond);
+	pthread_mutex_unlock(&event_waiters_lock);
+}
+
+/** \ingroup poll
+ * Determine if an active thread is handling events (i.e. if anyone is holding
+ * the event handling lock).
+ *
+ * \returns 1 if a thread is handling events
+ * \returns 0 if there are no threads currently handling events
+ * \see \ref mtasync
+ */
+API_EXPORTED int libusb_event_handler_active(void)
+{
+	return event_handler_active;
+}
+
+/** \ingroup poll
+ * Acquire the event waiters lock. This lock is designed to be obtained under
+ * the situation where you want to be aware when events are completed, but
+ * some other thread is event handling so calling libusb_handle_events() is not
+ * allowed.
+ *
+ * You then obtain this lock, re-check that another thread is still handling
+ * events, then call libusb_wait_for_event().
+ *
+ * You only need to use this lock if you are developing an application
+ * which calls poll() or select() on libusb's file descriptors directly,
+ * <b>and</b> may potentially be handling events from 2 threads simultaenously.
+ * If you stick to libusb's event handling loop functions (e.g.
+ * libusb_handle_events()) then you do not need to be concerned with this
+ * locking.
+ *
+ * \see \ref mtasync
+ */
+API_EXPORTED void libusb_lock_event_waiters(void)
+{
+	pthread_mutex_lock(&event_waiters_lock);
+}
+
+/** \ingroup poll
+ * Release the event waiters lock.
+ * \see \ref mtasync
+ */
+API_EXPORTED void libusb_unlock_event_waiters(void)
+{
+	pthread_mutex_unlock(&event_waiters_lock);
+}
+
+/** \ingroup poll
+ * Wait for another thread to signal completion of an event. Must be called
+ * with the event waiters lock held, see libusb_lock_event_waiters().
+ *
+ * This function will block until any of the following conditions are met:
+ * -# The timeout expires
+ * -# A transfer completes
+ * -# A thread releases the event handling lock through libusb_unlock_events()
+ *
+ * Condition 1 is obvious. Condition 2 unblocks your thread <em>after</em>
+ * the callback for the transfer has completed. Condition 3 is important
+ * because it means that the thread that was previously handling events is no
+ * longer doing so, so if any events are to complete, another thread needs to
+ * step up and start event handling.
+ *
+ * This function releases the event waiters lock before putting your thread
+ * to sleep, and reacquires the lock as it is being woken up.
+ *
+ * \param tv maximum timeout for this blocking function. A NULL value
+ * indicates unlimited timeout.
+ * \returns 0 after a transfer completes or another thread stops event handling
+ * \returns 1 if the timeout expired
+ * \see \ref mtasync
+ */
+API_EXPORTED int libusb_wait_for_event(struct timeval *tv)
+{
+	struct timespec timeout;
+	int r;
+
+	if (tv == NULL) {
+		pthread_cond_wait(&event_waiters_cond, &event_waiters_lock);
+		return 0;
+	}
+
+	r = clock_gettime(CLOCK_REALTIME, &timeout);
+	if (r < 0) {
+		usbi_err("failed to read realtime clock, error %d", errno);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	timeout.tv_sec += tv->tv_sec;
+	timeout.tv_nsec += tv->tv_usec * 1000;
+	if (timeout.tv_nsec > 1000000000) {
+		timeout.tv_nsec -= 1000000000;
+		timeout.tv_sec++;
+	}
+
+	r = pthread_cond_timedwait(&event_waiters_cond, &event_waiters_lock,
+		&timeout);
+	return (r == ETIMEDOUT);
 }
 
 static void handle_timeout(struct usbi_transfer *itransfer)
@@ -880,31 +1288,16 @@ out:
 	return r;
 }
 
+/* do the actual event handling. assumes that no other thread is concurrently
+ * doing the same thing. */
 static int handle_events(struct timeval *tv)
 {
 	int r;
 	struct usbi_pollfd *ipollfd;
-	struct timeval timeout;
-	struct timeval poll_timeout;
 	nfds_t nfds = 0;
 	struct pollfd *fds;
 	int i = -1;
 	int timeout_ms;
-
-	r = libusb_get_next_timeout(&timeout);
-	if (r) {
-		/* timeout already expired? */
-		if (!timerisset(&timeout))
-			return handle_timeouts();
-
-		/* choose the smallest of next URB timeout or user specified timeout */
-		if (timercmp(&timeout, tv, <))
-			poll_timeout = timeout;
-		else
-			poll_timeout = *tv;
-	} else {
-		poll_timeout = *tv;
-	}
 
 	pthread_mutex_lock(&pollfds_lock);
 	list_for_each_entry(ipollfd, &pollfds, list)
@@ -925,7 +1318,7 @@ static int handle_events(struct timeval *tv)
 	}
 	pthread_mutex_unlock(&pollfds_lock);
 
-	timeout_ms = (poll_timeout.tv_sec * 1000) + (poll_timeout.tv_usec / 1000);
+	timeout_ms = (tv->tv_sec * 1000) + (tv->tv_usec / 1000);
 	usbi_dbg("poll() %d fds with timeout in %dms", nfds, timeout_ms);
 	r = poll(fds, nfds, timeout_ms);
 	usbi_dbg("poll() returned %d", r);
@@ -949,6 +1342,32 @@ static int handle_events(struct timeval *tv)
 	return r;
 }
 
+/* returns the smallest of:
+ *  1. timeout of next URB
+ *  2. user-supplied timeout
+ * returns 1 if there is an already-expired timeout, otherwise returns 0
+ * and populates out
+ */
+static int get_next_timeout(struct timeval *tv, struct timeval *out)
+{
+	struct timeval timeout;
+	int r = libusb_get_next_timeout(&timeout);
+	if (r) {
+		/* timeout already expired? */
+		if (!timerisset(&timeout))
+			return 1;
+
+		/* choose the smallest of next URB timeout or user specified timeout */
+		if (timercmp(&timeout, tv, <))
+			*out = timeout;
+		else
+			*out = *tv;
+	} else {
+		*out = *tv;
+	}
+	return 0;
+}
+
 /** \ingroup poll
  * Handle any pending events.
  *
@@ -969,7 +1388,45 @@ static int handle_events(struct timeval *tv)
  */
 API_EXPORTED int libusb_handle_events_timeout(struct timeval *tv)
 {
-	return handle_events(tv);
+	int r;
+	struct timeval poll_timeout;
+
+	r = get_next_timeout(tv, &poll_timeout);
+	if (r) {
+		/* timeout already expired */
+		return handle_timeouts();
+	}
+
+retry:
+	if (libusb_try_lock_events() == 0) {
+		/* we obtained the event lock: do our own event handling */
+		r = handle_events(&poll_timeout);
+		libusb_unlock_events();
+		return r;
+	}
+
+	/* another thread is doing event handling. wait for pthread events that
+	 * notify event completion. */
+	libusb_lock_event_waiters();
+
+	if (!libusb_event_handler_active()) {
+		/* we hit a race: whoever was event handling earlier finished in the
+		 * time it took us to reach this point. try the cycle again. */
+		libusb_unlock_event_waiters();
+		usbi_dbg("event handler was active but went away, retrying");
+		goto retry;
+	}
+
+	usbi_dbg("another thread is doing event handling");
+	r = libusb_wait_for_event(&poll_timeout);
+	libusb_unlock_event_waiters();
+
+	if (r < 0)
+		return r;
+	else if (r == 1)
+		return handle_timeouts();
+	else
+		return 0;
 }
 
 /** \ingroup poll
@@ -986,7 +1443,37 @@ API_EXPORTED int libusb_handle_events(void)
 	struct timeval tv;
 	tv.tv_sec = 2;
 	tv.tv_usec = 0;
-	return handle_events(&tv);
+	return libusb_handle_events_timeout(&tv);
+}
+
+/** \ingroup poll
+ * Handle any pending events by polling file descriptors, without checking if
+ * any other threads are already doing so. Must be called with the event lock
+ * held, see libusb_lock_events().
+ *
+ * This function is designed to be called under the situation where you have
+ * taken the event lock and are calling poll()/select() directly on libusb's
+ * file descriptors (as opposed to using libusb_handle_events() or similar).
+ * You detect events on libusb's descriptors, so you then call this function
+ * with a zero timeout value (while still holding the event lock).
+ *
+ * \param tv the maximum time to block waiting for events, or zero for
+ * non-blocking mode
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ * \see \ref mtasync
+ */
+API_EXPORTED int libusb_handle_events_locked(struct timeval *tv)
+{
+	int r;
+	struct timeval poll_timeout;
+
+	r = get_next_timeout(tv, &poll_timeout);
+	if (r) {
+		/* timeout already expired */
+		return handle_timeouts();
+	}
+
+	return handle_events(&poll_timeout);
 }
 
 /** \ingroup poll

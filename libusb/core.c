@@ -629,7 +629,7 @@ API_EXPORTED void libusb_unref_device(libusb_device *dev)
  * This is a non-blocking function; no requests are sent over the bus.
  *
  * \param dev the device to open
- * \param output location for the returned device handle pointer. Only
+ * \param handle output location for the returned device handle pointer. Only
  * populated when the return code is 0.
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NO_MEM on memory allocation failure

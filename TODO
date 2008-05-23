@@ -1,7 +1,3 @@
-for 1.0
-=======
-serialization of handle_events
-
 for 1.1 or future
 ==================
 optional timerfd support (runtime detection)
