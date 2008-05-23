@@ -723,6 +723,7 @@ struct libusb_transfer {
 
 int libusb_init(void);
 void libusb_exit(void);
+void libusb_set_debug(int level);
 
 ssize_t libusb_get_device_list(libusb_device ***list);
 void libusb_free_device_list(libusb_device **list, int unref_devices);

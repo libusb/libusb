@@ -31,6 +31,8 @@
 #include "libusb.h"
 #include "libusbi.h"
 
+static int usbi_debug = 0;
+
 #ifdef OS_LINUX
 const struct usbi_os_backend * const usbi_backend = &linux_usbfs_backend;
 #else
@@ -988,6 +990,29 @@ API_EXPORTED int libusb_detach_kernel_driver(libusb_device_handle *dev,
 }
 
 /** \ingroup lib
+ * Set message verbosity.
+ *  - Level 0: no messages ever printed by the library (default)
+ *  - Level 1: error messages are printed to stderr
+ *  - Level 2: warning and error messages are printed to stderr
+ *  - Level 3: informational messages are printed to stdout, warning and error
+ *    messages are printed to stderr
+ *
+ * The default level is 0, which means no messages are ever printed. If you
+ * choose to increase the message verbosity level, ensure that your
+ * application does not close the stdout/stderr file descriptors.
+ *
+ * libusb also offers the compile-time option to print verbose debug messages
+ * to stderr. If libusb was compiled with this option, this function
+ * effectively does nothing: messages of all types are always printed.
+ *
+ * \param level debug level to set
+ */
+API_EXPORTED void libusb_set_debug(int level)
+{
+	usbi_debug = level;
+}
+
+/** \ingroup lib
  * Initialize libusb. This function must be called before calling any other
  * libusb function.
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
@@ -1040,6 +1065,15 @@ void usbi_log(enum usbi_log_level level, const char *function,
 	va_list args;
 	FILE *stream = stdout;
 	const char *prefix;
+
+#ifndef ENABLE_DEBUG_LOGGING
+	if (!usbi_debug)
+		return;
+	if (level == LOG_LEVEL_WARNING && usbi_debug < 2)
+		return;
+	if (level == LOG_LEVEL_INFO && usbi_debug < 3)
+		return;
+#endif
 
 	switch (level) {
 	case LOG_LEVEL_INFO:
