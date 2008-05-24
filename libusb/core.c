@@ -32,6 +32,7 @@
 #include "libusbi.h"
 
 static int usbi_debug = 0;
+static int debug_fixed = 0;
 
 #ifdef OS_LINUX
 const struct usbi_os_backend * const usbi_backend = &linux_usbfs_backend;
@@ -97,6 +98,33 @@ pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
  * libusb functions typically return 0 on success or a negative error code
  * on failure. These negative error codes relate to LIBUSB_ERROR constants
  * which are listed on the \ref misc "miscellaneous" documentation page.
+ *
+ * \section msglog Debug message logging
+ *
+ * libusb does not log any messages by default. Your application is therefore
+ * free to close stdout/stderr and those descriptors may be reused without
+ * worry.
+ *
+ * The libusb_set_debug() function can be used to enable stdout/stderr logging
+ * of certain messages. Under standard configuration, libusb doesn't really
+ * log much at all, so you are advised to use this function to enable all
+ * error/warning/informational messages. It will help you debug problems with
+ * your software.
+ *
+ * The LIBUSB_DEBUG environment variable can be used to enable message logging
+ * at run-time. This environment variable should be set to a number, which is
+ * interpreted the same as the libusb_set_debug() parameter. When this
+ * environment variable is set, the message logging verbosity level is fixed
+ * and libusb_set_debug() effectively does nothing.
+ *
+ * libusb can be compiled without any logging functions, useful for embedded
+ * systems. In this case, libusb_set_debug() and the LIBUSB_DEBUG environment
+ * variable have no effects.
+ *
+ * libusb can also be compiled with verbose debugging messages. When the
+ * library is compiled in this way, all messages of all verbosities are always
+ * logged.  libusb_set_debug() and the LIBUSB_DEBUG environment variable have
+ * no effects.
  *
  * \section remarks Other remarks
  *
@@ -1001,15 +1029,26 @@ API_EXPORTED int libusb_detach_kernel_driver(libusb_device_handle *dev,
  * choose to increase the message verbosity level, ensure that your
  * application does not close the stdout/stderr file descriptors.
  *
- * libusb also offers the compile-time option to print verbose debug messages
- * to stderr. If libusb was compiled with this option, this function
- * effectively does nothing: messages of all types are always printed.
+ * You are advised to set level 3. libusb is conservative with it's message
+ * logging and most of the time, will only log messages that explain error
+ * conditions and other oddities. This will help you debug your software.
+ *
+ * If the LIBUSB_DEBUG environment variable was set when libusb was
+ * initialized, this function does nothing: the message verbosity is fixed
+ * to the value in the environment variable.
+ *
+ * If libusb was compiled without any message logging, this function does
+ * nothing: you'll never get any messages.
+ *
+ * If libusb was compiled with verbose debug message logging, this function
+ * does nothing: you'll always get messages from all levels.
  *
  * \param level debug level to set
  */
 API_EXPORTED void libusb_set_debug(int level)
 {
-	usbi_debug = level;
+	if (!debug_fixed)
+		usbi_debug = level;
 }
 
 /** \ingroup lib
@@ -1019,8 +1058,14 @@ API_EXPORTED void libusb_set_debug(int level)
  */
 API_EXPORTED int libusb_init(void)
 {
-	usbi_dbg("");
+	char *dbg = getenv("LIBUSB_DEBUG");
+	if (dbg) {
+		usbi_debug = atoi(dbg);
+		if (usbi_debug)
+			debug_fixed = 1;
+	}
 
+	usbi_dbg("");
 	if (usbi_backend->init) {
 		int r = usbi_backend->init();
 		if (r)
