@@ -1045,7 +1045,9 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	 * this point. */
 	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER)
 		libusb_free_transfer(transfer);
+	pthread_mutex_lock(&event_waiters_lock);
 	pthread_cond_broadcast(&event_waiters_cond);
+	pthread_mutex_unlock(&event_waiters_lock);
 }
 
 /* Similar to usbi_handle_transfer_completion() but exclusively for transfers
