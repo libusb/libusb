@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS = dist-bzip2
 DISTCLEANFILES = ChangeLog libusb-1.0.pc
-EXTRA_DIST = TODO
+EXTRA_DIST = TODO PORTING
 SUBDIRS = libusb doc
 
 if BUILD_EXAMPLES
@@ -17,5 +17,5 @@ ChangeLog:
 dist-hook: ChangeLog
 
 dist-up: dist
-	ncftpput upload.sourceforge.net incoming $(distdir).tar.bz2
+	rsync $(distdir).tar.bz2 frs.sourceforge.net:uploads/
 

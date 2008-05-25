@@ -1,3 +1,6 @@
 This file lists notable changes in each release. For the full history of all
 changes, see ChangeLog.
 
+2008-05-25: v0.9.0 release
+ * First libusb-1.0 beta release
+
