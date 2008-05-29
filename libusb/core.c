@@ -764,6 +764,57 @@ API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
 }
 
 /** \ingroup dev
+ * Determine the bConfigurationValue of the currently active configuration.
+ *
+ * You could formulate your own control request to obtain this information,
+ * but this function has the advantage that it may be able to retrieve the
+ * information from operating system caches (no I/O involved).
+ *
+ * If the OS does not cache this information, then this function will block
+ * while a control transfer is submitted to retrieve the information.
+ *
+ * This function will return a value of 0 in the <tt>config</tt> output
+ * parameter if the device is in unconfigured state.
+ *
+ * \param dev a device handle
+ * \param config output location for the bConfigurationValue of the active
+ * configuration (only valid for return code 0)
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+API_EXPORTED int libusb_get_configuration(libusb_device_handle *dev,
+	int *config)
+{
+	int r = LIBUSB_ERROR_NOT_SUPPORTED;
+
+	usbi_dbg("");
+	if (usbi_backend->get_configuration)
+		r = usbi_backend->get_configuration(dev, config);
+
+	if (r == LIBUSB_ERROR_NOT_SUPPORTED) {
+		uint8_t tmp = 0;
+		usbi_dbg("falling back to control message");
+		r = libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
+			LIBUSB_REQUEST_GET_CONFIGURATION, 0, 0, &tmp, 1, 1000);
+		if (r == 0) {
+			usbi_err("zero bytes returned in ctrl transfer?");
+			r = LIBUSB_ERROR_IO;
+		} else if (r == 1) {
+			r = 0;
+			*config = tmp;
+		} else {
+			usbi_dbg("control failed, error %d", r);
+		}
+	}
+
+	if (r == 0)
+		usbi_dbg("active config %d", *config);
+
+	return r;
+}
+
+/** \ingroup dev
  * Set the active configuration for a device. The operating system may have
  * already set an active configuration on the device, but for portability
  * reasons you should use this function to select the configuration you want
@@ -771,11 +822,26 @@ API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
  *
  * If you wish to change to another configuration at some later time, you
  * must release all claimed interfaces using libusb_release_interface() before
- * setting a new active configuration.
+ * setting a new active configuration. Also, consider that other applications
+ * or drivers may have claimed interfaces, in which case you are unable to
+ * change the configuration.
  *
  * A configuration value of -1 will put the device in unconfigured state.
  * The USB specifications state that a configuration value of 0 does this,
  * however buggy devices exist which actually have a configuration 0.
+ *
+ * This function checks the current active configuration before setting the
+ * new one. If the requested configuration is already active, this function
+ * does nothing more.
+ *
+ * This function is inherently racy: there is a small chance that someone may
+ * change the configuration after libusb has determined the active
+ * configuration but before the new one has been applied (or not applied, if
+ * libusb thinks the specified configuration is already active). After changing
+ * configuration, you may choose to claim an interface and then call
+ * libusb_get_configuration() to ensure that the requested change actually took
+ * place. The fact that you have now claimed an interface means that nobody
+ * else can change the configuration.
  *
  * You should always use this function rather than formulating your own
  * SET_CONFIGURATION control request. This is because the underlying operating
@@ -786,7 +852,8 @@ API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
  * \param dev a device handle
  * \param configuration the bConfigurationValue of the configuration you
  * wish to activate, or -1 if you wish to put the device in unconfigured state
- * \returns 0 on success
+ * \returns 1 if the configuration was changed
+ * \returns 0 if the configuration was already active
  * \returns LIBUSB_ERROR_NOT_FOUND if the requested configuration does not exist
  * \returns LIBUSB_ERROR_BUSY if interfaces are currently claimed
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
@@ -795,8 +862,24 @@ API_EXPORTED libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
 API_EXPORTED int libusb_set_configuration(libusb_device_handle *dev,
 	int configuration)
 {
+	int r;
+	int active;
+
 	usbi_dbg("configuration %d", configuration);
-	return usbi_backend->set_configuration(dev, configuration);
+	r = libusb_get_configuration(dev, &active);
+	if (r < 0)
+		return r;
+	if (active == 0)
+		active = -1;
+	if (active == configuration) {
+		usbi_dbg("already active");
+		return 0;
+	}
+
+	r = usbi_backend->set_configuration(dev, configuration);
+	if (r == 0)
+		r = 1;
+	return r;
 }
 
 /** \ingroup dev

@@ -904,6 +904,20 @@ static void op_close(struct libusb_device_handle *dev_handle)
 	close(fd);
 }
 
+static int op_get_configuration(struct libusb_device_handle *handle,
+	int *config)
+{
+	int r;
+	if (sysfs_can_relate_devices != 1)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	r = sysfs_get_active_config(handle->dev, config);
+	if (*config == -1)
+		*config = 0;
+
+	return 0;
+}
+
 static int op_set_configuration(struct libusb_device_handle *handle, int config)
 {
 	struct linux_device_priv *priv = __device_priv(handle->dev);
@@ -1827,6 +1841,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 
 	.open = op_open,
 	.close = op_close,
+	.get_configuration = op_get_configuration,
 	.set_configuration = op_set_configuration,
 	.claim_interface = op_claim_interface,
 	.release_interface = op_release_interface,

@@ -436,6 +436,25 @@ struct usbi_os_backend {
 		uint8_t config_index, unsigned char *buffer, size_t len,
 		int *host_endian);
 
+	/* Get the bConfigurationValue for the active configuration for a device.
+	 * Optional. This should only be implemented if you can retrieve it from
+	 * cache (don't generate I/O).
+	 *
+	 * If you cannot retrieve this from cache, either do not implement this
+	 * function, or return LIBUSB_ERROR_NOT_SUPPORTED. This will cause
+	 * libusb to retrieve the information through a standard control transfer.
+	 *
+	 * This function must be non-blocking.
+	 * Return:
+	 * - 0 on success
+	 * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected since it
+	 *   was opened
+	 * - LIBUSB_ERROR_NOT_SUPPORTED if the value cannot be retrieved without
+	 *   blocking
+	 * - another LIBUSB_ERROR code on other failure.
+	 */
+	int (*get_configuration)(struct libusb_device_handle *handle, int *config);
+
 	/* Set the active configuration for a device.
 	 *
 	 * A configuration value of -1 should put the device in unconfigured state.
