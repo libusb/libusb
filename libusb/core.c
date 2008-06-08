@@ -207,6 +207,7 @@ libusb_device **list;
 libusb_device *found = NULL;
 size_t cnt = libusb_get_device_list(&list);
 size_t i = 0;
+int err = 0;
 if (cnt < 0)
 	error();
 
@@ -219,7 +220,11 @@ for (i = 0; i < cnt; i++) {
 }
 
 if (found) {
-	libusb_device_handle *handle = libusb_open(found);
+	libusb_device_handle *handle;
+
+	err = libusb_open(found, &handle);
+	if (err)
+		error();
 	// etc
 }
 
