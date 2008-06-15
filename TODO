@@ -1,3 +1,8 @@
+new sysfs descriptors format
+configuration API
+contexts
+event handling/threads issue
+
 for 1.1 or future
 ==================
 optional timerfd support (runtime detection)
@@ -5,3 +10,4 @@ notifications of hotplugged/unplugged devices
 offer API to create/destroy handle_events thread
 isochronous sync I/O?
 exposing of parent-child device relationships
+"usb primer" introduction docs
