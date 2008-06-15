@@ -1335,6 +1335,11 @@ static int handle_events(struct timeval *tv)
 	pthread_mutex_unlock(&pollfds_lock);
 
 	timeout_ms = (tv->tv_sec * 1000) + (tv->tv_usec / 1000);
+
+	/* round up to next millisecond */
+	if (tv->tv_usec % 1000)
+		timeout_ms++;
+
 	usbi_dbg("poll() %d fds with timeout in %dms", nfds, timeout_ms);
 	r = poll(fds, nfds, timeout_ms);
 	usbi_dbg("poll() returned %d", r);
