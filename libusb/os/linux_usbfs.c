@@ -1577,8 +1577,8 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		if (tpriv->awaiting_reap == 0 && tpriv->awaiting_discard == 0) {
 			usbi_dbg("CANCEL: last URB handled, reporting");
 			if (tpriv->reap_action == CANCELLED) {
-				usbi_handle_transfer_cancellation(itransfer);
 				free(tpriv->urbs);
+				usbi_handle_transfer_cancellation(itransfer);
 				return 0;
 			} else if (tpriv->reap_action == COMPLETED_EARLY) {
 				goto out;
