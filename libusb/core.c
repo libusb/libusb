@@ -178,6 +178,59 @@ pthread_mutex_t usbi_open_devs_lock = PTHREAD_MUTEX_INITIALIZER;
  *    LIBUSB_TRANSFER_NO_DEVICE status code.
  *  - Many functions such as libusb_set_configuration() return the special
  *    LIBUSB_ERROR_NO_DEVICE error code when the device has been disconnected.
+ *
+ * \section configsel Configuration selection and handling
+ *
+ * When libusb presents a device handle to an application, there is a chance
+ * that the corresponding device may be in unconfigured state. For devices
+ * with multiple configurations, there is also a chance that the configuration
+ * currently selected is not the one that the application wants to use.
+ *
+ * The obvious solution is to add a call to libusb_set_configuration() early
+ * on during your device initialization routines, but there are caveats to
+ * be aware of:
+ * -# If the device is already in the desired configuration, calling
+ *    libusb_set_configuration() using the same configuration value will cause
+ *    a lightweight device reset. This may not be desirable behaviour.
+ * -# libusb will be unable to change configuration if the device is in
+ *    another configuration and other programs or drivers have claimed
+ *    interfaces under that configuration.
+ * -# In the case where the desired configuration is already active, libusb
+ *    may not even be able to perform a lightweight device reset. For example,
+ *    take my USB keyboard with fingerprint reader: I'm interested in driving
+ *    the fingerprint reader interface through libusb, but the kernel's
+ *    USB-HID driver will almost always have claimed the keyboard interface.
+ *    Because the kernel has claimed an interface, it is not even possible to
+ *    perform the lightweight device reset, so libusb_set_configuration() will
+ *    fail. (Luckily the device in question only has a single configuration.)
+ *
+ * One solution to some of the above problems is to consider the currently
+ * active configuration. If the configuration we want is already active, then
+ * we don't have to select any configuration:
+\code
+cfg = libusb_get_configuration(dev);
+if (cfg != desired)
+	libusb_set_configuration(dev, desired);
+\endcode
+ *
+ * This is probably suitable for most scenarios, but is inherently racy:
+ * another application or driver may change the selected configuration
+ * <em>after</em> the libusb_get_configuration() call.
+ *
+ * Even in cases where libusb_set_configuration() succeeds, consider that other
+ * applications or drivers may change configuration after your application
+ * calls libusb_set_configuration().
+ *
+ * One possible way to lock your device into a specific configuration is as
+ * follows:
+ * -# Set the desired configuration (or use the logic above to realise that
+ *    it is already in the desired configuration)
+ * -# Claim the interface that you wish to use
+ * -# Check that the currently active configuration is the one that you want
+ *    to use.
+ *
+ * The above method works because once an interface is claimed, no application
+ * or driver is able to select another configuration.
  */
 
 /**
@@ -820,33 +873,27 @@ API_EXPORTED int libusb_get_configuration(libusb_device_handle *dev,
 }
 
 /** \ingroup dev
- * Set the active configuration for a device. The operating system may have
- * already set an active configuration on the device, but for portability
- * reasons you should use this function to select the configuration you want
- * before claiming any interfaces.
+ * Set the active configuration for a device.
  *
- * If you wish to change to another configuration at some later time, you
- * must release all claimed interfaces using libusb_release_interface() before
- * setting a new active configuration. Also, consider that other applications
- * or drivers may have claimed interfaces, in which case you are unable to
- * change the configuration.
+ * The operating system may or may not have already set an active
+ * configuration on the device. It is up to your application to ensure the
+ * correct configuration is selected before you attempt to claim interfaces
+ * and perform other operations.
+ * 
+ * If you call this function on a device already configured with the selected
+ * configuration, then this function will act as a lightweight device reset:
+ * it will issue a SET_CONFIGURATION request using the current configuration,
+ * causing most USB-related device state to be reset (altsetting reset to zero,
+ * endpoint halts cleared, toggles reset).
+ *
+ * You cannot change/reset configuration if your application has claimed
+ * interfaces - you should free them with libusb_release_interface() first.
+ * You cannot change/reset configuration if other applications or drivers have
+ * claimed interfaces.
  *
  * A configuration value of -1 will put the device in unconfigured state.
  * The USB specifications state that a configuration value of 0 does this,
  * however buggy devices exist which actually have a configuration 0.
- *
- * This function checks the current active configuration before setting the
- * new one. If the requested configuration is already active, this function
- * does nothing more.
- *
- * This function is inherently racy: there is a small chance that someone may
- * change the configuration after libusb has determined the active
- * configuration but before the new one has been applied (or not applied, if
- * libusb thinks the specified configuration is already active). After changing
- * configuration, you may choose to claim an interface and then call
- * libusb_get_configuration() to ensure that the requested change actually took
- * place. The fact that you have now claimed an interface means that nobody
- * else can change the configuration.
  *
  * You should always use this function rather than formulating your own
  * SET_CONFIGURATION control request. This is because the underlying operating
@@ -857,8 +904,7 @@ API_EXPORTED int libusb_get_configuration(libusb_device_handle *dev,
  * \param dev a device handle
  * \param configuration the bConfigurationValue of the configuration you
  * wish to activate, or -1 if you wish to put the device in unconfigured state
- * \returns 1 if the configuration was changed
- * \returns 0 if the configuration was already active
+ * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the requested configuration does not exist
  * \returns LIBUSB_ERROR_BUSY if interfaces are currently claimed
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
@@ -867,24 +913,8 @@ API_EXPORTED int libusb_get_configuration(libusb_device_handle *dev,
 API_EXPORTED int libusb_set_configuration(libusb_device_handle *dev,
 	int configuration)
 {
-	int r;
-	int active;
-
 	usbi_dbg("configuration %d", configuration);
-	r = libusb_get_configuration(dev, &active);
-	if (r < 0)
-		return r;
-	if (active == 0)
-		active = -1;
-	if (active == configuration) {
-		usbi_dbg("already active");
-		return 0;
-	}
-
-	r = usbi_backend->set_configuration(dev, configuration);
-	if (r == 0)
-		r = 1;
-	return r;
+	return usbi_backend->set_configuration(dev, configuration);
 }
 
 /** \ingroup dev
