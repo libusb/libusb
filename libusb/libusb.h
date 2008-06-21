@@ -593,20 +593,23 @@ enum libusb_error {
 	/** Operation timed out */
 	LIBUSB_ERROR_TIMEOUT = -7,
 
+	/** Overflow */
+	LIBUSB_ERROR_OVERFLOW = -8,
+
 	/** Pipe error */
-	LIBUSB_ERROR_PIPE = -8,
+	LIBUSB_ERROR_PIPE = -9,
 
 	/** System call interrupted (perhaps due to signal) */
-	LIBUSB_ERROR_INTERRUPTED = -9,
+	LIBUSB_ERROR_INTERRUPTED = -10,
 
 	/** Insufficient memory */
-	LIBUSB_ERROR_NO_MEM = -10,
+	LIBUSB_ERROR_NO_MEM = -11,
 
 	/** Operation not supported or unimplemented on this platform */
-	LIBUSB_ERROR_NOT_SUPPORTED = -11,
+	LIBUSB_ERROR_NOT_SUPPORTED = -12,
 
 	/** Other error */
-	LIBUSB_ERROR_OTHER = -12,
+	LIBUSB_ERROR_OTHER = -99,
 };
 
 /** \ingroup asyncio
@@ -631,6 +634,9 @@ enum libusb_transfer_status {
 
 	/** Device was disconnected */
 	LIBUSB_TRANSFER_NO_DEVICE,
+
+	/** Device sent more data than requested */
+	LIBUSB_TRANSFER_OVERFLOW,
 };
 
 /** \ingroup asyncio

@@ -186,6 +186,49 @@ if (r == 0 && actual_length == sizeof(data)) {
  * \ref asyncio "asynchronous I/O API" documentation pages.
  */
 
+
+/**
+ * \page packetoverflow Packets and overflows
+ *
+ * \section packets Packet abstraction
+ *
+ * The USB specifications describe how data is transmitted in packets, with
+ * constraints on packet size defined by endpoint descriptors. The host must
+ * not send data payloads larger than the endpoint's maximum packet size.
+ *
+ * libusb and the underlying OS abstract out the packet concept, allowing you
+ * to request transfers of any size. Internally, the request will be divided
+ * up into correctly-sized packets. You do not have to be concerned with
+ * packet sizes, but there is one exception when considering overflows.
+ *
+ * \section overflow Bulk/interrupt transfer overflows
+ *
+ * When requesting data on a bulk endpoint, libusb requires you to supply a
+ * buffer and the maximum number of bytes of data that libusb can put in that
+ * buffer. However, the size of the buffer is not communicated to the device -
+ * the device is just asked to send any amount of data.
+ *
+ * There is no problem if the device sends an amount of data that is less than
+ * or equal to the buffer size. libusb reports this condition to you through
+ * the \ref libusb_transfer::actual_length "libusb_transfer.actual_length"
+ * field.
+ *
+ * Problems may occur if the device attempts to send more data than can fit in
+ * the buffer. libusb reports LIBUSB_TRANSFER_OVERFLOW for this condition but
+ * other behaviour is largely undefined: actual_length may or may not be
+ * accurate, the chunk of data that can fit in the buffer (before overflow)
+ * may or may not have been transferred.
+ *
+ * Overflows are nasty, but can be avoided. Even though you were told to
+ * ignore packets above, think about the lower level details: each transfer is
+ * split into packets (typically small, with a maximum size of 512 bytes).
+ * Overflows can only happen if the final packet in an incoming data transfer
+ * is smaller than the actual packet that the device wants to transfer.
+ * Therefore, you will never see an overflow if your transfer buffer size is a
+ * multiple of the endpoint's packet size: the final packet will either
+ * fill up completely or will be only partially filled.
+ */
+
 /**
  * @defgroup asyncio Asynchronous device I/O
  *
@@ -292,6 +335,14 @@ if (r == 0 && actual_length == sizeof(data)) {
  *
  * Freeing the transfer after it has been cancelled but before cancellation
  * has completed will result in undefined behaviour.
+ *
+ * \section bulk_overflows Overflows on device-to-host bulk/interrupt endpoints
+ *
+ * If your device does not have predictable transfer sizes (or it misbehaves),
+ * your application may submit a request for data on an IN endpoint which is
+ * smaller than the data that the device wishes to send. In some circumstances
+ * this will cause an overflow, which is a nasty condition to deal with. See
+ * the \ref packetoverflow page for discussion.
  *
  * \section asyncctrl Considerations for control transfers
  *

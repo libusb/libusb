@@ -1,5 +1,4 @@
 new sysfs descriptors format
-configuration API
 contexts
 event handling/threads issue
 
@@ -11,3 +10,4 @@ offer API to create/destroy handle_events thread
 isochronous sync I/O?
 exposing of parent-child device relationships
 "usb primer" introduction docs
+more examples

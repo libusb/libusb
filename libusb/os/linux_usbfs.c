@@ -1546,7 +1546,8 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	usbi_dbg("handling completion status %d of bulk urb %d/%d", urb->status,
 		urb_idx + 1, num_urbs);
 
-	if (urb->status == 0)
+	if (urb->status == 0 ||
+			(urb->status == -EOVERFLOW && urb->actual_length > 0))
 		itransfer->transferred += urb->actual_length;
 
 	if (tpriv->reap_action != NORMAL) {
@@ -1566,6 +1567,11 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 				usbi_warn("SOME DATA LOST! (completed early but remaining "
 					"urb completed)");
 
+			if (tpriv->awaiting_reap == 0)
+				usbi_err("CANCEL: completed URB not awaiting reap?");
+			else
+				tpriv->awaiting_reap--;
+		} else if (urb->status == -EPIPE || urb->status == -EOVERFLOW) {
 			if (tpriv->awaiting_reap == 0)
 				usbi_err("CANCEL: completed URB not awaiting reap?");
 			else
@@ -1593,6 +1599,11 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	if (urb->status == -EPIPE) {
 		usbi_dbg("detected endpoint stall");
 		status = LIBUSB_TRANSFER_STALL;
+		goto out;
+	} else if (urb->status == -EOVERFLOW) {
+		/* overflow can only ever occur in the last urb */
+		usbi_dbg("overflow, actual_length=%d", urb->actual_length);
+		status = LIBUSB_TRANSFER_OVERFLOW;
 		goto out;
 	} else if (urb->status != 0) {
 		usbi_warn("unrecognised urb status %d", urb->status);
