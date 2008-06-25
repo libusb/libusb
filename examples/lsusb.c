@@ -47,18 +47,18 @@ int main(void)
 	int r;
 	ssize_t cnt;
 
-	r = libusb_init();
+	r = libusb_init(NULL);
 	if (r < 0)
 		return r;
 
-	cnt = libusb_get_device_list(&devs);
+	cnt = libusb_get_device_list(NULL, &devs);
 	if (cnt < 0)
 		return (int) cnt;
 
 	print_devs(devs);
 	libusb_free_device_list(devs, 1);
 
-	libusb_exit();
+	libusb_exit(NULL);
 	return 0;
 }
 

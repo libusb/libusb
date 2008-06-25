@@ -533,8 +533,28 @@ struct libusb_control_setup {
 
 /* libusb */
 
+struct libusb_context;
 struct libusb_device;
 struct libusb_device_handle;
+
+/** \ingroup lib
+ * Structure representing a libusb session. The concept of individual libusb
+ * sessions allows for your program to use two libraries (or dynamically
+ * load two modules) which both independently use libusb. This will prevent
+ * interference between the individual libusb users - for example
+ * libusb_set_debug() will not affect the other user of the library, and
+ * libusb_exit() will not destroy resources that the other user is still
+ * using.
+ *
+ * Sessions are created by libusb_init() and destroyed through libusb_exit().
+ * If your application is guaranteed to only ever include a single libusb
+ * user (i.e. you), you do not have to worry about contexts: pass NULL in
+ * every function call where a context is required. The default context
+ * will be used.
+ *
+ * For more information, see \ref contexts.
+ */
+typedef struct libusb_context libusb_context;
 
 /** \ingroup dev
  * Structure representing a USB device detected on the system. This is an
@@ -727,11 +747,12 @@ struct libusb_transfer {
 	struct libusb_iso_packet_descriptor iso_packet_desc[0];
 };
 
-int libusb_init(void);
-void libusb_exit(void);
-void libusb_set_debug(int level);
+int libusb_init(libusb_context **ctx);
+void libusb_exit(libusb_context *ctx);
+void libusb_set_debug(libusb_context *ctx, int level);
 
-ssize_t libusb_get_device_list(libusb_device ***list);
+ssize_t libusb_get_device_list(libusb_context *ctx,
+	libusb_device ***list);
 void libusb_free_device_list(libusb_device **list, int unref_devices);
 libusb_device *libusb_ref_device(libusb_device *dev);
 void libusb_unref_device(libusb_device *dev);
@@ -757,8 +778,8 @@ int libusb_set_configuration(libusb_device_handle *dev, int configuration);
 int libusb_claim_interface(libusb_device_handle *dev, int iface);
 int libusb_release_interface(libusb_device_handle *dev, int iface);
 
-libusb_device_handle *libusb_open_device_with_vid_pid(uint16_t vendor_id,
-	uint16_t product_id);
+libusb_device_handle *libusb_open_device_with_vid_pid(libusb_context *ctx,
+	uint16_t vendor_id, uint16_t product_id);
 
 int libusb_set_interface_alt_setting(libusb_device_handle *dev,
 	int interface_number, int alternate_setting);
@@ -1112,18 +1133,18 @@ int libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
 
 /* polling and timeouts */
 
-int libusb_try_lock_events(void);
-void libusb_lock_events(void);
-void libusb_unlock_events(void);
-int libusb_event_handler_active(void);
-void libusb_lock_event_waiters(void);
-void libusb_unlock_event_waiters(void);
-int libusb_wait_for_event(struct timeval *tv);
+int libusb_try_lock_events(libusb_context *ctx);
+void libusb_lock_events(libusb_context *ctx);
+void libusb_unlock_events(libusb_context *ctx);
+int libusb_event_handler_active(libusb_context *ctx);
+void libusb_lock_event_waiters(libusb_context *ctx);
+void libusb_unlock_event_waiters(libusb_context *ctx);
+int libusb_wait_for_event(libusb_context *ctx, struct timeval *tv);
 
-int libusb_handle_events_timeout(struct timeval *tv);
-int libusb_handle_events(void);
-int libusb_handle_events_locked(struct timeval *tv);
-int libusb_get_next_timeout(struct timeval *tv);
+int libusb_handle_events_timeout(libusb_context *ctx, struct timeval *tv);
+int libusb_handle_events(libusb_context *ctx);
+int libusb_handle_events_locked(libusb_context *ctx, struct timeval *tv);
+int libusb_get_next_timeout(libusb_context *ctx, struct timeval *tv);
 
 /** \ingroup poll
  * File descriptor for polling
@@ -1158,9 +1179,9 @@ typedef void (*libusb_pollfd_added_cb)(int fd, short events);
  */
 typedef void (*libusb_pollfd_removed_cb)(int fd);
 
-const struct libusb_pollfd **libusb_get_pollfds(void);
-void libusb_set_pollfd_notifiers(libusb_pollfd_added_cb added_cb,
-	libusb_pollfd_removed_cb removed_cb);
+const struct libusb_pollfd **libusb_get_pollfds(libusb_context *ctx);
+void libusb_set_pollfd_notifiers(libusb_context *ctx,
+	libusb_pollfd_added_cb added_cb, libusb_pollfd_removed_cb removed_cb);
 
 #ifdef __cplusplus
 }

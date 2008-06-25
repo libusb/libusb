@@ -112,29 +112,80 @@ enum usbi_log_level {
 	LOG_LEVEL_ERROR,
 };
 
-void usbi_log(enum usbi_log_level, const char *function, const char *format, ...);
+void usbi_log(struct libusb_context *ctx, enum usbi_log_level,
+	const char *function, const char *format, ...);
 
 #ifdef ENABLE_LOGGING
-#define _usbi_log(level, fmt...) usbi_log(level, __FUNCTION__, fmt)
+#define _usbi_log(ctx, level, fmt...) usbi_log(ctx, level, __FUNCTION__, fmt)
 #else
-#define _usbi_log(level, fmt...)
+#define _usbi_log(ctx, level, fmt...)
 #endif
 
 #ifdef ENABLE_DEBUG_LOGGING
-#define usbi_dbg(fmt...) _usbi_log(LOG_LEVEL_DEBUG, fmt)
+#define usbi_dbg(fmt...) _usbi_log(NULL, LOG_LEVEL_DEBUG, fmt)
 #else
 #define usbi_dbg(fmt...)
 #endif
 
-#define usbi_info(fmt...) _usbi_log(LOG_LEVEL_INFO, fmt)
-#define usbi_warn(fmt...) _usbi_log(LOG_LEVEL_WARNING, fmt)
-#define usbi_err(fmt...) _usbi_log(LOG_LEVEL_ERROR, fmt)
+#define usbi_info(ctx, fmt...) _usbi_log(ctx, LOG_LEVEL_INFO, fmt)
+#define usbi_warn(ctx, fmt...) _usbi_log(ctx, LOG_LEVEL_WARNING, fmt)
+#define usbi_err(ctx, fmt...) _usbi_log(ctx, LOG_LEVEL_ERROR, fmt)
+
+#define USBI_GET_CONTEXT(ctx) if (!(ctx)) (ctx) = usbi_default_context
+#define DEVICE_CTX(dev) ((dev)->ctx)
+#define HANDLE_CTX(handle) (DEVICE_CTX((handle)->dev))
+#define TRANSFER_CTX(transfer) (HANDLE_CTX((transfer)->dev_handle))
+#define ITRANSFER_CTX(transfer) \
+	(TRANSFER_CTX(__USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)))
+
+extern struct libusb_context *usbi_default_context;
+
+struct libusb_context {
+	int debug;
+	int debug_fixed;
+
+	struct list_head usb_devs;
+	pthread_mutex_t usb_devs_lock;
+
+	/* A list of open handles. Backends are free to traverse this if required.
+	 */
+	struct list_head open_devs;
+	pthread_mutex_t open_devs_lock;
+
+	/* this is a list of in-flight transfer handles, sorted by timeout 
+	 * expiration. URBs to timeout the soonest are placed at the beginning of
+	 * the list, URBs that will time out later are placed after, and urbs with
+	 * infinite timeout are always placed at the very end. */
+	struct list_head flying_transfers;
+	pthread_mutex_t flying_transfers_lock;
+
+	/* list of poll fd's */
+	struct list_head pollfds;
+	pthread_mutex_t pollfds_lock;
+
+	/* user callbacks for pollfd changes */
+	libusb_pollfd_added_cb fd_added_cb;
+	libusb_pollfd_removed_cb fd_removed_cb;
+
+	/* ensures that only one thread is handling events at any one time */
+	pthread_mutex_t events_lock;
+
+	/* used to see if there is an active thread doing event handling */
+	int event_handler_active;
+
+	/* used to wait for event completion in threads other than the one that is
+	 * event handling */
+	pthread_mutex_t event_waiters_lock;
+	pthread_cond_t event_waiters_cond;
+};
 
 struct libusb_device {
 	/* lock protects refcnt, everything else is finalized at initialization
 	 * time */
 	pthread_mutex_t lock;
 	int refcnt;
+
+	struct libusb_context *ctx;
 
 	uint8_t bus_number;
 	uint8_t device_address;
@@ -203,13 +254,12 @@ struct usb_descriptor_header {
 
 /* shared data and functions */
 
-extern struct list_head usbi_open_devs;
-extern pthread_mutex_t usbi_open_devs_lock;
+void usbi_io_init(struct libusb_context *ctx);
 
-void usbi_io_init(void);
-
-struct libusb_device *usbi_alloc_device(unsigned long session_id);
-struct libusb_device *usbi_get_device_by_session_id(unsigned long session_id);
+struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
+	unsigned long session_id);
+struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
+	unsigned long session_id);
 int usbi_sanitize_device(struct libusb_device *dev);
 void usbi_handle_disconnect(struct libusb_device_handle *handle);
 
@@ -231,8 +281,8 @@ struct usbi_pollfd {
 	struct list_head list;
 };
 
-int usbi_add_pollfd(int fd, short events);
-void usbi_remove_pollfd(int fd);
+int usbi_add_pollfd(struct libusb_context *ctx, int fd, short events);
+void usbi_remove_pollfd(struct libusb_context *ctx, int fd);
 
 /* device discovery */
 
@@ -267,7 +317,7 @@ struct usbi_os_backend {
 	 *
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */
-	int (*init)(void);
+	int (*init)(struct libusb_context *ctx);
 
 	/* Deinitialization. Optional. This function should destroy anything
 	 * that was set up by init.
@@ -325,7 +375,8 @@ struct usbi_os_backend {
 	 *
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */
-	int (*get_device_list)(struct discovered_devs **discdevs);
+	int (*get_device_list)(struct libusb_context *ctx,
+		struct discovered_devs **discdevs);
 
 	/* Open a device for I/O and other USB operations. The device handle
 	 * is preallocated for you, you can retrieve the device in question
@@ -651,7 +702,8 @@ struct usbi_os_backend {
 	 *
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */
-	int (*handle_events)(struct pollfd *fds, nfds_t nfds, int num_ready);
+	int (*handle_events)(struct libusb_context *ctx,
+		struct pollfd *fds, nfds_t nfds, int num_ready);
 
 	/* Number of bytes to reserve for per-device private backend data.
 	 * This private data area is accessible through the "os_priv" field of

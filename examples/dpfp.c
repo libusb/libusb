@@ -67,7 +67,7 @@ static int do_exit = 0;
 
 static int find_dpfp_device(void)
 {
-	devh = libusb_open_device_with_vid_pid(0x05ba, 0x000a);
+	devh = libusb_open_device_with_vid_pid(NULL, 0x05ba, 0x000a);
 	return devh ? 0 : -EIO;
 }
 
@@ -347,7 +347,7 @@ static int init_capture(void)
 	if (r < 0) {
 		libusb_cancel_transfer(irq_transfer);
 		while (irq_transfer)
-			if (libusb_handle_events() < 0)
+			if (libusb_handle_events(NULL) < 0)
 				break;
 		return r;
 	}
@@ -419,7 +419,7 @@ int main(void)
 	struct sigaction sigact;
 	int r = 1;
 
-	r = libusb_init();
+	r = libusb_init(NULL);
 	if (r < 0) {
 		fprintf(stderr, "failed to initialise libusb\n");
 		exit(1);
@@ -464,7 +464,7 @@ int main(void)
 	sigaction(SIGQUIT, &sigact, NULL);
 
 	while (!do_exit) {
-		r = libusb_handle_events();
+		r = libusb_handle_events(NULL);
 		if (r < 0)
 			goto out_deinit;
 	}
@@ -484,7 +484,7 @@ int main(void)
 	}
 	
 	while (irq_transfer || img_transfer)
-		if (libusb_handle_events() < 0)
+		if (libusb_handle_events(NULL) < 0)
 			break;
 	
 	if (do_exit == 1)
@@ -501,7 +501,7 @@ out_release:
 	libusb_release_interface(devh, 0);
 out:
 	libusb_close(devh);
-	libusb_exit();
+	libusb_exit(NULL);
 	return r >= 0 ? r : -r;
 }
 
