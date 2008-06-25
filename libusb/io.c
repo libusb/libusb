@@ -1196,21 +1196,7 @@ API_EXPORTED void libusb_unlock_events(void)
  */
 API_EXPORTED int libusb_event_handler_active(void)
 {
-	int r;
-
-	if (!event_handler_active)
-		return 0;
-
-	/* FIXME: temporary hack to ensure thread didn't quit (e.g. due to signal)
-	 * without libusb_unlock_events being triggered */
-	r = pthread_mutex_trylock(&events_lock);
-	if (r == 0) {
-		event_handler_active = 0;
-		pthread_mutex_unlock(&events_lock);
-		return 0;
-	}
-
-	return 1;
+	return event_handler_active;
 }
 
 /** \ingroup poll
