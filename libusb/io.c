@@ -1634,13 +1634,17 @@ API_EXPORTED int libusb_get_next_timeout(libusb_context *ctx,
  * \param ctx the context to operate on, or NULL for the default context
  * \param added_cb pointer to function for addition notifications
  * \param removed_cb pointer to function for removal notifications
+ * \param user_data User data to be passed back to callbacks (useful for
+ * passing context information)
  */
 API_EXPORTED void libusb_set_pollfd_notifiers(libusb_context *ctx,
-	libusb_pollfd_added_cb added_cb, libusb_pollfd_removed_cb removed_cb)
+	libusb_pollfd_added_cb added_cb, libusb_pollfd_removed_cb removed_cb,
+	void *user_data)
 {
 	USBI_GET_CONTEXT(ctx);
 	ctx->fd_added_cb = added_cb;
 	ctx->fd_removed_cb = removed_cb;
+	ctx->fd_cb_user_data = user_data;
 }
 
 /* Add a file descriptor to the list of file descriptors to be monitored.
@@ -1660,7 +1664,7 @@ int usbi_add_pollfd(struct libusb_context *ctx, int fd, short events)
 	pthread_mutex_unlock(&ctx->pollfds_lock);
 
 	if (ctx->fd_added_cb)
-		ctx->fd_added_cb(fd, events);
+		ctx->fd_added_cb(fd, events, ctx->fd_cb_user_data);
 	return 0;
 }
 
@@ -1688,7 +1692,7 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
 	pthread_mutex_unlock(&ctx->pollfds_lock);
 	free(ipollfd);
 	if (ctx->fd_removed_cb)
-		ctx->fd_removed_cb(fd);
+		ctx->fd_removed_cb(fd, ctx->fd_cb_user_data);
 }
 
 /** \ingroup poll

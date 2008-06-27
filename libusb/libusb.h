@@ -1166,22 +1166,27 @@ struct libusb_pollfd {
  * \param fd the new file descriptor
  * \param events events to monitor for, see \ref libusb_pollfd for a
  * description
+ * \param user_data User data pointer specified in
+ * libusb_set_pollfd_notifiers() call
  * \see libusb_set_pollfd_notifiers()
  */
-typedef void (*libusb_pollfd_added_cb)(int fd, short events);
+typedef void (*libusb_pollfd_added_cb)(int fd, short events, void *user_data);
 
 /** \ingroup poll
  * Callback function, invoked when a file descriptor should be removed from
  * the set of file descriptors being monitored for events. After returning
  * from this callback, do not use that file descriptor again.
  * \param fd the file descriptor to stop monitoring
+ * \param user_data User data pointer specified in
+ * libusb_set_pollfd_notifiers() call
  * \see libusb_set_pollfd_notifiers()
  */
-typedef void (*libusb_pollfd_removed_cb)(int fd);
+typedef void (*libusb_pollfd_removed_cb)(int fd, void *user_data);
 
 const struct libusb_pollfd **libusb_get_pollfds(libusb_context *ctx);
 void libusb_set_pollfd_notifiers(libusb_context *ctx,
-	libusb_pollfd_added_cb added_cb, libusb_pollfd_removed_cb removed_cb);
+	libusb_pollfd_added_cb added_cb, libusb_pollfd_removed_cb removed_cb,
+	void *user_data);
 
 #ifdef __cplusplus
 }

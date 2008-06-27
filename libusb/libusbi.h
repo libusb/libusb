@@ -166,6 +166,7 @@ struct libusb_context {
 	/* user callbacks for pollfd changes */
 	libusb_pollfd_added_cb fd_added_cb;
 	libusb_pollfd_removed_cb fd_removed_cb;
+	void *fd_cb_user_data;
 
 	/* ensures that only one thread is handling events at any one time */
 	pthread_mutex_t events_lock;
