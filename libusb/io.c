@@ -1713,6 +1713,7 @@ API_EXPORTED const struct libusb_pollfd **libusb_get_pollfds(
 	struct usbi_pollfd *ipollfd;
 	size_t i = 0;
 	size_t cnt = 0;
+	USBI_GET_CONTEXT(ctx);
 
 	pthread_mutex_lock(&ctx->pollfds_lock);
 	list_for_each_entry(ipollfd, &ctx->pollfds, list)
