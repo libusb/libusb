@@ -56,6 +56,10 @@
  *
  * If we also have descriptors, we can obtain the device descriptor and active 
  * configuration without touching usbfs at all.
+ *
+ * The descriptors file originally only contained the active configuration
+ * descriptor alongside the device descriptor, but all configurations are
+ * included as of Linux 2.6.26.
  */
 
 static const char *usbfs_path = NULL;
@@ -262,12 +266,96 @@ static int usbfs_get_active_config_descriptor(struct libusb_device *dev,
 	return 0;
 }
 
+/* read the bConfigurationValue for a device */
+static int sysfs_get_active_config(struct libusb_device *dev, int *config)
+{
+	char *endptr;
+	char tmp[4] = {0, 0, 0, 0};
+	long num;
+	int fd;
+	size_t r;
+
+	fd = __open_sysfs_attr(dev, "bConfigurationValue");
+	if (fd < 0)
+		return fd;
+
+	r = read(fd, tmp, sizeof(tmp));
+	close(fd);
+	if (r < 0) {
+		usbi_err(DEVICE_CTX(dev), 
+			"read bConfigurationValue failed ret=%d errno=%d", r, errno);
+		return LIBUSB_ERROR_IO;
+	} else if (r == 0) {
+		usbi_err(DEVICE_CTX(dev), "device unconfigured");
+		*config = -1;
+		return 0;
+	}
+
+	if (tmp[sizeof(tmp) - 1] != 0) {
+		usbi_err(DEVICE_CTX(dev), "not null-terminated?");
+		return LIBUSB_ERROR_IO;
+	} else if (tmp[0] == 0) {
+		usbi_err(DEVICE_CTX(dev), "no configuration value?");
+		return LIBUSB_ERROR_IO;
+	}
+
+	num = strtol(tmp, &endptr, 10);
+	if (endptr == tmp) {
+		usbi_err(DEVICE_CTX(dev), "error converting '%s' to integer", tmp);
+		return LIBUSB_ERROR_IO;
+	}
+
+	*config = (int) num;
+	return 0;
+}
+
+/* takes a usbfs/descriptors fd seeked to the start of a configuration, and
+ * seeks to the next one. */
+static int seek_to_next_config(struct libusb_context *ctx, int fd)
+{
+	struct libusb_config_descriptor config;
+	unsigned char tmp[6];
+	off_t off;
+	int r;
+
+	/* read first 6 bytes of descriptor */
+	r = read(fd, tmp, sizeof(tmp));
+	if (r < 0) {
+		usbi_err(ctx, "read failed ret=%d errno=%d", r, errno);
+		return LIBUSB_ERROR_IO;
+	} else if (r < sizeof(tmp)) {
+		usbi_err(ctx, "short descriptor read %d/%d", r, sizeof(tmp));
+		return LIBUSB_ERROR_IO;
+	}
+
+	/* seek forward to end of config */
+	usbi_parse_descriptor(tmp, "bbwbb", &config, 1);
+	off = lseek(fd, config.wTotalLength - sizeof(tmp), SEEK_CUR);
+	if (off < 0) {
+		usbi_err(ctx, "seek failed ret=%d errno=%d", off, errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	return 0;
+}
+
 static int sysfs_get_active_config_descriptor(struct libusb_device *dev,
 	unsigned char *buffer, size_t len)
 {
 	int fd;
 	ssize_t r;
 	off_t off;
+	int to_copy;
+	int config;
+	unsigned char tmp[6];
+
+	r = sysfs_get_active_config(dev, &config);
+	if (r < 0)
+		return r;
+	if (config == -1)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	usbi_dbg("active configuration %d", config);
 
 	/* sysfs provides access to an in-memory copy of the device descriptor,
 	 * so we use that rather than keeping our own copy */
@@ -276,6 +364,19 @@ static int sysfs_get_active_config_descriptor(struct libusb_device *dev,
 	if (fd < 0)
 		return fd;
 
+	/* device might have been unconfigured since we read bConfigurationValue,
+	 * so first check that there is any config descriptor data at all... */
+	off = lseek(fd, 0, SEEK_END);
+	if (off < 1) {
+		usbi_err(DEVICE_CTX(dev), "end seek failed, ret=%d errno=%d",
+			off, errno);
+		close(fd);
+		return LIBUSB_ERROR_IO;
+	} else if (off == DEVICE_DESC_LENGTH) {
+		close(fd);
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
 	off = lseek(fd, DEVICE_DESC_LENGTH, SEEK_SET);
 	if (off < 0) {
 		usbi_err(DEVICE_CTX(dev), "seek failed, ret=%d errno=%d", off, errno);
@@ -283,20 +384,54 @@ static int sysfs_get_active_config_descriptor(struct libusb_device *dev,
 		return LIBUSB_ERROR_IO;
 	}
 
-	r = read(fd, buffer, len);
-	close(fd);
-	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev), "read failed, ret=%d errno=%d", fd, errno);
-		return LIBUSB_ERROR_IO;
-	} else if (r == 0) {
-		usbi_dbg("device is unconfigured");
-		return LIBUSB_ERROR_NOT_FOUND;
-	} else if (r < len) {
-		usbi_err(DEVICE_CTX(dev), "short read %d/%d", r, len);
-		return LIBUSB_ERROR_IO;
+	/* unbounded loop: we expect the descriptor to be present under all
+	 * circumstances */
+	while (1) {
+		r = read(fd, tmp, sizeof(tmp));
+		if (r < 0) {
+			usbi_err(DEVICE_CTX(dev), "read failed, ret=%d errno=%d",
+				fd, errno);
+			return LIBUSB_ERROR_IO;
+		} else if (r < sizeof(tmp)) {
+			usbi_err(DEVICE_CTX(dev), "short read %d/%d", r, sizeof(tmp));
+			return LIBUSB_ERROR_IO;
+		}
+
+		/* check bConfigurationValue */
+		if (tmp[5] == config)
+			break;
+
+		/* try the next descriptor */
+		off = lseek(fd, 0 - sizeof(tmp), SEEK_CUR);
+		if (off < 0)
+			return LIBUSB_ERROR_IO;
+
+		r = seek_to_next_config(DEVICE_CTX(dev), fd);
+		if (r < 0)
+			return r;
 	}
 
-	return 0;
+	to_copy = (len < sizeof(tmp)) ? len : sizeof(tmp);
+	memcpy(buffer, tmp, to_copy);
+	if (len > sizeof(tmp)) {
+		r = read(fd, buffer + sizeof(tmp), len - sizeof(tmp));
+		if (r < 0) {
+			usbi_err(DEVICE_CTX(dev), "read failed, ret=%d errno=%d",
+				fd, errno);
+			r = LIBUSB_ERROR_IO;
+		} else if (r == 0) {
+			usbi_dbg("device is unconfigured");
+			r = LIBUSB_ERROR_NOT_FOUND;
+		} else if (r < len - sizeof(tmp)) {
+			usbi_err(DEVICE_CTX(dev), "short read %d/%d", r, len);
+			r = LIBUSB_ERROR_IO;
+		}
+	} else {
+		r = 0;
+	}
+
+	close(fd);
+	return r;
 }
 
 static int op_get_active_config_descriptor(struct libusb_device *dev,
@@ -310,14 +445,11 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 	}
 }
 
-
 /* takes a usbfs fd, attempts to find the requested config and copy a certain
- * amount of it into an output buffer. a bConfigurationValue of -1 indicates
- * that the first config should be retreived. */
+ * amount of it into an output buffer. */
 static int get_config_descriptor(struct libusb_context *ctx, int fd,
 	uint8_t config_index, unsigned char *buffer, size_t len)
 {
-	unsigned char tmp[8];
 	off_t off;
 	ssize_t r;
 
@@ -329,28 +461,10 @@ static int get_config_descriptor(struct libusb_context *ctx, int fd,
 
 	/* might need to skip some configuration descriptors to reach the
 	 * requested configuration */
-	while (config_index) {
-		struct libusb_config_descriptor config;
-
-		/* read first 8 bytes of descriptor */
-		r = read(fd, tmp, sizeof(tmp));
-		if (r < 0) {
-			usbi_err(ctx, "read failed ret=%d errno=%d", r, errno);
-			return LIBUSB_ERROR_IO;
-		} else if (r < sizeof(tmp)) {
-			usbi_err(ctx, "short descriptor read %d/%d", r, sizeof(tmp));
-			return LIBUSB_ERROR_IO;
-		}
-
-		usbi_parse_descriptor(tmp, "bbwbb", &config, 1);
-
-		/* seek forward to end of config */
-		off = lseek(fd, config.wTotalLength - sizeof(tmp), SEEK_CUR);
-		if (off < 0) {
-			usbi_err(ctx, "seek failed ret=%d errno=%d", off, errno);
-			return LIBUSB_ERROR_IO;
-		}
-
+	while (config_index > 0) {
+		r = seek_to_next_config(ctx, fd);
+		if (r < 0)
+			return r;
 		config_index--;
 	}
 
@@ -376,6 +490,10 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 
 	/* always read from usbfs: sysfs only has the active descriptor
 	 * this will involve waking the device up, but oh well! */
+
+	/* FIXME: the above is no longer true, new kernels have all descriptors
+	 * in the descriptors file. but its kinda hard to detect if the kernel
+	 * is sufficiently new. */
 
 	__get_usbfs_path(dev, filename);
 	fd = open(filename, O_RDONLY);
@@ -435,49 +553,6 @@ static int cache_active_config(struct libusb_device *dev, int fd,
 	if (priv->config_descriptor)
 		free(priv->config_descriptor);
 	priv->config_descriptor = buf;
-	return 0;
-}
-
-/* read the bConfigurationValue for a device */
-static int sysfs_get_active_config(struct libusb_device *dev, int *config)
-{
-	char *endptr;
-	char tmp[4] = {0, 0, 0, 0};
-	long num;
-	int fd;
-	size_t r;
-
-	fd = __open_sysfs_attr(dev, "bConfigurationValue");
-	if (fd < 0)
-		return fd;
-
-	r = read(fd, tmp, sizeof(tmp));
-	close(fd);
-	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev), 
-			"read bConfigurationValue failed ret=%d errno=%d", r, errno);
-		return LIBUSB_ERROR_IO;
-	} else if (r == 0) {
-		usbi_err(DEVICE_CTX(dev), "device unconfigured");
-		*config = -1;
-		return 0;
-	}
-
-	if (tmp[sizeof(tmp) - 1] != 0) {
-		usbi_err(DEVICE_CTX(dev), "not null-terminated?");
-		return LIBUSB_ERROR_IO;
-	} else if (tmp[0] == 0) {
-		usbi_err(DEVICE_CTX(dev), "no configuration value?");
-		return LIBUSB_ERROR_IO;
-	}
-
-	num = strtol(tmp, &endptr, 10);
-	if (endptr == tmp) {
-		usbi_err(DEVICE_CTX(dev), "error converting '%s' to integer", tmp);
-		return LIBUSB_ERROR_IO;
-	}
-
-	*config = (int) num;
 	return 0;
 }
 

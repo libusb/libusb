@@ -1,5 +1,3 @@
-new sysfs descriptors format
-
 for 1.1 or future
 ==================
 optional timerfd support (runtime detection)
