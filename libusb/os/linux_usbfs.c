@@ -1564,6 +1564,8 @@ static void cancel_bulk_transfer(struct usbi_transfer *itransfer)
 	int i;
 
 	tpriv->reap_action = CANCELLED;
+	tpriv->awaiting_reap = 0;
+	tpriv->awaiting_discard = 0;
 	for (i = 0; i < tpriv->num_urbs; i++) {
 		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
 		if (tmp == 0)
@@ -1586,6 +1588,8 @@ static void cancel_iso_transfer(struct usbi_transfer *itransfer)
 	int i;
 
 	tpriv->reap_action = CANCELLED;
+	tpriv->awaiting_reap = 0;
+	tpriv->awaiting_discard = 0;
 	for (i = 0; i < tpriv->num_urbs; i++) {
 		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, tpriv->iso_urbs[i]);
 		if (tmp == 0)
