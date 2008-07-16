@@ -72,7 +72,7 @@ static int sysfs_can_relate_devices = -1;
 static int sysfs_has_descriptors = -1;
 
 struct linux_device_priv {
-	char sysfs_dir[SYSFS_DIR_LENGTH];
+	char *sysfs_dir;
 	unsigned char *dev_descriptor;
 	unsigned char *config_descriptor;
 };
@@ -599,8 +599,12 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	dev->bus_number = busnum;
 	dev->device_address = devaddr;
 
-	if (sysfs_dir)
-		strncpy(priv->sysfs_dir, sysfs_dir, SYSFS_DIR_LENGTH);
+	if (sysfs_dir) {
+		priv->sysfs_dir = malloc(strlen(sysfs_dir) + 1);
+		if (!priv->sysfs_dir)
+			return LIBUSB_ERROR_NO_MEM;
+		strcpy(priv->sysfs_dir, sysfs_dir);
+	}
 
 	if (sysfs_has_descriptors)
 		return 0;
@@ -1195,6 +1199,8 @@ static void op_destroy_device(struct libusb_device *dev)
 		if (priv->config_descriptor)
 			free(priv->config_descriptor);
 	}
+	if (priv->sysfs_dir)
+		free(priv->sysfs_dir);
 }
 
 static void free_iso_urbs(struct linux_transfer_priv *tpriv)
