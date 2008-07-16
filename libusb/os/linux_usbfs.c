@@ -202,7 +202,7 @@ static int usbfs_get_device_descriptor(struct libusb_device *dev,
 static int __open_sysfs_attr(struct libusb_device *dev, const char *attr)
 {
 	struct linux_device_priv *priv = __device_priv(dev);
-	char filename[PATH_MAX + 1];
+	char filename[PATH_MAX];
 	int fd;
 
 	snprintf(filename, PATH_MAX, "%s/%s/%s",
@@ -484,7 +484,7 @@ static int get_config_descriptor(struct libusb_context *ctx, int fd,
 static int op_get_config_descriptor(struct libusb_device *dev,
 	uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
 {
-	char filename[PATH_MAX + 1];
+	char filename[PATH_MAX];
 	int fd;
 	int r;
 
@@ -590,7 +590,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 {
 	struct linux_device_priv *priv = __device_priv(dev);
 	unsigned char *dev_buf;
-	char path[PATH_MAX + 1];
+	char path[PATH_MAX];
 	int fd;
 	int active_config = 0;
 	int device_configured = 1;
@@ -752,7 +752,7 @@ static int usbfs_scan_busdir(struct libusb_context *ctx,
 	struct discovered_devs **_discdevs, uint8_t busnum)
 {
 	DIR *dir;
-	char dirpath[PATH_MAX + 1];
+	char dirpath[PATH_MAX];
 	struct dirent *entry;
 	struct discovered_devs *discdevs = *_discdevs;
 	int r = 0;
@@ -835,7 +835,7 @@ static int sysfs_scan_device(struct libusb_context *ctx,
 {
 	int r;
 	FILE *fd;
-	char filename[PATH_MAX + 1];
+	char filename[PATH_MAX];
 	int busnum;
 	int devaddr;
 
@@ -962,7 +962,7 @@ static int op_get_device_list(struct libusb_context *ctx,
 static int op_open(struct libusb_device_handle *handle)
 {
 	struct linux_device_handle_priv *hpriv = __device_handle_priv(handle);
-	char filename[PATH_MAX + 1];
+	char filename[PATH_MAX];
 
 	__get_usbfs_path(handle->dev, filename);
 	hpriv->fd = open(filename, O_RDWR);
