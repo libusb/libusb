@@ -757,6 +757,7 @@ void libusb_free_device_list(libusb_device **list, int unref_devices);
 libusb_device *libusb_ref_device(libusb_device *dev);
 void libusb_unref_device(libusb_device *dev);
 
+int libusb_get_configuration(libusb_device_handle *dev, int *config);
 int libusb_get_device_descriptor(libusb_device *dev,
 	struct libusb_device_descriptor *desc);
 int libusb_get_active_config_descriptor(libusb_device *dev,
