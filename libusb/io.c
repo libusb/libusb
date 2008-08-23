@@ -997,6 +997,7 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 	int r;
 
 	itransfer->transferred = 0;
+	itransfer->flags = 0;
 	r = calculate_timeout(itransfer);
 	if (r < 0)
 		return LIBUSB_ERROR_OTHER;
