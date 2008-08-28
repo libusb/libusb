@@ -693,7 +693,10 @@ struct libusb_transfer;
 typedef void (*libusb_transfer_cb_fn)(struct libusb_transfer *transfer);
 
 /** \ingroup asyncio
- * The generic USB transfer structure.
+ * The generic USB transfer structure. The user populates this structure and
+ * then submits it in order to request a transfer. After the transfer has
+ * completed, the library populates the transfer with the results and passes
+ * it back to the user.
  */
 struct libusb_transfer {
 	/** Handle of the device that this transfer will be submitted to */

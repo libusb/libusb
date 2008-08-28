@@ -231,11 +231,14 @@ if (r == 0 && actual_length == sizeof(data)) {
  * \section asynctrf Asynchronous transfers
  *
  * We can view asynchronous I/O as a 5 step process:
- * -# Allocation
- * -# Filling
- * -# Submission
- * -# Completion handling
- * -# Deallocation
+ * -# <b>Allocation</b>: allocate a libusb_transfer
+ * -# <b>Filling</b>: populate the libusb_transfer instance with information
+ *    about the transfer you wish to perform
+ * -# <b>Submission</b>: ask libusb to submit the transfer
+ * -# <b>Completion handling</b>: examine transfer results in the
+ *    libusb_transfer structure
+ * -# <b>Deallocation</b>: clean up resources
+ * 
  *
  * \subsection asyncalloc Allocation
  *
@@ -275,6 +278,12 @@ if (r == 0 && actual_length == sizeof(data)) {
  * Each of these will cause the user-specified transfer callback function to
  * be invoked. It is up to the callback function to determine which of the
  * above actually happened and to act accordingly.
+ *
+ * The user-specified callback is passed a pointer to the libusb_transfer
+ * structure which was used to setup and submit the transfer. At completion
+ * time, libusb has populated this structure with results of the transfer:
+ * success or failure reason, number of bytes of data transferred, etc. See
+ * the libusb_transfer structure documentation for more information.
  *
  * \subsection Deallocation
  *
