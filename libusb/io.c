@@ -718,7 +718,7 @@ void myfunc() {
 		if (poll indicates activity)
 			libusb_handle_events_timeout(ctx, 0);
 	}
-	libusb_lock_events(ctx);
+	libusb_unlock_events(ctx);
 \endcode
  * ...and the answer is that it is not. This is because the transfer in the
  * code shown above may take a long time (say 30 seconds) to complete, and
