@@ -1,4 +1,4 @@
-EXTRA_DIST = doxygen.cfg
+EXTRA_DIST = doxygen.cfg.in
 
 docs: doxygen.cfg
 	doxygen $^
