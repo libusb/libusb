@@ -1190,6 +1190,38 @@ static int op_detach_kernel_driver(struct libusb_device_handle *handle,
 	return 0;
 }
 
+static int op_attach_kernel_driver(struct libusb_device_handle *handle,
+	int interface)
+{
+	int fd = __device_handle_priv(handle)->fd;
+	struct usbfs_ioctl command;
+	int r;
+
+	command.ifno = interface;
+	command.ioctl_code = IOCTL_USBFS_CONNECT;
+	command.data = NULL;
+
+	r = ioctl(fd, IOCTL_USBFS_IOCTL, &command);
+	if (r < 0) {
+		if (errno == ENODATA)
+			return LIBUSB_ERROR_NOT_FOUND;
+		else if (errno == EINVAL)
+			return LIBUSB_ERROR_INVALID_PARAM;
+		else if (errno == ENODEV)
+			return LIBUSB_ERROR_NO_DEVICE;
+		else if (errno == EBUSY)
+			return LIBUSB_ERROR_BUSY;
+
+		usbi_err(HANDLE_CTX(handle),
+			"attach failed error %d errno %d", r, errno);
+		return LIBUSB_ERROR_OTHER;
+	} else if (r == 0) {
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	return 0;
+}
+
 static void op_destroy_device(struct libusb_device *dev)
 {
 	struct linux_device_priv *priv = __device_priv(dev);
@@ -2023,6 +2055,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 
 	.kernel_driver_active = op_kernel_driver_active,
 	.detach_kernel_driver = op_detach_kernel_driver,
+	.attach_kernel_driver = op_attach_kernel_driver,
 
 	.destroy_device = op_destroy_device,
 

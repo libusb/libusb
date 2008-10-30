@@ -640,6 +640,23 @@ struct usbi_os_backend {
 	int (*detach_kernel_driver)(struct libusb_device_handle *handle,
 		int interface);
 
+	/* Attach a kernel driver to an interface. Optional.
+	 *
+	 * Reattach a kernel driver to the device.
+	 *
+	 * Return:
+	 * - 0 on success
+	 * - LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
+	 * - LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
+	 * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected since it
+	 *   was opened
+	 * - LIBUSB_ERROR_BUSY if a program or driver has claimed the interface,
+	 *   preventing reattachment
+	 * - another LIBUSB_ERROR code on other failure
+	 */
+	int (*attach_kernel_driver)(struct libusb_device_handle *handle,
+		int interface);
+
 	/* Destroy a device. Optional.
 	 *
 	 * This function is called when the last reference to a device is

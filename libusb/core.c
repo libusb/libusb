@@ -1179,6 +1179,31 @@ API_EXPORTED int libusb_detach_kernel_driver(libusb_device_handle *dev,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+/** \ingroup dev
+ * Re-attach an interface's kernel driver, which was previously detached
+ * using libusb_detach_kernel_driver().
+ *
+ * \param dev a device handle
+ * \param interface the interface to attach the driver from
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
+ * \returns LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns LIBUSB_ERROR_BUSY if the driver cannot be attached because the
+ * interface is claimed by a program or driver
+ * \returns another LIBUSB_ERROR code on other failure
+ * \see libusb_kernel_driver_active()
+ */
+API_EXPORTED int libusb_attach_kernel_driver(libusb_device_handle *dev,
+	int interface)
+{
+	usbi_dbg("interface %d", interface);
+	if (usbi_backend->attach_kernel_driver)
+		return usbi_backend->attach_kernel_driver(dev, interface);
+	else
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 /** \ingroup lib
  * Set message verbosity.
  *  - Level 0: no messages ever printed by the library (default)

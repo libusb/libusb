@@ -792,6 +792,7 @@ int libusb_reset_device(libusb_device_handle *dev);
 
 int libusb_kernel_driver_active(libusb_device_handle *dev, int interface);
 int libusb_detach_kernel_driver(libusb_device_handle *dev, int interface);
+int libusb_attach_kernel_driver(libusb_device_handle *dev, int interface);
 
 /* async I/O */
 
