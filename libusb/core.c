@@ -104,6 +104,17 @@ static pthread_mutex_t default_context_lock = PTHREAD_MUTEX_INITIALIZER;
  * error/warning/informational messages. It will help you debug problems with
  * your software.
  *
+ * The logged messages are unstructured. There is no one-to-one correspondence
+ * between messages being logged and success or failure return codes from
+ * libusb functions. There is no format to the messages, so you should not
+ * try to capture or parse them. They are not and will not be localized.
+ * These messages are not suitable for being passed to your application user;
+ * instead, you should interpret the error codes returned from libusb functions
+ * and provide appropriate notification to the user. The messages are simply
+ * there to aid you as a programmer, and if you're confused because you're
+ * getting a strange error code from a libusb function, enabling message
+ * logging may give you a suitable explanation.
+ *
  * The LIBUSB_DEBUG environment variable can be used to enable message logging
  * at run-time. This environment variable should be set to a number, which is
  * interpreted the same as the libusb_set_debug() parameter. When this
