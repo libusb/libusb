@@ -1716,18 +1716,29 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		return 0;
 	}
 
-	if (urb->status == -EPIPE) {
+	switch (urb->status) {
+	case 0:
+		break;
+	case -EPIPE:
 		usbi_dbg("detected endpoint stall");
 		status = LIBUSB_TRANSFER_STALL;
 		goto out;
-	} else if (urb->status == -EOVERFLOW) {
+	case -EOVERFLOW:
 		/* overflow can only ever occur in the last urb */
 		usbi_dbg("overflow, actual_length=%d", urb->actual_length);
 		status = LIBUSB_TRANSFER_OVERFLOW;
 		goto out;
-	} else if (urb->status != 0) {
+	case -ETIME:
+	case -EPROTO:
+	case -EILSEQ:
+		usbi_dbg("low level error %d", urb->status);
+		status = LIBUSB_TRANSFER_ERROR;
+		goto out;
+	default:
 		usbi_warn(ITRANSFER_CTX(itransfer),
 			"unrecognised urb status %d", urb->status);
+		status = LIBUSB_TRANSFER_ERROR;
+		goto out;
 	}
 
 	/* if we're the last urb or we got less data than requested then we're
@@ -1836,9 +1847,19 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		return 0;
 	}
 
-	if (urb->status != 0)
+	switch (urb->status) {
+	case 0:
+		break;
+	case -ETIME:
+	case -EPROTO:
+	case -EILSEQ:
+		usbi_dbg("low-level USB error %d", urb->status);
+		break;
+	default:
 		usbi_warn(TRANSFER_CTX(transfer),
 			"unrecognised urb status %d", urb->status);
+		break;
+	}
 
 	/* if we're the last urb or we got less data than requested then we're
 	 * done */
@@ -1871,20 +1892,28 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 		return 0;
 	}
 
-	if (urb->status == -EPIPE) {
+	switch (urb->status) {
+	case 0:
+		itransfer->transferred = urb->actual_length;
+		status = LIBUSB_TRANSFER_COMPLETED;
+		break;
+	case -EPIPE:
 		usbi_dbg("unsupported control request");
 		status = LIBUSB_TRANSFER_STALL;
-		goto out;
-	} else if (urb->status != 0) {
+		break;
+	case -ETIME:
+	case -EPROTO:
+	case -EILSEQ:
+		usbi_dbg("low-level bus error occurred");
+		status = LIBUSB_TRANSFER_ERROR;
+		break;
+	default:
 		usbi_warn(ITRANSFER_CTX(itransfer),
 			"unrecognised urb status %d", urb->status);
 		status = LIBUSB_TRANSFER_ERROR;
-		goto out;
+		break;
 	}
 
-	itransfer->transferred = urb->actual_length;
-	status = LIBUSB_TRANSFER_COMPLETED;
-out:
 	free(tpriv->urbs);
 	usbi_handle_transfer_completion(itransfer, status);
 	return 0;
