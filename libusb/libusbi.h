@@ -144,6 +144,10 @@ struct libusb_context {
 	int debug;
 	int debug_fixed;
 
+	/* internal control pipe, used for interrupting event handling when
+	 * something needs to modify poll fds. */
+	int ctrl_pipe[2];
+
 	struct list_head usb_devs;
 	pthread_mutex_t usb_devs_lock;
 
@@ -159,9 +163,14 @@ struct libusb_context {
 	struct list_head flying_transfers;
 	pthread_mutex_t flying_transfers_lock;
 
-	/* list of poll fd's */
+	/* list of poll fds */
 	struct list_head pollfds;
 	pthread_mutex_t pollfds_lock;
+
+	/* a counter that is set when we want to interrupt event handling, in order
+	 * to modify the poll fd set. and a lock to protect it. */
+	unsigned int pollfd_modify;
+	pthread_mutex_t pollfd_modify_lock;
 
 	/* user callbacks for pollfd changes */
 	libusb_pollfd_added_cb fd_added_cb;
@@ -255,7 +264,8 @@ struct usb_descriptor_header {
 
 /* shared data and functions */
 
-void usbi_io_init(struct libusb_context *ctx);
+int usbi_io_init(struct libusb_context *ctx);
+void usbi_io_exit(struct libusb_context *ctx);
 
 struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	unsigned long session_id);

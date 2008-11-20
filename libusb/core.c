@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "libusb.h"
 #include "libusbi.h"
@@ -364,7 +365,7 @@ libusb_free_device_list(list, 1);
  * New devices presented by the libusb_get_device_list() function all have a
  * reference count of 1. You can increase and decrease reference count using
  * libusb_ref_device() and libusb_unref_device(). A device is destroyed when
- * it's reference count reaches 0.
+ * its reference count reaches 0.
  *
  * With the above information in mind, the process of opening a device can
  * be viewed as follows:
@@ -739,8 +740,10 @@ API_EXPORTED void libusb_unref_device(libusb_device *dev)
  */
 API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 {
+	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device_handle *_handle;
 	size_t priv_size = usbi_backend->device_handle_priv_size;
+	unsigned char dummy = 1;
 	int r;
 	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
 
@@ -763,10 +766,50 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 		return r;
 	}
 
-	pthread_mutex_lock(&dev->ctx->open_devs_lock);
-	list_add(&_handle->list, &dev->ctx->open_devs);
-	pthread_mutex_unlock(&dev->ctx->open_devs_lock);
+	pthread_mutex_lock(&ctx->open_devs_lock);
+	list_add(&_handle->list, &ctx->open_devs);
+	pthread_mutex_unlock(&ctx->open_devs_lock);
 	*handle = _handle;
+
+
+	/* At this point, we want to interrupt any existing event handlers so
+	 * that they realise the addition of the new device's poll fd. One
+	 * example when this is desirable is if the user is running a separate
+	 * dedicated libusb events handling thread, which is running with a long
+	 * or infinite timeout. We want to interrupt that iteration of the loop,
+	 * so that it picks up the new fd, and then continues. */
+
+	/* record that we are messing with poll fds */
+	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	ctx->pollfd_modify++;
+	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+
+	/* write some data on control pipe to interrupt event handlers */
+	r = write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
+	if (r <= 0) {
+		usbi_warn(ctx, "internal signalling write failed");
+		pthread_mutex_lock(&ctx->pollfd_modify_lock);
+		ctx->pollfd_modify--;
+		pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+		return 0;
+	}
+
+	/* take event handling lock */
+	libusb_lock_events(ctx);
+
+	/* read the dummy data */
+	r = read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+	if (r <= 0)
+		usbi_warn(ctx, "internal signalling read failed");
+
+	/* we're done with modifying poll fds */
+	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	ctx->pollfd_modify--;
+	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+
+	/* Release event handling lock and wake up event waiters */
+	libusb_unlock_events(ctx);
+
 	return 0;
 }
 
@@ -821,10 +864,16 @@ out:
 	return handle;
 }
 
-static void do_close(struct libusb_device_handle *dev_handle)
+static void do_close(struct libusb_context *ctx,
+	struct libusb_device_handle *dev_handle)
 {
+	pthread_mutex_lock(&ctx->open_devs_lock);
+	list_del(&dev_handle->list);
+	pthread_mutex_unlock(&ctx->open_devs_lock);
+
 	usbi_backend->close(dev_handle);
 	libusb_unref_device(dev_handle->dev);
+	free(dev_handle);
 }
 
 /** \ingroup dev
@@ -840,16 +889,56 @@ static void do_close(struct libusb_device_handle *dev_handle)
  */
 API_EXPORTED void libusb_close(libusb_device_handle *dev_handle)
 {
+	struct libusb_context *ctx;
+	unsigned char dummy = 1;
+	ssize_t r;
+
 	if (!dev_handle)
 		return;
 	usbi_dbg("");
 
-	pthread_mutex_lock(&HANDLE_CTX(dev_handle)->open_devs_lock);
-	list_del(&dev_handle->list);
-	pthread_mutex_unlock(&HANDLE_CTX(dev_handle)->open_devs_lock);
+	ctx = HANDLE_CTX(dev_handle);
 
-	do_close(dev_handle);
-	free(dev_handle);
+	/* Similarly to libusb_open(), we want to interrupt all event handlers
+	 * at this point. More importantly, we want to perform the actual close of
+	 * the device while holding the event handling lock (preventing any other
+	 * thread from doing event handling) because we will be removing a file
+	 * descriptor from the polling loop. */
+
+	/* record that we are messing with poll fds */
+	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	ctx->pollfd_modify++;
+	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+
+	/* write some data on control pipe to interrupt event handlers */
+	r = write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
+	if (r <= 0) {
+		usbi_warn(ctx, "internal signalling write failed, closing anyway");
+		do_close(ctx, dev_handle);
+		pthread_mutex_lock(&ctx->pollfd_modify_lock);
+		ctx->pollfd_modify--;
+		pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+		return;
+	}
+
+	/* take event handling lock */
+	libusb_lock_events(ctx);
+
+	/* read the dummy data */
+	r = read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+	if (r <= 0)
+		usbi_warn(ctx, "internal signalling read failed, closing anyway");
+
+	/* Close the device */
+	do_close(ctx, dev_handle);
+
+	/* we're done with modifying poll fds */
+	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	ctx->pollfd_modify--;
+	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+
+	/* Release event handling lock and wake up event waiters */
+	libusb_unlock_events(ctx);
 }
 
 /** \ingroup dev
@@ -1216,7 +1305,7 @@ API_EXPORTED int libusb_attach_kernel_driver(libusb_device_handle *dev,
  * choose to increase the message verbosity level, ensure that your
  * application does not close the stdout/stderr file descriptors.
  *
- * You are advised to set level 3. libusb is conservative with it's message
+ * You are advised to set level 3. libusb is conservative with its message
  * logging and most of the time, will only log messages that explain error
  * conditions and other oddities. This will help you debug your software.
  *
@@ -1251,6 +1340,7 @@ API_EXPORTED int libusb_init(libusb_context **context)
 {
 	char *dbg = getenv("LIBUSB_DEBUG");
 	struct libusb_context *ctx = malloc(sizeof(*ctx));
+	int r;
 
 	if (!ctx)
 		return LIBUSB_ERROR_NO_MEM;
@@ -1263,19 +1353,24 @@ API_EXPORTED int libusb_init(libusb_context **context)
 	}
 
 	usbi_dbg("");
+
 	if (usbi_backend->init) {
-		int r = usbi_backend->init(ctx);
-		if (r) {
-			free(ctx);
-			return r;
-		}
+		r = usbi_backend->init(ctx);
+		if (r)
+			goto err;
 	}
 
 	pthread_mutex_init(&ctx->usb_devs_lock, NULL);
 	pthread_mutex_init(&ctx->open_devs_lock, NULL);
 	list_init(&ctx->usb_devs);
 	list_init(&ctx->open_devs);
-	usbi_io_init(ctx);
+
+	r = usbi_io_init(ctx);
+	if (r < 0) {
+		if (usbi_backend->exit)
+			usbi_backend->exit();
+		goto err;
+	}
 
 	pthread_mutex_lock(&default_context_lock);
 	if (!usbi_default_context) {
@@ -1287,6 +1382,10 @@ API_EXPORTED int libusb_init(libusb_context **context)
 	if (context)
 		*context = ctx;
 	return 0;
+
+err:
+	free(ctx);
+	return r;
 }
 
 /** \ingroup lib
@@ -1299,23 +1398,15 @@ API_EXPORTED void libusb_exit(struct libusb_context *ctx)
 	USBI_GET_CONTEXT(ctx);
 	usbi_dbg("");
 
-	pthread_mutex_lock(&ctx->open_devs_lock);
-	if (!list_empty(&ctx->open_devs)) {
-		struct libusb_device_handle *devh;
-		struct libusb_device_handle *tmp;
+	/* a little sanity check. doesn't bother with open_devs locking because
+	 * unless there is an application bug, nobody will be accessing this. */
+	if (!list_empty(&ctx->open_devs))
+		usbi_warn(ctx, "application left some devices open");
 
-		usbi_dbg("naughty app left some devices open!");
-		list_for_each_entry_safe(devh, tmp, &ctx->open_devs, list) {
-			list_del(&devh->list);
-			do_close(devh);
-			free(devh);
-		}
-	}
-	pthread_mutex_unlock(&ctx->open_devs_lock);
-
+	usbi_io_exit(ctx);
 	if (usbi_backend->exit)
 		usbi_backend->exit();
-	
+
 	pthread_mutex_lock(&default_context_lock);
 	if (ctx == usbi_default_context) {
 		usbi_dbg("freeing default context");

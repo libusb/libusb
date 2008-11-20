@@ -760,7 +760,6 @@ void myfunc() {
 retry:
 if (libusb_try_lock_events(ctx) == 0) {
 	// we obtained the event lock: do our own event handling
-	libusb_lock_events(ctx);
 	while (!completed) {
 		poll(libusb file descriptors, 120*1000);
 		if (poll indicates activity)
@@ -841,15 +840,36 @@ printf("completed!\n");
  * fall back to the "event waiters" mechanism detailed above.
  */
 
-void usbi_io_init(struct libusb_context *ctx)
+int usbi_io_init(struct libusb_context *ctx)
 {
+	int r;
+
 	pthread_mutex_init(&ctx->flying_transfers_lock, NULL);
 	pthread_mutex_init(&ctx->pollfds_lock, NULL);
+	pthread_mutex_init(&ctx->pollfd_modify_lock, NULL);
 	pthread_mutex_init(&ctx->events_lock, NULL);
 	pthread_mutex_init(&ctx->event_waiters_lock, NULL);
 	pthread_cond_init(&ctx->event_waiters_cond, NULL);
 	list_init(&ctx->flying_transfers);
 	list_init(&ctx->pollfds);
+
+	/* FIXME should use an eventfd on kernels that support it */
+	r = pipe(ctx->ctrl_pipe);
+	if (r < 0)
+		return LIBUSB_ERROR_OTHER;
+
+	r = usbi_add_pollfd(ctx, ctx->ctrl_pipe[0], POLLIN);
+	if (r < 0)
+		return r;
+
+	return 0;
+}
+
+void usbi_io_exit(struct libusb_context *ctx)
+{
+	usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
+	close(ctx->ctrl_pipe[0]);
+	close(ctx->ctrl_pipe[1]);
 }
 
 static int calculate_timeout(struct usbi_transfer *transfer)
@@ -1132,7 +1152,17 @@ API_EXPORTED int libusb_try_lock_events(libusb_context *ctx)
 {
 	int r;
 	USBI_GET_CONTEXT(ctx);
-	
+
+	/* is someone else waiting to modify poll fds? if so, don't let this thread
+	 * start event handling */
+	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	r = ctx->pollfd_modify;
+	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+	if (r) {
+		usbi_dbg("someone else is modifying poll fds");
+		return 1;
+	}
+
 	r = pthread_mutex_trylock(&ctx->events_lock);
 	if (r)
 		return 1;
@@ -1196,7 +1226,19 @@ API_EXPORTED void libusb_unlock_events(libusb_context *ctx)
  */
 API_EXPORTED int libusb_event_handler_active(libusb_context *ctx)
 {
+	int r;
 	USBI_GET_CONTEXT(ctx);
+
+	/* is someone else waiting to modify poll fds? if so, don't let this thread
+	 * start event handling -- indicate that event handling is happening */
+	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	r = ctx->pollfd_modify;
+	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+	if (r) {
+		usbi_dbg("someone else is modifying poll fds");
+		return 1;
+	}
+
 	return ctx->event_handler_active;
 }
 
@@ -1401,10 +1443,27 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		return LIBUSB_ERROR_IO;
 	}
 
+	/* fd[0] is always the ctrl pipe */
+	if (fds[0].revents) {
+		/* another thread wanted to interrupt event handling, and it succeeded!
+		 * handle any other events that cropped up at the same time, and
+		 * simply return */
+		usbi_dbg("caught a fish on the control pipe");
+
+		if (r == 1) {
+			r = 0;
+			goto handled;
+		} else {
+			/* prevent OS backend from trying to handle events on ctrl pipe */
+			fds[0].revents = 0;
+		}
+	}
+
 	r = usbi_backend->handle_events(ctx, fds, nfds, r);
 	if (r)
 		usbi_err(ctx, "backend handle_events failed with error %d", r);
 
+handled:
 	free(fds);
 	return r;
 }
@@ -1641,6 +1700,14 @@ API_EXPORTED int libusb_get_next_timeout(libusb_context *ctx,
  *
  * To remove notifiers, pass NULL values for the function pointers.
  *
+ * Note that file descriptors may have been added even before you register
+ * these notifiers (e.g. at libusb_init() time).
+ *
+ * Additionally, note that the removal notifier may be called during
+ * libusb_exit() (e.g. when it is closing file descriptors that were opened
+ * and added to the poll set at libusb_init() time). If you don't want this,
+ * remove the notifiers immediately before calling libusb_exit().
+ *
  * \param ctx the context to operate on, or NULL for the default context
  * \param added_cb pointer to function for addition notifications
  * \param removed_cb pointer to function for removal notifications
@@ -1670,7 +1737,7 @@ int usbi_add_pollfd(struct libusb_context *ctx, int fd, short events)
 	ipollfd->pollfd.fd = fd;
 	ipollfd->pollfd.events = events;
 	pthread_mutex_lock(&ctx->pollfds_lock);
-	list_add(&ipollfd->list, &ctx->pollfds);
+	list_add_tail(&ipollfd->list, &ctx->pollfds);
 	pthread_mutex_unlock(&ctx->pollfds_lock);
 
 	if (ctx->fd_added_cb)
