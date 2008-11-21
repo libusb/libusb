@@ -1141,6 +1141,7 @@ int libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
 int libusb_try_lock_events(libusb_context *ctx);
 void libusb_lock_events(libusb_context *ctx);
 void libusb_unlock_events(libusb_context *ctx);
+int libusb_event_handling_ok(libusb_context *ctx);
 int libusb_event_handler_active(libusb_context *ctx);
 void libusb_lock_event_waiters(libusb_context *ctx);
 void libusb_unlock_event_waiters(libusb_context *ctx);

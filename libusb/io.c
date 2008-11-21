@@ -653,7 +653,6 @@ void cb(struct libusb_transfer *transfer)
 }
 
 void myfunc() {
-	const struct timeval timeout = { 120, 0 };
 	struct libusb_transfer *transfer;
 	unsigned char buffer[LIBUSB_CONTROL_SETUP_SIZE];
 	int completed = 0;
@@ -761,6 +760,10 @@ retry:
 if (libusb_try_lock_events(ctx) == 0) {
 	// we obtained the event lock: do our own event handling
 	while (!completed) {
+		if (!libusb_event_handling_ok(ctx)) {
+			libusb_unlock_events(ctx);
+			goto retry;
+		}
 		poll(libusb file descriptors, 120*1000);
 		if (poll indicates activity)
 			libusb_handle_events_locked(ctx, 0);
@@ -788,6 +791,13 @@ if (libusb_try_lock_events(ctx) == 0) {
 printf("completed!\n");
 \endcode
  *
+ * A naive look at the above code may suggest that this can only support
+ * one event waiter (hence a total of 2 competing threads, the other doing
+ * event handling), because the event waiter seems to have taken the event
+ * waiters lock while waiting for an event. However, the system does support
+ * multiple event waiters, because libusb_wait_for_event() actually drops
+ * the lock while waiting, and reaquires it before continuing.
+ *
  * We have now implemented code which can dynamically handle situations where
  * nobody is handling events (so we should do it ourselves), and it can also
  * handle situations where another thread is doing event handling (so we can
@@ -796,10 +806,17 @@ printf("completed!\n");
  * whatever reason it stops doing so before our condition is met, so we take
  * over the event handling.
  *
- * Three functions were introduced in the above pseudo-code. Their importance
+ * Four functions were introduced in the above pseudo-code. Their importance
  * should be apparent from the code shown above.
  * -# libusb_try_lock_events() is a non-blocking function which attempts
  *    to acquire the events lock but returns a failure code if it is contended.
+ * -# libusb_event_handling_ok() checks that libusb is still happy for your
+ *    thread to be performing event handling. Sometimes, libusb needs to
+ *    interrupt the event handler, and this is how you can check if you have
+ *    been interrupted. If this function returns 0, the correct behaviour is
+ *    for you to give up the event handling lock, and then to repeat the cycle.
+ *    The following libusb_try_lock_events() will fail, so you will become an
+ *    events waiter. For more information on this, read \ref fullstory below.
  * -# libusb_handle_events_locked() is a variant of
  *    libusb_handle_events_timeout() that you can call while holding the
  *    events lock. libusb_handle_events_timeout() itself implements similar
@@ -813,6 +830,76 @@ printf("completed!\n");
  * internally: it will wake up all such threads when someone calls
  * libusb_unlock_events() or when a transfer completes (at the point after its
  * callback has returned).
+ *
+ * \subsection fullstory The full story
+ *
+ * The above explanation should be enough to get you going, but if you're
+ * really thinking through the issues then you may be left with some more
+ * questions regarding libusb's internals. If you're curious, read on, and if
+ * not, skip to the next section to avoid confusing yourself!
+ *
+ * The immediate question that may spring to mind is: what if one thread
+ * modifies the set of file descriptors that need to be polled while another
+ * thread is doing event handling?
+ *
+ * There are 2 situations in which this may happen.
+ * -# libusb_open() will add another file descriptor to the poll set,
+ *    therefore it is desirable to interrupt the event handler so that it
+ *    restarts, picking up the new descriptor.
+ * -# libusb_close() will remove a file descriptor from the poll set. There
+ *    are all kinds of race conditions that could arise here, so it is
+ *    important that nobody is doing event handling at this time.
+ *
+ * libusb handles these issues internally, so application developers do not
+ * have to stop their event handlers while opening/closing devices. Here's how
+ * it works, focusing on the libusb_close() situation first:
+ *
+ * -# During initialization, libusb opens an internal pipe, and it adds the read
+ *    end of this pipe to the set of file descriptors to be polled.
+ * -# During libusb_close(), libusb writes some dummy data on this control pipe.
+ *    This immediately interrupts the event handler. libusb also records
+ *    internally that it is trying to interrupt event handlers for this
+ *    high-priority event.
+ * -# At this point, some of the functions described above start behaving
+ *    differently:
+ *   - libusb_event_handling_ok() starts returning 1, indicating that it is NOT
+ *     OK for event handling to continue.
+ *   - libusb_try_lock_events() starts returning 1, indicating that another
+ *     thread holds the event handling lock, even if the lock is uncontended.
+ *   - libusb_event_handler_active() starts returning 1, indicating that
+ *     another thread is doing event handling, even if that is not true.
+ * -# The above changes in behaviour result in the event handler stopping and
+ *    giving up the events lock very quickly, giving the high-priority
+ *    libusb_close() operation a "free ride" to acquire the events lock. All
+ *    threads that are competing to do event handling become event waiters.
+ * -# With the events lock held inside libusb_close(), libusb can safely remove
+ *    a file descriptor from the poll set, in the safety of knowledge that
+ *    nobody is polling those descriptors or trying to access the poll set.
+ * -# After obtaining the events lock, the close operation completes very
+ *    quickly (usually a matter of milliseconds) and then immediately releases
+ *    the events lock.
+ * -# At the same time, the behaviour of libusb_event_handling_ok() and friends
+ *    reverts to the original, documented behaviour.
+ * -# The release of the events lock causes the threads that are waiting for
+ *    events to be woken up and to start competing to become event handlers
+ *    again. One of them will succeed; it will then re-obtain the list of poll
+ *    descriptors, and USB I/O will then continue as normal.
+ *
+ * libusb_open() is similar, and is actually a more simplistic case. Upon a
+ * call to libusb_open():
+ *
+ * -# The device is opened and a file descriptor is added to the poll set.
+ * -# libusb sends some dummy data on the control pipe, and records that it
+ *    is trying to modify the poll descriptor set.
+ * -# The event handler is interrupted, and the same behaviour change as for
+ *    libusb_close() takes effect, causing all event handling threads to become
+ *    event waiters.
+ * -# The libusb_open() implementation takes its free ride to the events lock.
+ * -# Happy that it has successfully paused the events handler, libusb_open()
+ *    releases the events lock.
+ * -# The event waiter threads are all woken up and compete to become event
+ *    handlers again. The one that succeeds will obtain the list of poll
+ *    descriptors again, which will include the addition of the new device.
  *
  * \subsection concl Closing remarks
  *
@@ -835,9 +922,12 @@ printf("completed!\n");
  * in them getting along in perfect harmony.
  *
  * If you do have a dedicated thread doing event handling, it is perfectly
- * legal for it to take the event handling lock and never release it. Any
+ * legal for it to take the event handling lock for long periods of time. Any
  * synchronous I/O functions you call from other threads will transparently
- * fall back to the "event waiters" mechanism detailed above.
+ * fall back to the "event waiters" mechanism detailed above. The only
+ * consideration that your event handling thread must apply is the one related
+ * to libusb_event_handling_ok(): you must call this before every poll(), and
+ * give up the events lock if instructed.
  */
 
 int usbi_io_init(struct libusb_context *ctx)
@@ -1210,10 +1300,53 @@ API_EXPORTED void libusb_unlock_events(libusb_context *ctx)
 	ctx->event_handler_active = 0;
 	pthread_mutex_unlock(&ctx->events_lock);
 
+	/* FIXME: perhaps we should be a bit more efficient by not broadcasting
+	 * the availability of the events lock when we are modifying pollfds
+	 * (check ctx->pollfd_modify)? */
 	pthread_mutex_lock(&ctx->event_waiters_lock);
 	pthread_cond_broadcast(&ctx->event_waiters_cond);
 	pthread_mutex_unlock(&ctx->event_waiters_lock);
 }
+
+/** \ingroup poll
+ * Determine if it is still OK for this thread to be doing event handling.
+ *
+ * Sometimes, libusb needs to temporarily pause all event handlers, and this
+ * is the function you should use before polling file descriptors to see if
+ * this is the case.
+ *
+ * If this function instructs your thread to give up the events lock, you
+ * should just continue the usual logic that is documented in \ref mtasync.
+ * On the next iteration, your thread will fail to obtain the events lock,
+ * and will hence become an event waiter.
+ *
+ * This function should be called while the events lock is held: you don't
+ * need to worry about the results of this function if your thread is not
+ * the current event handler.
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \returns 1 if event handling can start or continue
+ * \returns 0 if this thread must give up the events lock
+ * \see \ref fullstory "Multi-threaded I/O: the full story"
+ */
+API_EXPORTED int libusb_event_handling_ok(libusb_context *ctx)
+{
+	int r;
+	USBI_GET_CONTEXT(ctx);
+
+	/* is someone else waiting to modify poll fds? if so, don't let this thread
+	 * continue event handling */
+	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	r = ctx->pollfd_modify;
+	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+	if (r) {
+		usbi_dbg("someone else is modifying poll fds");
+		return 0;
+	}
+
+	return 1;
+}
+
 
 /** \ingroup poll
  * Determine if an active thread is handling events (i.e. if anyone is holding
