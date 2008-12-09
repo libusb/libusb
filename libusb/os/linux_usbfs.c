@@ -559,7 +559,7 @@ static int cache_active_config(struct libusb_device *dev, int fd,
 /* send a control message to retrieve active configuration */
 static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 {
-	int active_config;
+	unsigned char active_config = 0;
 	int r;
 
 	struct usbfs_ctrltransfer ctrl = {
