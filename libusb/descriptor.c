@@ -174,6 +174,7 @@ static void clear_interface(struct libusb_interface *interface)
 			}
 		}
 		free((void *) interface->altsetting);
+		interface->altsetting = NULL;
 	}
 	
 }
