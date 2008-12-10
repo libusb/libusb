@@ -641,7 +641,7 @@ API_EXPORTED int libusb_get_max_packet_size(libusb_device *dev,
 	int iface_idx;
 	struct libusb_config_descriptor *config;
 	int r;
-	
+
 	r = libusb_get_active_config_descriptor(dev, &config);
 	if (r < 0) {
 		usbi_err(DEVICE_CTX(dev),
@@ -1011,7 +1011,7 @@ API_EXPORTED int libusb_get_configuration(libusb_device_handle *dev,
  * configuration on the device. It is up to your application to ensure the
  * correct configuration is selected before you attempt to claim interfaces
  * and perform other operations.
- * 
+ *
  * If you call this function on a device already configured with the selected
  * configuration, then this function will act as a lightweight device reset:
  * it will issue a SET_CONFIGURATION request using the current configuration,
@@ -1165,7 +1165,7 @@ API_EXPORTED int libusb_set_interface_alt_setting(libusb_device_handle *dev,
 
 	pthread_mutex_lock(&dev->lock);
 	if (!(dev->claimed_interfaces & (1 << interface_number))) {
-		pthread_mutex_unlock(&dev->lock);	
+		pthread_mutex_unlock(&dev->lock);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 	pthread_mutex_unlock(&dev->lock);

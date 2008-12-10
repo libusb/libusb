@@ -206,7 +206,7 @@ enum libusb_standard_request {
 
 	/** Return the selected alternate setting for the specified interface */
 	LIBUSB_REQUEST_GET_INTERFACE = 0x0A,
-	
+
 	/** Select an alternate interface for the specified interface */
 	LIBUSB_REQUEST_SET_INTERFACE = 0x0B,
 
@@ -416,7 +416,7 @@ struct libusb_interface_descriptor {
 	/** Number of endpoints used by this interface (excluding the control
 	 * endpoint). */
 	uint8_t  bNumEndpoints;
-	
+
 	/** USB-IF class code for this interface. See \ref libusb_class_code. */
 	uint8_t  bInterfaceClass;
 
@@ -669,7 +669,7 @@ enum libusb_transfer_flags {
 	LIBUSB_TRANSFER_FREE_BUFFER = 1<<1,
 
 	/** Automatically call libusb_free_transfer() after callback returns.
-	 * If this flag is set, it is illegal to call libusb_free_transfer() 
+	 * If this flag is set, it is illegal to call libusb_free_transfer()
 	 * from your transfer callback, as this will result in a double-free
 	 * when this flag is acted upon. */
 	LIBUSB_TRANSFER_FREE_TRANSFER = 1<<2,
@@ -799,7 +799,7 @@ int libusb_attach_kernel_driver(libusb_device_handle *dev, int interface);
 /** \ingroup asyncio
  * Get the data section of a control transfer. This convenience function is here
  * to remind you that the data does not start until 8 bytes into the actual
- * buffer, as the setup packet comes first. 
+ * buffer, as the setup packet comes first.
  *
  * Calling this function only makes sense from a transfer callback function,
  * or situations where you have already allocated a suitably sized buffer at
@@ -836,22 +836,22 @@ static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
  * Helper function to populate the setup packet (first 8 bytes of the data
  * buffer) for a control transfer. The wIndex, wValue and wLength values should
  * be given in host-endian byte order.
- * 
+ *
  * \param buffer buffer to output the setup packet into
  * \param bmRequestType see the
  * \ref libusb_control_setup::bmRequestType "bmRequestType" field of
  * \ref libusb_control_setup
  * \param bRequest see the
- * \ref libusb_control_setup::bRequest "bRequest" field of 
+ * \ref libusb_control_setup::bRequest "bRequest" field of
  * \ref libusb_control_setup
  * \param wValue see the
- * \ref libusb_control_setup::wValue "wValue" field of 
+ * \ref libusb_control_setup::wValue "wValue" field of
  * \ref libusb_control_setup
  * \param wIndex see the
- * \ref libusb_control_setup::wIndex "wIndex" field of 
+ * \ref libusb_control_setup::wIndex "wIndex" field of
  * \ref libusb_control_setup
  * \param wLength see the
- * \ref libusb_control_setup::wLength "wLength" field of 
+ * \ref libusb_control_setup::wLength "wLength" field of
  * \ref libusb_control_setup
  */
 static inline void libusb_fill_control_setup(unsigned char *buffer,
@@ -1027,7 +1027,7 @@ static inline void libusb_set_iso_packet_lengths(
  * Typically you will assign equal lengths to each packet in the transfer,
  * and hence the above method is sub-optimal. You may wish to use
  * libusb_get_iso_packet_buffer_simple() instead.
- * 
+ *
  * \param transfer a transfer
  * \param packet the packet to return the address of
  * \returns the base address of the packet buffer inside the transfer buffer,
@@ -1073,7 +1073,7 @@ static inline unsigned char *libusb_get_iso_packet_buffer_simple(
 {
 	if (packet >= transfer->num_iso_packets)
 		return NULL;
-	
+
 	return transfer->buffer + (transfer->iso_packet_desc[0].length * packet);
 }
 
