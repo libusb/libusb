@@ -1,6 +1,9 @@
 This file lists notable changes in each release. For the full history of all
 changes, see ChangeLog.
 
+2008-12-13: v1.0.0 release
+ * Bug fixes
+
 2008-11-21: v0.9.4 release
  * Bug fixes
  * Add libusb_attach_kernel_driver()
