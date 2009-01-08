@@ -102,8 +102,7 @@ struct linux_transfer_priv {
 
 	enum reap_action reap_action;
 	int num_urbs;
-	unsigned int awaiting_reap;
-	unsigned int awaiting_discard;
+	unsigned int num_retired;
 
 	/* next iso packet in user-supplied transfer to be populated */
 	int iso_packet_offset;
@@ -1281,8 +1280,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 	memset(urbs, 0, alloc_size);
 	tpriv->urbs = urbs;
 	tpriv->num_urbs = num_urbs;
-	tpriv->awaiting_discard = 0;
-	tpriv->awaiting_reap = 0;
+	tpriv->num_retired = 0;
 	tpriv->reap_action = NORMAL;
 
 	for (i = 0; i < num_urbs; i++) {
@@ -1330,20 +1328,19 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 			 * the final discard completes we can report error to the user.
 			 */
 			tpriv->reap_action = SUBMIT_FAILED;
+
+			/* The URBs we haven't submitted yet we count as already
+			 * retired. */
+			tpriv->num_retired += num_urbs - i;
 			for (j = 0; j < i; j++) {
 				int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &urbs[j]);
-				if (tmp == 0)
-					tpriv->awaiting_discard++;
-				else if (errno == EINVAL)
-					tpriv->awaiting_reap++;
-				else
+				if (tmp && errno != EINVAL)
 					usbi_warn(TRANSFER_CTX(transfer),
-						"unrecognised discard return %d", tmp);
+						"unrecognised discard errno %d", errno);
 			}
 
 			usbi_dbg("reporting successful submission but waiting for %d "
-				"discards and %d reaps before reporting error",
-				tpriv->awaiting_discard, tpriv->awaiting_reap);
+				"discards before reporting error", i);
 			return 0;
 		}
 	}
@@ -1395,8 +1392,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 	tpriv->iso_urbs = urbs;
 	tpriv->num_urbs = num_urbs;
-	tpriv->awaiting_discard = 0;
-	tpriv->awaiting_reap = 0;
+	tpriv->num_retired = 0;
 	tpriv->reap_action = NORMAL;
 	tpriv->iso_packet_offset = 0;
 
@@ -1486,20 +1482,19 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 			 * the final discard completes we can report error to the user.
 			 */
 			tpriv->reap_action = SUBMIT_FAILED;
+
+			/* The URBs we haven't submitted yet we count as already
+			 * retired. */
+			tpriv->num_retired = num_urbs - i;
 			for (j = 0; j < i; j++) {
 				int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, urbs[j]);
-				if (tmp == 0)
-					tpriv->awaiting_discard++;
-				else if (errno == EINVAL)
-					tpriv->awaiting_reap++;
-				else
+				if (tmp && errno != EINVAL)
 					usbi_warn(TRANSFER_CTX(transfer),
-						"unrecognised discard return %d", tmp);
+						"unrecognised discard errno %d", errno);
 			}
 
 			usbi_dbg("reporting successful submission but waiting for %d "
-				"discards and %d reaps before reporting error",
-				tpriv->awaiting_discard, tpriv->awaiting_reap);
+				"discards before reporting error", i);
 			return 0;
 		}
 	}
@@ -1602,17 +1597,11 @@ static void cancel_bulk_transfer(struct usbi_transfer *itransfer)
 	int i;
 
 	tpriv->reap_action = CANCELLED;
-	tpriv->awaiting_reap = 0;
-	tpriv->awaiting_discard = 0;
 	for (i = 0; i < tpriv->num_urbs; i++) {
 		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
-		if (tmp == 0)
-			tpriv->awaiting_discard++;
-		else if (errno == EINVAL)
-			tpriv->awaiting_reap++;
-		else
+		if (tmp && errno != EINVAL)
 			usbi_warn(TRANSFER_CTX(transfer),
-				"unrecognised discard return %d", errno);
+				"unrecognised discard errno %d", errno);
 	}
 }
 
@@ -1626,17 +1615,11 @@ static void cancel_iso_transfer(struct usbi_transfer *itransfer)
 	int i;
 
 	tpriv->reap_action = CANCELLED;
-	tpriv->awaiting_reap = 0;
-	tpriv->awaiting_discard = 0;
 	for (i = 0; i < tpriv->num_urbs; i++) {
 		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, tpriv->iso_urbs[i]);
-		if (tmp == 0)
-			tpriv->awaiting_discard++;
-		else if (errno == EINVAL)
-			tpriv->awaiting_reap++;
-		else
+		if (tmp && errno != EINVAL)
 			usbi_warn(TRANSFER_CTX(transfer),
-				"unrecognised discard return %d", errno);
+				"unrecognised discard errno %d", errno);
 	}
 }
 
@@ -1694,56 +1677,32 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	usbi_dbg("handling completion status %d of bulk urb %d/%d", urb->status,
 		urb_idx + 1, num_urbs);
 
+	tpriv->num_retired++;
+
 	if (urb->status == 0 ||
 			(urb->status == -EOVERFLOW && urb->actual_length > 0))
 		itransfer->transferred += urb->actual_length;
 
 	if (tpriv->reap_action != NORMAL) {
 		/* cancelled, submit_fail, or completed early */
-		if (urb->status == -ENOENT) {
-			usbi_dbg("CANCEL: detected a cancelled URB");
-			if (tpriv->awaiting_discard == 0)
-				usbi_err(ITRANSFER_CTX(itransfer),
-					"CANCEL: cancelled URB but not awaiting discards?");
-			else
-				tpriv->awaiting_discard--;
-		} else if (urb->status == 0) {
-			usbi_dbg("CANCEL: detected a completed URB");
-
+		if (urb->status == 0 && tpriv->reap_action == COMPLETED_EARLY) {
 			/* FIXME we could solve this extreme corner case with a memmove
 			 * or something */
-			if (tpriv->reap_action == COMPLETED_EARLY)
-				usbi_warn(ITRANSFER_CTX(itransfer), "SOME DATA LOST! "
-					"(completed early but remaining urb completed)");
-
-			if (tpriv->awaiting_reap == 0)
-				usbi_err(ITRANSFER_CTX(itransfer),
-					"CANCEL: completed URB not awaiting reap?");
-			else
-				tpriv->awaiting_reap--;
-		} else if (urb->status == -EPIPE || urb->status == -EOVERFLOW) {
-			if (tpriv->awaiting_reap == 0)
-				usbi_err(ITRANSFER_CTX(itransfer),
-					"CANCEL: completed URB not awaiting reap?");
-			else
-				tpriv->awaiting_reap--;
-		} else {
-			usbi_warn(ITRANSFER_CTX(itransfer),
-				"unhandled CANCEL urb status %d", urb->status);
+			usbi_warn(ITRANSFER_CTX(itransfer), "SOME DATA LOST! "
+				"(completed early but remaining urb completed)");
 		}
+		usbi_dbg("CANCEL: urb status %d", urb->status);
 
-		if (tpriv->awaiting_reap == 0 && tpriv->awaiting_discard == 0) {
+		if (tpriv->num_retired == num_urbs) {
 			usbi_dbg("CANCEL: last URB handled, reporting");
 			if (tpriv->reap_action == CANCELLED) {
 				free(tpriv->urbs);
 				usbi_handle_transfer_cancellation(itransfer);
 				return 0;
-			} else if (tpriv->reap_action == COMPLETED_EARLY) {
-				goto out;
-			} else {
-				status = LIBUSB_TRANSFER_ERROR;
-				goto out;
 			}
+			if (tpriv->reap_action != COMPLETED_EARLY)
+				status = LIBUSB_TRANSFER_ERROR;
+			goto out;
 		}
 		return 0;
 	}
@@ -1792,13 +1751,9 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		tpriv->reap_action = COMPLETED_EARLY;
 		for (i = urb_idx + 1; i < tpriv->num_urbs; i++) {
 			int r = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
-			if (r == 0)
-				tpriv->awaiting_discard++;
-			else if (errno == EINVAL)
-				tpriv->awaiting_reap++;
-			else
-				usbi_warn(ITRANSFER_CTX(itransfer),
-					"unrecognised discard return %d", errno);
+			if (r && errno != EINVAL)
+				usbi_warn(TRANSFER_CTX(transfer),
+					"unrecognised discard errno %d", errno);
 		}
 		return 0;
 	} else {
@@ -1847,27 +1802,12 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		}
 	}
 
-	if (tpriv->reap_action != NORMAL) { /* cancelled or submit_fail */
-		if (urb->status == -ENOENT) {
-			usbi_dbg("CANCEL: detected a cancelled URB");
-			if (tpriv->awaiting_discard == 0)
-				usbi_err(TRANSFER_CTX(transfer),
-					"CANCEL: cancelled URB but not awaiting discards?");
-			else
-				tpriv->awaiting_discard--;
-		} else if (urb->status == 0) {
-			usbi_dbg("CANCEL: detected a completed URB");
-			if (tpriv->awaiting_reap == 0)
-				usbi_err(TRANSFER_CTX(transfer),
-					"CANCEL: completed URB not awaiting reap?");
-			else
-				tpriv->awaiting_reap--;
-		} else {
-			usbi_warn(TRANSFER_CTX(transfer),
-				"unhandled CANCEL urb status %d", urb->status);
-		}
+	tpriv->num_retired++;
 
-		if (tpriv->awaiting_reap == 0 && tpriv->awaiting_discard == 0) {
+	if (tpriv->reap_action != NORMAL) { /* cancelled or submit_fail */
+		usbi_dbg("CANCEL: urb status %d", urb->status);
+
+		if (tpriv->num_retired == num_urbs) {
 			usbi_dbg("CANCEL: last URB handled, reporting");
 			free_iso_urbs(tpriv);
 			if (tpriv->reap_action == CANCELLED)
