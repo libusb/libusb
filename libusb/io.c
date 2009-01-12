@@ -1101,12 +1101,10 @@ API_EXPORTED void libusb_free_transfer(struct libusb_transfer *transfer)
  * Submit a transfer. This function will fire off the USB transfer and then
  * return immediately.
  *
- * It is undefined behaviour to submit a transfer that has already been
- * submitted but has not yet completed.
- *
  * \param transfer the transfer to submit
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns LIBUSB_ERROR_BUSY if the transfer has already been submitted.
  * \returns another LIBUSB_ERROR code on other failure
  */
 API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
@@ -1134,8 +1132,6 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 
 /** \ingroup asyncio
  * Asynchronously cancel a previously submitted transfer.
- * It is undefined behaviour to call this function on a transfer that is
- * already being cancelled or has already completed.
  * This function returns immediately, but this does not indicate cancellation
  * is complete. Your callback function will be invoked at some later time
  * with a transfer status of
@@ -1144,6 +1140,8 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
  *
  * \param transfer the transfer to cancel
  * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if the transfer is already complete or
+ * cancelled.
  * \returns a LIBUSB_ERROR code on failure
  */
 API_EXPORTED int libusb_cancel_transfer(struct libusb_transfer *transfer)

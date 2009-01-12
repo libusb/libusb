@@ -1245,6 +1245,7 @@ static void free_iso_urbs(struct linux_transfer_priv *tpriv)
 	}
 
 	free(tpriv->iso_urbs);
+	tpriv->iso_urbs = NULL;
 }
 
 static int submit_bulk_transfer(struct usbi_transfer *itransfer,
@@ -1259,6 +1260,9 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 	int r;
 	int i;
 	size_t alloc_size;
+
+	if (tpriv->urbs)
+		return LIBUSB_ERROR_BUSY;
 
 	/* usbfs places a 16kb limit on bulk URBs. we divide up larger requests
 	 * into smaller units to meet such restriction, then fire off all the
@@ -1311,6 +1315,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 			if (i == 0) {
 				usbi_dbg("first URB failed, easy peasy");
 				free(urbs);
+				tpriv->urbs = NULL;
 				return r;
 			}
 
@@ -1364,6 +1369,9 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	int packet_offset = 0;
 	unsigned int packet_len;
 	unsigned char *urb_buffer = transfer->buffer;
+
+	if (tpriv->iso_urbs)
+		return LIBUSB_ERROR_BUSY;
 
 	/* usbfs places a 32kb limit on iso URBs. we divide up larger requests
 	 * into smaller units to meet such restriction, then fire off all the
@@ -1512,6 +1520,9 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	struct usbfs_urb *urb;
 	int r;
 
+	if (tpriv->urbs)
+		return LIBUSB_ERROR_BUSY;
+
 	if (transfer->length - LIBUSB_CONTROL_SETUP_SIZE > MAX_CTRL_BUFFER_LENGTH)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -1531,6 +1542,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	r = ioctl(dpriv->fd, IOCTL_USBFS_SUBMITURB, urb);
 	if (r < 0) {
 		free(urb);
+		tpriv->urbs = NULL;
 		if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
@@ -1571,6 +1583,9 @@ static int cancel_control_transfer(struct usbi_transfer *itransfer)
 		__device_handle_priv(transfer->dev_handle);
 	int r;
 
+	if (!tpriv->urbs)
+		return LIBUSB_ERROR_NOT_FOUND;
+
 	tpriv->reap_action = CANCELLED;
 	r = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, tpriv->urbs);
 	if(r) {
@@ -1587,7 +1602,7 @@ static int cancel_control_transfer(struct usbi_transfer *itransfer)
 	return 0;
 }
 
-static void cancel_bulk_transfer(struct usbi_transfer *itransfer)
+static int cancel_bulk_transfer(struct usbi_transfer *itransfer)
 {
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 	struct libusb_transfer *transfer =
@@ -1595,6 +1610,9 @@ static void cancel_bulk_transfer(struct usbi_transfer *itransfer)
 	struct linux_device_handle_priv *dpriv =
 		__device_handle_priv(transfer->dev_handle);
 	int i;
+
+	if (!tpriv->urbs)
+		return LIBUSB_ERROR_NOT_FOUND;
 
 	tpriv->reap_action = CANCELLED;
 	for (i = 0; i < tpriv->num_urbs; i++) {
@@ -1603,9 +1621,10 @@ static void cancel_bulk_transfer(struct usbi_transfer *itransfer)
 			usbi_warn(TRANSFER_CTX(transfer),
 				"unrecognised discard errno %d", errno);
 	}
+	return 0;
 }
 
-static void cancel_iso_transfer(struct usbi_transfer *itransfer)
+static int cancel_iso_transfer(struct usbi_transfer *itransfer)
 {
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 	struct libusb_transfer *transfer =
@@ -1614,6 +1633,9 @@ static void cancel_iso_transfer(struct usbi_transfer *itransfer)
 		__device_handle_priv(transfer->dev_handle);
 	int i;
 
+	if (!tpriv->iso_urbs)
+		return LIBUSB_ERROR_NOT_FOUND;
+
 	tpriv->reap_action = CANCELLED;
 	for (i = 0; i < tpriv->num_urbs; i++) {
 		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, tpriv->iso_urbs[i]);
@@ -1621,6 +1643,7 @@ static void cancel_iso_transfer(struct usbi_transfer *itransfer)
 			usbi_warn(TRANSFER_CTX(transfer),
 				"unrecognised discard errno %d", errno);
 	}
+	return 0;
 }
 
 static int op_cancel_transfer(struct usbi_transfer *itransfer)
@@ -1633,11 +1656,9 @@ static int op_cancel_transfer(struct usbi_transfer *itransfer)
 		return cancel_control_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_BULK:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-		cancel_bulk_transfer(itransfer);
-		return 0;
+		return cancel_bulk_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		cancel_iso_transfer(itransfer);
-		return 0;
+		return cancel_iso_transfer(itransfer);
 	default:
 		usbi_err(TRANSFER_CTX(transfer),
 			"unknown endpoint type %d", transfer->type);
@@ -1656,6 +1677,7 @@ static void op_clear_transfer_priv(struct usbi_transfer *itransfer)
 	case LIBUSB_TRANSFER_TYPE_BULK:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 		free(tpriv->urbs);
+		tpriv->urbs = NULL;
 		break;
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		free_iso_urbs(tpriv);
@@ -1697,6 +1719,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 			usbi_dbg("CANCEL: last URB handled, reporting");
 			if (tpriv->reap_action == CANCELLED) {
 				free(tpriv->urbs);
+				tpriv->urbs = NULL;
 				usbi_handle_transfer_cancellation(itransfer);
 				return 0;
 			}
@@ -1762,6 +1785,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 
 out:
 	free(tpriv->urbs);
+	tpriv->urbs = NULL;
 	usbi_handle_transfer_completion(itransfer, status);
 	return 0;
 }
@@ -1860,6 +1884,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 			usbi_warn(ITRANSFER_CTX(itransfer),
 				"cancel: unrecognised urb status %d", urb->status);
 		free(tpriv->urbs);
+		tpriv->urbs = NULL;
 		usbi_handle_transfer_cancellation(itransfer);
 		return 0;
 	}
@@ -1887,6 +1912,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	}
 
 	free(tpriv->urbs);
+	tpriv->urbs = NULL;
 	usbi_handle_transfer_completion(itransfer, status);
 	return 0;
 }
