@@ -1587,6 +1587,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		} else {
 			/* prevent OS backend from trying to handle events on ctrl pipe */
 			fds[0].revents = 0;
+			r--;
 		}
 	}
 
