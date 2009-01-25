@@ -747,7 +747,13 @@ struct libusb_transfer {
 	int num_iso_packets;
 
 	/** Isochronous packet descriptors, for isochronous transfers only. */
-	struct libusb_iso_packet_descriptor iso_packet_desc[0];
+	struct libusb_iso_packet_descriptor iso_packet_desc
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
+	[] /* valid C99 code */
+#else
+	[0] /* non-standard, but usually working code */
+#endif
+	;
 };
 
 int libusb_init(libusb_context **ctx);
