@@ -294,8 +294,8 @@ if (cfg != desired)
 // discover devices
 libusb_device **list;
 libusb_device *found = NULL;
-size_t cnt = libusb_get_device_list(NULL, &list);
-size_t i = 0;
+ssize_t cnt = libusb_get_device_list(NULL, &list);
+ssize_t i = 0;
 int err = 0;
 if (cnt < 0)
 	error();
