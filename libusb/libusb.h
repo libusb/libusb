@@ -690,6 +690,15 @@ struct libusb_iso_packet_descriptor {
 
 struct libusb_transfer;
 
+/** \ingroup asyncio
+ * Asynchronous transfer callback function type. When submitting asynchronous
+ * transfers, you pass a pointer to a callback function of this type via the
+ * \ref libusb_transfer::callback "callback" member of the libusb_transfer
+ * structure. libusb will call this function later, when the transfer has
+ * completed or failed. See \ref asyncio for more information.
+ * \param transfer The libusb_transfer struct the callback function is being
+ * notified about.
+ */
 typedef void (*libusb_transfer_cb_fn)(struct libusb_transfer *transfer);
 
 /** \ingroup asyncio
