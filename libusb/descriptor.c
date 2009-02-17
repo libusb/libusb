@@ -442,11 +442,11 @@ API_EXPORTED int libusb_get_device_descriptor(libusb_device *dev,
 		return r;
 
 	memcpy((unsigned char *) desc, raw_desc, sizeof(raw_desc));
-	if (host_endian) {
-		desc->bcdUSB = libusb_cpu_to_le16(desc->bcdUSB);
-		desc->idVendor = libusb_cpu_to_le16(desc->idVendor);
-		desc->idProduct = libusb_cpu_to_le16(desc->idProduct);
-		desc->bcdDevice = libusb_cpu_to_le16(desc->bcdDevice);
+	if (!host_endian) {
+		desc->bcdUSB = libusb_le16_to_cpu(desc->bcdUSB);
+		desc->idVendor = libusb_le16_to_cpu(desc->idVendor);
+		desc->idProduct = libusb_le16_to_cpu(desc->idProduct);
+		desc->bcdDevice = libusb_le16_to_cpu(desc->bcdDevice);
 	}
 	return 0;
 }
