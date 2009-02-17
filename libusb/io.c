@@ -972,7 +972,7 @@ static int calculate_timeout(struct usbi_transfer *transfer)
 	if (!timeout)
 		return 0;
 
-	r = clock_gettime(CLOCK_MONOTONIC, &current_time);
+	r = usbi_backend->clock_gettime(USBI_CLOCK_MONOTONIC, &current_time);
 	if (r < 0) {
 		usbi_err(ITRANSFER_CTX(transfer),
 			"failed to read monotonic clock, errno=%d", errno);
@@ -1445,7 +1445,7 @@ API_EXPORTED int libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 		return 0;
 	}
 
-	r = clock_gettime(CLOCK_REALTIME, &timeout);
+	r = usbi_backend->clock_gettime(USBI_CLOCK_REALTIME, &timeout);
 	if (r < 0) {
 		usbi_err(ctx, "failed to read realtime clock, error %d", errno);
 		return LIBUSB_ERROR_OTHER;
@@ -1489,7 +1489,7 @@ static int handle_timeouts(struct libusb_context *ctx)
 		goto out;
 
 	/* get current time */
-	r = clock_gettime(CLOCK_MONOTONIC, &systime_ts);
+	r = usbi_backend->clock_gettime(USBI_CLOCK_MONOTONIC, &systime_ts);
 	if (r < 0)
 		goto out;
 
@@ -1807,7 +1807,7 @@ API_EXPORTED int libusb_get_next_timeout(libusb_context *ctx,
 		return 0;
 	}
 
-	r = clock_gettime(CLOCK_MONOTONIC, &cur_ts);
+	r = usbi_backend->clock_gettime(USBI_CLOCK_MONOTONIC, &cur_ts);
 	if (r < 0) {
 		usbi_err(ctx, "failed to read monotonic clock, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;

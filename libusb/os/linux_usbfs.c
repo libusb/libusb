@@ -1999,6 +1999,18 @@ out:
 	return r;
 }
 
+static int op_clock_gettime(int clk_id, struct timespec *tp)
+{
+	switch (clk_id) {
+	case USBI_CLOCK_MONOTONIC:
+		return clock_gettime(CLOCK_MONOTONIC, tp);
+	case USBI_CLOCK_REALTIME:
+		return clock_gettime(CLOCK_REALTIME, tp);
+	default:
+		return LIBUSB_ERROR_INVALID_PARAM;
+  }
+}
+
 const struct usbi_os_backend linux_usbfs_backend = {
 	.name = "Linux usbfs",
 	.init = op_init,
@@ -2030,6 +2042,8 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.clear_transfer_priv = op_clear_transfer_priv,
 
 	.handle_events = op_handle_events,
+
+	.clock_gettime = op_clock_gettime,
 
 	.device_priv_size = sizeof(struct linux_device_priv),
 	.device_handle_priv_size = sizeof(struct linux_device_handle_priv),

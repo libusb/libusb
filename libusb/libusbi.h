@@ -218,6 +218,11 @@ struct libusb_device_handle {
 
 #define USBI_TRANSFER_TIMED_OUT	 			(1<<0)
 
+enum {
+  USBI_CLOCK_MONOTONIC,
+  USBI_CLOCK_REALTIME
+};
+
 /* in-memory transfer layout:
  *
  * 1. struct usbi_transfer
@@ -732,6 +737,16 @@ struct usbi_os_backend {
 	 */
 	int (*handle_events)(struct libusb_context *ctx,
 		struct pollfd *fds, nfds_t nfds, int num_ready);
+
+	/* Get time from specified clock. At least two clocks must be implemented
+	   by the backend: USBI_CLOCK_REALTIME, and USBI_CLOCK_MONOTONIC.
+
+	   Description of clocks:
+	     USBI_CLOCK_REALTIME : clock returns time since system epoch.
+	     USBI_CLOCK_MONOTONIC: clock returns time since unspecified start
+	                             time (usually boot).
+	 */
+	int (*clock_gettime)(int clkid, struct timespec *tp);
 
 	/* Number of bytes to reserve for per-device private backend data.
 	 * This private data area is accessible through the "os_priv" field of
