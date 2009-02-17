@@ -18,12 +18,21 @@ case $host in
 	AC_MSG_RESULT([Linux])
 	backend="linux"
 	AC_CHECK_LIB(rt, clock_gettime)
+	AM_LDFLAGS=""
+	;;
+*-darwin*)
+	AC_DEFINE(OS_DARWIN, [], [Darwin backend])
+	AC_SUBST(OS_DARWIN)
+	AC_MSG_RESULT([Darwin/MacOS X])
+	backend="darwin"
+	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
 *)
 	AC_MSG_ERROR([unsupported operating system])
 esac
 
 AM_CONDITIONAL([OS_LINUX], [test "x$backend" == "xlinux"])
+AM_CONDITIONAL([OS_DARWIN], [test "x$backend" == "xdarwin"])
 
 # Library versioning
 lt_major="0"
@@ -64,7 +73,9 @@ CFLAGS="$saved_cflags"
 
 AC_DEFINE([API_EXPORTED], [__attribute__((visibility("default")))], [Default visibility])
 AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration -Wno-pointer-sign -Wshadow"
+
 AC_SUBST(AM_CFLAGS)
+AC_SUBST(AM_LDFLAGS)
 
 AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [examples/Makefile] [doc/Makefile] [doc/doxygen.cfg])
 AC_OUTPUT

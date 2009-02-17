@@ -1,5 +1,9 @@
 #!/bin/sh
-libtoolize --copy --force || exit 1
+
+# use glibtoolize if it is available (darwin)
+(glibtoolize --version) < /dev/null > /dev/null 2>&1 && LIBTOOLIZE=glibtoolize || LIBTOOLIZE=libtoolize
+
+$LIBTOOLIZE --copy --force || exit 1
 aclocal || exit 1
 autoheader || exit 1
 autoconf || exit 1

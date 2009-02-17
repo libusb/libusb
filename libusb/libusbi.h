@@ -774,6 +774,7 @@ struct usbi_os_backend {
 extern const struct usbi_os_backend * const usbi_backend;
 
 extern const struct usbi_os_backend linux_usbfs_backend;
+extern const struct usbi_os_backend darwin_backend;
 
 #endif
 

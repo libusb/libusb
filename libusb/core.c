@@ -32,8 +32,10 @@
 #include "libusb.h"
 #include "libusbi.h"
 
-#ifdef OS_LINUX
+#if defined(OS_LINUX)
 const struct usbi_os_backend * const usbi_backend = &linux_usbfs_backend;
+#elif defined(OS_DARWIN)
+const struct usbi_os_backend * const usbi_backend = &darwin_backend;
 #else
 #error "Unsupported OS"
 #endif
