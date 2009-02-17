@@ -10,7 +10,6 @@ endif
 
 libusb_1_0_la_CFLAGS = -fvisibility=hidden $(AM_CFLAGS) -pthread
 libusb_1_0_la_SOURCES = libusbi.h core.c descriptor.c io.c sync.c $(OS_SRC)
-libusb_1_0_la_LIBADD = -lrt
 
 hdrdir = $(includedir)/libusb-1.0
 hdr_HEADERS = libusb.h

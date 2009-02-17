@@ -17,6 +17,7 @@ case $host in
 	AC_SUBST(OS_LINUX)
 	AC_MSG_RESULT([Linux])
 	backend="linux"
+	AC_CHECK_LIB(rt, clock_gettime)
 	;;
 *)
 	AC_MSG_ERROR([unsupported operating system])
