@@ -21,21 +21,13 @@
 #ifndef __LIBUSB_H__
 #define __LIBUSB_H__
 
-#include <endian.h>
 #include <stdint.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 
-#define bswap16(x) (((x & 0xff) << 8) | (x >> 8))
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-#define libusb_cpu_to_le16(x) (x)
-#define libusb_le16_to_cpu(x) (x)
-#elif __BYTE_ORDER == __BIG_ENDIAN
-#define libusb_le16_to_cpu(x) bswap16(x)
-#define libusb_cpu_to_le16(x) bswap16(x)
-#else
-#error "Unrecognized endianness"
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 /** \def libusb_cpu_to_le16
@@ -46,6 +38,16 @@
  * \param x the host-endian value to convert
  * \returns the value in little-endian byte order
  */
+#define libusb_cpu_to_le16(x) ({ \
+	union { \
+		uint8_t  b8[2]; \
+		uint16_t b16; \
+	} _tmp; \
+	uint16_t _tmp2 = (uint16_t)(x); \
+	_tmp.b8[1] = _tmp2 >> 8; \
+	_tmp.b8[0] = _tmp2 & 0xff; \
+	_tmp.b16; \
+})
 
 /** \def libusb_le16_to_cpu
  * \ingroup misc
@@ -55,10 +57,7 @@
  * \param x the little-endian value to convert
  * \returns the value in host-endian byte order
  */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define libusb_le16_to_cpu libusb_cpu_to_le16
 
 /* standard USB stuff */
 
