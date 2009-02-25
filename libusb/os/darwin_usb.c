@@ -1387,11 +1387,11 @@ static int darwin_clock_gettime(int clk_id, struct timespec *tp) {
   clock_serv_t clock_ref;
 
   switch (clk_id) {
-  case LIBUSB_CLOCK_REALTIME:
+  case USBI_CLOCK_REALTIME:
     /* CLOCK_REALTIME represents time since the epoch */
     host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &clock_ref);
     break;
-  case LIBUSB_CLOCK_MONOTONIC:
+  case USBI_CLOCK_MONOTONIC:
     /* use system boot time as reference for the monotonic clock */
     host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &clock_ref);
     break;
