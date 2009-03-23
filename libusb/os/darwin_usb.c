@@ -360,18 +360,36 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
   struct darwin_device_priv *priv = (struct darwin_device_priv *)dev->os_priv;
   IOUSBConfigurationDescriptorPtr desc;
   IOReturn kresult;
+  usb_device_t **device;
 
-  kresult = (*(priv->device))->GetConfigurationDescriptorPtr (priv->device, config_index, &desc);
+  if (!priv)
+    return LIBUSB_ERROR_OTHER;
+
+  if (!priv->device) {
+    kresult = darwin_get_device (priv->location, &device);
+    if (kresult || !device) {
+      _usbi_log (DEVICE_CTX (dev), LOG_LEVEL_ERROR, "could not find device: %s", darwin_error_str (kresult));
+      return darwin_to_libusb (kresult);
+    }
+
+    /* don't have to open the device to get a config descriptor */
+  } else
+    device = priv->device;
+
+  kresult = (*device)->GetConfigurationDescriptorPtr (device, config_index, &desc);
   if (kresult != kIOReturnSuccess)
     return darwin_to_libusb (kresult);
 
-  /* sanity check. is the buffer larger than the returned descriptor */
-  if (len > sizeof (*desc))
-    len = sizeof (*desc);
+  if (!priv->device)
+    (*device)->Release (device);
+
+  /* copy descriptor */
+  if (libusb_le16_to_cpu(desc->wTotalLength) < len)
+    len = libusb_le16_to_cpu(desc->wTotalLength);
 
   memmove (buffer, desc, len);
 
-  /* GetConfigurationDescriptorPtr returns the descriptor is USB bus order */
+  /* GetConfigurationDescriptorPtr returns the descriptor in USB bus order */
   *host_endian = 0;
 
   return 0;
