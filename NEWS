@@ -1,6 +1,10 @@
 This file lists notable changes in each release. For the full history of all
 changes, see ChangeLog.
 
+2009-05-12: v1.0.1 release
+ * Bug fixes
+ * Darwin backend
+
 2008-12-13: v1.0.0 release
  * Bug fixes
 
