@@ -503,6 +503,7 @@ API_EXPORTED int libusb_get_active_config_descriptor(libusb_device *dev,
 		usbi_warn(dev->ctx, "descriptor data still left");
 	}
 
+	free(buf);
 	*config = _config;
 	return 0;
 
@@ -571,6 +572,7 @@ API_EXPORTED int libusb_get_config_descriptor(libusb_device *dev,
 		usbi_warn(dev->ctx, "descriptor data still left");
 	}
 
+	free(buf);
 	*config = _config;
 	return 0;
 
