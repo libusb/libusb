@@ -14,7 +14,7 @@ OS_SRC = $(DARWIN_USB_SRC)
 AM_CFLAGS_EXT = -no-cpp-precomp
 endif
 
-libusb_1_0_la_CFLAGS = -fvisibility=hidden $(AM_CFLAGS) -pthread
+libusb_1_0_la_CFLAGS = $(VISIBILITY_CFLAGS) $(AM_CFLAGS) -pthread
 libusb_1_0_la_SOURCES = libusbi.h core.c descriptor.c io.c sync.c $(OS_SRC)
 
 hdrdir = $(includedir)/libusb-1.0

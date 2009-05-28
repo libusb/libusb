@@ -71,9 +71,27 @@ CFLAGS="$CFLAGS -fgnu89-inline"
 AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]), inline_cflags="-fgnu89-inline", inline_cflags="")
 CFLAGS="$saved_cflags"
 
-AC_DEFINE([API_EXPORTED], [__attribute__((visibility("default")))], [Default visibility])
-AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration -Wno-pointer-sign -Wshadow"
+# check for -fvisibility=hidden compiler support (GCC >= 3.4)
+saved_cflags="$CFLAGS"
+CFLAGS="$CFLAGS -fvisibility=hidden"
+AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
+	[VISIBILITY_CFLAGS="-fvisibility=hidden"
+	 AC_DEFINE([API_EXPORTED], [__attribute__((visibility("default")))], [Default visibility]) ],
+	[ VISIBILITY_CFLAGS=""
+	 AC_DEFINE([API_EXPORTED], [], [Default visibility]) ],
+	])
+CFLAGS="$saved_cflags"
 
+# check for -Wno-pointer-sign compiler support (GCC >= 4)
+saved_cflags="$CFLAGS"
+CFLAGS="$CFLAGS -Wno-pointer-sign"
+AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
+	nopointersign_cflags="-Wno-pointer-sign", nopointersign_cflags="")
+CFLAGS="$saved_cflags"
+
+AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
+
+AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)
 AC_SUBST(AM_LDFLAGS)
 
