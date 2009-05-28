@@ -104,6 +104,8 @@ API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
 	while (!completed) {
 		r = libusb_handle_events(HANDLE_CTX(dev_handle));
 		if (r < 0) {
+			if (r == LIBUSB_ERROR_INTERRUPTED)
+				continue;
 			libusb_cancel_transfer(transfer);
 			while (!completed)
 				if (libusb_handle_events(HANDLE_CTX(dev_handle)) < 0)
@@ -172,6 +174,8 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	while (!completed) {
 		r = libusb_handle_events(HANDLE_CTX(dev_handle));
 		if (r < 0) {
+			if (r == LIBUSB_ERROR_INTERRUPTED)
+				continue;
 			libusb_cancel_transfer(transfer);
 			while (!completed)
 				if (libusb_handle_events(HANDLE_CTX(dev_handle)) < 0)
