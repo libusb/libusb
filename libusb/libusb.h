@@ -25,6 +25,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
+#include <limits.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -1053,11 +1054,19 @@ static inline unsigned char *libusb_get_iso_packet_buffer(
 {
 	int i;
 	size_t offset = 0;
+	int _packet;
 
-	if (packet >= transfer->num_iso_packets)
+	/* oops..slight bug in the API. packet is an unsigned int, but we use
+	 * signed integers almost everywhere else. range-check and convert to
+	 * signed to avoid compiler warnings. FIXME for libusb-2. */
+	if (packet > INT_MAX)
+		return NULL;
+	_packet = packet;
+
+	if (_packet >= transfer->num_iso_packets)
 		return NULL;
 
-	for (i = 0; i < packet; i++)
+	for (i = 0; i < _packet; i++)
 		offset += transfer->iso_packet_desc[i].length;
 
 	return transfer->buffer + offset;
@@ -1085,10 +1094,19 @@ static inline unsigned char *libusb_get_iso_packet_buffer(
 static inline unsigned char *libusb_get_iso_packet_buffer_simple(
 	struct libusb_transfer *transfer, unsigned int packet)
 {
-	if (packet >= transfer->num_iso_packets)
+	int _packet;
+
+	/* oops..slight bug in the API. packet is an unsigned int, but we use
+	 * signed integers almost everywhere else. range-check and convert to
+	 * signed to avoid compiler warnings. FIXME for libusb-2. */
+	if (packet > INT_MAX)
+		return NULL;
+	_packet = packet;
+
+	if (_packet >= transfer->num_iso_packets)
 		return NULL;
 
-	return transfer->buffer + (transfer->iso_packet_desc[0].length * packet);
+	return transfer->buffer + (transfer->iso_packet_desc[0].length * _packet);
 }
 
 /* sync I/O */
