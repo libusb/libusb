@@ -225,22 +225,22 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
     CFRelease (locationCF);
     IOObjectRelease (device);
 
+    pthread_mutex_lock(&ctx->open_devs_lock);
     list_for_each_entry(handle, &ctx->open_devs, list) {
       dpriv = (struct darwin_device_priv *)handle->dev->os_priv;
       if (dpriv->location == location)
 	break;
     }
 
-    if (handle) {
+    if (handle && handle->os_priv) {
       priv  = (struct darwin_device_handle_priv *)handle->os_priv;
 
       message = MESSAGE_DEVICE_GONE;
       write (priv->fds[1], &message, sizeof (message));
-
-      CFRunLoopRemoveSource (libusb_darwin_acfl, priv->cfSource, kCFRunLoopDefaultMode);
-      CFRelease (priv->cfSource);
-      priv->cfSource = NULL;
     }
+
+    pthread_mutex_unlock(&ctx->open_devs_lock);
+
   }
 }
 
@@ -261,6 +261,8 @@ static void *event_thread_main (void *arg0) {
   io_iterator_t          libusb_rem_device_iterator;
 
   _usbi_log (ctx, LOG_LEVEL_INFO, "creating hotplug event source");
+
+  CFRetain (CFRunLoopGetCurrent ());
 
   /* add the notification port to the run loop */
   libusb_notification_port     = IONotificationPortCreate (libusb_darwin_mp);
@@ -295,7 +297,9 @@ static void *event_thread_main (void *arg0) {
   /* delete notification port */
   CFRunLoopSourceInvalidate (libusb_notification_cfsource);
   IONotificationPortDestroy (libusb_notification_port);
-  
+
+  CFRelease (CFRunLoopGetCurrent ());
+
   libusb_darwin_acfl = NULL;
 
   pthread_exit (0);
@@ -461,10 +465,10 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     ret = (*(device))->DeviceRequest (device, &req);
     if (ret != kIOReturnSuccess) {
       int try_unsuspend = 1;
+#if DeviceVersion >= 320
       UInt32 info;
 
       /* device may be suspended. unsuspend it and try again */
-#if DeviceVersion >= 320
       /* IOUSBFamily 320+ provides a way to detect device suspension but earlier versions do not */
       (void)(*device)->GetUSBDeviceInformation (device, &info);
 
@@ -831,9 +835,18 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
   /* get an interface to the device's interface */
   kresult = IOCreatePlugInInterfaceForService (usbInterface, kIOUSBInterfaceUserClientTypeID,
 					       kIOCFPlugInInterfaceID, &plugInInterface, &score);
-  kresult = IOObjectRelease(usbInterface);
-  if (kresult || !plugInInterface)
+  if (kresult) {
+    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "IOCreatePlugInInterfaceForService: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
+  }
+
+  if (!plugInInterface) {
+    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "plugin interface not found");
+    return LIBUSB_ERROR_NOT_FOUND;
+  }
+
+  /* ignore release error */
+  (void)IOObjectRelease (usbInterface);
   
   /* Do the actual claim */
   kresult = (*plugInInterface)->QueryInterface(plugInInterface,
@@ -863,11 +876,20 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
     return kresult;
   }
 
+  cInterface->cfSource = NULL;
+
   /* create async event source */
   kresult = (*(cInterface->interface))->CreateInterfaceAsyncEventSource (cInterface->interface, &cInterface->cfSource);
-  
-  /* add the cfSource to the aync run loop */
-  CFRetain (libusb_darwin_acfl);
+  if (kresult != kIOReturnSuccess) {
+    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "could not create async event source");
+
+    /* can't continue without an async event source */
+    (void)darwin_release_interface (dev_handle, iface);
+
+    return darwin_to_libusb (kresult);
+  }
+
+  /* add the cfSource to the async thread's run loop */
   CFRunLoopAddSource(libusb_darwin_acfl, cInterface->cfSource, kCFRunLoopDefaultMode);
 
   _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_INFO, "interface opened");
@@ -890,8 +912,10 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, int
   cInterface->num_endpoints = 0;
   
   /* delete the interface's async event source */
-  CFRunLoopRemoveSource (libusb_darwin_acfl, cInterface->cfSource, kCFRunLoopDefaultMode);
-  CFRelease (cInterface->cfSource);
+  if (cInterface->cfSource) {
+    CFRunLoopRemoveSource (libusb_darwin_acfl, cInterface->cfSource, kCFRunLoopDefaultMode);
+    CFRelease (cInterface->cfSource);
+  }
 
   kresult = (*(cInterface->interface))->USBInterfaceClose(cInterface->interface);
   if (kresult)
@@ -1391,20 +1415,24 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds
 	break;
     }
 
-    if (pollfd->revents & POLLERR) {
-      usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->fds[0]);
-      usbi_handle_disconnect(handle);
-
-      /* done with this device */
-      continue;
-    }
-
-    ret = read (hpriv->fds[0], &message, sizeof (message));
-    if (ret < sizeof (message))
-      continue;
+    if (!(pollfd->revents & POLLERR)) {
+      ret = read (hpriv->fds[0], &message, sizeof (message));
+      if (ret < sizeof (message))
+	continue;
+    } else
+      /* could not poll the device-- response is to delete the device (this seems a little heavy-handed) */
+      message = MESSAGE_DEVICE_GONE;
 
     switch (message) {
     case MESSAGE_DEVICE_GONE:
+      /* remove the device's async port from the runloop */
+      if (hpriv->cfSource) {
+	if (libusb_darwin_acfl)
+	  CFRunLoopRemoveSource (libusb_darwin_acfl, hpriv->cfSource, kCFRunLoopDefaultMode);
+	CFRelease (hpriv->cfSource);
+	hpriv->cfSource = NULL;
+      }
+
       usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->fds[0]);
       usbi_handle_disconnect(handle);
       
