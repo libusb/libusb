@@ -344,23 +344,50 @@ static int darwin_get_device_descriptor(struct libusb_device *dev, unsigned char
   return 0;
 }
 
-static int darwin_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian) {
+static int get_configuration_index (struct libusb_device *dev, int config_value) {
   struct darwin_device_priv *priv = (struct darwin_device_priv *)dev->os_priv;
-  UInt8 configNum;
+  UInt8 i, numConfig;
+  IOUSBConfigurationDescriptorPtr desc;
   IOReturn kresult;
 
-  kresult = (*(priv->device))->GetConfiguration (priv->device, &configNum);
+  /* is there a simpler way to determine the index? */
+  kresult = (*(priv->device))->GetNumberOfConfigurations (priv->device, &numConfig);
   if (kresult != kIOReturnSuccess)
     return darwin_to_libusb (kresult);
 
-  return darwin_get_config_descriptor (dev, configNum, buffer, len, host_endian);
+  for (i = 0 ; i < numConfig ; i++) {
+    (*(priv->device))->GetConfigurationDescriptorPtr (priv->device, i, &desc);
+
+    if (libusb_le16_to_cpu (desc->bConfigurationValue) == config_value)
+      return i;
+  }
+
+  /* configuration not found */
+  return LIBUSB_ERROR_OTHER;
+}
+
+static int darwin_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian) {
+  struct darwin_device_priv *priv = (struct darwin_device_priv *)dev->os_priv;
+  UInt8 config_value;
+  int config_index;
+  IOReturn kresult;
+
+  kresult = (*(priv->device))->GetConfiguration (priv->device, &config_value);
+  if (kresult != kIOReturnSuccess)
+    return darwin_to_libusb (kresult);
+
+  config_index = get_configuration_index (dev, config_value);
+  if (config_index < 0)
+    return config_index;
+
+  return darwin_get_config_descriptor (dev, config_index, buffer, len, host_endian);
 }
 
 static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian) {
   struct darwin_device_priv *priv = (struct darwin_device_priv *)dev->os_priv;
   IOUSBConfigurationDescriptorPtr desc;
   IOReturn kresult;
-  usb_device_t **device;
+  usb_device_t **device = NULL;
 
   if (!priv)
     return LIBUSB_ERROR_OTHER;
@@ -369,6 +396,7 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
     kresult = darwin_get_device (priv->location, &device);
     if (kresult || !device) {
       _usbi_log (DEVICE_CTX (dev), LOG_LEVEL_ERROR, "could not find device: %s", darwin_error_str (kresult));
+
       return darwin_to_libusb (kresult);
     }
 
@@ -377,22 +405,21 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
     device = priv->device;
 
   kresult = (*device)->GetConfigurationDescriptorPtr (device, config_index, &desc);
-  if (kresult != kIOReturnSuccess)
-    return darwin_to_libusb (kresult);
+  if (kresult == kIOReturnSuccess) {
+    /* copy descriptor */
+    if (libusb_le16_to_cpu(desc->wTotalLength) < len)
+      len = libusb_le16_to_cpu(desc->wTotalLength);
+
+    memmove (buffer, desc, len);
+
+    /* GetConfigurationDescriptorPtr returns the descriptor in USB bus order */
+    *host_endian = 0;
+  }
 
   if (!priv->device)
     (*device)->Release (device);
 
-  /* copy descriptor */
-  if (libusb_le16_to_cpu(desc->wTotalLength) < len)
-    len = libusb_le16_to_cpu(desc->wTotalLength);
-
-  memmove (buffer, desc, len);
-
-  /* GetConfigurationDescriptorPtr returns the descriptor in USB bus order */
-  *host_endian = 0;
-
-  return 0;
+  return darwin_to_libusb (kresult);
 }
 
 static int process_new_device (struct libusb_context *ctx, usb_device_t **device, UInt32 locationID, struct discovered_devs **_discdevs) {
