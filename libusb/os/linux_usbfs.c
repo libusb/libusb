@@ -62,6 +62,13 @@
  * included as of Linux 2.6.26.
  */
 
+/* endianness for multi-byte fields:
+ *
+ * Descriptors exposed by usbfs have the multi-byte fields in the device
+ * descriptor as host endian. Multi-byte fields in the other descriptors are
+ * bus-endian. The kernel documentation says otherwise, but it is wrong.
+ */
+
 static const char *usbfs_path = NULL;
 
 /* do we have a busnum to relate devices? this also implies that we can read
@@ -439,7 +446,6 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 	if (sysfs_has_descriptors) {
 		return sysfs_get_active_config_descriptor(dev, buffer, len);
 	} else {
-		*host_endian = 1;
 		return usbfs_get_active_config_descriptor(dev, buffer, len);
 	}
 }
@@ -504,7 +510,6 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 
 	r = get_config_descriptor(DEVICE_CTX(dev), fd, config_index, buffer, len);
 	close(fd);
-	*host_endian = 1;
 	return r;
 }
 

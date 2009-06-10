@@ -559,6 +559,7 @@ API_EXPORTED int libusb_get_config_descriptor(libusb_device *dev,
 		goto err;
 	}
 
+	host_endian = 0;
 	r = usbi_backend->get_config_descriptor(dev, config_index, buf,
 		_config->wTotalLength, &host_endian);
 	if (r < 0)
