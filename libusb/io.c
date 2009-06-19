@@ -1478,10 +1478,11 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 
 static int handle_timeouts(struct libusb_context *ctx)
 {
+	int r = 0;
+#ifndef USBI_OS_HANDLES_TIMEOUT
 	struct timespec systime_ts;
 	struct timeval systime;
 	struct usbi_transfer *transfer;
-	int r = 0;
 
 	USBI_GET_CONTEXT(ctx);
 	pthread_mutex_lock(&ctx->flying_transfers_lock);
@@ -1520,6 +1521,8 @@ static int handle_timeouts(struct libusb_context *ctx)
 
 out:
 	pthread_mutex_unlock(&ctx->flying_transfers_lock);
+#endif
+
 	return r;
 }
 
@@ -1770,6 +1773,7 @@ API_EXPORTED int libusb_handle_events_locked(libusb_context *ctx,
 API_EXPORTED int libusb_get_next_timeout(libusb_context *ctx,
 	struct timeval *tv)
 {
+#ifndef USBI_OS_HANDLES_TIMEOUT
 	struct usbi_transfer *transfer;
 	struct timespec cur_ts;
 	struct timeval cur_tv;
@@ -1823,6 +1827,9 @@ API_EXPORTED int libusb_get_next_timeout(libusb_context *ctx,
 	}
 
 	return 1;
+#else
+	return 0;
+#endif
 }
 
 /** \ingroup poll
