@@ -1276,7 +1276,9 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 	int num_urbs = transfer->length / MAX_BULK_BUFFER_LENGTH;
 	int last_urb_partial = 0;
 
-	if ((transfer->length % MAX_BULK_BUFFER_LENGTH) > 0) {
+	if (transfer->length == 0) {
+		num_urbs = 1;
+	} else if ((transfer->length % MAX_BULK_BUFFER_LENGTH) > 0) {
 		last_urb_partial = 1;
 		num_urbs++;
 	}
@@ -1300,6 +1302,8 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 		urb->buffer = transfer->buffer + (i * MAX_BULK_BUFFER_LENGTH);
 		if (i == num_urbs - 1 && last_urb_partial)
 			urb->buffer_length = transfer->length % MAX_BULK_BUFFER_LENGTH;
+		else if (transfer->length == 0)
+			urb->buffer_length = 0;
 		else
 			urb->buffer_length = MAX_BULK_BUFFER_LENGTH;
 
