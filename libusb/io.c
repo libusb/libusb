@@ -410,11 +410,16 @@ if (r == 0 && actual_length == sizeof(data)) {
  * Next, populate the length field for the first num_iso_packets entries in
  * the \ref libusb_transfer::iso_packet_desc "iso_packet_desc" array. Section
  * 5.6.3 of the USB2 specifications describe how the maximum isochronous
- * packet length is determined by wMaxPacketSize field in the endpoint
- * descriptor. Two functions can help you here:
+ * packet length is determined by the wMaxPacketSize field in the endpoint
+ * descriptor.
+ * Two functions can help you here:
  *
- * - libusb_get_max_packet_size() is an easy way to determine the max
- *   packet size for an endpoint.
+ * - libusb_get_max_iso_packet_size() is an easy way to determine the max
+ *   packet size for an isochronous endpoint. Note that the maximum packet
+ *   size is actually the maximum number of bytes that can be transmitted in
+ *   a single microframe, therefore this function multiplies the maximum number
+ *   of bytes per transaction by the number of transaction opportunities per
+ *   microframe.
  * - libusb_set_iso_packet_lengths() assigns the same length to all packets
  *   within a transfer, which is usually what you want.
  *
