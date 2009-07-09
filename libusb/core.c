@@ -238,6 +238,62 @@ if (cfg != desired)
  *
  * The above method works because once an interface is claimed, no application
  * or driver is able to select another configuration.
+ *
+ * \section cancel Cancellation, early completion and timeouts
+ *
+ * NOTE: This section is currently Linux-centric. I am not sure if any of these
+ * considerations apply to Darwin or other platforms.
+ *
+ * Cancellation of transfers can produce some slightly undesirable results.
+ * It is important to understand that a transfer timing out can also result in
+ * cancellation, as can a transfer that completes early (with a short packet).
+ *
+ * The timeout case is easy to comprehend; if a transfer times out, libusb
+ * will cancel it at the point of timeout and inform you of this. Hence timeout
+ * equals cancellation.
+ *
+ * The early completion case needs a little more explanation: When you submit
+ * a large transfer, libusb may need to divide it into several smaller
+ * sub-transfers which are then submitted to the host controller in parallel
+ * for performance reasons. If one sub-transfer completes early, libusb then
+ * needs to cancel all the subsequent sub-transfers before returning the result
+ * to you.
+ *
+ * All forms of cancellation including the usual libusb_cancel_transfer() can
+ * add some complications as it is possible that data transfer may be happening
+ * while libusb is performing cancellation. This can lead to the following
+ * kinds of situations:
+ *  - A transfer may timeout or be cancelled by the user. While libusb is
+ *    cancelling the transfer (which may consist of several sub-transfers
+ *    which libusb has to cancel one-by-one), data may start to be transferred.
+ *    libusb will report successful cancellation as usual, and will reflect the
+ *    situation with the \ref libusb_transfer::actual_length "actual_length"
+ *    field of the transfer, and for device-to-host transfers, the appropriate
+ *    amount of data will be present in \ref libusb_transfer::buffer "buffer").
+ *  - Similarly, a few USB-level packets within the transfer may already have
+ *    been transferred when the timeout/cancellation occurred, and more
+ *    packets may complete during the time needed to cancel the transfer.
+ *  - A non-ultimate sub-transfer within a transfer may complete with a short
+ *    packet, prompting libusb to immediately cancel all subsequent
+ *    sub-transfers and report early completion. However, during the time
+ *    needed to cancel the subsequent transfers, more data may be transferred.
+ *    This is a difficult situation because the libusb API does not currently
+ *    have a way of indicating the point at which the transfer ended relative
+ *    to the surplus data that was transferred.
+ *
+ * In all cases where the transfer is a device-to-host transfer and surplus
+ * data is recieved as above, libusb places it in the transfer buffer as if
+ * it had arrived contiguously and updates
+ * \ref libusb_transfer::actual_length "actual_length" accordingly.
+ *
+ * We hope to eliminate some of these difficulties in the near future, but
+ * kernel changes may be required.
+ *
+ * Ultimately, if you cancel a transfer before it has completed then you are
+ * obligated to handle the above caveats and to resynchronize with the device
+ * at the application level. Also, remember that timeouts are simply time-based
+ * cancellations which libusb makes convenient for you, hence the same
+ * considerations apply.
  */
 
 /**
