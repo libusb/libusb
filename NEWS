@@ -1,6 +1,10 @@
 This file lists notable changes in each release. For the full history of all
 changes, see ChangeLog.
 
+2009-08-27: v1.0.3 release
+ * Bug fixes
+ * Add libusb_get_max_iso_packet_size()
+
 2009-06-13: v1.0.2 release
  * Bug fixes
 
