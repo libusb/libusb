@@ -1,6 +1,6 @@
 /*
  * Linux usbfs backend for libusb
- * Copyright (C) 2007-2008 Daniel Drake <dsd@gentoo.org>
+ * Copyright (C) 2007-2009 Daniel Drake <dsd@gentoo.org>
  * Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -70,6 +70,10 @@
  */
 
 static const char *usbfs_path = NULL;
+
+/* clock ID for monotonic clock, as not all clock sources are available on all
+ * systems. appropriate choice made at initialization time. */
+static clockid_t monotonic_clkid = -1;
 
 /* do we have a busnum to relate devices? this also implies that we can read
  * the active configuration through bConfigurationValue */
@@ -172,6 +176,38 @@ static const char *find_usbfs_path(void)
 	return ret;
 }
 
+static clockid_t find_monotonic_clock(void)
+{
+	struct timespec ts;
+	int i;
+	const clockid_t clktypes[] = {
+		/* the most monotonic clock I know about, but only available since
+		 * Linux 2.6.28, and not even available in glibc-2.10 */
+#ifndef CLOCK_MONOTONIC_RAW
+#define CLOCK_MONOTONIC_RAW 4
+#endif
+		CLOCK_MONOTONIC_RAW,
+
+		/* a monotonic clock, but it's not available on all architectures,
+		 * and is susceptible to ntp adjustments */
+		CLOCK_MONOTONIC,
+
+		/* the fallback option */
+		CLOCK_REALTIME,
+	};
+
+	for (i = 0; i < (sizeof(clktypes) / sizeof(*clktypes)); i++) {
+		int r = clock_gettime(clktypes[i], &ts);
+		if (r == 0) {
+			usbi_dbg("clock %d selected", clktypes[i]);
+			return r;
+		}
+		usbi_dbg("clock %d doesn't work", clktypes[i]);
+	}
+
+	return -1;
+}
+
 static int op_init(struct libusb_context *ctx)
 {
 	struct stat statbuf;
@@ -181,6 +217,14 @@ static int op_init(struct libusb_context *ctx)
 	if (!usbfs_path) {
 		usbi_err(ctx, "could not find usbfs");
 		return LIBUSB_ERROR_OTHER;
+	}
+
+	if (monotonic_clkid == -1) {
+		monotonic_clkid = find_monotonic_clock();
+		if (monotonic_clkid == -1) {
+			usbi_err(ctx, "could not find working monotonic clock");
+			return LIBUSB_ERROR_OTHER;
+		}
 	}
 
 	r = stat(SYSFS_DEVICE_PATH, &statbuf);
@@ -2036,7 +2080,7 @@ static int op_clock_gettime(int clk_id, struct timespec *tp)
 {
 	switch (clk_id) {
 	case USBI_CLOCK_MONOTONIC:
-		return clock_gettime(CLOCK_MONOTONIC, tp);
+		return clock_gettime(monotonic_clkid, tp);
 	case USBI_CLOCK_REALTIME:
 		return clock_gettime(CLOCK_REALTIME, tp);
 	default:
