@@ -81,6 +81,8 @@ static char *darwin_error_str (int result) {
     return "transaction aborted";
   case kIOReturnNotResponding:
     return "device not responding";
+  case kIOReturnOverrun:
+    return "data overrun";
   default:
     return "unknown error";
   }
@@ -1300,12 +1302,17 @@ static void darwin_bulk_callback (struct usbi_transfer *itransfer, kern_return_t
     usbi_handle_transfer_cancellation(itransfer);
     return;
   case kIOUSBPipeStalled:
-    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_WARNING, "unsupported control request");
+    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_WARNING, "bulk error. pipe is stalled");
     status = LIBUSB_TRANSFER_STALL;
     
     break;
+  case kIOReturnOverrun:
+    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_ERROR, "bulk error. data overrun", darwin_error_str (result));
+    status = LIBUSB_TRANSFER_OVERFLOW;
+
+    break;
   default:
-    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_ERROR, "control error = %s", darwin_error_str (result));
+    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_ERROR, "bulk error = %s (value = 0x%08x)", darwin_error_str (result), result);
     status = LIBUSB_TRANSFER_ERROR;
   }
 
@@ -1339,6 +1346,11 @@ static void darwin_isoc_callback (struct usbi_transfer *itransfer, kern_return_t
   case kIOUSBPipeStalled:
     _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_WARNING, "unsupported control request");
     status = LIBUSB_TRANSFER_STALL;
+
+    break;
+  case kIOReturnOverrun:
+    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_ERROR, "bulk error. data overrun", darwin_error_str (result));
+    status = LIBUSB_TRANSFER_OVERFLOW;
 
     break;
   default:
