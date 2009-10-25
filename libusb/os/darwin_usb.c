@@ -57,7 +57,7 @@ static void darwin_isoc_callback (struct usbi_transfer *itransfer, kern_return_t
 static void darwin_control_callback (struct usbi_transfer *itransfer, kern_return_t result, UInt32 io_size);
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0);
 
-static char *darwin_error_str (int result) {
+static const char *darwin_error_str (int result) {
   switch (result) {
   case kIOReturnSuccess:
     return "no error";
