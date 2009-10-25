@@ -788,6 +788,7 @@ void libusb_free_config_descriptor(struct libusb_config_descriptor *config);
 uint8_t libusb_get_bus_number(libusb_device *dev);
 uint8_t libusb_get_device_address(libusb_device *dev);
 int libusb_get_max_packet_size(libusb_device *dev, unsigned char endpoint);
+int libusb_get_max_iso_packet_size(libusb_device *dev, unsigned char endpoint);
 
 int libusb_open(libusb_device *dev, libusb_device_handle **handle);
 void libusb_close(libusb_device_handle *dev_handle);
