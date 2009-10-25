@@ -22,7 +22,7 @@
 
 #include <libusb/libusb.h>
 
-void print_devs(libusb_device **devs)
+static void print_devs(libusb_device **devs)
 {
 	libusb_device *dev;
 	int i = 0;
