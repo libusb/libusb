@@ -1072,6 +1072,7 @@ API_EXPORTED struct libusb_transfer *libusb_alloc_transfer(int iso_packets)
 
 	memset(itransfer, 0, alloc_size);
 	itransfer->num_iso_packets = iso_packets;
+	pthread_mutex_init(&itransfer->lock, NULL);
 	return __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 }
 
@@ -1087,6 +1088,9 @@ API_EXPORTED struct libusb_transfer *libusb_alloc_transfer(int iso_packets)
  * It is legal to call this function with a NULL transfer. In this case,
  * the function will simply return safely.
  *
+ * It is not legal to free an active transfer (one which has been submitted
+ * and has not yet completed).
+ *
  * \param transfer the transfer to free
  */
 API_EXPORTED void libusb_free_transfer(struct libusb_transfer *transfer)
@@ -1099,6 +1103,7 @@ API_EXPORTED void libusb_free_transfer(struct libusb_transfer *transfer)
 		free(transfer->buffer);
 
 	itransfer = __LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+	pthread_mutex_destroy(&itransfer->lock);
 	free(itransfer);
 }
 
@@ -1118,11 +1123,14 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 		__LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
 
+	pthread_mutex_lock(&itransfer->lock);
 	itransfer->transferred = 0;
 	itransfer->flags = 0;
 	r = calculate_timeout(itransfer);
-	if (r < 0)
-		return LIBUSB_ERROR_OTHER;
+	if (r < 0) {
+		r = LIBUSB_ERROR_OTHER;
+		goto out;
+	}
 
 	add_to_flying_list(itransfer);
 	r = usbi_backend->submit_transfer(itransfer);
@@ -1132,6 +1140,8 @@ API_EXPORTED int libusb_submit_transfer(struct libusb_transfer *transfer)
 		pthread_mutex_unlock(&TRANSFER_CTX(transfer)->flying_transfers_lock);
 	}
 
+out:
+	pthread_mutex_unlock(&itransfer->lock);
 	return r;
 }
 
@@ -1156,10 +1166,12 @@ API_EXPORTED int libusb_cancel_transfer(struct libusb_transfer *transfer)
 	int r;
 
 	usbi_dbg("");
+	pthread_mutex_lock(&itransfer->lock);
 	r = usbi_backend->cancel_transfer(itransfer);
 	if (r < 0)
 		usbi_err(TRANSFER_CTX(transfer),
 			"cancel transfer failed error %d", r);
+	pthread_mutex_unlock(&itransfer->lock);
 	return r;
 }
 
@@ -1167,7 +1179,10 @@ API_EXPORTED int libusb_cancel_transfer(struct libusb_transfer *transfer)
  * This will invoke the user-supplied callback function, which may end up
  * freeing the transfer. Therefore you cannot use the transfer structure
  * after calling this function, and you should free all backend-specific
- * data before calling it. */
+ * data before calling it.
+ * Do not call this function with the usbi_transfer lock held. User-specified
+ * callback functions may attempt to directly resubmit the transfer, which
+ * will attempt to take the lock. */
 void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status)
 {
@@ -1208,7 +1223,9 @@ void usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 /* Similar to usbi_handle_transfer_completion() but exclusively for transfers
  * that were asynchronously cancelled. The same concerns w.r.t. freeing of
  * transfers exist here.
- */
+ * Do not call this function with the usbi_transfer lock held. User-specified
+ * callback functions may attempt to directly resubmit the transfer, which
+ * will attempt to take the lock. */
 void usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
 {
 	/* if the URB was cancelled due to timeout, report timeout to the user */

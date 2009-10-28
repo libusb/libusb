@@ -242,6 +242,15 @@ struct usbi_transfer {
 	struct timeval timeout;
 	int transferred;
 	uint8_t flags;
+
+	/* this lock is held during libusb_submit_transfer() and
+	 * libusb_cancel_transfer() (allowing the OS backend to prevent duplicate
+	 * cancellation, submission-during-cancellation, etc). the OS backend
+	 * should also take this lock in the handle_events path, to prevent the user
+	 * cancelling the transfer from another thread while you are processing
+	 * its completion (presumably there would be races within your OS backend
+	 * if this were possible). */
+	pthread_mutex_t lock;
 };
 
 #define __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
@@ -732,6 +741,10 @@ struct usbi_os_backend {
 	 *
 	 * This function should also be able to detect disconnection of the
 	 * device, reporting that situation with usbi_handle_disconnect().
+	 *
+	 * When processing an event related to a transfer, you probably want to
+	 * take usbi_transfer.lock to prevent races. See the documentation for
+	 * the usbi_transfer structure.
 	 *
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */

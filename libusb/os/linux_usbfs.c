@@ -1749,6 +1749,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	int urb_idx = urb - tpriv->urbs;
 	enum libusb_transfer_status status = LIBUSB_TRANSFER_COMPLETED;
 
+	pthread_mutex_lock(&itransfer->lock);
 	usbi_dbg("handling completion status %d of bulk urb %d/%d", urb->status,
 		urb_idx + 1, num_urbs);
 
@@ -1792,14 +1793,15 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 			if (tpriv->reap_action == CANCELLED) {
 				free(tpriv->urbs);
 				tpriv->urbs = NULL;
+				pthread_mutex_unlock(&itransfer->lock);
 				usbi_handle_transfer_cancellation(itransfer);
-				return 0;
+				goto out_unlock;
 			}
 			if (tpriv->reap_action != COMPLETED_EARLY)
 				status = LIBUSB_TRANSFER_ERROR;
-			goto out;
+			goto completed;
 		}
-		return 0;
+		goto out_unlock;
 	}
 
 	if (urb->status == 0 ||
@@ -1813,23 +1815,23 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	case -EPIPE:
 		usbi_dbg("detected endpoint stall");
 		status = LIBUSB_TRANSFER_STALL;
-		goto out;
+		goto completed;
 	case -EOVERFLOW:
 		/* overflow can only ever occur in the last urb */
 		usbi_dbg("overflow, actual_length=%d", urb->actual_length);
 		status = LIBUSB_TRANSFER_OVERFLOW;
-		goto out;
+		goto completed;
 	case -ETIME:
 	case -EPROTO:
 	case -EILSEQ:
 		usbi_dbg("low level error %d", urb->status);
 		status = LIBUSB_TRANSFER_ERROR;
-		goto out;
+		goto completed;
 	default:
 		usbi_warn(ITRANSFER_CTX(itransfer),
 			"unrecognised urb status %d", urb->status);
 		status = LIBUSB_TRANSFER_ERROR;
-		goto out;
+		goto completed;
 	}
 
 	/* if we're the last urb or we got less data than requested then we're
@@ -1855,15 +1857,19 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 				usbi_warn(TRANSFER_CTX(transfer),
 					"unrecognised discard errno %d", errno);
 		}
-		return 0;
+		goto out_unlock;
 	} else {
-		return 0;
+		goto out_unlock;
 	}
 
-out:
+completed:
 	free(tpriv->urbs);
 	tpriv->urbs = NULL;
+	pthread_mutex_unlock(&itransfer->lock);
 	usbi_handle_transfer_completion(itransfer, status);
+	return 0;
+out_unlock:
+	pthread_mutex_unlock(&itransfer->lock);
 	return 0;
 }
 
@@ -1877,6 +1883,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	int urb_idx = 0;
 	int i;
 
+	pthread_mutex_lock(&itransfer->lock);
 	for (i = 0; i < num_urbs; i++) {
 		if (urb == tpriv->iso_urbs[i]) {
 			urb_idx = i + 1;
@@ -1885,6 +1892,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	}
 	if (urb_idx == 0) {
 		usbi_err(TRANSFER_CTX(transfer), "could not locate urb!");
+		pthread_mutex_unlock(&itransfer->lock);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
@@ -1911,13 +1919,17 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		if (tpriv->num_retired == num_urbs) {
 			usbi_dbg("CANCEL: last URB handled, reporting");
 			free_iso_urbs(tpriv);
-			if (tpriv->reap_action == CANCELLED)
+			if (tpriv->reap_action == CANCELLED) {
+				pthread_mutex_unlock(&itransfer->lock);
 				usbi_handle_transfer_cancellation(itransfer);
-			else
+			} else {
+				pthread_mutex_unlock(&itransfer->lock);
 				usbi_handle_transfer_completion(itransfer,
 					LIBUSB_TRANSFER_ERROR);
+			}
+			return 0;
 		}
-		return 0;
+		goto out;
 	}
 
 	switch (urb->status) {
@@ -1939,9 +1951,13 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	if (urb_idx == num_urbs) {
 		usbi_dbg("last URB in transfer --> complete!");
 		free_iso_urbs(tpriv);
+		pthread_mutex_unlock(&itransfer->lock);
 		usbi_handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
+		return 0;
 	}
 
+out:
+	pthread_mutex_unlock(&itransfer->lock);
 	return 0;
 }
 
@@ -1951,6 +1967,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 	int status;
 
+	pthread_mutex_lock(&itransfer->lock);
 	usbi_dbg("handling completion status %d", urb->status);
 
 	if (urb->status == 0)
@@ -1962,6 +1979,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 				"cancel: unrecognised urb status %d", urb->status);
 		free(tpriv->urbs);
 		tpriv->urbs = NULL;
+		pthread_mutex_unlock(&itransfer->lock);
 		usbi_handle_transfer_cancellation(itransfer);
 		return 0;
 	}
@@ -1990,6 +2008,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 
 	free(tpriv->urbs);
 	tpriv->urbs = NULL;
+	pthread_mutex_unlock(&itransfer->lock);
 	usbi_handle_transfer_completion(itransfer, status);
 	return 0;
 }
