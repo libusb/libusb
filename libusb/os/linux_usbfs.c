@@ -187,36 +187,22 @@ static const char *find_usbfs_path(void)
 	return ret;
 }
 
+/* the monotonic clock is not usable on all systems (e.g. embedded ones often
+ * seem to lack it). fall back to REALTIME if we have to. */
 static clockid_t find_monotonic_clock(void)
 {
 	struct timespec ts;
-	int i;
-	const clockid_t clktypes[] = {
-		/* the most monotonic clock I know about, but only available since
-		 * Linux 2.6.28, and not even available in glibc-2.10 */
-#ifndef CLOCK_MONOTONIC_RAW
-#define CLOCK_MONOTONIC_RAW 4
-#endif
-		CLOCK_MONOTONIC_RAW,
+	int r;
 
-		/* a monotonic clock, but it's not available on all architectures,
-		 * and is susceptible to ntp adjustments */
-		CLOCK_MONOTONIC,
-
-		/* the fallback option */
-		CLOCK_REALTIME,
-	};
-
-	for (i = 0; i < (sizeof(clktypes) / sizeof(*clktypes)); i++) {
-		int r = clock_gettime(clktypes[i], &ts);
-		if (r == 0) {
-			usbi_dbg("clock %d selected", clktypes[i]);
-			return r;
-		}
-		usbi_dbg("clock %d doesn't work", clktypes[i]);
+	/* Linux 2.6.28 adds CLOCK_MONOTONIC_RAW but we don't use it
+	 * because it's not available through timerfd */
+	r = clock_gettime(CLOCK_MONOTONIC, &ts);
+	if (r == 0) {
+		return CLOCK_MONOTONIC;
+	} else {
+		usbi_dbg("monotonic clock doesn't work, errno %d", errno);
+		return CLOCK_REALTIME;
 	}
-
-	return -1;
 }
 
 /* bulk continuation URB flag available from Linux 2.6.32 */
@@ -247,13 +233,8 @@ static int op_init(struct libusb_context *ctx)
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	if (monotonic_clkid == -1) {
+	if (monotonic_clkid == -1)
 		monotonic_clkid = find_monotonic_clock();
-		if (monotonic_clkid == -1) {
-			usbi_err(ctx, "could not find working monotonic clock");
-			return LIBUSB_ERROR_OTHER;
-		}
-	}
 
 	if (supports_flag_bulk_continuation == -1) {
 		supports_flag_bulk_continuation = check_flag_bulk_continuation();
@@ -1792,6 +1773,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	int num_urbs = tpriv->num_urbs;
 	int urb_idx = urb - tpriv->urbs;
 	enum libusb_transfer_status status = LIBUSB_TRANSFER_COMPLETED;
+	int r = 0;
 
 	pthread_mutex_lock(&itransfer->lock);
 	usbi_dbg("handling completion status %d of bulk urb %d/%d", urb->status,
@@ -1838,7 +1820,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 				free(tpriv->urbs);
 				tpriv->urbs = NULL;
 				pthread_mutex_unlock(&itransfer->lock);
-				usbi_handle_transfer_cancellation(itransfer);
+				r = usbi_handle_transfer_cancellation(itransfer);
 				goto out_unlock;
 			}
 			if (tpriv->reap_action != COMPLETED_EARLY)
@@ -1902,8 +1884,8 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 			 * cancelled by the kernel */
 			if (tpriv->urbs[i].flags & USBFS_URB_BULK_CONTINUATION)
 				continue;
-			int r = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
-			if (r && errno != EINVAL)
+			int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
+			if (tmp && errno != EINVAL)
 				usbi_warn(TRANSFER_CTX(transfer),
 					"unrecognised discard errno %d", errno);
 		}
@@ -1916,11 +1898,10 @@ completed:
 	free(tpriv->urbs);
 	tpriv->urbs = NULL;
 	pthread_mutex_unlock(&itransfer->lock);
-	usbi_handle_transfer_completion(itransfer, status);
-	return 0;
+	return usbi_handle_transfer_completion(itransfer, status);
 out_unlock:
 	pthread_mutex_unlock(&itransfer->lock);
-	return 0;
+	return r;
 }
 
 static int handle_iso_completion(struct usbi_transfer *itransfer,
@@ -1971,13 +1952,12 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 			free_iso_urbs(tpriv);
 			if (tpriv->reap_action == CANCELLED) {
 				pthread_mutex_unlock(&itransfer->lock);
-				usbi_handle_transfer_cancellation(itransfer);
+				return usbi_handle_transfer_cancellation(itransfer);
 			} else {
 				pthread_mutex_unlock(&itransfer->lock);
-				usbi_handle_transfer_completion(itransfer,
+				return usbi_handle_transfer_completion(itransfer,
 					LIBUSB_TRANSFER_ERROR);
 			}
-			return 0;
 		}
 		goto out;
 	}
@@ -2002,8 +1982,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		usbi_dbg("last URB in transfer --> complete!");
 		free_iso_urbs(tpriv);
 		pthread_mutex_unlock(&itransfer->lock);
-		usbi_handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
-		return 0;
+		return usbi_handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
 	}
 
 out:
@@ -2030,8 +2009,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 		free(tpriv->urbs);
 		tpriv->urbs = NULL;
 		pthread_mutex_unlock(&itransfer->lock);
-		usbi_handle_transfer_cancellation(itransfer);
-		return 0;
+		return usbi_handle_transfer_cancellation(itransfer);
 	}
 
 	switch (urb->status) {
@@ -2059,8 +2037,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	free(tpriv->urbs);
 	tpriv->urbs = NULL;
 	pthread_mutex_unlock(&itransfer->lock);
-	usbi_handle_transfer_completion(itransfer, status);
-	return 0;
+	return usbi_handle_transfer_completion(itransfer, status);
 }
 
 static int reap_for_handle(struct libusb_device_handle *handle)
@@ -2157,6 +2134,14 @@ static int op_clock_gettime(int clk_id, struct timespec *tp)
   }
 }
 
+#ifdef USBI_TIMERFD_AVAILABLE
+static clockid_t op_get_timerfd_clockid(void)
+{
+	return monotonic_clkid;
+
+}
+#endif
+
 const struct usbi_os_backend linux_usbfs_backend = {
 	.name = "Linux usbfs",
 	.init = op_init,
@@ -2190,6 +2175,10 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.handle_events = op_handle_events,
 
 	.clock_gettime = op_clock_gettime,
+
+#ifdef USBI_TIMERFD_AVAILABLE
+	.get_timerfd_clockid = op_get_timerfd_clockid,
+#endif
 
 	.device_priv_size = sizeof(struct linux_device_priv),
 	.device_handle_priv_size = sizeof(struct linux_device_handle_priv),
