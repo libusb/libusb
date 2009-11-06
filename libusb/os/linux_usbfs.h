@@ -60,9 +60,10 @@ struct usbfs_getdriver {
 	char driver[USBFS_MAXDRIVERNAME + 1];
 };
 
-#define USBFS_URB_DISABLE_SPD	1
-#define USBFS_URB_ISO_ASAP	2
-#define USBFS_URB_QUEUE_BULK	0x10
+#define USBFS_URB_SHORT_NOT_OK		0x01
+#define USBFS_URB_ISO_ASAP			0x02
+#define USBFS_URB_BULK_CONTINUATION	0x04
+#define USBFS_URB_QUEUE_BULK		0x10
 
 enum usbfs_urb_type {
 	USBFS_URB_TYPE_ISO = 0,

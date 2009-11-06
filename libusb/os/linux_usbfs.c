@@ -31,6 +31,7 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include "libusb.h"
@@ -70,6 +71,16 @@
  */
 
 static const char *usbfs_path = NULL;
+
+/* Linux 2.6.32 adds support for a bulk continuation URB flag. this should
+ * be set on all URBs in the transfer except the first. also set the
+ * SHORT_NOT_OK flag on all of them, to raise error conditions on short
+ * transfers.
+ * then, on any error except a cancellation, all URBs until the next
+ * non-continuation URB will be cancelled with the endpoint disabled,
+ * meaning that no more data can creep in during the time it takes us to
+ * cancel the remaining URBs. */
+static int supports_flag_bulk_continuation = -1;
 
 /* clock ID for monotonic clock, as not all clock sources are available on all
  * systems. appropriate choice made at initialization time. */
@@ -208,6 +219,23 @@ static clockid_t find_monotonic_clock(void)
 	return -1;
 }
 
+/* bulk continuation URB flag available from Linux 2.6.32 */
+static int check_flag_bulk_continuation(void)
+{
+	struct utsname uts;
+	int sublevel;
+
+	if (uname(&uts) < 0)
+		return -1;
+	if (strlen(uts.release) < 4)
+		return 0;
+	if (strncmp(uts.release, "2.6.", 4) != 0)
+		return 0;
+
+	sublevel = atoi(uts.release + 4);
+	return sublevel >= 32;
+}
+
 static int op_init(struct libusb_context *ctx)
 {
 	struct stat statbuf;
@@ -226,6 +254,17 @@ static int op_init(struct libusb_context *ctx)
 			return LIBUSB_ERROR_OTHER;
 		}
 	}
+
+	if (supports_flag_bulk_continuation == -1) {
+		supports_flag_bulk_continuation = check_flag_bulk_continuation();
+		if (supports_flag_bulk_continuation == -1) {
+			usbi_err(ctx, "error checking for bulk continuation support");
+			return LIBUSB_ERROR_OTHER;
+		}
+	}
+
+	if (supports_flag_bulk_continuation)
+		usbi_dbg("bulk continuation flag supported");
 
 	r = stat(SYSFS_DEVICE_PATH, &statbuf);
 	if (r == 0 && S_ISDIR(statbuf.st_mode)) {
@@ -1344,12 +1383,17 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 		urb->type = urb_type;
 		urb->endpoint = transfer->endpoint;
 		urb->buffer = transfer->buffer + (i * MAX_BULK_BUFFER_LENGTH);
+		if (supports_flag_bulk_continuation)
+			urb->flags = USBFS_URB_SHORT_NOT_OK;
 		if (i == num_urbs - 1 && last_urb_partial)
 			urb->buffer_length = transfer->length % MAX_BULK_BUFFER_LENGTH;
 		else if (transfer->length == 0)
 			urb->buffer_length = 0;
 		else
 			urb->buffer_length = MAX_BULK_BUFFER_LENGTH;
+
+		if (i > 0 && supports_flag_bulk_continuation)
+			urb->flags |= USBFS_URB_BULK_CONTINUATION;
 
 		r = ioctl(dpriv->fd, IOCTL_USBFS_SUBMITURB, urb);
 		if (r < 0) {
@@ -1804,13 +1848,15 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		goto out_unlock;
 	}
 
-	if (urb->status == 0 ||
+	if (urb->status == 0 || urb->status == -EREMOTEIO ||
 			(urb->status == -EOVERFLOW && urb->actual_length > 0))
 		itransfer->transferred += urb->actual_length;
 
 
 	switch (urb->status) {
 	case 0:
+		break;
+	case -EREMOTEIO: /* short transfer */
 		break;
 	case -EPIPE:
 		usbi_dbg("detected endpoint stall");
@@ -1852,6 +1898,10 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		 * before reporting results */
 		tpriv->reap_action = COMPLETED_EARLY;
 		for (i = urb_idx + 1; i < tpriv->num_urbs; i++) {
+			/* remaining URBs with continuation flag are automatically
+			 * cancelled by the kernel */
+			if (tpriv->urbs[i].flags & USBFS_URB_BULK_CONTINUATION)
+				continue;
 			int r = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
 			if (r && errno != EINVAL)
 				usbi_warn(TRANSFER_CTX(transfer),
