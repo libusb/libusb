@@ -323,6 +323,10 @@ if (r == 0 && actual_length == sizeof(data)) {
  * Freeing the transfer after it has been cancelled but before cancellation
  * has completed will result in undefined behaviour.
  *
+ * When a transfer is cancelled, some of the data may have been transferred.
+ * libusb will communicate this to you in the transfer callback. Do not assume
+ * that no data was transferred.
+ *
  * \section bulk_overflows Overflows on device-to-host bulk/interrupt endpoints
  *
  * If your device does not have predictable transfer sizes (or it misbehaves),
