@@ -1,6 +1,10 @@
 This file lists notable changes in each release. For the full history of all
 changes, see ChangeLog.
 
+2009-11-15: v1.0.5
+ * Use timerfd when available for timer management
+ * Small fixes/updates
+
 2009-11-06: v1.0.4 release
  * Bug fixes including transfer locking to fix some potential threading races
  * More flexibility with clock types on Linux
