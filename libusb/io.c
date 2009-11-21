@@ -1958,11 +1958,10 @@ retry:
 }
 
 /** \ingroup poll
- * Handle any pending events in blocking mode with a sensible timeout. This
- * timeout is currently hardcoded at 2 seconds but we may change this if we
- * decide other values are more sensible. For finer control over whether this
- * function is blocking or non-blocking, or the maximum timeout, use
- * libusb_handle_events_timeout() instead.
+ * Handle any pending events in blocking mode. There is currently a timeout
+ * hardcoded at 60 seconds but we plan to make it unlimited in future. For
+ * finer control over whether this function is blocking or non-blocking, or
+ * for control over the timeout, use libusb_handle_events_timeout() instead.
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
@@ -1970,7 +1969,7 @@ retry:
 API_EXPORTED int libusb_handle_events(libusb_context *ctx)
 {
 	struct timeval tv;
-	tv.tv_sec = 2;
+	tv.tv_sec = 60;
 	tv.tv_usec = 0;
 	return libusb_handle_events_timeout(ctx, &tv);
 }
