@@ -231,19 +231,17 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
     pthread_mutex_lock(&ctx->open_devs_lock);
     list_for_each_entry(handle, &ctx->open_devs, list) {
       dpriv = (struct darwin_device_priv *)handle->dev->os_priv;
-      if (dpriv->location == location)
-	break;
-    }
 
-    if (handle && handle->os_priv) {
-      priv  = (struct darwin_device_handle_priv *)handle->os_priv;
+      /* the device may have been opened several times. write to each handle's event descriptor */
+      if (dpriv->location == location  && handle->os_priv) {
+	priv  = (struct darwin_device_handle_priv *)handle->os_priv;
 
-      message = MESSAGE_DEVICE_GONE;
-      write (priv->fds[1], &message, sizeof (message));
+	message = MESSAGE_DEVICE_GONE;
+	write (priv->fds[1], &message, sizeof (message));
+      }
     }
 
     pthread_mutex_unlock(&ctx->open_devs_lock);
-
   }
 }
 
@@ -568,42 +566,47 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
   usb_device_t  **darwin_device;
   IOReturn kresult;
 
-  kresult = darwin_get_device (dpriv->location, &darwin_device);
-  if (kresult) {
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "could not find device: %s", darwin_error_str (kresult));
-    return darwin_to_libusb (kresult);
-  }
-
-  dpriv->device = darwin_device;
-
-  /* try to open the device */
-  kresult = (*(dpriv->device))->USBDeviceOpenSeize (dpriv->device);
-
-  if (kresult != kIOReturnSuccess) {
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "USBDeviceOpen: %s", darwin_error_str(kresult));
-
-    switch (kresult) {
-    case kIOReturnExclusiveAccess:
-      /* it is possible to perform some actions on a device that is not open so do not return an error */
-      priv->is_open = 0;
-
-      break;
-    default:
-      (*(dpriv->device))->Release (dpriv->device);
-      dpriv->device = NULL;
+  if (0 == dpriv->open_count) {
+    kresult = darwin_get_device (dpriv->location, &darwin_device);
+    if (kresult) {
+      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "could not find device: %s", darwin_error_str (kresult));
       return darwin_to_libusb (kresult);
     }
-  } else {
-    priv->is_open = 1;
 
-    /* create async event source */
-    kresult = (*(dpriv->device))->CreateDeviceAsyncEventSource (dpriv->device, &priv->cfSource);
+    dpriv->device = darwin_device;
 
-    CFRetain (libusb_darwin_acfl);
+    /* try to open the device */
+    kresult = (*(dpriv->device))->USBDeviceOpenSeize (dpriv->device);
 
-    /* add the cfSource to the aync run loop */
-    CFRunLoopAddSource(libusb_darwin_acfl, priv->cfSource, kCFRunLoopCommonModes);
+    if (kresult != kIOReturnSuccess) {
+      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "USBDeviceOpen: %s", darwin_error_str(kresult));
+
+      switch (kresult) {
+      case kIOReturnExclusiveAccess:
+	/* it is possible to perform some actions on a device that is not open so do not return an error */
+	priv->is_open = 0;
+
+	break;
+      default:
+	(*(dpriv->device))->Release (dpriv->device);
+	dpriv->device = NULL;
+	return darwin_to_libusb (kresult);
+      }
+    } else {
+      priv->is_open = 1;
+
+      /* create async event source */
+      kresult = (*(dpriv->device))->CreateDeviceAsyncEventSource (dpriv->device, &priv->cfSource);
+
+      CFRetain (libusb_darwin_acfl);
+
+      /* add the cfSource to the aync run loop */
+      CFRunLoopAddSource(libusb_darwin_acfl, priv->cfSource, kCFRunLoopCommonModes);
+    }
   }
+
+  /* device opened successfully */
+  dpriv->open_count++;
 
   /* create a file descriptor for notifications */
   pipe (priv->fds);
@@ -624,39 +627,51 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
   IOReturn kresult;
   int i;
 
+  if (dpriv->open_count == 0) {
+    /* something is probably very wrong if this is the case */
+    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "Close called on a device that was not open!\n");
+    return;
+  }
+
+  dpriv->open_count--;
+
   /* make sure all interfaces are released */
   for (i = 0 ; i < USB_MAXINTERFACES ; i++)
     if (dev_handle->claimed_interfaces & (1 << i))
       libusb_release_interface (dev_handle, i);
 
-  if (priv->is_open) {
-    /* delete the device's async event source */
-    if (priv->cfSource) {
-      CFRunLoopRemoveSource (libusb_darwin_acfl, priv->cfSource, kCFRunLoopDefaultMode);
-      CFRelease (priv->cfSource);
-    }
+  if (0 == dpriv->open_count) {
+    if (priv->is_open) {
+      /* delete the device's async event source */
+      if (priv->cfSource) {
+	CFRunLoopRemoveSource (libusb_darwin_acfl, priv->cfSource, kCFRunLoopDefaultMode);
+	CFRelease (priv->cfSource);
+      }
 
-    /* close the device */
-    kresult = (*(dpriv->device))->USBDeviceClose(dpriv->device);
+      /* close the device */
+      kresult = (*(dpriv->device))->USBDeviceClose(dpriv->device);
+      if (kresult) {
+	/* Log the fact that we had a problem closing the file, however failing a
+	 * close isn't really an error, so return success anyway */
+	_usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "USBDeviceClose: %s", darwin_error_str(kresult));
+      }
+    }
+  
+    kresult = (*(dpriv->device))->Release(dpriv->device);
     if (kresult) {
       /* Log the fact that we had a problem closing the file, however failing a
        * close isn't really an error, so return success anyway */
-      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "USBDeviceClose: %s", darwin_error_str(kresult));
+      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "Release: %s", darwin_error_str(kresult));
     }
-  }
-  
-  kresult = (*(dpriv->device))->Release(dpriv->device);
-  if (kresult) {
-    /* Log the fact that we had a problem closing the file, however failing a
-     * close isn't really an error, so return success anyway */
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "Release: %s", darwin_error_str(kresult));
+
+    dpriv->device = NULL;
   }
 
+  /* file descriptors are maintained per-instance */
   usbi_remove_pollfd (HANDLE_CTX (dev_handle), priv->fds[0]);
   close (priv->fds[1]);
   close (priv->fds[0]);
 
-  dpriv->device = NULL;
   priv->fds[0] = priv->fds[1] = -1;
 }
 
@@ -949,6 +964,15 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
   kresult = (*(cInterface->interface))->SetAlternateInterface (cInterface->interface, altsetting);
   if (kresult != kIOReturnSuccess)
     darwin_reset_device (dev_handle);
+
+  /* update list of endpoints */
+  kresult = get_endpoints (dev_handle, iface);
+  if (kresult) {
+    /* this should not happen */
+    darwin_release_interface (dev_handle, iface);
+    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "could not build endpoint table");
+    return kresult;
+  }
 
   return darwin_to_libusb (kresult);
 }

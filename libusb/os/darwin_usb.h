@@ -121,6 +121,7 @@ struct darwin_device_priv {
   UInt32                location;
   char                  sys_path[21];
   usb_device_t        **device;
+  int                  open_count;
 };
 
 struct darwin_device_handle_priv {
