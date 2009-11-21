@@ -53,15 +53,19 @@ AC_ARG_ENABLE([timerfd],
 	[use_timerfd=$enableval], [use_timerfd='auto'])
 
 if test "x$use_timerfd" = "xyes" -a "x$timerfd_h" = "x0"; then
-	AC_MSG_ERROR([timerfd header not available; glibc 2.8+ required])
-error
+	AC_MSG_ERROR([timerfd header not available; glibc 2.9+ required])
+fi
+
+AC_CHECK_DECL([TFD_NONBLOCK], [tfd_hdr_ok=yes], [tfd_hdr_ok=no], [#include <sys/timerfd.h>])
+if test "x$use_timerfd" = "xyes" -a "x$tfd_hdr_ok" = "xno"; then
+	AC_MSG_ERROR([timerfd header not usable; glibc 2.9+ required])
 fi
 
 AC_MSG_CHECKING([whether to use timerfd for timing])
 if test "x$use_timerfd" = "xno"; then
 	AC_MSG_RESULT([no (disabled by user)])
 else
-	if test "x$timerfd_h" = "x1"; then
+	if test "x$timerfd_h" = "x1" -a "x$tfd_hdr_ok" = "xyes"; then
 		AC_MSG_RESULT([yes])
 		AC_DEFINE(USBI_TIMERFD_AVAILABLE, [], [timerfd headers available])
 	else

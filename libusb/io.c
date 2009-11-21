@@ -632,7 +632,7 @@ while (user has not requested application exit) {
  *  - Darwin
  *  - Linux, provided that the following version requirements are satisfied:
  *   - Linux v2.6.27 or newer, compiled with timerfd support
- *   - glibc v2.8 or newer
+ *   - glibc v2.9 or newer
  *   - libusb v1.0.5 or newer
  *
  * Under these configurations, libusb_get_next_timeout() will \em always return
