@@ -1,6 +1,10 @@
 This file lists notable changes in each release. For the full history of all
 changes, see ChangeLog.
 
+2009-11-22: v1.0.6
+* Bug fixes
+* Increase libusb_handle_events() timeout to 60s for powersaving
+
 2009-11-15: v1.0.5
  * Use timerfd when available for timer management
  * Small fixes/updates
