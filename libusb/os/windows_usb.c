@@ -971,9 +971,9 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	SP_DEVINFO_DATA dev_info_data;
 	DEVINST parent_devinst;
 	GUID guid;
-	DWORD size, reg_type;
+	DWORD size, reg_type, port_nr;
 	int	r = LIBUSB_SUCCESS;
-	unsigned i, j, j_max, port_nr, hub_nr;
+	unsigned i, j;
 	bool found;
 
 	// TODO: MI_## automated driver installation:
@@ -997,58 +997,13 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			continue;
 		}
 
-		if (windows_version >= WINDOWS_VISTA_AND_LATER) {
-			// Retrieve location information (port#) through the Location Information registry data
-			if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_LOCATION_INFORMATION, 
-				&reg_type, (BYTE*)reg_key, MAX_KEY_LENGTH, &size)) {
-				usbi_warn(ctx, "could not retrieve location information for device #%u, skipping: %s", 
-					i, windows_error_str(0));
-				continue;
-			}
-
-			if (size != sizeof("Port_#1234.Hub_#1234")) {
-				usbi_warn(ctx, "unexpected registry key size for device #%u, skipping", i);
-				continue;
-			}
-			if (sscanf(reg_key, "Port_#%04d.Hub_#%04d", &port_nr, &hub_nr) != 2) {
-				usbi_warn(ctx, "failure to read port and hub number for device #%u, skipping", i);
-				continue;
-			}
-		} else {
-			// We're out of luck for Location Information on XP, since SPDRP_LOCATION_INFORMATION
-			// returns anything but an actual location. However, it looks like the port number is 
-			// the last digit before '#{' in the path string, so let's try that.
-			// TODO: device enum that doesn't require this workaround
-			found = false;
-			for (j=0; j<safe_strlen(dev_interface_details->DevicePath); j++) {
-				if ( (dev_interface_details->DevicePath[j] == '{') 
-				  && (dev_interface_details->DevicePath[j-1] == '#') ) {
-					  j_max = j-1;
-					// Matched '#{'. Now go back to last delimiter
-					for (; j>=0; j--) {
-						if (dev_interface_details->DevicePath[j] == '&') {
-							found = true;
-							break;
-						}
-					}
-					if (found) {
-						j++;
-						// The port number should only be 1 or 2 chars long
-						if (((j_max - j) != 1) && ((j_max - j) != 2)) {
-							found = false;
-						} else if (sscanf(&dev_interface_details->DevicePath[j], 
-							"%d#{%*s", &port_nr) != 1) {
-							found = false;
-						}
-					}
-					break;
-				}
-			}
-			if (!found) {
-				usbi_warn(ctx, "program assertion failed - unable to \"guess\" port number for %s", 
-					dev_interface_details->DevicePath);
-				continue;
-			}
+		// The SPDRP_ADDRESS for USB devices should be the device port number on the hub
+		if ( (!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_ADDRESS, 
+			&reg_type, (BYTE*)&port_nr, 4, &size))
+		  && (size != 4) ){
+			usbi_warn(ctx, "could not retrieve port number for device #%u, skipping: %s", 
+				i, windows_error_str(0));
+			continue;
 		}
 
 		// Retrieve parent's path using PnP Configuration Manager (CM)
