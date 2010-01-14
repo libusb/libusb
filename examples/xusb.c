@@ -1,6 +1,9 @@
 /*
- * libusb example program to list devices on the bus
- * Copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
+ * xusb: winusb specific test program
+ * based on lsusb, copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
+ *
+ * Currently, this test program will try to access an XBox USB
+ * Gamepad through WinUSB. To access your device, change VID/PID.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -42,8 +45,10 @@ static void print_devs(libusb_device **devs)
 
 		// DEBUG: Access an XBox gamepad through WinUSB
 		if ((desc.idVendor == 0x045e) && (desc.idProduct == 0x0289)) {
-			printf("got Xbox gamepad\n");
+			printf("Opening Xbox gamepad:\n");
 			r = libusb_open(dev, &handle);
+			if (r != LIBUSB_SUCCESS)
+				printf("libusb error: %d\n", r);
 		}
 	}
 }

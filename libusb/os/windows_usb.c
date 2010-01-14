@@ -78,6 +78,11 @@
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
 static int windows_get_active_config(struct libusb_device *dev);
 static int windows_clock_gettime(int clk_id, struct timespec *tp);
+// WinUSB API prototypes
+static int winusb_api_init(struct libusb_context *ctx);
+static int winusb_api_exit(void);
+static int winusb_open(struct libusb_device_handle *dev_handle);
+static void winusb_close(struct libusb_device_handle *dev_handle);
 
 // HCD private chained list
 struct windows_hcd_priv* hcd_root = NULL;
@@ -86,6 +91,8 @@ uint64_t hires_frequency, hires_ticks_to_ps;
 // 1970.01.01 00:00:000 in MS Filetime, as computed and confirmed with google
 const uint64_t epoch_time = 116444736000000000;
 DWORD_PTR old_affinity_mask;
+bool api_winusb_available = false;
+#define CHECK_WINUSB_AVAILABLE do { if (!api_winusb_available) return LIBUSB_ERROR_NOT_SUPPORTED; } while (0)
 
 /*
  * Converts a WCHAR string to UTF8 (allocate returned string)
@@ -122,8 +129,10 @@ static char err_string[ERR_BUFFER_SIZE];
 	unsigned int errcode, format_errcode;
 
 	errcode = GetLastError();
+	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%08X] ", errcode);
+
 	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errcode,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &err_string,
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &err_string[strlen(err_string)],
 		ERR_BUFFER_SIZE, NULL);
 	if (size == 0)
 	{
@@ -201,6 +210,12 @@ static int windows_init(struct libusb_context *ctx)
 	if (hcd_root != NULL) {
 		usbi_dbg("init already occured.");
 		return LIBUSB_SUCCESS;
+	}
+
+	// Initialize the API
+	r = winusb_api_init(ctx);
+	if (r != LIBUSB_SUCCESS) {
+		return r;
 	}
 
 	// Because QueryPerformanceCounter might report different values when 
@@ -883,6 +898,8 @@ static void windows_exit(void)
 		safe_free(hcd_tmp);
 	}
 
+	winusb_api_exit();
+
 	SetThreadAffinityMask(GetCurrentThread(), old_affinity_mask);
 
 	//TODO: Thread stuff
@@ -950,11 +967,20 @@ static int windows_get_active_config_descriptor(struct libusb_device *dev, unsig
 
 static int windows_open(struct libusb_device_handle *dev_handle)
 {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	int r = LIBUSB_SUCCESS;
+
+	r = winusb_open(dev_handle);
+	if (r != LIBUSB_SUCCESS)
+		return r;
+
+	// TODO: setup polling
+	return r;
 }
 
 static void windows_close(struct libusb_device_handle *dev_handle)
 {
+	winusb_close(dev_handle);
+	// TODO: cancel polling
 }
 
 /*
@@ -1169,3 +1195,150 @@ const struct usbi_os_backend windows_backend = {
 	.transfer_priv_size = sizeof(struct windows_transfer_priv),
 	.add_iso_packet_size = 0,
 };
+
+/*
+ * WinUSB API functions
+ */
+
+// TO_DO: check if DLL has been loaded in all functions?
+static int winusb_api_init(struct libusb_context *ctx)
+{
+	DLL_LOAD(winusb.dll, WinUsb_Initialize, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_Free, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_GetAssociatedInterface, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_GetDescriptor, TRUE); 
+	DLL_LOAD(winusb.dll, WinUsb_QueryInterfaceSettings, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_QueryDeviceInformation, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_SetCurrentAlternateSetting, TRUE); 
+	DLL_LOAD(winusb.dll, WinUsb_GetCurrentAlternateSetting, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_QueryPipe, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_SetPipePolicy, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_GetPipePolicy, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_ReadPipe, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_WritePipe, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_ControlTransfer, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_ResetPipe, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_AbortPipe, TRUE);
+	DLL_LOAD(winusb.dll, WinUsb_FlushPipe, TRUE);
+
+	api_winusb_available = true;
+	return LIBUSB_SUCCESS;
+}
+
+static int winusb_api_exit(void) 
+{
+	CHECK_WINUSB_AVAILABLE;
+	api_winusb_available = false;
+	return LIBUSB_SUCCESS;
+}
+
+/*
+ * TODO: check if device has been diconnected
+ */
+static int winusb_open(struct libusb_device_handle *dev_handle) 
+{
+	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
+
+	HANDLE handle;
+	WINUSB_INTERFACE_HANDLE winusb_handle;
+	USB_INTERFACE_DESCRIPTOR interface_desc;
+	WINUSB_PIPE_INFORMATION pipe_info;
+	uint8_t speed, i;
+	ULONG length;
+
+	CHECK_WINUSB_AVAILABLE;
+/*
+	usbi_dbg("testing detached device: disconnect NOW!");
+	Sleep(2000);
+*/
+	// TODO: better check for detached devices
+	handle = CreateFileA(priv->path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, 
+		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
+	if (handle == INVALID_HANDLE_VALUE) {
+		usbi_err(ctx, "could not open device: %s", windows_error_str());
+		// TODO? Create a windows errcode -> libusb errcode function
+		switch(GetLastError()) {
+		case ERROR_FILE_NOT_FOUND:	// The device was disconnected
+			return LIBUSB_ERROR_NO_DEVICE;
+		case ERROR_ACCESS_DENIED:
+			return LIBUSB_ERROR_ACCESS;
+		default:
+			return LIBUSB_ERROR_IO;
+		}
+	}
+
+	handle_priv->file_handle = handle;
+
+	if (!WinUsb_Initialize(handle, &winusb_handle)) {
+		usbi_err(ctx, "could not initialize WinUSB: %s", windows_error_str());
+		return LIBUSB_ERROR_IO;
+	}
+
+	handle_priv->winusb_handle = winusb_handle;
+
+	length = sizeof(speed);
+	if (!WinUsb_QueryDeviceInformation(winusb_handle, DEVICE_SPEED, &length, &speed)) {
+		usbi_err(ctx, "could not get device speed: %s", windows_error_str());
+		return LIBUSB_ERROR_IO;
+	}
+
+	/* TODO:
+	 * Because the Fx2 device supports only one interface that has no alternative settings, 
+	 * the AlternateSettingNumber parameter is set to zero and the function is called only 
+	 * once. If the device supports multiple interfaces, call WinUsb_GetAssociatedInterface
+	 * to obtain interface handles for associated interfaces.
+	 */
+
+	if (!WinUsb_QueryInterfaceSettings(winusb_handle, 0, &interface_desc)) {
+		usbi_err(ctx, "could not get interface settings: %s", windows_error_str());
+		return LIBUSB_ERROR_IO;
+	}
+
+	for(i=0; i<interface_desc.bNumEndpoints; i++) 
+	{
+		if (!WinUsb_QueryPipe(winusb_handle, 0, i, &pipe_info)) {
+			usbi_err(ctx, "could not query pipe: %s", windows_error_str());
+			return LIBUSB_ERROR_IO;
+		}
+
+		if (pipe_info.PipeType == UsbdPipeTypeBulk && USB_ENDPOINT_DIRECTION_IN(pipe_info.PipeId)) {
+			usbi_dbg("pipe %d: bulk In pipe", i);
+//			bulk_in_pipe = pipe_info.PipeId;
+		} 
+		else if(pipe_info.PipeType == UsbdPipeTypeBulk && USB_ENDPOINT_DIRECTION_OUT(pipe_info.PipeId)) {
+			usbi_dbg("pipe %d: bulk Out pipe", i);
+//			bulk_out_pipe = pipe_info.PipeId;
+		}
+		else if(pipe_info.PipeType == UsbdPipeTypeInterrupt) {
+			usbi_dbg("pipe %d: interrupt pipe", i);
+//			interrupt_pipe = pipe_info.PipeId;
+		}
+		else {
+			usbi_dbg("%d: ceci n'est pas un(e) pipe", i);
+			break;
+		}
+	}
+
+	return LIBUSB_SUCCESS;
+}
+
+static void winusb_close(struct libusb_device_handle *dev_handle)
+{
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
+
+	if (api_winusb_available)
+	{
+		// libusb_open zeroes the priv struct, which is different from INVALID_HANDLE_VALUE (-1)
+		// However: http://www.tech-archive.net/Archive/Development/microsoft.public.win32.programmer.kernel/2005-05/msg00448.html
+		// "On any NT-derived platform 0 (zero) can never be a valid handle value" so we should be OK
+		if ((handle_priv->winusb_handle != 0) && (handle_priv->winusb_handle != INVALID_HANDLE_VALUE)) {
+			WinUsb_Free(handle_priv->winusb_handle);
+		}
+	}
+
+	if ((handle_priv->file_handle != 0) && (handle_priv->file_handle != INVALID_HANDLE_VALUE)) {
+		CloseHandle(handle_priv->file_handle);
+	}
+}

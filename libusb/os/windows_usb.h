@@ -113,10 +113,13 @@ static inline struct windows_device_priv *__device_priv(struct libusb_device *de
 	return (struct windows_device_priv *)dev->os_priv;
 }
 
-struct windows_device_handle_priv {
-	HANDLE fd;
-};
+typedef void *WINUSB_INTERFACE_HANDLE, *PWINUSB_INTERFACE_HANDLE;
 
+struct windows_device_handle_priv {
+	bool is_open;
+	HANDLE file_handle;
+	WINUSB_INTERFACE_HANDLE winusb_handle;
+};
 
 struct windows_transfer_priv {
 	int NOT_IMPLEMENTED;
@@ -212,3 +215,111 @@ typedef struct _USB_HUB_CAPABILITIES_EX {
 	CTL_CODE( FILE_DEVICE_USB, USB_GET_HUB_CAPABILITIES_EX, \
 	METHOD_BUFFERED, FILE_ANY_ACCESS )
 #endif
+
+/*
+ * WinUSB macros - from libusb-win32 1.x
+ */
+#pragma once
+
+#define DLL_DECLARE(api, ret, name, args)                    \
+  typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name
+
+#define DLL_LOAD(dll, name, ret_on_failure)                   \
+  do {                                                        \
+  HMODULE h = GetModuleHandle(#dll);                          \
+  if(!h)                                                      \
+    h = LoadLibrary(#dll);                                    \
+  if(!h) {                                                    \
+    if(ret_on_failure)                                        \
+      return LIBUSB_ERROR_OTHER;                             \
+    else break; }                                             \
+  if((name = (__dll_##name##_t)GetProcAddress(h, #name)))     \
+    break;                                                    \
+  if((name = (__dll_##name##_t)GetProcAddress(h, #name "A"))) \
+    break;                                                    \
+  if((name = (__dll_##name##_t)GetProcAddress(h, #name "W"))) \
+    break;                                                    \
+  if(ret_on_failure)                                          \
+    return LIBUSB_ERROR_OTHER;                               \
+  } while(0)
+
+
+/* winusb.dll interface */
+
+#define SHORT_PACKET_TERMINATE  0x01
+#define AUTO_CLEAR_STALL        0x02
+#define PIPE_TRANSFER_TIMEOUT   0x03
+#define IGNORE_SHORT_PACKETS    0x04
+#define ALLOW_PARTIAL_READS     0x05
+#define AUTO_FLUSH              0x06
+#define RAW_IO                  0x07
+#define MAXIMUM_TRANSFER_SIZE   0x08
+#define AUTO_SUSPEND            0x81
+#define SUSPEND_DELAY           0x83
+#define DEVICE_SPEED            0x01
+#define LowSpeed                0x01
+#define FullSpeed               0x02
+#define HighSpeed               0x03 
+
+typedef enum _USBD_PIPE_TYPE {
+	UsbdPipeTypeControl,
+	UsbdPipeTypeIsochronous,
+	UsbdPipeTypeBulk,
+	UsbdPipeTypeInterrupt
+} USBD_PIPE_TYPE;
+
+typedef struct {
+  USBD_PIPE_TYPE PipeType;
+  UCHAR          PipeId;
+  USHORT         MaximumPacketSize;
+  UCHAR          Interval;
+} WINUSB_PIPE_INFORMATION, *PWINUSB_PIPE_INFORMATION;
+
+#pragma pack(1)
+typedef struct {
+  UCHAR  request_type;
+  UCHAR  request;
+  USHORT value;
+  USHORT index;
+  USHORT length;
+} WINUSB_SETUP_PACKET, *PWINUSB_SETUP_PACKET;
+#pragma pack()
+
+DLL_DECLARE(WINAPI, BOOL, WinUsb_Initialize, 
+            (HANDLE, PWINUSB_INTERFACE_HANDLE));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_Free, (WINUSB_INTERFACE_HANDLE));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_GetAssociatedInterface, 
+            (WINUSB_INTERFACE_HANDLE, UCHAR, PWINUSB_INTERFACE_HANDLE));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_GetDescriptor, 
+            (WINUSB_INTERFACE_HANDLE, UCHAR, UCHAR, USHORT, PUCHAR,
+             ULONG, PULONG));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_QueryInterfaceSettings,
+            (WINUSB_INTERFACE_HANDLE, UCHAR, PUSB_INTERFACE_DESCRIPTOR));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_QueryDeviceInformation, 
+            (WINUSB_INTERFACE_HANDLE, ULONG, PULONG, PVOID));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_SetCurrentAlternateSetting, 
+            (WINUSB_INTERFACE_HANDLE, UCHAR));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_GetCurrentAlternateSetting, 
+            (WINUSB_INTERFACE_HANDLE, PUCHAR));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_QueryPipe, 
+            (WINUSB_INTERFACE_HANDLE, UCHAR, UCHAR,
+             PWINUSB_PIPE_INFORMATION));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_SetPipePolicy, 
+            (WINUSB_INTERFACE_HANDLE, UCHAR, ULONG, ULONG, PVOID));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_GetPipePolicy, 
+            (WINUSB_INTERFACE_HANDLE, UCHAR, ULONG, PULONG, PVOID));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_ReadPipe, 
+            (WINUSB_INTERFACE_HANDLE, UCHAR, PUCHAR, ULONG, PULONG,
+             LPOVERLAPPED));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_WritePipe,
+            (WINUSB_INTERFACE_HANDLE, UCHAR, PUCHAR, ULONG, PULONG, 
+             LPOVERLAPPED));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_ControlTransfer,
+            (WINUSB_INTERFACE_HANDLE, WINUSB_SETUP_PACKET, PUCHAR, ULONG, 
+             PULONG, LPOVERLAPPED));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_ResetPipe, 
+            (WINUSB_INTERFACE_HANDLE, UCHAR));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_AbortPipe, 
+            (WINUSB_INTERFACE_HANDLE, UCHAR));
+DLL_DECLARE(WINAPI, BOOL, WinUsb_FlushPipe, 
+            (WINUSB_INTERFACE_HANDLE, UCHAR));
