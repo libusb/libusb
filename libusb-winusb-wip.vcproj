@@ -41,6 +41,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="E:\WinDDK\7600.16385.0\inc;.\msvc;.\libusb;.\"
+				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
