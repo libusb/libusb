@@ -162,7 +162,7 @@ struct windows_device_handle_priv {
 
 // used for async polling functions
 struct windows_transfer_priv {
-	OVERLAPPED* io;
+	int overlapped_fd;
 	HANDLE handle;
 };
 

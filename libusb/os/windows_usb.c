@@ -84,7 +84,7 @@ static int winusb_open(struct libusb_device_handle *dev_handle);
 static void winusb_close(struct libusb_device_handle *dev_handle);
 static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int iface);
 static int winusb_release_interface(struct libusb_device_handle *dev_handle, int iface);
-static int winusb_submit_control_transfer(struct usbi_transfer *itransfer, OVERLAPPED *io);
+static int winusb_submit_control_transfer(struct usbi_transfer *itransfer);
 
 // HCD private chained list
 struct windows_hcd_priv* hcd_root = NULL;
@@ -316,31 +316,6 @@ static int read_registry_key(struct libusb_context *ctx, char* key_path, char* v
 	// If we get here, value was not matched
 	RegCloseKey(parent_key);
 	return 0;
-}
-
-// From libusb-win32
-static OVERLAPPED* create_overlapped(void)
-{
-	OVERLAPPED* io = malloc(sizeof(OVERLAPPED));
-
-	if(io == NULL)
-		return NULL;
-
-	memset(io, 0, sizeof(OVERLAPPED));
-	io->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!io->hEvent) {
-		free(io);
-		return NULL;
-	}
-	return io;
-}
-
-// From libusb-win32
-void free_overlapped(OVERLAPPED* io)
-{
-	if(io->hEvent)
-		CloseHandle(io->hEvent);
-	free(io);
 }
 
 /*
@@ -1403,29 +1378,25 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
-	OVERLAPPED *io;
+	int overlapped_fd;
 	int r;
 
 	// Our custom poll doesn't provide as fine grained control over an OVERLAPPED
 	// (which we use as fd) as POSIX's poll provides over an fd
 	// => deal with OVERLAPPED in transfer related functions
-	if ((io = create_overlapped()) == NULL)
+	if ((overlapped_fd = create_overlapped(&ctx->pollfds_lock)) < 0)
 		return LIBUSB_ERROR_NO_MEM;
 
-	API_CALL(priv->api, submit_control_transfer, itransfer, io);
+	transfer_priv->overlapped_fd = overlapped_fd;
+
+	API_CALL(priv->api, submit_control_transfer, itransfer);
 
 	if (r != LIBUSB_SUCCESS) {
-		free_overlapped(io);
+		free_overlapped(overlapped_fd);
 		return r;
 	}
 
-	transfer_priv->io = io;
-
-	// TODO: we use the OVERLAPPED _pointer_ as a file descriptor with a  
-	// *VERY DANGEROUS* cast to _int_)
-	// => use a global lookup table for fd <-> HANDLE
-	usbi_dbg("WARNING: casting (OVERLAPPED*) %p to (int) 0x%x", io, (int)io);
-	usbi_add_pollfd(ctx, (int)io, POLLIN);
+	usbi_add_pollfd(ctx, overlapped_fd, POLLIN);
 
 	return LIBUSB_SUCCESS;
 }
@@ -1549,19 +1520,20 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 		// is the most logical choice for now
 		list_for_each_entry(transfer, &ctx->flying_transfers, list) {
 			transfer_priv = usbi_transfer_get_os_priv(transfer);
-			if ((int)transfer_priv->io == pollfd->fd) {
+			if (transfer_priv->overlapped_fd == pollfd->fd) {
 				found = true;
 				break;
 			}
 		}
 
 		if (found) {
-			if (GetOverlappedResult(transfer_priv->handle, transfer_priv->io, &io_size, false)) {
+			if (GetOverlappedResult(transfer_priv->handle, 
+				fd_to_overlapped(transfer_priv->overlapped_fd), &io_size, false)) {
 				io_result = NO_ERROR;
 			} else {
 				io_result = GetLastError();
 			}
-			usbi_remove_pollfd(ctx, (int)transfer_priv->io);
+			usbi_remove_pollfd(ctx, transfer_priv->overlapped_fd);
 			windows_handle_callback(transfer, io_result, io_size);
 		} else {
 			usbi_err(ctx, "could not find a matching transfer for fd %x", fds[i]);
@@ -1842,17 +1814,18 @@ static int winusb_release_interface(struct libusb_device_handle *dev_handle, int
 	return LIBUSB_SUCCESS;
 }
 
-static int winusb_submit_control_transfer(struct usbi_transfer *itransfer, OVERLAPPED *io)
+static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)transfer->dev_handle->os_priv;
 	WINUSB_SETUP_PACKET *setup = (WINUSB_SETUP_PACKET *) transfer->buffer;
-	ULONG size, junk;
+	ULONG size;
 	HANDLE winusb_handle;
 	bool found;
 	int i;
+	OVERLAPPED* overlapped = fd_to_overlapped(transfer_priv->overlapped_fd);
 
 	CHECK_WINUSB_AVAILABLE;
 
@@ -1874,7 +1847,7 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer, OVERL
 	}
 	usbi_dbg("will use interface %d", i-1);
 
-	if (!WinUsb_ControlTransfer(winusb_handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, &junk, io)) {
+	if (!WinUsb_ControlTransfer(winusb_handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, overlapped)) {
 		if(GetLastError() != ERROR_IO_PENDING) {
 			usbi_err(ctx, "WinUsb_ControlTransfer failed: %s", windows_error_str(0));
 			return LIBUSB_ERROR_IO;

@@ -1,84 +1,221 @@
 /*
  * Windows compat: POSIX compatibility wrapper
+ * Copyright (C) 2009 Pete Batard <pbatard@gmail.com>
  *
- * pipe implementation from mlton (http://www.mlton.org - runtime/platform/mingw.c):
- * -----------------------------------------------------------------------------
- * This is the license for MLton, a whole-program optimizing compiler for
- * the Standard ML programming language.  Send comments and questions to
- * MLton@mlton.org.
+ * Parts of poll implementation from libusb-win32, by Stephan Meyer et al.
  *
- * MLton COPYRIGHT NOTICE, LICENSE AND DISCLAIMER.
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
- * Copyright (C) 1999-2009 Henry Cejtin, Matthew Fluet, Suresh
- *    Jagannathan, and Stephen Weeks.
- * Copyright (C) 1997-2000 by the NEC Research Institute
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * Permission to use, copy, modify, and distribute this software and its
- * documentation for any purpose and without fee is hereby granted,
- * provided that the above copyright notice appear in all copies and that
- * both the copyright notice and this permission notice and warranty
- * disclaimer appear in supporting documentation, and that the name of
- * the above copyright holders, or their entities, not be used in
- * advertising or publicity pertaining to distribution of the software
- * without specific, written prior permission.
-
- * The above copyright holders disclaim all warranties with regard to
- * this software, including all implied warranties of merchantability and
- * fitness. In no event shall the above copyright holders be liable for
- * any special, indirect or consequential damages or any damages
- * whatsoever resulting from loss of use, data or profits, whether in an
- * action of contract, negligence or other tortious action, arising out
- * of or in connection with the use or performance of this software.
- * -----------------------------------------------------------------------------
- *
- *
- * parts of poll implementation from libusb-win32 v1, by Stephan Meyer et al.
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  */
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <windows.h>
+#include <pthread.h>
 
 #include "windows_compat.h"
 
-int pipe (int filedes[2]) {
-        HANDLE read_h;
-        HANDLE write_h;
+#ifndef FILE_FLAG_FIRST_PIPE_INSTANCE
+#define FILE_FLAG_FIRST_PIPE_INSTANCE 524288
+#endif
 
-        /* We pass no security attributes (0), so the current policy gets
-         * inherited. The pipe is set to NOT stay open in child processes.
-         * This will be corrected using DuplicateHandle in create()
-         * The 4k buffersize is choosen b/c that's what linux uses.
-         */
-        if (!CreatePipe(&read_h, &write_h, 0, 4096)) {
-                errno = ENOMEM; /* fake errno: out of resources */
-                return -1;
-        }
-        /* This requires Win98+
-         * Choosing text/binary mode is defered till a later setbin/text call
-         */
-        filedes[0] = _open_osfhandle((intptr_t)read_h,  _O_RDONLY);
-        filedes[1] = _open_osfhandle((intptr_t)write_h, _O_WRONLY);
-        if ((filedes[0] == -1) || (filedes[1] == -1)) {
-                if (filedes[0] == -1)
-                        CloseHandle(read_h);
-                else    close(filedes[0]);
-                if (filedes[1] == -1)
-                        CloseHandle(write_h);
-                else    close(filedes[1]);
+#define CHECK_INIT_OVERLAPPED do {if(!is_overlapped_set) init_overlapped();} while(0)
 
-                errno = ENFILE;
-                return -1;
-        }
-        return 0;
+struct pseudo_fd {
+	int fd;
+	OVERLAPPED* overlapped;
+};
+
+int is_overlapped_set = 0;
+unsigned short pipe_number = 0;
+struct pseudo_fd overlapped_fd[MAX_FDS];
+
+int libusb_pipe(int filedes[2])
+{
+	int i, j;
+	OVERLAPPED *overlapped = calloc(2, sizeof(OVERLAPPED));
+	char pipe_name[] = "\\\\.\\pipe\\libusb000000000000";
+
+	CHECK_INIT_OVERLAPPED;
+
+	if (overlapped == NULL) {
+		return -1;
+	}
+
+	sprintf(pipe_name, "\\\\.\\pipe\\libusb%08x%04x", (unsigned)GetCurrentProcessId(), pipe_number++);
+
+	filedes[0] = _open_osfhandle((intptr_t)CreateNamedPipeA(pipe_name, PIPE_ACCESS_INBOUND|FILE_FLAG_OVERLAPPED,
+		PIPE_TYPE_MESSAGE|PIPE_READMODE_MESSAGE, 1, 4096, 4096, 0, NULL), _O_RDONLY);
+	if (filedes[0] < 0) {
+		printf("Could not create read pipe: errcode %d\n", (int)GetLastError());
+		goto out1;
+	}
+
+    filedes[1] = _open_osfhandle((intptr_t)CreateFileA(pipe_name, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL|FILE_FLAG_OVERLAPPED, NULL), _O_WRONLY);
+	if (filedes[1] < 0) {
+		printf("Could not create write pipe: errcode %d\n", (int)GetLastError());
+		goto out2;
+	}
+
+	// Now let's set ourselves some overlapped
+	overlapped[0].hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!overlapped[0].hEvent) {
+		goto out3;
+	}
+	overlapped[1].hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!overlapped[1].hEvent) {
+		goto out4;
+	}
+
+	// ideally, you'd need a mutex lock here. However, we don't have 
+	// access to the context locks through the pipe call..
+	// TODO: create our own mutex?
+	for (i=0, j=0; i<MAX_FDS; i++) {
+		if (overlapped_fd[i].overlapped == NULL) {
+			overlapped_fd[i].fd = filedes[j];
+			overlapped_fd[i].overlapped = &overlapped[j++];
+			if (j == 2)
+				return 0;
+		}
+	}
+
+	CloseHandle(overlapped[1].hEvent);
+out4:
+	CloseHandle(overlapped[0].hEvent);
+out3:
+	_close(filedes[1]);
+out2:
+	_close(filedes[0]);
+out1:
+	free(overlapped);
+	return -1;
+}
+
+// TODO: better (faster!) fd <-> overlapped handling in all these functions
+int create_overlapped(void* pollfds_lock)
+{
+	int i, fd;
+	OVERLAPPED* overlapped = calloc(1, sizeof(OVERLAPPED));
+	pthread_mutex_t *mutex_lock = (pthread_mutex_t*)pollfds_lock;
+
+	CHECK_INIT_OVERLAPPED;
+
+	if(overlapped == NULL)
+		return -1;
+
+	// We need a fd that's assigned by the system to avoid conflict with any
+	// fd that was generated for pipes (can't use a homemade fd system here)
+	// Don't care about the file, so just use NUL: to get an fd
+	fd = _open_osfhandle((intptr_t)CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE,
+		NULL, OPEN_EXISTING, 0, NULL), _O_WRONLY);
+	if (fd < 0) {
+		free(overlapped);
+		return -1;
+	}
+
+	overlapped->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!overlapped->hEvent) {
+		free(overlapped);
+		_close(fd);
+		return -1;
+	}
+	// Bad things might happen if we don't protect this loop
+	pthread_mutex_lock(mutex_lock);
+	for (i=0; i<MAX_FDS; i++) {
+		if (overlapped_fd[i].overlapped == NULL) {
+			overlapped_fd[i].fd = fd;
+			overlapped_fd[i].overlapped = overlapped;
+			pthread_mutex_unlock(mutex_lock);
+			return fd;
+		}
+	}
+	pthread_mutex_unlock(mutex_lock);
+	CloseHandle(overlapped->hEvent);
+	_close(fd);
+	free(overlapped);
+	return -1;
+}
+
+void free_overlapped(int fd)
+{
+	int i;
+
+	CHECK_INIT_OVERLAPPED;
+
+	for (i=0; i<MAX_FDS; i++) {
+		if ( (overlapped_fd[i].fd == fd)
+		  && (overlapped_fd[i].overlapped != NULL) )
+		{
+			_close(overlapped_fd[i].fd);
+			CloseHandle(overlapped_fd[i].overlapped->hEvent);
+			free(overlapped_fd[i].overlapped);
+			overlapped_fd[i].fd = -1;
+			overlapped_fd[i].overlapped = NULL;
+			return;
+		}
+	}
+}
+
+void init_overlapped(void)
+{
+	int i;
+	if (is_overlapped_set)
+		return;
+	is_overlapped_set = -1;
+	for (i=0; i<MAX_FDS; i++) {
+		overlapped_fd[i].fd = -1;
+		overlapped_fd[i].overlapped = NULL;
+	}
+}
+
+void* fd_to_overlapped(int fd)
+{
+	int i;
+
+	CHECK_INIT_OVERLAPPED;
+
+	for (i=0; i<MAX_FDS; i++) {
+		if (overlapped_fd[i].fd == fd)
+			return overlapped_fd[i].overlapped;
+	}
+	return NULL;
+}
+
+int overlapped_to_fd(void* overlapped)
+{
+	int i;
+
+	CHECK_INIT_OVERLAPPED;
+
+	if (overlapped == NULL)
+		return -1;
+	for (i=0; i<MAX_FDS; i++) {
+		if (overlapped_fd[i].overlapped == overlapped)
+			return overlapped_fd[i].fd;
+	}
+	return -1;
 }
 
 // Rudimentary poll using OVERLAPPED
-int windows_poll(struct pollfd *fds, unsigned int nfds, int timeout)
+int libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 {
 	int i, triggered = 0;
-	OVERLAPPED* io;
+	OVERLAPPED* overlapped;
+
+	CHECK_INIT_OVERLAPPED;
 
 	for (i = 0; i < nfds; ++i) {
 		fds[i].revents = 0;
@@ -92,20 +229,23 @@ int windows_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		 *    high-priority event.
 		 */
 		// TODO: for now, we just ignore the control pipe
-		if (i==0)
-			continue;
+//		if (i==0)
+//			continue;
 
-		// All the fds above 1 are actually OVERLAPPED pointers converted to int
-		io = (OVERLAPPED*)fds[i].fd;
+		overlapped = fd_to_overlapped(fds[i].fd);
+		printf("windows_poll: fd[%d] (overlapped = %p) got events %04X\n", i, overlapped, fds[i].events);
 
-		printf("windows_poll: fd[%d] (fd = %p) got events %04X\n", i, io, fds[i].events);
+		if (overlapped == NULL) {
+			fds[i].revents |= POLLERR;
+			return -1;
+		}
 
-		if (HasOverlappedIoCompleted(io)) {
+		if (HasOverlappedIoCompleted(overlapped)) {
 			printf("  completed\n");
 			fds[i].revents |= POLLIN;
 			triggered++;
 		} else {
-			switch(WaitForSingleObject(io->hEvent, (timeout==-1)?INFINITE:timeout)) 
+			switch(WaitForSingleObject(overlapped->hEvent, (timeout==-1)?INFINITE:timeout)) 
 			{
 			case WAIT_OBJECT_0:
 				printf("  completed after wait\n");
@@ -114,9 +254,10 @@ int windows_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 				break;
 			case WAIT_TIMEOUT:
 				printf("  timed out\n");
-				break;
+				return 0;	// 0 = timeout
 			default:
 				fds[i].revents |= POLLERR;
+				return -1;	// error
 				break;
 			}
 		}

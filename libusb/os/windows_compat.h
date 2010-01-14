@@ -1,45 +1,28 @@
 /*
  * Windows compat: POSIX compatibility wrapper
+ * Copyright (C) 2009 Pete Batard <pbatard@gmail.com>
  *
- * pipe implementation from mlton (http://www.mlton.org - runtime/platform/mingw.h):
- * -----------------------------------------------------------------------------
- * This is the license for MLton, a whole-program optimizing compiler for
- * the Standard ML programming language.  Send comments and questions to
- * MLton@mlton.org.
+ * Parts of poll implementation from libusb-win32, by Stephan Meyer et al.
  *
- * MLton COPYRIGHT NOTICE, LICENSE AND DISCLAIMER.
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
  *
- * Copyright (C) 1999-2009 Henry Cejtin, Matthew Fluet, Suresh
- *    Jagannathan, and Stephen Weeks.
- * Copyright (C) 1997-2000 by the NEC Research Institute
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * Permission to use, copy, modify, and distribute this software and its
- * documentation for any purpose and without fee is hereby granted,
- * provided that the above copyright notice appear in all copies and that
- * both the copyright notice and this permission notice and warranty
- * disclaimer appear in supporting documentation, and that the name of
- * the above copyright holders, or their entities, not be used in
- * advertising or publicity pertaining to distribution of the software
- * without specific, written prior permission.
-
- * The above copyright holders disclaim all warranties with regard to
- * this software, including all implied warranties of merchantability and
- * fitness. In no event shall the above copyright holders be liable for
- * any special, indirect or consequential damages or any damages
- * whatsoever resulting from loss of use, data or profits, whether in an
- * action of contract, negligence or other tortious action, arising out
- * of or in connection with the use or performance of this software.
- * -----------------------------------------------------------------------------
- *
- *
- * parts of poll implementation from libusb-win32 v1, by Stephan Meyer et al.
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  */
 #pragma once
 
-/* 
- * Copied from linux man pages.
- */
+#define MAX_FDS 256
+
 #define POLLIN      0x0001    /* There is data to read */
 #define POLLPRI     0x0002    /* There is urgent data to read */
 #define POLLOUT     0x0004    /* Writing now will not block */
@@ -52,11 +35,18 @@ struct pollfd {
     short events;     /* requested events */
     short revents;    /* returned events */
 };
-#define poll(x, y, z) windows_poll(x, y, z)
-
 typedef unsigned int nfds_t;
-int pipe(int pipefd[2]);
-int windows_poll(struct pollfd *fds, unsigned int nfds, int timeout);
+
+#define poll(x, y, z) libusb_poll(x, y, z)
+#define pipe(x) libusb_pipe(x)
+
+int libusb_pipe(int pipefd[2]);
+int libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout);
+int create_overlapped(void* pollfds_lock);
+void free_overlapped(int fd);
+void *fd_to_overlapped(int fd);
+int overlapped_to_fd(void* overlapped);
+void init_overlapped(void);
 
 #ifndef TIMESPEC_TO_TIMEVAL
 #define TIMESPEC_TO_TIMEVAL(tv, ts) { \
