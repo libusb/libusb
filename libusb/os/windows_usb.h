@@ -31,7 +31,6 @@
 #define false FALSE
 #endif
 
-// Make sure you keep these in check with what libusb uses for its device declaration
 #if !defined(libusb_bus_t)
 #define libusb_bus_t uint8_t
 #define LIBUSB_BUS_MAX UINT8_MAX
@@ -41,7 +40,6 @@
 #define LIBUSB_DEVADDR_MAX UINT8_MAX
 #endif
 
-// Better safe than sorry...
 #define safe_free(p) do {if (p != NULL) {free(p); p = NULL;}} while(0)
 #define safe_closehandle(h) do {if (h != INVALID_HANDLE_VALUE) {CloseHandle(h); h = INVALID_HANDLE_VALUE;}} while(0)
 #define safe_strncpy(dst, dst_max, src, count) strncpy(dst, src, min(count, dst_max - 1))
@@ -71,7 +69,7 @@ void inline upperize(char* str) {
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 #define ERRNO GetLastError()
 
-// API (driver access) types
+// Supported APIs
 enum api_type {
 	API_NONE,
 	API_WINUSB,
@@ -91,7 +89,6 @@ enum api_type {
 
 enum windows_version {
 	WINDOWS_UNSUPPORTED,
-	WINDOWS_2000,
 	WINDOWS_XP,
 	WINDOWS_VISTA_AND_LATER,
 };
@@ -222,34 +219,6 @@ typedef struct _USB_CONFIGURATION_DESCRIPTOR_SHORT {
 	USB_CONFIGURATION_DESCRIPTOR data;
 } USB_CONFIGURATION_DESCRIPTOR_SHORT;
 #pragma pack()
-
-
-/*
- * Some of the EX stuff is not yet in MinGW => define it
- */
-#ifndef USB_GET_NODE_CONNECTION_INFORMATION_EX
-#define USB_GET_NODE_CONNECTION_INFORMATION_EX 274
-#endif
-
-#ifndef IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX
-#define IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX \
-	CTL_CODE(FILE_DEVICE_USB, USB_GET_NODE_CONNECTION_INFORMATION_EX, \
-	METHOD_BUFFERED, FILE_ANY_ACCESS)
-#endif
-
-#ifndef USB_NODE_CONNECTION_INFORMATION_EX
-typedef struct _USB_NODE_CONNECTION_INFORMATION_EX {
-	ULONG ConnectionIndex;
-	USB_DEVICE_DESCRIPTOR DeviceDescriptor;
-	UCHAR CurrentConfigurationValue;
-	UCHAR Speed;
-	BOOLEAN DeviceIsHub;
-	USHORT DeviceAddress;
-	ULONG NumberOfOpenPipes;
-	USB_CONNECTION_STATUS ConnectionStatus;
-	USB_PIPE_INFO PipeList[0];
-} USB_NODE_CONNECTION_INFORMATION_EX, *PUSB_NODE_CONNECTION_INFORMATION_EX;
-#endif
 
 #ifndef USB_HUB_CAP_FLAGS
 typedef union _USB_HUB_CAP_FLAGS {

@@ -134,6 +134,16 @@ int test_mass_storage(libusb_device_handle *handle)
 	unsigned char lun;
 	struct command_block_wrapper cbw;
 	struct command_status_wrapper csw;
+	uint8_t buffer[512];
+	if (buffer == NULL) {
+		perr("failed to allocate mass storage test buffer\n");
+		return -1;
+	}
+
+	// This reset doesn't seem to work...
+	printf("Resetting device...\n");
+	CALL_CHECK(libusb_reset_device(handle));
+
 	printf("Sending Mass Storage Reset...\n");
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		BOMS_RESET, 0, 0, NULL, 0, 1000));
@@ -152,15 +162,31 @@ int test_mass_storage(libusb_device_handle *handle)
 	cbw.bCBWLUN = 0;
 	cbw.bCBWCBLength = 1;
 
-	CALL_CHECK(libusb_bulk_transfer(handle, 0x01, (unsigned char*)&cbw, 16,	&size, 1000));
+	CALL_CHECK(libusb_bulk_transfer(handle, 0x01, (unsigned char*)&cbw, 16, &size, 1000));
 	printf("sent %d bytes\n", size);
-	CALL_CHECK(libusb_bulk_transfer(handle, 0x81, (unsigned char*)&csw, 13,	&size, 1000));
+	CALL_CHECK(libusb_bulk_transfer(handle, 0x81, (unsigned char*)&csw, 13, &size, 1000));
 	printf("received %d bytes\n", size);
 	printf("Tag = %08X\n", csw.dCSWTag);
 	printf("Status = %02X\n", csw.bCSWStatus);
 
-	printf("Resetting device...\n");
-	CALL_CHECK(libusb_reset_device(handle));
+	// Send Inquiry
+	cbw.dCBWSignature[0] = 'U';
+	cbw.dCBWSignature[1] = 'S';
+	cbw.dCBWSignature[2] = 'B';
+	cbw.dCBWSignature[3] = 'C';
+	cbw.dCBWTag = 0x01234567;
+	cbw.dCBWDataTransferLength = 0x60;
+	cbw.bmCBWFlags = 0x80;
+	cbw.bCBWLUN = 0;
+	cbw.bCBWCBLength = 6;
+	cbw.CBWCB[0] = 0x12;	// Inquiry
+	cbw.CBWCB[4] = 0x60;	// Inquiry data size
+
+	CALL_CHECK(libusb_bulk_transfer(handle, 0x01, (unsigned char*)&cbw, 22, &size, 100));
+	printf("sent %d bytes\n", size);
+	CALL_CHECK(libusb_bulk_transfer(handle, 0x81, (unsigned char*)&buffer, 0x60, &size, 100));
+	printf("received %d bytes\n", size);
+	printf("VID:PID:REV:SPE %s:%s:%s:%s\n", &buffer[8], &buffer[16], &buffer[32], &buffer[38]);
 	return 0;
 }
 
@@ -172,6 +198,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
 	int iface, nb_ifaces;
+	int test_scsi = 0;
 	
 	printf("Opening device...\n");
 	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
@@ -206,6 +233,12 @@ int test_device(uint16_t vid, uint16_t pid)
 				conf_desc->interface[i].altsetting[j].bInterfaceClass,
 				conf_desc->interface[i].altsetting[j].bInterfaceSubClass,
 				conf_desc->interface[i].altsetting[j].bInterfaceProtocol);
+			if ( (conf_desc->interface[i].altsetting[j].bInterfaceClass == LIBUSB_CLASS_MASS_STORAGE) 
+			  && ( (conf_desc->interface[i].altsetting[j].bInterfaceSubClass == 0x01)
+			  || (conf_desc->interface[i].altsetting[j].bInterfaceSubClass == 0x06) ) ) {
+				// Mass storage devices that can use basic SCSI commands
+				test_scsi = -1;
+			}
 			for (k=0; k<conf_desc->interface[i].altsetting[j].bNumEndpoints; k++) {
 				endpoint = &conf_desc->interface[i].altsetting[j].endpoint[k];
 				printf("       endpoint[%d].address: %02X\n", k, endpoint->bEndpointAddress);
@@ -245,7 +278,7 @@ int test_device(uint16_t vid, uint16_t pid)
 		printf("Got string: \"%s\"\n", string);
 	}
 
-	if (test_mode == USE_KEY) {
+	if (test_scsi) {
 		CALL_CHECK(test_mass_storage(handle));
 	}
 

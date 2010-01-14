@@ -35,7 +35,7 @@
  *   pollable fds
  * - leave the core functions call the poll routine and flag POLLIN/POLLOUT
  * 
- * For pipe pollavle synchronous I/O (read end polling only), you would:
+ * For pipe pollable synchronous I/O (read end polling only), you would:
  * - create an anonymous pipe with pipe_for_poll to obtain 2 fds (r & w)
  * - use write_for_poll / read_for_poll to write to either end of the pipe
  * - use poll to check for data to read
@@ -60,6 +60,11 @@
  * use the OVERLAPPED directly (which is what we do in the USB async I/O 
  * functions), the marker is not used at all.
  */
+
+/*
+ * TODO: Once MinGW supports it (or for other compilation platforms) use
+ * CancelIoEx instead of CancelIo for Vista and later platforms
+ */
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -68,16 +73,12 @@
 
 #include "windows_compat.h"
 
+// Uncomment to debug the polling layer
 //#define DEBUG_WINDOWS_COMPAT
 #ifdef DEBUG_WINDOWS_COMPAT
 #define printb(...) printf(__VA_ARGS__)
 #else
 #define printb(...)
-#endif
-
-// Required for MinGW as the default WINNT_VER is too low
-#ifndef FILE_FLAG_FIRST_PIPE_INSTANCE
-#define FILE_FLAG_FIRST_PIPE_INSTANCE 524288
 #endif
 
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
@@ -87,8 +88,8 @@ const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE};
 struct winfd poll_fd[MAX_FDS];
 // internal fd data
 struct {
-	pthread_mutex_t mutex;	// thread mutex lock for fds
-	BYTE marker;	// 1st byte of a read_for_poll operation gets stored here
+	pthread_mutex_t mutex;  // thread mutex lock for fds
+	BYTE marker;            // 1st byte of a read_for_poll operation gets stored here
 
 } _poll_fd[MAX_FDS];
 
@@ -262,7 +263,7 @@ int pipe_for_poll(int filedes[2])
 	filedes[1] = _open_osfhandle((intptr_t)handle[1], _O_WRONLY);
 	printb("filedes[1] = %d\n", filedes[1]);
 
-	// Now let's set ourselves some OVERLAPPED
+	// Create an OVERLAPPED for each end
 	overlapped[0].hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	if(!overlapped[0].hEvent) {
 		goto out3;
@@ -373,9 +374,6 @@ struct winfd create_fd_for_poll(HANDLE handle, int access_mode)
 void _free_index(int index)
 {
 	// Cancel any async IO (Don't care about the validity of our handles for this)
-	// TODO: Once MinGW supports it (or for other compilation platforms) use
-	// CancelIoEx for Vista and later
-//	CancelIoEx(poll_fd[index].handle, poll_fd[index].overlapped);
 	CancelIo(poll_fd[index].handle);
 	// close fake handle for devices
 	if ( (poll_fd[index].handle != INVALID_HANDLE_VALUE) && (poll_fd[index].handle != 0)
@@ -473,7 +471,7 @@ struct winfd overlapped_to_winfd(OVERLAPPED* overlapped)
 
 /*
  * POSIX poll equivalent, using Windows OVERLAPPED
- * Currently, this function can only accept one of POLLIN or POLLOUT per fd
+ * Currently, this function only accepts one of POLLIN or POLLOUT per fd
  * (but you can create multiple fds from the same handle for read and write)
  */
 int poll(struct pollfd *fds, unsigned int nfds, int timeout)
@@ -486,7 +484,6 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 
 	CHECK_INIT_POLLING;
 
-	// TODO: malloc'ing on each poll is not super-efficient
 	if ((handles_to_wait_on == NULL) || (handle_to_index == NULL)) {
 		errno = ENOMEM;
 		return -1;
