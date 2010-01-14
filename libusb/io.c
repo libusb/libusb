@@ -1321,7 +1321,7 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 {
 	struct usbi_transfer *transfer;
 
-	list_for_each_entry(transfer, &ctx->flying_transfers, list) {
+	list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
 		struct timeval *cur_tv = &transfer->timeout;
 
 		/* if we've reached transfers of infinite timeout, then we have no

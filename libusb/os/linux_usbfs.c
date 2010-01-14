@@ -2097,7 +2097,7 @@ static int op_handle_events(struct libusb_context *ctx,
 			continue;
 
 		num_ready--;
-		list_for_each_entry(handle, &ctx->open_devs, list) {
+		list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
 			hpriv =  __device_handle_priv(handle);
 			if (hpriv->fd == pollfd->fd)
 				break;

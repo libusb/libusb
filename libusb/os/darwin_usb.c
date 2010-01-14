@@ -229,7 +229,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
     IOObjectRelease (device);
 
     pthread_mutex_lock(&ctx->open_devs_lock);
-    list_for_each_entry(handle, &ctx->open_devs, list) {
+    list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
       dpriv = (struct darwin_device_priv *)handle->dev->os_priv;
 
       /* the device may have been opened several times. write to each handle's event descriptor */
@@ -1449,7 +1449,7 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds
       continue;
 
     num_ready--;
-    list_for_each_entry(handle, &ctx->open_devs, list) {
+    list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
       hpriv =  (struct darwin_device_handle_priv *)handle->os_priv;
       if (hpriv->fds[0] == pollfd->fd)
 	break;
