@@ -81,6 +81,7 @@ int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
 	int r;
+	int iface = 1;
 	
 	printf("Opening device...\n");
 	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
@@ -90,23 +91,23 @@ int test_device(uint16_t vid, uint16_t pid)
 		return -1;
 	}
 
-	printf("Claiming interface...\n");
-	r = libusb_claim_interface(handle, 0);
+	printf("Claiming interface %d...\n", iface);
+	r = libusb_claim_interface(handle, iface);
 	if (r != LIBUSB_SUCCESS) {
 		// Maybe we need to detach the driver
 		perr("failed. Trying to detach driver...\n");
-		CALL_CHECK(libusb_detach_kernel_driver(handle, 0));
+		CALL_CHECK(libusb_detach_kernel_driver(handle, iface));
 		printf("Claiming interface again...\n");
-		CALL_CHECK(libusb_claim_interface(handle, 0));
+		CALL_CHECK(libusb_claim_interface(handle, iface));
 	}
 
 	char string[128];
 	printf("Retieving string descriptor...\n");
-	CALL_CHECK(libusb_get_string_descriptor_ascii(handle, 2, string, 128));
+	CALL_CHECK(libusb_get_string_descriptor_ascii(handle, 3, string, 128));
 	printf("Got string: \"%s\"\n", string);
 
 	printf("Releasing interface...\n");
-	CALL_CHECK(libusb_release_interface(handle, 0));
+	CALL_CHECK(libusb_release_interface(handle, iface));
 
 	printf("Closing device...\n");
 	libusb_close(handle);

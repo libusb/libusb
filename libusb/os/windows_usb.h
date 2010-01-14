@@ -44,25 +44,47 @@
 #define safe_free(p) do {if (p != NULL) {free(p); p = NULL;}} while(0)
 #define safe_closehandle(h) do {if (h != INVALID_HANDLE_VALUE) {CloseHandle(h); h = INVALID_HANDLE_VALUE;}} while(0)
 #define safe_strncpy(dst, dst_max, src, count) strncpy(dst, src, min(count, dst_max - 1))
+#define safe_strcpy(dst, dst_max, src) safe_strncpy(dst, dst_max, src, strlen(src)+1)
 #define safe_strncat(dst, dst_max, src, count) strncat(dst, src, min(count, dst_max - strlen(dst) - 1))
+#define safe_strcat(dst, dst_max, src) safe_strncat(dst, dst_max, src, strlen(src)+1)
 #define safe_strcmp(str1, str2) strcmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2))
 #define safe_strncmp(str1, str2, count) strncmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2), count)
 #define safe_strdup _strdup
 #define safe_sprintf _snprintf
 #define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
+void inline upperize(char* str) {
+	size_t i;
+	if (str == NULL) return;
+	for (i=0; i<strlen(str); i++)
+		str[i] = toupper(str[i]);
+}
 
 // #define MAX_ISO_BUFFER_LENGTH		32768
 // #define MAX_BULK_BUFFER_LENGTH		16384
 #define MAX_CTRL_BUFFER_LENGTH		4096
 
-#define ROOT_PREFIX "\\\\.\\"
 #define MAX_PATH_LENGTH 128
-#define MAX_KEY_LENGTH 64
+#define MAX_KEY_LENGTH 256
 #define ERR_BUFFER_SIZE	256
 
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 #define ERRNO GetLastError()
 
+// API (driver access) types
+enum api_type {
+	API_NONE,
+	API_WINUSB,
+};
+
+#define API_CALL(api, fname, ...)			\
+	switch(api) {							\
+	case API_WINUSB:						\
+		r = winusb_##fname(__VA_ARGS__);	\
+		break;								\
+	default:								\
+		r = LIBUSB_ERROR_NOT_SUPPORTED;		\
+		break;								\
+	}
 
 /*
  * private structures definition
@@ -90,20 +112,26 @@ struct windows_device_priv {
 	struct libusb_device *parent_dev;	// access to parent is required for usermode ops
 	ULONG connection_index;	// also required for some usermode ops
 	char *path;	// path used by Windows to reference the USB node
+	char *interface_path[USB_MAXINTERFACES];	// each interface has a path as well
 	char *driver;	// driver name (eg WinUSB, USBSTOR, HidUsb, etc)
+	enum api_type api;
 	uint8_t active_config;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
 	unsigned char **config_descriptor;	// list of pointers to the cached config descriptors
 };
 
 static inline void windows_device_priv_init(struct windows_device_priv* p) {
+	int i;
 	p->parent_dev = NULL;
 	p->connection_index = 0;
 	p->path = NULL;
 	p->driver = NULL;
+	p->api = API_NONE;
 	p->active_config = 0;
 	p->config_descriptor = NULL;
 	memset(&(p->dev_descriptor), 0, sizeof(USB_DEVICE_DESCRIPTOR));
+	for (i=0; i<USB_MAXINTERFACES; i++)
+		p->interface_path[i] = NULL;
 }
 
 static inline void windows_device_priv_release(struct windows_device_priv* p, int num_configurations) {
@@ -115,24 +143,27 @@ static inline void windows_device_priv_release(struct windows_device_priv* p, in
 			safe_free(p->config_descriptor[i]);
 	}
 	safe_free(p->config_descriptor);
+	for (i=0; i<USB_MAXINTERFACES; i++)
+		safe_free(p->interface_path[i]);
 }
 
 static inline struct windows_device_priv *__device_priv(struct libusb_device *dev) {
 	return (struct windows_device_priv *)dev->os_priv;
 }
 
-typedef void *WINUSB_INTERFACE_HANDLE, *PWINUSB_INTERFACE_HANDLE;
-
-struct windows_device_handle_priv {
-	bool is_open;
-	HANDLE file_handle;
-	WINUSB_INTERFACE_HANDLE interface_handle[USB_MAXINTERFACES];
+struct winusb_handles {
+	HANDLE file;
+	HANDLE winusb;
 };
 
+struct windows_device_handle_priv {
+	struct winusb_handles interface_handle[USB_MAXINTERFACES];
+};
+
+// used for async polling functions
 struct windows_transfer_priv {
 	OVERLAPPED* io;
 	HANDLE handle;
-	uint32_t io_size;
 };
 
 
@@ -294,6 +325,8 @@ typedef struct {
   USHORT length;
 } WINUSB_SETUP_PACKET, *PWINUSB_SETUP_PACKET;
 #pragma pack()
+
+typedef void *WINUSB_INTERFACE_HANDLE, *PWINUSB_INTERFACE_HANDLE;
 
 DLL_DECLARE(WINAPI, BOOL, WinUsb_Initialize, 
             (HANDLE, PWINUSB_INTERFACE_HANDLE));
