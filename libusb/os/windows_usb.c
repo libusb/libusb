@@ -87,6 +87,7 @@ static void winusb_close(struct libusb_device_handle *dev_handle);
 static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int iface);
 static int winusb_release_interface(struct libusb_device_handle *dev_handle, int iface);
 static int winusb_submit_control_transfer(struct usbi_transfer *itransfer);
+static int winusb_set_interface_altsetting(struct libusb_device_handle *dev_handle, int iface, int altsetting);
 
 // HCD private chained list
 struct windows_hcd_priv* hcd_root = NULL;
@@ -1256,13 +1257,21 @@ static int windows_get_configuration(struct libusb_device_handle *dev_handle, in
 
 static int windows_set_configuration(struct libusb_device_handle *dev_handle, int config)
 {
-	/* 
-	 * from http://msdn.microsoft.com/en-us/library/ms793522.aspx: The port driver 
-	 * does not currently expose a service that allows higher-level drivers to set 
-	 * the configuration.
-	 * TODO: See if this is achievable with kernel drivers
-	 */
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	int r = LIBUSB_SUCCESS;
+
+	if (config >= USB_MAXCONFIG)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	r = libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_OUT | 
+		LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_DEVICE,
+		LIBUSB_REQUEST_SET_CONFIGURATION, config,
+		0, NULL, 0, 1000);
+
+	if (r == LIBUSB_SUCCESS) {
+		// TODO: update pipes data?
+	}
+
+	return r;
 }
 
 static int windows_claim_interface(struct libusb_device_handle *dev_handle, int iface)
@@ -1290,16 +1299,49 @@ static int windows_release_interface(struct libusb_device_handle *dev_handle, in
 
 static int windows_set_interface_altsetting(struct libusb_device_handle *dev_handle, int iface, int altsetting)
 {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	int r = LIBUSB_SUCCESS;
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+
+	API_CALL(priv->api, set_interface_altsetting, dev_handle, iface, altsetting);
+
+	return r;
 }
 
+/* Clear a halt/stall condition on an endpoint.
+ *
+ * It's OK for this function to block.
+ *
+ * Return:
+ * - 0 on success
+ * - LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
+ * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected since it
+ *   was opened
+ * - another LIBUSB_ERROR code on other failure
+ */
 static int windows_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+/* Perform a USB port reset to reinitialize a device.
+ *
+ * If possible, the handle should still be usable after the reset
+ * completes, assuming that the device descriptors did not change during
+ * reset and all previous interface state can be restored.
+ *
+ * If something changes, or you cannot easily locate/verify the resetted
+ * device, return LIBUSB_ERROR_NOT_FOUND. This prompts the application
+ * to close the old handle and re-enumerate the device.
+ *
+ * Return:
+ * - 0 on success
+ * - LIBUSB_ERROR_NOT_FOUND if re-enumeration is required, or if the device
+ *   has been disconnected since it was opened
+ * - another LIBUSB_ERROR code on other failure
+ */
 static int windows_reset_device(struct libusb_device_handle *dev_handle)
 {
+// http://stackoverflow.com/questions/987958/how-do-i-reset-usb-devices-using-the-windows-api
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
@@ -1308,6 +1350,7 @@ static int windows_kernel_driver_active(struct libusb_device_handle *dev_handle,
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+// The 2 functions below are unlikely to ever get supported on Windows
 static int windows_attach_kernel_driver(struct libusb_device_handle *dev_handle, int iface) {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
@@ -1324,9 +1367,25 @@ static void windows_destroy_device(struct libusb_device *dev)
 
 static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 {
+/*	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
+	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
+	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
+	int r;
+
+	API_CALL(priv->api, submit_bulk_transfer, itransfer);
+	if (r != LIBUSB_SUCCESS) {
+		return r;
+	}
+
+	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, POLLIN);
+
+	return LIBUSB_SUCCESS;
+*/
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+// WinUSB does not support isochronous transfers
 static int submit_iso_transfer(struct usbi_transfer *itransfer)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
@@ -1821,7 +1880,29 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	// Again, use priv_transfer to store data needed for async polling
 	transfer_priv->pollable_fd = wfd;
 
-	usbi_dbg("overlapped WinUsb_ControlTransfer initiated");
+//	usbi_dbg("overlapped WinUsb_ControlTransfer initiated");
+
+	return LIBUSB_SUCCESS;
+}
+
+static int winusb_set_interface_altsetting(struct libusb_device_handle *dev_handle, int iface, int altsetting)
+{
+	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
+	HANDLE winusb_handle;
+
+	winusb_handle = handle_priv->interface_handle[iface].winusb;
+	if ((winusb_handle == 0) || (winusb_handle == INVALID_HANDLE_VALUE)) {
+		usbi_err(ctx, "interface must be claimed first");
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	if (!WinUsb_SetCurrentAlternateSetting(winusb_handle, altsetting)) {
+		usbi_err(ctx, "WinUsb_SetCurrentAlternateSetting failed: %s", windows_error_str(0));
+		return LIBUSB_ERROR_IO;
+	}
+
+	usbi_dbg("WinUsb_SetCurrentAlternateSetting success");
 
 	return LIBUSB_SUCCESS;
 }
