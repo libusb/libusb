@@ -59,17 +59,17 @@ struct winfd {
 	HANDLE handle;           // what we need to attach overlapped to the I/O op, so we can poll it
 	OVERLAPPED* overlapped;  // what will report our I/O status
 	enum rw_type rw;         // I/O transfer direction: read *XOR* write (NOT BOTH)
-	BYTE marker;             // 1st byte of a read_for_poll operation gets stored here
 };
 extern const struct winfd INVALID_WINFD;
 
-#define pipe(x) pipe_for_poll(x)
 int pipe_for_poll(int pipefd[2]);
 int poll(struct pollfd *fds, unsigned int nfds, int timeout);
 ssize_t write_for_poll(int fd, const void *buf, size_t count);
 ssize_t read_for_poll(int fd, void *buf, size_t count);
 int close_for_poll(int fd);
 
+void init_polling(void);
+void exit_polling(void);
 struct winfd create_fd_for_poll(HANDLE handle, int access_mode);
 void free_fd_for_poll(int fd);
 void free_overlapped_for_poll(int fd);

@@ -76,14 +76,16 @@ enum api_type {
 	API_WINUSB,
 };
 
-#define API_CALL(api, fname, ...)			\
-	switch(api) {							\
-	case API_WINUSB:						\
-		r = winusb_##fname(__VA_ARGS__);	\
-		break;								\
-	default:								\
-		r = LIBUSB_ERROR_NOT_SUPPORTED;		\
-		break;								\
+#define API_CALL(api, fname, ...)				\
+	switch(api) {								\
+	case API_WINUSB:							\
+		r = winusb_##fname(__VA_ARGS__);		\
+		break;									\
+	default:									\
+		r = LIBUSB_ERROR_NOT_SUPPORTED;			\
+		usbi_dbg("unsupported API call for '"	\
+			#fname "' (api=%d)", api);			\
+		break;									\
 	}
 
 /*

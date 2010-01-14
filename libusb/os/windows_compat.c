@@ -60,7 +60,6 @@
  * use the OVERLAPPED directly (which is what we do in the USB async I/O 
  * functions), the marker is not used at all.
  */
-// TODO: fd mutexes
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -83,43 +82,55 @@
 
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
 
-const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE, 0};
+// public fd data
+const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE};
 struct winfd poll_fd[MAX_FDS];
+// internal fd data
+struct {
+	pthread_mutex_t mutex;	// thread mutex lock for fds
+	BYTE marker;	// 1st byte of a read_for_poll operation gets stored here
 
+} _poll_fd[MAX_FDS];
+
+// globals
 BOOLEAN is_polling_set = FALSE;
 unsigned short pipe_number = 0;
-pthread_mutex_t winfd_lock;	// lockout other threads when looking up winfds
 
+// Init
 void init_polling(void)
 {
 	int i;
-	if (is_polling_set)
+	// This might not 
+	if (is_polling_set) {
+		// The sleep 1 sec is to give enough time for our initialization
+		// below to finish, should concurrent simultaneous inits be issued 
+		// from multiple threads - we don't want the second init to return
+		// before the first has had time to complete its job.
+		Sleep(1000);
 		return;
+	}
 	is_polling_set = TRUE;
 	for (i=0; i<MAX_FDS; i++) {
 		poll_fd[i] = INVALID_WINFD;
+		_poll_fd[i].marker = 0;
+		pthread_mutex_init(&_poll_fd[i].mutex, NULL);
 	}
-	pthread_mutex_init(&winfd_lock, NULL);
 }
 
-// Internal function to retrieve the table index
-int _fd_to_index(int fd)
+// Internal function to retrieve the table index (and lock the fd mutex)
+int _fd_to_index_and_lock(int fd)
 {
 	int i;
-
-	CHECK_INIT_POLLING;
 
 	if (fd <= 0)
 		return -1;
 
-	pthread_mutex_lock(&winfd_lock);
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd == fd) {
-			pthread_mutex_unlock(&winfd_lock);
+			pthread_mutex_lock(&_poll_fd[i].mutex);
 			return i;
 		}
 	}
-	pthread_mutex_unlock(&winfd_lock);
 	return -1;
 }
 
@@ -163,6 +174,31 @@ void reset_overlapped(OVERLAPPED *overlapped)
 	overlapped->hEvent = event_handle;
 }
 
+void exit_polling(void)
+{
+	int i;
+	if (!is_polling_set)
+		return;
+	is_polling_set = FALSE;
+
+	for (i=0; i<MAX_FDS; i++) {
+		// Cancel any async I/O (handle can be invalid)
+		CancelIo(poll_fd[i].handle);
+		// If anything was pending on that I/O, it should be
+		// terminating, and we should be able to access the fd
+		// mutex lock before too long
+		pthread_mutex_lock(&_poll_fd[i].mutex);
+		if ( (poll_fd[i].fd > 0) && (poll_fd[i].handle != INVALID_HANDLE_VALUE) && (poll_fd[i].handle != 0)
+		  && (GetFileType(poll_fd[i].handle) == FILE_TYPE_UNKNOWN) ) {
+			_close(poll_fd[i].fd);
+		}
+		free_overlapped(poll_fd[i].overlapped);
+		poll_fd[i] = INVALID_WINFD;
+		pthread_mutex_unlock(&_poll_fd[i].mutex);
+		pthread_mutex_destroy(&_poll_fd[i].mutex);
+	}
+}
+
 /*
  * sets the async I/O read on our 1 byte marker
  *
@@ -170,9 +206,11 @@ void reset_overlapped(OVERLAPPED *overlapped)
  */
 inline void _init_read_marker(int index) 
 {
+	// Cancel any read operation in progress
+	CancelIo(poll_fd[index].handle);
 	// Setup a new async read on our marker
 	reset_overlapped(poll_fd[index].overlapped);
-	if (!ReadFile(poll_fd[index].handle, &poll_fd[index].marker, 1, NULL, poll_fd[index].overlapped)) {
+	if (!ReadFile(poll_fd[index].handle, &_poll_fd[index].marker, 1, NULL, poll_fd[index].overlapped)) {
 		if(GetLastError() != ERROR_IO_PENDING) {
 			printb("_init_read_marker: didn't get IO_PENDING!\n");
 			reset_overlapped(poll_fd[index].overlapped);
@@ -234,9 +272,9 @@ int pipe_for_poll(int filedes[2])
 		goto out4;
 	}
 
-	pthread_mutex_lock(&winfd_lock);
 	for (i=0, j=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd < 0) {
+			pthread_mutex_lock(&_poll_fd[i].mutex);
 			poll_fd[i].fd = filedes[j];
 			poll_fd[i].handle = handle[j];
 			poll_fd[i].overlapped = &overlapped[j];
@@ -246,13 +284,13 @@ int pipe_for_poll(int filedes[2])
 				// Start a 1 byte nonblocking read operation
 				// so that we get read event notifications
 				_init_read_marker(i);
-			} else {
-				pthread_mutex_unlock(&winfd_lock);
+			}
+			pthread_mutex_unlock(&_poll_fd[i].mutex);
+			if (j>=2) {
 				return 0;
 			}
 		}
 	}
-	pthread_mutex_unlock(&winfd_lock);
 
 	CloseHandle(overlapped[1].hEvent);
 out4:
@@ -304,8 +342,7 @@ struct winfd create_fd_for_poll(HANDLE handle, int access_mode)
 	}
 
 	// Ensure that we get a non system conflicting unique fd
-	// TODO: remove read and write access and see if it still works
-	fd = _open_osfhandle((intptr_t)CreateFileA("NUL", GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE,
+	fd = _open_osfhandle((intptr_t)CreateFileA("NUL", 0, 0,
 		NULL, OPEN_EXISTING, 0, NULL), _O_RDWR);
 	if (fd < 0) {
 		return INVALID_WINFD;
@@ -317,22 +354,33 @@ struct winfd create_fd_for_poll(HANDLE handle, int access_mode)
 		return INVALID_WINFD;
 	}
 
-	// Bad things might happen if we don't protect this loop
-	pthread_mutex_lock(&winfd_lock);
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd < 0) {
+			pthread_mutex_lock(&_poll_fd[i].mutex);
 			wfd.fd = fd;
 			wfd.handle = handle;
 			wfd.overlapped = overlapped;
 			memcpy(&poll_fd[i], &wfd, sizeof(struct winfd));
-			pthread_mutex_unlock(&winfd_lock);
+			pthread_mutex_unlock(&_poll_fd[i].mutex);
 			return wfd;
 		}
 	}
-	pthread_mutex_unlock(&winfd_lock);
 	free_overlapped(overlapped);
 	_close(fd);
 	return INVALID_WINFD;
+}
+
+void _free_index(int index)
+{
+	// Cancel any async IO (Don't care about the validity of our handle for this)
+	CancelIo(poll_fd[index].handle);
+	// close fake handle for devices
+	if ( (poll_fd[index].handle != INVALID_HANDLE_VALUE) && (poll_fd[index].handle != 0)
+	  && (GetFileType(poll_fd[index].handle) == FILE_TYPE_UNKNOWN) ) {
+		_close(poll_fd[index].fd);
+	}
+	free_overlapped(poll_fd[index].overlapped);
+	poll_fd[index] = INVALID_WINFD;
 }
 
 /*
@@ -342,32 +390,21 @@ struct winfd create_fd_for_poll(HANDLE handle, int access_mode)
  */
 void free_fd_for_poll(int fd)
 {
-	int i;
+	int index;
 
 	CHECK_INIT_POLLING;
 
-	pthread_mutex_lock(&winfd_lock);
-	for (i=0; i<MAX_FDS; i++) {
-		if (poll_fd[i].fd == fd) {
-			// Cancel any async IO (Don't care about the validity of our handle for this)
-			CancelIo(poll_fd[i].handle);
-			// close fake handle for devices
-			if ( (poll_fd[i].handle != INVALID_HANDLE_VALUE) && (poll_fd[i].handle != 0)
-			  && (GetFileType(poll_fd[i].handle) == FILE_TYPE_UNKNOWN) ) {
-				_close(poll_fd[i].fd);
-			}
-			free_overlapped(poll_fd[i].overlapped);
-			poll_fd[i] = INVALID_WINFD;
-			break;
-		}
+	index = _fd_to_index_and_lock(fd);
+	if (index < 0) {
+		return;
 	}
-	pthread_mutex_unlock(&winfd_lock);
+	_free_index(index);
+	pthread_mutex_unlock(&_poll_fd[index].mutex);
 }
 
 /*
  * The functions below perform various conversions between fd, handle and OVERLAPPED
  */
-// TODO: more efficient lookups
 struct winfd fd_to_winfd(int fd)
 {
 	int i;
@@ -378,15 +415,14 @@ struct winfd fd_to_winfd(int fd)
 	if (fd <= 0)
 		return INVALID_WINFD;
 
-	pthread_mutex_lock(&winfd_lock);
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd == fd) {
+			pthread_mutex_lock(&_poll_fd[i].mutex);
 			memcpy(&wfd, &poll_fd[i], sizeof(struct winfd));
-			pthread_mutex_unlock(&winfd_lock);
+			pthread_mutex_unlock(&_poll_fd[i].mutex);
 			return wfd;
 		}
 	}
-	pthread_mutex_unlock(&winfd_lock);
 	return INVALID_WINFD;
 }
 
@@ -400,15 +436,14 @@ struct winfd handle_to_winfd(HANDLE handle)
 	if ((handle == 0) || (handle == INVALID_HANDLE_VALUE))
 		return INVALID_WINFD;
 
-	pthread_mutex_lock(&winfd_lock);
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].handle == handle) {
+			pthread_mutex_lock(&_poll_fd[i].mutex);
 			memcpy(&wfd, &poll_fd[i], sizeof(struct winfd));
-			pthread_mutex_unlock(&winfd_lock);
+			pthread_mutex_unlock(&_poll_fd[i].mutex);
 			return wfd;
 		}
 	}
-	pthread_mutex_unlock(&winfd_lock);
 	return INVALID_WINFD;
 }
 
@@ -422,15 +457,14 @@ struct winfd overlapped_to_winfd(OVERLAPPED* overlapped)
 	if (overlapped == NULL)
 		return INVALID_WINFD;
 
-	pthread_mutex_lock(&winfd_lock);
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].overlapped == overlapped) {
+			pthread_mutex_lock(&_poll_fd[i].mutex);
 			memcpy(&wfd, &poll_fd[i], sizeof(struct winfd));
-			pthread_mutex_unlock(&winfd_lock);
+			pthread_mutex_unlock(&_poll_fd[i].mutex);
 			return wfd;
 		}
 	}
-	pthread_mutex_unlock(&winfd_lock);
 	return INVALID_WINFD;
 }
 
@@ -466,12 +500,13 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			return -1;
 		}
 
-		index = _fd_to_index(fds[i].fd);
+		index = _fd_to_index_and_lock(fds[i].fd);
 		if ( (index < 0) || (poll_fd[index].handle == INVALID_HANDLE_VALUE)
 		  || (poll_fd[index].handle == 0) || (poll_fd[index].overlapped == NULL)) {
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
 			printb("poll: invalid fd\n");
+			pthread_mutex_unlock(&_poll_fd[index].mutex);
 			return -1;
 		}
 
@@ -480,6 +515,7 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
 			printb("poll: attempted POLLIN on fd[%d] without READ access\n", i);
+			pthread_mutex_unlock(&_poll_fd[index].mutex);
 			return -1;
 		}
 
@@ -487,6 +523,7 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
 			printb("poll: attempted POLLOUT on fd[%d] without WRITE access\n", i);
+			pthread_mutex_unlock(&_poll_fd[index].mutex);
 			return -1;
 		}
 		
@@ -503,6 +540,7 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			handle_to_index[nb_handles_to_wait_on] = i;
 			nb_handles_to_wait_on++;
 		}
+		pthread_mutex_unlock(&_poll_fd[index].mutex);
 	}
 
 	if (triggered != 0)
@@ -517,9 +555,10 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		if (((ret-WAIT_OBJECT_0) >= 0) && ((ret-WAIT_OBJECT_0) < nb_handles_to_wait_on)) {
 			printb("  completed after wait\n");
 			i = handle_to_index[ret-WAIT_OBJECT_0];
-			index = _fd_to_index(fds[i].fd);
+			index = _fd_to_index_and_lock(fds[i].fd);
 			fds[i].revents = fds[i].events;
 			triggered++;
+			pthread_mutex_unlock(&_poll_fd[index].mutex);
 		} else if (ret == WAIT_TIMEOUT) {
 			printb("  timed out\n");
 			return 0;	// 0 = timeout
@@ -539,20 +578,26 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
  */
 int close_for_poll(int fd)
 {
-	int index = _fd_to_index(fd);
+	int index;
 	HANDLE handle;
+
+	CHECK_INIT_POLLING;
+
+	index = _fd_to_index_and_lock(fd);
+
 	if (index < 0) {
 		errno = EBADF;
-		return -1;
+	} else {
+		handle = poll_fd[index].handle;
+		_free_index(index);
+		if (CloseHandle(handle) == 0) {
+			errno = EIO;
+		} else {
+			errno = 0;
+		}
+		pthread_mutex_unlock(&_poll_fd[index].mutex);
 	}
-	// Need to store the handle before the call to free
-	handle = poll_fd[index].handle;
-	free_fd_for_poll(fd);
-	if (CloseHandle(handle) == 0) {
-		errno = EIO;
-		return -1;
-	}
-	return 0;
+	return errno?-1:0;
 }
 
 /*
@@ -565,8 +610,12 @@ int close_for_poll(int fd)
  */
 ssize_t write_for_poll(int fd, const void *buf, size_t count)
 {
-	int index = _fd_to_index(fd);
+	int index;
 	DWORD wr_count;
+
+	CHECK_INIT_POLLING;
+
+	index = _fd_to_index_and_lock(fd);
 
 	if (count == 0) {
 		return 0;
@@ -575,6 +624,7 @@ ssize_t write_for_poll(int fd, const void *buf, size_t count)
 	if ( (index < 0) || (poll_fd[index].overlapped == NULL) 
 	  || (poll_fd[index].rw != RW_WRITE) ) {
 		errno = EBADF;
+		pthread_mutex_unlock(&_poll_fd[index].mutex);
 		return -1;
 	}
 
@@ -584,7 +634,6 @@ ssize_t write_for_poll(int fd, const void *buf, size_t count)
 		CancelIo(poll_fd[index].handle);
 	}
 
-	// TODO: a mutex on the overlapped would be nice...
 	printb("write_for_poll: writing %d bytes to fd=%d\n", count, poll_fd[index].fd);
 
 	reset_overlapped(poll_fd[index].overlapped);
@@ -597,33 +646,36 @@ ssize_t write_for_poll(int fd, const void *buf, size_t count)
 				if (GetOverlappedResult(poll_fd[index].handle, 
 					poll_fd[index].overlapped, &wr_count, FALSE)) {
 					errno = 0;
-					return (ssize_t)wr_count;
+					goto out;
 				} else {
 					printb("write_for_poll: GetOverlappedResult failed with error %d\n", (int)GetLastError());
-					reset_overlapped(poll_fd[index].overlapped);
 					errno = EIO;
-					return -1;
+					goto out;
 				}
 			default:
 				errno = EIO;
-				return -1;
+				goto out;
 			}
 		} else {
 			// I/O started and failed
 			printb("write_for_poll: WriteFile failed with error %d\n", (int)GetLastError());
-			reset_overlapped(poll_fd[index].overlapped);
 			errno = EIO;
-			return -1;
+			goto out;
 		}
-	} else {
-		// I/O started and completed synchronously
-		errno = 0;
-		return (ssize_t)wr_count;
 	}
 
-	printb("write_for_poll: should not see me\n");
-	reset_overlapped(poll_fd[index].overlapped);
-	return -1;
+	// I/O started and completed synchronously
+	errno = 0;
+
+out:
+	if (errno) {
+		reset_overlapped(poll_fd[index].overlapped);
+		pthread_mutex_unlock(&_poll_fd[index].mutex);
+		return -1;
+	} else {
+		pthread_mutex_unlock(&_poll_fd[index].mutex);
+		return (ssize_t)wr_count;
+	}
 }
 
 /*
@@ -632,23 +684,31 @@ ssize_t write_for_poll(int fd, const void *buf, size_t count)
  */
 ssize_t read_for_poll(int fd, void *buf, size_t count)
 {
-	int index = _fd_to_index(fd);
+	int index;
 	DWORD rd_count;
 
+	CHECK_INIT_POLLING;
 	errno = 0;
 
 	if (count == 0) {
 		return 0;
 	}
 
-	if ((index < 0) || (poll_fd[index].rw != RW_READ)) {
+	index = _fd_to_index_and_lock(fd);
+
+	if (index < 0) {
 		errno = EBADF;
 		return -1;
 	}
 
+	if (poll_fd[index].rw != RW_READ) {
+		errno = EBADF;
+		goto out;
+	}
+
+
 	// still waiting for completion => force completion
 	if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
-		// TODO: timeout
 		if (WaitForSingleObject(poll_fd[index].overlapped->hEvent, INFINITE) != WAIT_OBJECT_0) {
 			printb("read_for_poll: waiting for marker failed: %d\n", (int)GetLastError());
 			errno = EIO;
@@ -676,7 +736,7 @@ ssize_t read_for_poll(int fd, void *buf, size_t count)
 		goto out;
 	}
 
-	((BYTE*)buf)[0] = poll_fd[index].marker;
+	((BYTE*)buf)[0] = _poll_fd[index].marker;
 
 	// Read supplementary bytes if needed (blocking)
 	if (count > 1) {
@@ -692,7 +752,7 @@ ssize_t read_for_poll(int fd, void *buf, size_t count)
 			} else {
 				printb("read_for_poll: could not start blocking read of supplementary: %d\n", (int)GetLastError());
 				errno = EIO;
-				return -1;
+				goto out;
 			}
 		}
 		// If ReadFile completed synchronously, we're fine too
@@ -709,6 +769,7 @@ ssize_t read_for_poll(int fd, void *buf, size_t count)
 out:
 	// Setup pending read I/O for the marker
 	_init_read_marker(index);
+	pthread_mutex_unlock(&_poll_fd[index].mutex);
 	if (errno)
 		return -1;
 	else

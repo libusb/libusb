@@ -342,6 +342,9 @@ static int windows_init(struct libusb_context *ctx)
 		return LIBUSB_SUCCESS;
 	}
 
+	// Initialize pollable file descriptors
+	init_polling();
+
 	// Initialize the API
 	r = winusb_api_init(ctx);
 	if (r != LIBUSB_SUCCESS) {
@@ -1101,7 +1104,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			parent_priv = __device_priv(priv->parent_dev);
 
 			// NB: we compare strings of different lengths below => strncmp
-			if ( (safe_strncmp(parent_priv->path, sanitized_path, sizeof(sanitized_path)) == 0)
+			if ( (safe_strncmp(parent_priv->path, sanitized_path, strlen(sanitized_path)) == 0)
 			  && (port_nr == priv->connection_index) ) {
 
 				priv->path = sanitize_path(dev_interface_details->DevicePath);
@@ -1201,6 +1204,7 @@ static void windows_exit(void)
 	}
 
 	winusb_api_exit();
+	exit_polling();
 
 	SetThreadAffinityMask(GetCurrentThread(), old_affinity_mask);
 
@@ -1497,11 +1501,10 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 
 	pthread_mutex_lock(&ctx->open_devs_lock);
 	for (i = 0; i < nfds && num_ready > 0; i++) {
-		struct pollfd *pollfd = &fds[i];
 
-		usbi_dbg("checking fd %x with revents = %x", fds[i], pollfd->revents);
+		usbi_dbg("checking fd %d with revents = %04x", fds[i].fd, fds[i].revents);
 
-		if (!pollfd->revents) {
+		if (!fds[i].revents) {
 			continue;
 		}
 
@@ -1511,7 +1514,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 		// is the most logical choice for now
 		list_for_each_entry(transfer, &ctx->flying_transfers, list) {
 			transfer_priv = usbi_transfer_get_os_priv(transfer);
-			if (transfer_priv->pollable_fd.fd == pollfd->fd) {
+			if (transfer_priv->pollable_fd.fd == fds[i].fd) {
 				found = true;
 				break;
 			}
@@ -1652,10 +1655,6 @@ static int winusb_api_exit(void)
 /*
  * TODO: check if device has been diconnected
  */
-extern int __cdecl _alloc_osfhnd(
-        void
-        );
-
 static int winusb_open(struct libusb_device_handle *dev_handle) 
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
