@@ -48,6 +48,7 @@
 #include <ddk/usbioctl.h>
 #include <ddk/cfgmgr32.h>
 #include <largeint.h>
+#include <inttypes.h>
 
 /* Prevent compilation problems on Windows platforms */
 #ifdef interface
@@ -76,13 +77,15 @@
 
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
 static int windows_get_active_config(struct libusb_device *dev);
+static int windows_clock_gettime(int clk_id, struct timespec *tp);
 
 // HCD private chained list
 struct windows_hcd_priv* hcd_root = NULL;
 // timers
-uint64_t hires_frequency, hires_frequency_ns;
+uint64_t hires_frequency, hires_ticks_to_ps;
 // 1970.01.01 00:00:000 in MS Filetime, as computed and confirmed with google
 const uint64_t epoch_time = 116444736000000000;
+DWORD_PTR old_affinity_mask;
 
 /*
  * Converts a WCHAR string to UTF8 (allocate returned string)
@@ -200,17 +203,40 @@ static int windows_init(struct libusb_context *ctx)
 		return LIBUSB_SUCCESS;
 	}
 
+	// Because QueryPerformanceCounter might report different values when 
+	// running on different cores, we glue the libusb main thread to the
+	// first core to prevent timing discrepancies.
+	// TODO? create a seperate thread for timer and detect single core
+	old_affinity_mask = SetThreadAffinityMask(GetCurrentThread(), 0);
+
 	// Find out if we have access to a monotonic (hires) timer
 	if (!QueryPerformanceFrequency(&li_frequency)) {
 		usbi_dbg("no hires timer available on this platform");
 		hires_frequency = 0;
-		hires_frequency_ns = 0;	
+		hires_ticks_to_ps = 0;	
 	} else {
-		usbi_dbg("hires timer available");
 		hires_frequency = li_frequency.QuadPart;
-		// We compute the ns frequency as well for speedup
-		hires_frequency_ns =  hires_frequency / 1000000000; 
+		// The hires frequency can go as high as 4 GHz, so we'll use a conversion
+		// to picoseconds to compute the tv_nsecs part in clock_gettime
+		hires_ticks_to_ps =  1000000000000 / hires_frequency; 
+		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
 	}
+
+/*
+	// Test our timer
+	struct timespec tp;
+	uint64_t start_time, end_time;
+	uint64_t duration_ms = 3333;
+	if (windows_clock_gettime(USBI_CLOCK_MONOTONIC, &tp) != LIBUSB_SUCCESS)
+		return LIBUSB_ERROR_OTHER;
+	// Make sure computations are 64 bit
+	start_time = ((uint64_t)tp.tv_sec)*1000000000 + ((uint64_t)tp.tv_nsec);
+	Sleep(duration_ms);
+	if (windows_clock_gettime(USBI_CLOCK_MONOTONIC, &tp) != LIBUSB_SUCCESS)
+		return LIBUSB_ERROR_OTHER;
+	end_time = ((uint64_t)tp.tv_sec)*1000000000 + ((uint64_t)tp.tv_nsec);
+	usbi_dbg("timed %"PRIu64" ns: %"PRIu64" ns", (uint64_t)(duration_ms*1000000), (uint64_t)(end_time-start_time));
+*/
 
 	// We maintain a chained list of the Host Controllers found
 	struct windows_hcd_priv** _hcd_cur = &hcd_root;
@@ -857,6 +883,8 @@ static void windows_exit(void)
 		safe_free(hcd_tmp);
 	}
 
+	SetThreadAffinityMask(GetCurrentThread(), old_affinity_mask);
+
 	//TODO: Thread stuff
 }
 
@@ -1077,18 +1105,18 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 	switch(clk_id) {
 	case USBI_CLOCK_MONOTONIC:
 		// If hires_frequency is set, we have an hires monotonic timer available
-		if (hires_frequency != 0) {
-			if (QueryPerformanceCounter(&hires_counter) == 0)
-				return LIBUSB_ERROR_IO;
+		if ((hires_frequency != 0) && (QueryPerformanceCounter(&hires_counter) != 0))
+		{
 			tp->tv_sec = hires_counter.QuadPart / hires_frequency;
-			tp->tv_nsec = (hires_counter.QuadPart % hires_frequency) / hires_frequency_ns;
+			tp->tv_nsec = ((hires_counter.QuadPart % hires_frequency)/1000) * hires_ticks_to_ps;
 			return LIBUSB_SUCCESS;
 		}	
-		// make sure we fall through to real-time if no hires timer is present
+		// make sure we fall through to real-time if we can't get hires timer
 	case USBI_CLOCK_REALTIME:
-		// To get a 100ns resolution time value with real time, we follow 
-		// http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
+		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
 		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
+		// Note however that our resolution is bounded by the Windows system time 
+		// functions and is at best of the order of 1 ms (or, usually, worse)
 		GetSystemTimeAsFileTime(&ftime);
 		rtime.LowPart = ftime.dwLowDateTime;
 		rtime.HighPart = ftime.dwHighDateTime;
