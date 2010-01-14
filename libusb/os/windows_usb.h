@@ -88,8 +88,9 @@ struct windows_device_priv {
 	struct libusb_device *parent_dev;	// access to parent is required for usermode ops
 	ULONG connection_index;	// also required for some usermode ops
 	char *path;	// path used by Windows to reference the USB node
+	uint8_t active_config;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
-	unsigned char *config_descriptor;
+	unsigned char **config_descriptor;	// list of pointers to the cached config descriptors
 };
 
 static inline void windows_device_priv_init(struct windows_device_priv* p) {
@@ -97,13 +98,19 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 	p->parent_dev = NULL;
 	p->connection_index = 0;
 	p->path = NULL;
+	p->active_config = 0;
 	p->config_descriptor = NULL;
 	memset(&(p->dev_descriptor), 0, sizeof(USB_DEVICE_DESCRIPTOR));
 }
 
-static inline void windows_device_priv_release(struct windows_device_priv* p) {
+static inline void windows_device_priv_release(struct windows_device_priv* p, int num_configurations) {
+	int i;
 	safe_closehandle(p->handle);
 	safe_free(p->path);
+	if ((num_configurations > 0) && (p->config_descriptor != NULL)) {
+		for (i=0; i < num_configurations; i++)
+			safe_free(p->config_descriptor[i]);
+	}
 	safe_free(p->config_descriptor);
 }
 

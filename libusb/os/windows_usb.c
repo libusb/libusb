@@ -79,6 +79,14 @@
 #define LOOP_CONTINUE(...) { usbi_warn(ctx, __VA_ARGS__); continue; }
 #define LOOP_BREAK(err) { r=err; continue; } 
 
+
+/*
+ * prototypes
+ */
+static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
+static int windows_get_active_config(struct libusb_device *dev);
+
+
 /*
  * globals
  */
@@ -318,6 +326,7 @@ static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
 	struct libusb_device *parent_dev)
 {
 	struct windows_device_priv *priv = __device_priv(dev);
+	int active_config = 0;
 
 	// Set default values
 	windows_device_priv_init(priv);
@@ -328,6 +337,16 @@ static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
 	priv->handle = handle;
 	priv->connection_index = connection_index;
 	priv->parent_dev = parent_dev;
+
+	active_config = windows_get_active_config(dev);
+
+	if (active_config < 0) {
+		return active_config;
+	} else if (active_config == 0) {
+		// specs say a configuration value of 0 means unconfigured.
+		usbi_dbg("assuming unconfigured device");
+	}
+	priv->active_config = active_config;
 
 	return LIBUSB_SUCCESS;
 }
@@ -424,10 +443,113 @@ static int force_hcd_device_descriptor(struct libusb_device *dev)
 }
 
 /*
+ * fetch and cache all the config descriptors through I/O
+ */
+static int cache_config_descriptors(struct libusb_device *dev) 
+{
+	DWORD size, ret_size;
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct windows_device_priv *priv = __device_priv(dev);
+	struct windows_device_priv *parent_priv = __device_priv(priv->parent_dev);
+	int r;
+	uint8_t i;
+
+	USB_CONFIGURATION_DESCRIPTOR_SHORT cd_buf_short;	// dummy request
+	PUSB_DESCRIPTOR_REQUEST cd_buf_actual = NULL;	// actual request
+	PUSB_CONFIGURATION_DESCRIPTOR cd_data = NULL;
+
+	// Report an error if there are no configs available
+	if (dev->num_configurations == 0)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	// Allocate the list of pointers to the descriptors
+	priv->config_descriptor = malloc(dev->num_configurations * sizeof(PUSB_CONFIGURATION_DESCRIPTOR));
+	if (priv->config_descriptor == NULL)
+		return LIBUSB_ERROR_NO_MEM;
+	for (i=0; i<dev->num_configurations; i++)
+		priv->config_descriptor[i] = NULL;
+
+	for (i=0, r=LIBUSB_SUCCESS; ; i++) 
+	{
+		// safe loop: release all dynamic resources
+		safe_free(cd_buf_actual);
+
+		// safe loop: end of loop condition 
+		if ((i >= dev->num_configurations) || (r != LIBUSB_SUCCESS))
+			break;
+
+		size = sizeof(USB_CONFIGURATION_DESCRIPTOR_SHORT);
+		memset(&cd_buf_short, 0, size);
+
+		cd_buf_short.req.ConnectionIndex = priv->connection_index;
+		cd_buf_short.req.SetupPacket.bmRequest = 0x80;
+		cd_buf_short.req.SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
+		cd_buf_short.req.SetupPacket.wValue = (USB_CONFIGURATION_DESCRIPTOR_TYPE << 8) | i;
+		cd_buf_short.req.SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
+
+		// Dummy call to get the required data size
+		if (!DeviceIoControl(parent_priv->handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
+			&cd_buf_short, size, &ret_size, NULL)) {
+			usbi_err(ctx, "could not access configuration descriptor (dummy): %s", i, windows_error_str());
+			LOOP_BREAK(LIBUSB_ERROR_IO);
+		}
+
+		if ((ret_size != size) || (cd_buf_short.data.wTotalLength < sizeof(USB_CONFIGURATION_DESCRIPTOR))) {
+			usbi_err(ctx, "unexpected configuration descriptor size (dummy).");
+			LOOP_BREAK(LIBUSB_ERROR_IO);
+		}
+
+		size = sizeof(USB_DESCRIPTOR_REQUEST) + cd_buf_short.data.wTotalLength;
+		if ((cd_buf_actual = (PUSB_DESCRIPTOR_REQUEST)malloc(size)) == NULL) {
+			usbi_err(ctx, "could not allocate configuration descriptor buffer. aborting.");
+			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+		}
+		memset(cd_buf_actual, 0, size);
+
+		// Actual call
+		cd_buf_actual->ConnectionIndex = priv->connection_index;
+		cd_buf_actual->SetupPacket.bmRequest = 0x80;
+		cd_buf_actual->SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
+		cd_buf_actual->SetupPacket.wValue = (USB_CONFIGURATION_DESCRIPTOR_TYPE << 8) | i;
+		cd_buf_actual->SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
+
+		if (!DeviceIoControl(parent_priv->handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
+			cd_buf_actual, size, &ret_size, NULL)) {
+			usbi_err(ctx, "could not access configuration descriptor (actual): %s", windows_error_str());
+			LOOP_BREAK(LIBUSB_ERROR_IO);
+		}
+
+		cd_data = (PUSB_CONFIGURATION_DESCRIPTOR)cd_buf_actual->Data;
+
+		if ((size != ret_size) || (cd_data->wTotalLength != cd_buf_short.data.wTotalLength)) {
+			usbi_err(ctx, "unexpected configuration descriptor size (actual).");
+			LOOP_BREAK(LIBUSB_ERROR_IO);
+		}
+
+		if (cd_data->bDescriptorType != USB_CONFIGURATION_DESCRIPTOR_TYPE) {
+			usbi_err(ctx, "not a configuration descriptor");
+			LOOP_BREAK(LIBUSB_ERROR_IO);
+		}
+
+		usbi_dbg("Got config descriptor alright for config %d (%d bytes)", i+1, cd_data->wTotalLength);
+	
+		// Sanity check. Ensures that indexes for our list of config desc is in the right order
+		if (i != (cd_data->bConfigurationValue-1)) {
+			LOOP_CONTINUE("program assertion failed: config descriptors are being read out of order");
+		}
+
+		// Cache the descriptor
+		priv->config_descriptor[i] = malloc(cd_data->wTotalLength);
+		if (priv->config_descriptor[i] == NULL)
+			return LIBUSB_ERROR_NO_MEM;
+
+		memcpy(priv->config_descriptor[i], cd_data, cd_data->wTotalLength);
+	}
+	return LIBUSB_SUCCESS;
+}
+
+/*
  * Recursively enumerates and finds all hubs & devices
- *
- * hub_dev: HANDLE of the Hub to be enumerated
- * parent_privv: pointer to the parent hub priv struct, or NULL is parent is an HCD
  */
 static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs **_discdevs, 
 	HANDLE hub_handle, libusb_bus_t busnum, struct libusb_device *parent_dev, uint8_t nb_ports) 
@@ -592,6 +714,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			// For HCDs, we just populate it manually
 			if (!is_hcd) { 
 				LOOP_CHECK(cache_device_descriptor(dev));
+				LOOP_CHECK(cache_config_descriptors(dev));
 			} else {
 				LOOP_CHECK(force_hcd_device_descriptor(dev));
 			}
@@ -700,14 +823,53 @@ static int windows_get_device_descriptor(struct libusb_device *dev, unsigned cha
 	return LIBUSB_SUCCESS;
 }
 
-static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian)
-{
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
+/*
+ * return the cached copy of the relevant config descriptor
+ */
 static int windows_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
 {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	struct windows_device_priv *priv = __device_priv(dev);
+	PUSB_CONFIGURATION_DESCRIPTOR config_header;
+	size_t size;
+
+	// config index is zero based
+	if (config_index >= dev->num_configurations)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	if ((priv->config_descriptor == NULL) || (priv->config_descriptor[config_index] == NULL))
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	config_header = (PUSB_CONFIGURATION_DESCRIPTOR)priv->config_descriptor[config_index];
+
+	size = min(config_header->wTotalLength, len);
+	memcpy(buffer, priv->config_descriptor[config_index], size);
+
+	return LIBUSB_SUCCESS;
+}
+
+/*
+ * Retrieve the bConfigurationValue for the active configuration for a device.
+ * This is meant to be called during init so that the value can be cached
+ */
+static int windows_get_active_config(struct libusb_device *dev)
+{
+	// TODO: As we don't have control msg I/O yet, force the value to first conf.
+	return 1;
+}
+
+/*
+ * return the cached copy of the active config descriptor
+ */
+static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian)
+{
+	struct windows_device_priv *priv = __device_priv(dev);
+
+	// Has active config been set yet
+	if (priv->active_config == 0)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	// config indexes for get_config_descriptors start at zero
+	return windows_get_config_descriptor(dev, priv->active_config-1, buffer, len, host_endian);
 }
 
 static int windows_open(struct libusb_device_handle *dev_handle)
@@ -719,13 +881,25 @@ static void windows_close(struct libusb_device_handle *dev_handle)
 {
 }
 
+/*
+ * Get the bConfigurationValue for the active configuration for a device.
+ */
 static int windows_get_configuration(struct libusb_device_handle *dev_handle, int *config)
 {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+
+	*config = priv->active_config;
+	return LIBUSB_SUCCESS;
 }
 
 static int windows_set_configuration(struct libusb_device_handle *dev_handle, int config)
 {
+	/* 
+	 * from http://msdn.microsoft.com/en-us/library/ms793522.aspx: The port driver 
+	 * does not currently expose a service that allows higher-level drivers to set 
+	 * the configuration.
+	 * TODO: See if this is achievable with kernel drivers
+	 */
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
@@ -772,7 +946,7 @@ static void windows_destroy_device(struct libusb_device *dev)
 {
 	struct windows_device_priv *priv = __device_priv(dev);
 //	usbi_dbg("destroying dev %d", dev->session_data);
-	windows_device_priv_release(priv);
+	windows_device_priv_release(priv, dev->num_configurations);
 }
 
 static int submit_bulk_transfer(struct usbi_transfer *itransfer)
