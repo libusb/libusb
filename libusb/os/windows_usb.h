@@ -66,28 +66,21 @@
 
 // HCDs
 struct windows_hcd_priv {
-	HANDLE handle;
-	char *name;
 	char *path;
 	struct windows_hcd_priv *next;
 };
 
 static inline void windows_hcd_priv_init(struct windows_hcd_priv* p) {
-	p->handle = INVALID_HANDLE_VALUE;
-	p->name = NULL;
 	p->path = NULL;
 	p->next = NULL;
 }
 
 static inline void windows_hcd_priv_release(struct windows_hcd_priv* p) {
-	safe_closehandle(p->handle);
-	safe_free(p->name);
 	safe_free(p->path);
 }
 
 // Nodes (Hubs & devices)
 struct windows_device_priv {
-	HANDLE handle;	// connection handle
 	struct libusb_device *parent_dev;	// access to parent is required for usermode ops
 	ULONG connection_index;	// also required for some usermode ops
 	char *path;	// path used by Windows to reference the USB node
@@ -97,7 +90,6 @@ struct windows_device_priv {
 };
 
 static inline void windows_device_priv_init(struct windows_device_priv* p) {
-	p->handle = INVALID_HANDLE_VALUE;
 	p->parent_dev = NULL;
 	p->connection_index = 0;
 	p->path = NULL;
@@ -108,7 +100,6 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 
 static inline void windows_device_priv_release(struct windows_device_priv* p, int num_configurations) {
 	int i;
-	safe_closehandle(p->handle);
 	safe_free(p->path);
 	if ((num_configurations > 0) && (p->config_descriptor != NULL)) {
 		for (i=0; i < num_configurations; i++)

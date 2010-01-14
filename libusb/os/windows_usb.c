@@ -176,7 +176,7 @@ static char* sanitize_path(const char* path)
 	if (path == NULL)
 		return NULL;
 
-	size = strlen(path);
+	size = strlen(path)+1;
 	if ((size > 3) && (path[0] == '\\') && (path[1] == '\\') && (path[3] == '\\')) {
 		has_root_prefix = true;
 	} else {
@@ -213,11 +213,9 @@ static char* sanitize_path(const char* path)
  */
 static int windows_init(struct libusb_context *ctx)
 {
-	HANDLE handle = INVALID_HANDLE_VALUE;
 	HDEVINFO dev_info;
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA *_dev_interface_details = NULL;
-	USB_HCD_DRIVERKEY_NAME_FIXED driverkey_name;
 	GUID guid;
 	DWORD size;
 	libusb_bus_t bus;
@@ -259,7 +257,6 @@ static int windows_init(struct libusb_context *ctx)
 		{
 			// safe loop: free up any (unprotected) dynamic resource
 			// NB: this is always executed before breaking the loop
-			safe_closehandle(handle);
 			safe_free(_dev_interface_details);
 			safe_free(_hcd_cur);
 
@@ -297,49 +294,14 @@ static int windows_init(struct libusb_context *ctx)
 					bus, windows_error_str());
 			}
 
-			handle = CreateFileA(_dev_interface_details->DevicePath, GENERIC_WRITE, FILE_SHARE_WRITE,
-				NULL, OPEN_EXISTING, FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
-			if(handle == INVALID_HANDLE_VALUE) {
-				LOOP_CONTINUE("could not open bus %u, skipping: %s", bus, windows_error_str());
-			}
-
-//			usbi_dbg("Found Hcd: %s", _dev_interface_details->DevicePath);
-
 			// Allocate and init a new priv structure to hold our data
 			if ((_hcd_cur = malloc(sizeof(struct windows_hcd_priv))) == NULL) {
 				usbi_err(ctx, "could not allocate private structure for bus %u. aborting.", bus);
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
 			windows_hcd_priv_init(_hcd_cur);
-			_hcd_cur->path = safe_strdup(_dev_interface_details->DevicePath);
+			_hcd_cur->path = sanitize_path(_dev_interface_details->DevicePath);
 
-			// get the Driverkey name for this HDC
-			if (!DeviceIoControl(handle, IOCTL_GET_HCD_DRIVERKEY_NAME, &driverkey_name, sizeof(USB_HCD_DRIVERKEY_NAME),
-				&driverkey_name, sizeof(USB_HCD_DRIVERKEY_NAME), &size, NULL)) {
-				LOOP_CONTINUE("could not access DriverKey name (dummy) for bus %u, skipping: %s",
-					bus, windows_error_str());
-			}
-
-			if ((size = driverkey_name.ActualLength) > (MAX_KEY_LENGTH*sizeof(WCHAR))) {
-				LOOP_CONTINUE("DriverKey name too long for bus %d (%d), skipping.", size, bus);
-			}
-
-			if (!DeviceIoControl(handle, IOCTL_GET_HCD_DRIVERKEY_NAME, &driverkey_name, size,
-				&driverkey_name, size, &size, NULL)) {
-				LOOP_CONTINUE("could not access DriverKey name (actual) for bus %u, skipping: %s",
-					bus, windows_error_str());
-			}
-
-			// Convert DriverKey name to something we can handle
-			_hcd_cur->name = wchar_to_utf8(driverkey_name.DriverKeyName);
-			if (_hcd_cur == NULL) {
-				LOOP_CONTINUE("Could not convert DriverKey Name for bus %u. skipping.", bus);
-			}
-//			usbi_dbg("Got driverkey: %s", _hcd_cur->name);
-
-			// Setup new chained list node as current
-			_hcd_cur->handle = handle;			// Keep a copy of the HCD file handle
-			handle = INVALID_HANDLE_VALUE;		// Prevents the CloseHandle() call at the beginning of loop
 			__hcd_cur = &(_hcd_cur->next);
 		}
 		SetupDiDestroyDeviceInfoList(dev_info);
@@ -365,7 +327,7 @@ static int windows_init(struct libusb_context *ctx)
  * Initialize device structure, including active config
  */ 
 static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
-	libusb_devaddr_t devaddr, char *path, HANDLE handle, int connection_index,
+	libusb_devaddr_t devaddr, char *path, int connection_index,
 	struct libusb_device *parent_dev)
 {
 	struct windows_device_priv *priv = __device_priv(dev);
@@ -377,7 +339,6 @@ static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
 	dev->bus_number = busnum;
 	dev->device_address = devaddr;
 	priv->path = path;
-	priv->handle = handle;
 	priv->connection_index = connection_index;
 	priv->parent_dev = parent_dev;
 
@@ -397,11 +358,10 @@ static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
 /*
  * fetch device descriptor through I/O
  */
-static int cache_device_descriptor (struct libusb_device *dev)
+static int cache_device_descriptor (struct libusb_device *dev, HANDLE hub_handle)
 {
 	DWORD size, ret_size;
 	struct windows_device_priv *priv = __device_priv(dev);
-	struct windows_device_priv *parent_priv = __device_priv(priv->parent_dev);
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	USB_DEVICE_DESCRIPTOR_BUFFER dd_buf;
   
@@ -415,7 +375,7 @@ static int cache_device_descriptor (struct libusb_device *dev)
 	dd_buf.req.SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
 
 	// read the device descriptor
-	if (!DeviceIoControl(parent_priv->handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &dd_buf, size,
+	if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &dd_buf, size,
 		&dd_buf, size, &ret_size, NULL)) {
 		usbi_warn(ctx, "could not read device descriptor: %s", windows_error_str());
 		return LIBUSB_ERROR_IO;
@@ -445,7 +405,7 @@ static int cache_device_descriptor (struct libusb_device *dev)
  * Note that we follow the Linux convention and use the "Linux Foundation root hub"
  * vendor ID as well as the product ID to indicate the hub speed
  */
-static int force_hcd_device_descriptor(struct libusb_device *dev) 
+static int force_hcd_device_descriptor(struct libusb_device *dev, HANDLE handle) 
 {
 	DWORD size;
 	USB_HUB_CAPABILITIES hub_caps;
@@ -463,7 +423,7 @@ static int force_hcd_device_descriptor(struct libusb_device *dev)
 	// of detecting the windows version in MinGW (the _WIN32_WINNT variable is fixed)
 	// Thus we try the ex query regardless and fallback to regular if it fails
 	size = sizeof(USB_HUB_CAPABILITIES_EX);
-	if (DeviceIoControl(priv->handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps_ex, 
+	if (DeviceIoControl(handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps_ex, 
 		size, &hub_caps_ex, size, &size, NULL)) {
 		// Sanity check. HCD hub should always be root
 		if (!hub_caps_ex.CapabilityFlags.HubIsRoot) {
@@ -473,7 +433,7 @@ static int force_hcd_device_descriptor(struct libusb_device *dev)
 	} else {
 		// Standard query
 		size = sizeof(USB_HUB_CAPABILITIES);
-		if (!DeviceIoControl(priv->handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps, 
+		if (!DeviceIoControl(handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps, 
 			size, &hub_caps, size, &size, NULL)) {
 			usbi_warn(ctx, "could not read hub capabilities (std) for hub %s: %s", 
 				priv->path, windows_error_str());
@@ -488,12 +448,11 @@ static int force_hcd_device_descriptor(struct libusb_device *dev)
 /*
  * fetch and cache all the config descriptors through I/O
  */
-static int cache_config_descriptors(struct libusb_device *dev) 
+static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle) 
 {
 	DWORD size, ret_size;
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct windows_device_priv *priv = __device_priv(dev);
-	struct windows_device_priv *parent_priv = __device_priv(priv->parent_dev);
 	int r;
 	uint8_t i;
 
@@ -531,7 +490,7 @@ static int cache_config_descriptors(struct libusb_device *dev)
 		cd_buf_short.req.SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
 
 		// Dummy call to get the required data size
-		if (!DeviceIoControl(parent_priv->handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
+		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
 			&cd_buf_short, size, &ret_size, NULL)) {
 			usbi_err(ctx, "could not access configuration descriptor (dummy): %s", i, windows_error_str());
 			LOOP_BREAK(LIBUSB_ERROR_IO);
@@ -556,7 +515,7 @@ static int cache_config_descriptors(struct libusb_device *dev)
 		cd_buf_actual->SetupPacket.wValue = (USB_CONFIGURATION_DESCRIPTOR_TYPE << 8) | i;
 		cd_buf_actual->SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
 
-		if (!DeviceIoControl(parent_priv->handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
+		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
 			cd_buf_actual, size, &ret_size, NULL)) {
 			usbi_err(ctx, "could not access configuration descriptor (actual): %s", windows_error_str());
 			LOOP_BREAK(LIBUSB_ERROR_IO);
@@ -717,8 +676,6 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			if(handle == INVALID_HANDLE_VALUE) {
 				LOOP_CONTINUE("could not open hub %s: %s", path_str, windows_error_str());
 			}
-		} else {
-			// TODO: Do we need to do regular device init (handle, etc)?
 		}
 
 		// Generate a session ID
@@ -743,19 +700,17 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
 
-			LOOP_CHECK(initialize_device(dev, busnum, devaddr, path_str, handle, i, parent_dev));
+			LOOP_CHECK(initialize_device(dev, busnum, devaddr, path_str, i, parent_dev));
 			priv = __device_priv(dev);
 			path_str = NULL;	// protect our path from being freed
-			handle = INVALID_HANDLE_VALUE;	// protect our handle from closure
-			// TODO: probably want to do that only for hubs with connections
 
 			// Setup the cached descriptors. Note that only non HCDs can fetch descriptors
 			// For HCDs, we just populate it manually
 			if (!is_hcd) { 
-				LOOP_CHECK(cache_device_descriptor(dev));
-				LOOP_CHECK(cache_config_descriptors(dev));
+				LOOP_CHECK(cache_device_descriptor(dev, hub_handle));
+				LOOP_CHECK(cache_config_descriptors(dev, hub_handle));
 			} else {
-				LOOP_CHECK(force_hcd_device_descriptor(dev));
+				LOOP_CHECK(force_hcd_device_descriptor(dev, handle));
 			}
 			LOOP_CHECK(usbi_sanitize_device(dev));
 		}
@@ -772,7 +727,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 		if (conn_info.DeviceIsHub) {
 			// Find number of ports for this hub
 			size =  sizeof(USB_NODE_INFORMATION);
-			if (!DeviceIoControl(priv->handle, IOCTL_USB_GET_NODE_INFORMATION, &hub_node, size,
+			if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_INFORMATION, &hub_node, size,
 				&hub_node, size, &size, NULL)) {
 				LOOP_CONTINUE("could not retreive information for hub %s: %s", 
 					priv->path, windows_error_str());
@@ -785,11 +740,9 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			usbi_dbg("%d ports Hub: %s", hub_node.u.HubInformation.HubDescriptor.bNumberOfPorts, priv->path);
 
 			// More hubs (NB: we don't really care about the value returned)
-			usb_enumerate_hub(ctx, _discdevs, priv->handle, busnum, dev, 
+			usb_enumerate_hub(ctx, _discdevs, handle, busnum, dev, 
 				hub_node.u.HubInformation.HubDescriptor.bNumberOfPorts);
-		} else {
-			usbi_dbg("device on port %d not a hub", i);
-		} 
+		}
 	}
 
 	return r;
@@ -933,19 +886,30 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs)
 {
 	struct windows_hcd_priv* _hcd;	
+	HANDLE handle = INVALID_HANDLE_VALUE;
 	int r = LIBUSB_SUCCESS;
 	libusb_bus_t bus;
 
 	// We use the index of the HCD in the chained list as bus #
-	for (_hcd = _hcd_root, bus = 0; _hcd != NULL; _hcd = _hcd->next, bus++)
+	for (_hcd = _hcd_root, bus = 0; ; _hcd = _hcd->next, bus++)
 	{
+		safe_closehandle(handle);
+
+		if ( (_hcd == NULL) || (r != LIBUSB_SUCCESS) )
+			break;
+
 		// Shouldn't be needed, but let's be safe
 		if (bus == LIBUSB_BUS_MAX) {
 			LOOP_CONTINUE("program assertion failed - got more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
 		}
 
-		usbi_dbg("Enumerating bus %u", bus);
-		LOOP_CHECK(usb_enumerate_hub(ctx, _discdevs, _hcd->handle, bus, NULL, 1));
+		handle = CreateFileA(_hcd->path, GENERIC_WRITE, FILE_SHARE_WRITE,
+			NULL, OPEN_EXISTING, FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
+		if (handle == INVALID_HANDLE_VALUE) {
+			LOOP_CONTINUE("could not open bus %u, skipping: %s", bus, windows_error_str());
+		}
+
+		LOOP_CHECK(usb_enumerate_hub(ctx, _discdevs, handle, bus, NULL, 1));
 	}
 
 	// Non hub device paths are set using a separate method
