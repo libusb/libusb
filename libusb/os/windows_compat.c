@@ -68,7 +68,7 @@
 
 #include "windows_compat.h"
 
-#define DEBUG_WINDOWS_COMPAT
+//#define DEBUG_WINDOWS_COMPAT
 #ifdef DEBUG_WINDOWS_COMPAT
 #define printb(...) printf(__VA_ARGS__)
 #else

@@ -49,6 +49,8 @@
 #include <ddk/cfgmgr32.h>
 #include <largeint.h>
 #include <inttypes.h>
+// string to GUID conv. requires libole32.a
+#include <objbase.h>
 
 /* Prevent compilation problems on Windows platforms */
 #ifdef interface
@@ -95,6 +97,7 @@ const uint64_t epoch_time = 116444736000000000;
 DWORD_PTR old_affinity_mask;
 bool api_winusb_available = false;
 #define CHECK_WINUSB_AVAILABLE do { if (!api_winusb_available) return LIBUSB_ERROR_ACCESS; } while (0)
+enum windows_version windows_version = WINDOWS_UNSUPPORTED;
 
 /*
  * Converts a WCHAR string to UTF8 (allocate returned string)
@@ -196,126 +199,71 @@ static char* sanitize_path(const char* path)
 }
 
 /*
- * reads an REG_SZ key (name or value)
- * if val_name is NULL, the function returns the key name indexed by key_index into ret_content
- * if val_name is not NULL, the functions returns the RG_SZ value of attribute val_name into ret_content
- * returns total number of keys/values found for this path, or -1 on error
- */ 
-static int read_registry_key(struct libusb_context *ctx, char* key_path, char* val_name, int key_index, char* ret_content, int ret_size)
+ * This function, which should be called repeatedly, enumerates the interfaces for a specific GUID
+ *
+ * Parameters:
+ * dev_info: a pointer to a dev_info list
+ * guid: the GUID for which to retrieve interface details
+ * index: zero based index of the interface in the device info list
+ *
+ * Note: it is the responsibility of the caller to free the DEVICE_INTERFACE_DETAIL_DATA
+ * structure returned and use the same guid, with an incremented index starting at zero,
+ * until all interfaces have been returned
+ */
+SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ctx, HDEVINFO* dev_info, GUID guid, unsigned index)
 {
-	HKEY parent_key;
-	LONG i, r; 
-	DWORD size, val_name_size, type;
-	DWORD nb_keys = 0;
-	DWORD nb_values = 0;
-	char internal_key_name[MAX_KEY_LENGTH];
-	char internal_val_name[MAX_KEY_LENGTH]; 
-	char *_key_name;
-	bool only_read_keys = (val_name == NULL);
+	SP_DEVICE_INTERFACE_DATA dev_interface_data;
+	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
+	DWORD size;
 
-	r = RegOpenKeyEx(HKEY_LOCAL_MACHINE, key_path, 0, KEY_READ, &parent_key);
-	if (r != ERROR_SUCCESS) {
-		usbi_err(ctx, "could not access registry path %s: %s", key_path, windows_error_str(r));
-		return -1;
+	if (index <= 0) {
+		*dev_info = SetupDiGetClassDevs(&guid, NULL, NULL, DIGCF_PRESENT|DIGCF_DEVICEINTERFACE);
 	}
 
-	// Get the number of keys and values
-	r = RegQueryInfoKey(parent_key,	NULL, NULL,	NULL, &nb_keys, NULL, NULL,
-			&nb_values, NULL, NULL, NULL, NULL);
-
-	if (r != ERROR_SUCCESS) {
-		usbi_err(ctx, "could not read keys for registry path %s: %s", 
-			key_path, windows_error_str(r));
-		RegCloseKey(parent_key);
-		return -1;
+	if (*dev_info == INVALID_HANDLE_VALUE) {
+		return NULL;
 	}
 
-	// If what we're interested in is empty, just say so
-	if ( ((only_read_keys) && (nb_keys == 0)) ||
-	     ((!only_read_keys) && (nb_values == 0)) ) {
-		RegCloseKey(parent_key);
-		return 0;
+	dev_interface_data.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+
+	if (!SetupDiEnumDeviceInterfaces(*dev_info, NULL, &guid, index, &dev_interface_data)) {
+		SetupDiDestroyDeviceInfoList(*dev_info);
+		*dev_info = INVALID_HANDLE_VALUE;
+		return NULL;
 	}
 
-	// A negative key_index means just return the number of keys
-	if (key_index < 0) {
-		RegCloseKey(parent_key);
-		return nb_keys;
-	}
-
-	if ((ret_size > 0) && (ret_content != NULL))
-		ret_content[0] = '\0';
-
-	if (key_index >= nb_keys) {
-		usbi_err(ctx, "key index out of range for registry path %s: %d vs %d keys", 
-			key_path, key_index, nb_keys);
-		RegCloseKey(parent_key);
-		return -1;
-	}
-
-	// If what we're interested in is the key name, read the key name
-	// directly into the return string buffer. Otherwise, use internal
-	if (only_read_keys) {
-		size = ret_size;
-		_key_name = ret_content;
-	} else {
-		size = MAX_KEY_LENGTH;
-		_key_name = internal_key_name;
-	}
-	r = RegEnumKeyEx(parent_key, key_index, _key_name, &size, 
-			NULL, NULL, NULL, NULL); 
-
-	switch (r) {
-	case ERROR_SUCCESS:
-		break;
-	case ERROR_MORE_DATA:
-		usbi_err(ctx, "name of key %d exceeds buffer by %d bytes", key_index, 
-			size+1-(only_read_keys?ret_size:MAX_KEY_LENGTH));
-		RegCloseKey(parent_key);
-		return -1;
-	default:
-		usbi_err(ctx, "could not read key %d: %s", key_index, windows_error_str(r));
-		RegCloseKey(parent_key);
-		return -1;
-	}
-	
-	// Don't push it further if we only want key names
-	if (only_read_keys) {
-		RegCloseKey(parent_key);
-		return nb_keys;
-	}
-
-	// Read values
-	for (i=0; i<nb_values; i++) 
-	{ 
-		size = ret_size;
-		val_name_size = MAX_KEY_LENGTH;
-		internal_val_name[0] = '\0'; 
-		r = RegEnumValue(parent_key, i, internal_val_name, &val_name_size, 
-			NULL, &type, ret_content, &size);
-
-		switch(r) {
-		case ERROR_SUCCESS:
-			if ((type == REG_SZ) && (safe_strcmp(internal_val_name, val_name) == 0)) {
-				// There's only ever one value with the name of val_name, so return
-				RegCloseKey(parent_key);
-				return nb_values;
-			}
-			break;
-		case ERROR_MORE_DATA:
-			usbi_err(ctx, "value of %s exceeds buffer by %d bytes", val_name, size-ret_size+1);
-			RegCloseKey(parent_key);
-			return -1;
-		default:
-			usbi_err(ctx, "could not read value of %s: %s", val_name, windows_error_str(r));
-			RegCloseKey(parent_key);
-			return -1;
+	// Read interface data (dummy + actual) to access the device path
+	if (!SetupDiGetDeviceInterfaceDetail(*dev_info, &dev_interface_data, NULL, 0, &size, NULL)) {
+		// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
+		if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+			usbi_err(ctx, "could not access interface data (dummy) for index %u: %s", 
+				index, windows_error_str(0));
+			goto err_exit;
 		}
+	} 
+	else {
+		usbi_err(ctx, "program assertion failed - http://msdn.microsoft.com/en-us/library/ms792901.aspx is wrong.");
+		goto err_exit;
 	}
 
-	// If we get here, value was not matched
-	RegCloseKey(parent_key);
-	return 0;
+	if ((dev_interface_details = malloc(size)) == NULL) {
+		usbi_err(ctx, "could not allocate interface data for index %u.", index);
+		goto err_exit;
+	}
+
+	dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA); 
+	if (!SetupDiGetDeviceInterfaceDetail(*dev_info, &dev_interface_data, 
+		dev_interface_details, size, &size, NULL)) {
+		usbi_err(ctx, "could not access interface data (actual) for index %u: %s", 
+			index, windows_error_str(0));
+	}
+
+	return dev_interface_details;
+
+err_exit:
+	SetupDiDestroyDeviceInfoList(*dev_info);
+	*dev_info = INVALID_HANDLE_VALUE;
+	return NULL;
 }
 
 /*
@@ -328,18 +276,34 @@ static int read_registry_key(struct libusb_context *ctx, char* key_path, char* v
 static int windows_init(struct libusb_context *ctx)
 {
 	HDEVINFO dev_info;
-	SP_DEVICE_INTERFACE_DATA dev_interface_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
 	GUID guid;
-	DWORD size;
 	libusb_bus_t bus;
 	int r = LIBUSB_SUCCESS;
 	LARGE_INTEGER li_frequency;
+	OSVERSIONINFO os_version;
 
 	// If our HCD list is populated, we don't need to re-init
 	if (hcd_root != NULL) {
 		usbi_dbg("init already occured.");
 		return LIBUSB_SUCCESS;
+	}
+
+	// Detect OS version
+	memset(&os_version, 0, sizeof(OSVERSIONINFO));
+	os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+	windows_version = WINDOWS_UNSUPPORTED;
+	if ((GetVersionEx(&os_version) != 0) && (os_version.dwPlatformId == VER_PLATFORM_WIN32_NT)) {
+		if ((os_version.dwMajorVersion == 5) && (os_version.dwMinorVersion == 0)) {
+			windows_version = WINDOWS_2000;
+		} else if ((os_version.dwMajorVersion == 5) && (os_version.dwMinorVersion == 1)) {
+			windows_version = WINDOWS_XP;
+		} else if (os_version.dwMajorVersion >= 6) {
+			windows_version = WINDOWS_VISTA_AND_LATER;
+		}
+	}
+	if (windows_version < WINDOWS_XP) {
+		usbi_warn(ctx, "This version of Windows is NOT supported");
 	}
 
 	// Initialize pollable file descriptors
@@ -391,64 +355,33 @@ static int windows_init(struct libusb_context *ctx)
 	struct windows_hcd_priv** _hcd_cur = &hcd_root;
 
 	guid = GUID_DEVINTERFACE_USB_HOST_CONTROLLER;
-	dev_info = SetupDiGetClassDevs(&guid, NULL, NULL, (DIGCF_PRESENT | DIGCF_DEVICEINTERFACE));
 
-	if (dev_info != INVALID_HANDLE_VALUE)
+	for (bus = 0; ; bus++)
 	{
-		dev_interface_data.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+		// safe loop: free up any (unprotected) dynamic resource
+		// NB: this is always executed before breaking the loop
+		safe_free(dev_interface_details);
+		safe_free(*_hcd_cur);
 
-		for (bus = 0; ; bus++)
-		{
-			// safe loop: free up any (unprotected) dynamic resource
-			// NB: this is always executed before breaking the loop
-			safe_free(dev_interface_details);
-			safe_free(*_hcd_cur);
+		dev_interface_details = get_interface_details(ctx, &dev_info, guid, bus);
+		// safe loop: end of loop condition
+		if ((dev_interface_details == NULL) || (r != LIBUSB_SUCCESS))
+			break;
 
-			// safe loop: end of loop condition
-			if ((SetupDiEnumDeviceInterfaces(dev_info, NULL, &guid, bus, &dev_interface_data) != TRUE) || (r != LIBUSB_SUCCESS))
-				break;
-
-			// Will need to change storage and size of libusb_bus_t if this ever occurs
-			if (bus == LIBUSB_BUS_MAX) {
-				LOOP_CONTINUE("program assertion failed - found more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
-			}
-
-			// Do a dummy call to get the size
-			if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, NULL, 0, &size, NULL)) {
-				// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
-				if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-					LOOP_CONTINUE("could not access interface data for bus %u, skipping: %s",
-						bus, windows_error_str(0));
-				}
-			}
-			else {
-				LOOP_CONTINUE("program assertion failed - http://msdn.microsoft.com/en-us/library/ms792901.aspx is wrong.");
-			}
-
-			if ((dev_interface_details = malloc(size)) == NULL) {
-				usbi_err(ctx, "could not allocate interface data for bus %u. aborting.", bus);
-				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-			}
-
-			dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
-			// Actual call.
-			if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data,
-				dev_interface_details, size, &size, NULL)) {
-				LOOP_CONTINUE("could not access interface data for bus %u, skipping: %s",
-					bus, windows_error_str(0));
-			}
-
-			// Allocate and init a new priv structure to hold our data
-			if ((*_hcd_cur = malloc(sizeof(struct windows_hcd_priv))) == NULL) {
-				usbi_err(ctx, "could not allocate private structure for bus %u. aborting.", bus);
-				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-			}
-			windows_hcd_priv_init(*_hcd_cur);
-			(*_hcd_cur)->path = sanitize_path(dev_interface_details->DevicePath);
-
-			_hcd_cur = &((*_hcd_cur)->next);
+		// Will need to change storage and size of libusb_bus_t if this ever occurs
+		if (bus == LIBUSB_BUS_MAX) {
+			LOOP_CONTINUE("program assertion failed - found more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
 		}
-		SetupDiDestroyDeviceInfoList(dev_info);
+
+		// Allocate and init a new priv structure to hold our data
+		if ((*_hcd_cur = malloc(sizeof(struct windows_hcd_priv))) == NULL) {
+			usbi_err(ctx, "could not allocate private structure for bus %u. aborting.", bus);
+			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+		}
+		windows_hcd_priv_init(*_hcd_cur);
+		(*_hcd_cur)->path = sanitize_path(dev_interface_details->DevicePath);
+
+		_hcd_cur = &((*_hcd_cur)->next);
 	}
 
 	// TODO: pthread stuff
@@ -854,90 +787,115 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 	return r;
 }
 
-static char* get_composite_interface_path(struct libusb_context *ctx, char* path)
-{
-	char cmp_path[MAX_PATH];
-	LONG i, j, r; 
-	bool found = false;
-	char* ret_path = NULL;
-
-	char guid_name[40];	// 40 chars are enough for a GUID string
-	char instance_path[MAX_PATH];
-	char device_classes_path[] = "SYSTEM\\CurrentControlSet\\Control\\DeviceClasses\\";
-	char device_guid_path[MAX_PATH_LENGTH];	// could do without, but clearer code
-	char full_shebang[MAX_KEY_LENGTH];
-
-	int nb_device_classes = read_registry_key(ctx, device_classes_path, NULL, -1, NULL, 0);
-	if (nb_device_classes <= 0) {
-		usbi_err(ctx, "could not find any device classes");
-		return NULL;
-	}
-
-	// browse GUIDs: HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceClasses\*
-	// eg. of returned value: "{b35924d6-3e16-4a9e-9782-5524a4b79bac}"
-	for (i=0; i<nb_device_classes; i++) {
-		r = read_registry_key(ctx, device_classes_path, NULL, i, guid_name, 40);
-
-		if (r <= 0)
-		{
-			usbi_err(ctx, "could not read device class #%d", i);
-			continue;
-		}
-
-		safe_strcpy(device_guid_path, MAX_PATH_LENGTH, device_classes_path);
-		safe_strcat(device_guid_path, MAX_PATH_LENGTH, guid_name);
-		int nb_device_paths = read_registry_key(ctx, device_guid_path, NULL, -1, NULL, 0);
-		if (nb_device_paths <= 0) {
-			continue;
-		}
-
-		// browse device instance paths. 
-		// eg: HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceClasses\{b35924d6-3e16-4a9e-9782-5524a4b79bac}\*
-		// eg of returned value: "##?#USB#VID_045E&PID_0289#7&7ef95eb&0&1#{b35924d6-3e16-4a9e-9782-5524a4b79bac}"
-		for (j=0; j<nb_device_paths; j++) {
-			if (read_registry_key(ctx, device_guid_path, NULL, j, instance_path, MAX_PATH) <= 0) {
-				continue;
-			}
-			if (strlen(device_guid_path) + strlen(instance_path) + 2 > MAX_KEY_LENGTH) {
-				usbi_warn(ctx, "key path exceeds buffer - skipping key: %s\\%s", device_guid_path, instance_path);
-				continue;
-			}
-			safe_strcpy(full_shebang, MAX_KEY_LENGTH, device_guid_path);
-			safe_strcat(full_shebang, MAX_KEY_LENGTH, "\\");
-			safe_strcat(full_shebang, MAX_KEY_LENGTH, instance_path);
-
-			// Read the DeviceInstance attribute for this key
-			if (read_registry_key(ctx, full_shebang, "DeviceInstance", 0, cmp_path, MAX_PATH) <= 0) {
-				continue;
-			}
-
-			upperize(cmp_path);	// Fix for MS inconsistancy
-
-			if (safe_strncmp(cmp_path, path, MAX_PATH) == 0) {
-				if (found) {
-					usbi_dbg("I stand corrected: device GUIDs do actually serve a purpose.");
-				} else {
-					ret_path = sanitize_path(instance_path);
-				}
-				found = true;
-			}
-		}
-	}
-	
-	return ret_path;
-}
-
+/*
+ * Composite device interfaces are not enumerated using GUID_DEVINTERFACE_USB_DEVICE,
+ * but instead require a different lookup mechanism
+ */
 static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, struct windows_device_priv *priv)
 {
 	DEVINST child_devinst;
-	int interface_number, found;
-	char path[MAX_PATH_LENGTH];
+	int i, j, max_guids, nb_paths, interface_number;
+	bool found;
+	DWORD type, size;
 	CONFIGRET r;
+	HDEVINFO dev_info;
+	SP_DEVINFO_DATA dev_info_data;
+	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
+	HKEY key;
+	WCHAR guid_string_w[40];
+	GUID guid;
+	GUID guid_table[MAX_USB_DEVICES];
+	char* sanitized_path[MAX_USB_DEVICES];
+	char* sanitized_short = NULL;
+	char path[MAX_PATH_LENGTH];
+	char driver[MAX_KEY_LENGTH];
 
-	// TODO: can we check that these kids actually use WinUSB.sys?
-	// Also, we assume MS does list siblings in interface order
-	// TODO: lookup the rightmost MI_## and use that for interface_nr
-	found = 0;
+	dev_info = SetupDiGetClassDevs(NULL, "USB", NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
+	if (dev_info == INVALID_HANDLE_VALUE) {
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	// First, retrieve all the device interface GUIDs
+	max_guids = 0;
+	for (i = 0; ; i++)
+	{
+		dev_info_data.cbSize = sizeof(dev_info_data);
+		if (!SetupDiEnumDeviceInfo(dev_info, i, &dev_info_data)) {
+			break;
+		}
+
+		key = SetupDiOpenDevRegKey(dev_info, &dev_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
+		if (key == INVALID_HANDLE_VALUE) {
+			usbi_dbg("invalid handle");
+			continue;
+		}
+
+		// We'll need a WCHAR string to convert to GUID
+		if (RegQueryValueExW(key, L"DeviceInterfaceGUIDs", NULL, &type, (BYTE*)guid_string_w, &size) != ERROR_SUCCESS) {
+			RegCloseKey(key);
+			continue;
+		}
+		RegCloseKey(key);
+		CLSIDFromString(guid_string_w, &guid);
+
+		// identical device interface GUIDs are not supposed to happen, but are a real possibility
+		// => check and ignore duplicates
+		found = false;
+		for (j=0; j<max_guids; j++) {
+			if (memcmp(&guid_table[j], &guid, sizeof(GUID)) == 0) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			guid_table[max_guids++] = guid;
+			if (max_guids > MAX_USB_DEVICES) {
+				usbi_warn(ctx, "more than %d devices - ignoring the rest", MAX_USB_DEVICES);
+				break;
+			}
+		}
+	}
+	SetupDiDestroyDeviceInfoList(dev_info);
+
+	// Now let's find the device interface paths for all these devices
+	nb_paths = 0;
+	for (j=0; j<max_guids; j++)
+	{
+		guid = guid_table[j];
+		for (i = 0; ; i++)	
+		{
+			safe_free(dev_interface_details);
+			dev_interface_details = get_interface_details(ctx, &dev_info, guid, i);
+			if (dev_interface_details == NULL)
+				break;
+
+			// Check the driver to weed out non WinUSB interfaces (which can happen
+			// with a mix of WinUSB and proprietary drivers on composite devices)
+			dev_info_data.cbSize = sizeof(dev_info_data);
+			if (!SetupDiEnumDeviceInfo(dev_info, i, &dev_info_data)) {
+				LOOP_CONTINUE("could not retrieve info data: %s", windows_error_str(0));
+			}
+
+			if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_SERVICE, 
+				NULL, (BYTE*)driver, MAX_KEY_LENGTH, &size)) {
+				LOOP_CONTINUE("could not read driver: %s", windows_error_str(0));
+			}
+
+			if (safe_strcmp(driver, "WinUSB") == 0) {
+				sanitized_path[nb_paths++] = sanitize_path(dev_interface_details->DevicePath);
+				if (nb_paths > MAX_USB_DEVICES) {
+					usbi_warn(ctx, "more than %d devices - ignoring the rest", MAX_USB_DEVICES);
+					break;
+				}
+			}
+		}
+	}
+
+	// Finally, match the interface paths with the interfaces. We do that 
+	// by looking at the children of the composite device
+	// TODO: For now we assume MS does list siblings in interface order
+	// => lookup the rightmost MI_## and use that for interface_nr
+	found = false;
 	for (interface_number = 0; interface_number<USB_MAXINTERFACES; interface_number++)
 	{
 		if (interface_number == 0) {
@@ -957,19 +915,31 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 			usbi_err(ctx, "could not retrieve simple path for interface %d: CR error %d", 
 				interface_number, r);
 		}
+		sanitized_short = sanitize_path(path);
 
-		priv->interface_path[interface_number] = get_composite_interface_path(ctx, path);
+		for (j=0; j<nb_paths; j++) {
+			if (safe_strncmp(sanitized_path[j], sanitized_short, strlen(sanitized_short)) == 0) {
+				priv->interface_path[interface_number] = sanitized_path[j];
+				sanitized_path[j] = NULL;
+			}
+		}
+		safe_free(sanitized_short);
+
 		if (priv->interface_path[interface_number] == NULL) {
-			usbi_warn(ctx, "could not retreive full path for interface %d", 
+			usbi_warn(ctx, "could not retrieve full path for interface %d", 
 				interface_number);
 			continue;
 		}
 		usbi_dbg("interface_path[%d]: %s", interface_number, priv->interface_path[interface_number]);
-		found++;
+		found = true;
+	}
+
+	for (j=0; j<nb_paths; j++) {
+		safe_free(sanitized_path[j]);
 	}
 
 	if (found == 0) {
-		usbi_dbg("composite device: no interfaces found");
+		usbi_warn(ctx, "composite device: no interfaces were found");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
@@ -988,7 +958,6 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	char reg_key[MAX_KEY_LENGTH];
 	char *sanitized_path = NULL;
 	HDEVINFO dev_info;
-	SP_DEVICE_INTERFACE_DATA dev_interface_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
 	SP_DEVINFO_DATA dev_info_data;
 	DEVINST parent_devinst;
@@ -999,79 +968,66 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	bool found;
 
 	/*
-	 * List *most* connected devices that are not a hub
-	 *
-	 * Note that the BIG problem with Microsoft's SetupDi functions is they DO NOT list WinUSB
-	 * MI_## devices, i.e. devices associated to a specific interface of a composite USB device.
-	 * Moreover, until someone proves otherwise (especially on Windows 7 x64 - good luck with that!),
-	 * the only way to retrieve an interface device path that can actually be used with CreateFile 
-	 * is to lookup all the GUIDs in HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceClasses\
-	 *
+	 * List connected devices that are not a hub
 	 * TODO: MI_## automated driver installation:
 	 */
 	guid = GUID_DEVINTERFACE_USB_DEVICE; 
-	dev_info = SetupDiGetClassDevs(&guid, NULL, NULL, DIGCF_PRESENT|DIGCF_DEVICEINTERFACE);
-
-	if (dev_info == INVALID_HANDLE_VALUE) {
-		SetupDiDestroyDeviceInfoList(dev_info);
-		return LIBUSB_SUCCESS;
-	}
-
-	dev_interface_data.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
 	for (i = 0; ; i++)	
 	{
 		// safe loop: free up any (unprotected) dynamic resource
 		safe_free(dev_interface_details);
 		safe_free(sanitized_path);
 
+		dev_interface_details = get_interface_details(ctx, &dev_info, guid, i);
 		// safe loop: end of loop condition
-		guid = GUID_DEVINTERFACE_USB_DEVICE;
-		if ( (SetupDiEnumDeviceInterfaces(dev_info, NULL, &guid, i, &dev_interface_data) != TRUE) 
-			||(r != LIBUSB_SUCCESS) )
+		if ( (dev_interface_details == NULL)
+		  || (r != LIBUSB_SUCCESS) )
 			break;
 
-		// Read interface data (dummy + actual) to access the device path
-		if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, NULL, 0, &size, NULL)) {
-			// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
-			if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-				LOOP_CONTINUE("could not access interface data (dummy) for device #%u, skipping: %s", 
-					i, windows_error_str(0));
-			}
-		} 
-		else {
-			LOOP_CONTINUE("program assertion failed - http://msdn.microsoft.com/en-us/library/ms792901.aspx is wrong.");
-		}
-
-		if ((dev_interface_details = malloc(size)) == NULL) {
-			usbi_err(ctx, "could not allocate interface data for device #%u. aborting.", i);
-			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-		}
-
-		dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA); 
-		if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, 
-			dev_interface_details, size, &size, NULL)) {
-			LOOP_CONTINUE("could not access interface data (actual) for device #%u, skipping: %s", 
-				i, windows_error_str(0));
-		}
-
-		// Retrieve location information (port#) through the Location Information registry data
 		dev_info_data.cbSize = sizeof(dev_info_data);
 		if (!SetupDiEnumDeviceInfo(dev_info, i, &dev_info_data)) {
 			LOOP_CONTINUE("could not retrieve info data for device #%u, skipping: %s", 
 				i, windows_error_str(0));
 		}
 
-		if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_LOCATION_INFORMATION, 
-			&reg_type, (BYTE*)reg_key, MAX_KEY_LENGTH, &size)) {
-			LOOP_CONTINUE("could not retrieve location information for device #%u, skipping: %s", 
-				i, windows_error_str(0));
-		}
+		if (windows_version >= WINDOWS_VISTA_AND_LATER) {
+			// Retrieve location information (port#) through the Location Information registry data
+			if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_LOCATION_INFORMATION, 
+				&reg_type, (BYTE*)reg_key, MAX_KEY_LENGTH, &size)) {
+				LOOP_CONTINUE("could not retrieve location information for device #%u, skipping: %s", 
+					i, windows_error_str(0));
+			}
 
-		if (size != sizeof("Port_#1234.Hub_#1234")) {
-			LOOP_CONTINUE("unexpected registry key size for device #%u, skipping", i);
-		}
-		if (sscanf(reg_key, "Port_#%04d.Hub_#%04d", &port_nr, &hub_nr) != 2) {
-			LOOP_CONTINUE("failure to read port and hub number for device #%u, skipping", i);
+			if (size != sizeof("Port_#1234.Hub_#1234")) {
+				LOOP_CONTINUE("unexpected registry key size for device #%u, skipping", i);
+			}
+			if (sscanf(reg_key, "Port_#%04d.Hub_#%04d", &port_nr, &hub_nr) != 2) {
+				LOOP_CONTINUE("failure to read port and hub number for device #%u, skipping", i);
+			}
+		} else {
+			// We're out of luck for Location Information on XP, since SPDRP_LOCATION_INFORMATION
+			// returns anything but an actual location. However, it looks like the port number is 
+			// the last digit before '#{' in the path string, so let's try that.
+			found = false;
+			for (j=0; j<safe_strlen(dev_interface_details->DevicePath); j++) {
+				if ( (dev_interface_details->DevicePath[j] == '{') 
+				  && (dev_interface_details->DevicePath[j-1] == '#') ) {
+					// Matched '#{'. Now go back to last delimiter
+					for (; j>=0; j--) {
+						if (dev_interface_details->DevicePath[j] == '&') {
+							found = true;
+							break;
+						}
+					}
+					if (found) {
+						sscanf(&dev_interface_details->DevicePath[j+1], "%d#{%*s", &port_nr);
+					}
+					break;
+				}
+			}
+			if (!found) {
+				LOOP_CONTINUE("failure to \"guess\" port number for device #%u, skipping", i);
+			}
 		}
 
 		// Retrieve parent's path using PnP Configuration Manager (CM)
@@ -1101,10 +1057,11 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			if (priv->parent_dev == NULL) {
 				continue;
 			}
+
 			parent_priv = __device_priv(priv->parent_dev);
 
 			// NB: we compare strings of different lengths below => strncmp
-			if ( (safe_strncmp(parent_priv->path, sanitized_path, strlen(sanitized_path)) == 0)
+			if ( (safe_strncmp(parent_priv->path, sanitized_path, strlen(sanitized_path)) == 0) 
 			  && (port_nr == priv->connection_index) ) {
 
 				priv->path = sanitize_path(dev_interface_details->DevicePath);
@@ -1145,7 +1102,6 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			LOOP_CONTINUE("could not match %s with a libusb device.", dev_interface_details->DevicePath);
 		}
 	}
-	SetupDiDestroyDeviceInfoList(dev_info);
 
 	return LIBUSB_SUCCESS;
 }
@@ -1381,7 +1337,6 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
-	struct windows_device_handle_priv *handle_priv = __device_handle_priv(transfer->dev_handle);
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
 	int r;
 

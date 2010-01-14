@@ -36,7 +36,7 @@ case $host in
 	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
 	AC_MSG_RESULT([Windows])
 	backend="windows"
-	LIBS="-lpthread -lsetupapi -lws2_32"
+	LIBS="-lpthread -lsetupapi -lole32"
 	AM_LDFLAGS=""
 	;;
 *)

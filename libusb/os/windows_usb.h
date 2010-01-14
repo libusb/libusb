@@ -49,6 +49,7 @@
 #define safe_strcat(dst, dst_max, src) safe_strncat(dst, dst_max, src, strlen(src)+1)
 #define safe_strcmp(str1, str2) strcmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2))
 #define safe_strncmp(str1, str2, count) strncmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2), count)
+#define safe_strlen(str) ((str==NULL)?0:strlen(str))
 #define safe_strdup _strdup
 #define safe_sprintf _snprintf
 #define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
@@ -62,6 +63,7 @@ void inline upperize(char* str) {
 // #define MAX_ISO_BUFFER_LENGTH		32768
 // #define MAX_BULK_BUFFER_LENGTH		16384
 #define MAX_CTRL_BUFFER_LENGTH		4096
+#define MAX_USB_DEVICES				256
 
 #define MAX_PATH_LENGTH 128
 #define MAX_KEY_LENGTH 256
@@ -87,6 +89,13 @@ enum api_type {
 			#fname "' (api=%d)", api);			\
 		break;									\
 	}
+
+enum windows_version {
+	WINDOWS_UNSUPPORTED,
+	WINDOWS_2000,
+	WINDOWS_XP,
+	WINDOWS_VISTA_AND_LATER,
+};
 
 /*
  * private structures definition
