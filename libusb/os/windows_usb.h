@@ -84,18 +84,18 @@ static inline void windows_hcd_priv_release(struct windows_hcd_priv* p) {
 
 // Nodes (Hubs & devices)
 struct windows_device_priv {
-	HANDLE handle;
-	bool is_hcd;
-	char *path;
-	uint8_t nb_ports;
+	HANDLE handle;	// connection handle
+	struct libusb_device *parent_dev;	// access to parent is required for usermode ops
+	ULONG connection_index;	// also required for some usermode ops
+	char *path;	// path used by Windows to reference the USB node
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
 	unsigned char *config_descriptor;
 };
 
 static inline void windows_device_priv_init(struct windows_device_priv* p) {
-	p->is_hcd = false;
-	p->nb_ports = 0;
 	p->handle = INVALID_HANDLE_VALUE;
+	p->parent_dev = NULL;
+	p->connection_index = 0;
 	p->path = NULL;
 	p->config_descriptor = NULL;
 	memset(&(p->dev_descriptor), 0, sizeof(USB_DEVICE_DESCRIPTOR));
@@ -222,11 +222,3 @@ typedef struct _USB_HUB_CAPABILITIES_EX {
 	METHOD_BUFFERED, FILE_ANY_ACCESS )
 #endif
 
-// TODO: fix this mingw32 hack
-#ifndef GUID_DEVINTERFACE_USB_HOST_CONTROLLER
-const GUID GUID_DEVINTERFACE_USB_HOST_CONTROLLER = {
-	0x3abf6f2d, 0x71c4, 0x462a, {
-		0x8a, 0x92, 0x1e, 0x68, 0x61, 0xe6, 0xaf, 0x27
-	}
-};
-#endif

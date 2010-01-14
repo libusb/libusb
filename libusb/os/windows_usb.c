@@ -61,6 +61,19 @@
 #include "windows_compat.h"
 #include "windows_usb.h"
 
+// These GUIDs appear undefined on MinGW32
+#ifndef GUID_DEVINTERFACE_USB_HOST_CONTROLLER
+	// http://msdn.microsoft.com/en-us/library/bb663109.aspx: 
+	// {3ABF6F2D-71C4-462A-8A92-1E6861E6AF27}
+	const GUID GUID_DEVINTERFACE_USB_HOST_CONTROLLER = {  0x3ABF6F2D, 0x71C4, 0x462A, {0x8A, 0x92, 0x1E, 0x68, 0x61, 0xE6, 0xAF, 0x27} };
+#endif
+
+#ifndef GUID_DEVINTERFACE_USB_DEVICE
+	// http://msdn.microsoft.com/en-us/library/bb663093.aspx: 
+	// {A5DCBF10-6530-11D2-901F-00C04FB951ED}
+	const GUID GUID_DEVINTERFACE_USB_DEVICE = {  0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED} };
+#endif
+
 // The 3 macros below are used in conjunction with safe loops.
 #define LOOP_CHECK(fcall) { r=fcall; if (r != LIBUSB_SUCCESS) continue; }
 #define LOOP_CONTINUE(...) { usbi_warn(ctx, __VA_ARGS__); continue; }
@@ -85,7 +98,6 @@ const uint64_t epoch_time = 116444736000000000;
 /*
  * Helper functions
  *
- * TODO: Move elsewhere
  */
 
 
@@ -114,7 +126,10 @@ char* wchar_to_utf8(LPCWSTR wstr)
 	return str;
 }
 
-
+/*
+ * Converts a windows error to human readable string
+ */
+// TODO: could we have reentrant issue if called by multiple threads?
 #define ERR_BUFFER_SIZE	256
 static char *windows_error_str(void)
 {
@@ -138,16 +153,12 @@ static char err_string[ERR_BUFFER_SIZE];
 	return err_string;
 }
 
-
 /*
  * init: libusb backend init function
  *
  * This function enumerates the HCDs (Host Controller Drivers) and populates our private HCD list
  * In our implementation, we equate Windows' "HCD" to LibUSB's "bus". Note that bus is zero indexed.
  * HCDs are not expected to change after init (might not hold true for hot pluggable USB PCI card?)
- *
- * This function must return a LIBUSB code
- *
  */
 static int windows_init(struct libusb_context *ctx)
 {
@@ -183,7 +194,7 @@ static int windows_init(struct libusb_context *ctx)
 	// We maintain a chained list of the Host Controllers found
 	struct windows_hcd_priv** __hcd_cur = &_hcd_root;
 
-	// For readability
+	// Local define for readability 
 	#define _hcd_cur (*__hcd_cur)
 
 	guid = GUID_DEVINTERFACE_USB_HOST_CONTROLLER;
@@ -193,7 +204,6 @@ static int windows_init(struct libusb_context *ctx)
 	{
 		dev_interface_data.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
 
-		guid = GUID_CLASS_USB_HOST_CONTROLLER;
 		for (bus = 0; ; bus++)
 		{
 			// safe loop: free up any (unprotected) dynamic resource
@@ -219,8 +229,9 @@ static int windows_init(struct libusb_context *ctx)
 						bus, windows_error_str());
 				}
 			}
-			else
+			else {
 				LOOP_CONTINUE("program assertion failed - http://msdn.microsoft.com/en-us/library/ms792901.aspx is wrong.");
+			}
 
 			if ((_dev_interface_details = malloc(size)) == NULL) {
 				usbi_err(ctx, "could not allocate interface data for bus %u. aborting.", bus);
@@ -280,9 +291,9 @@ static int windows_init(struct libusb_context *ctx)
 			handle = INVALID_HANDLE_VALUE;		// Prevents the CloseHandle() call at the beginning of loop
 			__hcd_cur = &(_hcd_cur->next);
 		}
+		SetupDiDestroyDeviceInfoList(dev_info);
 	}
 
-	// TODO: SetupDiDestroyDeviceInfoList(dev_info);
 	// TODO: pthread stuff
 /*
 	pthread_create(&libusb_windows_at, NULL, event_thread_main, (void *)ctx);
@@ -290,154 +301,59 @@ static int windows_init(struct libusb_context *ctx)
 	while (!libusb_windows_acfl)
 		usleep (10);
 */
-	// nonzero on error
-
-	return (_hcd_root == NULL)?LIBUSB_ERROR_NO_DEVICE:LIBUSB_SUCCESS;
+	if (_hcd_root == NULL)
+		// TODO: Should we return success if no root hub is detected?
+		// are hotplug root hubs a possibility?
+		return LIBUSB_ERROR_NO_DEVICE;
+	else 
+		return LIBUSB_SUCCESS;
 	#undef _hcd_cur
 }
 
-
+/*
+ * Initialize device structure, including active config
+ */ 
 static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
-	libusb_devaddr_t devaddr, const char *path_or_something)
+	libusb_devaddr_t devaddr, char *path, HANDLE handle, int connection_index,
+	struct libusb_device *parent_dev)
 {
-
 	struct windows_device_priv *priv = __device_priv(dev);
-/*	unsigned char *dev_buf;
-	char path[PATH_MAX];
-	int fd;
-	int active_config = 0;
-	int device_configured = 1;
-	ssize_t r;
-*/
-	// Empty struct
+
+	// Set default values
 	windows_device_priv_init(priv);
+
 	dev->bus_number = busnum;
 	dev->device_address = devaddr;
+	priv->path = path;
+	priv->handle = handle;
+	priv->connection_index = connection_index;
+	priv->parent_dev = parent_dev;
 
-/*
-	if (sysfs_dir) {
-		priv->sysfs_dir = malloc(strlen(sysfs_dir) + 1);
-		if (!priv->sysfs_dir)
-			return LIBUSB_ERROR_NO_MEM;
-		strcpy(priv->sysfs_dir, sysfs_dir);
-	}
-
-	if (sysfs_has_descriptors)
-		return 0;
-
-	// cache device descriptor in memory so that we can retrieve it later
-	// without waking the device up (op_get_device_descriptor)
-
-	priv->dev_descriptor = NULL;
-	priv->config_descriptor = NULL;
-
-	if (sysfs_can_relate_devices) {
-		int tmp = sysfs_get_active_config(dev, &active_config);
-		if (tmp < 0)
-			return tmp;
-		if (active_config == -1)
-			device_configured = 0;
-	}
-
-	__get_usbfs_path(dev, path);
-	fd = open(path, O_RDWR);
-	if (fd < 0 && errno == EACCES) {
-		fd = open(path, O_RDONLY);
-		// if we only have read-only access to the device, we cannot
-		// send a control message to determine the active config. just
-		// assume the first one is active.
-		active_config = -1;
-	}
-
-	if (fd < 0) {
-		usbi_err(DEVICE_CTX(dev), "open failed, ret=%d errno=%d", fd, errno);
-		return LIBUSB_ERROR_IO;
-	}
-
-	if (!sysfs_can_relate_devices) {
-		if (active_config == -1) {
-			// if we only have read-only access to the device, we cannot
-			// send a control message to determine the active config. just
-			// assume the first one is active.
-			usbi_warn(DEVICE_CTX(dev), "access to %s is read-only; cannot "
-				"determine active configuration descriptor", path);
-		} else {
-			active_config = usbfs_get_active_config(dev, fd);
-			if (active_config < 0) {
-				close(fd);
-				return active_config;
-			} else if (active_config == 0) {
-				// some buggy devices have a configuration 0, but we're
-				// reaching into the corner of a corner case here, so let's
-				// not support buggy devices in these circumstances.
-				// stick to the specs: a configuration value of 0 means
-				// unconfigured.
-				usbi_dbg("assuming unconfigured device");
-				device_configured = 0;
-			}
-		}
-	}
-
-	dev_buf = malloc(DEVICE_DESC_LENGTH);
-	if (!dev_buf) {
-		close(fd);
-		return LIBUSB_ERROR_NO_MEM;
-	}
-
-	r = read(fd, dev_buf, DEVICE_DESC_LENGTH);
-	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev),
-			"read descriptor failed ret=%d errno=%d", fd, errno);
-		free(dev_buf);
-		close(fd);
-		return LIBUSB_ERROR_IO;
-	} else if (r < DEVICE_DESC_LENGTH) {
-		usbi_err(DEVICE_CTX(dev), "short descriptor read (%d)", r);
-		free(dev_buf);
-		close(fd);
-		return LIBUSB_ERROR_IO;
-	}
-
-	// bit of a hack: set num_configurations now because cache_active_config()
-	// calls usbi_get_config_index_by_value() which uses it
-	dev->num_configurations = dev_buf[DEVICE_DESC_LENGTH - 1];
-
-	if (device_configured) {
-		r = cache_active_config(dev, fd, active_config);
-		if (r < 0) {
-			close(fd);
-			free(dev_buf);
-			return r;
-		}
-	}
-
-	close(fd);
-	priv->dev_descriptor = dev_buf;
-*/
 	return LIBUSB_SUCCESS;
 }
 
-static int read_device_descriptor(struct libusb_context *ctx,
-	struct libusb_device *dev, HANDLE hub_handle, ULONG connection_index,
-	UCHAR descriptor_index)
+/*
+ * fetch device descriptor through I/O
+ */
+static int cache_device_descriptor (struct libusb_device *dev)
 {
 	DWORD size, ret_size;
 	struct windows_device_priv *priv = __device_priv(dev);
-
+	struct windows_device_priv *parent_priv = __device_priv(priv->parent_dev);
+	struct libusb_context *ctx = DEVICE_CTX(dev);
 	USB_DEVICE_DESCRIPTOR_BUFFER dd_buf;
+  
 	size = sizeof(dd_buf);
 	memset(&dd_buf, 0, size);
 
-	dd_buf.req.ConnectionIndex = connection_index;
+	dd_buf.req.ConnectionIndex = priv->connection_index;
 	dd_buf.req.SetupPacket.bmRequest = 0x80;
 	dd_buf.req.SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
-//	cd_buf.rew.SetupPacket.wValue = (USB_CONFIGURATION_DESCRIPTOR_TYPE << 8) | descriptor_index;
-	dd_buf.req.SetupPacket.wValue = (USB_DEVICE_DESCRIPTOR_TYPE << 8) | descriptor_index;
-//	cd_buf.req.SetupPacket.wIndex = descriptor_lang;	// USHORT
+	dd_buf.req.SetupPacket.wValue = (USB_DEVICE_DESCRIPTOR_TYPE << 8);
 	dd_buf.req.SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
 
 	// read the device descriptor
-	if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &dd_buf, size,
+	if (!DeviceIoControl(parent_priv->handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &dd_buf, size,
 		&dd_buf, size, &ret_size, NULL)) {
 		usbi_warn(ctx, "could not read device descriptor: %s", windows_error_str());
 		return LIBUSB_ERROR_IO;
@@ -451,31 +367,70 @@ static int read_device_descriptor(struct libusb_context *ctx,
 	}
 
 	memmove(&(priv->dev_descriptor), &(dd_buf.data), DEVICE_DESC_LENGTH);
-//	usbi_dbg("ID: %04x:%04x", priv->dev_descriptor.idVendor, priv->dev_descriptor.idProduct);
+
+	dev->num_configurations = priv->dev_descriptor.bNumConfigurations;
+
+	// I'd like to see one of those some day...
+	if (dev->num_configurations > 1)
+		usbi_dbg("*** CONGRATULATIONS: You actually have a device with more than one conf!! ***");
 
 	return LIBUSB_SUCCESS;
 }
 
-static int set_hcd_device_descriptor(struct libusb_context *ctx, struct libusb_device *dev)
+/*
+ * HCD (root) hubs need to have their device descriptor manually populated
+ *
+ * Note that we follow the Linux convention and use the "Linux Foundation root hub"
+ * vendor ID as well as the product ID to indicate the hub speed
+ */
+static int force_hcd_device_descriptor(struct libusb_device *dev) 
 {
- 	struct windows_device_priv *priv = __device_priv(dev);
+	DWORD size;
+	USB_HUB_CAPABILITIES hub_caps;
+	USB_HUB_CAPABILITIES_EX hub_caps_ex;
+	struct windows_device_priv *priv = __device_priv(dev);
+	struct libusb_context *ctx = DEVICE_CTX(dev);
 
-	// TODO: fill in more blanks and call IOCTL_USB_GET_HUB_CAPABILITIES from here?
+	// TODO: fill in more blanks 
 	priv->dev_descriptor.bLength = sizeof(USB_DEVICE_DESCRIPTOR);
 	priv->dev_descriptor.bDescriptorType = USB_DEVICE_DESCRIPTOR_TYPE;
-	priv->dev_descriptor.idVendor = 0x1d6b;
-	priv->dev_descriptor.idProduct = 1;
+	dev->num_configurations = priv->dev_descriptor.bNumConfigurations = 1;
+	priv->dev_descriptor.idVendor = 0x1d6b;			// Linux Foundation root hub
+
+	// The EX query was implemented in Vista, and at the moment, we have no easy way
+	// of detecting the windows version in MinGW (the _WIN32_WINNT variable is fixed)
+	// Thus we try the ex query regardless and fallback to regular if it fails
+	size = sizeof(USB_HUB_CAPABILITIES_EX);
+	if (DeviceIoControl(priv->handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps_ex, 
+		size, &hub_caps_ex, size, &size, NULL)) {
+		// Sanity check. HCD hub should always be root
+		if (!hub_caps_ex.CapabilityFlags.HubIsRoot) {
+			usbi_warn(ctx, "program assertion failed - HCD hub is not reported as root hub.");
+		}
+		priv->dev_descriptor.idProduct = hub_caps_ex.CapabilityFlags.HubIsHighSpeedCapable?2:1;
+	} else {
+		// Standard query
+		size = sizeof(USB_HUB_CAPABILITIES);
+		if (!DeviceIoControl(priv->handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps, 
+			size, &hub_caps, size, &size, NULL)) {
+			usbi_warn(ctx, "could not read hub capabilities (std) for hub %s: %s", 
+				priv->path, windows_error_str());
+			return LIBUSB_ERROR_IO;
+		}
+		priv->dev_descriptor.idProduct = hub_caps.HubIs2xCapable?2:1;
+	}
+
+	return LIBUSB_SUCCESS;
 }
 
 /*
- * Recursively enumerates and find all hubs
+ * Recursively enumerates and finds all hubs & devices
  *
  * hub_dev: HANDLE of the Hub to be enumerated
  * parent_privv: pointer to the parent hub priv struct, or NULL is parent is an HCD
  */
-static int usb_enumerate_hub(struct libusb_context *ctx,
-	struct discovered_devs **_discdevs, HANDLE hub_handle,
-	libusb_bus_t busnum, struct windows_device_priv* parent_priv)
+static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs **_discdevs, 
+	HANDLE hub_handle, libusb_bus_t busnum, struct libusb_device *parent_dev, uint8_t nb_ports) 
 {
 	struct discovered_devs *discdevs = *_discdevs;
 	struct libusb_device *dev = NULL;
@@ -484,52 +439,50 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 	USB_HUB_NAME_FIXED s_hubname;
 	USB_NODE_CONNECTION_INFORMATION conn_info;
 	USB_NODE_INFORMATION hub_node;
-	USB_HUB_CAPABILITIES hub_caps;
-#if (_WIN32_WINNT >= 0x0600)
-#error If you see this, then MinGW is great!
-	USB_HUB_CAPABILITIES_EX hub_caps_ex;
-#endif
-	bool is_hcd, has_hub_caps_ex;	
+	bool is_hcd;	
 	int i, r;
 	LPCWSTR wstr;
-	char *tmp_str = NULL, *tmp_str2 = NULL;
-	uint8_t nb_ports;
+	char *tmp_str = NULL, *path_str = NULL;
 	unsigned long session_id;
 	libusb_devaddr_t devaddr = 0;
-	struct windows_device_priv *priv;
+	struct windows_device_priv *priv, *parent_priv; 
 
-	is_hcd = (parent_priv == NULL);
+	// obviously, root (HCD) hubs have no parent
+	is_hcd = (parent_dev == NULL);
 	if (is_hcd)
 	{	// HCD root hub
-		nb_ports = 1;
+		if (nb_ports != 1) {
+			usbi_warn(ctx, "program assertion failed - invalid number of ports for HCD.");
+			return LIBUSB_ERROR_INVALID_PARAM;
+		}
+		parent_priv = NULL;
 		size_initial = sizeof(USB_ROOT_HUB_NAME);
 		size_fixed = sizeof(USB_ROOT_HUB_NAME_FIXED);
 		getname_ioctl = IOCTL_USB_GET_ROOT_HUB_NAME;
 	}
 	else
-	{	// Node Hub
-		nb_ports = parent_priv->nb_ports;
+	{	// Node
+		parent_priv = __device_priv(parent_dev);
 		size_initial = sizeof(USB_NODE_CONNECTION_NAME);
 		size_fixed = sizeof(USB_NODE_CONNECTION_NAME_FIXED);
 		getname_ioctl = IOCTL_USB_GET_NODE_CONNECTION_NAME;
 	}
 
-	// Loop through all the ports
-	for (i=1, r = LIBUSB_SUCCESS; ; i++)
+	// Loop through all the ports on this hub
+	for (i = 1, r = LIBUSB_SUCCESS; ; i++)
 	{
-		// safe loop: release all dynamic resources
+		// safe loop: release all dynamic resources 
 		safe_unref_device(dev);
 		safe_free(tmp_str);
-		safe_free(tmp_str2);
+		safe_free(path_str);
 		safe_closehandle(handle);
 
-		// safe loop: end of loop condition
+		// safe loop: end of loop condition 
 		if ((i > nb_ports) || (r != LIBUSB_SUCCESS))
 			break;
 
-		// For non HCD nodes, check if we have a hub or a regular device
-		if (!is_hcd)
-		{
+		// For non HCDs, check if the node on this port is a hub or a regular device
+		if (!is_hcd) {
 			// TODO: add EX info
 			size = sizeof(USB_NODE_CONNECTION_INFORMATION);
 			conn_info.ConnectionIndex = i;	
@@ -544,167 +497,137 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 			}
 
 			if (conn_info.DeviceAddress == 0) {
-				LOOP_CONTINUE("program assertion failed - device address is zero "
-					"(conflicts with HCD), ignoring device");
+				LOOP_CONTINUE("program assertion failed - device address is zero " 
+					"(conflicts with root hub), ignoring device");
 			}
 
-			s_hubname.u.node.ConnectionIndex = i;
-		}
-		else
-		{	// HCDs have 1 node, and it's a hub
+			s_hubname.u.node.ConnectionIndex = i;	// Only used for non HCDs (s_hubname is an union)
+		} 
+		else 
+		{
+			// HCDs have only 1 node, and it's always a hub
 			conn_info.DeviceAddress = 0;
 			conn_info.DeviceIsHub = true;
 		}
 
-		// Allocate device
+		// If this node is a hub (HCD or not), open it
+		if (conn_info.DeviceIsHub) {	
+			size = size_initial;
+			if (!DeviceIoControl(hub_handle, getname_ioctl, &s_hubname, size, 
+				&s_hubname, size, &size, NULL)) {
+				LOOP_CONTINUE("could not get hub path (dummy): %s", windows_error_str());
+			}
 
+			size = is_hcd?s_hubname.u.root.ActualLength:s_hubname.u.node.ActualLength;
+			if (size > size_fixed) {
+				LOOP_CONTINUE("program assertion failed - hub path is too long");
+			}
+
+			// ConnectionIndex needs to be written again for the actual query
+			if (!is_hcd) {
+				s_hubname.u.node.ConnectionIndex = i;
+			}
+			if (!DeviceIoControl(hub_handle, getname_ioctl, &s_hubname, size,
+				&s_hubname, size, &size, NULL)) {
+				LOOP_CONTINUE("could not get hub path (actual): %s", windows_error_str());
+			}
+
+			// Add prefix
+			wstr = is_hcd?s_hubname.u.root.RootHubName:s_hubname.u.node.NodeName;
+			tmp_str = wchar_to_utf8(wstr);
+			if (tmp_str == NULL) {
+				usbi_err(ctx, "could not convert hub path string.");
+				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+			}
+			size = strlen(tmp_str) + sizeof(ROOT_PREFIX);
+
+			if ((path_str = malloc(size)) == NULL) {
+				usbi_err(ctx, "could not allocate string for hub path.");
+				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+			}
+
+			// Buffer overflows shouldn't happen on system strings, but still...
+			safe_strncpy(path_str, size, ROOT_PREFIX, sizeof(ROOT_PREFIX));
+			safe_strncat(path_str, size, tmp_str, strlen(tmp_str));
+
+			// Open Hub
+			handle = CreateFileA(path_str, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 
+				FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
+			if(handle == INVALID_HANDLE_VALUE) {
+				LOOP_CONTINUE("could not open hub %s: %s", path_str, windows_error_str());
+			}
+		} else {
+			// TODO: Do we need to do regular device init (handle, etc)?
+		}
+
+		// Generate a session ID
 		// Will need to change the session_id computation if this assertion fails
 		if (conn_info.DeviceAddress > LIBUSB_DEVADDR_MAX) {
 			LOOP_CONTINUE("program assertion failed - device address is greater than 255, ignoring device");
 		} else {
 			devaddr = conn_info.DeviceAddress;
 		}
-
 		// Same trick as linux for session_id, with same caveat
 		session_id = busnum << (sizeof(libusb_devaddr_t)*8) | devaddr;
 		usbi_dbg("busnum %d devaddr %d session_id %ld", busnum, devaddr, session_id);
 
+		// Allocate device if needed
 		dev = usbi_get_device_by_session_id(ctx, session_id);
-
 		if (dev) {
 			usbi_dbg("using existing device for session %ld", session_id);
+			priv = __device_priv(dev);
 		} else {
 			usbi_dbg("allocating new device for session %ld", session_id);
-			if ((dev = usbi_alloc_device(ctx, session_id)) == NULL) {
+			if ((dev = usbi_alloc_device(ctx, session_id)) == NULL) { 
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
 
-			LOOP_CHECK(initialize_device(dev, busnum, devaddr, "whatever"));
+			LOOP_CHECK(initialize_device(dev, busnum, devaddr, path_str, handle, i, parent_dev));
+			priv = __device_priv(dev);
+			path_str = NULL;	// protect our path from being freed
+			handle = INVALID_HANDLE_VALUE;	// protect our handle from closure
+			// TODO: probably want to do that only for hubs with connections
 
-			if (!is_hcd) {
-				// Only non HCD hubs have a configuration descriptor
-				LOOP_CHECK(read_device_descriptor(ctx, dev, hub_handle, i, 0));
+			// Setup the cached descriptors. Note that only non HCDs can fetch descriptors
+			// For HCDs, we just populate it manually
+			if (!is_hcd) { 
+				LOOP_CHECK(cache_device_descriptor(dev));
 			} else {
-				// So we manually setup HCDs as a result
-				LOOP_CHECK(set_hcd_device_descriptor(ctx, dev));
+				LOOP_CHECK(force_hcd_device_descriptor(dev));
 			}
-
-			// TODO: set conf so that sanitize is happy?
-//			LOOP_CHECK(usbi_sanitize_device(dev));
+			LOOP_CHECK(usbi_sanitize_device(dev));
 		}
 
 		// Append the device to the list of discovered devices
 		discdevs = discovered_devs_append(*_discdevs, dev);
-		if (!discdevs) {
+		if (!discdevs) { 
 			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 		}
 
 		*_discdevs = discdevs;
 
-		// Not a hub => ignore
-		if (!conn_info.DeviceIsHub)	{
+		// Finally, if device is a hub, recurse
+		if (conn_info.DeviceIsHub) {
+			// Find number of ports for this hub
+			size =  sizeof(USB_NODE_INFORMATION);
+			if (!DeviceIoControl(priv->handle, IOCTL_USB_GET_NODE_INFORMATION, &hub_node, size,
+				&hub_node, size, &size, NULL)) {
+				LOOP_CONTINUE("could not retreive information for hub %s: %s", 
+					priv->path, windows_error_str());
+			}
+
+			if (hub_node.NodeType != UsbHub) {
+				LOOP_CONTINUE("unexpected hub type (%d) for hub %s", hub_node.NodeType, priv->path);
+			}
+
+			usbi_dbg("%d ports Hub: %s", hub_node.u.HubInformation.HubDescriptor.bNumberOfPorts, priv->path);
+
+			// More hubs (NB: we don't really care about the value returned)
+			usb_enumerate_hub(ctx, _discdevs, priv->handle, busnum, dev, 
+				hub_node.u.HubInformation.HubDescriptor.bNumberOfPorts);
+		} else {
 			usbi_dbg("device on port %d not a hub", i);
-			continue;
-		}
-
-		// At this stage, we are dealing with a hub
-		size = size_initial;
-		if (!DeviceIoControl(hub_handle, getname_ioctl, &s_hubname, size,
-			&s_hubname, size, &size, NULL)) {
-			LOOP_CONTINUE("could not get hub path (dummy): %s", windows_error_str());
-		}
-
-		size = is_hcd?s_hubname.u.root.ActualLength:s_hubname.u.node.ActualLength;
-		if (size > size_fixed) {
-			LOOP_CONTINUE("program assertion failed - hub path is too long");
-		}
-
-		// ConnectionIndex needs to be re-initialized for nodes
-		if (!is_hcd)
-			s_hubname.u.node.ConnectionIndex = i;
-		if (!DeviceIoControl(hub_handle, getname_ioctl, &s_hubname, size,
-			&s_hubname, size, &size, NULL)) {
-			LOOP_CONTINUE("could not get hub path (actual): %s", windows_error_str());
-		}
-
-		// Add prefix
-		wstr = is_hcd?s_hubname.u.root.RootHubName:s_hubname.u.node.NodeName;
-		tmp_str = wchar_to_utf8(wstr);
-		if (tmp_str == NULL) {
-			usbi_err(ctx, "could not convert hub path string.");
-			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-		}
-		size = strlen(tmp_str) + sizeof(ROOT_PREFIX);
-
-		if ((tmp_str2 = malloc(size)) == NULL) {
-			usbi_err(ctx, "could not allocate string for hub path.");
-			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-		}
-
-		// Buffer overflows shouldn't happen on system strings, but still...
-		safe_strncpy(tmp_str2, size, ROOT_PREFIX, sizeof(ROOT_PREFIX));
-		safe_strncat(tmp_str2, size, tmp_str, strlen(tmp_str));
-
-		// Populate hub private data
-		priv = __device_priv(dev);
-		// Session IDs are supposed to prevent the need for this
-		if (priv->path != NULL)
-			free(priv->path);
-		priv->path = tmp_str2;
-		tmp_str2 = NULL;	// protect our path from being freed
-
-		// Open Hub
-		handle = CreateFileA(priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
-			FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
-		if(handle == INVALID_HANDLE_VALUE) {
-			LOOP_CONTINUE("could not open hub %s: %s", priv->path, windows_error_str());
-		}
-		priv->handle = handle;
-		handle = INVALID_HANDLE_VALUE;	// protect our handle from closure
-
-		// Get Hub capabilities as reported by Windows (needed to fill in the "fake" HCD
-		// hub device descriptor)
-		has_hub_caps_ex = false;
-
-		// The EX query was implemented in Vista
-		// TODO: drop the broken version detection and try EX regardless
-#if (_WIN32_WINNT >= 0x0600)
-		size = sizeof(USB_HUB_CAPABILITIES_EX);
-		if (!DeviceIoControl(priv->handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps_ex,
-			size, &hub_caps_ex, size, &size, NULL)) {
-			LOOP_CONTINUE("could not read hub capabilities (ex) for hub %s: %s",
-				priv->path, windows_error_str());
-		}
-		has_hub_caps_ex = true;
-#endif
-		// Standard query
-		size = sizeof(USB_HUB_CAPABILITIES);
-		if (!DeviceIoControl(priv->handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps,
-			size, &hub_caps, size, &size, NULL)) {
-			LOOP_CONTINUE("could not read hub capabilities (std) for hub %s: %s",
-				priv->path, windows_error_str());
-		}
-
-		if (is_hcd)
-			priv->dev_descriptor.idProduct = (hub_caps.HubIs2xCapable)?2:1;
-
-		// Find number of ports for this hub
-		size = sizeof(USB_NODE_INFORMATION);
-		if (!DeviceIoControl(priv->handle, IOCTL_USB_GET_NODE_INFORMATION, &hub_node, size,
-			&hub_node, size, &size, NULL)) {
-			LOOP_CONTINUE("could not retreive information for hub %s: %s",
-				priv->path, windows_error_str());
-		}
-
-		if (hub_node.NodeType != UsbHub) {
-			LOOP_CONTINUE("unexpected hub type (%d) for hub %s", hub_node.NodeType, priv->path);
-		}
-
-		priv->nb_ports = hub_node.u.HubInformation.HubDescriptor.bNumberOfPorts;
-		usbi_dbg("%d ports Hub: %s", priv->nb_ports, priv->path);
-
-		// More hubs
-		usb_enumerate_hub(ctx, _discdevs, priv->handle, busnum, priv);
+		} 
 	}
 
 	return r;
@@ -730,7 +653,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 		}
 
 		usbi_dbg("Enumerating bus %u", bus);
-		LOOP_CHECK(usb_enumerate_hub(ctx, _discdevs, _hcd->handle, bus, NULL));
+		LOOP_CHECK(usb_enumerate_hub(ctx, _discdevs, _hcd->handle, bus, NULL, 1));
 	}
 
 	return r;
@@ -916,7 +839,7 @@ static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 }
 
-static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds, int num_ready)
+static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds, int num_ready)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
@@ -988,7 +911,7 @@ const struct usbi_os_backend windows_backend = {
 	.cancel_transfer = windows_cancel_transfer,
 	.clear_transfer_priv = windows_clear_transfer_priv,
 
-	.handle_events = op_handle_events,
+	.handle_events = windows_handle_events,
 
 	.clock_gettime = windows_clock_gettime,
 
