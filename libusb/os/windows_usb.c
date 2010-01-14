@@ -52,6 +52,11 @@
 #include <ddk/usbioctl.h>
 #include <largeint.h>
 
+/* Prevent compilation problems on Windows platforms */
+#ifdef interface
+#undef interface
+#endif
+
 #include "libusbi.h"
 #include "windows_compat.h"
 #include "windows_usb.h"

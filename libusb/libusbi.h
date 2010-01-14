@@ -581,7 +581,7 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*claim_interface)(struct libusb_device_handle *handle, int interface_number);
+	int (*claim_interface)(struct libusb_device_handle *handle, int iface);
 
 	/* Release a previously claimed interface.
 	 *
@@ -598,7 +598,7 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*release_interface)(struct libusb_device_handle *handle, int interface_number);
+	int (*release_interface)(struct libusb_device_handle *handle, int iface);
 
 	/* Set the alternate setting for an interface.
 	 *
@@ -615,7 +615,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*set_interface_altsetting)(struct libusb_device_handle *handle,
-		int interface_number, int altsetting);
+		int iface, int altsetting);
 
 	/* Clear a halt/stall condition on an endpoint.
 	 *
@@ -662,7 +662,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*kernel_driver_active)(struct libusb_device_handle *handle,
-		int interface_number);
+		int interface);
 	
 	/* Detach a kernel driver from an interface. Optional.
 	 *
@@ -678,7 +678,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*detach_kernel_driver)(struct libusb_device_handle *handle,
-		int interface_number);
+		int interface);
 
 	/* Attach a kernel driver to an interface. Optional.
 	 *
@@ -695,7 +695,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*attach_kernel_driver)(struct libusb_device_handle *handle,
-		int interface_number);
+		int interface);
 
 	/* Destroy a device. Optional.
 	 *

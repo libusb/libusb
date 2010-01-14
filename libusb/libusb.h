@@ -491,7 +491,7 @@ struct libusb_config_descriptor {
 
 	/** Array of interfaces supported by this configuration. The length of
 	 * this array is determined by the bNumInterfaces field. */
-	const struct libusb_interface *iface;
+	const struct libusb_interface *interface;
 
 	/** Extra descriptors. If libusb encounters unknown configuration
 	 * descriptors, it will store them here, should you wish to parse them. */
@@ -795,8 +795,8 @@ void libusb_close(libusb_device_handle *dev_handle);
 libusb_device *libusb_get_device(libusb_device_handle *dev_handle);
 
 int libusb_set_configuration(libusb_device_handle *dev, int configuration);
-int libusb_claim_interface(libusb_device_handle *dev, int interface_number);
-int libusb_release_interface(libusb_device_handle *dev, int interface_number);
+int libusb_claim_interface(libusb_device_handle *dev, int iface);
+int libusb_release_interface(libusb_device_handle *dev, int iface);
 
 libusb_device_handle *libusb_open_device_with_vid_pid(libusb_context *ctx,
 	uint16_t vendor_id, uint16_t product_id);
@@ -806,9 +806,9 @@ int libusb_set_interface_alt_setting(libusb_device_handle *dev,
 int libusb_clear_halt(libusb_device_handle *dev, unsigned char endpoint);
 int libusb_reset_device(libusb_device_handle *dev);
 
-int libusb_kernel_driver_active(libusb_device_handle *dev, int interface_number);
-int libusb_detach_kernel_driver(libusb_device_handle *dev, int interface_number);
-int libusb_attach_kernel_driver(libusb_device_handle *dev, int interface_number);
+int libusb_kernel_driver_active(libusb_device_handle *dev, int interface);
+int libusb_detach_kernel_driver(libusb_device_handle *dev, int interface);
+int libusb_attach_kernel_driver(libusb_device_handle *dev, int interface);
 
 /* async I/O */
 
