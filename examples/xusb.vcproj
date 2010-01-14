@@ -22,6 +22,7 @@
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="1"
+			BuildLogFile="$(IntDir)\$(ProjectName).htm"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -65,6 +66,7 @@
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="E:\WinDDK\7600.16385.0\lib\win7\i386;..\msvc"
 				GenerateDebugInformation="true"
+				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
 				TargetMachine="1"
 			/>
@@ -97,6 +99,7 @@
 			ConfigurationType="1"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
+			BuildLogFile="$(IntDir)\$(ProjectName).htm"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -140,6 +143,7 @@
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="E:\WinDDK\7600.16385.0\lib\win7\i386;..\msvc"
 				GenerateDebugInformation="true"
+				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
