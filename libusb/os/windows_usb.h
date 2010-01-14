@@ -46,11 +46,14 @@
 #define safe_strncpy(dst, dst_max, src, count) strncpy(dst, src, min(count, dst_max - 1))
 #define safe_strncat(dst, dst_max, src, count) strncat(dst, src, min(count, dst_max - strlen(dst) - 1))
 #define safe_strcmp(str1, str2) strcmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2))
+#define safe_strncmp(str1, str2, count) strncmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2), count)
 #define safe_strdup _strdup
 #define safe_sprintf _snprintf
 #define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
 
 #define ROOT_PREFIX "\\\\.\\"
+#define MAX_PATH_LENGTH 128
+#define MAX_KEY_LENGTH 64
 
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 #define ERRNO GetLastError()
@@ -131,23 +134,26 @@ struct windows_transfer_priv {
 /*
  * Windows API structures (redefined for convenience)
  */
-#define USB_HCD_DRIVERKEY_NAME_FIXED_MAX 64
 typedef struct _USB_HCD_DRIVERKEY_NAME_FIXED {
 	ULONG ActualLength;
-	WCHAR DriverKeyName[USB_HCD_DRIVERKEY_NAME_FIXED_MAX];
+	WCHAR DriverKeyName[MAX_KEY_LENGTH];
 } USB_HCD_DRIVERKEY_NAME_FIXED;
 
+typedef struct _USB_NODE_DRIVERKEY_NAME_FIXED {
+  ULONG ActualLength;
+  WCHAR DriverKeyName[MAX_KEY_LENGTH];			
+} USB_NODE_DRIVERKEY_NAME_FIXED;
+
 // Fixed length version of USB_ROOT_HUB_NAME & USB_NODE_CONNECTION_NAME
-#define USB_HUB_NAME_FIXED_MAX 128
 typedef struct _USB_ROOT_HUB_NAME_FIXED {
 	ULONG ActualLength;
-	WCHAR RootHubName[USB_HUB_NAME_FIXED_MAX];
+	WCHAR RootHubName[MAX_PATH_LENGTH];
 } USB_ROOT_HUB_NAME_FIXED;
 
 typedef struct _USB_NODE_CONNECTION_NAME_FIXED {
 	ULONG ConnectionIndex;
 	ULONG ActualLength;
-	WCHAR NodeName[USB_HUB_NAME_FIXED_MAX];
+	WCHAR NodeName[MAX_PATH_LENGTH];
 } USB_NODE_CONNECTION_NAME_FIXED;
 
 typedef struct _USB_HUB_NAME_FIXED {

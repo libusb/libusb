@@ -50,6 +50,7 @@
 #include <setupapi.h>
 #include <ddk/usbiodef.h>
 #include <ddk/usbioctl.h>
+#include <ddk/cfgmgr32.h>
 #include <largeint.h>
 
 /* Prevent compilation problems on Windows platforms */
@@ -159,6 +160,48 @@ static char err_string[ERR_BUFFER_SIZE];
 			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", errcode);
 	}
 	return err_string;
+}
+
+/*
+ * Sanitize Microsoft's paths: convert to uppercase, add prefix and fix backslashes.
+ * Return an allocated sanitized string or NULL on error.
+ */
+static char* sanitize_path(const char* path)
+{
+	int j;
+	size_t size;
+	char* ret_path;
+	bool has_root_prefix = false;
+
+	if (path == NULL)
+		return NULL;
+
+	size = strlen(path);
+	if ((size > 3) && (path[0] == '\\') && (path[1] == '\\') && (path[3] == '\\')) {
+		has_root_prefix = true;
+	} else {
+		size += sizeof(ROOT_PREFIX);
+	}
+
+	if ((ret_path = (char*)calloc(size, 1)) == NULL) 
+		return NULL;
+
+	if (!has_root_prefix) {
+		safe_strncpy(ret_path, size, ROOT_PREFIX, sizeof(ROOT_PREFIX));
+	}
+	safe_strncat(ret_path, size, path, strlen(path));
+
+	// Microsoft indiscriminatly uses '\\?\' or '\\.\' for root prefixes. Ensure '\\.\' is used
+	ret_path[2] = '.';
+
+	// Same goes for '\' and '#' after the root prefix. Ensure '#' is used
+	for(j=sizeof(ROOT_PREFIX)-1; j<size; j++) {
+		ret_path[j] = toupper(ret_path[j]);	// Fix case too
+		if (ret_path[j] == '\\')
+			ret_path[j] = '#';
+	}
+
+	return ret_path;
 }
 
 /*
@@ -277,7 +320,7 @@ static int windows_init(struct libusb_context *ctx)
 					bus, windows_error_str());
 			}
 
-			if ((size = driverkey_name.ActualLength) > (USB_HCD_DRIVERKEY_NAME_FIXED_MAX*sizeof(WCHAR))) {
+			if ((size = driverkey_name.ActualLength) > (MAX_KEY_LENGTH*sizeof(WCHAR))) {
 				LOOP_CONTINUE("DriverKey name too long for bus %d (%d), skipping.", size, bus);
 			}
 
@@ -661,16 +704,12 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 				usbi_err(ctx, "could not convert hub path string.");
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
-			size = strlen(tmp_str) + sizeof(ROOT_PREFIX);
 
-			if ((path_str = malloc(size)) == NULL) {
-				usbi_err(ctx, "could not allocate string for hub path.");
+			path_str = sanitize_path(tmp_str);
+			if (path_str == NULL) {
+				usbi_err(ctx, "could not sanitize hub path string.");
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
-
-			// Buffer overflows shouldn't happen on system strings, but still...
-			safe_strncpy(path_str, size, ROOT_PREFIX, sizeof(ROOT_PREFIX));
-			safe_strncat(path_str, size, tmp_str, strlen(tmp_str));
 
 			// Open Hub
 			handle = CreateFileA(path_str, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 
@@ -757,6 +796,136 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 }
 
 /*
+ * This function retrieves and sets the paths of all non-hub devices
+ * NB: No I/O with device is required during this call
+ */
+static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *discdevs) 
+{
+	struct windows_device_priv *priv;
+	struct windows_device_priv *parent_priv;
+	char parent_path[MAX_PATH_LENGTH];
+	char reg_key[MAX_KEY_LENGTH];
+	char *sanitized_path = NULL;
+	HDEVINFO dev_info;
+	SP_DEVICE_INTERFACE_DATA dev_interface_data;
+	SP_DEVICE_INTERFACE_DETAIL_DATA *_dev_interface_details = NULL;
+	SP_DEVINFO_DATA dev_info_data;
+	DEVINST parent_devinst;
+	GUID guid;
+	DWORD size, reg_type;
+	int	r = LIBUSB_SUCCESS;
+	unsigned i, j, port_nr, hub_nr;
+	bool found;
+
+	// List all connected devices that are not a hub
+	guid = GUID_DEVINTERFACE_USB_DEVICE; 
+	dev_info = SetupDiGetClassDevs(&guid, NULL, NULL, (DIGCF_PRESENT | DIGCF_DEVICEINTERFACE));
+
+	if (dev_info != INVALID_HANDLE_VALUE)
+	{
+		dev_interface_data.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+
+		for (i = 0; ; i++)	
+		{
+			// safe loop: free up any (unprotected) dynamic resource
+			safe_free(_dev_interface_details);
+			safe_free(sanitized_path);
+
+			// safe loop: end of loop condition
+			guid = GUID_DEVINTERFACE_USB_DEVICE;
+			if ( (SetupDiEnumDeviceInterfaces(dev_info, NULL, &guid, i, &dev_interface_data) != TRUE) 
+				||(r != LIBUSB_SUCCESS) )
+				break;
+
+			// Read interface data (dummy + actual) to access the device path
+			if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, NULL, 0, &size, NULL)) {
+				// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
+				if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+					LOOP_CONTINUE("could not access interface data (dummy) for device #%u, skipping: %s", 
+						i, windows_error_str());
+				}
+			} 
+			else {
+				LOOP_CONTINUE("program assertion failed - http://msdn.microsoft.com/en-us/library/ms792901.aspx is wrong.");
+			}
+
+			if ((_dev_interface_details = malloc(size)) == NULL) {
+				usbi_err(ctx, "could not allocate interface data for device #%u. aborting.", i);
+				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+			}
+
+			_dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA); 
+			if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, 
+				_dev_interface_details, size, &size, NULL)) {
+				LOOP_CONTINUE("could not access interface data (actual) for device #%u, skipping: %s", 
+					i, windows_error_str());
+			}
+
+			// Retrieve location information (port#) through the Location Information registry data
+			dev_info_data.cbSize = sizeof(dev_info_data);
+			if (!SetupDiEnumDeviceInfo(dev_info, i, &dev_info_data)) {
+				LOOP_CONTINUE("could not retrieve info data for device #%u, skipping: %s", 
+					i, windows_error_str());
+			}
+
+			if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_LOCATION_INFORMATION, 
+				&reg_type, (BYTE*)reg_key, MAX_KEY_LENGTH, &size)) {
+				LOOP_CONTINUE("could not retrieve location information for device #%u, skipping: %s", 
+					i, windows_error_str());
+			}
+
+			if (size != sizeof("Port_#1234.Hub_#1234")) {
+				LOOP_CONTINUE("unexpected registry key size for device #%u, skipping", i);
+			}
+			sscanf(reg_key, "Port_#%04d.Hub_#%04d", &port_nr, &hub_nr);
+
+			// Retrieve parent's path using PnP Configuration Manager (CM)
+			if (CM_Get_Parent(&parent_devinst, dev_info_data.DevInst, 0) != CR_SUCCESS) {
+				LOOP_CONTINUE("could not retrieve parent info data for device #%u, skipping: %s", 
+					i, windows_error_str());
+			}
+			
+			if (CM_Get_Device_ID(parent_devinst, parent_path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
+				LOOP_CONTINUE("could not retrieve parent's path for device #%u, skipping: %s", 
+					i, windows_error_str());
+			}
+
+			// Fix parent's path inconsistancies before attempting to compare
+			sanitized_path = sanitize_path(parent_path);
+			if (sanitized_path == NULL) {
+				LOOP_CONTINUE("could not sanitize parent's path for device #%u, skipping.", i);
+			}
+
+			// With the parent path and port number, we should be able to locate our device 
+			// by comparing these values to the ones we got when enumerating hubs
+			found = false;
+			for (j=0; j<discdevs->len; j++) {
+				priv = __device_priv(discdevs->devices[j]);
+				// ignore HCDs
+				if (priv->parent_dev == NULL) {
+					continue;
+				}
+				parent_priv = __device_priv(priv->parent_dev);
+				if ( (safe_strncmp(parent_priv->path, sanitized_path, strlen(sanitized_path)) == 0) &&
+					 (port_nr == priv->connection_index) ) {
+					priv->path = sanitize_path(_dev_interface_details->DevicePath);
+					usbi_dbg("path (%d:%d): %s", discdevs->devices[j]->bus_number, 
+						discdevs->devices[j]->device_address, priv->path);
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				LOOP_CONTINUE("could not match %s with a libusb device.", _dev_interface_details->DevicePath);
+			}
+		}
+		SetupDiDestroyDeviceInfoList(dev_info);
+	}
+
+	return LIBUSB_SUCCESS;
+}
+
+/*
  * get_device_list: libusb backend device enumeration function
  *
  *
@@ -778,6 +947,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 		usbi_dbg("Enumerating bus %u", bus);
 		LOOP_CHECK(usb_enumerate_hub(ctx, _discdevs, _hcd->handle, bus, NULL, 1));
 	}
+
+	// Non hub device paths are set using a separate method
+	r = set_device_paths(ctx, *_discdevs);
 
 	return r;
 }
