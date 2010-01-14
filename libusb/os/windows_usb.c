@@ -1029,7 +1029,8 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				}
 			}
 			if (!found) {
-				LOOP_CONTINUE("program assertion failed - unable to \"guess\" port number for device #%u, skipping", i);
+				LOOP_CONTINUE("program assertion failed - unable to \"guess\" port number for %s", 
+					dev_interface_details->DevicePath);
 			}
 		}
 
