@@ -20,11 +20,15 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#ifdef _MSC_VER
+#include <config_msvc.h>
+#else
+#include <config.h>
+#endif
 #include <stdio.h>
 #include <sys/types.h>
 #include <inttypes.h>
 #include <string.h>
-#include "../config.h"
 
 #include <libusb/libusb.h>
 
@@ -330,7 +334,8 @@ int test_device(uint16_t vid, uint16_t pid)
 	int i, j, k, r;
 	int iface, nb_ifaces;
 	int test_scsi = 0;
-	
+	struct libusb_device_descriptor dev_desc;
+
 	printf("Opening device...\n");
 	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
 
@@ -341,7 +346,6 @@ int test_device(uint16_t vid, uint16_t pid)
 
 	dev = libusb_get_device(handle);
 
-	struct libusb_device_descriptor dev_desc;
 	printf("reading device descriptor...\n");
 	CALL_CHECK(libusb_get_device_descriptor(dev, &dev_desc));
 	printf("length = %d\n", dev_desc.bLength);
@@ -439,7 +443,7 @@ int main(int argc, char** argv)
 			printf("   -h: display usage\n");
 			printf("   -j: test OLIMEX ARM-USB-TINY JTAG, 2 channel composite device\n");
 			printf("   -k: test Generic 2 GB USB Key\n");
-			printf("   -x: test Microsoft XBox Controller Type S\n");
+			printf("   -x: test Microsoft XBox Controller Type S (default)\n");
 			return 0;
 		}
 		switch(argv[1][1]) {

@@ -21,8 +21,11 @@
 #ifndef __LIBUSBI_H__
 #define __LIBUSBI_H__
 
+#ifdef _MSC_VER
+#include <config_msvc.h>
+#else
 #include <config.h>
-
+#endif
 #include <pthread.h>
 #include <stddef.h>
 #include <time.h>
@@ -57,17 +60,18 @@ struct list_head {
  *	pos - A structure pointer has a "member" element
  *	head - list head
  *	member - the list_head element in "pos"
+ *  type - the type of the first parameter
  */
-#define list_for_each_entry(pos, head, member)				\
-	for (pos = list_entry((head)->next, typeof(*pos), member);	\
+#define list_for_each_entry(pos, head, member, type)				\
+	for (pos = list_entry((head)->next, type, member);	\
 	     &pos->member != (head);					\
-	     pos = list_entry(pos->member.next, typeof(*pos), member))
+	     pos = list_entry(pos->member.next, type, member))
 
-#define list_for_each_entry_safe(pos, n, head, member)			\
-        for (pos = list_entry((head)->next, typeof(*pos), member),	\
-		n = list_entry(pos->member.next, typeof(*pos), member);	\
+#define list_for_each_entry_safe(pos, n, head, member, type)			\
+        for (pos = list_entry((head)->next, type, member),	\
+		n = list_entry(pos->member.next, type, member);	\
 	     &pos->member != (head);					\
-	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
+	     pos = n, n = list_entry(n->member.next, type, member))
 
 #define list_empty(entry) ((entry)->next == (entry))
 
@@ -121,20 +125,20 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level,
 	const char *function, const char *format, ...);
 
 #ifdef ENABLE_LOGGING
-#define _usbi_log(ctx, level, fmt...) usbi_log(ctx, level, __FUNCTION__, fmt)
+#define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __FUNCTION__, __VA_ARGS__)
 #else
-#define _usbi_log(ctx, level, fmt...)
+#define _usbi_log(ctx, level, ...)
 #endif
 
 #ifdef ENABLE_DEBUG_LOGGING
-#define usbi_dbg(fmt...) _usbi_log(NULL, LOG_LEVEL_DEBUG, fmt)
+#define usbi_dbg(...) _usbi_log(NULL, LOG_LEVEL_DEBUG, __VA_ARGS__)
 #else
-#define usbi_dbg(fmt...)
+#define usbi_dbg(...)
 #endif
 
-#define usbi_info(ctx, fmt...) _usbi_log(ctx, LOG_LEVEL_INFO, fmt)
-#define usbi_warn(ctx, fmt...) _usbi_log(ctx, LOG_LEVEL_WARNING, fmt)
-#define usbi_err(ctx, fmt...) _usbi_log(ctx, LOG_LEVEL_ERROR, fmt)
+#define usbi_info(ctx, ...) _usbi_log(ctx, LOG_LEVEL_INFO, __VA_ARGS__)
+#define usbi_warn(ctx, ...) _usbi_log(ctx, LOG_LEVEL_WARNING, __VA_ARGS__)
+#define usbi_err(ctx, ...) _usbi_log(ctx, LOG_LEVEL_ERROR, __VA_ARGS__)
 
 #define USBI_GET_CONTEXT(ctx) if (!(ctx)) (ctx) = usbi_default_context
 #define DEVICE_CTX(dev) ((dev)->ctx)
@@ -271,15 +275,15 @@ struct usbi_transfer {
 };
 
 #define __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
-	((struct libusb_transfer *)(((void *)(transfer)) \
+	((struct libusb_transfer *)(((char *)(transfer)) \
 		+ sizeof(struct usbi_transfer)))
 #define __LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer) \
-	((struct usbi_transfer *)(((void *)(transfer)) \
+	((struct usbi_transfer *)(((char *)(transfer)) \
 		- sizeof(struct usbi_transfer)))
 
 static inline void *usbi_transfer_get_os_priv(struct usbi_transfer *transfer)
 {
-	return ((void *)transfer) + sizeof(struct usbi_transfer)
+	return ((char *)transfer) + sizeof(struct usbi_transfer)
 		+ sizeof(struct libusb_transfer)
 		+ (transfer->num_iso_packets
 			* sizeof(struct libusb_iso_packet_descriptor));

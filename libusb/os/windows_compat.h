@@ -26,8 +26,16 @@
  *
  * This is placed in the .h to limit changes required to the core files
  */
-#ifdef interface
+#if defined(interface)
 #undef interface
+#endif
+
+#if !defined(ssize_t)
+#if defined (_WIN64)
+#define ssize_t __int64
+#else
+#define ssize_t long
+#endif
 #endif
 
 #define MAX_FDS     256
@@ -77,13 +85,13 @@ struct winfd fd_to_winfd(int fd);
 struct winfd handle_to_winfd(HANDLE handle);
 struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);
 
-#ifndef TIMESPEC_TO_TIMEVAL
+#if !defined(TIMESPEC_TO_TIMEVAL)
 #define TIMESPEC_TO_TIMEVAL(tv, ts) { \
 (tv)->tv_sec = (ts)->tv_sec; \
 (tv)->tv_usec = (ts)->tv_nsec / 1000; \
 }
 #endif
-#ifndef timersub
+#if !defined(timersub)
 #define timersub(a, b, result)                          \
 do {                                                    \
 	(result)->tv_sec = (a)->tv_sec - (b)->tv_sec;       \

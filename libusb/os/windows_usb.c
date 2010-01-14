@@ -17,9 +17,12 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
+#if defined(_MSC_VER)
+#include <config_msvc.h>
+#else
 #include <config.h>
+#endif
 #include <ctype.h>
-#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
@@ -28,15 +31,23 @@
 #include <windows.h>
 #include <tchar.h>
 #include <setupapi.h>
+#if defined(_MSC_VER)
+#include <api/usbiodef.h>
+#include <api/usbioctl.h>
+#if !defined __drv_preferredFunction
+#define __drv_preferredFunction(func,why)
+#endif
+#include <api/cfgmgr32.h>
+#else
 #include <ddk/usbiodef.h>
 #include <ddk/usbioctl.h>
 #include <ddk/cfgmgr32.h>
-#include <largeint.h>
+#endif
 #include <inttypes.h>
 #include <objbase.h>  // for string to GUID conv. requires libole32.a
 
 /* Prevent compilation problems on Windows platforms */
-#ifdef interface
+#if defined(interface)
 #undef interface
 #endif
 
@@ -45,12 +56,12 @@
 #include "windows_usb.h"
 
 // These GUIDs appear undefined on MinGW32
-#ifndef GUID_DEVINTERFACE_USB_HOST_CONTROLLER
+#if !defined(GUID_DEVINTERFACE_USB_HOST_CONTROLLER)
 	// http://msdn.microsoft.com/en-us/library/bb663109.aspx
 	const GUID GUID_DEVINTERFACE_USB_HOST_CONTROLLER = {  0x3ABF6F2D, 0x71C4, 0x462A, {0x8A, 0x92, 0x1E, 0x68, 0x61, 0xE6, 0xAF, 0x27} };
 #endif
 
-#ifndef GUID_DEVINTERFACE_USB_DEVICE
+#if !defined(GUID_DEVINTERFACE_USB_DEVICE)
 	// http://msdn.microsoft.com/en-us/library/bb663093.aspx
 	const GUID GUID_DEVINTERFACE_USB_DEVICE = {  0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED} };
 #endif
@@ -151,8 +162,7 @@ static char err_string[ERR_BUFFER_SIZE];
 static char* sanitize_path(const char* path)
 {
 	const char root_prefix[] = "\\\\.\\";
-	int j;
-	size_t size, root_size;
+	size_t j, size, root_size;
 	char* ret_path = NULL;
 	int add_root = 0;
 
@@ -702,7 +712,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 		if (conn_info.DeviceAddress > LIBUSB_DEVADDR_MAX) {
 			LOOP_CONTINUE("program assertion failed - device address is greater than 255, ignoring device");
 		} else {
-			devaddr = conn_info.DeviceAddress;
+			devaddr = (uint8_t)conn_info.DeviceAddress;
 		}
 		// Same trick as linux for session_id, with same caveat
 		session_id = busnum << (sizeof(libusb_devaddr_t)*8) | devaddr;
@@ -1483,7 +1493,7 @@ static void windows_handle_callback (struct usbi_transfer *itransfer, uint32_t i
 static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds, int num_ready)
 {
 	struct windows_transfer_priv* transfer_priv = NULL;
-	int i = 0;
+	nfds_t i = 0;
 	bool found = false;
 	struct usbi_transfer *transfer;
 	DWORD io_size, io_result;
@@ -1501,7 +1511,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 
 		// Because a Windows OVERLAPPED is used for poll emulation, 
 		// a pollable fd is created and stored with each transfer
-		list_for_each_entry(transfer, &ctx->flying_transfers, list) {
+		list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
 			transfer_priv = usbi_transfer_get_os_priv(transfer);
 			if (transfer_priv->pollable_fd.fd == fds[i].fd) {
 				found = true;
@@ -1543,8 +1553,8 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 		// If hires_frequency is set, we have an hires monotonic timer available
 		if ((hires_frequency != 0) && (QueryPerformanceCounter(&hires_counter) != 0))
 		{
-			tp->tv_sec = hires_counter.QuadPart / hires_frequency;
-			tp->tv_nsec = ((hires_counter.QuadPart % hires_frequency)/1000) * hires_ticks_to_ps;
+			tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
+			tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency)/1000) * hires_ticks_to_ps);
 			return LIBUSB_SUCCESS;
 		}	
 		// make sure we fall through to real-time if we can't get hires timer
@@ -1557,8 +1567,8 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 		rtime.LowPart = ftime.dwLowDateTime;
 		rtime.HighPart = ftime.dwHighDateTime;
 		rtime.QuadPart -= epoch_time;
-		tp->tv_sec = rtime.QuadPart / 10000000;
-		tp->tv_nsec = (rtime.QuadPart % 10000000)*100;
+		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
+		tp->tv_nsec = (long)((rtime.QuadPart % 10000000)*100);
 		return LIBUSB_SUCCESS;
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -1603,7 +1613,7 @@ const struct usbi_os_backend windows_backend = {
 	windows_handle_events,
 
 	windows_clock_gettime,
-#ifdef USBI_TIMERFD_AVAILABLE
+#if defined(USBI_TIMERFD_AVAILABLE)
 	NULL,
 #endif
 	sizeof(struct windows_device_priv),

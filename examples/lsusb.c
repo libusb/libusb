@@ -44,8 +44,7 @@ static void print_devs(libusb_device **devs)
 int main(void)
 {
 	libusb_device **devs;
-	int r;
-	ssize_t cnt;
+	int r, cnt;
 
 	r = libusb_init(NULL);
 	if (r < 0)

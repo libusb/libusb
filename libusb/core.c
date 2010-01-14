@@ -18,19 +18,22 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#ifdef _MSC_VER
+#include <config_msvc.h>
+#else
 #include <config.h>
-
+#endif
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <unistd.h>
 #ifdef OS_WINDOWS
 #include <windows.h>
 #include "os/windows_compat.h"
 #else
+#include <unistd.h>
 #include <poll.h>
 #define write_for_poll write
 #define read_for_poll read
@@ -569,7 +572,7 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	struct libusb_device *ret = NULL;
 
 	pthread_mutex_lock(&ctx->usb_devs_lock);
-	list_for_each_entry(dev, &ctx->usb_devs, list)
+	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device)
 		if (dev->session_data == session_id) {
 			ret = dev;
 			break;
@@ -599,14 +602,13 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
  * \returns the number of devices in the outputted list, or LIBUSB_ERROR_NO_MEM
  * on memory allocation failure.
  */
-API_EXPORTED ssize_t libusb_get_device_list(libusb_context *ctx,
+API_EXPORTED int libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list)
 {
 	struct discovered_devs *discdevs = discovered_devs_alloc();
 	struct libusb_device **ret;
 	int r = 0;
-	size_t i;
-	ssize_t len;
+	int i, len;
 	USBI_GET_CONTEXT(ctx);
 	usbi_dbg("");
 

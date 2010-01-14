@@ -22,7 +22,12 @@
 #define __LIBUSB_H__
 
 #include <stdint.h>
+#if defined(_MSC_VER)
+#define inline __inline
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
 #include <sys/types.h>
 #include <time.h>
 #include <limits.h>
@@ -39,16 +44,16 @@ extern "C" {
  * \param x the host-endian value to convert
  * \returns the value in little-endian byte order
  */
-#define libusb_cpu_to_le16(x) ({ \
-	union { \
-		uint8_t  b8[2]; \
-		uint16_t b16; \
-	} _tmp; \
-	uint16_t _tmp2 = (uint16_t)(x); \
-	_tmp.b8[1] = _tmp2 >> 8; \
-	_tmp.b8[0] = _tmp2 & 0xff; \
-	_tmp.b16; \
-})
+static inline uint16_t libusb_cpu_to_le16(uint16_t x) {
+	union {
+		uint8_t  b8[2];
+		uint16_t b16;
+	} _tmp;
+	uint16_t _tmp2 = (uint16_t)(x);
+	_tmp.b8[1] = _tmp2 >> 8;
+	_tmp.b8[0] = _tmp2 & 0xff;
+	return _tmp.b16;
+}
 
 /** \def libusb_le16_to_cpu
  * \ingroup misc
@@ -769,7 +774,7 @@ int libusb_init(libusb_context **ctx);
 void libusb_exit(libusb_context *ctx);
 void libusb_set_debug(libusb_context *ctx, int level);
 
-ssize_t libusb_get_device_list(libusb_context *ctx,
+int libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);
 void libusb_free_device_list(libusb_device **list, int unref_devices);
 libusb_device *libusb_ref_device(libusb_device *dev);

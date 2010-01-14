@@ -70,12 +70,13 @@
 #include <stdio.h>
 #include <windows.h>
 #include <pthread.h>
+#include <io.h>
 
 #include "windows_compat.h"
 
 // Uncomment to debug the polling layer
 //#define DEBUG_WINDOWS_COMPAT
-#ifdef DEBUG_WINDOWS_COMPAT
+#if defined(DEBUG_WINDOWS_COMPAT)
 #define printb(...) printf(__VA_ARGS__)
 #else
 #define printb(...)
@@ -205,7 +206,7 @@ void exit_polling(void)
  *
  * requires a valid index
  */
-inline void _init_read_marker(int index) 
+__inline void _init_read_marker(int index) 
 {
 	// Cancel any read operation in progress
 	CancelIo(poll_fd[index].handle);
@@ -241,7 +242,7 @@ int pipe_for_poll(int filedes[2])
 		return -1;
 	}
 
-	sprintf(pipe_name, "\\\\.\\pipe\\libusb%08x%04x", (unsigned)GetCurrentProcessId(), pipe_number++);
+	_snprintf(pipe_name, sizeof(pipe_name), "\\\\.\\pipe\\libusb%08x%04x", (unsigned)GetCurrentProcessId(), pipe_number++);
 
 	// Read end of the pipe
 	handle[0] = CreateNamedPipeA(pipe_name, PIPE_ACCESS_INBOUND|FILE_FLAG_OVERLAPPED,
@@ -476,7 +477,7 @@ struct winfd overlapped_to_winfd(OVERLAPPED* overlapped)
  */
 int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 {
-	int i, index, triggered = 0;
+	unsigned int i, index, triggered = 0;
 	HANDLE *handles_to_wait_on = malloc(nfds*sizeof(HANDLE));
 	int *handle_to_index = malloc(nfds*sizeof(int));
 	DWORD nb_handles_to_wait_on = 0;
@@ -747,7 +748,7 @@ ssize_t read_for_poll(int fd, void *buf, size_t count)
 	// Read supplementary bytes if needed (blocking)
 	if (count > 1) {
 		reset_overlapped(poll_fd[index].overlapped);
-		if (!ReadFile(poll_fd[index].handle, buf+1, (DWORD)(count-1), &rd_count, poll_fd[index].overlapped)) {
+		if (!ReadFile(poll_fd[index].handle, (char*)buf+1, (DWORD)(count-1), &rd_count, poll_fd[index].overlapped)) {
 			if(GetLastError() == ERROR_IO_PENDING) {
 				if (!GetOverlappedResult(poll_fd[index].handle,	poll_fd[index].overlapped, &rd_count, TRUE)) {
 					// TODO: handle more data!
