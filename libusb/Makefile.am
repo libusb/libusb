@@ -19,7 +19,7 @@ if OS_WINDOWS
 OS_SRC = $(WINDOWS_USB_SRC)
 endif
 
-libusb_1_0_la_CFLAGS = $(VISIBILITY_CFLAGS) $(AM_CFLAGS) -pthread
+libusb_1_0_la_CFLAGS = $(VISIBILITY_CFLAGS) $(AM_CFLAGS)
 libusb_1_0_la_SOURCES = libusbi.h core.c descriptor.c io.c sync.c $(OS_SRC)
 
 hdrdir = $(includedir)/libusb-1.0

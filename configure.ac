@@ -20,6 +20,7 @@ case $host in
 	AC_MSG_RESULT([Linux])
 	backend="linux"
 	AC_CHECK_LIB(rt, clock_gettime)
+	CFLAGS="-pthread"
 	AM_LDFLAGS=""
 	;;
 *-darwin*)
@@ -28,6 +29,7 @@ case $host in
 	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
 	AC_MSG_RESULT([Darwin/MacOS X])
 	backend="darwin"
+	CFLAGS="-pthread"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
 *-mingw*)
@@ -36,6 +38,7 @@ case $host in
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	LIBS="-lpthreadGC2 -lsetupapi -lole32"
+	CFLAGS=""	
 	AM_LDFLAGS=""
 	;;
 *)
