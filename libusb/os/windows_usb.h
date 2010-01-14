@@ -121,14 +121,18 @@ static inline void windows_hcd_priv_release(struct windows_hcd_priv* p) {
 // Nodes (Hubs & devices)
 struct windows_device_priv {
 	struct libusb_device *parent_dev;	// access to parent is required for usermode ops
-	ULONG connection_index;	// also required for some usermode ops
-	char *path;	// path used by Windows to reference the USB node
-	char *interface_path[USB_MAXINTERFACES];	// each interface has a path as well
-	char *driver;	// driver name (eg WinUSB, USBSTOR, HidUsb, etc)
+	ULONG connection_index;	            // also required for some usermode ops
+	char *path;	                        // path used by Windows to reference the USB node
+	struct {
+		char *path;                     // each interface has a path as well
+		int8_t nb_endpoints;            // and a set of endpoint addresses (USB_MAXENDPOINTS)
+		uint8_t *endpoint;	            
+	} interface[USB_MAXINTERFACES];
+	char *driver;	                    // driver name (eg WinUSB, USBSTOR, HidUsb, etc)
 	enum api_type api;
 	uint8_t active_config;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
-	unsigned char **config_descriptor;	// list of pointers to the cached config descriptors
+	unsigned char **config_descriptor;  // list of pointers to the cached config descriptors
 };
 
 static inline void windows_device_priv_init(struct windows_device_priv* p) {
@@ -141,8 +145,11 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 	p->active_config = 0;
 	p->config_descriptor = NULL;
 	memset(&(p->dev_descriptor), 0, sizeof(USB_DEVICE_DESCRIPTOR));
-	for (i=0; i<USB_MAXINTERFACES; i++)
-		p->interface_path[i] = NULL;
+	for (i=0; i<USB_MAXINTERFACES; i++) {
+		p->interface[i].path = NULL;
+		p->interface[i].nb_endpoints = 0;
+		p->interface[i].endpoint = NULL;
+	}
 }
 
 static inline void windows_device_priv_release(struct windows_device_priv* p, int num_configurations) {
@@ -154,8 +161,10 @@ static inline void windows_device_priv_release(struct windows_device_priv* p, in
 			safe_free(p->config_descriptor[i]);
 	}
 	safe_free(p->config_descriptor);
-	for (i=0; i<USB_MAXINTERFACES; i++)
-		safe_free(p->interface_path[i]);
+	for (i=0; i<USB_MAXINTERFACES; i++) {
+		safe_free(p->interface[i].path);
+		safe_free(p->interface[i].endpoint);
+	}
 }
 
 static inline struct windows_device_priv *__device_priv(struct libusb_device *dev) {

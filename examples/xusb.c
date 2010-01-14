@@ -59,6 +59,26 @@
 #define BOMS_RESET                    0xFF
 #define BOMS_GET_MAX_LUN              0xFE
 
+// Section 5.1: Command Block Wrapper (CBW)
+struct command_block_wrapper {
+	uint8_t dCBWSignature[4];
+	uint32_t dCBWTag;
+	uint32_t dCBWDataTransferLength;
+	uint8_t bmCBWFlags;
+	uint8_t bCBWLUN;
+	uint8_t bCBWCBLength;
+	uint8_t CBWCB[16];
+};
+
+// Section 5.2: Command Status Wrapper (CSW)
+struct command_status_wrapper {
+	uint8_t dCSWSignature[4];
+	uint32_t dCSWTag;
+	uint32_t dCSWDataResidue;
+	uint8_t bCSWStatus;
+};
+
+
 enum test_type {
 	USE_XBOX,
 	USE_KEY,
@@ -110,8 +130,10 @@ int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_t right
 // Mass Storage device to test bulk transfers (/!\ destructive test /!\)
 int test_mass_storage(libusb_device_handle *handle)
 {
-	int r;
+	int r, size;
 	unsigned char lun;
+	struct command_block_wrapper cbw;
+	struct command_status_wrapper csw;
 	printf("Sending Mass Storage Reset...\n");
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		BOMS_RESET, 0, 0, NULL, 0, 1000));
@@ -119,6 +141,23 @@ int test_mass_storage(libusb_device_handle *handle)
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		BOMS_GET_MAX_LUN, 0, 0, &lun, 1, 1000));
 	printf("  Max LUN = %d\n", lun);
+
+	cbw.dCBWSignature[0] = 'U';
+	cbw.dCBWSignature[1] = 'S';
+	cbw.dCBWSignature[2] = 'B';
+	cbw.dCBWSignature[3] = 'C';
+	cbw.dCBWTag = 0x01020304;
+	cbw.dCBWDataTransferLength = 0;
+	cbw.bmCBWFlags = 0;
+	cbw.bCBWLUN = 0;
+	cbw.bCBWCBLength = 1;
+
+	CALL_CHECK(libusb_bulk_transfer(handle, 0x01, (unsigned char*)&cbw, 16,	&size, 1000));
+	printf("sent %d bytes\n", size);
+	CALL_CHECK(libusb_bulk_transfer(handle, 0x81, (unsigned char*)&csw, 13,	&size, 1000));
+	printf("received %d bytes\n", size);
+	printf("Tag = %08X\n", csw.dCSWTag);
+	printf("Status = %02X\n", csw.bCSWStatus);
 	return 0;
 }
 
@@ -126,8 +165,10 @@ int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
 	libusb_device *dev;
-	int i, j, r;
-	int iface = 0;
+	struct libusb_config_descriptor *conf_desc;
+	const struct libusb_endpoint_descriptor *endpoint;
+	int i, j, k, r;
+	int iface, nb_ifaces;
 	
 	printf("Opening device...\n");
 	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
@@ -138,16 +179,6 @@ int test_device(uint16_t vid, uint16_t pid)
 	}
 
 	dev = libusb_get_device(handle);
-
-	printf("Claiming interface %d...\n", iface);
-	r = libusb_claim_interface(handle, iface);
-	if (r != LIBUSB_SUCCESS) {
-		// Maybe we need to detach the driver
-		perr("failed. Trying to detach driver...\n");
-		CALL_CHECK(libusb_detach_kernel_driver(handle, iface));
-		printf("Claiming interface again...\n");
-		CALL_CHECK(libusb_claim_interface(handle, iface));
-	}
 
 	struct libusb_device_descriptor dev_desc;
 	printf("reading device descriptor...\n");
@@ -160,10 +191,10 @@ int test_device(uint16_t vid, uint16_t pid)
 	printf("iMan:iProd:iSer %d:%d:%d\n", dev_desc.iManufacturer, dev_desc.iProduct, dev_desc.iSerialNumber);
 	printf("num confs = %d\n", dev_desc.bNumConfigurations);
 
-	struct libusb_config_descriptor *conf_desc;
 	printf("reading configuration descriptor...\n");
 	CALL_CHECK(libusb_get_config_descriptor(dev, 0, &conf_desc));
-	printf("num interfaces = %d\n", conf_desc->bNumInterfaces);
+	nb_ifaces = conf_desc->bNumInterfaces;
+	printf("num interfaces = %d\n", nb_ifaces);
 	for (i=0; i<conf_desc->bNumInterfaces; i++) {
 		for (j=0; j<conf_desc->interface[i].num_altsetting; j++) {
 			printf("interface[%d].altsetting[%d]: num endpoints = %d\n", 
@@ -172,9 +203,32 @@ int test_device(uint16_t vid, uint16_t pid)
 				conf_desc->interface[i].altsetting[j].bInterfaceClass,
 				conf_desc->interface[i].altsetting[j].bInterfaceSubClass,
 				conf_desc->interface[i].altsetting[j].bInterfaceProtocol);
+			for (k=0; k<conf_desc->interface[i].altsetting[j].bNumEndpoints; k++) {
+				endpoint = &conf_desc->interface[i].altsetting[j].endpoint[k];
+				printf("       endpoint[%d].address: %02X\n", k, endpoint->bEndpointAddress);
+				printf("           max packet size: %04X\n", endpoint->wMaxPacketSize);
+				printf("          polling interval: %02X\n", endpoint->bInterval);
+			}
 		}
 	}
 	libusb_free_config_descriptor(conf_desc);
+
+	for (iface = 0; iface < nb_ifaces; iface++)
+	{
+		printf("Claiming interface %d...\n", iface);
+		r = libusb_claim_interface(handle, iface);
+		if (r != LIBUSB_SUCCESS) {
+			if (iface == 0) {
+				// Maybe we need to detach the driver
+				perr("failed. Trying to detach driver...\n");
+				CALL_CHECK(libusb_detach_kernel_driver(handle, iface));
+				printf("Claiming interface again...\n");
+				CALL_CHECK(libusb_claim_interface(handle, iface));
+			} else {
+				printf("failed.\n");
+			}
+		}
+	}
 
 	if (test_mode == USE_XBOX) {
 		CALL_CHECK(display_xbox_status(handle));
@@ -188,12 +242,14 @@ int test_device(uint16_t vid, uint16_t pid)
 		printf("Got string: \"%s\"\n", string);
 	}
 
-	if (test_mode = USE_KEY) {
+	if (test_mode == USE_KEY) {
 		CALL_CHECK(test_mass_storage(handle));
 	}
 
-	printf("Releasing interface...\n");
-	CALL_CHECK(libusb_release_interface(handle, iface));
+	for (iface = 0; iface<nb_ifaces; iface++) {
+		printf("Releasing interface %d...\n", iface);
+		libusb_release_interface(handle, iface);
+	}
 
 	printf("Closing device...\n");
 	libusb_close(handle);
@@ -205,7 +261,7 @@ int main(int argc, char** argv)
 {
 	int r;
 
-	// Default test = Microsoft XBox Controller Type S
+	// Default test = Microsoft XBox Controller Type S - 1 interface
 	VID = 0x045E;
 	PID = 0x0289;
 	test_mode = USE_XBOX;
@@ -221,13 +277,13 @@ int main(int argc, char** argv)
 		}
 		switch(argv[1][1]) {
 		case 'j':
-			// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device
+			// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
 			VID = 0x15BA;
 			PID = 0x0004;
 			test_mode = USE_JTAG;
 			break;
 		case 'k':
-			// Generic 2 GB USB Key (SCSI Transparent/Bulk Only)
+			// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
 			VID = 0x0204;
 			PID = 0x6025;
 			test_mode = USE_KEY;
