@@ -1,6 +1,7 @@
 /*
  * Windows backend for libusb 1.0
  * Copyright (C) 2009 Pete Batard <pbatard@gmail.com>
+ * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -60,14 +61,12 @@ void inline upperize(char* str) {
 		str[i] = toupper(str[i]);
 }
 
-// #define MAX_ISO_BUFFER_LENGTH		32768
-// #define MAX_BULK_BUFFER_LENGTH		16384
-#define MAX_CTRL_BUFFER_LENGTH		4096
-#define MAX_USB_DEVICES				256
+#define MAX_CTRL_BUFFER_LENGTH      4096
+#define MAX_USB_DEVICES             256
 
-#define MAX_PATH_LENGTH 128
-#define MAX_KEY_LENGTH 256
-#define ERR_BUFFER_SIZE	256
+#define MAX_PATH_LENGTH             128
+#define MAX_KEY_LENGTH              256
+#define ERR_BUFFER_SIZE             256
 
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 #define ERRNO GetLastError()
@@ -78,16 +77,16 @@ enum api_type {
 	API_WINUSB,
 };
 
-#define API_CALL(api, fname, ...)				\
-	switch(api) {								\
-	case API_WINUSB:							\
-		r = winusb_##fname(__VA_ARGS__);		\
-		break;									\
-	default:									\
-		r = LIBUSB_ERROR_NOT_SUPPORTED;			\
-		usbi_dbg("unsupported API call for '"	\
-			#fname "' (api=%d)", api);			\
-		break;									\
+#define API_CALL(api, fname, ...)               \
+	switch(api) {                               \
+	case API_WINUSB:                            \
+		r = winusb_##fname(__VA_ARGS__);        \
+		break;                                  \
+	default:                                    \
+		r = LIBUSB_ERROR_NOT_SUPPORTED;         \
+		usbi_dbg("unsupported API call for '"   \
+			#fname "' (api=%d)", api);          \
+		break;                                  \
 	}
 
 enum windows_version {
@@ -120,15 +119,15 @@ static inline void windows_hcd_priv_release(struct windows_hcd_priv* p) {
 
 // Nodes (Hubs & devices)
 struct windows_device_priv {
-	struct libusb_device *parent_dev;	// access to parent is required for usermode ops
-	ULONG connection_index;	            // also required for some usermode ops
-	char *path;	                        // path used by Windows to reference the USB node
+	struct libusb_device *parent_dev;   // access to parent is required for usermode ops
+	ULONG connection_index;             // also required for some usermode ops
+	char *path;                         // path used by Windows to reference the USB node
 	struct {
 		char *path;                     // each interface has a path as well
 		int8_t nb_endpoints;            // and a set of endpoint addresses (USB_MAXENDPOINTS)
 		uint8_t *endpoint;	            
 	} interface[USB_MAXINTERFACES];
-	char *driver;	                    // driver name (eg WinUSB, USBSTOR, HidUsb, etc)
+	char *driver;                       // driver name (eg WinUSB, USBSTOR, HidUsb, etc)
 	enum api_type api;
 	uint8_t active_config;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;

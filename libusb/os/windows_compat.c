@@ -372,7 +372,10 @@ struct winfd create_fd_for_poll(HANDLE handle, int access_mode)
 
 void _free_index(int index)
 {
-	// Cancel any async IO (Don't care about the validity of our handle for this)
+	// Cancel any async IO (Don't care about the validity of our handles for this)
+	// TODO: Once MinGW supports it (or for other compilation platforms) use
+	// CancelIoEx for Vista and later
+//	CancelIoEx(poll_fd[index].handle, poll_fd[index].overlapped);
 	CancelIo(poll_fd[index].handle);
 	// close fake handle for devices
 	if ( (poll_fd[index].handle != INVALID_HANDLE_VALUE) && (poll_fd[index].handle != 0)

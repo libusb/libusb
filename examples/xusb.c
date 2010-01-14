@@ -158,6 +158,9 @@ int test_mass_storage(libusb_device_handle *handle)
 	printf("received %d bytes\n", size);
 	printf("Tag = %08X\n", csw.dCSWTag);
 	printf("Status = %02X\n", csw.bCSWStatus);
+
+	printf("Resetting device...\n");
+	CALL_CHECK(libusb_reset_device(handle));
 	return 0;
 }
 
