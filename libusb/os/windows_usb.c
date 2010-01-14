@@ -527,7 +527,7 @@ static int force_hcd_device_descriptor(struct libusb_device *dev, HANDLE handle)
 	} else {
 		// Standard query
 		size = sizeof(USB_HUB_CAPABILITIES);
-		if (!DeviceIoControl(handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps, 
+		if (!DeviceIoControl(handle, IOCTL_USB_GET_HUB_CAPABILITIES, &hub_caps, 
 			size, &hub_caps, size, &size, NULL)) {
 			usbi_warn(ctx, "could not read hub capabilities (std) for hub %s: %s", 
 				priv->path, windows_error_str(0));
@@ -863,7 +863,7 @@ static char* get_composite_interface_path(struct libusb_context *ctx, char* path
 
 	char guid_name[40];	// 40 chars are enough for a GUID string
 	char instance_path[MAX_PATH];
-	char device_classes_path[] = "SYSTEM\\ControlSet001\\Control\\DeviceClasses\\";
+	char device_classes_path[] = "SYSTEM\\CurrentControlSet\\Control\\DeviceClasses\\";
 	char device_guid_path[MAX_PATH_LENGTH];	// could do without, but clearer code
 	char full_shebang[MAX_KEY_LENGTH];
 
@@ -873,7 +873,7 @@ static char* get_composite_interface_path(struct libusb_context *ctx, char* path
 		return NULL;
 	}
 
-	// browse GUIDs: HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\DeviceClasses\*
+	// browse GUIDs: HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceClasses\*
 	// eg. of returned value: "{b35924d6-3e16-4a9e-9782-5524a4b79bac}"
 	for (i=0; i<nb_device_classes; i++) {
 		r = read_registry_key(ctx, device_classes_path, NULL, i, guid_name, 40);
@@ -892,7 +892,7 @@ static char* get_composite_interface_path(struct libusb_context *ctx, char* path
 		}
 
 		// browse device instance paths. 
-		// eg: HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\DeviceClasses\{b35924d6-3e16-4a9e-9782-5524a4b79bac}\*
+		// eg: HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceClasses\{b35924d6-3e16-4a9e-9782-5524a4b79bac}\*
 		// eg of returned value: "##?#USB#VID_045E&PID_0289#7&7ef95eb&0&1#{b35924d6-3e16-4a9e-9782-5524a4b79bac}"
 		for (j=0; j<nb_device_paths; j++) {
 			if (read_registry_key(ctx, device_guid_path, NULL, j, instance_path, MAX_PATH) <= 0) {
@@ -1005,7 +1005,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	 * MI_## devices, i.e. devices associated to a specific interface of a composite USB device.
 	 * Moreover, until someone proves otherwise (especially on Windows 7 x64 - good luck with that!),
 	 * the only way to retrieve an interface device path that can actually be used with CreateFile 
-	 * is to lookup all the GUIDs in HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\DeviceClasses\
+	 * is to lookup all the GUIDs in HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceClasses\
 	 *
 	 * TODO: MI_## automated driver installation:
 	 */
