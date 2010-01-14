@@ -1233,8 +1233,7 @@ static int windows_get_configuration(struct libusb_device_handle *dev_handle, in
  * from http://msdn.microsoft.com/en-us/library/ms793522.aspx: "The port driver 
  * does not currently expose a service that allows higher-level drivers to set 
  * the configuration."
- * The current version of this function still attempts to change conf to see
- * what happens...
+ * TODO: See what users of devices with multiple confs report with this call
  */
 static int windows_set_configuration(struct libusb_device_handle *dev_handle, int config)
 {
@@ -1247,12 +1246,6 @@ static int windows_set_configuration(struct libusb_device_handle *dev_handle, in
 		LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_DEVICE,
 		LIBUSB_REQUEST_SET_CONFIGURATION, config,
 		0, NULL, 0, 1000);
-
-	if (r == LIBUSB_SUCCESS) {
-		// TODO: If the above ever works, some code will be needed here
-		// to invalidate the endpoints & interfaces
-		usbi_dbg("against all odds, it worked! - now add some code");
-	}
 
 	return r;
 }
