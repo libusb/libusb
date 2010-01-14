@@ -1546,10 +1546,9 @@ API_EXPORTED void libusb_exit(struct libusb_context *ctx)
 	free(ctx);
 }
 
-void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
-	const char *function, const char *format, ...)
+void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
+	const char *function, const char *format, va_list args)
 {
-	va_list args;
 	FILE *stream = stdout;
 	const char *prefix;
 
@@ -1587,10 +1586,18 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 
 	fprintf(stream, "libusb:%s [%s] ", prefix, function);
 
-	va_start (args, format);
 	vfprintf(stream, format, args);
-	va_end (args);
 
 	fprintf(stream, "\n");
+}
+
+void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
+	const char *function, const char *format, ...)
+{
+	va_list args;
+
+	va_start (args, format);
+	usbi_log_v(ctx, level, function, format, args);
+	va_end (args);
 }
 
