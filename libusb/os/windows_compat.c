@@ -77,9 +77,15 @@
 // Uncomment to debug the polling layer
 //#define DEBUG_WINDOWS_COMPAT
 #if defined(DEBUG_WINDOWS_COMPAT)
-#define printb(...) printf(__VA_ARGS__)
+#define printb printf
+#else
+// MSVC6 cannot use a variadic argument and non MSVC
+// compilers produce warnings if parenthesis are ommitted.
+#if defined(_MSC_VER)
+#define printb
 #else
 #define printb(...)
+#endif
 #endif
 
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
@@ -102,7 +108,6 @@ unsigned short pipe_number = 0;
 void init_polling(void)
 {
 	int i;
-	// This might not 
 	if (is_polling_set) {
 		// The sleep 1 sec is to give enough time for our initialization
 		// below to finish, should concurrent simultaneous inits be issued 
