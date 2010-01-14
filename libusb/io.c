@@ -20,7 +20,11 @@
 
 #include <config.h>
 #include <errno.h>
+#ifdef OS_WINDOWS
+#include "os/windows_compat.h"
+#else
 #include <poll.h>
+#endif
 #include <pthread.h>
 #include <signal.h>
 #include <stdint.h>

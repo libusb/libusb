@@ -23,7 +23,11 @@
 
 #include <config.h>
 
+#ifdef OS_WINDOWS
+#include "os/windows_compat.h"
+#else
 #include <poll.h>
+#endif
 #include <pthread.h>
 #include <stddef.h>
 #include <time.h>
@@ -577,7 +581,7 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*claim_interface)(struct libusb_device_handle *handle, int iface);
+	int (*claim_interface)(struct libusb_device_handle *handle, int interface_number);
 
 	/* Release a previously claimed interface.
 	 *
@@ -594,7 +598,7 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*release_interface)(struct libusb_device_handle *handle, int iface);
+	int (*release_interface)(struct libusb_device_handle *handle, int interface_number);
 
 	/* Set the alternate setting for an interface.
 	 *
@@ -611,7 +615,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*set_interface_altsetting)(struct libusb_device_handle *handle,
-		int iface, int altsetting);
+		int interface_number, int altsetting);
 
 	/* Clear a halt/stall condition on an endpoint.
 	 *
@@ -658,7 +662,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*kernel_driver_active)(struct libusb_device_handle *handle,
-		int interface);
+		int interface_number);
 	
 	/* Detach a kernel driver from an interface. Optional.
 	 *
@@ -674,7 +678,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*detach_kernel_driver)(struct libusb_device_handle *handle,
-		int interface);
+		int interface_number);
 
 	/* Attach a kernel driver to an interface. Optional.
 	 *
@@ -691,7 +695,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*attach_kernel_driver)(struct libusb_device_handle *handle,
-		int interface);
+		int interface_number);
 
 	/* Destroy a device. Optional.
 	 *
@@ -805,6 +809,7 @@ extern const struct usbi_os_backend * const usbi_backend;
 
 extern const struct usbi_os_backend linux_usbfs_backend;
 extern const struct usbi_os_backend darwin_backend;
+extern const struct usbi_os_backend windows_backend;
 
 #endif
 

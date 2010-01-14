@@ -154,16 +154,16 @@ static int parse_endpoint(struct libusb_context *ctx,
 	return parsed;
 }
 
-static void clear_interface(struct libusb_interface *interface)
+static void clear_interface(struct libusb_interface *iface)
 {
 	int i;
 	int j;
 
-	if (interface->altsetting) {
-		for (i = 0; i < interface->num_altsetting; i++) {
+	if (iface->altsetting) {
+		for (i = 0; i < iface->num_altsetting; i++) {
 			struct libusb_interface_descriptor *ifp =
 				(struct libusb_interface_descriptor *)
-				interface->altsetting + i;
+				iface->altsetting + i;
 			if (ifp->extra)
 				free((void *) ifp->extra);
 			if (ifp->endpoint) {
@@ -173,14 +173,14 @@ static void clear_interface(struct libusb_interface *interface)
 				free((void *) ifp->endpoint);
 			}
 		}
-		free((void *) interface->altsetting);
-		interface->altsetting = NULL;
+		free((void *) iface->altsetting);
+		iface->altsetting = NULL;
 	}
 	
 }
 
 static int parse_interface(libusb_context *ctx,
-	struct libusb_interface *interface, unsigned char *buffer, int size,
+	struct libusb_interface *iface, unsigned char *buffer, int size,
 	int host_endian)
 {
 	int i;
@@ -192,22 +192,22 @@ static int parse_interface(libusb_context *ctx,
 	struct libusb_interface_descriptor *ifp;
 	unsigned char *begin;
 
-	interface->num_altsetting = 0;
+	iface->num_altsetting = 0;
 
 	while (size >= INTERFACE_DESC_LENGTH) {
 		struct libusb_interface_descriptor *altsetting =
-			(struct libusb_interface_descriptor *) interface->altsetting;
+			(struct libusb_interface_descriptor *) iface->altsetting;
 		altsetting = realloc(altsetting,
 			sizeof(struct libusb_interface_descriptor) *
-			(interface->num_altsetting + 1));
+			(iface->num_altsetting + 1));
 		if (!altsetting) {
 			r = LIBUSB_ERROR_NO_MEM;
 			goto err;
 		}
-		interface->altsetting = altsetting;
+		iface->altsetting = altsetting;
 
-		ifp = altsetting + interface->num_altsetting;
-		interface->num_altsetting++;
+		ifp = altsetting + iface->num_altsetting;
+		iface->num_altsetting++;
 		usbi_parse_descriptor(buffer, "bbbbbbbbb", ifp, 0);
 		ifp->extra = NULL;
 		ifp->extra_length = 0;
@@ -309,18 +309,18 @@ static int parse_interface(libusb_context *ctx,
 
 	return parsed;
 err:
-	clear_interface(interface);
+	clear_interface(iface);
 	return r;
 }
 
 static void clear_configuration(struct libusb_config_descriptor *config)
 {
-	if (config->interface) {
+	if (config->iface) {
 		int i;
 		for (i = 0; i < config->bNumInterfaces; i++)
 			clear_interface((struct libusb_interface *)
-				config->interface + i);
-		free((void *) config->interface);
+				config->iface + i);
+		free((void *) config->iface);
 	}
 	if (config->extra)
 		free((void *) config->extra);
@@ -335,7 +335,7 @@ static int parse_configuration(struct libusb_context *ctx,
 	int size;
 	int tmp;
 	struct usb_descriptor_header header;
-	struct libusb_interface *interface;
+	struct libusb_interface *iface;
 
 	usbi_parse_descriptor(buffer, "bbwbbbbb", config, host_endian);
 	size = config->wTotalLength;
@@ -346,12 +346,12 @@ static int parse_configuration(struct libusb_context *ctx,
 	}
 
 	tmp = config->bNumInterfaces * sizeof(struct libusb_interface);
-	interface = malloc(tmp);
-	config->interface = interface;
-	if (!config->interface)
+	iface = malloc(tmp);
+	config->iface = iface;
+	if (!config->iface)
 		return LIBUSB_ERROR_NO_MEM;
 
-	memset(interface, 0, tmp);
+	memset(iface, 0, tmp);
 	buffer += config->bLength;
 	size -= config->bLength;
 
@@ -405,7 +405,7 @@ static int parse_configuration(struct libusb_context *ctx,
 			}
 		}
 
-		r = parse_interface(ctx, interface + i, buffer, size, host_endian);
+		r = parse_interface(ctx, iface + i, buffer, size, host_endian);
 		if (r < 0)
 			goto err;
 

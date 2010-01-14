@@ -30,12 +30,22 @@ case $host in
 	backend="darwin"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
+*-mingw*)
+	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
+	AC_SUBST(OS_WINDOWS)
+	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
+	AC_MSG_RESULT([Windows])
+	backend="windows"
+	LIBS="-lpthread -lsetupapi -lws2_32"
+	AM_LDFLAGS=""
+	;;
 *)
 	AC_MSG_ERROR([unsupported operating system])
 esac
 
 AM_CONDITIONAL([OS_LINUX], [test "x$backend" == "xlinux"])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" == "xdarwin"])
+AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" == "xwindows"])
 
 # Library versioning
 lt_major="0"
