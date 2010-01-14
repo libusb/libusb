@@ -505,8 +505,10 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		  || (poll_fd[index].handle == 0) || (poll_fd[index].overlapped == NULL)) {
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
+			if (index >= 0) {
+				pthread_mutex_unlock(&_poll_fd[index].mutex);
+			}
 			printb("poll: invalid fd\n");
-			pthread_mutex_unlock(&_poll_fd[index].mutex);
 			return -1;
 		}
 
@@ -527,7 +529,7 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			return -1;
 		}
 		
-		printb("windows_poll: fd[%d]=%d (overlapped = %p) got events %04X\n", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
+		printb("poll: fd[%d]=%d (overlapped = %p) got events %04X\n", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
 
 		// The following macro only works if overlapped I/O was reported pending
 		if (HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
@@ -558,7 +560,9 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			index = _fd_to_index_and_lock(fds[i].fd);
 			fds[i].revents = fds[i].events;
 			triggered++;
-			pthread_mutex_unlock(&_poll_fd[index].mutex);
+			if (index >= 0) {
+				pthread_mutex_unlock(&_poll_fd[index].mutex);
+			}
 		} else if (ret == WAIT_TIMEOUT) {
 			printb("  timed out\n");
 			return 0;	// 0 = timeout
@@ -624,7 +628,9 @@ ssize_t write_for_poll(int fd, const void *buf, size_t count)
 	if ( (index < 0) || (poll_fd[index].overlapped == NULL) 
 	  || (poll_fd[index].rw != RW_WRITE) ) {
 		errno = EBADF;
-		pthread_mutex_unlock(&_poll_fd[index].mutex);
+		if (index >= 0) {
+			pthread_mutex_unlock(&_poll_fd[index].mutex);
+		}
 		return -1;
 	}
 

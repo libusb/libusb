@@ -33,7 +33,6 @@ case $host in
 *-mingw*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
 	AC_SUBST(OS_WINDOWS)
-	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	LIBS="-lpthread -lsetupapi -lole32"

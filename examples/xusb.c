@@ -43,6 +43,7 @@
 #define ERR_EXIT(errcode) do { perr("  libusb error: %d\n", errcode); return -1; } while (0)
 #define CALL_CHECK(fcall) do { r=fcall; if (r < 0) ERR_EXIT(r); } while (0);
 #define B(x) (((x)!=0)?1:0)
+#define be_to_int32(buf) (((buf)[0]<<24)|((buf)[1]<<16)|((buf)[2]<<8)|(buf)[3])
 
 // HID Class-Specific Requests values. See section 7.2 of the HID specifications
 #define HID_GET_REPORT                0x01
@@ -78,6 +79,25 @@ struct command_status_wrapper {
 	uint8_t bCSWStatus;
 };
 
+static uint8_t cdb_length[256] = {
+//	 0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
+	06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,  //  0
+	06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,  //  1
+	10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,  //  2
+	10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,  //  3
+	10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,  //  4
+	10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,  //  5
+	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  6
+	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  7
+	16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,  //  8
+	16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,  //  9
+	12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,  //  A
+	12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,  //  B
+	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  C
+	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  D
+	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  E
+	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  F
+};
 
 enum test_type {
 	USE_XBOX,
@@ -117,32 +137,122 @@ int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_t right
 
 	printf("Writing XBox Controller Output Report...\n");
 
-	memset(output_report, 0, 6);
-	output_report[1] = 6;
+	memset(output_report, 0, sizeof(output_report));
+	output_report[1] = sizeof(output_report);
 	output_report[3] = left;
 	output_report[5] = right;
 
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
-		HID_SET_REPORT, (HID_REPORT_TYPE_OUTPUT<<8)|0x00, 0, output_report, 6, 1000));
+		HID_SET_REPORT, (HID_REPORT_TYPE_OUTPUT<<8)|0x00, 0, output_report,06, 1000));
 	return 0;
 }
 
-// Mass Storage device to test bulk transfers (/!\ destructive test /!\)
-int test_mass_storage(libusb_device_handle *handle)
+int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, uint8_t lun, 
+	uint8_t *cdb, uint8_t direction, int data_length, uint32_t *ret_tag)
+{
+	static uint32_t tag = 1;
+	uint8_t cdb_len;
+	int r, size;
+	struct command_block_wrapper cbw;
+
+	if (cdb == NULL) {
+		return -1;
+	}
+
+	if (endpoint & LIBUSB_ENDPOINT_IN) {
+		perr("send_mass_storage_command: cannot send command on IN endpoint\n");
+		return -1;
+	}
+
+	cdb_len = cdb_length[cdb[0]];
+	if ((cdb_len == 0) || (cdb_len > sizeof(cbw.CBWCB))) {
+		perr("send_mass_storage_command: don't know how to handle this command (%02X, length %d)\n",
+			cdb[0], cdb_len);
+		return -1;
+	}
+
+	memset(&cbw, 0, sizeof(cbw));
+	cbw.dCBWSignature[0] = 'U';
+	cbw.dCBWSignature[1] = 'S';
+	cbw.dCBWSignature[2] = 'B';
+	cbw.dCBWSignature[3] = 'C';
+	*ret_tag = tag;
+	cbw.dCBWTag = tag++;
+	cbw.dCBWDataTransferLength = data_length;
+	cbw.bmCBWFlags = direction;
+	cbw.bCBWLUN = lun;
+	cbw.bCBWCBLength = cdb_len;
+	memcpy(cbw.CBWCB, cdb, cdb_len);
+
+	CALL_CHECK(libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, 15+cdb_len, &size, 1000));
+	printf("sent %d bytes (confirmed %d)\n", 15+cdb_len, size);
+	return 0;
+}
+
+int get_mass_storage_status(libusb_device_handle *handle, uint8_t endpoint, uint32_t expected_tag)
 {
 	int r, size;
-	unsigned char lun;
-	struct command_block_wrapper cbw;
 	struct command_status_wrapper csw;
+
+	CALL_CHECK(libusb_bulk_transfer(handle, endpoint, (unsigned char*)&csw, 13, &size, 1000));
+	if (size != 13) {
+		perr("get_mass_storage_status: received %d bytes (expected 13)\n", size);
+		return -1;
+	}
+	if (csw.dCSWTag != expected_tag) {
+		perr("get_mass_storage_status: mismatched tags (expected %08X, received %08X)\n",
+			expected_tag, csw.dCSWTag);
+		return -1;
+	}
+	printf("Mass Storage Status: %02X (%s)\n", csw.bCSWStatus, csw.bCSWStatus?"FAILED":"Success");
+	if (csw.dCSWTag != expected_tag)
+		return -1;
+	if (csw.bCSWStatus)
+		return -2;	// request Get Sense
+
+	return 0;
+}
+
+void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoint_out)
+{
+	uint8_t cdb[16];	// SCSI Command Descriptor Block
+	uint8_t sense[18];
+	uint32_t expected_tag;
+	int size;
+
+	// Request Sense
+	printf("Request Sense...\n");
+	memset(sense, 0, sizeof(sense));
+	memset(cdb, 0, sizeof(cdb));
+	cdb[0] = 0x03;	// Request Sense
+	cdb[4] = 0x12;
+
+	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, 0x12, &expected_tag);
+	libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&sense, 0x12, &size, 1000);
+	printf("received %d bytes\n", size);
+
+	if ((sense[0] != 0x70) && (sense[0] != 0x71)) {
+		perr("ERROR No sense data\n");
+	} else {
+		perr("ERROR Sense: %02X %02X %02X\n", sense[2]&0x0F, sense[12], sense[13]);
+	}
+	get_mass_storage_status(handle, endpoint_in, expected_tag);
+}
+
+// Mass Storage device to test bulk transfers (non destructive test)
+int test_mass_storage(libusb_device_handle *handle)
+{
+	int r, i, size;
+	uint8_t lun;
+	uint32_t expected_tag;
+	uint32_t max_lba, block_size;
+	double device_size;
+	uint8_t cdb[16];	// SCSI Command Descriptor Block
 	uint8_t buffer[512];
 	if (buffer == NULL) {
 		perr("failed to allocate mass storage test buffer\n");
 		return -1;
 	}
-
-	// This reset doesn't seem to work...
-	printf("Resetting device...\n");
-	CALL_CHECK(libusb_reset_device(handle));
 
 	printf("Sending Mass Storage Reset...\n");
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
@@ -152,41 +262,62 @@ int test_mass_storage(libusb_device_handle *handle)
 		BOMS_GET_MAX_LUN, 0, 0, &lun, 1, 1000));
 	printf("  Max LUN = %d\n", lun);
 
-	cbw.dCBWSignature[0] = 'U';
-	cbw.dCBWSignature[1] = 'S';
-	cbw.dCBWSignature[2] = 'B';
-	cbw.dCBWSignature[3] = 'C';
-	cbw.dCBWTag = 0x01020304;
-	cbw.dCBWDataTransferLength = 0;
-	cbw.bmCBWFlags = 0;
-	cbw.bCBWLUN = 0;
-	cbw.bCBWCBLength = 1;
-
-	CALL_CHECK(libusb_bulk_transfer(handle, 0x01, (unsigned char*)&cbw, 16, &size, 1000));
-	printf("sent %d bytes\n", size);
-	CALL_CHECK(libusb_bulk_transfer(handle, 0x81, (unsigned char*)&csw, 13, &size, 1000));
-	printf("received %d bytes\n", size);
-	printf("Tag = %08X\n", csw.dCSWTag);
-	printf("Status = %02X\n", csw.bCSWStatus);
-
 	// Send Inquiry
-	cbw.dCBWSignature[0] = 'U';
-	cbw.dCBWSignature[1] = 'S';
-	cbw.dCBWSignature[2] = 'B';
-	cbw.dCBWSignature[3] = 'C';
-	cbw.dCBWTag = 0x01234567;
-	cbw.dCBWDataTransferLength = 0x60;
-	cbw.bmCBWFlags = 0x80;
-	cbw.bCBWLUN = 0;
-	cbw.bCBWCBLength = 6;
-	cbw.CBWCB[0] = 0x12;	// Inquiry
-	cbw.CBWCB[4] = 0x60;	// Inquiry data size
+	printf("Sending Inquiry...\n");
+	memset(buffer, 0, sizeof(buffer));
+	memset(cdb, 0, sizeof(cdb));
+	cdb[0] = 0x12;	// Inquiry
+	cdb[4] = 0x60;	// Inquiry data size
 
-	CALL_CHECK(libusb_bulk_transfer(handle, 0x01, (unsigned char*)&cbw, 22, &size, 100));
-	printf("sent %d bytes\n", size);
-	CALL_CHECK(libusb_bulk_transfer(handle, 0x81, (unsigned char*)&buffer, 0x60, &size, 100));
+	send_mass_storage_command(handle, 0x01, 0, cdb, LIBUSB_ENDPOINT_IN, 0x60, &expected_tag);
+	CALL_CHECK(libusb_bulk_transfer(handle, 0x81, (unsigned char*)&buffer, 0x60, &size, 1000));
 	printf("received %d bytes\n", size);
 	printf("VID:PID:REV:SPE %s:%s:%s:%s\n", &buffer[8], &buffer[16], &buffer[32], &buffer[38]);
+	if (get_mass_storage_status(handle, 0x81, expected_tag) == -2) {
+		get_sense(handle, 0x81, 0x01);
+	}
+
+
+	// Read capacity
+	printf("Reading Capacity...\n");
+	memset(buffer, 0, sizeof(buffer));
+	memset(cdb, 0, sizeof(cdb));
+	cdb[0] = 0x25;	// Read Capacity
+
+	send_mass_storage_command(handle, 0x01, 0, cdb, LIBUSB_ENDPOINT_IN, 0x08, &expected_tag);
+	CALL_CHECK(libusb_bulk_transfer(handle, 0x81, (unsigned char*)&buffer, 0x08, &size, 1000));
+	printf("received %d bytes\n", size);
+	max_lba = be_to_int32(&buffer[0]);
+	block_size = be_to_int32(&buffer[4]);
+	device_size = ((double)(max_lba+1))*block_size/(1024*1024*1024);
+	printf("Max LBA: %08X, Block Size: %08X (%.2f GB)\n", max_lba, block_size, device_size);
+	if (get_mass_storage_status(handle, 0x81, expected_tag) == -2) {
+		get_sense(handle, 0x81, 0x01);
+	}
+
+	// Send Read
+	printf("Try to read 512 bytes...\n");
+	memset(buffer, 0, sizeof(buffer));
+	memset(cdb, 0, sizeof(cdb));
+
+//	cdb[0] = 0x28;	// Read(10)
+//	cdb[7] = 0x02;	// 0x200 bytes
+
+	cdb[0] = 0xA8;	// Read(12)
+	cdb[8] = 0x02;	// 0x200 bytes
+
+	send_mass_storage_command(handle, 0x01, 0, cdb, LIBUSB_ENDPOINT_IN, 0x200, &expected_tag);
+	libusb_bulk_transfer(handle, 0x81, (unsigned char*)&buffer, 0x200, &size, 5000);
+	printf("READ: received %d bytes\n", size);
+	if (get_mass_storage_status(handle, 0x81, expected_tag) == -2) {
+		get_sense(handle, 0x81, 0x01);
+	} else {
+		for(i=0; i<0x10; i++) {
+			printf(" %02X", buffer[i]);
+		}
+		printf("\n");
+	}
+
 	return 0;
 }
 

@@ -83,3 +83,14 @@ struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);
 (tv)->tv_usec = (ts)->tv_nsec / 1000; \
 }
 #endif
+#ifndef timersub
+# define timersub(a, b, result)					        \
+do {                                                    \
+	(result)->tv_sec = (a)->tv_sec - (b)->tv_sec;       \
+	(result)->tv_usec = (a)->tv_usec - (b)->tv_usec;    \
+	if ((result)->tv_usec < 0) {                        \
+		--(result)->tv_sec;                             \
+		(result)->tv_usec += 1000000;                   \
+	}                                                   \
+} while (0)
+#endif

@@ -1343,6 +1343,14 @@ static void windows_destroy_device(struct libusb_device *dev)
 	windows_device_priv_release(priv, dev->num_configurations);
 }
 
+static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
+{
+	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
+
+	usbi_remove_pollfd(ITRANSFER_CTX(itransfer), transfer_priv->pollable_fd.fd);
+	free_fd_for_poll(transfer_priv->pollable_fd.fd);
+}
+
 static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
@@ -1442,6 +1450,8 @@ static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
+	windows_clear_transfer_priv(itransfer);	// Cancel polling
+
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
 		return windows_abort_control(itransfer);
@@ -1453,12 +1463,6 @@ static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 		usbi_err(ITRANSFER_CTX(itransfer), "unknown endpoint type %d", transfer->type);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-}
-
-static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
-{
-	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
-	free_fd_for_poll(transfer_priv->pollable_fd.fd);
 }
 
 static void windows_transfer_callback (struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size) 
@@ -1473,7 +1477,7 @@ static void windows_transfer_callback (struct usbi_transfer *itransfer, uint32_t
 		itransfer->transferred += io_size;
 		break;
 	case ERROR_GEN_FAILURE:
-		usbi_dbg("unsupported I/O request");
+		usbi_dbg("detected endpoint stall");
 		status = LIBUSB_TRANSFER_STALL;
 		break;
 	default:
@@ -2038,13 +2042,7 @@ static int winusb_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
  */
 static int winusb_abort_control(struct usbi_transfer *itransfer)
 {
-	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
-
-	CHECK_WINUSB_AVAILABLE;
-
-	// The best we can do is cancel the control I/O
-	free_fd_for_poll(transfer_priv->pollable_fd.fd);
-
+	// Cancelling of the I/O is done in the parent
 	return LIBUSB_SUCCESS;
 }
 
@@ -2053,15 +2051,11 @@ static int winusb_abort_transfers(struct usbi_transfer *itransfer)
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)transfer->dev_handle->os_priv;
-	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
 	HANDLE winusb_handle;
 	int current_interface;
 
 	CHECK_WINUSB_AVAILABLE;
-
-	// Cancel the I/O
-	free_fd_for_poll(transfer_priv->pollable_fd.fd);
 
 	current_interface = winusb_interface_by_endpoint(priv, handle_priv, transfer->endpoint);
 	if (current_interface < 0) {
@@ -2103,10 +2097,13 @@ static int winusb_reset_device(struct libusb_device_handle *dev_handle)
 	// Reset any available pipe (except control)
 	for (i=0; i<USB_MAXINTERFACES; i++) {
 		winusb_handle = handle_priv->interface_handle[i].winusb;
-		do {
+		for (wfd = handle_to_winfd(winusb_handle); wfd.fd > 0;)
+		{
+			// Cancel any pollable I/O
+			usbi_remove_pollfd(ctx, wfd.fd);
+			free_fd_for_poll(wfd.fd);
 			wfd = handle_to_winfd(winusb_handle);
-			free_fd_for_poll(wfd.fd);	// Cancel any pending I/O
-		} while (wfd.fd > 0);
+		} 
 
 		if ( (winusb_handle != 0) && (winusb_handle != INVALID_HANDLE_VALUE)) {
 			for (j=0; j<priv->interface[i].nb_endpoints; j++) {
