@@ -69,23 +69,28 @@ void inline upperize(char* str) {
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 #define ERRNO GetLastError()
 
-// Supported APIs
-enum api_type {
-	API_NONE,
-	API_WINUSB,
+// This is used to support multiple kernel drivers in Windows.
+struct windows_driver_backend {
+	const char *name;	// A human-readable name for your backend, e.g. "WinUSB"
+	int (*open)(struct libusb_device_handle *dev_handle);
+	int (*claim_interface)(struct libusb_device_handle *dev_handle, int iface);
+	int (*set_interface_altsetting)(struct libusb_device_handle *dev_handle, int iface, int altsetting);
+	int (*release_interface)(struct libusb_device_handle *dev_handle, int iface);
+	int (*clear_halt)(struct libusb_device_handle *dev_handle, unsigned char endpoint);
+	int (*reset_device)(struct libusb_device_handle *dev_handle);
+	int (*submit_bulk_transfer)(struct usbi_transfer *itransfer);
+	int (*submit_iso_transfer)(struct usbi_transfer *itransfer);
+	int (*submit_control_transfer)(struct usbi_transfer *itransfer);
+	int (*abort_control)(struct usbi_transfer *itransfer);
+	int (*abort_transfers)(struct usbi_transfer *itransfer);
 };
+extern const struct windows_driver_backend windows_template_backend;
+extern const struct windows_driver_backend windows_winusb_backend;
 
-#define API_CALL(api, fname, ...)               \
-	switch(api) {                               \
-	case API_WINUSB:                            \
-		r = winusb_##fname(__VA_ARGS__);        \
-		break;                                  \
-	default:                                    \
-		r = LIBUSB_ERROR_NOT_SUPPORTED;         \
-		usbi_dbg("unsupported API call for '"   \
-			#fname "' (api=%d)", api);          \
-		break;                                  \
-	}
+#define PRINT_UNSUPPORTED_API(fname)        \
+	usbi_dbg("unsupported API call for '"   \
+		#fname "'");                        \
+	return LIBUSB_ERROR_NOT_SUPPORTED;
 
 enum windows_version {
 	WINDOWS_UNSUPPORTED,
@@ -125,7 +130,7 @@ struct windows_device_priv {
 		uint8_t *endpoint;	            
 	} interface[USB_MAXINTERFACES];
 	char *driver;                       // driver name (eg WinUSB, USBSTOR, HidUsb, etc)
-	enum api_type api;
+	struct windows_driver_backend const *apib;
 	uint8_t active_config;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
 	unsigned char **config_descriptor;  // list of pointers to the cached config descriptors
@@ -137,7 +142,7 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 	p->connection_index = 0;
 	p->path = NULL;
 	p->driver = NULL;
-	p->api = API_NONE;
+	p->apib = &windows_template_backend;
 	p->active_config = 0;
 	p->config_descriptor = NULL;
 	memset(&(p->dev_descriptor), 0, sizeof(USB_DEVICE_DESCRIPTOR));
@@ -213,12 +218,23 @@ typedef struct _USB_HUB_NAME_FIXED {
 } USB_HUB_NAME_FIXED;
 
 // The following structure needs to be packed
-#pragma pack(1)
+// NB: can't reuse structs containing a zero element arrays
+// (eg. struct with a 'Data[0]'), as MSVC6 can't handle it.
+#pragma pack(push, 1)
 typedef struct _USB_CONFIGURATION_DESCRIPTOR_SHORT {
-	USB_DESCRIPTOR_REQUEST req;
+	struct {
+		ULONG ConnectionIndex;
+		struct {
+			UCHAR bmRequest;
+			UCHAR bRequest;
+			USHORT wValue;
+			USHORT wIndex;
+			USHORT wLength;
+		} SetupPacket;
+	} req;
 	USB_CONFIGURATION_DESCRIPTOR data;
 } USB_CONFIGURATION_DESCRIPTOR_SHORT;
-#pragma pack()
+#pragma pack(pop)
 
 #ifndef USB_HUB_CAP_FLAGS
 typedef union _USB_HUB_CAP_FLAGS {

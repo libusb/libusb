@@ -298,6 +298,9 @@ static int windows_init(struct libusb_context *ctx)
 	LARGE_INTEGER li_frequency;
 	OSVERSIONINFO os_version;
 
+	// We maintain a chained list of the Host Controllers found
+	struct windows_hcd_priv** _hcd_cur = &hcd_root;
+
 	// If our HCD list is populated, we don't need to re-init
 	if (hcd_root != NULL) {
 		usbi_dbg("init already occured.");
@@ -347,9 +350,6 @@ static int windows_init(struct libusb_context *ctx)
 		hires_ticks_to_ps =  1000000000000 / hires_frequency; 
 		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
 	}
-
-	// We maintain a chained list of the Host Controllers found
-	struct windows_hcd_priv** _hcd_cur = &hcd_root;
 
 	guid = GUID_DEVINTERFACE_USB_HOST_CONTROLLER;
 
@@ -1068,16 +1068,16 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				found = true;
 
 				if (safe_strcmp(priv->driver, "WinUSB") == 0) {
-					priv->api = API_WINUSB;
+					priv->apib = &windows_winusb_backend;
 					// For non composite, the first interface is the same as the device
 					priv->interface[0].path = safe_strdup(priv->path);	// needs strdup
 				} else if (safe_strcmp(reg_key, "usbccgp") == 0) {
 					// Composite (multi-interface) devices are identified by their use of 
 					// the USB Common Class Generic Parent driver
 					if (set_composite_device(ctx, dev_info_data.DevInst, priv) == LIBUSB_SUCCESS) {
-						priv->api = API_WINUSB;
+						priv->apib = &windows_winusb_backend;
 					} else {
-						priv->api = API_NONE;
+						priv->apib = &windows_template_backend;
 					}
 				} else {
 					// All other USB access drivers (HID, Mass Storage) are ignored for now
@@ -1200,24 +1200,19 @@ static int windows_get_active_config_descriptor(struct libusb_device *dev, unsig
 
 static int windows_open(struct libusb_device_handle *dev_handle)
 {
-	int r = LIBUSB_SUCCESS;
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 
-	API_CALL(priv->api, open, dev_handle);
-
-	return r;
+	return priv->apib->open(dev_handle);
 }
 
 static void windows_close(struct libusb_device_handle *dev_handle)
 {
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 
-	switch(priv->api) {
-	case API_WINUSB:
+	// Incidentally, we could just add a "close" member and have it not
+	//   warn.
+	if(&windows_winusb_backend == priv->apib) {
 		winusb_close(dev_handle);
-		break;
-	default:
-		break;
 	}
 }
 
@@ -1261,7 +1256,7 @@ static int windows_claim_interface(struct libusb_device_handle *dev_handle, int 
 	safe_free(priv->interface[iface].endpoint);
 	priv->interface[iface].nb_endpoints= 0;
 
-	API_CALL(priv->api, claim_interface, dev_handle, iface);
+	r = priv->apib->claim_interface(dev_handle, iface);
 
 	if (r == LIBUSB_SUCCESS) {
 		windows_assign_endpoints(dev_handle->dev, iface, 0);
@@ -1278,7 +1273,7 @@ static int windows_set_interface_altsetting(struct libusb_device_handle *dev_han
 	safe_free(priv->interface[iface].endpoint);
 	priv->interface[iface].nb_endpoints= 0;
 
-	API_CALL(priv->api, set_interface_altsetting, dev_handle, iface, altsetting);
+	r = priv->apib->set_interface_altsetting(dev_handle, iface, altsetting);
 
 	if (r == LIBUSB_SUCCESS) {
 		windows_assign_endpoints(dev_handle->dev, iface, altsetting);
@@ -1289,31 +1284,22 @@ static int windows_set_interface_altsetting(struct libusb_device_handle *dev_han
 
 static int windows_release_interface(struct libusb_device_handle *dev_handle, int iface)
 {
-	int r = LIBUSB_SUCCESS;
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 
 	windows_set_interface_altsetting(dev_handle, iface, 0);
-	API_CALL(priv->api, release_interface, dev_handle, iface);
-
-	return r;
+	return priv->apib->release_interface(dev_handle, iface);
 }
 
 static int windows_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint)
 {
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
-	int r;
-
-	API_CALL(priv->api, clear_halt, dev_handle, endpoint);
-	return r;
+	return priv->apib->clear_halt(dev_handle, endpoint);
 }
 
 static int windows_reset_device(struct libusb_device_handle *dev_handle)
 {
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
-	int r;
-
-	API_CALL(priv->api, reset_device, dev_handle);
-	return r;
+	return priv->apib->reset_device(dev_handle);
 }
 
 // The 3 functions below are unlikely to ever get supported on Windows
@@ -1352,7 +1338,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
 	int r;
 
-	API_CALL(priv->api, submit_bulk_transfer, itransfer);
+	r = priv->apib->submit_bulk_transfer(itransfer);
 	if (r != LIBUSB_SUCCESS) {
 		return r;
 	}
@@ -1371,7 +1357,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
 	int r;
 
-	API_CALL(priv->api, submit_iso_transfer, itransfer);
+	r = priv->apib->submit_iso_transfer(itransfer);
 	if (r != LIBUSB_SUCCESS) {
 		return r;
 	}
@@ -1390,7 +1376,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
 	int r;
 
-	API_CALL(priv->api, submit_control_transfer, itransfer);
+	r = priv->apib->submit_control_transfer(itransfer);
 	if (r != LIBUSB_SUCCESS) {
 		return r;
 	}
@@ -1423,20 +1409,16 @@ static int windows_abort_control(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
-	int r;
 
-	API_CALL(priv->api, abort_control, itransfer);
-	return r;
+	return priv->apib->abort_control(itransfer);
 }
 
 static int windows_abort_transfers(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
-	int r;
 
-	API_CALL(priv->api, abort_transfers, itransfer);
-	return r;
+	return priv->apib->abort_transfers(itransfer);
 }
 
 static int windows_cancel_transfer(struct usbi_transfer *itransfer)
@@ -1584,45 +1566,117 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 	return LIBUSB_ERROR_OTHER;
 }
 
+
+// NB: MSVC6 does not support named initializers.
 const struct usbi_os_backend windows_backend = {
-	.name = "Windows",
-	.init = windows_init,
-	.exit = windows_exit,
-	.get_device_list = windows_get_device_list,
-	.get_device_descriptor = windows_get_device_descriptor,
-	.get_active_config_descriptor = windows_get_active_config_descriptor,
-	.get_config_descriptor = windows_get_config_descriptor,
+	"Windows",
+	windows_init,
+	windows_exit,
 
-	.open = windows_open,
-	.close = windows_close,
-	.get_configuration = windows_get_configuration,
-	.set_configuration = windows_set_configuration,
-	.claim_interface = windows_claim_interface,
-	.release_interface = windows_release_interface,
+	windows_get_device_list,
+	windows_open,
+	windows_close,
 
-	.set_interface_altsetting = windows_set_interface_altsetting,
-	.clear_halt = windows_clear_halt,
-	.reset_device = windows_reset_device,
+	windows_get_device_descriptor,
+	windows_get_active_config_descriptor,
+	windows_get_config_descriptor,
 
-	.kernel_driver_active = windows_kernel_driver_active,
-	.detach_kernel_driver = windows_detach_kernel_driver,
-	.attach_kernel_driver = windows_attach_kernel_driver,
+	windows_get_configuration,
+	windows_set_configuration,
+	windows_claim_interface,
+	windows_release_interface,
 
-	.destroy_device = windows_destroy_device,
+	windows_set_interface_altsetting,
+	windows_clear_halt,
+	windows_reset_device,
 
-	.submit_transfer = windows_submit_transfer,
-	.cancel_transfer = windows_cancel_transfer,
-	.clear_transfer_priv = windows_clear_transfer_priv,
+	windows_kernel_driver_active,
+	windows_detach_kernel_driver,
+	windows_attach_kernel_driver,
 
-	.handle_events = windows_handle_events,
+	windows_destroy_device,
 
-	.clock_gettime = windows_clock_gettime,
+	windows_submit_transfer,
+	windows_cancel_transfer,
+	windows_clear_transfer_priv,
 
-	.device_priv_size = sizeof(struct windows_device_priv),
-	.device_handle_priv_size = sizeof(struct windows_device_handle_priv),
-	.transfer_priv_size = sizeof(struct windows_transfer_priv),
-	.add_iso_packet_size = 0,
+	windows_handle_events,
+
+	windows_clock_gettime,
+#ifdef USBI_TIMERFD_AVAILABLE
+	NULL,
+#endif
+	sizeof(struct windows_device_priv),
+	sizeof(struct windows_device_handle_priv),
+	sizeof(struct windows_transfer_priv),
+	0,
 };
+
+
+const struct windows_driver_backend windows_winusb_backend = {
+	"WinUSB",
+	winusb_open,
+	winusb_claim_interface,
+	winusb_set_interface_altsetting,
+	winusb_release_interface,
+	winusb_clear_halt,
+	winusb_reset_device,
+	winusb_submit_bulk_transfer,
+	winusb_submit_iso_transfer,
+	winusb_submit_control_transfer,
+	winusb_abort_control,
+	winusb_abort_transfers,
+};
+
+static int unsupported_open(struct libusb_device_handle *dev_handle) {
+	PRINT_UNSUPPORTED_API(unsupported_open);
+}
+static int unsupported_claim_interface(struct libusb_device_handle *dev_handle, int iface) {
+	PRINT_UNSUPPORTED_API(unsupported_claim_interface);
+}
+static int unsupported_set_interface_altsetting(struct libusb_device_handle *dev_handle, int iface, int altsetting) {
+	PRINT_UNSUPPORTED_API(unsupported_set_interface_altsetting);
+}
+static int unsupported_release_interface(struct libusb_device_handle *dev_handle, int iface) {
+	PRINT_UNSUPPORTED_API(unsupported_release_interface);
+}
+static int unsupported_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint) {
+	PRINT_UNSUPPORTED_API(unsupported_clear_halt);
+}
+static int unsupported_reset_device(struct libusb_device_handle *dev_handle) {
+	PRINT_UNSUPPORTED_API(unsupported_reset_device);
+}
+static int unsupported_submit_bulk_transfer(struct usbi_transfer *itransfer) {
+	PRINT_UNSUPPORTED_API(unsupported_submit_bulk_transfer);
+}
+static int unsupported_submit_iso_transfer(struct usbi_transfer *itransfer) {
+	PRINT_UNSUPPORTED_API(unsupported_submit_iso_transfer);
+}
+static int unsupported_submit_control_transfer(struct usbi_transfer *itransfer) {
+	PRINT_UNSUPPORTED_API(unsupported_submit_control_transfer);
+}
+static int unsupported_abort_control(struct usbi_transfer *itransfer) {
+	PRINT_UNSUPPORTED_API(unsupported_abort_control);
+}
+static int unsupported_abort_transfers(struct usbi_transfer *itransfer) {
+	PRINT_UNSUPPORTED_API(unsupported_abort_transfers);
+}
+
+const struct windows_driver_backend windows_template_backend = {
+	"Dummy",
+	unsupported_open,
+	unsupported_claim_interface,
+	unsupported_set_interface_altsetting,
+	unsupported_release_interface,
+	unsupported_clear_halt,
+	unsupported_reset_device,
+	unsupported_submit_bulk_transfer,
+	unsupported_submit_iso_transfer,
+	unsupported_submit_control_transfer,
+	unsupported_abort_control,
+	unsupported_abort_transfers,
+};
+
 
 /*
  * WinUSB API functions
