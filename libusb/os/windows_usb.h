@@ -51,6 +51,10 @@
 #define safe_sprintf _snprintf
 #define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
 
+// #define MAX_ISO_BUFFER_LENGTH		32768
+// #define MAX_BULK_BUFFER_LENGTH		16384
+#define MAX_CTRL_BUFFER_LENGTH		4096
+
 #define ROOT_PREFIX "\\\\.\\"
 #define MAX_PATH_LENGTH 128
 #define MAX_KEY_LENGTH 64
@@ -126,7 +130,9 @@ struct windows_device_handle_priv {
 };
 
 struct windows_transfer_priv {
-	int NOT_IMPLEMENTED;
+	OVERLAPPED* io;
+	HANDLE handle;
+	uint32_t io_size;
 };
 
 

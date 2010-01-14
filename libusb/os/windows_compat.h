@@ -32,36 +32,13 @@
  * -----------------------------------------------------------------------------
  *
  *
- * poll implementation from polipo (http://www.pps.jussieu.fr/~jch/software/polipo/):
- * -----------------------------------------------------------------------------
- * Copyright (c) 2006 by Dan Kennedy.
- * Copyright (c) 2006 by Juliusz Chroboczek.
+ * parts of poll implementation from libusb-win32 v1, by Stephan Meyer et al.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- * -----------------------------------------------------------------------------
  */
 #pragma once
 
-/* winsock doesn't feature poll(), so there is a version implemented
- * in terms of select() in mingw.c. The following definitions
- * are copied from linux man pages. A poll() macro is defined to
- * call the version in mingw.c.
+/* 
+ * Copied from linux man pages.
  */
 #define POLLIN      0x0001    /* There is data to read */
 #define POLLPRI     0x0002    /* There is urgent data to read */
@@ -75,11 +52,11 @@ struct pollfd {
     short events;     /* requested events */
     short revents;    /* returned events */
 };
-#define poll(x, y, z)        mingw_poll(x, y, z)
+#define poll(x, y, z) windows_poll(x, y, z)
 
 typedef unsigned int nfds_t;
 int pipe(int pipefd[2]);
-int mingw_poll(struct pollfd *fds, unsigned int nfds, int timo);
+int windows_poll(struct pollfd *fds, unsigned int nfds, int timeout);
 
 #ifndef TIMESPEC_TO_TIMEVAL
 #define TIMESPEC_TO_TIMEVAL(tv, ts) { \

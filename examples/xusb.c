@@ -1,9 +1,9 @@
 /*
- * xusb: winusb specific test program
+ * xusb: libusb-winusb specific test program, (c) 2009 Pete Batard
  * based on lsusb, copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
  *
- * Currently, this test program will try to access an XBox USB
- * Gamepad through WinUSB. To access your device, change VID/PID.
+ * This test program tries to access an USB device through WinUSB. 
+ * To access your device, change VID/PID.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,11 +22,17 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <inttypes.h>
 
 #include <libusb/libusb.h>
 
+#define perr(...) fprintf(stderr, __VA_ARGS__)
+#define ERR_EXIT(errcode) do { perr("  libusb error: %d\n", errcode); return -1; } while (0)
+#define CALL_CHECK(fcall) do { r=fcall; if (r < 0) ERR_EXIT(r); } while (0);
+
 //#define USE_MOUSE
-#define USE_XBOX
+//#define USE_XBOX
+#define USE_JTAG
 
 #ifdef USE_MOUSE
 // Logitech optical mouse
@@ -46,54 +52,66 @@
 #define PID 0x6025
 #endif
 
-
+#ifdef USE_JTAG
+// OLIMEX ARM-USB-TINY, 2 channel composite device
+#define VID 0x15BA
+#define PID 0x0004
+#endif
 
 static void print_devs(libusb_device **devs)
 {
 	libusb_device *dev;
-	libusb_device_handle *handle;
 	int i = 0;
 
 	while ((dev = devs[i++]) != NULL) {
 		struct libusb_device_descriptor desc;
 		int r = libusb_get_device_descriptor(dev, &desc);
 		if (r < 0) {
-			fprintf(stderr, "failed to get device descriptor");
+			perr("failed to get device descriptor\n");
 			return;
 		}
 
 		printf("%04x:%04x (bus %d, device %d)\n",
 			desc.idVendor, desc.idProduct,
 			libusb_get_bus_number(dev), libusb_get_device_address(dev));
-
-		// DEBUG: Access an XBox gamepad through WinUSB
-//		if ((desc.idVendor == 0x045e) && (desc.idProduct == 0x0289)) {
-		if ((desc.idVendor == VID) && (desc.idProduct == PID)) {
-			printf("Opening device:\n");
-			r = libusb_open(dev, &handle);
-			if (r != LIBUSB_SUCCESS) {
-				printf("libusb error: %d\n", r);
-				continue;
-			}
-			
-			printf("Claiming interface:\n");
-			r = libusb_claim_interface(handle, 0);
-			if (r != LIBUSB_SUCCESS) {
-				printf("libusb error: %d\n", r);
-				continue;
-			}
-
-			printf("Releasing interface:\n");
-			r = libusb_release_interface(handle, 0);
-			if (r != LIBUSB_SUCCESS) {
-				printf("libusb error: %d\n", r);
-				continue;
-			}
-
-			printf("Closing device:\n");
-			libusb_close(handle);
-		}
 	}
+}
+
+int test_device(uint16_t vid, uint16_t pid)
+{
+	libusb_device_handle *handle;
+	int r;
+	
+	printf("Opening device...\n");
+	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
+
+	if (handle == NULL) {
+		perr("  failed.\n");
+		return -1;
+	}
+
+	printf("Claiming interface...\n");
+	r = libusb_claim_interface(handle, 0);
+	if (r != LIBUSB_SUCCESS) {
+		// Maybe we need to detach the driver
+		perr("failed. Trying to detach driver...\n");
+		CALL_CHECK(libusb_detach_kernel_driver(handle, 0));
+		printf("Claiming interface again...\n");
+		CALL_CHECK(libusb_claim_interface(handle, 0));
+	}
+
+	char string[128];
+	printf("Retieving string descriptor...\n");
+	CALL_CHECK(libusb_get_string_descriptor_ascii(handle, 2, string, 128));
+	printf("Got string: \"%s\"\n", string);
+
+	printf("Releasing interface...\n");
+	CALL_CHECK(libusb_release_interface(handle, 0));
+
+	printf("Closing device...\n");
+	libusb_close(handle);
+
+	return 0;
 }
 
 int main(void)
@@ -105,13 +123,16 @@ int main(void)
 	r = libusb_init(NULL);
 	if (r < 0)
 		return r;
-
+/*
 	cnt = libusb_get_device_list(NULL, &devs);
 	if (cnt < 0)
 		return (int) cnt;
+*/
+//	print_devs(devs);
 
-	print_devs(devs);
-	libusb_free_device_list(devs, 1);
+	test_device(VID, PID);
+
+//	libusb_free_device_list(devs, 1);
 
 	libusb_exit(NULL);
 	return 0;

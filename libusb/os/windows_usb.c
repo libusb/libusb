@@ -70,13 +70,20 @@
 	const GUID GUID_DEVINTERFACE_USB_DEVICE = {  0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED} };
 #endif
 
+// HACK: WinUSB composite device test
+#ifndef GUID_DEVINTERFACE_LIBUSB_DEVICE
+	// {78a1c341-4539-11d3-b88d-00c04fad5171}
+//	const GUID GUID_DEVINTERFACE_LIBUSB_DEVICE = {  0x78a1c341, 0x4539, 0x11d3, {0xb8, 0x8d, 0x00, 0xc0, 0x4f, 0xad, 0x51, 0x71} };
+	//	{b35924d6-3e16-4a9e-9782-5524a4b79bac (XBOX)
+	const GUID GUID_DEVINTERFACE_LIBUSB_DEVICE = {  0xB35924d6, 0x3E16, 0x4A9E, {0x97, 0x82, 0x55, 0x24, 0xA4, 0xB7, 0x9b, 0xAC} };
+#endif
+
 // The 3 macros below are used in conjunction with safe loops.
 #define LOOP_CHECK(fcall) { r=fcall; if (r != LIBUSB_SUCCESS) continue; }
 #define LOOP_CONTINUE(...) { usbi_warn(ctx, __VA_ARGS__); continue; }
 #define LOOP_BREAK(err) { r=err; continue; } 
 
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
-static int windows_get_active_config(struct libusb_device *dev);
 static int windows_clock_gettime(int clk_id, struct timespec *tp);
 // WinUSB API prototypes
 static int winusb_api_init(struct libusb_context *ctx);
@@ -85,6 +92,7 @@ static int winusb_open(struct libusb_device_handle *dev_handle);
 static void winusb_close(struct libusb_device_handle *dev_handle);
 static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int iface);
 static int winusb_release_interface(struct libusb_device_handle *dev_handle, int iface);
+static int winusb_submit_control_transfer(struct usbi_transfer *itransfer, OVERLAPPED *io);
 
 // HCD private chained list
 struct windows_hcd_priv* hcd_root = NULL;
@@ -239,11 +247,12 @@ static int windows_init(struct libusb_context *ctx)
 		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
 	}
 
-/*
+//#define TEST_TIMER 3333
+#ifdef TEST_TIMER
 	// Test our timer
 	struct timespec tp;
 	uint64_t start_time, end_time;
-	uint64_t duration_ms = 3333;
+	uint64_t duration_ms = TEST_TIMER;
 	if (windows_clock_gettime(USBI_CLOCK_MONOTONIC, &tp) != LIBUSB_SUCCESS)
 		return LIBUSB_ERROR_OTHER;
 	// Make sure computations are 64 bit
@@ -253,7 +262,7 @@ static int windows_init(struct libusb_context *ctx)
 		return LIBUSB_ERROR_OTHER;
 	end_time = ((uint64_t)tp.tv_sec)*1000000000 + ((uint64_t)tp.tv_nsec);
 	usbi_dbg("timed %"PRIu64" ns: %"PRIu64" ns", (uint64_t)(duration_ms*1000000), (uint64_t)(end_time-start_time));
-*/
+#endif
 
 	// We maintain a chained list of the Host Controllers found
 	struct windows_hcd_priv** _hcd_cur = &hcd_root;
@@ -331,11 +340,10 @@ static int windows_init(struct libusb_context *ctx)
  * Initialize device structure, including active config
  */ 
 static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
-	libusb_devaddr_t devaddr, char *path, int connection_index,
+	libusb_devaddr_t devaddr, char *path, int connection_index, uint8_t active_config,
 	struct libusb_device *parent_dev)
 {
 	struct windows_device_priv *priv = __device_priv(dev);
-	int active_config = 0;
 
 	// Set default values
 	windows_device_priv_init(priv);
@@ -346,15 +354,18 @@ static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
 	priv->connection_index = connection_index;
 	priv->parent_dev = parent_dev;
 
-	active_config = windows_get_active_config(dev);
-
-	if (active_config < 0) {
-		return active_config;
-	} else if (active_config == 0) {
-		// specs say a configuration value of 0 means unconfigured.
-		usbi_dbg("assuming unconfigured device");
-	}
 	priv->active_config = active_config;
+
+	if (priv->active_config != 0) {
+		usbi_dbg("active config: %d", priv->active_config);
+	} else {
+		// USB devices that don't have a config value are usually missing
+		// a driver issue => report this
+		// TODO: use this for automated driver installation
+		// TODO: can we get an error code to confirm from SetupDiWhatever?
+		priv->driver = safe_strdup("no_driver");
+		usbi_dbg("* DRIVERLESS DEVICE *");
+	}
 
 	return LIBUSB_SUCCESS;
 }
@@ -571,7 +582,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 		if (!is_hcd) {
 			// TODO: add EX info
 			size = sizeof(USB_NODE_CONNECTION_INFORMATION);
-			conn_info.ConnectionIndex = i;	
+			conn_info.ConnectionIndex = i;
 			if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION, &conn_info, size,
 				&conn_info, size, &size, NULL)) {
 				LOOP_CONTINUE("could not get node connection information: %s", windows_error_str());
@@ -593,6 +604,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			// HCDs have only 1 node, and it's always a hub
 			conn_info.DeviceAddress = 0;
 			conn_info.DeviceIsHub = true;
+			conn_info.CurrentConfigurationValue = 1;
 		}
 
 		// If this node is a hub (HCD or not), open it
@@ -661,14 +673,9 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
 
-			LOOP_CHECK(initialize_device(dev, busnum, devaddr, path_str, i, parent_dev));
+			LOOP_CHECK(initialize_device(dev, busnum, devaddr, path_str, i, 
+				conn_info.CurrentConfigurationValue, parent_dev));
 			priv = __device_priv(dev);
-			// Detect devices that don't have a driver
-			// TODO: use this for automated driver installation
-			if (!conn_info.CurrentConfigurationValue) {
-				priv->driver = safe_strdup("no_driver");
-				usbi_dbg("* THIS DEVICE HAS NO DRIVER *");
-			}
 
 			path_str = NULL;	// protect our path from being freed
 
@@ -732,14 +739,14 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 {
 	struct windows_device_priv *priv;
 	struct windows_device_priv *parent_priv;
-	char parent_path[MAX_PATH_LENGTH];
+	char path[MAX_PATH_LENGTH];
 	char reg_key[MAX_KEY_LENGTH];
 	char *sanitized_path = NULL;
-	HDEVINFO dev_info;
+	HDEVINFO dev_info; //, dev_info2;
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
 	SP_DEVINFO_DATA dev_info_data;
-	DEVINST parent_devinst;
+	DEVINST parent_devinst; //, child_devinst
 	GUID guid;
 	DWORD size, reg_type;
 	int	r = LIBUSB_SUCCESS;
@@ -748,8 +755,12 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 
 	// List all connected devices that are not a hub
 	guid = GUID_DEVINTERFACE_USB_DEVICE; 
-	dev_info = SetupDiGetClassDevs(&guid, NULL, NULL, (DIGCF_PRESENT | DIGCF_DEVICEINTERFACE));
+//	guid = GUID_DEVINTERFACE_LIBUSB_DEVICE;	// Why doesn't this work?!?!
+	dev_info = SetupDiGetClassDevs(&guid, NULL, NULL, DIGCF_PRESENT|DIGCF_DEVICEINTERFACE);
 
+	// "USB\\VID_045E&PID_0289\\7&7EF95EB&0&1"
+	// "USB\\VID_15BA&PID_0004&MI_00\\7&259ca3ed&5&0000"
+	//	dev_info = SetupDiGetClassDevsA(NULL, "USB\\VID_15BA&PID_0004&MI_00\\7&259ca3ed&5&0000", NULL, DIGCF_ALLCLASSES|DIGCF_DEVICEINTERFACE);
 
 	if (dev_info != INVALID_HANDLE_VALUE)
 	{
@@ -767,6 +778,8 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			if ( (SetupDiEnumDeviceInterfaces(dev_info, NULL, &guid, i, &dev_interface_data) != TRUE) 
 				||(r != LIBUSB_SUCCESS) )
 				break;
+
+//			usbi_dbg("*********i = %d", i);
 
 			// Read interface data (dummy + actual) to access the device path
 			if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, NULL, 0, &size, NULL)) {
@@ -791,6 +804,8 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				LOOP_CONTINUE("could not access interface data (actual) for device #%u, skipping: %s", 
 					i, windows_error_str());
 			}
+
+//			usbi_dbg("GOT %s", dev_interface_details->DevicePath);
 
 			// Retrieve location information (port#) through the Location Information registry data
 			dev_info_data.cbSize = sizeof(dev_info_data);
@@ -818,13 +833,13 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 					i, windows_error_str());
 			}
 			
-			if (CM_Get_Device_ID(parent_devinst, parent_path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
+			if (CM_Get_Device_ID(parent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
 				LOOP_CONTINUE("could not retrieve parent's path for device #%u, skipping: %s", 
 					i, windows_error_str());
 			}
 
 			// Fix parent's path inconsistancies before attempting to compare
-			sanitized_path = sanitize_path(parent_path);
+			sanitized_path = sanitize_path(path);
 			if (sanitized_path == NULL) {
 				LOOP_CONTINUE("could not sanitize parent's path for device #%u, skipping.", i);
 			}
@@ -841,20 +856,73 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				parent_priv = __device_priv(priv->parent_dev);
 				if ( (safe_strncmp(parent_priv->path, sanitized_path, strlen(sanitized_path)) == 0) &&
 					 (port_nr == priv->connection_index) ) {
-					priv->path = sanitize_path(dev_interface_details->DevicePath);
-					usbi_dbg("path (%d:%d): %s", discdevs->devices[j]->bus_number, 
-						discdevs->devices[j]->device_address, priv->path);
-					found = true;
 
+					safe_free(sanitized_path);
+
+					// before anything, check the service name to know what kind of device we have.
 					// The service name is really the driver name without ".sys" ("WinUSB", "HidUsb", ...)
-					// We store it as it tells which API we should use to access our device
+					// It tells us if we can use WinUSB or if we need to handle a composite device
 					if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_SERVICE, 
 						&reg_type, (BYTE*)reg_key, MAX_KEY_LENGTH, &size)) {
 						LOOP_CONTINUE("could not retrieve driver information for device #%u, skipping: %s", 
 							i, windows_error_str());
 					}
-					usbi_dbg("driver: %s\n", reg_key);
+					usbi_dbg("driver: %s", reg_key);
+
+					// Composite devices use the USB Common Class Generic Parent driver
+					if (safe_strncmp(reg_key, "usbccgp", MAX_KEY_LENGTH) == 0) {
+						usbi_dbg("composite device %s", dev_interface_details->DevicePath);
+/*
+						// We can't use the ccgp driver for WinUSB. Instead, try the first child
+						if (CM_Get_Child(&child_devinst, dev_info_data.DevInst, 0) != CR_SUCCESS) {
+							LOOP_CONTINUE("could not retrieve child info data for device #%u, skipping: %s", 
+								i, windows_error_str());
+						}
+			
+						if (CM_Get_Device_ID(child_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
+							LOOP_CONTINUE("could not retrieve children's path for device #%u, skipping: %s", 
+								i, windows_error_str());
+						}
+
+						// Of course, no CM function returns a path that we can actually use with CreateFile
+						// (that would have been too easy), and of course, there's absolutely NO WAY to list
+						// the composite WinUSB devices using SetupDi, because Microsoft decided they should
+						// be 100% invisible to the SetupDi functions...
+
+
+						// Try a call requiring admin privs...
+
+						dev_info2 = SetupDiCreateDeviceInfoList(NULL, NULL);
+						if (dev_info2 == INVALID_HANDLE_VALUE) {
+							usbi_dbg("dammit 1");
+						}
+
+						if (!SetupDiCreateDeviceInfo(dev_info2, "USB\\VID_15BA&PID_0004&MI_00\\7&259ca3ed&5&0000", NULL, NULL, NULL, 0, NULL)) {
+							usbi_dbg("dammit 2: %s", windows_error_str());
+						}
+ 
+//						SetupDiEnumDeviceInterfaces
+*/
+//						safe_strncat(path, MAX_PATH_LENGTH, "#{A5DCBF10-6530-11D2-901F-00C04FB951ED}", sizeof("#{A5DCBF10-6530-11D2-901F-00C04FB951ED}"));
+				//		sanitized_path = sanitize_path(path);
+						sanitized_path = sanitize_path(dev_interface_details->DevicePath);
+						if (sanitized_path == NULL) {
+							LOOP_CONTINUE("could not sanitize child's path for device #%u, skipping.", i);
+						}
+
+						// TODO: actual check for WinUSB driver on ALL children
+						safe_strncpy(reg_key, MAX_KEY_LENGTH, "WinUSB", sizeof("WinUSB"));
+						usbi_dbg("TODO: FETCH ACTUAL DRIVER (forcing driver to: %s)", reg_key);
+					} else {
+						sanitized_path = sanitize_path(dev_interface_details->DevicePath);
+					}
+
 					priv->driver = safe_strdup(reg_key);
+					priv->path = sanitized_path;
+					sanitized_path = NULL;	// safe loop
+					usbi_dbg("path (%d:%d): %s", discdevs->devices[j]->bus_number, 
+						discdevs->devices[j]->device_address, priv->path);
+					found = true;
 
 					break;
 				}
@@ -965,16 +1033,6 @@ static int windows_get_config_descriptor(struct libusb_device *dev, uint8_t conf
 }
 
 /*
- * Retrieve the bConfigurationValue for the active configuration for a device.
- * This is meant to be called during init so that the value can be cached
- */
-static int windows_get_active_config(struct libusb_device *dev)
-{
-	// TODO: As we don't have control msg I/O yet, force the value to first conf.
-	return 1;
-}
-
-/*
  * return the cached copy of the active config descriptor
  */
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian)
@@ -989,10 +1047,36 @@ static int windows_get_active_config_descriptor(struct libusb_device *dev, unsig
 	return windows_get_config_descriptor(dev, priv->active_config-1, buffer, len, host_endian);
 }
 
+// From libusb-win32
+static OVERLAPPED* create_overlapped(void)
+{
+	OVERLAPPED* io = malloc(sizeof(OVERLAPPED));
+
+	if(io == NULL)
+		return NULL;
+
+	memset(io, 0, sizeof(OVERLAPPED));
+	io->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!io->hEvent) {
+		free(io);
+		return NULL;
+	}
+	return io;
+}
+
+// From libusb-win32
+void free_overlapped(OVERLAPPED* io)
+{
+	if(io->hEvent)
+		CloseHandle(io->hEvent);
+	free(io);
+}
+
 static int windows_open(struct libusb_device_handle *dev_handle)
 {
 	int r = LIBUSB_SUCCESS;
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+//	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
 
 	// Select the API to use
 	if (safe_strcmp(priv->driver, "WinUSB") == 0) {
@@ -1001,19 +1085,28 @@ static int windows_open(struct libusb_device_handle *dev_handle)
 		r = LIBUSB_ERROR_NOT_SUPPORTED;
 	}
 
-	// TODO: setup polling
+	// TODO: update pipe info here?
+	// TODO: HANDLE is a void* which we cast to int => MASSIVE POTENTIAL ISSUE!!!
+	// => provide a lookup table for fd <-> HANDLE ?
+//	usbi_dbg("WARNING: casting (HANDLE) %p to (int) 0x%x", handle_priv->file_handle, (int)handle_priv->file_handle);
+//	usbi_add_pollfd(HANDLE_CTX(dev_handle), (int)handle_priv->file_handle, POLLIN);
+
 	return r;
 }
 
 static void windows_close(struct libusb_device_handle *dev_handle)
 {
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+//	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
 
 	if (safe_strcmp(priv->driver, "WinUSB") == 0) {
 		winusb_close(dev_handle);
 	}
 
-	// TODO: cancel polling
+	// TODO: free pipe?
+	// TODO: HANDLE vs int
+//	usbi_remove_pollfd (HANDLE_CTX(dev_handle), (int)handle_priv->file_handle);
+
 }
 
 /*
@@ -1116,8 +1209,31 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 static int submit_control_transfer(struct usbi_transfer *itransfer)
 {
-	// TODO: call WinUsb_ControlTransfer
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
+	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
+	OVERLAPPED *io;
+	int r;
+
+	// TODO: is it safe to create io in open?
+	if((io = create_overlapped()) == NULL)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = winusb_submit_control_transfer(itransfer, io);
+	if (r != LIBUSB_SUCCESS) {
+		free_overlapped(io);
+		return r;
+	}
+
+	// TODO: are transfer reused?
+	transfer_priv->io = io;
+
+	// TODO: we use the OVERLAPPED _pointer_ as a file descriptor with a  
+	// *VERY DANGEROUS* cast to _int_)
+	usbi_dbg("WARNING: casting (OVERLAPPED*) %p to (int) 0x%x", io, (int)io);
+	usbi_add_pollfd(ctx, (int)io, POLLIN);
+
+	return LIBUSB_SUCCESS;
 }
 
 static int windows_submit_transfer(struct usbi_transfer *itransfer)
@@ -1169,9 +1285,102 @@ static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 }
 
+static void windows_control_callback (struct usbi_transfer *itransfer, int io_result, uint32_t io_size) 
+{
+	int status;
+
+	usbi_dbg("handling control completion with status %d", io_result);
+
+	// TODO
+	switch(io_result) {
+	default:
+		status = LIBUSB_TRANSFER_COMPLETED;
+		itransfer->transferred += io_size;
+		break;
+	}
+
+	usbi_handle_transfer_completion(itransfer, status);
+}
+
+
+static void windows_handle_callback (struct usbi_transfer *itransfer, int io_result, uint32_t io_size) 
+{
+	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+
+	switch (transfer->type) {
+	case LIBUSB_TRANSFER_TYPE_CONTROL:
+		windows_control_callback (itransfer, io_result, io_size);
+		break;
+	case LIBUSB_TRANSFER_TYPE_BULK:
+	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
+//		windows_bulk_callback (itransfer, io_result, io_size);
+		break;
+	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
+		// TODO: ain't gonna happen with WinUSB
+//		windows_isoc_callback (itransfer, io_result);
+		break;
+	default:
+		usbi_err(TRANSFER_CTX(transfer), "unknown endpoint type %d", transfer->type);
+	}
+}
+
 static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds, int num_ready)
 {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	struct windows_transfer_priv* transfer_priv = NULL;
+	int i = 0;
+	bool found = false;
+	struct usbi_transfer *transfer;
+	DWORD io_size;
+
+
+//	pthread_mutex_lock(&ctx->open_devs_lock);
+	for (i = 0; i < nfds && num_ready > 0; i++) {
+		struct pollfd *pollfd = &fds[i];
+//		struct libusb_device_handle *handle;
+//		struct windows_device_handle_priv *hpriv = NULL;
+
+		usbi_dbg("checking fd %x with revents = %x", fds[i], pollfd->revents);
+
+		if (!pollfd->revents) {
+			continue;
+		}
+
+		num_ready--;
+
+		list_for_each_entry(transfer, &ctx->flying_transfers, list) {
+			transfer_priv = usbi_transfer_get_os_priv(transfer);
+			if ((int)transfer_priv->io == pollfd->fd) {
+				found = true;
+				break;
+			}
+		}
+
+		if (found) {
+			if (!GetOverlappedResult(transfer_priv->handle, transfer_priv->io, &io_size, false)) {
+				usbi_err(ctx, "GetOverlappedResult failed: %s", windows_error_str());
+			} else {
+				// Remove the polled "fd"
+				usbi_remove_pollfd(ctx, (int)transfer_priv->io);
+				windows_handle_callback(transfer, 0, io_size);
+			}
+		}
+
+/*
+		list_for_each_entry(handle, &ctx->open_devs, list) {
+			hpriv = (struct windows_device_handle_priv *)handle->os_priv;
+			// TODO: does this actually work?
+			usbi_dbg("pollfd->fd = %x", pollfd->fd);
+			// TODO: HANDLE vs int
+			if ((int)hpriv->io == pollfd->fd) {
+				usbi_dbg("io == fd");
+				break;
+			}
+		}
+*/
+	}
+
+//	pthread_mutex_unlock(&ctx->open_devs_lock);
+	return LIBUSB_SUCCESS;
 }
 
 /*
@@ -1306,7 +1515,7 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 	handle = CreateFileA(priv->path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, 
 		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 	if (handle == INVALID_HANDLE_VALUE) {
-		usbi_err(ctx, "could not open device: %s", windows_error_str());
+		usbi_err(ctx, "could not open device %s: %s", priv->path, windows_error_str());
 		// TODO? Create a windows errcode -> libusb errcode function
 		switch(GetLastError()) {
 		case ERROR_FILE_NOT_FOUND:	// The device was disconnected
@@ -1322,14 +1531,11 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 }
 
 /*
-
-
 	WINUSB_INTERFACE_HANDLE interface_handle;
 	USB_INTERFACE_DESCRIPTOR interface_desc;
 	WINUSB_PIPE_INFORMATION pipe_info;
 	uint8_t speed, i;
 	ULONG length;
-
 
 	length = sizeof(speed);
 	if (!WinUsb_QueryDeviceInformation(winusb_handle, DEVICE_SPEED, &length, &speed)) {
@@ -1337,13 +1543,13 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 		return LIBUSB_ERROR_IO;
 	}
 
-	/* TODO:
-	 * Because the Fx2 device supports only one interface that has no alternative settings, 
-	 * the AlternateSettingNumber parameter is set to zero and the function is called only 
-	 * once. If the device supports multiple interfaces, call WinUsb_GetAssociatedInterface
-	 * to obtain interface handles for associated interfaces.
-	 */
-/*
+	// TODO:
+	// Because the Fx2 device supports only one interface that has no alternative settings, 
+	// the AlternateSettingNumber parameter is set to zero and the function is called only 
+	// once. If the device supports multiple interfaces, call WinUsb_GetAssociatedInterface
+	// to obtain interface handles for associated interfaces.
+	
+
 	if (!WinUsb_QueryInterfaceSettings(winusb_handle, 0, &interface_desc)) {
 		usbi_err(ctx, "could not get interface settings: %s", windows_error_str());
 		return LIBUSB_ERROR_IO;
@@ -1379,7 +1585,7 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 */
 static void winusb_close(struct libusb_device_handle *dev_handle)
 {
-	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
+//	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
 	
 	if (!api_winusb_available)
@@ -1449,7 +1655,7 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 
 static int winusb_release_interface(struct libusb_device_handle *dev_handle, int iface)
 {
-	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
+//	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
 
 	CHECK_WINUSB_AVAILABLE;
@@ -1472,6 +1678,41 @@ static int winusb_release_interface(struct libusb_device_handle *dev_handle, int
 	} else {
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
+
+	return LIBUSB_SUCCESS;
+}
+
+static int winusb_submit_control_transfer(struct usbi_transfer *itransfer, OVERLAPPED *io)
+{
+	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
+	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)transfer->dev_handle->os_priv;
+	WINUSB_SETUP_PACKET *setup = (WINUSB_SETUP_PACKET *) transfer->buffer;
+	ULONG size, junk;
+
+	//TODO: multiple interfaces
+	int iface = 0;	// Force interface 0
+
+	size = transfer->length - LIBUSB_CONTROL_SETUP_SIZE;
+
+	if (size > MAX_CTRL_BUFFER_LENGTH)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	if (!WinUsb_ControlTransfer(handle_priv->interface_handle[iface], *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, &junk, io)) {
+		if(GetLastError() != ERROR_IO_PENDING) {
+			usbi_err(ctx, "WinUsb_ControlTransfer failed: %s", windows_error_str());
+			return LIBUSB_ERROR_IO;
+		}
+	} else {
+		usbi_err(ctx, "chill out man; this is like way too fast for async I/O...");
+		return LIBUSB_ERROR_IO;
+	}
+
+	// TODO: don't store this is transfer_priv
+	transfer_priv->handle = handle_priv->interface_handle[iface];
+
+	usbi_dbg("overlapped WinUsb_ControlTransfer initiated");
 
 	return LIBUSB_SUCCESS;
 }
