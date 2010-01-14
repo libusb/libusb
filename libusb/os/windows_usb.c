@@ -1891,7 +1891,16 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	current_interface = winusb_get_valid_interface(handle_priv);
+	// Attempt to claim an interface if none was found
 	if (current_interface < 0) {
+		for (current_interface=0; current_interface<USB_MAXINTERFACES; current_interface++) {
+			if (libusb_claim_interface(transfer->dev_handle, current_interface) == LIBUSB_SUCCESS) {
+				usbi_warn(ctx, "auto-claimed interface %d for control request", current_interface);
+				break;
+			}
+		}
+	}
+	if (current_interface == USB_MAXINTERFACES) {
 		usbi_err(ctx, "no active interface");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
