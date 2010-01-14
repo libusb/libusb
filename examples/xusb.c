@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <inttypes.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include <libusb/libusb.h>
 
