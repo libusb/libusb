@@ -35,7 +35,7 @@ case $host in
 	AC_SUBST(OS_WINDOWS)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
-	LIBS="-lpthread -lsetupapi -lole32"
+	LIBS="-lpthreadGC2 -lsetupapi -lole32"
 	AM_LDFLAGS=""
 	;;
 *)
