@@ -50,15 +50,21 @@
 #include <setupapi.h>
 #include <ddk/usbiodef.h>
 #include <ddk/usbioctl.h>
+#include <largeint.h>
 
 #include "libusbi.h"
 #include "windows_compat.h"
 #include "windows_usb.h"
 
 // The 3 macros below are used in conjunction with safe loops.
-#define LOOP_CHECK(fcall) do { r=fcall; if (r != LIBUSB_SUCCESS) continue; } while (0);
-#define LOOP_WARN(...) do { usbi_warn(ctx, __VA_ARGS__); continue; } while (0);
-#define LOOP_BREAK(err) do { r=err; continue; } while (0);
+#define LOOP_CHECK(fcall) { r=fcall; if (r != LIBUSB_SUCCESS) continue; }
+#define LOOP_CONTINUE(...) { usbi_warn(ctx, __VA_ARGS__); continue; }
+#define LOOP_BREAK(err) { r=err; continue; } 
+
+/*
+ * globals
+ */
+
 
 // async event thread
 // static pthread_t libusb_windows_at;
@@ -66,6 +72,10 @@
 // root and last HCD pointer
 struct windows_hcd_priv* _hcd_root = NULL;
 
+// timers
+uint64_t hires_frequency, hires_frequency_ns;
+// 1970.01.01 00:00:000 in MS Filetime, as computed and confirmed with google
+const uint64_t epoch_time = 116444736000000000;
 
 /*
  * Helper functions
@@ -145,8 +155,25 @@ static int windows_init(struct libusb_context *ctx)
 	DWORD size;
 	libusb_bus_t bus;
 	int r = LIBUSB_SUCCESS;
+	LARGE_INTEGER li_frequency;
 
-	// TODO: prevent reentry
+	// If our HCD list is populated, we don't need to re-init
+	if (_hcd_root != NULL) {
+		usbi_dbg("init already occured.");
+		return LIBUSB_SUCCESS;
+	}
+
+	// Find out if we have access to a monotonic (hires) timer
+	if (!QueryPerformanceFrequency(&li_frequency)) {
+		usbi_dbg("no hires timer available on this platform");
+		hires_frequency = 0;
+		hires_frequency_ns = 0;	
+	} else {
+		usbi_dbg("hires timer available");
+		hires_frequency = li_frequency.QuadPart;
+		// We compute the ns frequency as well for speedup
+		hires_frequency_ns =  hires_frequency / 1000000000; 
+	}
 
 	// We maintain a chained list of the Host Controllers found
 	struct windows_hcd_priv** __hcd_cur = &_hcd_root;
@@ -176,19 +203,19 @@ static int windows_init(struct libusb_context *ctx)
 
 			// Will need to change storage and size of libusb_bus_t if this ever occurs
 			if (bus == LIBUSB_BUS_MAX) {
-				LOOP_WARN("program assertion failed - found more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
+				LOOP_CONTINUE("program assertion failed - found more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
 			}
 
 			// Do a dummy call to get the size
 			if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, NULL, 0, &size, NULL)) {
 				// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
 				if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-					LOOP_WARN("could not access interface data for bus %u, skipping: %s",
+					LOOP_CONTINUE("could not access interface data for bus %u, skipping: %s",
 						bus, windows_error_str());
 				}
 			}
 			else
-				LOOP_WARN("program assertion failed - http://msdn.microsoft.com/en-us/library/ms792901.aspx is wrong.");
+				LOOP_CONTINUE("program assertion failed - http://msdn.microsoft.com/en-us/library/ms792901.aspx is wrong.");
 
 			if ((_dev_interface_details = malloc(size)) == NULL) {
 				usbi_err(ctx, "could not allocate interface data for bus %u. aborting.", bus);
@@ -199,14 +226,14 @@ static int windows_init(struct libusb_context *ctx)
 			// Actual call.
 			if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data,
 				_dev_interface_details, size, &size, NULL)) {
-				LOOP_WARN("could not access interface data for bus %u, skipping: %s",
+				LOOP_CONTINUE("could not access interface data for bus %u, skipping: %s",
 					bus, windows_error_str());
 			}
 
 			handle = CreateFileA(_dev_interface_details->DevicePath, GENERIC_WRITE, FILE_SHARE_WRITE,
 				NULL, OPEN_EXISTING, FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
 			if(handle == INVALID_HANDLE_VALUE) {
-				LOOP_WARN("could not open bus %u, skipping: %s", bus, windows_error_str());
+				LOOP_CONTINUE("could not open bus %u, skipping: %s", bus, windows_error_str());
 			}
 
 //			usbi_dbg("Found Hcd: %s", _dev_interface_details->DevicePath);
@@ -222,24 +249,24 @@ static int windows_init(struct libusb_context *ctx)
 			// get the Driverkey name for this HDC
 			if (!DeviceIoControl(handle, IOCTL_GET_HCD_DRIVERKEY_NAME, &driverkey_name, sizeof(USB_HCD_DRIVERKEY_NAME),
 				&driverkey_name, sizeof(USB_HCD_DRIVERKEY_NAME), &size, NULL)) {
-				LOOP_WARN("could not access DriverKey name (dummy) for bus %u, skipping: %s",
+				LOOP_CONTINUE("could not access DriverKey name (dummy) for bus %u, skipping: %s",
 					bus, windows_error_str());
 			}
 
 			if ((size = driverkey_name.ActualLength) > (USB_HCD_DRIVERKEY_NAME_FIXED_MAX*sizeof(WCHAR))) {
-				LOOP_WARN("DriverKey name too long for bus %d (%d), skipping.", size, bus);
+				LOOP_CONTINUE("DriverKey name too long for bus %d (%d), skipping.", size, bus);
 			}
 
 			if (!DeviceIoControl(handle, IOCTL_GET_HCD_DRIVERKEY_NAME, &driverkey_name, size,
 				&driverkey_name, size, &size, NULL)) {
-				LOOP_WARN("could not access DriverKey name (actual) for bus %u, skipping: %s",
+				LOOP_CONTINUE("could not access DriverKey name (actual) for bus %u, skipping: %s",
 					bus, windows_error_str());
 			}
 
 			// Convert DriverKey name to something we can handle
 			_hcd_cur->name = wchar_to_utf8(driverkey_name.DriverKeyName);
 			if (_hcd_cur == NULL) {
-				LOOP_WARN("Could not convert DriverKey Name for bus %u. skipping.", bus);
+				LOOP_CONTINUE("Could not convert DriverKey Name for bus %u. skipping.", bus);
 			}
 //			usbi_dbg("Got driverkey: %s", _hcd_cur->name);
 
@@ -503,7 +530,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 			conn_info.ConnectionIndex = i;	
 			if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION, &conn_info, size,
 				&conn_info, size, &size, NULL)) {
-				LOOP_WARN("could not get node connection information: %s", windows_error_str());
+				LOOP_CONTINUE("could not get node connection information: %s", windows_error_str());
 			}
 
 			if (conn_info.ConnectionStatus == NoDeviceConnected) {
@@ -512,7 +539,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 			}
 
 			if (conn_info.DeviceAddress == 0) {
-				LOOP_WARN("program assertion failed - device address is zero "
+				LOOP_CONTINUE("program assertion failed - device address is zero "
 					"(conflicts with HCD), ignoring device");
 			}
 
@@ -528,7 +555,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 
 		// Will need to change the session_id computation if this assertion fails
 		if (conn_info.DeviceAddress > LIBUSB_DEVADDR_MAX) {
-			LOOP_WARN("program assertion failed - device address is greater than 255, ignoring device");
+			LOOP_CONTINUE("program assertion failed - device address is greater than 255, ignoring device");
 		} else {
 			devaddr = conn_info.DeviceAddress;
 		}
@@ -579,12 +606,12 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 		size = size_initial;
 		if (!DeviceIoControl(hub_handle, getname_ioctl, &s_hubname, size,
 			&s_hubname, size, &size, NULL)) {
-			LOOP_WARN("could not get hub path (dummy): %s", windows_error_str());
+			LOOP_CONTINUE("could not get hub path (dummy): %s", windows_error_str());
 		}
 
 		size = is_hcd?s_hubname.u.root.ActualLength:s_hubname.u.node.ActualLength;
 		if (size > size_fixed) {
-			LOOP_WARN("program assertion failed - hub path is too long");
+			LOOP_CONTINUE("program assertion failed - hub path is too long");
 		}
 
 		// ConnectionIndex needs to be re-initialized for nodes
@@ -592,7 +619,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 			s_hubname.u.node.ConnectionIndex = i;
 		if (!DeviceIoControl(hub_handle, getname_ioctl, &s_hubname, size,
 			&s_hubname, size, &size, NULL)) {
-			LOOP_WARN("could not get hub path (actual): %s", windows_error_str());
+			LOOP_CONTINUE("could not get hub path (actual): %s", windows_error_str());
 		}
 
 		// Add prefix
@@ -625,7 +652,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 		handle = CreateFileA(priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
 			FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
 		if(handle == INVALID_HANDLE_VALUE) {
-			LOOP_WARN("could not open hub %s: %s", priv->path, windows_error_str());
+			LOOP_CONTINUE("could not open hub %s: %s", priv->path, windows_error_str());
 		}
 		priv->handle = handle;
 		handle = INVALID_HANDLE_VALUE;	// protect our handle from closure
@@ -640,7 +667,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 		size = sizeof(USB_HUB_CAPABILITIES_EX);
 		if (!DeviceIoControl(priv->handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps_ex,
 			size, &hub_caps_ex, size, &size, NULL)) {
-			LOOP_WARN("could not read hub capabilities (ex) for hub %s: %s",
+			LOOP_CONTINUE("could not read hub capabilities (ex) for hub %s: %s",
 				priv->path, windows_error_str());
 		}
 		has_hub_caps_ex = true;
@@ -649,7 +676,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 		size = sizeof(USB_HUB_CAPABILITIES);
 		if (!DeviceIoControl(priv->handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps,
 			size, &hub_caps, size, &size, NULL)) {
-			LOOP_WARN("could not read hub capabilities (std) for hub %s: %s",
+			LOOP_CONTINUE("could not read hub capabilities (std) for hub %s: %s",
 				priv->path, windows_error_str());
 		}
 
@@ -660,12 +687,12 @@ static int usb_enumerate_hub(struct libusb_context *ctx,
 		size = sizeof(USB_NODE_INFORMATION);
 		if (!DeviceIoControl(priv->handle, IOCTL_USB_GET_NODE_INFORMATION, &hub_node, size,
 			&hub_node, size, &size, NULL)) {
-			LOOP_WARN("could not retreive information for hub %s: %s",
+			LOOP_CONTINUE("could not retreive information for hub %s: %s",
 				priv->path, windows_error_str());
 		}
 
 		if (hub_node.NodeType != UsbHub) {
-			LOOP_WARN("unexpected hub type (%d) for hub %s", hub_node.NodeType, priv->path);
+			LOOP_CONTINUE("unexpected hub type (%d) for hub %s", hub_node.NodeType, priv->path);
 		}
 
 		priv->nb_ports = hub_node.u.HubInformation.HubDescriptor.bNumberOfPorts;
@@ -694,7 +721,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	{
 		// Shouldn't be needed, but let's be safe
 		if (bus == LIBUSB_BUS_MAX) {
-			LOOP_WARN("program assertion failed - got more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
+			LOOP_CONTINUE("program assertion failed - got more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
 		}
 
 		usbi_dbg("Enumerating bus %u", bus);
@@ -889,32 +916,41 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+/*
+ * Monotonic and real time functions
+ */
 static int windows_clock_gettime(int clk_id, struct timespec *tp)
 {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-/*
-	mach_timespec_t sys_time;
-	clock_serv_t clock_ref;
+	LARGE_INTEGER hires_counter;
+	FILETIME ftime;
+	ULARGE_INTEGER rtime;
 
-	switch (clk_id) {
-	case USBI_CLOCK_REALTIME:
-		// CLOCK_REALTIME represents time since the epoch
-		host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &clock_ref);
-		break;
+	switch(clk_id) {
 	case USBI_CLOCK_MONOTONIC:
-		// use system boot time as reference for the monotonic clock
-		host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &clock_ref);
-		break;
+		// If hires_frequency is set, we have an hires monotonic timer available
+		if (hires_frequency != 0) {
+			if (QueryPerformanceCounter(&hires_counter) == 0)
+				return LIBUSB_ERROR_IO;
+			tp->tv_sec = hires_counter.QuadPart / hires_frequency;
+			tp->tv_nsec = (hires_counter.QuadPart % hires_frequency) / hires_frequency_ns;
+			return LIBUSB_SUCCESS;
+		}	
+		// make sure we fall through to real-time if no hires timer is present
+	case USBI_CLOCK_REALTIME:
+		// To get a 100ns resolution time value with real time, we follow 
+		// http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
+		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
+		GetSystemTimeAsFileTime(&ftime);
+		rtime.LowPart = ftime.dwLowDateTime;
+		rtime.HighPart = ftime.dwHighDateTime;
+		rtime.QuadPart -= epoch_time;
+		tp->tv_sec = rtime.QuadPart / 10000000;
+		tp->tv_nsec = (rtime.QuadPart % 10000000)*100;
+		return LIBUSB_SUCCESS;
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-
-	clock_get_time(clock_ref, &sys_time);
-
-	tp->tv_sec = sys_time.tv_sec;
-	tp->tv_nsec = sys_time.tv_nsec;
-*/
-	return LIBUSB_SUCCESS;
+	return LIBUSB_ERROR_OTHER;
 }
 
 const struct usbi_os_backend windows_backend = {
