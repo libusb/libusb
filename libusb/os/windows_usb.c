@@ -317,50 +317,6 @@ static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
 }
 
 /*
- * fetch device descriptor through I/O
- */
-static int cache_device_descriptor (struct libusb_device *dev, HANDLE hub_handle)
-{
-	DWORD size, ret_size;
-	struct windows_device_priv *priv = __device_priv(dev);
-	struct libusb_context *ctx = DEVICE_CTX(dev);
-	USB_DEVICE_DESCRIPTOR_BUFFER dd_buf;
-  
-	size = sizeof(dd_buf);
-	memset(&dd_buf, 0, size);
-
-	dd_buf.req.ConnectionIndex = priv->connection_index;
-	dd_buf.req.SetupPacket.bmRequest = 0x80;
-	dd_buf.req.SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
-	dd_buf.req.SetupPacket.wValue = (USB_DEVICE_DESCRIPTOR_TYPE << 8);
-	dd_buf.req.SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
-
-	// read the device descriptor
-	if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &dd_buf, size,
-		&dd_buf, size, &ret_size, NULL)) {
-		usbi_warn(ctx, "could not read device descriptor: %s", windows_error_str());
-		return LIBUSB_ERROR_IO;
-	}
-
-	if ((ret_size != size) ||
-		(dd_buf.data.bLength < sizeof(USB_DEVICE_DESCRIPTOR)) ||
-		(DEVICE_DESC_LENGTH != sizeof(USB_DEVICE_DESCRIPTOR))) {
-		usbi_warn(ctx, "unexpected device descriptor size.");
-		return LIBUSB_ERROR_IO;
-	}
-
-	memmove(&(priv->dev_descriptor), &(dd_buf.data), DEVICE_DESC_LENGTH);
-
-	dev->num_configurations = priv->dev_descriptor.bNumConfigurations;
-
-	// I'd like to see one of those some day...
-	if (dev->num_configurations > 1)
-		usbi_dbg("*** CONGRATULATIONS: You actually have a device with more than one conf!! ***");
-
-	return LIBUSB_SUCCESS;
-}
-
-/*
  * HCD (root) hubs need to have their device descriptor manually populated
  *
  * Note that we follow the Linux convention and use the "Linux Foundation root hub"
@@ -448,12 +404,13 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		cd_buf_short.req.SetupPacket.bmRequest = 0x80;
 		cd_buf_short.req.SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
 		cd_buf_short.req.SetupPacket.wValue = (USB_CONFIGURATION_DESCRIPTOR_TYPE << 8) | i;
+		cd_buf_short.req.SetupPacket.wIndex = i;
 		cd_buf_short.req.SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
 
 		// Dummy call to get the required data size
 		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
 			&cd_buf_short, size, &ret_size, NULL)) {
-			usbi_err(ctx, "could not access configuration descriptor (dummy): %s", i, windows_error_str());
+			usbi_err(ctx, "could not access configuration descriptor (dummy): %s", windows_error_str());
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
@@ -474,6 +431,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		cd_buf_actual->SetupPacket.bmRequest = 0x80;
 		cd_buf_actual->SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
 		cd_buf_actual->SetupPacket.wValue = (USB_CONFIGURATION_DESCRIPTOR_TYPE << 8) | i;
+		cd_buf_actual->SetupPacket.wIndex = i;
 		cd_buf_actual->SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
 
 		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
@@ -494,7 +452,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
-		usbi_dbg("Got config descriptor alright for config %d (%d bytes)", i+1, cd_data->wTotalLength);
+		usbi_dbg("cached config descriptor #%d (%d bytes)", i+1, cd_data->wTotalLength);
 	
 		// Sanity check. Ensures that indexes for our list of config desc is in the right order
 		if (i != (cd_data->bConfigurationValue-1)) {
@@ -667,8 +625,14 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			// Setup the cached descriptors. Note that only non HCDs can fetch descriptors
 			// For HCDs, we just populate it manually
 			if (!is_hcd) { 
-				LOOP_CHECK(cache_device_descriptor(dev, hub_handle));
-				LOOP_CHECK(cache_config_descriptors(dev, hub_handle));
+				// The device descriptor has been read with conn_info
+				memcpy(&priv->dev_descriptor, &(conn_info.DeviceDescriptor), sizeof(USB_DEVICE_DESCRIPTOR));
+				dev->num_configurations = priv->dev_descriptor.bNumConfigurations;
+				// If we can't read the config descriptors, just set the number of confs to zero
+				if (cache_config_descriptors(dev, hub_handle) != LIBUSB_SUCCESS) {
+					dev->num_configurations = 0;
+					priv->dev_descriptor.bNumConfigurations = 0;
+				}
 			} else {
 				LOOP_CHECK(force_hcd_device_descriptor(dev, handle));
 			}
@@ -790,7 +754,9 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			if (size != sizeof("Port_#1234.Hub_#1234")) {
 				LOOP_CONTINUE("unexpected registry key size for device #%u, skipping", i);
 			}
-			sscanf(reg_key, "Port_#%04d.Hub_#%04d", &port_nr, &hub_nr);
+			if (sscanf(reg_key, "Port_#%04d.Hub_#%04d", &port_nr, &hub_nr) != 2) {
+				LOOP_CONTINUE("failure to read port and hub number for device #%u, skipping", i);
+			}
 
 			// Retrieve parent's path using PnP Configuration Manager (CM)
 			if (CM_Get_Parent(&parent_devinst, dev_info_data.DevInst, 0) != CR_SUCCESS) {

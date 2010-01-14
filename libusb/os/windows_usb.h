@@ -126,15 +126,6 @@ struct windows_transfer_priv {
 /*
  * Windows API structures (redefined for convenience)
  */
-typedef struct _USB_HCD_DRIVERKEY_NAME_FIXED {
-	ULONG ActualLength;
-	WCHAR DriverKeyName[MAX_KEY_LENGTH];
-} USB_HCD_DRIVERKEY_NAME_FIXED;
-
-typedef struct _USB_NODE_DRIVERKEY_NAME_FIXED {
-  ULONG ActualLength;
-  WCHAR DriverKeyName[MAX_KEY_LENGTH];			
-} USB_NODE_DRIVERKEY_NAME_FIXED;
 
 // Fixed length version of USB_ROOT_HUB_NAME & USB_NODE_CONNECTION_NAME
 typedef struct _USB_ROOT_HUB_NAME_FIXED {
@@ -155,17 +146,12 @@ typedef struct _USB_HUB_NAME_FIXED {
 	} u;
 } USB_HUB_NAME_FIXED;
 
-// The following structures need to be packed
+// The following structure needs to be packed
 #pragma pack(1)
 typedef struct _USB_CONFIGURATION_DESCRIPTOR_SHORT {
 	USB_DESCRIPTOR_REQUEST req;
 	USB_CONFIGURATION_DESCRIPTOR data;
 } USB_CONFIGURATION_DESCRIPTOR_SHORT;
-
-typedef struct _USB_DEVICE_DESCRIPTOR_BUFFER {
-	USB_DESCRIPTOR_REQUEST req;
-	USB_DEVICE_DESCRIPTOR data;
-} USB_DEVICE_DESCRIPTOR_BUFFER;
 #pragma pack()
 
 
