@@ -117,7 +117,7 @@ bool api_winusb_available = false;
  */
 char* wchar_to_utf8(LPCWSTR wstr)
 {
-	size_t size;
+	int size;
 	char* str;
 
 	// Find out the size we need to allocate for our converted string
@@ -201,7 +201,7 @@ static char* sanitize_path(const char* path)
 
 	// Same goes for '\' and '#' after the root prefix. Ensure '#' is used
 	for(j=root_size; j<size; j++) {
-		ret_path[j] = toupper(ret_path[j]);	// Fix case too
+		ret_path[j] = (char)toupper(ret_path[j]);	// Fix case too
 		if (ret_path[j] == '\\')
 			ret_path[j] = '#';
 	}
@@ -1250,7 +1250,7 @@ static int windows_set_configuration(struct libusb_device_handle *dev_handle, in
 
 	r = libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_OUT | 
 		LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_DEVICE,
-		LIBUSB_REQUEST_SET_CONFIGURATION, config,
+		LIBUSB_REQUEST_SET_CONFIGURATION, (uint16_t)config,
 		0, NULL, 0, 1000);
 
 	return r;
@@ -1798,7 +1798,7 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 			return LIBUSB_ERROR_ACCESS;
 		}
 
-		if (!WinUsb_GetAssociatedInterface(winusb_handle, iface-1, 
+		if (!WinUsb_GetAssociatedInterface(winusb_handle, (UCHAR)iface-1, 
 			&handle_priv->interface_handle[iface].winusb)) {
 			handle_priv->interface_handle[iface].winusb = INVALID_HANDLE_VALUE;
 			switch(GetLastError()) {
@@ -1998,13 +1998,17 @@ static int winusb_set_interface_altsetting(struct libusb_device_handle *dev_hand
 
 	CHECK_WINUSB_AVAILABLE;
 
+	if (altsetting > 255) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
 	winusb_handle = handle_priv->interface_handle[iface].winusb;
 	if ((winusb_handle == 0) || (winusb_handle == INVALID_HANDLE_VALUE)) {
 		usbi_err(ctx, "interface must be claimed first");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
-	if (!WinUsb_SetCurrentAlternateSetting(winusb_handle, altsetting)) {
+	if (!WinUsb_SetCurrentAlternateSetting(winusb_handle, (UCHAR)altsetting)) {
 		usbi_err(ctx, "WinUsb_SetCurrentAlternateSetting failed: %s", windows_error_str(0));
 		return LIBUSB_ERROR_IO;
 	}

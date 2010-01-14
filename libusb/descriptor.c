@@ -592,7 +592,7 @@ err:
 int usbi_get_config_index_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, int *idx)
 {
-	int i;
+	uint8_t i;
 
 	usbi_dbg("value %d", bConfigurationValue);
 	for (i = 0; i < dev->num_configurations; i++) {
@@ -639,7 +639,7 @@ API_EXPORTED int libusb_get_config_descriptor_by_value(libusb_device *dev,
 	else if (idx == -1)
 		return LIBUSB_ERROR_NOT_FOUND;
 	else
-		return libusb_get_config_descriptor(dev, idx, config);
+		return libusb_get_config_descriptor(dev, (uint8_t)idx, config);
 }
 
 /** \ingroup desc
@@ -676,7 +676,8 @@ API_EXPORTED int libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
 	uint8_t desc_index, unsigned char *data, int length)
 {
 	unsigned char tbuf[255]; /* Some devices choke on size > 255 */
-	int r, langid, si, di;
+	int r, si, di;
+	uint16_t langid;
 
 	/* Asking for the zero'th index is special - it returns a string
 	 * descriptor that contains all the language IDs supported by the device.

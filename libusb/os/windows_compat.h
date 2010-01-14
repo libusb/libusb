@@ -48,7 +48,7 @@
 #define POLLNVAL    0x0020    /* Invalid request: fd not open */
 
 struct pollfd {
-    unsigned int fd;  /* file descriptor */
+    int fd;           /* file descriptor */
     short events;     /* requested events */
     short revents;    /* returned events */
 };
