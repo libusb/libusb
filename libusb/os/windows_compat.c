@@ -238,12 +238,20 @@ int pipe_for_poll(int filedes[2])
 {
 	int i, j;
 	HANDLE handle[2];
-	OVERLAPPED *overlapped = calloc(2, sizeof(OVERLAPPED));
+	OVERLAPPED *overlapped0, *overlapped1;
+//	OVERLAPPED *overlapped2 = calloc(1, sizeof(OVERLAPPED));
 	char pipe_name[] = "\\\\.\\pipe\\libusb000000000000";
 
 	CHECK_INIT_POLLING;
 
-	if (overlapped == NULL) {
+	overlapped0 = calloc(1, sizeof(OVERLAPPED));
+	if (overlapped0 == NULL) {
+		return -1;
+	}
+
+	overlapped1 = calloc(1, sizeof(OVERLAPPED));
+	if (overlapped1 == NULL) {
+		free(overlapped0);
 		return -1;
 	}
 
@@ -270,12 +278,12 @@ int pipe_for_poll(int filedes[2])
 	printb("filedes[1] = %d\n", filedes[1]);
 
 	// Create an OVERLAPPED for each end
-	overlapped[0].hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!overlapped[0].hEvent) {
+	overlapped0->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!overlapped0->hEvent) {
 		goto out3;
 	}
-	overlapped[1].hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!overlapped[1].hEvent) {
+	overlapped1->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!overlapped1->hEvent) {
 		goto out4;
 	}
 
@@ -284,7 +292,7 @@ int pipe_for_poll(int filedes[2])
 			pthread_mutex_lock(&_poll_fd[i].mutex);
 			poll_fd[i].fd = filedes[j];
 			poll_fd[i].handle = handle[j];
-			poll_fd[i].overlapped = &overlapped[j];
+			poll_fd[i].overlapped = (j==0)?overlapped0:overlapped1;
 			poll_fd[i].rw = RW_READ+j;
 			j++;
 			if (j==1) {
@@ -299,15 +307,16 @@ int pipe_for_poll(int filedes[2])
 		}
 	}
 
-	CloseHandle(overlapped[1].hEvent);
+	CloseHandle(overlapped1->hEvent);
 out4:
-	CloseHandle(overlapped[0].hEvent);
+	CloseHandle(overlapped0->hEvent);
 out3:
 	CloseHandle(handle[1]);
 out2:
 	CloseHandle(handle[0]);
 out1:
-	free(overlapped);
+	free(overlapped1);
+	free(overlapped0);
 	return -1;
 }
 
