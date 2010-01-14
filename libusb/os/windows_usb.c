@@ -39,10 +39,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
-// TODO: fix this. prevents an annoying warning for now
-#ifdef PTW32_DLLPORT
-#undef PTW32_DLLPORT
-#endif
 #include <pthread.h>
 #include <stdio.h>
 #include <windows.h>
@@ -64,14 +60,12 @@
 
 // These GUIDs appear undefined on MinGW32
 #ifndef GUID_DEVINTERFACE_USB_HOST_CONTROLLER
-	// http://msdn.microsoft.com/en-us/library/bb663109.aspx: 
-	// {3ABF6F2D-71C4-462A-8A92-1E6861E6AF27}
+	// http://msdn.microsoft.com/en-us/library/bb663109.aspx
 	const GUID GUID_DEVINTERFACE_USB_HOST_CONTROLLER = {  0x3ABF6F2D, 0x71C4, 0x462A, {0x8A, 0x92, 0x1E, 0x68, 0x61, 0xE6, 0xAF, 0x27} };
 #endif
 
 #ifndef GUID_DEVINTERFACE_USB_DEVICE
-	// http://msdn.microsoft.com/en-us/library/bb663093.aspx: 
-	// {A5DCBF10-6530-11D2-901F-00C04FB951ED}
+	// http://msdn.microsoft.com/en-us/library/bb663093.aspx
 	const GUID GUID_DEVINTERFACE_USB_DEVICE = {  0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED} };
 #endif
 
@@ -80,35 +74,15 @@
 #define LOOP_CONTINUE(...) { usbi_warn(ctx, __VA_ARGS__); continue; }
 #define LOOP_BREAK(err) { r=err; continue; } 
 
-
-/*
- * prototypes
- */
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
 static int windows_get_active_config(struct libusb_device *dev);
 
-
-/*
- * globals
- */
-
-
-// async event thread
-// static pthread_t libusb_windows_at;
-
-// root and last HCD pointer
-struct windows_hcd_priv* _hcd_root = NULL;
-
+// HCD private chained list
+struct windows_hcd_priv* hcd_root = NULL;
 // timers
 uint64_t hires_frequency, hires_frequency_ns;
 // 1970.01.01 00:00:000 in MS Filetime, as computed and confirmed with google
 const uint64_t epoch_time = 116444736000000000;
-
-/*
- * Helper functions
- *
- */
-
 
 /*
  * Converts a WCHAR string to UTF8 (allocate returned string)
@@ -138,8 +112,6 @@ char* wchar_to_utf8(LPCWSTR wstr)
 /*
  * Converts a windows error to human readable string
  */
-// TODO: could we have reentrant issue if called by multiple threads?
-#define ERR_BUFFER_SIZE	256
 static char *windows_error_str(void)
 {
 static char err_string[ERR_BUFFER_SIZE];
@@ -215,7 +187,7 @@ static int windows_init(struct libusb_context *ctx)
 {
 	HDEVINFO dev_info;
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
-	SP_DEVICE_INTERFACE_DETAIL_DATA *_dev_interface_details = NULL;
+	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
 	GUID guid;
 	DWORD size;
 	libusb_bus_t bus;
@@ -223,7 +195,7 @@ static int windows_init(struct libusb_context *ctx)
 	LARGE_INTEGER li_frequency;
 
 	// If our HCD list is populated, we don't need to re-init
-	if (_hcd_root != NULL) {
+	if (hcd_root != NULL) {
 		usbi_dbg("init already occured.");
 		return LIBUSB_SUCCESS;
 	}
@@ -241,10 +213,7 @@ static int windows_init(struct libusb_context *ctx)
 	}
 
 	// We maintain a chained list of the Host Controllers found
-	struct windows_hcd_priv** __hcd_cur = &_hcd_root;
-
-	// Local define for readability 
-	#define _hcd_cur (*__hcd_cur)
+	struct windows_hcd_priv** _hcd_cur = &hcd_root;
 
 	guid = GUID_DEVINTERFACE_USB_HOST_CONTROLLER;
 	dev_info = SetupDiGetClassDevs(&guid, NULL, NULL, (DIGCF_PRESENT | DIGCF_DEVICEINTERFACE));
@@ -257,8 +226,8 @@ static int windows_init(struct libusb_context *ctx)
 		{
 			// safe loop: free up any (unprotected) dynamic resource
 			// NB: this is always executed before breaking the loop
-			safe_free(_dev_interface_details);
-			safe_free(_hcd_cur);
+			safe_free(dev_interface_details);
+			safe_free(*_hcd_cur);
 
 			// safe loop: end of loop condition
 			if ((SetupDiEnumDeviceInterfaces(dev_info, NULL, &guid, bus, &dev_interface_data) != TRUE) || (r != LIBUSB_SUCCESS))
@@ -281,46 +250,38 @@ static int windows_init(struct libusb_context *ctx)
 				LOOP_CONTINUE("program assertion failed - http://msdn.microsoft.com/en-us/library/ms792901.aspx is wrong.");
 			}
 
-			if ((_dev_interface_details = malloc(size)) == NULL) {
+			if ((dev_interface_details = malloc(size)) == NULL) {
 				usbi_err(ctx, "could not allocate interface data for bus %u. aborting.", bus);
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
 
-			_dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+			dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
 			// Actual call.
 			if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data,
-				_dev_interface_details, size, &size, NULL)) {
+				dev_interface_details, size, &size, NULL)) {
 				LOOP_CONTINUE("could not access interface data for bus %u, skipping: %s",
 					bus, windows_error_str());
 			}
 
 			// Allocate and init a new priv structure to hold our data
-			if ((_hcd_cur = malloc(sizeof(struct windows_hcd_priv))) == NULL) {
+			if ((*_hcd_cur = malloc(sizeof(struct windows_hcd_priv))) == NULL) {
 				usbi_err(ctx, "could not allocate private structure for bus %u. aborting.", bus);
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
-			windows_hcd_priv_init(_hcd_cur);
-			_hcd_cur->path = sanitize_path(_dev_interface_details->DevicePath);
+			windows_hcd_priv_init(*_hcd_cur);
+			(*_hcd_cur)->path = sanitize_path(dev_interface_details->DevicePath);
 
-			__hcd_cur = &(_hcd_cur->next);
+			_hcd_cur = &((*_hcd_cur)->next);
 		}
 		SetupDiDestroyDeviceInfoList(dev_info);
 	}
 
 	// TODO: pthread stuff
-/*
-	pthread_create(&libusb_windows_at, NULL, event_thread_main, (void *)ctx);
 
-	while (!libusb_windows_acfl)
-		usleep (10);
-*/
-	if (_hcd_root == NULL)
-		// TODO: Should we return success if no root hub is detected?
-		// are hotplug root hubs a possibility?
+	if (hcd_root == NULL)
 		return LIBUSB_ERROR_NO_DEVICE;
 	else 
 		return LIBUSB_SUCCESS;
-	#undef _hcd_cur
 }
 
 /*
@@ -616,7 +577,6 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			}
 
 			if (conn_info.ConnectionStatus == NoDeviceConnected) {
-//				usbi_dbg("No device is connected on port %d.", i);
 				continue;
 			}
 
@@ -761,7 +721,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	char *sanitized_path = NULL;
 	HDEVINFO dev_info;
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
-	SP_DEVICE_INTERFACE_DETAIL_DATA *_dev_interface_details = NULL;
+	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
 	SP_DEVINFO_DATA dev_info_data;
 	DEVINST parent_devinst;
 	GUID guid;
@@ -781,7 +741,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 		for (i = 0; ; i++)	
 		{
 			// safe loop: free up any (unprotected) dynamic resource
-			safe_free(_dev_interface_details);
+			safe_free(dev_interface_details);
 			safe_free(sanitized_path);
 
 			// safe loop: end of loop condition
@@ -802,14 +762,14 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				LOOP_CONTINUE("program assertion failed - http://msdn.microsoft.com/en-us/library/ms792901.aspx is wrong.");
 			}
 
-			if ((_dev_interface_details = malloc(size)) == NULL) {
+			if ((dev_interface_details = malloc(size)) == NULL) {
 				usbi_err(ctx, "could not allocate interface data for device #%u. aborting.", i);
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
 
-			_dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA); 
+			dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA); 
 			if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, 
-				_dev_interface_details, size, &size, NULL)) {
+				dev_interface_details, size, &size, NULL)) {
 				LOOP_CONTINUE("could not access interface data (actual) for device #%u, skipping: %s", 
 					i, windows_error_str());
 			}
@@ -861,7 +821,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				parent_priv = __device_priv(priv->parent_dev);
 				if ( (safe_strncmp(parent_priv->path, sanitized_path, strlen(sanitized_path)) == 0) &&
 					 (port_nr == priv->connection_index) ) {
-					priv->path = sanitize_path(_dev_interface_details->DevicePath);
+					priv->path = sanitize_path(dev_interface_details->DevicePath);
 					usbi_dbg("path (%d:%d): %s", discdevs->devices[j]->bus_number, 
 						discdevs->devices[j]->device_address, priv->path);
 					found = true;
@@ -869,7 +829,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				}
 			}
 			if (!found) {
-				LOOP_CONTINUE("could not match %s with a libusb device.", _dev_interface_details->DevicePath);
+				LOOP_CONTINUE("could not match %s with a libusb device.", dev_interface_details->DevicePath);
 			}
 		}
 		SetupDiDestroyDeviceInfoList(dev_info);
@@ -880,22 +840,20 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 
 /*
  * get_device_list: libusb backend device enumeration function
- *
- *
  */
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs)
 {
-	struct windows_hcd_priv* _hcd;	
+	struct windows_hcd_priv* hcd;	
 	HANDLE handle = INVALID_HANDLE_VALUE;
 	int r = LIBUSB_SUCCESS;
 	libusb_bus_t bus;
 
 	// We use the index of the HCD in the chained list as bus #
-	for (_hcd = _hcd_root, bus = 0; ; _hcd = _hcd->next, bus++)
+	for (hcd = hcd_root, bus = 0; ; hcd = hcd->next, bus++)
 	{
 		safe_closehandle(handle);
 
-		if ( (_hcd == NULL) || (r != LIBUSB_SUCCESS) )
+		if ( (hcd == NULL) || (r != LIBUSB_SUCCESS) )
 			break;
 
 		// Shouldn't be needed, but let's be safe
@@ -903,7 +861,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			LOOP_CONTINUE("program assertion failed - got more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
 		}
 
-		handle = CreateFileA(_hcd->path, GENERIC_WRITE, FILE_SHARE_WRITE,
+		handle = CreateFileA(hcd->path, GENERIC_WRITE, FILE_SHARE_WRITE,
 			NULL, OPEN_EXISTING, FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
 		if (handle == INVALID_HANDLE_VALUE) {
 			LOOP_CONTINUE("could not open bus %u, skipping: %s", bus, windows_error_str());
@@ -920,32 +878,20 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 
 /*
  * exit: libusb backend deinitialization function
- *
  */
 static void windows_exit(void)
 {
-	struct windows_hcd_priv* _hcd_tmp;	
+	struct windows_hcd_priv* hcd_tmp;	
 
-	while (_hcd_root != NULL)
+	while (hcd_root != NULL)
 	{
-//		usbi_dbg("freeing HCD %s", _hcd_root->path);
-		_hcd_tmp = _hcd_root;	// Keep a copy for free
-		_hcd_root = _hcd_root->next;
-		windows_hcd_priv_release(_hcd_tmp);
-		safe_free(_hcd_tmp);
+		hcd_tmp = hcd_root;	// Keep a copy for free
+		hcd_root = hcd_root->next;
+		windows_hcd_priv_release(hcd_tmp);
+		safe_free(hcd_tmp);
 	}
 
 	//TODO: Thread stuff
-/*
-	// stop the async runloop
-	CFRunLoopStop(libusb_windows_acfl);
-	pthread_join(libusb_windows_at, &ret);
-
-	if (libusb_windows_mp)
-		mach_port_deallocate(mach_task_self(), libusb_windows_mp);
-
-	libusb_windows_mp = 0;
-*/
 }
 
 static int windows_get_device_descriptor(struct libusb_device *dev, unsigned char *buffer, int *host_endian)
@@ -1081,7 +1027,6 @@ static int windows_detach_kernel_driver(struct libusb_device_handle *dev_handle,
 static void windows_destroy_device(struct libusb_device *dev)
 {
 	struct windows_device_priv *priv = __device_priv(dev);
-//	usbi_dbg("destroying dev %d", dev->session_data);
 	windows_device_priv_release(priv, dev->num_configurations);
 }
 

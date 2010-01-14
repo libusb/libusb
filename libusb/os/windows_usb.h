@@ -54,6 +54,7 @@
 #define ROOT_PREFIX "\\\\.\\"
 #define MAX_PATH_LENGTH 128
 #define MAX_KEY_LENGTH 64
+#define ERR_BUFFER_SIZE	256
 
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 #define ERRNO GetLastError()
@@ -225,4 +226,3 @@ typedef struct _USB_HUB_CAPABILITIES_EX {
 	CTL_CODE( FILE_DEVICE_USB, USB_GET_HUB_CAPABILITIES_EX, \
 	METHOD_BUFFERED, FILE_ANY_ACCESS )
 #endif
-
