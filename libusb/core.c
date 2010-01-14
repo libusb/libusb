@@ -21,21 +21,21 @@
 #include <config.h>
 
 #include <errno.h>
-#ifdef OS_WINDOWS
-#include "os/windows_compat.h"
-#else
-#include <poll.h>
-#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-/* Prevent compilation problems on Windows platforms */
-#ifdef interface
-#undef interface
+#ifdef OS_WINDOWS
+#include <windows.h>
+#include "os/windows_compat.h"
+#else
+#include <poll.h>
+#define write_for_poll write
+#define read_for_poll read
+#define close_for_poll close
+#define pipe_for_poll pipe
 #endif
 
 #include "libusb.h"
@@ -912,7 +912,7 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
 
 	/* write some data on control pipe to interrupt event handlers */
-	r = write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
+	r = write_for_poll(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
 	if (r <= 0) {
 		usbi_warn(ctx, "internal signalling write failed");
 		pthread_mutex_lock(&ctx->pollfd_modify_lock);
@@ -925,7 +925,7 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	libusb_lock_events(ctx);
 
 	/* read the dummy data */
-	r = read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+	r = read_for_poll(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
 	if (r <= 0)
 		usbi_warn(ctx, "internal signalling read failed");
 
@@ -1038,7 +1038,7 @@ API_EXPORTED void libusb_close(libusb_device_handle *dev_handle)
 	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
 
 	/* write some data on control pipe to interrupt event handlers */
-	r = write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
+	r = write_for_poll(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
 	if (r <= 0) {
 		usbi_warn(ctx, "internal signalling write failed, closing anyway");
 		do_close(ctx, dev_handle);
@@ -1052,7 +1052,7 @@ API_EXPORTED void libusb_close(libusb_device_handle *dev_handle)
 	libusb_lock_events(ctx);
 
 	/* read the dummy data */
-	r = read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+	r = read_for_poll(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
 	if (r <= 0)
 		usbi_warn(ctx, "internal signalling read failed, closing anyway");
 

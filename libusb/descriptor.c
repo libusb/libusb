@@ -22,11 +22,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Prevent compilation problems on Windows platforms */
-#ifdef interface
-#undef interface
-#endif
-
 #include "libusbi.h"
 
 #define DESC_HEADER_LENGTH		2

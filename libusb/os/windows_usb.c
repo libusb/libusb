@@ -1001,7 +1001,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	 * Note that the BIG problem with Microsoft's SetupDi functions is they DO NOT list WinUSB
 	 * MI_## devices, i.e. devices associated to a specific interface of a composite USB device.
 	 * Moreover, until someone proves otherwise (especially on Windows 7 x64 - good luck with that!),
-	 * the only way to retrieve a interface device path that can actually be used with CreateFile 
+	 * the only way to retrieve an interface device path that can actually be used with CreateFile 
 	 * is to lookup all the GUIDs in HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\DeviceClasses\
 	 *
 	 * TODO: MI_## automated driver installation:
@@ -1377,28 +1377,19 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
+	struct windows_device_handle_priv *handle_priv = __device_handle_priv(transfer->dev_handle);
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
-	int overlapped_fd;
 	int r;
 
-	// Our custom poll doesn't provide as fine grained control over an OVERLAPPED
-	// (which we use as fd) as POSIX's poll provides over an fd
-	// => deal with OVERLAPPED in transfer related functions
-	if ((overlapped_fd = create_overlapped(&ctx->pollfds_lock)) < 0)
-		return LIBUSB_ERROR_NO_MEM;
-
-	transfer_priv->overlapped_fd = overlapped_fd;
-
 	API_CALL(priv->api, submit_control_transfer, itransfer);
-
 	if (r != LIBUSB_SUCCESS) {
-		free_overlapped(overlapped_fd);
 		return r;
 	}
 
-	usbi_add_pollfd(ctx, overlapped_fd, POLLIN);
+	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, POLLIN);
 
 	return LIBUSB_SUCCESS;
+
 }
 
 static int windows_submit_transfer(struct usbi_transfer *itransfer)
@@ -1520,20 +1511,21 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 		// is the most logical choice for now
 		list_for_each_entry(transfer, &ctx->flying_transfers, list) {
 			transfer_priv = usbi_transfer_get_os_priv(transfer);
-			if (transfer_priv->overlapped_fd == pollfd->fd) {
+			if (transfer_priv->pollable_fd.fd == pollfd->fd) {
 				found = true;
 				break;
 			}
 		}
 
 		if (found) {
-			if (GetOverlappedResult(transfer_priv->handle, 
-				fd_to_overlapped(transfer_priv->overlapped_fd), &io_size, false)) {
+			if (GetOverlappedResult(transfer_priv->pollable_fd.handle, 
+				transfer_priv->pollable_fd.overlapped, &io_size, false)) {
 				io_result = NO_ERROR;
 			} else {
 				io_result = GetLastError();
 			}
-			usbi_remove_pollfd(ctx, transfer_priv->overlapped_fd);
+			usbi_remove_pollfd(ctx, transfer_priv->pollable_fd.fd);
+			free_fd_for_poll(transfer_priv->pollable_fd.fd);
 			windows_handle_callback(transfer, io_result, io_size);
 		} else {
 			usbi_err(ctx, "could not find a matching transfer for fd %x", fds[i]);
@@ -1660,6 +1652,10 @@ static int winusb_api_exit(void)
 /*
  * TODO: check if device has been diconnected
  */
+extern int __cdecl _alloc_osfhnd(
+        void
+        );
+
 static int winusb_open(struct libusb_device_handle *dev_handle) 
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
@@ -1765,6 +1761,7 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 			}
 		}
 		usbi_dbg("claimed interface %d", iface);
+		handle_priv->active_interface = iface;
 		return LIBUSB_SUCCESS;
 	}
 
@@ -1788,6 +1785,7 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	}
 	handle_priv->interface_handle[iface].winusb = winusb_handle;
 	usbi_dbg("claimed interface %d", iface);
+	handle_priv->active_interface = iface;
 	return LIBUSB_SUCCESS;
 }
 
@@ -1825,10 +1823,11 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	HANDLE winusb_handle;
 	bool found;
 	int i;
-	OVERLAPPED* overlapped = fd_to_overlapped(transfer_priv->overlapped_fd);
+	struct winfd wfd;
 
 	CHECK_WINUSB_AVAILABLE;
 
+	transfer_priv->pollable_fd = INVALID_WINFD;
 	size = transfer->length - LIBUSB_CONTROL_SETUP_SIZE;
 
 	if (size > MAX_CTRL_BUFFER_LENGTH)
@@ -1847,18 +1846,26 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	}
 	usbi_dbg("will use interface %d", i-1);
 
-	if (!WinUsb_ControlTransfer(winusb_handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, overlapped)) {
+//	usbi_dbg("active interface = %d (handle = %p)", handle_priv->active_interface, handle_priv->interface_handle[handle_priv->active_interface].winusb);
+	wfd = create_fd_for_poll(winusb_handle, _O_RDONLY);	
+	if (wfd.fd < 0) {
+		return LIBUSB_ERROR_NO_MEM;	// somtehing else
+	}
+
+	if (!WinUsb_ControlTransfer(wfd.handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, wfd.overlapped)) {
 		if(GetLastError() != ERROR_IO_PENDING) {
 			usbi_err(ctx, "WinUsb_ControlTransfer failed: %s", windows_error_str(0));
+			free_fd_for_poll(wfd.fd);
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
 		usbi_err(ctx, "chill out man; this is like way too fast for async I/O...");
+		free_fd_for_poll(wfd.fd);
 		return LIBUSB_ERROR_IO;
 	}
 
 	// Again, use priv_transfer to store data needed for async polling
-	transfer_priv->handle = winusb_handle;
+	transfer_priv->pollable_fd = wfd;
 
 	usbi_dbg("overlapped WinUsb_ControlTransfer initiated");
 

@@ -20,11 +20,6 @@
 
 #include <config.h>
 #include <errno.h>
-#ifdef OS_WINDOWS
-#include "os/windows_compat.h"
-#else
-#include <poll.h>
-#endif
 #include <pthread.h>
 #include <signal.h>
 #include <stdint.h>
@@ -33,6 +28,16 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef OS_WINDOWS
+#include <windows.h>
+#include "os/windows_compat.h"
+#else
+#include <poll.h>
+#define write_for_poll write
+#define read_for_poll read
+#define close_for_poll close
+#define pipe_for_poll pipe
+#endif
 
 #ifdef USBI_TIMERFD_AVAILABLE
 #include <sys/timerfd.h>
@@ -1012,7 +1017,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	list_init(&ctx->pollfds);
 
 	/* FIXME should use an eventfd on kernels that support it */
-	r = pipe(ctx->ctrl_pipe);
+	r = pipe_for_poll(ctx->ctrl_pipe);
 	if (r < 0)
 		return LIBUSB_ERROR_OTHER;
 
@@ -1042,8 +1047,8 @@ int usbi_io_init(struct libusb_context *ctx)
 void usbi_io_exit(struct libusb_context *ctx)
 {
 	usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
-	close(ctx->ctrl_pipe[0]);
-	close(ctx->ctrl_pipe[1]);
+	close_for_poll(ctx->ctrl_pipe[0]);
+	close_for_poll(ctx->ctrl_pipe[1]);
 #ifdef USBI_TIMERFD_AVAILABLE
 	if (usbi_using_timerfd(ctx)) {
 		usbi_remove_pollfd(ctx, ctx->timerfd);

@@ -157,13 +157,19 @@ struct winusb_handles {
 };
 
 struct windows_device_handle_priv {
+	int active_interface;
 	struct winusb_handles interface_handle[USB_MAXINTERFACES];
 };
 
+static inline struct windows_device_handle_priv *__device_handle_priv(
+	struct libusb_device_handle *handle)
+{
+	return (struct windows_device_handle_priv *) handle->os_priv;
+}
+
 // used for async polling functions
 struct windows_transfer_priv {
-	int overlapped_fd;
-	HANDLE handle;
+	struct winfd pollable_fd;
 };
 
 

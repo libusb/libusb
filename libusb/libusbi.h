@@ -23,14 +23,15 @@
 
 #include <config.h>
 
+#include <pthread.h>
+#include <stddef.h>
+#include <time.h>
 #ifdef OS_WINDOWS
+#include <windows.h>
 #include "os/windows_compat.h"
 #else
 #include <poll.h>
 #endif
-#include <pthread.h>
-#include <stddef.h>
-#include <time.h>
 
 #include <libusb.h>
 

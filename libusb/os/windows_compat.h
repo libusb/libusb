@@ -21,7 +21,16 @@
  */
 #pragma once
 
-#define MAX_FDS 256
+/* 
+ * Prevent compilation problems on Windows platforms
+ *
+ * This is placed in the .h to limit changes required to the core files
+ */
+#ifdef interface
+#undef interface
+#endif
+
+#define MAX_FDS     256
 
 #define POLLIN      0x0001    /* There is data to read */
 #define POLLPRI     0x0002    /* There is urgent data to read */
@@ -37,16 +46,36 @@ struct pollfd {
 };
 typedef unsigned int nfds_t;
 
-#define poll(x, y, z) libusb_poll(x, y, z)
-#define pipe(x) libusb_pipe(x)
+// access modes
+enum rw_type {
+	RW_NONE,
+	RW_READ,
+	RW_WRITE,
+};
 
-int libusb_pipe(int pipefd[2]);
-int libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout);
-int create_overlapped(void* pollfds_lock);
-void free_overlapped(int fd);
-void *fd_to_overlapped(int fd);
-int overlapped_to_fd(void* overlapped);
-void init_overlapped(void);
+// fd struct that can be used for polling on Windows
+struct winfd {
+	int fd;                  // what's exposed to libusb core
+	HANDLE handle;           // what we need to attach overlapped to the I/O op, so we can poll it
+	OVERLAPPED* overlapped;  // what will report our I/O status
+	enum rw_type rw;         // I/O transfer direction: read *XOR* write (NOT BOTH)
+	BYTE marker;             // 1st byte of a read_for_poll operation gets stored here
+};
+extern const struct winfd INVALID_WINFD;
+
+#define pipe(x) pipe_for_poll(x)
+int pipe_for_poll(int pipefd[2]);
+int poll(struct pollfd *fds, unsigned int nfds, int timeout);
+ssize_t write_for_poll(int fd, const void *buf, size_t count);
+ssize_t read_for_poll(int fd, void *buf, size_t count);
+int close_for_poll(int fd);
+
+struct winfd create_fd_for_poll(HANDLE handle, int access_mode);
+void free_fd_for_poll(int fd);
+void free_overlapped_for_poll(int fd);
+struct winfd fd_to_winfd(int fd);
+struct winfd handle_to_winfd(HANDLE handle);
+struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);
 
 #ifndef TIMESPEC_TO_TIMEVAL
 #define TIMESPEC_TO_TIMEVAL(tv, ts) { \
