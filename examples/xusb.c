@@ -25,6 +25,29 @@
 
 #include <libusb/libusb.h>
 
+//#define USE_MOUSE
+#define USE_XBOX
+
+#ifdef USE_MOUSE
+// Logitech optical mouse
+#define VID 0x046D
+#define PID 0xC03E
+#endif
+
+#ifdef USE_XBOX
+// Microsoft XBox Controller
+#define VID 0x045E
+#define PID 0x0289
+#endif
+
+#ifdef USE_KEY
+// 2 GB Usb key
+#define VID 0x0204
+#define PID 0x6025
+#endif
+
+
+
 static void print_devs(libusb_device **devs)
 {
 	libusb_device *dev;
@@ -44,11 +67,31 @@ static void print_devs(libusb_device **devs)
 			libusb_get_bus_number(dev), libusb_get_device_address(dev));
 
 		// DEBUG: Access an XBox gamepad through WinUSB
-		if ((desc.idVendor == 0x045e) && (desc.idProduct == 0x0289)) {
-			printf("Opening Xbox gamepad:\n");
+//		if ((desc.idVendor == 0x045e) && (desc.idProduct == 0x0289)) {
+		if ((desc.idVendor == VID) && (desc.idProduct == PID)) {
+			printf("Opening device:\n");
 			r = libusb_open(dev, &handle);
-			if (r != LIBUSB_SUCCESS)
+			if (r != LIBUSB_SUCCESS) {
 				printf("libusb error: %d\n", r);
+				continue;
+			}
+			
+			printf("Claiming interface:\n");
+			r = libusb_claim_interface(handle, 0);
+			if (r != LIBUSB_SUCCESS) {
+				printf("libusb error: %d\n", r);
+				continue;
+			}
+
+			printf("Releasing interface:\n");
+			r = libusb_release_interface(handle, 0);
+			if (r != LIBUSB_SUCCESS) {
+				printf("libusb error: %d\n", r);
+				continue;
+			}
+
+			printf("Closing device:\n");
+			libusb_close(handle);
 		}
 	}
 }

@@ -83,6 +83,8 @@ static int winusb_api_init(struct libusb_context *ctx);
 static int winusb_api_exit(void);
 static int winusb_open(struct libusb_device_handle *dev_handle);
 static void winusb_close(struct libusb_device_handle *dev_handle);
+static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int iface);
+static int winusb_release_interface(struct libusb_device_handle *dev_handle, int iface);
 
 // HCD private chained list
 struct windows_hcd_priv* hcd_root = NULL;
@@ -92,7 +94,7 @@ uint64_t hires_frequency, hires_ticks_to_ps;
 const uint64_t epoch_time = 116444736000000000;
 DWORD_PTR old_affinity_mask;
 bool api_winusb_available = false;
-#define CHECK_WINUSB_AVAILABLE do { if (!api_winusb_available) return LIBUSB_ERROR_NOT_SUPPORTED; } while (0)
+#define CHECK_WINUSB_AVAILABLE do { if (!api_winusb_available) return LIBUSB_ERROR_ACCESS; } while (0)
 
 /*
  * Converts a WCHAR string to UTF8 (allocate returned string)
@@ -577,7 +579,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 
 			if (conn_info.ConnectionStatus == NoDeviceConnected) {
 				continue;
-			}
+			} 
 
 			if (conn_info.DeviceAddress == 0) {
 				LOOP_CONTINUE("program assertion failed - device address is zero " 
@@ -661,6 +663,13 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 
 			LOOP_CHECK(initialize_device(dev, busnum, devaddr, path_str, i, parent_dev));
 			priv = __device_priv(dev);
+			// Detect devices that don't have a driver
+			// TODO: use this for automated driver installation
+			if (!conn_info.CurrentConfigurationValue) {
+				priv->driver = safe_strdup("no_driver");
+				usbi_dbg("* THIS DEVICE HAS NO DRIVER *");
+			}
+
 			path_str = NULL;	// protect our path from being freed
 
 			// Setup the cached descriptors. Note that only non HCDs can fetch descriptors
@@ -690,6 +699,8 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 
 		// Finally, if device is a hub, recurse
 		if (conn_info.DeviceIsHub) {
+			// Force the driver name
+			priv->driver = safe_strdup("usbhub");
 			// Find number of ports for this hub
 			size =  sizeof(USB_NODE_INFORMATION);
 			if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_INFORMATION, &hub_node, size,
@@ -739,12 +750,14 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	guid = GUID_DEVINTERFACE_USB_DEVICE; 
 	dev_info = SetupDiGetClassDevs(&guid, NULL, NULL, (DIGCF_PRESENT | DIGCF_DEVICEINTERFACE));
 
+
 	if (dev_info != INVALID_HANDLE_VALUE)
 	{
 		dev_interface_data.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
 
 		for (i = 0; ; i++)	
 		{
+			
 			// safe loop: free up any (unprotected) dynamic resource
 			safe_free(dev_interface_details);
 			safe_free(sanitized_path);
@@ -832,6 +845,17 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 					usbi_dbg("path (%d:%d): %s", discdevs->devices[j]->bus_number, 
 						discdevs->devices[j]->device_address, priv->path);
 					found = true;
+
+					// The service name is really the driver name without ".sys" ("WinUSB", "HidUsb", ...)
+					// We store it as it tells which API we should use to access our device
+					if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_SERVICE, 
+						&reg_type, (BYTE*)reg_key, MAX_KEY_LENGTH, &size)) {
+						LOOP_CONTINUE("could not retrieve driver information for device #%u, skipping: %s", 
+							i, windows_error_str());
+					}
+					usbi_dbg("driver: %s\n", reg_key);
+					priv->driver = safe_strdup(reg_key);
+
 					break;
 				}
 			}
@@ -968,10 +992,14 @@ static int windows_get_active_config_descriptor(struct libusb_device *dev, unsig
 static int windows_open(struct libusb_device_handle *dev_handle)
 {
 	int r = LIBUSB_SUCCESS;
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 
-	r = winusb_open(dev_handle);
-	if (r != LIBUSB_SUCCESS)
-		return r;
+	// Select the API to use
+	if (safe_strcmp(priv->driver, "WinUSB") == 0) {
+		r = winusb_open(dev_handle);
+	} else {
+		r = LIBUSB_ERROR_NOT_SUPPORTED;
+	}
 
 	// TODO: setup polling
 	return r;
@@ -979,7 +1007,12 @@ static int windows_open(struct libusb_device_handle *dev_handle)
 
 static void windows_close(struct libusb_device_handle *dev_handle)
 {
-	winusb_close(dev_handle);
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+
+	if (safe_strcmp(priv->driver, "WinUSB") == 0) {
+		winusb_close(dev_handle);
+	}
+
 	// TODO: cancel polling
 }
 
@@ -1007,12 +1040,33 @@ static int windows_set_configuration(struct libusb_device_handle *dev_handle, in
 
 static int windows_claim_interface(struct libusb_device_handle *dev_handle, int iface)
 {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	int r = LIBUSB_SUCCESS;
+	
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+
+	// Select the API to use
+	if (safe_strcmp(priv->driver, "WinUSB") == 0) {
+		r = winusb_claim_interface(dev_handle, iface);
+	} else {
+		r = LIBUSB_ERROR_NOT_SUPPORTED;
+	}
+
+	return r;
 }
 
 static int windows_release_interface(struct libusb_device_handle *dev_handle, int iface)
 {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	int r = LIBUSB_SUCCESS;
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+
+	// Select the API to use
+	if (safe_strcmp(priv->driver, "WinUSB") == 0) {
+		r = winusb_release_interface(dev_handle, iface);
+	} else {
+		r = LIBUSB_ERROR_NOT_SUPPORTED;
+	}
+
+	return r;
 }
 
 static int windows_set_interface_altsetting(struct libusb_device_handle *dev_handle, int iface, int altsetting)
@@ -1062,6 +1116,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 static int submit_control_transfer(struct usbi_transfer *itransfer)
 {
+	// TODO: call WinUsb_ControlTransfer
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
@@ -1227,7 +1282,6 @@ static int winusb_api_init(struct libusb_context *ctx)
 
 static int winusb_api_exit(void) 
 {
-	CHECK_WINUSB_AVAILABLE;
 	api_winusb_available = false;
 	return LIBUSB_SUCCESS;
 }
@@ -1242,11 +1296,6 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
 
 	HANDLE handle;
-	WINUSB_INTERFACE_HANDLE winusb_handle;
-	USB_INTERFACE_DESCRIPTOR interface_desc;
-	WINUSB_PIPE_INFORMATION pipe_info;
-	uint8_t speed, i;
-	ULONG length;
 
 	CHECK_WINUSB_AVAILABLE;
 /*
@@ -1270,13 +1319,17 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 	}
 
 	handle_priv->file_handle = handle;
+}
 
-	if (!WinUsb_Initialize(handle, &winusb_handle)) {
-		usbi_err(ctx, "could not initialize WinUSB: %s", windows_error_str());
-		return LIBUSB_ERROR_IO;
-	}
+/*
 
-	handle_priv->winusb_handle = winusb_handle;
+
+	WINUSB_INTERFACE_HANDLE interface_handle;
+	USB_INTERFACE_DESCRIPTOR interface_desc;
+	WINUSB_PIPE_INFORMATION pipe_info;
+	uint8_t speed, i;
+	ULONG length;
+
 
 	length = sizeof(speed);
 	if (!WinUsb_QueryDeviceInformation(winusb_handle, DEVICE_SPEED, &length, &speed)) {
@@ -1290,7 +1343,7 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 	 * once. If the device supports multiple interfaces, call WinUsb_GetAssociatedInterface
 	 * to obtain interface handles for associated interfaces.
 	 */
-
+/*
 	if (!WinUsb_QueryInterfaceSettings(winusb_handle, 0, &interface_desc)) {
 		usbi_err(ctx, "could not get interface settings: %s", windows_error_str());
 		return LIBUSB_ERROR_IO;
@@ -1323,22 +1376,102 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 
 	return LIBUSB_SUCCESS;
 }
-
+*/
 static void winusb_close(struct libusb_device_handle *dev_handle)
 {
+	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
-
-	if (api_winusb_available)
-	{
-		// libusb_open zeroes the priv struct, which is different from INVALID_HANDLE_VALUE (-1)
-		// However: http://www.tech-archive.net/Archive/Development/microsoft.public.win32.programmer.kernel/2005-05/msg00448.html
-		// "On any NT-derived platform 0 (zero) can never be a valid handle value" so we should be OK
-		if ((handle_priv->winusb_handle != 0) && (handle_priv->winusb_handle != INVALID_HANDLE_VALUE)) {
-			WinUsb_Free(handle_priv->winusb_handle);
-		}
-	}
+	
+	if (!api_winusb_available)
+		return;
 
 	if ((handle_priv->file_handle != 0) && (handle_priv->file_handle != INVALID_HANDLE_VALUE)) {
 		CloseHandle(handle_priv->file_handle);
 	}
+}
+
+/* Claim an interface. When claimed, the application can then perform
+ * I/O to an interface's endpoints.
+ *
+ * Return:
+ * - LIBUSB_ERROR_NOT_FOUND if the interface does not exist
+ * - LIBUSB_ERROR_BUSY if the interface is in use by another driver/app
+ * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected since it
+ *   was opened
+ * - another LIBUSB_ERROR code on other failure
+ */
+static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int iface)
+{
+	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
+
+	CHECK_WINUSB_AVAILABLE;
+
+/*
+	usbi_dbg("testing detached device: disconnect NOW!");
+	Sleep(2000);
+*/
+
+	// TODO
+	if (iface != 0) {
+		usbi_dbg("mutliple interfaces not supported yet");
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	}
+
+	if ((handle_priv->interface_handle[iface] != 0) && (handle_priv->interface_handle[iface] != INVALID_HANDLE_VALUE)) {
+		return LIBUSB_ERROR_BUSY;
+	}
+
+	if ((handle_priv->file_handle == 0) || (handle_priv->file_handle == INVALID_HANDLE_VALUE)) {
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	// The handle returned by WinUsb_Initialize is the first interface handle
+	if (!WinUsb_Initialize(handle_priv->file_handle, &handle_priv->interface_handle[0])) {
+		usbi_err(ctx, "could not claim interface 0: %s", windows_error_str());
+
+		switch(GetLastError()) {
+		case ERROR_BAD_COMMAND:	// The device was disconnected
+			return LIBUSB_ERROR_NO_DEVICE;
+		default:
+			return LIBUSB_ERROR_ACCESS;
+		}
+
+		// TODO: check error for LIBUSB_ERROR_BUSY
+		handle_priv->interface_handle[0] = INVALID_HANDLE_VALUE;
+		return LIBUSB_ERROR_IO;
+	}
+
+	// TODO: for other interface handles, use WinUsb_GetAssociatedInterface
+
+	return LIBUSB_SUCCESS;
+}
+
+static int winusb_release_interface(struct libusb_device_handle *dev_handle, int iface)
+{
+	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
+
+	CHECK_WINUSB_AVAILABLE;
+
+	// TODO
+	if (iface != 0) {
+		usbi_dbg("mutliple interfaces not supported yet");
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	}
+
+	if ((handle_priv->file_handle == 0) || (handle_priv->file_handle == INVALID_HANDLE_VALUE)) {
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	// libusb_open zeroes the priv struct, which is different from INVALID_HANDLE_VALUE (-1)
+	// However: http://www.tech-archive.net/Archive/Development/microsoft.public.win32.programmer.kernel/2005-05/msg00448.html
+	// "On any NT-derived platform 0 (zero) can never be a valid handle value", therefore we should be OK
+	if ((handle_priv->interface_handle[iface] != 0) && (handle_priv->interface_handle[iface] != INVALID_HANDLE_VALUE)) {
+		WinUsb_Free(handle_priv->interface_handle[iface]);
+	} else {
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	return LIBUSB_SUCCESS;
 }
