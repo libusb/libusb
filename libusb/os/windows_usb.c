@@ -66,9 +66,8 @@
 	const GUID GUID_DEVINTERFACE_USB_DEVICE = {  0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED} };
 #endif
 
-// The 3 macros below are used in conjunction with safe loops.
+// The 2 macros below are used in conjunction with safe loops.
 #define LOOP_CHECK(fcall) { r=fcall; if (r != LIBUSB_SUCCESS) continue; }
-#define LOOP_CONTINUE(...) { usbi_warn(ctx, __VA_ARGS__); continue; }
 #define LOOP_BREAK(err) { r=err; continue; } 
 
 // Helper prototypes
@@ -377,7 +376,8 @@ static int windows_init(struct libusb_context *ctx)
 
 		// Will need to change storage and size of libusb_bus_t if this ever occurs
 		if (bus == LIBUSB_BUS_MAX) {
-			LOOP_CONTINUE("program assertion failed - found more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
+			usbi_warn(ctx, "program assertion failed - found more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
+			continue;
 		}
 
 		// Allocate and init a new priv structure to hold our data
@@ -567,7 +567,8 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 	
 		// Sanity check. Ensures that indexes for our list of config desc is in the right order
 		if (i != (cd_data->bConfigurationValue-1)) {
-			LOOP_CONTINUE("program assertion failed - config descriptors are being read out of order");
+			usbi_warn(ctx, "program assertion failed - config descriptors are being read out of order");
+			continue;
 		}
 
 		// Cache the descriptor
@@ -641,7 +642,8 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			conn_info.ConnectionIndex = i;
 			if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION, &conn_info, size,
 				&conn_info, size, &size, NULL)) {
-				LOOP_CONTINUE("could not get node connection information: %s", windows_error_str(0));
+				usbi_warn(ctx, "could not get node connection information: %s", windows_error_str(0));
+				continue;
 			}
 
 			if (conn_info.ConnectionStatus == NoDeviceConnected) {
@@ -649,8 +651,9 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			} 
 
 			if (conn_info.DeviceAddress == 0) {
-				LOOP_CONTINUE("program assertion failed - device address is zero " 
+				usbi_warn(ctx, "program assertion failed - device address is zero " 
 					"(conflicts with root hub), ignoring device");
+				continue;
 			}
 
 			s_hubname.u.node.ConnectionIndex = i;	// Only used for non HCDs (s_hubname is an union)
@@ -668,12 +671,14 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			size = size_initial;
 			if (!DeviceIoControl(hub_handle, getname_ioctl, &s_hubname, size, 
 				&s_hubname, size, &size, NULL)) {
-				LOOP_CONTINUE("could not get hub path (dummy): %s", windows_error_str(0));
+				usbi_warn(ctx, "could not get hub path (dummy): %s", windows_error_str(0));
+				continue;
 			}
 
 			size = is_hcd?s_hubname.u.root.ActualLength:s_hubname.u.node.ActualLength;
 			if (size > size_fixed) {
-				LOOP_CONTINUE("program assertion failed - hub path is too long");
+				usbi_warn(ctx, "program assertion failed - hub path is too long");
+				continue;
 			}
 
 			if (!is_hcd) {
@@ -682,7 +687,8 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			}
 			if (!DeviceIoControl(hub_handle, getname_ioctl, &s_hubname, size,
 				&s_hubname, size, &size, NULL)) {
-				LOOP_CONTINUE("could not get hub path (actual): %s", windows_error_str(0));
+				usbi_warn(ctx, "could not get hub path (actual): %s", windows_error_str(0));
+				continue;
 			}
 
 			// Add prefix
@@ -703,14 +709,16 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			handle = CreateFileA(path_str, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 
 				FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
 			if(handle == INVALID_HANDLE_VALUE) {
-				LOOP_CONTINUE("could not open hub %s: %s", path_str, windows_error_str(0));
+				usbi_warn(ctx, "could not open hub %s: %s", path_str, windows_error_str(0));
+				continue;
 			}
 		}
 
 		// Generate a session ID
 		// Will need to change the session_id computation if this assertion fails
 		if (conn_info.DeviceAddress > LIBUSB_DEVADDR_MAX) {
-			LOOP_CONTINUE("program assertion failed - device address is greater than 255, ignoring device");
+			usbi_warn(ctx, "program assertion failed - device address is greater than 255, ignoring device");
+			continue;
 		} else {
 			devaddr = (uint8_t)conn_info.DeviceAddress;
 		}
@@ -766,12 +774,14 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			size =  sizeof(USB_NODE_INFORMATION);
 			if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_INFORMATION, &hub_node, size,
 				&hub_node, size, &size, NULL)) {
-				LOOP_CONTINUE("could not retreive information for hub %s: %s", 
+				usbi_warn(ctx, "could not retreive information for hub %s: %s", 
 					priv->path, windows_error_str(0));
+				continue;
 			}
 
 			if (hub_node.NodeType != UsbHub) {
-				LOOP_CONTINUE("unexpected hub type (%d) for hub %s", hub_node.NodeType, priv->path);
+				usbi_warn(ctx, "unexpected hub type (%d) for hub %s", hub_node.NodeType, priv->path);
+				continue;
 			}
 
 			usbi_dbg("%d ports Hub: %s", hub_node.u.HubInformation.HubDescriptor.bNumberOfPorts, priv->path);
@@ -870,12 +880,14 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 			// If other APIs are supported, other drivers need to be added
 			dev_info_data.cbSize = sizeof(dev_info_data);
 			if (!SetupDiEnumDeviceInfo(dev_info, i, &dev_info_data)) {
-				LOOP_CONTINUE("could not retrieve info data: %s", windows_error_str(0));
+				usbi_warn(ctx, "could not retrieve info data: %s", windows_error_str(0));
+				continue;
 			}
 
 			if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_SERVICE, 
 				NULL, (BYTE*)driver, MAX_KEY_LENGTH, &size)) {
-				LOOP_CONTINUE("could not read driver: %s", windows_error_str(0));
+				usbi_warn(ctx, "could not read driver: %s", windows_error_str(0));
+				continue;
 			}
 
 			if (safe_strcmp(driver, "WinUSB") == 0) {
@@ -980,23 +992,27 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 
 		dev_info_data.cbSize = sizeof(dev_info_data);
 		if (!SetupDiEnumDeviceInfo(dev_info, i, &dev_info_data)) {
-			LOOP_CONTINUE("could not retrieve info data for device #%u, skipping: %s", 
+			usbi_warn(ctx, "could not retrieve info data for device #%u, skipping: %s", 
 				i, windows_error_str(0));
+			continue;
 		}
 
 		if (windows_version >= WINDOWS_VISTA_AND_LATER) {
 			// Retrieve location information (port#) through the Location Information registry data
 			if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_LOCATION_INFORMATION, 
 				&reg_type, (BYTE*)reg_key, MAX_KEY_LENGTH, &size)) {
-				LOOP_CONTINUE("could not retrieve location information for device #%u, skipping: %s", 
+				usbi_warn(ctx, "could not retrieve location information for device #%u, skipping: %s", 
 					i, windows_error_str(0));
+				continue;
 			}
 
 			if (size != sizeof("Port_#1234.Hub_#1234")) {
-				LOOP_CONTINUE("unexpected registry key size for device #%u, skipping", i);
+				usbi_warn(ctx, "unexpected registry key size for device #%u, skipping", i);
+				continue;
 			}
 			if (sscanf(reg_key, "Port_#%04d.Hub_#%04d", &port_nr, &hub_nr) != 2) {
-				LOOP_CONTINUE("failure to read port and hub number for device #%u, skipping", i);
+				usbi_warn(ctx, "failure to read port and hub number for device #%u, skipping", i);
+				continue;
 			}
 		} else {
 			// We're out of luck for Location Information on XP, since SPDRP_LOCATION_INFORMATION
@@ -1029,26 +1045,30 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				}
 			}
 			if (!found) {
-				LOOP_CONTINUE("program assertion failed - unable to \"guess\" port number for %s", 
+				usbi_warn(ctx, "program assertion failed - unable to \"guess\" port number for %s", 
 					dev_interface_details->DevicePath);
+				continue;
 			}
 		}
 
 		// Retrieve parent's path using PnP Configuration Manager (CM)
 		if (CM_Get_Parent(&parent_devinst, dev_info_data.DevInst, 0) != CR_SUCCESS) {
-			LOOP_CONTINUE("could not retrieve parent info data for device #%u, skipping: %s", 
+			usbi_warn(ctx, "could not retrieve parent info data for device #%u, skipping: %s", 
 				i, windows_error_str(0));
+			continue;
 		}
 		
 		if (CM_Get_Device_ID(parent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
-			LOOP_CONTINUE("could not retrieve parent's path for device #%u, skipping: %s", 
+			usbi_warn(ctx, "could not retrieve parent's path for device #%u, skipping: %s", 
 				i, windows_error_str(0));
+			continue;
 		}
 
 		// Fix parent's path inconsistancies before attempting to compare
 		sanitized_path = sanitize_path(path);
 		if (sanitized_path == NULL) {
-			LOOP_CONTINUE("could not sanitize parent's path for device #%u, skipping.", i);
+			usbi_warn(ctx, "could not sanitize parent's path for device #%u, skipping.", i);
+			continue;
 		}
 
 		// With the parent path and port number, we should be able to locate our device 
@@ -1105,7 +1125,8 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			}
 		}
 		if (!found) {
-			LOOP_CONTINUE("could not match %s with a libusb device.", dev_interface_details->DevicePath);
+			usbi_warn(ctx, "could not match %s with a libusb device.", dev_interface_details->DevicePath);
+			continue;
 		}
 	}
 
@@ -1131,13 +1152,15 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			break;
 
 		if (bus == LIBUSB_BUS_MAX) {
-			LOOP_CONTINUE("program assertion failed - got more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
+			usbi_warn(ctx, "program assertion failed - got more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
+			continue;
 		}
 
 		handle = CreateFileA(hcd->path, GENERIC_WRITE, FILE_SHARE_WRITE,
 			NULL, OPEN_EXISTING, FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
 		if (handle == INVALID_HANDLE_VALUE) {
-			LOOP_CONTINUE("could not open bus %u, skipping: %s", bus, windows_error_str(0));
+			usbi_warn(ctx, "could not open bus %u, skipping: %s", bus, windows_error_str(0));
+			continue;
 		}
 
 		LOOP_CHECK(usb_enumerate_hub(ctx, _discdevs, handle, bus, NULL, 1));

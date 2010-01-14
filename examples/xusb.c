@@ -43,7 +43,18 @@
 #define	msleep(msecs) usleep(1000*msecs)
 #endif
 
-#define perr(...) fprintf(stderr, __VA_ARGS__)
+static int inline perr(char const *format, ...)
+{
+	va_list args;
+	int r;
+
+	va_start (args, format);
+	r = vfprintf(stderr, format, args);
+	va_end(args);
+
+	return r;
+}
+
 #define ERR_EXIT(errcode) do { perr("  libusb error: %d\n", errcode); return -1; } while (0)
 #define CALL_CHECK(fcall) do { r=fcall; if (r < 0) ERR_EXIT(r); } while (0);
 #define B(x) (((x)!=0)?1:0)

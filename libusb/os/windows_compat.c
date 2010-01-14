@@ -239,7 +239,6 @@ int pipe_for_poll(int filedes[2])
 	int i, j;
 	HANDLE handle[2];
 	OVERLAPPED *overlapped0, *overlapped1;
-//	OVERLAPPED *overlapped2 = calloc(1, sizeof(OVERLAPPED));
 	char pipe_name[] = "\\\\.\\pipe\\libusb000000000000";
 
 	CHECK_INIT_POLLING;
