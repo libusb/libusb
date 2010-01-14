@@ -567,7 +567,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 	
 		// Sanity check. Ensures that indexes for our list of config desc is in the right order
 		if (i != (cd_data->bConfigurationValue-1)) {
-			LOOP_CONTINUE("program assertion failed: config descriptors are being read out of order");
+			LOOP_CONTINUE("program assertion failed - config descriptors are being read out of order");
 		}
 
 		// Cache the descriptor
@@ -961,7 +961,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	GUID guid;
 	DWORD size, reg_type;
 	int	r = LIBUSB_SUCCESS;
-	unsigned i, j, port_nr, hub_nr;
+	unsigned i, j, j_max, port_nr, hub_nr;
 	bool found;
 
 	// TODO: MI_## automated driver installation:
@@ -1007,6 +1007,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			for (j=0; j<safe_strlen(dev_interface_details->DevicePath); j++) {
 				if ( (dev_interface_details->DevicePath[j] == '{') 
 				  && (dev_interface_details->DevicePath[j-1] == '#') ) {
+					  j_max = j-1;
 					// Matched '#{'. Now go back to last delimiter
 					for (; j>=0; j--) {
 						if (dev_interface_details->DevicePath[j] == '&') {
@@ -1015,13 +1016,20 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 						}
 					}
 					if (found) {
-						sscanf(&dev_interface_details->DevicePath[j+1], "%d#{%*s", &port_nr);
+						j++;
+						// The port number should only be 1 or 2 chars long
+						if (((j_max - j) != 1) && ((j_max - j) != 2)) {
+							found = false;
+						} else if (sscanf(&dev_interface_details->DevicePath[j], 
+							"%d#{%*s", &port_nr) != 1) {
+							found = false;
+						}
 					}
 					break;
 				}
 			}
 			if (!found) {
-				LOOP_CONTINUE("failure to \"guess\" port number for device #%u, skipping", i);
+				LOOP_CONTINUE("program assertion failed - unable to \"guess\" port number for device #%u, skipping", i);
 			}
 		}
 
@@ -1836,7 +1844,7 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	if (!WinUsb_QueryInterfaceSettings(winusb_handle, 0, &if_desc)) {
 		usbi_err(ctx, "could not query interface settings for interface %d: %s", iface, windows_error_str(0));
 	} else if (if_desc.bInterfaceNumber != iface) {
-		usbi_warn(ctx, "program assertion failed: WinUSB interface %d found at position %d", 
+		usbi_warn(ctx, "program assertion failed - WinUSB interface %d found at position %d", 
 			if_desc.bInterfaceNumber, iface);
 	}
 
