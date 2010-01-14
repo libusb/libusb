@@ -18,6 +18,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #if defined(_MSC_VER)
+// If the following is true, then Microsoft provided an improper WINVER 
+// to Visual Studio 2008 on Windows 7. Both should be set to 0x601
+#if (WINVER <= _WIN32_WINNT_LONGHORN) && (WINVER >= _WIN32_WINNT_WIN7)
+#undef WINVER
+#define WINVER 0x601
+#undef _WIN32_WINNT_WIN7
+#define _WIN32_WINNT_WIN7 0x601
+#endif
 #include <config_msvc.h>
 #else
 #include <config.h>
@@ -32,11 +40,15 @@
 #include <tchar.h>
 #include <setupapi.h>
 #if defined(_MSC_VER)
-#include <api/usbiodef.h>
-#include <api/usbioctl.h>
+// Fixes DDK errors
+#if !defined __drv_maxIRQL
+#define __drv_maxIRQL(x)
+#endif
 #if !defined __drv_preferredFunction
 #define __drv_preferredFunction(func,why)
 #endif
+#include <api/usbiodef.h>
+#include <api/usbioctl.h>
 #include <api/cfgmgr32.h>
 #else
 #include <ddk/usbiodef.h>
@@ -883,6 +895,7 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 				usbi_warn(ctx, "could not retrieve info data: %s", windows_error_str(0));
 				continue;
 			}
+			usbi_dbg("found path: %s", dev_interface_details->DevicePath);
 
 			if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_SERVICE, 
 				NULL, (BYTE*)driver, MAX_KEY_LENGTH, &size)) {
@@ -899,6 +912,7 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 			}
 		}
 	}
+	usbi_dbg("found %d paths", nb_paths);
 
 	// Finally, match the interface paths with the interfaces. We do that 
 	// by looking at the children of the composite device
