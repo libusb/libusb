@@ -821,7 +821,7 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 	SP_DEVINFO_DATA dev_info_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
 	HKEY key;
-	WCHAR guid_string_w[40];
+	WCHAR guid_string_w[GUID_STRING_LENGTH];
 	GUID guid;
 	GUID guid_table[MAX_USB_DEVICES];
 	char* sanitized_path[MAX_USB_DEVICES];
@@ -849,7 +849,9 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 			continue;
 		}
 
-		if (RegQueryValueExW(key, L"DeviceInterfaceGUIDs", NULL, &type, (BYTE*)guid_string_w, &size) != ERROR_SUCCESS) {
+		size = sizeof(guid_string_w);
+		if (RegQueryValueExW(key, L"DeviceInterfaceGUIDs", NULL, &type,
+			(BYTE*)guid_string_w, &size) != ERROR_SUCCESS) {
 			RegCloseKey(key);
 			continue;
 		}
@@ -895,7 +897,6 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 				usbi_warn(ctx, "could not retrieve info data: %s", windows_error_str(0));
 				continue;
 			}
-			usbi_dbg("found path: %s", dev_interface_details->DevicePath);
 
 			if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_SERVICE, 
 				NULL, (BYTE*)driver, MAX_KEY_LENGTH, &size)) {
@@ -912,7 +913,6 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 			}
 		}
 	}
-	usbi_dbg("found %d paths", nb_paths);
 
 	// Finally, match the interface paths with the interfaces. We do that 
 	// by looking at the children of the composite device

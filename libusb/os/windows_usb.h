@@ -65,6 +65,7 @@ void inline upperize(char* str) {
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
 #define ERR_BUFFER_SIZE             256
+#define GUID_STRING_LENGTH          40
 
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 #define ERRNO GetLastError()
