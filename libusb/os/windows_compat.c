@@ -89,6 +89,10 @@
 #endif
 
 #if defined(__CYGWIN__ )
+// cygwin produces a warning unless these prototypes are defined
+extern int _close(int fd);
+extern int _snprintf(char *buffer, size_t count, const char *format, ...);
+extern int cygwin_attach_handle_to_fd(char *name, int fd, HANDLE handle, int bin, int access); 
 // _open_osfhandle() is not available on cygwin, but we can emulate
 // it for our needs with cygwin_attach_handle_to_fd()
 static inline int _open_osfhandle(intptr_t osfhandle, int flags)
@@ -108,7 +112,7 @@ static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 		printb("_open_osfhandle (emulated): unuspported access mode\n");
 		return -1;
 	}
-	return cygwin_attach_handle_to_fd("/dev/null", -1, osfhandle, -1, access);
+	return cygwin_attach_handle_to_fd("/dev/null", -1, (HANDLE)osfhandle, -1, access);
 }
 #endif
 

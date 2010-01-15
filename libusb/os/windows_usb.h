@@ -40,6 +40,11 @@
 #define LIBUSB_DEVADDR_MAX UINT8_MAX
 #endif
 
+#if defined(__CYGWIN__ )
+// cygwin produces a warning unless these prototypes are defined
+extern int _snprintf(char *buffer, size_t count, const char *format, ...);
+extern char *_strdup(const char *strSource);
+#endif
 #define safe_free(p) do {if (p != NULL) {free(p); p = NULL;}} while(0)
 #define safe_closehandle(h) do {if (h != INVALID_HANDLE_VALUE) {CloseHandle(h); h = INVALID_HANDLE_VALUE;}} while(0)
 #define safe_strncpy(dst, dst_max, src, count) strncpy(dst, src, min(count, dst_max - 1))
