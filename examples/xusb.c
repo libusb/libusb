@@ -36,9 +36,6 @@
 #ifdef OS_WINDOWS
 #include <windows.h>
 #define msleep(msecs) Sleep(msecs)
-#ifdef interface
-#undef interface
-#endif
 #else
 #include <unistd.h>
 #define	msleep(msecs) usleep(1000*msecs)
@@ -373,21 +370,21 @@ int test_device(uint16_t vid, uint16_t pid)
 	nb_ifaces = conf_desc->bNumInterfaces;
 	printf("num interfaces = %d\n", nb_ifaces);
 	for (i=0; i<conf_desc->bNumInterfaces; i++) {
-		for (j=0; j<conf_desc->interface[i].num_altsetting; j++) {
+		for (j=0; j<conf_desc->usb_interface[i].num_altsetting; j++) {
 			printf("interface[%d].altsetting[%d]: num endpoints = %d\n", 
-				i, j, conf_desc->interface[i].altsetting[j].bNumEndpoints);
+				i, j, conf_desc->usb_interface[i].altsetting[j].bNumEndpoints);
 			printf("   Class.SubClass.Protocol: %02X.%02X.%02X\n", 
-				conf_desc->interface[i].altsetting[j].bInterfaceClass,
-				conf_desc->interface[i].altsetting[j].bInterfaceSubClass,
-				conf_desc->interface[i].altsetting[j].bInterfaceProtocol);
-			if ( (conf_desc->interface[i].altsetting[j].bInterfaceClass == LIBUSB_CLASS_MASS_STORAGE) 
-			  && ( (conf_desc->interface[i].altsetting[j].bInterfaceSubClass == 0x01)
-			  || (conf_desc->interface[i].altsetting[j].bInterfaceSubClass == 0x06) ) ) {
+				conf_desc->usb_interface[i].altsetting[j].bInterfaceClass,
+				conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass,
+				conf_desc->usb_interface[i].altsetting[j].bInterfaceProtocol);
+			if ( (conf_desc->usb_interface[i].altsetting[j].bInterfaceClass == LIBUSB_CLASS_MASS_STORAGE) 
+			  && ( (conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass == 0x01)
+			  || (conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass == 0x06) ) ) {
 				// Mass storage devices that can use basic SCSI commands
 				test_scsi = -1;
 			}
-			for (k=0; k<conf_desc->interface[i].altsetting[j].bNumEndpoints; k++) {
-				endpoint = &conf_desc->interface[i].altsetting[j].endpoint[k];
+			for (k=0; k<conf_desc->usb_interface[i].altsetting[j].bNumEndpoints; k++) {
+				endpoint = &conf_desc->usb_interface[i].altsetting[j].endpoint[k];
 				printf("       endpoint[%d].address: %02X\n", k, endpoint->bEndpointAddress);
 				printf("           max packet size: %04X\n", endpoint->wMaxPacketSize);
 				printf("          polling interval: %02X\n", endpoint->bInterval);
@@ -483,6 +480,7 @@ int main(int argc, char** argv)
 	test_device(VID, PID);
 
 	libusb_exit(NULL);
+
 	return 0;
 }
 

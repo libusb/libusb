@@ -287,14 +287,14 @@ static void windows_assign_endpoints(struct libusb_device *dev, int iface, int a
 	const struct libusb_interface_descriptor *if_desc;
 
 	if (libusb_get_config_descriptor(dev, 0, &conf_desc) == LIBUSB_SUCCESS) {
-		if_desc = &conf_desc->interface[iface].altsetting[altsetting];
-		safe_free(priv->interface[iface].endpoint);
-		priv->interface[iface].endpoint = malloc(if_desc->bNumEndpoints);
-		if (priv->interface[iface].endpoint != NULL) {
-			priv->interface[iface].nb_endpoints = if_desc->bNumEndpoints;
+		if_desc = &conf_desc->usb_interface[iface].altsetting[altsetting];
+		safe_free(priv->usb_interface[iface].endpoint);
+		priv->usb_interface[iface].endpoint = malloc(if_desc->bNumEndpoints);
+		if (priv->usb_interface[iface].endpoint != NULL) {
+			priv->usb_interface[iface].nb_endpoints = if_desc->bNumEndpoints;
 			for (i=0; i<if_desc->bNumEndpoints; i++) {
-				priv->interface[iface].endpoint[i] = if_desc->endpoint[i].bEndpointAddress;
-				usbi_dbg("(re)assigned endpoint %02X to interface %d", priv->interface[iface].endpoint[i], iface);
+				priv->usb_interface[iface].endpoint[i] = if_desc->endpoint[i].bEndpointAddress;
+				usbi_dbg("(re)assigned endpoint %02X to interface %d", priv->usb_interface[iface].endpoint[i], iface);
 			}
 		}
 		libusb_free_config_descriptor(conf_desc);		
@@ -941,18 +941,18 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 
 		for (j=0; j<nb_paths; j++) {
 			if (safe_strncmp(sanitized_path[j], sanitized_short, strlen(sanitized_short)) == 0) {
-				priv->interface[interface_number].path = sanitized_path[j];
+				priv->usb_interface[interface_number].path = sanitized_path[j];
 				sanitized_path[j] = NULL;
 			}
 		}
 		safe_free(sanitized_short);
 
-		if (priv->interface[interface_number].path == NULL) {
+		if (priv->usb_interface[interface_number].path == NULL) {
 			usbi_warn(ctx, "could not retrieve full path for interface %d", 
 				interface_number);
 			continue;
 		}
-		usbi_dbg("interface_path[%d]: %s", interface_number, priv->interface[interface_number].path);
+		usbi_dbg("interface_path[%d]: %s", interface_number, priv->usb_interface[interface_number].path);
 		found = true;
 	}
 
@@ -1077,7 +1077,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				if (safe_strcmp(priv->driver, "WinUSB") == 0) {
 					priv->apib = &windows_winusb_backend;
 					// For non composite, the first interface is the same as the device
-					priv->interface[0].path = safe_strdup(priv->path);	// needs strdup
+					priv->usb_interface[0].path = safe_strdup(priv->path);	// needs strdup
 				} else if (safe_strcmp(reg_key, "usbccgp") == 0) {
 					// Composite (multi-interface) devices are identified by their use of 
 					// the USB Common Class Generic Parent driver
@@ -1263,8 +1263,8 @@ static int windows_claim_interface(struct libusb_device_handle *dev_handle, int 
 	if (iface >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	safe_free(priv->interface[iface].endpoint);
-	priv->interface[iface].nb_endpoints= 0;
+	safe_free(priv->usb_interface[iface].endpoint);
+	priv->usb_interface[iface].nb_endpoints= 0;
 
 	r = priv->apib->claim_interface(dev_handle, iface);
 
@@ -1280,8 +1280,8 @@ static int windows_set_interface_altsetting(struct libusb_device_handle *dev_han
 	int r = LIBUSB_SUCCESS;
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 
-	safe_free(priv->interface[iface].endpoint);
-	priv->interface[iface].nb_endpoints= 0;
+	safe_free(priv->usb_interface[iface].endpoint);
+	priv->usb_interface[iface].nb_endpoints= 0;
 
 	r = priv->apib->set_interface_altsetting(dev_handle, iface, altsetting);
 
@@ -1734,8 +1734,8 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 
 	// WinUSB requires a seperate handle for each interface
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
-		if (priv->interface[i].path != NULL) {
-			file_handle = CreateFileA(priv->interface[i].path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, 
+		if (priv->usb_interface[i].path != NULL) {
+			file_handle = CreateFileA(priv->usb_interface[i].path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, 
 				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 			if (file_handle == INVALID_HANDLE_VALUE) {
 				usbi_err(ctx, "could not open device %s (interface %d): %s", priv->path, i, windows_error_str(0));
@@ -1846,8 +1846,8 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	// With handle and enpoints set (in parent), we can setup the default 
 	// pipe properties (copied from libusb-win32-v1)
 	// see http://download.microsoft.com/download/D/1/D/D1DD7745-426B-4CC3-A269-ABBBE427C0EF/DVC-T705_DDC08.pptx
-	for (i=0; i<priv->interface[iface].nb_endpoints; i++) {
-		endpoint_address = priv->interface[iface].endpoint[i];
+	for (i=0; i<priv->usb_interface[iface].nb_endpoints; i++) {
+		endpoint_address = priv->usb_interface[iface].endpoint[i];
 		policy = false;
 		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
 			SHORT_PACKET_TERMINATE, sizeof(UCHAR), &policy)) {
@@ -1916,10 +1916,10 @@ static int winusb_interface_by_endpoint(struct windows_device_priv *priv,
 			continue;
 		if (handle_priv->interface_handle[i].winusb == 0)
 			continue;
-		if (priv->interface[i].endpoint == NULL)
+		if (priv->usb_interface[i].endpoint == NULL)
 			continue;
-		for (j=0; j<priv->interface[i].nb_endpoints; j++) {
-			if (priv->interface[i].endpoint[j] == endpoint_address) {
+		for (j=0; j<priv->usb_interface[i].nb_endpoints; j++) {
+			if (priv->usb_interface[i].endpoint[j] == endpoint_address) {
 				return i;
 			}
 		}
@@ -2176,22 +2176,22 @@ static int winusb_reset_device(struct libusb_device_handle *dev_handle)
 		} 
 
 		if ( (winusb_handle != 0) && (winusb_handle != INVALID_HANDLE_VALUE)) {
-			for (j=0; j<priv->interface[i].nb_endpoints; j++) {
-				usbi_dbg("resetting ep %02X", priv->interface[i].endpoint[j]);
+			for (j=0; j<priv->usb_interface[i].nb_endpoints; j++) {
+				usbi_dbg("resetting ep %02X", priv->usb_interface[i].endpoint[j]);
 				// TODO: looks like whatever you try here, you can't get an actual reset of the ep
-				if (!WinUsb_AbortPipe(winusb_handle, priv->interface[i].endpoint[j])) {
+				if (!WinUsb_AbortPipe(winusb_handle, priv->usb_interface[i].endpoint[j])) {
 					usbi_err(ctx, "WinUsb_AbortPipe (pipe address %02X) failed: %s", 
-						priv->interface[i].endpoint[j], windows_error_str(0));
+						priv->usb_interface[i].endpoint[j], windows_error_str(0));
 				}
 				// FlushPipe seems to fail on OUT pipes
-				if ( (priv->interface[i].endpoint[j] & LIBUSB_ENDPOINT_IN) 
-				  && (!WinUsb_FlushPipe(winusb_handle, priv->interface[i].endpoint[j])) ) {
+				if ( (priv->usb_interface[i].endpoint[j] & LIBUSB_ENDPOINT_IN) 
+				  && (!WinUsb_FlushPipe(winusb_handle, priv->usb_interface[i].endpoint[j])) ) {
 					usbi_err(ctx, "WinUsb_FlushPipe (pipe address %02X) failed: %s", 
-						priv->interface[i].endpoint[j], windows_error_str(0));
+						priv->usb_interface[i].endpoint[j], windows_error_str(0));
 				}
-				if (!WinUsb_ResetPipe(winusb_handle, priv->interface[i].endpoint[j])) {
+				if (!WinUsb_ResetPipe(winusb_handle, priv->usb_interface[i].endpoint[j])) {
 					usbi_err(ctx, "WinUsb_ResetPipe (pipe address %02X) failed: %s", 
-						priv->interface[i].endpoint[j], windows_error_str(0));
+						priv->usb_interface[i].endpoint[j], windows_error_str(0));
 				}
 			}
 		}

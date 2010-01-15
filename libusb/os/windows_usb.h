@@ -134,7 +134,7 @@ struct windows_device_priv {
 		char *path;                     // each interface has a path as well
 		int8_t nb_endpoints;            // and a set of endpoint addresses (USB_MAXENDPOINTS)
 		uint8_t *endpoint;	            
-	} interface[USB_MAXINTERFACES];
+	} usb_interface[USB_MAXINTERFACES];
 	char *driver;                       // driver name (eg WinUSB, USBSTOR, HidUsb, etc)
 	struct windows_driver_backend const *apib;
 	uint8_t active_config;
@@ -153,9 +153,9 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 	p->config_descriptor = NULL;
 	memset(&(p->dev_descriptor), 0, sizeof(USB_DEVICE_DESCRIPTOR));
 	for (i=0; i<USB_MAXINTERFACES; i++) {
-		p->interface[i].path = NULL;
-		p->interface[i].nb_endpoints = 0;
-		p->interface[i].endpoint = NULL;
+		p->usb_interface[i].path = NULL;
+		p->usb_interface[i].nb_endpoints = 0;
+		p->usb_interface[i].endpoint = NULL;
 	}
 }
 
@@ -169,8 +169,8 @@ static inline void windows_device_priv_release(struct windows_device_priv* p, in
 	}
 	safe_free(p->config_descriptor);
 	for (i=0; i<USB_MAXINTERFACES; i++) {
-		safe_free(p->interface[i].path);
-		safe_free(p->interface[i].endpoint);
+		safe_free(p->usb_interface[i].path);
+		safe_free(p->usb_interface[i].endpoint);
 	}
 }
 

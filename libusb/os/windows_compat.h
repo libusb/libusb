@@ -21,15 +21,6 @@
  */
 #pragma once
 
-/* 
- * Prevent compilation problems on Windows platforms
- *
- * This is placed in the .h to limit changes required to the core files
- */
-#if defined(interface)
-#undef interface
-#endif
-
 #if !defined(ssize_t)
 #if defined (_WIN64)
 #define ssize_t __int64

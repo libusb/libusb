@@ -709,7 +709,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*kernel_driver_active)(struct libusb_device_handle *handle,
-		int interface);
+		int iface);
 	
 	/* Detach a kernel driver from an interface. Optional.
 	 *
@@ -725,7 +725,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*detach_kernel_driver)(struct libusb_device_handle *handle,
-		int interface);
+		int iface);
 
 	/* Attach a kernel driver to an interface. Optional.
 	 *
@@ -742,7 +742,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*attach_kernel_driver)(struct libusb_device_handle *handle,
-		int interface);
+		int iface);
 
 	/* Destroy a device. Optional.
 	 *
