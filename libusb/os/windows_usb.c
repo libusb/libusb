@@ -37,7 +37,6 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <windows.h>
-#include <tchar.h>
 #include <setupapi.h>
 #if defined(_MSC_VER)
 // Fixes DDK errors

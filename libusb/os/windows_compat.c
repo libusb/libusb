@@ -88,6 +88,30 @@
 #endif
 #endif
 
+#if defined(__CYGWIN__ )
+// _open_osfhandle() is not available on cygwin, but we can emulate
+// it for our needs with cygwin_attach_handle_to_fd()
+static inline int _open_osfhandle(intptr_t osfhandle, int flags)
+{
+	int access;
+	switch (flags) {
+	case _O_RDONLY:
+		access = GENERIC_READ;
+		break;
+	case _O_WRONLY:
+		access = GENERIC_WRITE;
+		break;
+	case _O_RDWR:
+		access = GENERIC_READ|GENERIC_WRITE;
+		break;
+	default:
+		printb("_open_osfhandle (emulated): unuspported access mode\n");
+		return -1;
+	}
+	return cygwin_attach_handle_to_fd("/dev/null", -1, osfhandle, -1, access);
+}
+#endif
+
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
 
 // public fd data

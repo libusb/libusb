@@ -20,7 +20,7 @@ case $host in
 	AC_MSG_RESULT([Linux])
 	backend="linux"
 	AC_CHECK_LIB(rt, clock_gettime)
-	CFLAGS="-pthread"
+	AM_CFLAGS="-pthread -Wshadow"
 	AM_LDFLAGS=""
 	;;
 *-darwin*)
@@ -29,7 +29,7 @@ case $host in
 	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
 	AC_MSG_RESULT([Darwin/MacOS X])
 	backend="darwin"
-	CFLAGS="-pthread"
+	AM_CFLAGS="-pthread -Wshadow"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
 *-mingw*)
@@ -38,9 +38,18 @@ case $host in
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	LIBS="-lpthreadGC2 -lsetupapi -lole32"
-	CFLAGS=""	
+	AM_CFLAGS="-Wshadow"	
 	AM_LDFLAGS=""
 	;;
+*-cygwin*)
+	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
+	AC_SUBST(OS_WINDOWS)
+	AC_MSG_RESULT([Windows])
+	backend="windows"
+	LIBS="-lpthread -lsetupapi -lole32"
+	AM_CFLAGS=""	
+	AM_LDFLAGS=""
+	;;	
 *)
 	AC_MSG_ERROR([unsupported operating system])
 esac
@@ -116,7 +125,8 @@ CFLAGS="$saved_cflags"
 
 # check for -fvisibility=hidden compiler support (GCC >= 3.4)
 saved_cflags="$CFLAGS"
-CFLAGS="$CFLAGS -fvisibility=hidden"
+# -Werror required for cygwin
+CFLAGS="$CFLAGS -Werror -fvisibility=hidden"
 AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
 	[VISIBILITY_CFLAGS="-fvisibility=hidden"
 	 AC_DEFINE([API_EXPORTED], [__attribute__((visibility("default")))], [Default visibility]) ],
@@ -132,7 +142,7 @@ AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
 	nopointersign_cflags="-Wno-pointer-sign", nopointersign_cflags="")
 CFLAGS="$saved_cflags"
 
-AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
+AM_CFLAGS="$AM_CFLAGS -std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags"
 
 AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)
