@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #ifdef _MSC_VER
+#define inline __inline
 #include <time.h>
 #else
 #include <sys/time.h>
@@ -31,12 +32,11 @@
 #include <time.h>
 #include <limits.h>
 
-// Work around for Windows "interface" macro redefinition
-#ifdef _MSC_VER
-#define inline __inline
-#pragma push_macro("interface")
-#endif
-#ifndef interface
+// Work around for existing libusb 1.0 code that might have used "interface"
+// instead of the newer "usb_interface", in libusb_config_descriptor.
+// "interface" was changed to "usb_interface" to work around macro redefinition 
+// issues on Windows platforms.
+#if !defined(OS_WINDOWS) && !defined(interface)
 #define interface usb_interface
 #endif
 
@@ -1245,7 +1245,4 @@ void libusb_set_pollfd_notifiers(libusb_context *ctx,
 }
 #endif
 
-#ifdef _MSC_VER
-#pragma pop_macro("interface")
-#endif
 #endif
