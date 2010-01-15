@@ -61,7 +61,7 @@ void inline upperize(char* str) {
 	size_t i;
 	if (str == NULL) return;
 	for (i=0; i<strlen(str); i++)
-		str[i] = (char)toupper(str[i]);
+		str[i] = (char)toupper((int)str[i]);
 }
 
 #define MAX_CTRL_BUFFER_LENGTH      4096

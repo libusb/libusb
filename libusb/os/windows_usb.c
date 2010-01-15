@@ -200,7 +200,7 @@ static char* sanitize_path(const char* path)
 
 	// Same goes for '\' and '#' after the root prefix. Ensure '#' is used
 	for(j=root_size; j<size; j++) {
-		ret_path[j] = (char)toupper(ret_path[j]);	// Fix case too
+		ret_path[j] = (char)toupper((int)ret_path[j]);	// Fix case too
 		if (ret_path[j] == '\\')
 			ret_path[j] = '#';
 	}
