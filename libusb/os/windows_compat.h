@@ -76,10 +76,11 @@ struct winfd fd_to_winfd(int fd);
 struct winfd handle_to_winfd(HANDLE handle);
 struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);
 
+// On Windows, timeval (defined in WinSock.h) uses long for its members
 #if !defined(TIMESPEC_TO_TIMEVAL)
-#define TIMESPEC_TO_TIMEVAL(tv, ts) { \
-(tv)->tv_sec = (ts)->tv_sec; \
-(tv)->tv_usec = (ts)->tv_nsec / 1000; \
+#define TIMESPEC_TO_TIMEVAL(tv, ts) {                   \
+	(tv)->tv_sec = (long)(ts)->tv_sec;                  \
+	(tv)->tv_usec = (long)(ts)->tv_nsec / 1000;         \
 }
 #endif
 #if !defined(timersub)
