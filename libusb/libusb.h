@@ -40,7 +40,7 @@
 #define interface usb_interface
 #endif
 
-// Windows doesn't know ssize_t
+// MSVC doesn't know ssize_t
 #if !defined(ssize_t)
 #if defined (_WIN64)
 #define ssize_t __int64

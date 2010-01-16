@@ -21,6 +21,9 @@ platform is actually 32 or 64 bit.
   http://sourceware.org/pthreads-win32/ and create both a pthreadVC2_x64.lib
   and pthreadVC2_x64.dll from the latest pthread-win32 source.
   
+  To help compiling pthreadVC2_x64.dll on x64 platforms, sample .sln and .vcproj 
+  files for pthread-win32 are provided in the msvc\pthread-win32_x64\ directory.
+  
 - (x64) Copy pthreadVC2_x64.lib to the msvc directory.
 
 - To run the 64 bit executables, you need to either have pthreadVC2_x64.dll
