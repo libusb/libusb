@@ -40,6 +40,15 @@
 #define interface usb_interface
 #endif
 
+// Windows doesn't know ssize_t
+#if !defined(ssize_t)
+#if defined (_WIN64)
+#define ssize_t __int64
+#else
+#define ssize_t long
+#endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -782,7 +791,7 @@ int libusb_init(libusb_context **ctx);
 void libusb_exit(libusb_context *ctx);
 void libusb_set_debug(libusb_context *ctx, int level);
 
-int libusb_get_device_list(libusb_context *ctx,
+ssize_t libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);
 void libusb_free_device_list(libusb_device **list, int unref_devices);
 libusb_device *libusb_ref_device(libusb_device *dev);

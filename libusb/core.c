@@ -602,13 +602,13 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
  * \returns the number of devices in the outputted list, or LIBUSB_ERROR_NO_MEM
  * on memory allocation failure.
  */
-API_EXPORTED int libusb_get_device_list(libusb_context *ctx,
+API_EXPORTED ssize_t libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list)
 {
 	struct discovered_devs *discdevs = discovered_devs_alloc();
 	struct libusb_device **ret;
 	int r = 0;
-	int i, len;
+	ssize_t i, len;
 	USBI_GET_CONTEXT(ctx);
 	usbi_dbg("");
 
@@ -873,7 +873,7 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	struct libusb_device_handle *_handle;
 	size_t priv_size = usbi_backend->device_handle_priv_size;
 	unsigned char dummy = 1;
-	int r;
+	ssize_t r;
 	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
 
 	_handle = malloc(sizeof(*_handle) + priv_size);
@@ -892,7 +892,7 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	if (r < 0) {
 		libusb_unref_device(dev);
 		free(_handle);
-		return r;
+		return (int)r;
 	}
 
 	pthread_mutex_lock(&ctx->open_devs_lock);

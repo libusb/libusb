@@ -174,7 +174,7 @@ static char* sanitize_path(const char* path)
 	const char root_prefix[] = "\\\\.\\";
 	size_t j, size, root_size;
 	char* ret_path = NULL;
-	int add_root = 0;
+	size_t add_root = 0;
 
 	if (path == NULL)
 		return NULL;

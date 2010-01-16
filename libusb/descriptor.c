@@ -65,7 +65,7 @@ int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest,
 		}
 	}
 
-	return sp - source;
+	return (int)(sp - source);
 }
 
 static void clear_endpoint(struct libusb_endpoint_descriptor *endpoint)
