@@ -1,4 +1,4 @@
-To compile libusb 1.0 using MSVC 9:
+To compile libusb 1.0 using Microsoft Visual Studio:
 
 Note: in the text below, (Win32) means "when producing 32 bit binaries" and
 (x64) "when producing 64 bit binaries". This is independent of whether your 
@@ -21,8 +21,8 @@ platform is actually 32 or 64 bit.
   http://sourceware.org/pthreads-win32/ and create both a pthreadVC2_x64.lib
   and pthreadVC2_x64.dll from the latest pthread-win32 source.
   
-  To help compiling pthreadVC2_x64.dll on x64 platforms, sample .sln and .vcproj 
-  files for pthread-win32 are provided in the msvc\pthread-win32_x64\ directory.
+  To help compiling pthreadVC2_x64.dll on x64 platforms, sample .sln and 
+  .vcproj files are provided in the msvc\pthread-win32_x64\ directory.
   
 - (x64) Copy pthreadVC2_x64.lib to the msvc directory.
 

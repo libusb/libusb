@@ -116,6 +116,7 @@ enum test_type {
 	USE_XBOX,
 	USE_KEY,
 	USE_JTAG,
+	USE_HID,
 } test_mode;
 uint16_t VID, PID;
 
@@ -448,14 +449,21 @@ int main(int argc, char** argv)
 
 	if (argc == 2) {
 		if ((argv[1][0] != '-') || (argv[1][1] == 'h')) {
-			printf("usage: %s [-h] [-j] [-k] [-x]\n", argv[0]);
+			printf("usage: %s [-h] [-i] [-j] [-k] [-x]\n", argv[0]);
 			printf("   -h: display usage\n");
+			printf("   -i: test IBM HID Optical Mouse\n");
 			printf("   -j: test OLIMEX ARM-USB-TINY JTAG, 2 channel composite device\n");
 			printf("   -k: test Generic 2 GB USB Key\n");
 			printf("   -x: test Microsoft XBox Controller Type S (default)\n");
 			return 0;
 		}
 		switch(argv[1][1]) {
+		case 'i':
+			// IBM HID Optical mouse - 1 interface
+			VID = 0x04B3;
+			PID = 0x3108;
+			test_mode = USE_HID;
+			break;
 		case 'j':
 			// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
 			VID = 0x15BA;

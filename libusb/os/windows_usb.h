@@ -75,10 +75,15 @@ void inline upperize(char* str) {
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 #define ERRNO GetLastError()
 
-// This is used to support multiple kernel drivers in Windows.
-struct windows_driver_backend {
-	const char *name;	// A human-readable name for your backend, e.g. "WinUSB"
+// This is used to support multiple kernel drivers and USB APIs in Windows.
+struct windows_usb_api_backend {
+	const char *name;    // A human-readable name for your backend, e.g. "WinUSB"
+	const char *driver_name; // Driver's name, without .sys, e.g. "usbccgp"
+	const uint8_t id;
+	int (*init)(struct libusb_context *ctx);
+	int (*exit)(void);
 	int (*open)(struct libusb_device_handle *dev_handle);
+	void (*close)(struct libusb_device_handle *dev_handle);
 	int (*claim_interface)(struct libusb_device_handle *dev_handle, int iface);
 	int (*set_interface_altsetting)(struct libusb_device_handle *dev_handle, int iface, int altsetting);
 	int (*release_interface)(struct libusb_device_handle *dev_handle, int iface);
@@ -90,8 +95,13 @@ struct windows_driver_backend {
 	int (*abort_control)(struct usbi_transfer *itransfer);
 	int (*abort_transfers)(struct usbi_transfer *itransfer);
 };
-extern const struct windows_driver_backend windows_template_backend;
-extern const struct windows_driver_backend windows_winusb_backend;
+
+#define USB_API_TEMPLATE    0
+#define USB_API_COMPOSITE   1
+#define USB_API_WINUSB      2
+#define USB_API_HID         3
+#define USB_API_MAX         4
+extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
 
 #define PRINT_UNSUPPORTED_API(fname)        \
 	usbi_dbg("unsupported API call for '"   \
@@ -131,12 +141,13 @@ struct windows_device_priv {
 	ULONG connection_index;             // also required for some usermode ops
 	char *path;                         // path used by Windows to reference the USB node
 	struct {
-		char *path;                     // each interface has a path as well
+		char *path;                     // each interface needs a Windows device interface path,
+		struct windows_usb_api_backend const *apib; // an API backend (multiple drivers support),
 		int8_t nb_endpoints;            // and a set of endpoint addresses (USB_MAXENDPOINTS)
 		uint8_t *endpoint;	            
 	} usb_interface[USB_MAXINTERFACES];
-	char *driver;                       // driver name (eg WinUSB, USBSTOR, HidUsb, etc)
-	struct windows_driver_backend const *apib;
+	struct windows_usb_api_backend const *apib;
+	uint8_t composite_api_flags;
 	uint8_t active_config;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
 	unsigned char **config_descriptor;  // list of pointers to the cached config descriptors
@@ -147,13 +158,14 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 	p->parent_dev = NULL;
 	p->connection_index = 0;
 	p->path = NULL;
-	p->driver = NULL;
-	p->apib = &windows_template_backend;
+	p->apib = &usb_api_backend[USB_API_TEMPLATE];
+	p->composite_api_flags = 0;
 	p->active_config = 0;
 	p->config_descriptor = NULL;
 	memset(&(p->dev_descriptor), 0, sizeof(USB_DEVICE_DESCRIPTOR));
 	for (i=0; i<USB_MAXINTERFACES; i++) {
 		p->usb_interface[i].path = NULL;
+		p->usb_interface[i].apib = &usb_api_backend[USB_API_TEMPLATE];
 		p->usb_interface[i].nb_endpoints = 0;
 		p->usb_interface[i].endpoint = NULL;
 	}
@@ -162,7 +174,6 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 static inline void windows_device_priv_release(struct windows_device_priv* p, int num_configurations) {
 	int i;
 	safe_free(p->path);
-	safe_free(p->driver);
 	if ((num_configurations > 0) && (p->config_descriptor != NULL)) {
 		for (i=0; i < num_configurations; i++)
 			safe_free(p->config_descriptor[i]);
@@ -197,6 +208,7 @@ static inline struct windows_device_handle_priv *__device_handle_priv(
 // used for async polling functions
 struct windows_transfer_priv {
 	struct winfd pollable_fd;
+	uint8_t interface_number;
 };
 
 
@@ -380,3 +392,53 @@ DLL_DECLARE(WINAPI, BOOL, WinUsb_AbortPipe,
             (WINUSB_INTERFACE_HANDLE, UCHAR));
 DLL_DECLARE(WINAPI, BOOL, WinUsb_FlushPipe, 
             (WINUSB_INTERFACE_HANDLE, UCHAR));
+
+/* hid.dll interface */
+
+#pragma pack(1)
+typedef struct {
+	ULONG Size; 
+	USHORT VendorID;
+	USHORT ProductID;
+	USHORT VersionNumber;
+} HIDD_ATTRIBUTES, *PHIDD_ATTRIBUTES;
+#pragma pack()
+
+typedef USHORT USAGE;
+typedef struct {
+  USAGE Usage;
+  USAGE UsagePage;
+  USHORT InputReportByteLength;
+  USHORT OutputReportByteLength;
+  USHORT FeatureReportByteLength;
+  USHORT Reserved[17];
+  USHORT NumberLinkCollectionNodes;
+  USHORT NumberInputButtonCaps;
+  USHORT NumberInputValueCaps;
+  USHORT NumberInputDataIndices;
+  USHORT NumberOutputButtonCaps;
+  USHORT NumberOutputValueCaps;
+  USHORT NumberOutputDataIndices;
+  USHORT NumberFeatureButtonCaps;
+  USHORT NumberFeatureValueCaps;
+  USHORT NumberFeatureDataIndices;
+} HIDP_CAPS, *PHIDP_CAPS;
+
+typedef void* PHIDP_PREPARSED_DATA;
+DLL_DECLARE(WINAPI, BOOL, HidD_GetAttributes, (HANDLE, PHIDD_ATTRIBUTES));
+DLL_DECLARE(WINAPI, VOID, HidD_GetHidGuid, (LPGUID));
+DLL_DECLARE(WINAPI, BOOL, HidD_GetPreparsedData, 
+            (HANDLE, PHIDP_PREPARSED_DATA *));
+DLL_DECLARE(WINAPI, BOOL, HidD_FreePreparsedData, (PHIDP_PREPARSED_DATA));
+DLL_DECLARE(WINAPI, BOOL, HidD_GetManufacturerString, (HANDLE, PVOID, ULONG));
+DLL_DECLARE(WINAPI, BOOL, HidD_GetProductString, (HANDLE, PVOID, ULONG));
+DLL_DECLARE(WINAPI, BOOL, HidD_GetSerialNumberString, (HANDLE, PVOID, ULONG));
+DLL_DECLARE(WINAPI, NTSTATUS, HidP_GetCaps, 
+            (PHIDP_PREPARSED_DATA, PHIDP_CAPS));
+DLL_DECLARE(WINAPI, BOOL, HidD_SetNumInputBuffers, (HANDLE, ULONG));
+DLL_DECLARE(WINAPI, BOOL, HidD_SetFeature, (HANDLE, PVOID, ULONG));
+DLL_DECLARE(WINAPI, BOOL, HidD_GetFeature, (HANDLE, PVOID, ULONG));
+DLL_DECLARE(WINAPI, BOOL, HidD_GetPhysicalDescriptor, (HANDLE, PVOID, ULONG));
+DLL_DECLARE(WINAPI, BOOL, HidD_GetInputReport, (HANDLE, PVOID, ULONG));
+DLL_DECLARE(WINAPI, BOOL, HidD_SetOutputReport, (HANDLE, PVOID, ULONG));
+
