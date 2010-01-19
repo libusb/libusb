@@ -1,4 +1,4 @@
-LIBRARY libusb-1.0.dll
+LIBRARY
 EXPORTS
 	libusb_init
 	libusb_exit

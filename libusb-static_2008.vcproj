@@ -2,9 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9.00"
-	Name="libusb-1.0 (dll)"
-	ProjectGUID="{349EE8FA-7D25-4909-AAF5-FF3FADE72187}"
-	RootNamespace="libusbdll"
+	Name="libusb-1.0 (static)"
+	ProjectGUID="{349EE8F9-7D25-4909-AAF5-FF3FADE72187}"
+	RootNamespace="libusb"
 	TargetFrameworkVersion="196613"
 	>
 	<Platforms>
@@ -20,9 +20,9 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
-			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
-			ConfigurationType="2"
+			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib"
+			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\libusb-1.0"
+			ConfigurationType="4"
 			CharacterSet="2"
 			>
 			<Tool
@@ -44,7 +44,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
-				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -61,16 +61,11 @@
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
-				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2.lib"
-				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
-				AdditionalLibraryDirectories=".\msvc"
+				Name="VCLibrarianTool"
+				OutputFile="$(OutDir)\libusb-1.0.lib"
 			/>
 			<Tool
 				Name="VCALinkTool"
-			/>
-			<Tool
-				Name="VCManifestTool"
 			/>
 			<Tool
 				Name="VCXDCMakeTool"
@@ -82,17 +77,14 @@
 				Name="VCFxCopTool"
 			/>
 			<Tool
-				Name="VCAppVerifierTool"
-			/>
-			<Tool
 				Name="VCPostBuildEventTool"
 			/>
 		</Configuration>
 		<Configuration
 			Name="Debug|x64"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
-			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
-			ConfigurationType="2"
+			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib"
+			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\libusb-1.0"
+			ConfigurationType="4"
 			CharacterSet="2"
 			>
 			<Tool
@@ -115,7 +107,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
-				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_WIN32;_WIN64;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -132,16 +124,11 @@
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
-				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib"
-				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
-				AdditionalLibraryDirectories=".\msvc"
+				Name="VCLibrarianTool"
+				OutputFile="$(OutDir)\libusb-1.0.lib"
 			/>
 			<Tool
 				Name="VCALinkTool"
-			/>
-			<Tool
-				Name="VCManifestTool"
 			/>
 			<Tool
 				Name="VCXDCMakeTool"
@@ -153,17 +140,14 @@
 				Name="VCFxCopTool"
 			/>
 			<Tool
-				Name="VCAppVerifierTool"
-			/>
-			<Tool
 				Name="VCPostBuildEventTool"
 			/>
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
-			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
-			ConfigurationType="2"
+			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib"
+			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\libusb-1.0"
+			ConfigurationType="4"
 			CharacterSet="2"
 			WholeProgramOptimization="1"
 			>
@@ -187,7 +171,7 @@
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
-				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_WIN32;_LIB;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -203,16 +187,11 @@
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
-				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2.lib"
-				OutputFile="$(OutDir)\libusb-1.0.dll"
-				AdditionalLibraryDirectories=".\msvc"
+				Name="VCLibrarianTool"
+				OutputFile="$(OutDir)\libusb-1.0.lib"
 			/>
 			<Tool
 				Name="VCALinkTool"
-			/>
-			<Tool
-				Name="VCManifestTool"
 			/>
 			<Tool
 				Name="VCXDCMakeTool"
@@ -224,17 +203,14 @@
 				Name="VCFxCopTool"
 			/>
 			<Tool
-				Name="VCAppVerifierTool"
-			/>
-			<Tool
 				Name="VCPostBuildEventTool"
 			/>
 		</Configuration>
 		<Configuration
 			Name="Release|x64"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
-			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
-			ConfigurationType="2"
+			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib"
+			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\libusb-1.0"
+			ConfigurationType="4"
 			CharacterSet="2"
 			WholeProgramOptimization="1"
 			>
@@ -259,7 +235,7 @@
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
-				PreprocessorDefinitions="_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_WIN32;_WIN64;_LIB;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -275,16 +251,11 @@
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
-				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib"
-				OutputFile="$(OutDir)\libusb-1.0.dll"
-				AdditionalLibraryDirectories=".\msvc"
+				Name="VCLibrarianTool"
+				OutputFile="$(OutDir)\libusb-1.0.lib"
 			/>
 			<Tool
 				Name="VCALinkTool"
-			/>
-			<Tool
-				Name="VCManifestTool"
 			/>
 			<Tool
 				Name="VCXDCMakeTool"
@@ -294,9 +265,6 @@
 			/>
 			<Tool
 				Name="VCFxCopTool"
-			/>
-			<Tool
-				Name="VCAppVerifierTool"
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"

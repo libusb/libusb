@@ -1,6 +1,10 @@
 To compile libusb 1.0 using Microsoft Visual Studio:
 
-Note: in the text below, (Win32) means "when producing 32 bit binaries" and
+Note 1: Two set of solution files are provided depending on whether you are
+running Visual Studio 2008 (MSVC9) or Visual Studio 2005 (MSVC8).
+Make sure you open the solution file matching your environment.
+
+Note 2: In the text below, (Win32) means "when producing 32 bit binaries" and
 (x64) "when producing 64 bit binaries". This is independent of whether your 
 platform is actually 32 or 64 bit.
 

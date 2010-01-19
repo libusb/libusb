@@ -2,10 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9.00"
-	Name="xusb"
-	ProjectGUID="{3F3138D0-7AB7-4268-9BF3-1A3EA5503A11}"
-	RootNamespace="examples"
-	Keyword="Win32Proj"
+	Name="libusb-1.0 (dll)"
+	ProjectGUID="{349EE8FA-7D25-4909-AAF5-FF3FADE72187}"
+	RootNamespace="libusbdll"
 	TargetFrameworkVersion="196613"
 	>
 	<Platforms>
@@ -21,11 +20,10 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples"
-			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples\$(ProjectName)"
-			ConfigurationType="1"
-			CharacterSet="1"
-			BuildLogFile="$(IntDir)\$(ProjectName).htm"
+			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
+			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
+			ConfigurationType="2"
+			CharacterSet="2"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -45,12 +43,11 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="E:\WinDDK\7600.16385.0\inc;..\msvc;..\"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
+				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
+				PreprocessorDefinitions="_WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
-				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="4"
 			/>
@@ -66,12 +63,10 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib pthreadVC2.lib"
-				LinkIncremental="2"
-				AdditionalLibraryDirectories="..\msvc"
+				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
+				AdditionalLibraryDirectories=".\msvc"
+				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				GenerateDebugInformation="true"
-				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
-				SubSystem="1"
-				TargetMachine="1"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -97,11 +92,10 @@
 		</Configuration>
 		<Configuration
 			Name="Debug|x64"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples"
-			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples\$(ProjectName)"
-			ConfigurationType="1"
-			CharacterSet="1"
-			BuildLogFile="$(IntDir)\$(ProjectName).htm"
+			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
+			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
+			ConfigurationType="2"
+			CharacterSet="2"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -122,12 +116,11 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="E:\WinDDK\7600.16385.0\inc;..\msvc;..\"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
+				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
+				PreprocessorDefinitions="_WIN32;_WIN64;_DEBUG;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
-				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="3"
 			/>
@@ -143,12 +136,10 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib"
-				LinkIncremental="2"
-				AdditionalLibraryDirectories="..\msvc"
+				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
+				AdditionalLibraryDirectories=".\msvc"
+				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				GenerateDebugInformation="true"
-				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
-				SubSystem="1"
-				TargetMachine="17"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -174,12 +165,11 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples"
-			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples\$(ProjectName)"
-			ConfigurationType="1"
-			CharacterSet="1"
+			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
+			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
+			ConfigurationType="2"
+			CharacterSet="2"
 			WholeProgramOptimization="1"
-			BuildLogFile="$(IntDir)\$(ProjectName).htm"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -200,11 +190,10 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="E:\WinDDK\7600.16385.0\inc;..\msvc;..\"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
+				PreprocessorDefinitions="_WIN32;_LIB;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
-				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="3"
 			/>
@@ -220,14 +209,9 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib pthreadVC2.lib"
-				LinkIncremental="1"
-				AdditionalLibraryDirectories="..\msvc"
-				GenerateDebugInformation="true"
-				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
-				SubSystem="1"
-				OptimizeReferences="2"
-				EnableCOMDATFolding="2"
-				TargetMachine="1"
+				OutputFile="$(OutDir)\libusb-1.0.dll"
+				AdditionalLibraryDirectories=".\msvc"
+				ModuleDefinitionFile="libusb\libusb-1.0.def"				
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -253,12 +237,11 @@
 		</Configuration>
 		<Configuration
 			Name="Release|x64"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples"
-			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples\$(ProjectName)"
-			ConfigurationType="1"
-			CharacterSet="1"
+			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
+			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
+			ConfigurationType="2"
+			CharacterSet="2"
 			WholeProgramOptimization="1"
-			BuildLogFile="$(IntDir)\$(ProjectName).htm"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -280,11 +263,10 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="E:\WinDDK\7600.16385.0\inc;..\msvc;..\"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
+				PreprocessorDefinitions="_WIN32;_WIN64;_LIB;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
-				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="3"
 			/>
@@ -300,14 +282,9 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib"
-				LinkIncremental="1"
-				AdditionalLibraryDirectories="..\msvc"
-				GenerateDebugInformation="true"
-				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
-				SubSystem="1"
-				OptimizeReferences="2"
-				EnableCOMDATFolding="2"
-				TargetMachine="17"
+				OutputFile="$(OutDir)\libusb-1.0.dll"
+				AdditionalLibraryDirectories=".\msvc"
+				ModuleDefinitionFile="libusb\libusb-1.0.def"				
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -341,7 +318,57 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\xusb.c"
+				RelativePath=".\libusb\core.c"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\descriptor.c"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\io.c"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\libusb-1.0.def"
+				>
+			</File>			
+			<File
+				RelativePath=".\libusb\sync.c"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\os\windows_compat.c"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\os\windows_usb.c"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="Header Files"
+			Filter="h;hpp;hxx;hm;inl;inc;xsd"
+			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
+			>
+			<File
+				RelativePath=".\config_msvc.h"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\libusb.h"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\libusbi.h"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\os\windows_compat.h"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\os\windows_usb.h"
 				>
 			</File>
 		</Filter>

@@ -39,7 +39,7 @@ case $host in
 	backend="windows"
 	LIBS="-lpthreadGC2 -lsetupapi -lole32"
 	AM_CFLAGS="-Wshadow"	
-	AM_LDFLAGS=""
+	AM_LDFLAGS="-no-undefined"
 	;;
 *-cygwin*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
@@ -48,7 +48,7 @@ case $host in
 	backend="windows"
 	LIBS="-lpthread -lsetupapi -lole32"
 	AM_CFLAGS=""	
-	AM_LDFLAGS=""
+	AM_LDFLAGS="-no-undefined"
 	;;	
 *)
 	AC_MSG_ERROR([unsupported operating system])
