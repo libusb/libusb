@@ -18,14 +18,23 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-// If using Visual Studio 2008 or earlier, Windows 7 is not defined...
 #if defined(_MSC_VER)
-#if !defined(_WIN32_WINNT_WIN7)
-#define _WIN32_WINNT_WIN7 0x601
-#endif
 #include <config_msvc.h>
+#include <api/sdkddkver.h>	// Windows 7 version for MSVC is defined here
+#include <api/windows.h>
+#include <api/setupapi.h>
+#include <api/sal_supp.h>
+#include <api/driverspecs.h>
+#include <api/usbiodef.h>
+#include <api/usbioctl.h>
+#include <api/cfgmgr32.h>
 #else
 #include <config.h>
+#include <windows.h>
+#include <setupapi.h>
+#include <ddk/usbiodef.h>
+#include <ddk/usbioctl.h>
+#include <ddk/cfgmgr32.h>
 #endif
 #include <ctype.h>
 #include <errno.h>
@@ -33,19 +42,6 @@
 #include <sched.h>
 #include <pthread.h>
 #include <stdio.h>
-#include <windows.h>
-#include <setupapi.h>
-#if defined(_MSC_VER)
-#include <api/sal_supp.h>
-#include <api/driverspecs.h>
-#include <api/usbiodef.h>
-#include <api/usbioctl.h>
-#include <api/cfgmgr32.h>
-#else
-#include <ddk/usbiodef.h>
-#include <ddk/usbioctl.h>
-#include <ddk/cfgmgr32.h>
-#endif
 #include <inttypes.h>
 #include <objbase.h>  // for string to GUID conv. requires libole32.a
 
