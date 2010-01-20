@@ -28,3 +28,9 @@ fpusb-*.tar.bz2
 fpusb-*.tar.gz
 ChangeLog
 doc/html
+*.plg
+*.ncb
+*.opt
+Debug
+Release
+*.user
