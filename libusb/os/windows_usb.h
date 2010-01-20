@@ -57,7 +57,7 @@ extern char *_strdup(const char *strSource);
 #define safe_strdup _strdup
 #define safe_sprintf _snprintf
 #define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
-void inline upperize(char* str) {
+inline void upperize(char* str) {
 	size_t i;
 	if (str == NULL) return;
 	for (i=0; i<strlen(str); i++)
@@ -66,6 +66,8 @@ void inline upperize(char* str) {
 
 #define MAX_CTRL_BUFFER_LENGTH      4096
 #define MAX_USB_DEVICES             256
+#define MAX_USB_STRING_LENGTH       128
+#define MAX_HID_REPORT_SIZE         1024 
 
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
@@ -77,8 +79,9 @@ void inline upperize(char* str) {
 
 // This is used to support multiple kernel drivers and USB APIs in Windows.
 struct windows_usb_api_backend {
-	const char *name;    // A human-readable name for your backend, e.g. "WinUSB"
+	const char *name;        // A human-readable name for your backend, e.g. "WinUSB"
 	const char *driver_name; // Driver's name, without .sys, e.g. "usbccgp"
+	const GUID *class_guid;  // The Class GUID (for fallback in case the driver name cannot be read)
 	const uint8_t id;
 	int (*init)(struct libusb_context *ctx);
 	int (*exit)(void);
@@ -134,20 +137,68 @@ static inline void windows_hcd_priv_release(struct windows_hcd_priv* p) {
 	safe_free(p->path);
 }
 
+// TODO: move hid desc to libusb.h?
+struct libusb_hid_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint16_t bcdHID;
+	uint8_t  bCountryCode;
+	uint8_t  bNumDescriptors;
+	uint8_t  bClassDescriptorType;
+	uint16_t wClassDescriptorLength;
+};
+#define LIBUSB_DT_HID_SIZE              9
+#define HID_MAX_CONFIG_DESC_SIZE (LIBUSB_DT_CONFIG_SIZE + LIBUSB_DT_INTERFACE_SIZE \
+	+ LIBUSB_DT_HID_SIZE + 2 * LIBUSB_DT_ENDPOINT_SIZE)
+#define HID_MAX_REPORT_SIZE             1024 
+#define HID_IN_EP                       0x81
+#define HID_OUT_EP                      0x02
+#define LIBUSB_REQ_RECIPIENT(request_type) ((request_type) & 0x1F)
+#define LIBUSB_REQ_TYPE(request_type) ((request_type) & (0x03 << 5))
+#define LIBUSB_REQ_IN(request_type) ((request_type) & LIBUSB_ENDPOINT_IN)
+#define LIBUSB_REQ_OUT(request_type) (!LIBUSB_REQ_IN(request_type))
 
-// Nodes (Hubs & devices)
+enum libusb_hid_request_type {
+	HID_REQ_GET_REPORT = 0x01,
+	HID_REQ_GET_IDLE = 0x02,
+	HID_REQ_GET_PROTOCOL = 0x03,
+	HID_REQ_SET_REPORT = 0x09,
+	HID_REQ_SET_IDLE = 0x0A,
+	HID_REQ_SET_PROTOCOL = 0x0B
+};
+
+enum libusb_hid_report_type {
+	HID_REPORT_TYPE_INPUT = 0x01,
+	HID_REPORT_TYPE_OUTPUT = 0x02,
+	HID_REPORT_TYPE_FEATURE = 0x03
+};
+
+
+struct hid_device_priv {
+	uint16_t vid;
+	uint16_t pid;
+	uint8_t config;
+	uint16_t output_report_size;
+	uint16_t input_report_size;
+	uint16_t feature_report_size;
+	WCHAR man_string[MAX_USB_STRING_LENGTH];
+	WCHAR prod_string[MAX_USB_STRING_LENGTH];
+	WCHAR ser_string[MAX_USB_STRING_LENGTH];
+};
+
 struct windows_device_priv {
 	struct libusb_device *parent_dev;   // access to parent is required for usermode ops
 	ULONG connection_index;             // also required for some usermode ops
 	char *path;                         // path used by Windows to reference the USB node
+	struct windows_usb_api_backend const *apib;
 	struct {
 		char *path;                     // each interface needs a Windows device interface path,
 		struct windows_usb_api_backend const *apib; // an API backend (multiple drivers support),
 		int8_t nb_endpoints;            // and a set of endpoint addresses (USB_MAXENDPOINTS)
 		uint8_t *endpoint;	            
 	} usb_interface[USB_MAXINTERFACES];
-	struct windows_usb_api_backend const *apib;
-	uint8_t composite_api_flags;
+	uint8_t composite_api_flags;        // HID and composite devices require additional data
+	struct hid_device_priv *hid;
 	uint8_t active_config;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
 	unsigned char **config_descriptor;  // list of pointers to the cached config descriptors
@@ -160,6 +211,7 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 	p->path = NULL;
 	p->apib = &usb_api_backend[USB_API_TEMPLATE];
 	p->composite_api_flags = 0;
+	p->hid = NULL;
 	p->active_config = 0;
 	p->config_descriptor = NULL;
 	memset(&(p->dev_descriptor), 0, sizeof(USB_DEVICE_DESCRIPTOR));
@@ -179,6 +231,7 @@ static inline void windows_device_priv_release(struct windows_device_priv* p, in
 			safe_free(p->config_descriptor[i]);
 	}
 	safe_free(p->config_descriptor);
+	safe_free(p->hid);
 	for (i=0; i<USB_MAXINTERFACES; i++) {
 		safe_free(p->usb_interface[i].path);
 		safe_free(p->usb_interface[i].endpoint);
@@ -189,14 +242,14 @@ static inline struct windows_device_priv *__device_priv(struct libusb_device *de
 	return (struct windows_device_priv *)dev->os_priv;
 }
 
-struct winusb_handles {
-	HANDLE file;
-	HANDLE winusb;
+struct interface_handle_t {
+	HANDLE winusb_file; // WinUSB needs an extra handle for the file
+	HANDLE handle;      // used by the API to communicate with the device
 };
 
 struct windows_device_handle_priv {
 	int active_interface;
-	struct winusb_handles interface_handle[USB_MAXINTERFACES];
+	struct interface_handle_t interface_handle[USB_MAXINTERFACES];
 };
 
 static inline struct windows_device_handle_priv *__device_handle_priv(
@@ -424,6 +477,7 @@ typedef struct {
   USHORT NumberFeatureDataIndices;
 } HIDP_CAPS, *PHIDP_CAPS;
 
+#define HIDP_STATUS_SUCCESS  0x110000
 typedef void* PHIDP_PREPARSED_DATA;
 DLL_DECLARE(WINAPI, BOOL, HidD_GetAttributes, (HANDLE, PHIDD_ATTRIBUTES));
 DLL_DECLARE(WINAPI, VOID, HidD_GetHidGuid, (LPGUID));

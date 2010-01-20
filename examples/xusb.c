@@ -402,9 +402,9 @@ int test_device(uint16_t vid, uint16_t pid)
 			if (iface == 0) {
 				// Maybe we need to detach the driver
 				perr("failed. Trying to detach driver...\n");
-				CALL_CHECK(libusb_detach_kernel_driver(handle, iface));
+				libusb_detach_kernel_driver(handle, iface);
 				printf("Claiming interface again...\n");
-				CALL_CHECK(libusb_claim_interface(handle, iface));
+				libusb_claim_interface(handle, iface);
 			} else {
 				printf("failed.\n");
 			}
@@ -449,7 +449,7 @@ int main(int argc, char** argv)
 
 	if (argc == 2) {
 		if ((argv[1][0] != '-') || (argv[1][1] == 'h')) {
-			printf("usage: %s [-h] [-i] [-j] [-k] [-x]\n", argv[0]);
+			printf("usage: %s [-h] [-i] [-j] [-k] [-l] [-x]\n", argv[0]);
 			printf("   -h: display usage\n");
 			printf("   -i: test IBM HID Optical Mouse\n");
 			printf("   -j: test OLIMEX ARM-USB-TINY JTAG, 2 channel composite device\n");
@@ -475,6 +475,12 @@ int main(int argc, char** argv)
 			VID = 0x0204;
 			PID = 0x6025;
 			test_mode = USE_KEY;
+			break;
+		case 'l':
+			// Plantronics DSP 400, 2 channel HID composite device - 1 HID interface
+			VID = 0x047F;
+			PID = 0x0CA1;
+			test_mode = USE_HID;
 			break;
 		default:
 			break;

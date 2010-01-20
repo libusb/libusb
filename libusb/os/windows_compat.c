@@ -119,7 +119,7 @@ static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
 
 // public fd data
-const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE};
+const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE, FALSE};
 struct winfd poll_fd[MAX_FDS];
 // internal fd data
 struct {
@@ -321,6 +321,7 @@ int pipe_for_poll(int filedes[2])
 			poll_fd[i].handle = handle[j];
 			poll_fd[i].overlapped = (j==0)?overlapped0:overlapped1;
 			poll_fd[i].rw = RW_READ+j;
+			poll_fd[i].completed_synchronously = FALSE;
 			j++;
 			if (j==1) {
 				// Start a 1 byte nonblocking read operation
@@ -518,7 +519,8 @@ struct winfd overlapped_to_winfd(OVERLAPPED* overlapped)
  */
 int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 {
-	unsigned int i, index, triggered = 0;
+	unsigned i, triggered = 0;
+	int index;
 	HANDLE *handles_to_wait_on = malloc(nfds*sizeof(HANDLE));
 	int *handle_to_index = malloc(nfds*sizeof(int));
 	DWORD nb_handles_to_wait_on = 0;
@@ -574,7 +576,8 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		printb("poll: fd[%d]=%d (overlapped = %p) got events %04X\n", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
 
 		// The following macro only works if overlapped I/O was reported pending
-		if (HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
+		if ( (HasOverlappedIoCompleted(poll_fd[index].overlapped))
+		  || (poll_fd[index].completed_synchronously) ) {
 			printb("  completed\n");
 			// checks above should ensure this works:
 			fds[i].revents = fds[i].events;
@@ -594,7 +597,7 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 	if (nb_handles_to_wait_on != 0)	{
 		printb("poll: starting %d ms wait for %d handles...\n", timeout, (int)nb_handles_to_wait_on);
 		ret = WaitForMultipleObjects(nb_handles_to_wait_on, handles_to_wait_on, 
-			FALSE, (timeout==-1)?INFINITE:timeout);
+			FALSE, (timeout==-1)?INFINITE:(DWORD)timeout);
 
 		if (((ret-WAIT_OBJECT_0) >= 0) && ((ret-WAIT_OBJECT_0) < nb_handles_to_wait_on)) {
 			printb("  completed after wait\n");
