@@ -1,24 +1,24 @@
-# Microsoft Developer Studio Project File - Name="libusb-static" - Package Owner=<4>
+# Microsoft Developer Studio Project File - Name="libusb_static" - Package Owner=<4>
 # Microsoft Developer Studio Generated Build File, Format Version 6.00
 # ** DO NOT EDIT **
 
 # TARGTYPE "Win32 (x86) Static Library" 0x0104
 
-CFG=libusb-static - Win32 Debug
+CFG=libusb_static - Win32 Debug
 !MESSAGE This is not a valid makefile. To build this project using NMAKE,
 !MESSAGE use the Export Makefile command and run
 !MESSAGE 
-!MESSAGE NMAKE /f "libusb-static.mak".
+!MESSAGE NMAKE /f "libusb_static.mak".
 !MESSAGE 
 !MESSAGE You can specify a configuration when running NMAKE
 !MESSAGE by defining the macro CFG on the command line. For example:
 !MESSAGE 
-!MESSAGE NMAKE /f "libusb-static.mak" CFG="libusb-static - Win32 Debug"
+!MESSAGE NMAKE /f "libusb_static.mak" CFG="libusb_static - Win32 Debug"
 !MESSAGE 
 !MESSAGE Possible choices for configuration are:
 !MESSAGE 
-!MESSAGE "libusb-static - Win32 Release" (based on "Win32 (x86) Static Library")
-!MESSAGE "libusb-static - Win32 Debug" (based on "Win32 (x86) Static Library")
+!MESSAGE "libusb_static - Win32 Release" (based on "Win32 (x86) Static Library")
+!MESSAGE "libusb_static - Win32 Debug" (based on "Win32 (x86) Static Library")
 !MESSAGE 
 
 # Begin Project
@@ -28,7 +28,7 @@ CFG=libusb-static - Win32 Debug
 CPP=cl.exe
 RSC=rc.exe
 
-!IF  "$(CFG)" == "libusb-static - Win32 Release"
+!IF  "$(CFG)" == "libusb_static - Win32 Release"
 
 # PROP BASE Use_MFC 0
 # PROP BASE Use_Debug_Libraries 0
@@ -41,7 +41,7 @@ RSC=rc.exe
 # PROP Intermediate_Dir "Win32/Release/lib"
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_MBCS" /D "_LIB" /YX /FD /c
-# ADD CPP /nologo /MD /W3 /GX /O2 /I "msvc" /I "libusb" /I "." /I "D:\Program Files\Microsoft SDK\include" /D "WIN32" /D "NDEBUG" /D "_MBCS" /D "_LIB" /FR /FD /EHsc /c
+# ADD CPP /nologo /MD /W3 /GX /O2 /I "msvc" /I "libusb" /I "." /D "WIN32" /D "NDEBUG" /D "_MBCS" /D "_LIB" /FR /FD /EHsc /c
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
 # ADD RSC /l 0x409 /d "NDEBUG"
 BSC32=bscmake.exe
@@ -51,7 +51,7 @@ LIB32=link.exe -lib
 # ADD BASE LIB32 /nologo
 # ADD LIB32 /nologo /out:"Win32/Release/lib/libusb-1.0.lib"
 
-!ELSEIF  "$(CFG)" == "libusb-static - Win32 Debug"
+!ELSEIF  "$(CFG)" == "libusb_static - Win32 Debug"
 
 # PROP BASE Use_MFC 0
 # PROP BASE Use_Debug_Libraries 1
@@ -64,7 +64,7 @@ LIB32=link.exe -lib
 # PROP Intermediate_Dir "Win32/Debug/lib"
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ /c
-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "msvc" /I "libusb" /I "." /I "D:\Program Files\Microsoft SDK\include" /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FR /FD /GZ /EHsc /c
+# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "msvc" /I "libusb" /I "." /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FR /FD /GZ /EHsc /c
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
 BSC32=bscmake.exe
@@ -78,8 +78,8 @@ LIB32=link.exe -lib
 
 # Begin Target
 
-# Name "libusb-static - Win32 Release"
-# Name "libusb-static - Win32 Debug"
+# Name "libusb_static - Win32 Release"
+# Name "libusb_static - Win32 Debug"
 # Begin Group "Source Files"
 
 # PROP Default_Filter "cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
