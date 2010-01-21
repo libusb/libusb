@@ -1,5 +1,8 @@
 /* config_msvc.h.  Manual config.h for MSVC.  */
 
+/* Default visibility */
+#define API_EXPORTED /**/
+
 /* Debug message logging */
 #define ENABLE_DEBUG_LOGGING 1
 
