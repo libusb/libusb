@@ -1,8 +1,5 @@
 /* config_msvc.h.  Manual config.h for MSVC.  */
 
-/* Default visibility */
-#define API_EXPORTED /**/
-
 /* Debug message logging */
 #define ENABLE_DEBUG_LOGGING 1
 
@@ -41,9 +38,3 @@
 
 /* Version number of package */
 #define VERSION "1.0.5"
-
-/* Define to `__inline__' or `__inline' if that's what the C compiler
-   calls it, or to nothing if 'inline' is not supported under any name.  */
-#ifndef __cplusplus
-/* #undef inline */
-#endif
