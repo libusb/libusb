@@ -20,22 +20,11 @@
 
 #if defined(_MSC_VER)
 #include <config_msvc.h>
-#include <api/sdkddkver.h>
-#include <api/windows.h>
-#include <api/setupapi.h>
-#include <api/sal_supp.h>
-#include <api/driverspecs.h>
-#include <api/usbiodef.h>
-#include <api/usbioctl.h>
-#include <api/cfgmgr32.h>
 #else
 #include <config.h>
+#endif
 #include <windows.h>
 #include <setupapi.h>
-#include <ddk/usbiodef.h>
-#include <ddk/usbioctl.h>
-#include <ddk/cfgmgr32.h>
-#endif
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -65,8 +54,7 @@
 	const GUID GUID_DEVINTERFACE_USB_DEVICE = {  0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED} };
 #endif
 
-// Additional GUID constants. The first one is supposed to be variable 
-// NB GUID_HID is setup through a call to HidD_GetHidGuid()
+// Additional GUID constants.
 const GUID GUID_NULL          = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} };
 const GUID GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
 const GUID GUID_LIBUSB_WINUSB = { 0x78a1c341, 0x4539, 0x11d3, {0xb8, 0x8d, 0x00, 0xc0, 0x4f, 0xad, 0x51, 0x71} };
@@ -603,7 +591,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
-		cd_data = (PUSB_CONFIGURATION_DESCRIPTOR)cd_buf_actual->Data;
+		cd_data = (PUSB_CONFIGURATION_DESCRIPTOR)((UCHAR*)cd_buf_actual+sizeof(USB_DESCRIPTOR_REQUEST));
 
 		if ((size != ret_size) || (cd_data->wTotalLength != cd_buf_short.data.wTotalLength)) {
 			usbi_err(ctx, "unexpected configuration descriptor size (actual).");
@@ -1044,6 +1032,7 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 		// Because MI_## are not necessarily in sequential order (some composite HID
 		// devices will have only MI_00 & MI_03 for instance), we retrieve the actual
 		// interface number from the path's MI value
+		interface_number = i;
 		for (j=0; sanitized_short[j] != 0; ) {
 			if ( (sanitized_short[j++] == 'M') && (sanitized_short[j++] == 'I')
 			  && (sanitized_short[j++] == '_') ) {
@@ -1054,8 +1043,8 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 		}
 		if (sanitized_short[j] == 0) {
 			// TODO: change this to debug?
-			usbi_warn(ctx, "failure to read interface number for %s. Will use default %d", i, sanitized_short);
-			interface_number = i;
+			usbi_warn(ctx, "failure to read interface number for %s. Using default value %d", 
+				sanitized_short, interface_number);
 		} 
 
 		for (j=0; j<nb_paths; j++) {

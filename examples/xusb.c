@@ -41,7 +41,7 @@
 #define	msleep(msecs) usleep(1000*msecs)
 #endif
 
-static int inline perr(char const *format, ...)
+inline static int perr(char const *format, ...)
 {
 	va_list args;
 	int r;
