@@ -7,7 +7,7 @@ DLLDEF=..\libusb-1.0.def
 MSC_WARNING_LEVEL=/W3
 !ENDIF
 
-!IFDEF WIN64
+!IFDEF _AMD64bit
 PTHREAD_LIB=pthreadVC2_x64.lib
 !ELSE
 PTHREAD_LIB=pthreadVC2.lib

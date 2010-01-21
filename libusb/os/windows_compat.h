@@ -77,12 +77,9 @@ struct winfd fd_to_winfd(int fd);
 struct winfd handle_to_winfd(HANDLE handle);
 struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);
 
-// On Windows, timeval (defined in WinSock.h) uses long for its members
-
-/*
- * Structure used in select() call, taken from the BSD file sys/time.h.
- */
+// When building using the MSDDK and sources
 #if defined(DDKBUILD)
+#if !defined(timeval)
 struct timeval {
         long    tv_sec;         /* seconds */
         long    tv_usec;        /* and microseconds */
@@ -101,6 +98,7 @@ struct timeval {
 
 #if !defined(timerclr)
 #define timerclear(tvp)         (tvp)->tv_sec = (tvp)->tv_usec = 0
+#endif
 #endif
 
 #if !defined(TIMESPEC_TO_TIMEVAL)
