@@ -1,0 +1,34 @@
+TARGETNAME=libusb
+TARGETTYPE=DYNLINK
+
+DLLDEF=..\libusb-1.0.def
+
+!IFNDEF MSC_WARNING_LEVEL
+MSC_WARNING_LEVEL=/W3
+!ENDIF
+
+!IFDEF WIN64
+PTHREAD_LIB=pthreadVC2_x64.lib
+!ELSE
+PTHREAD_LIB=pthreadVC2.lib
+!ENDIF
+
+USE_MSVCRT=1
+
+INCLUDES=..;..\..;..\..\msvc;$(DDK_INC_PATH)
+C_DEFINES = $(C_DEFINES) /DDDKBUILD
+
+TARGETLIBS=$(SDK_LIB_PATH)\kernel32.lib \
+           $(SDK_LIB_PATH)\advapi32.lib \
+           $(SDK_LIB_PATH)\user32.lib \
+           $(SDK_LIB_PATH)\setupapi.lib \
+           $(SDK_LIB_PATH)\ole32.lib \
+           ..\..\msvc\$(PTHREAD_LIB)
+
+SOURCES=..\core.c \
+	..\descriptor.c \
+	..\io.c \
+	..\sync.c \
+	windows_compat.c \
+	windows_usb.c
+

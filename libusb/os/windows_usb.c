@@ -2709,7 +2709,7 @@ static int _hid_get_config_descriptor(struct hid_device_priv* dev, void *data, i
 
 	cd->bLength = LIBUSB_DT_CONFIG_SIZE;
 	cd->bDescriptorType = LIBUSB_DT_CONFIG;
-	cd->wTotalLength = config_total_len;
+	cd->wTotalLength = (uint16_t) config_total_len;
 	cd->bNumInterfaces = 1;
 	cd->bConfigurationValue = 1;
 	cd->iConfiguration = 0;
@@ -2817,7 +2817,7 @@ static int _hid_get_hid_descriptor(struct hid_device_priv* dev, void *data, int 
 	d.bCountryCode = 0;
 	d.bNumDescriptors = 1;
 	d.bClassDescriptorType = LIBUSB_DT_REPORT;
-	d.wClassDescriptorLength = report_len;
+	d.wClassDescriptorLength = (uint16_t)report_len;
 
 	if(size > LIBUSB_DT_HID_SIZE)
 		size = LIBUSB_DT_HID_SIZE;
@@ -2923,6 +2923,7 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 		return size + 1;
 // TODO:
 //	return winio_write_sync(hid_handle, buf, size + 1, USBI_DEFAULT_TIMEOUT);
+	return -1;
 }
 
 static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data, int size)
@@ -2939,6 +2940,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 		return size + 1;
 // TODO:
 //	return winio_write_sync(hid_handle, buf, size + 1, USBI_DEFAULT_TIMEOUT);
+	return -1;
 }
 
 static int _hid_get_feature(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data, int size)

@@ -68,6 +68,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <windows.h>
 #include <pthread.h>
 #include <io.h>
@@ -520,7 +521,7 @@ struct winfd overlapped_to_winfd(OVERLAPPED* overlapped)
 int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 {
 	unsigned i, triggered = 0;
-	int index;
+	int index, object_index;
 	HANDLE *handles_to_wait_on = malloc(nfds*sizeof(HANDLE));
 	int *handle_to_index = malloc(nfds*sizeof(int));
 	DWORD nb_handles_to_wait_on = 0;
@@ -599,9 +600,10 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		ret = WaitForMultipleObjects(nb_handles_to_wait_on, handles_to_wait_on, 
 			FALSE, (timeout==-1)?INFINITE:(DWORD)timeout);
 
-		if (((ret-WAIT_OBJECT_0) >= 0) && ((ret-WAIT_OBJECT_0) < nb_handles_to_wait_on)) {
+		object_index = ret-WAIT_OBJECT_0;
+		if ((object_index >= 0) && ((DWORD)object_index < nb_handles_to_wait_on)) {
 			printb("  completed after wait\n");
-			i = handle_to_index[ret-WAIT_OBJECT_0];
+			i = handle_to_index[object_index];
 			index = _fd_to_index_and_lock(fds[i].fd);
 			fds[i].revents = fds[i].events;
 			triggered++;
