@@ -1,8 +1,8 @@
-To compile libusb 1.0 using Microsoft Visual Studio:
+To compile libusb 1.0 using either Microsoft Visual Studio or the Windows DDK
 
-Note 1: Two set of solution files are provided depending on whether you are
-running Visual Studio 2008 (MSVC9) or Visual Studio 2005 (MSVC8).
-Make sure you open the solution file matching your environment.
+Note 1: For Visual Studio, two set of solution files are provided depending on 
+whether you are running Visual Studio 2008 (MSVC9) or Visual Studio 2005 
+(MSVC8). For the DDK, the 'sources' file is located in libusb\os\.
 
 Note 2: In the text below, (Win32) means "when producing 32 bit binaries" and
 (x64) "when producing 64 bit binaries". This is independent of whether your 
@@ -35,20 +35,14 @@ platform is actually 32 or 64 bit.
 
 - Edit config_msvc.h according to your needs (you might want to comment out
   ENABLE_DEBUG_LOGGING).
-  
-- If you haven't done so, download and install the latest Windows DDK 
-  (http://www.microsoft.com/downloads/details.aspx?FamilyID=2105564e-1a9a-4bf4-8d74-ec5b52da3d00)
-  
-- In Visual Studio, go to Tools -> Options -> Projects and Solutions ->
-  VC++ directories and add the following to "Include files":
-  <path of Windows DDK>\inc
-  
-- Also in VC++ directories and add the following to "Library files":
-  <path of Windows DDK>\lib\<target platform>\<arch>
-  Where <targe platform> is one of wxp, wlh (Vista) or win7 and <arch> is
-  one of i386 or amd64, depending on whether Platform is Win32 or x64.
 
 You should now be able to compile the solution.
+
+Note that if the the compilation process complains about missing libraries,
+you will need to ensure that the default library paths for your project point
+to a directory that contains setupapi.lib and ole32.lib.
+If needed, these libraries can be obtained by downloading either the latest 
+Windows SDK or the DDK.
 
 The default solution is set to produce the static library and statically 
 linked binaries. The DLL is currently built as a standalone project.

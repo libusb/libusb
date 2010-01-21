@@ -65,11 +65,12 @@
  * TODO: Once MinGW supports it (or for other compilation platforms) use
  * CancelIoEx instead of CancelIo for Vista and later platforms
  */
+#include <windows.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <windows.h>
+#include <stdint.h>
 #include <pthread.h>
 #include <io.h>
 

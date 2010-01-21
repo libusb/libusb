@@ -40,6 +40,11 @@
 #define LIBUSB_DEVADDR_MAX UINT8_MAX
 #endif
 
+// Missing from MSVC6 setupapi.h
+#if !defined(SPDRP_ADDRESS)
+#define SPDRP_ADDRESS	28
+#endif
+
 #if defined(__CYGWIN__ )
 // cygwin produces a warning unless these prototypes are defined
 extern int _snprintf(char *buffer, size_t count, const char *format, ...);
