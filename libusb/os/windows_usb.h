@@ -72,12 +72,18 @@ inline void upperize(char* str) {
 #define MAX_CTRL_BUFFER_LENGTH      4096
 #define MAX_USB_DEVICES             256
 #define MAX_USB_STRING_LENGTH       128
-#define MAX_HID_REPORT_SIZE         1024 
+#define MAX_HID_REPORT_SIZE         1024
+#define MAX_HID_DESCRIPTOR_SIZE     256
 
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
 #define ERR_BUFFER_SIZE             256
 #define GUID_STRING_LENGTH          40
+
+// Handle code for HID interface that have been claimed ("dibs")
+#define INTERFACE_CLAIMED           ((HANDLE)0xD1B5)
+// Additional return code for HID operations that completed synchronously
+#define	LIBUSB_COMPLETED            (LIBUSB_SUCCESS + 1)
 
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 
@@ -177,7 +183,6 @@ enum libusb_hid_report_type {
 	HID_REPORT_TYPE_FEATURE = 0x03
 };
 
-
 struct hid_device_priv {
 	uint16_t vid;
 	uint16_t pid;
@@ -248,8 +253,8 @@ static inline struct windows_device_priv *__device_priv(struct libusb_device *de
 }
 
 struct interface_handle_t {
-	HANDLE winusb_file; // WinUSB needs an extra handle for the file
-	HANDLE handle;      // used by the API to communicate with the device
+	HANDLE dev_handle; // WinUSB needs an extra handle for the file
+	HANDLE api_handle;  // used by the API to communicate with the device
 };
 
 struct windows_device_handle_priv {
@@ -273,7 +278,6 @@ struct windows_transfer_priv {
 /*
  * Windows DDK API definitions. Most of it copied from MinGW's includes
  */
-
 typedef DWORD DEVNODE, DEVINST;
 typedef DEVNODE *PDEVNODE, *PDEVINST;
 typedef DWORD RETURN_TYPE;
@@ -287,23 +291,23 @@ typedef RETURN_TYPE	CONFIGRET;
 #define CMAPI DECLSPEC_IMPORT
 #endif
 
-#define USB_DEVICE_DESCRIPTOR_TYPE        LIBUSB_DT_DEVICE
-#define USB_CONFIGURATION_DESCRIPTOR_TYPE LIBUSB_DT_CONFIG
-#define USB_STRING_DESCRIPTOR_TYPE        LIBUSB_DT_STRING
-#define USB_INTERFACE_DESCRIPTOR_TYPE     LIBUSB_DT_INTERFACE
-#define USB_ENDPOINT_DESCRIPTOR_TYPE      LIBUSB_DT_ENDPOINT
+#define USB_DEVICE_DESCRIPTOR_TYPE              LIBUSB_DT_DEVICE
+#define USB_CONFIGURATION_DESCRIPTOR_TYPE       LIBUSB_DT_CONFIG
+#define USB_STRING_DESCRIPTOR_TYPE              LIBUSB_DT_STRING
+#define USB_INTERFACE_DESCRIPTOR_TYPE           LIBUSB_DT_INTERFACE
+#define USB_ENDPOINT_DESCRIPTOR_TYPE            LIBUSB_DT_ENDPOINT
 
-#define USB_REQUEST_GET_STATUS            LIBUSB_REQUEST_GET_STATUS
-#define USB_REQUEST_CLEAR_FEATURE         LIBUSB_REQUEST_CLEAR_FEATURE
-#define USB_REQUEST_SET_FEATURE           LIBUSB_REQUEST_SET_FEATURE
-#define USB_REQUEST_SET_ADDRESS           LIBUSB_REQUEST_SET_ADDRESS
-#define USB_REQUEST_GET_DESCRIPTOR        LIBUSB_REQUEST_GET_DESCRIPTOR
-#define USB_REQUEST_SET_DESCRIPTOR        LIBUSB_REQUEST_SET_DESCRIPTOR
-#define USB_REQUEST_GET_CONFIGURATION     LIBUSB_REQUEST_GET_CONFIGURATION
-#define USB_REQUEST_SET_CONFIGURATION     LIBUSB_REQUEST_SET_CONFIGURATION
-#define USB_REQUEST_GET_INTERFACE         LIBUSB_REQUEST_GET_INTERFACE
-#define USB_REQUEST_SET_INTERFACE         LIBUSB_REQUEST_SET_INTERFACE
-#define USB_REQUEST_SYNC_FRAME            LIBUSB_REQUEST_SYNCH_FRAME
+#define USB_REQUEST_GET_STATUS                  LIBUSB_REQUEST_GET_STATUS
+#define USB_REQUEST_CLEAR_FEATURE               LIBUSB_REQUEST_CLEAR_FEATURE
+#define USB_REQUEST_SET_FEATURE                 LIBUSB_REQUEST_SET_FEATURE
+#define USB_REQUEST_SET_ADDRESS                 LIBUSB_REQUEST_SET_ADDRESS
+#define USB_REQUEST_GET_DESCRIPTOR              LIBUSB_REQUEST_GET_DESCRIPTOR
+#define USB_REQUEST_SET_DESCRIPTOR              LIBUSB_REQUEST_SET_DESCRIPTOR
+#define USB_REQUEST_GET_CONFIGURATION           LIBUSB_REQUEST_GET_CONFIGURATION
+#define USB_REQUEST_SET_CONFIGURATION           LIBUSB_REQUEST_SET_CONFIGURATION
+#define USB_REQUEST_GET_INTERFACE               LIBUSB_REQUEST_GET_INTERFACE
+#define USB_REQUEST_SET_INTERFACE               LIBUSB_REQUEST_SET_INTERFACE
+#define USB_REQUEST_SYNC_FRAME                  LIBUSB_REQUEST_SYNCH_FRAME
 
 #define HCD_GET_ROOT_HUB_NAME                   258
 #define USB_GET_NODE_INFORMATION                258
@@ -316,16 +320,16 @@ typedef RETURN_TYPE	CONFIGRET;
 #endif
 
 #ifndef METHOD_BUFFERED
-#define METHOD_BUFFERED                   0
+#define METHOD_BUFFERED                         0
 #endif
 #ifndef FILE_ANY_ACCESS
-#define FILE_ANY_ACCESS                   0x00000000
+#define FILE_ANY_ACCESS                         0x00000000
 #endif
 #ifndef FILE_DEVICE_UNKNOWN
-#define FILE_DEVICE_UNKNOWN               0x00000022
+#define FILE_DEVICE_UNKNOWN                     0x00000022
 #endif
 #ifndef FILE_DEVICE_USB
-#define FILE_DEVICE_USB                   FILE_DEVICE_UNKNOWN
+#define FILE_DEVICE_USB                         FILE_DEVICE_UNKNOWN
 #endif
 
 #ifndef CTL_CODE

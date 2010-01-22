@@ -1,7 +1,7 @@
 To compile libusb 1.0 using either Microsoft Visual Studio or the Windows DDK
 
-Note 1: For Visual Studio, two set of solution files are provided depending on 
-whether you are running Visual Studio 2008 (MSVC9) or Visual Studio 2005 
+Note 1: For Visual Studio, 3 sets of solution files are provided depending on 
+whether you are running MSVC6, Visual Studio 2008 (MSVC9) or Visual Studio 2005 
 (MSVC8). For the DDK, the 'sources' file is located in libusb\os\.
 
 Note 2: In the text below, (Win32) means "when producing 32 bit binaries" and
