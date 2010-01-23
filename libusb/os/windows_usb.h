@@ -83,7 +83,7 @@ inline void upperize(char* str) {
 // Handle code for HID interface that have been claimed ("dibs")
 #define INTERFACE_CLAIMED           ((HANDLE)0xD1B5)
 // Additional return code for HID operations that completed synchronously
-#define	LIBUSB_COMPLETED            (LIBUSB_SUCCESS + 1)
+#define LIBUSB_COMPLETED            (LIBUSB_SUCCESS + 1)
 
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 

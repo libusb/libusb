@@ -2774,14 +2774,16 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 
 	*size += 1;
 	// Use ReadFile instead of HidD_GetInputReport for async I/O
+	// NB: HidD_GetInputReport returns the last Input Report read whereas ReadFile
+	// waits for input to be generated => in case your HID device requires human 
+	// action to generate a report, it may wait indefinitely
+	// TODO: give users a choice?
 	if (!ReadFile(hid_handle, buf, *size, NULL, overlapped)) {
-		if(GetLastError() != ERROR_IO_PENDING) {
-			usbi_dbg("READFILE FAILED");
+		if (GetLastError() != ERROR_IO_PENDING) {
+			usbi_dbg("Failed to Read HID Input Report: %s", windows_error_str(0));
 			return LIBUSB_ERROR_IO;
 		}
-		usbi_dbg("IO_PENDING");
 	} else {
-		usbi_dbg("IO_SYNC");
 		return LIBUSB_COMPLETED;
 	}
 
@@ -2803,6 +2805,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	// Une WriteFile instead of HidD_SetOutputReport for async I/O
 	if (!WriteFile(hid_handle, buf, *size, NULL, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
+			usbi_dbg("Failed to Write HID Output Report: %s", windows_error_str(0));
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
@@ -2936,6 +2939,7 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 		  && (priv->usb_interface[i].apib->id == USB_API_HID) ) {
 			hid_handle = CreateFileA(priv->usb_interface[i].path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, 
 				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
+			usbi_dbg("hid_handle = %p", hid_handle);
 			/*
 			 * http://www.lvr.com/hidfaq.htm: Why do I receive "Access denied" when attempting to access my HID?
 			 * "Windows 2000 and later have exclusive read/write access to HIDs that are configured as a system 

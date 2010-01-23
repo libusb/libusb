@@ -117,6 +117,7 @@ enum test_type {
 	USE_KEY,
 	USE_JTAG,
 	USE_HID,
+	USE_SIDEWINDER,
 } test_mode;
 uint16_t VID, PID;
 
@@ -335,6 +336,52 @@ int test_mass_storage(libusb_device_handle *handle)
 	return 0;
 }
 
+// Plantronics (HID)
+int display_plantronics_status(libusb_device_handle *handle)
+{
+	int r;
+	uint8_t input_report[2];
+	printf("Reading Plantronics Input Report...\n");
+	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
+		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 2, 5000);
+	if (r >= 0) {
+		printf("  OK\n");
+	} else {
+		switch(r) {
+		case LIBUSB_ERROR_TIMEOUT:
+			printf("  Timeout! Please make sure you press the mute button within the 5 seconds allocated...\n");
+			break;
+		default:
+			printf("  Error: %d\n", r);
+			break;
+		}
+	}
+	return 0;
+}
+
+// SideWinder (HID)
+int display_sidewinder_status(libusb_device_handle *handle)
+{
+	int r;
+	uint8_t input_report[6];
+	printf("Reading SideWinder Input Report.\n");
+	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
+		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 6, 5000);
+	if (r >= 0) {
+		printf("  OK\n");
+	} else {
+		switch(r) {
+		case LIBUSB_ERROR_TIMEOUT:
+			printf("  Timeout! Please make sure you use the joystick within the 5 seconds allocated...\n\n");
+			break;
+		default:
+			printf("  Error: %d\n", r);
+			break;
+		}
+	}
+	return 0;
+}
+
 int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
@@ -342,9 +389,10 @@ int test_device(uint16_t vid, uint16_t pid)
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
-	int iface, nb_ifaces;
+	int iface, nb_ifaces, nb_strings;
 	int test_scsi = 0;
 	struct libusb_device_descriptor dev_desc;
+	char string[128];
 
 	printf("Opening device...\n");
 	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
@@ -394,6 +442,8 @@ int test_device(uint16_t vid, uint16_t pid)
 	}
 	libusb_free_config_descriptor(conf_desc);
 
+	// On Windows, autoclaim will sort things out
+#ifndef OS_WINDOWS
 	for (iface = 0; iface < nb_ifaces; iface++)
 	{
 		printf("Claiming interface %d...\n", iface);
@@ -410,17 +460,34 @@ int test_device(uint16_t vid, uint16_t pid)
 			}
 		}
 	}
+#endif
 
-	if (test_mode == USE_XBOX) {
+	r = libusb_get_string_descriptor(handle, 0, 0, string, 128);
+	if (r > 0) {
+		nb_strings = string[0];
+		printf("Retrieving string descriptors...\n");
+		for (i=1; i<nb_strings; i++) {
+			if (libusb_get_string_descriptor_ascii(handle, i, string, 128) >= 0) {
+				printf("string (%d/%d): \"%s\"\n", i, nb_strings-1, string);
+			}
+		}
+	}
+	
+	switch(test_mode) {
+	case USE_XBOX:
 		CALL_CHECK(display_xbox_status(handle));
 		CALL_CHECK(set_xbox_actuators(handle, 128, 222));
 		msleep(2000);
 		CALL_CHECK(set_xbox_actuators(handle, 0, 0));
-	} else {
-		char string[128];
-		printf("Retieving string descriptor...\n");
-		CALL_CHECK(libusb_get_string_descriptor_ascii(handle, 2, string, 128));
-		printf("Got string: \"%s\"\n", string);
+		break;
+	case USE_SIDEWINDER:
+		display_sidewinder_status(handle);
+		break;
+	case USE_HID:
+		display_plantronics_status(handle);
+		break;
+	default:
+		break;
 	}
 
 	if (test_scsi) {
@@ -449,11 +516,12 @@ int main(int argc, char** argv)
 
 	if (argc == 2) {
 		if ((argv[1][0] != '-') || (argv[1][1] == 'h')) {
-			printf("usage: %s [-h] [-i] [-j] [-k] [-l] [-x]\n", argv[0]);
+			printf("usage: %s [-h] [-i] [-j] [-k] [-l] [-s] [-x]\n", argv[0]);
 			printf("   -h: display usage\n");
 			printf("   -i: test IBM HID Optical Mouse\n");
 			printf("   -j: test OLIMEX ARM-USB-TINY JTAG, 2 channel composite device\n");
 			printf("   -k: test Generic 2 GB USB Key\n");
+			printf("   -s: test Microsoft Sidwinder Precision Pro\n");
 			printf("   -x: test Microsoft XBox Controller Type S (default)\n");
 			return 0;
 		}
@@ -481,6 +549,12 @@ int main(int argc, char** argv)
 			VID = 0x047F;
 			PID = 0x0CA1;
 			test_mode = USE_HID;
+			break;
+		case 's':
+			// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
+			VID = 0x045E;
+			PID = 0x0008;
+			test_mode = USE_SIDEWINDER;
 			break;
 		default:
 			break;
