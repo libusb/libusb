@@ -132,7 +132,7 @@ struct {
 
 // globals
 BOOLEAN is_polling_set = FALSE;
-unsigned short pipe_number = 0;
+LONG pipe_number = 0;
 
 // Init
 void init_polling(void)
@@ -270,6 +270,7 @@ int pipe_for_poll(int filedes[2])
 	HANDLE handle[2];
 	OVERLAPPED *overlapped0, *overlapped1;
 	char pipe_name[] = "\\\\.\\pipe\\libusb000000000000";
+	LONG our_pipe_number;
 
 	CHECK_INIT_POLLING;
 
@@ -284,7 +285,9 @@ int pipe_for_poll(int filedes[2])
 		return -1;
 	}
 
-	_snprintf(pipe_name, sizeof(pipe_name), "\\\\.\\pipe\\libusb%08x%04x", (unsigned)GetCurrentProcessId(), pipe_number++);
+	our_pipe_number  = InterlockedIncrement(&pipe_number) - 1; // - 1 to mirror postfix operation inside _snprintf
+	our_pipe_number &= 0xFFFF; // Could warn if this was necessary (ToDo)
+	_snprintf(pipe_name, sizeof(pipe_name), "\\\\.\\pipe\\libusb%08x%04x", (unsigned)GetCurrentProcessId(), our_pipe_number);
 
 	// Read end of the pipe
 	handle[0] = CreateNamedPipeA(pipe_name, PIPE_ACCESS_INBOUND|FILE_FLAG_OVERLAPPED,
