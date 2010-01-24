@@ -2148,7 +2148,7 @@ API_EXPORTED int libusb_get_next_timeout(libusb_context *ctx,
 	}
 	TIMESPEC_TO_TIMEVAL(&cur_tv, &cur_ts);
 
-	if (timercmp(&cur_tv, next_timeout, >=)) {
+	if (!timercmp(&cur_tv, next_timeout, <)) {
 		usbi_dbg("first timeout already expired");
 		timerclear(tv);
 	} else {
