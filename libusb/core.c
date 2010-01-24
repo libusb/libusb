@@ -521,8 +521,10 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 		return NULL;
 
 	r = pthread_mutex_init(&dev->lock, NULL);
-	if (r)
+	if (r) {
+		free(dev);
 		return NULL;
+	}
 
 	dev->ctx = ctx;
 	dev->refcnt = 1;
