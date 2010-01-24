@@ -1703,6 +1703,51 @@ static int handle_timeouts(struct libusb_context *ctx)
 	return 0;
 }
 #else
+/* Note: there is code duplication between handle_timeouts_locked and
+ * handle_timeouts, as tranfer cancellation from the backend requires
+ * flying_transfers locks that are not set wholesale */
+static int handle_timeouts_locked(struct libusb_context *ctx)
+{
+	int r;
+	struct timespec systime_ts;
+	struct timeval systime;
+	struct usbi_transfer *transfer;
+
+	if (list_empty(&ctx->flying_transfers))
+		return 0;
+
+	/* get current time */
+	r = usbi_backend->clock_gettime(USBI_CLOCK_MONOTONIC, &systime_ts);
+	if (r < 0)
+		return r;
+
+	TIMESPEC_TO_TIMEVAL(&systime, &systime_ts);
+
+	/* iterate through flying transfers list, finding all transfers that
+	 * have expired timeouts */
+	list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
+		struct timeval *cur_tv = &transfer->timeout;
+
+		/* if we've reached transfers of infinite timeout, we're all done */
+		if (!timerisset(cur_tv))
+			return 0;
+
+		/* ignore timeouts we've already handled */
+		if (transfer->flags & USBI_TRANSFER_TIMED_OUT)
+			continue;
+
+		/* if transfer has non-expired timeout, nothing more to do */
+		if ((cur_tv->tv_sec > systime.tv_sec) ||
+				(cur_tv->tv_sec == systime.tv_sec &&
+					cur_tv->tv_usec > systime.tv_usec))
+			return 0;
+	
+		/* otherwise, we've got an expired timeout to handle */
+		handle_timeout(transfer);
+	}
+	return 0;
+}
+
 static int handle_timeouts(struct libusb_context *ctx)
 {
 	int r;
