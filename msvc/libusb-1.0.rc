@@ -21,6 +21,23 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #pragma code_page(1252)
 #endif //_WIN32
 
+#ifdef _DEBUG
+#define VER_ORIGINALFILENAME_STR "libusb-1.0_debug.dll\0"
+#else
+#define VER_ORIGINALFILENAME_STR "libusb-1.0.dll\0"
+#endif
+
+#define VER_MAJOR        1
+#define VER_MAJOR_STR   "1"
+#define VER_MINOR        0
+#define VER_MINOR_STR   "0"
+#define VER_MICRO        5
+#define VER_MICRO_STR   "5"
+#define VER_NANO         0
+#define VER_NANO_STR    "0"
+#define VER_VERSION_STR VER_MAJOR_STR ", " VER_MINOR_STR ", " VER_MICRO_STR ", " VER_NANO_STR "\0"
+
+
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -54,8 +71,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,5,0
- PRODUCTVERSION 1,0,5,0
+ FILEVERSION VER_MAJOR,VER_MINOR,VER_MICRO,VER_NANO
+ PRODUCTVERSION VER_MAJOR,VER_MINOR,VER_MICRO,VER_NANO
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -72,15 +89,15 @@ BEGIN
         BEGIN
             VALUE "Comments", "\0"
             VALUE "CompanyName", "libusb.org\0"
-            VALUE "FileDescription", "libusb\0"
-            VALUE "FileVersion", "1, 0, 5, 0\0"
+            VALUE "FileDescription", "libusb-1\0"
+            VALUE "FileVersion", VER_VERSION_STR
             VALUE "InternalName", "libusb\0"
-            VALUE "LegalCopyright", "(c) 2010 the Libusb Team, GNU LGPL v2.1 or later.\0"
+            VALUE "LegalCopyright", "(c) 2010 the Libusb Team, GNU LGPL v2.1 or later, see individual source files.\0"
             VALUE "LegalTrademarks", "http://www.gnu.org/licenses/lgpl-2.1.html\0"
-            VALUE "OriginalFilename", "libusb-1.0_debug.dll\0"
+            VALUE "OriginalFilename", VER_ORIGINALFILENAME_STR
             VALUE "PrivateBuild", "\0"
-            VALUE "ProductName", "libusb\0"
-            VALUE "ProductVersion", "1, 0, 5, 0\0"
+            VALUE "ProductName", "libusb-1\0"
+            VALUE "ProductVersion", VER_VERSION_STR
             VALUE "SpecialBuild", "\0"
         END
     END
