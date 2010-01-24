@@ -883,8 +883,10 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 		return LIBUSB_ERROR_NO_MEM;
 
 	r = pthread_mutex_init(&_handle->lock, NULL);
-	if (r)
+	if (r) {
+		free(_handle);
 		return LIBUSB_ERROR_OTHER;
+	}
 
 	_handle->dev = libusb_ref_device(dev);
 	_handle->claimed_interfaces = 0;
@@ -893,6 +895,7 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	r = usbi_backend->open(_handle);
 	if (r < 0) {
 		libusb_unref_device(dev);
+		pthread_mutex_destroy(&_handle->lock);
 		free(_handle);
 		return (int)r;
 	}
@@ -1004,6 +1007,7 @@ static void do_close(struct libusb_context *ctx,
 
 	usbi_backend->close(dev_handle);
 	libusb_unref_device(dev_handle->dev);
+	pthread_mutex_destroy(&dev_handle->lock);
 	free(dev_handle);
 }
 
@@ -1507,6 +1511,10 @@ API_EXPORTED int libusb_init(libusb_context **context)
 	if (!usbi_default_context) {
 		usbi_dbg("created default context");
 		usbi_default_context = ctx;
+	} else if (!context) {
+		pthread_mutex_unlock(&default_context_lock);
+		libusb_exit(ctx); /* free superfluous context; use default context */
+		return 0;
 	}
 	pthread_mutex_unlock(&default_context_lock);
 
@@ -1515,6 +1523,8 @@ API_EXPORTED int libusb_init(libusb_context **context)
 	return 0;
 
 err:
+	pthread_mutex_destroy(&ctx->open_devs_lock);
+	pthread_mutex_destroy(&ctx->usb_devs_lock);
 	free(ctx);
 	return r;
 }
@@ -1545,6 +1555,8 @@ API_EXPORTED void libusb_exit(struct libusb_context *ctx)
 	}
 	pthread_mutex_unlock(&default_context_lock);
 
+	pthread_mutex_destroy(&ctx->open_devs_lock);
+	pthread_mutex_destroy(&ctx->usb_devs_lock);
 	free(ctx);
 }
 
