@@ -53,7 +53,7 @@ inline static int perr(char const *format, ...)
 	return r;
 }
 
-#define ERR_EXIT(errcode) do { perr("  libusb error: %d\n", errcode); return -1; } while (0)
+#define ERR_EXIT(errcode) do { perr("  %s\n", libusb_strerror(errcode)); return -1; } while (0)
 #define CALL_CHECK(fcall) do { r=fcall; if (r < 0) ERR_EXIT(r); } while (0);
 #define B(x) (((x)!=0)?1:0)
 #define be_to_int32(buf) (((buf)[0]<<24)|((buf)[1]<<16)|((buf)[2]<<8)|(buf)[3])
