@@ -92,7 +92,7 @@ BEGIN
             VALUE "FileDescription", "libusb-1\0"
             VALUE "FileVersion", VER_VERSION_STR
             VALUE "InternalName", "libusb\0"
-            VALUE "LegalCopyright", "(c) 2010 the Libusb Team, GNU LGPL v2.1 or later, see individual source files.\0"
+            VALUE "LegalCopyright", "See individual source files, GNU LGPL v2.1 or later.\0"
             VALUE "LegalTrademarks", "http://www.gnu.org/licenses/lgpl-2.1.html\0"
             VALUE "OriginalFilename", VER_ORIGINALFILENAME_STR
             VALUE "PrivateBuild", "\0"
