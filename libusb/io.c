@@ -1015,6 +1015,8 @@ int usbi_io_init(struct libusb_context *ctx)
 {
 	int r;
 
+	/* We could destroy these mutexes in all the failure cases below,
+	 * but that would substantially complicate the code. */
 	pthread_mutex_init(&ctx->flying_transfers_lock, NULL);
 	pthread_mutex_init(&ctx->pollfds_lock, NULL);
 	pthread_mutex_init(&ctx->pollfd_modify_lock, NULL);
@@ -1063,8 +1065,16 @@ void usbi_io_exit(struct libusb_context *ctx)
 		close(ctx->timerfd);
 	}
 #endif
+	pthread_mutex_destroy(&ctx->flying_transfers_lock);
+	pthread_mutex_destroy(&ctx->pollfds_lock);
+	pthread_mutex_destroy(&ctx->pollfd_modify_lock);
+	pthread_mutex_destroy(&ctx->events_lock);
+	pthread_mutex_destroy(&ctx->event_waiters_lock);
+	pthread_cond_destroy(&ctx->event_waiters_cond);
 }
 
+/* Converts the relative timeout in the libusb_transfer "rider"
+ * to an absolute timeout in usbi_transfer */
 static int calculate_timeout(struct usbi_transfer *transfer)
 {
 	int r;
@@ -1848,8 +1858,10 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 	/* TODO: malloc when number of fd's changes, not on every poll */
 	fds = malloc(sizeof(*fds) * nfds);
-	if (!fds)
+	if (!fds) {
+		pthread_mutex_unlock(&ctx->pollfds_lock);
 		return LIBUSB_ERROR_NO_MEM;
+	}
 
 	list_for_each_entry(ipollfd, &ctx->pollfds, list, struct usbi_pollfd) {
 		struct libusb_pollfd *pollfd = &ipollfd->pollfd;
