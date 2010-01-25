@@ -90,6 +90,10 @@
 #endif
 #endif
 
+#if defined(_PREFAST_)
+#pragma warning(disable:28719)
+#endif
+
 #if defined(__CYGWIN__ )
 // cygwin produces a warning unless these prototypes are defined
 extern int _close(int fd);

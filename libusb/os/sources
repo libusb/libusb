@@ -1,4 +1,4 @@
-TARGETNAME=libusb
+TARGETNAME=libusb-1.0
 TARGETTYPE=DYNLINK
 
 DLLDEF=..\libusb-1.0.def
@@ -30,5 +30,6 @@ SOURCES=..\core.c \
 	..\io.c \
 	..\sync.c \
 	windows_compat.c \
-	windows_usb.c
+	windows_usb.c \
+	libusb-1.0.rc
 

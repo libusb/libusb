@@ -43,6 +43,10 @@
 #include "windows_compat.h"
 #include "windows_usb.h"
 
+#if defined(_PREFAST_)
+#pragma warning(disable:28719)
+#endif
+
 // These GUIDs appear undefined on MinGW32
 #if !defined(GUID_DEVINTERFACE_USB_HOST_CONTROLLER)
 	// http://msdn.microsoft.com/en-us/library/bb663109.aspx
@@ -59,7 +63,6 @@ const GUID GUID_NULL          = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00,
 const GUID GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
 const GUID GUID_LIBUSB_WINUSB = { 0x78a1c341, 0x4539, 0x11d3, {0xb8, 0x8d, 0x00, 0xc0, 0x4f, 0xad, 0x51, 0x71} };
 const GUID GUID_COMPOSITE     = { 0x36fc9e60, 0xc465, 0x11cf, {0x80, 0x56, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00} };
-const GUID GUID_MEDIA_IF      = { 0x6994AD04, 0x93EF, 0x11D0, {0xA3, 0xCC, 0x00, 0xA0, 0xC9, 0x22, 0x31, 0x96} };
 
 // The 2 macros below are used in conjunction with safe loops.
 #define LOOP_CHECK(fcall) { r=fcall; if (r != LIBUSB_SUCCESS) continue; }
@@ -861,10 +864,12 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
  */
 static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, struct windows_device_priv *priv)
 {
+// indexes for additional interface GUIDs, not available from "USB" 
+// SetupDiGetClassDevs enumeration should go here. Typically, these are 
+// device interfaces that begin with something else than "\\?\usb\"
 enum libusb_hid_report_type {
 	HID_DEVICE_INTERFACE_GUID_INDEX   = 0,
-	MEDIA_DEVICE_INTERFACE_GUID_INDEX = 1,
-	MAX_DEVICE_INTERFACE_GUID_INDEX   = 2
+	MAX_DEVICE_INTERFACE_GUID_INDEX   = 1
 };
 
 	DEVINST child_devinst, parent_devinst;
@@ -893,10 +898,10 @@ enum libusb_hid_report_type {
 	}
 
 	// Manually add the HID GUID as it cannot be read with DeviceInterfaceGUIDs reg key)
-	// NB the value returned by HidD_GetHidGuid, which is for interface class is different from GUID_HID
+	// NB the value returned by HidD_GetHidGuid, which is for interface class is different
+	// from GUID_HID, which is the device class GUID
 	HidD_GetHidGuid(&guid_table[HID_DEVICE_INTERFACE_GUID_INDEX]);
-	guid_table[MEDIA_DEVICE_INTERFACE_GUID_INDEX] = GUID_MEDIA_IF;
-	// TODO: use SetupDiClassGuidsFromName?
+	// NB: for other interface guids, SetupDiClassGuidsFromName can be used
 	max_guids = MAX_DEVICE_INTERFACE_GUID_INDEX;
 
 	// First, retrieve all the device interface GUIDs
@@ -906,18 +911,10 @@ enum libusb_hid_report_type {
 		if (!SetupDiEnumDeviceInfo(dev_info, i, &dev_info_data)) {
 			break;
 		}
-/*
-		if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_CLASSGUID, 
-			NULL, (BYTE*)driver, MAX_KEY_LENGTH, &size)) {
-			usbi_warn(ctx, "could not read class GUID: %s", windows_error_str(0));
-			continue;
-		}
-		usbi_dbg("class GUID: %s", driver);
-*/
 
 		key = SetupDiOpenDevRegKey(dev_info, &dev_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
 		if (key == INVALID_HANDLE_VALUE) {
-			usbi_dbg("invalid handle");
+			usbi_dbg("could not open registry key");
 			continue;
 		}
 
@@ -954,7 +951,6 @@ enum libusb_hid_report_type {
 	for (j=0; j<max_guids; j++)
 	{
 		guid = guid_table[j];
-//		usbi_dbg("GUID %d: %s", j, guid_to_string(guid_table[j]));
 
 		for (i = 0; ; i++)	
 		{
