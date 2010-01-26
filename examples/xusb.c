@@ -467,7 +467,7 @@ int test_device(uint16_t vid, uint16_t pid)
 		nb_strings = string[0];
 		printf("Retrieving string descriptors...\n");
 		for (i=1; i<nb_strings; i++) {
-			if (libusb_get_string_descriptor_ascii(handle, i, string, 128) >= 0) {
+			if (libusb_get_string_descriptor_ascii(handle, (uint8_t)i, string, 128) >= 0) {
 				printf("string (%d/%d): \"%s\"\n", i, nb_strings-1, string);
 			}
 		}
@@ -505,7 +505,11 @@ int test_device(uint16_t vid, uint16_t pid)
 	return 0;
 }
 
-int main(int argc, char** argv)
+int
+#ifdef _MSC_VER
+__cdecl
+#endif
+main(int argc, char** argv)
 {
 	int r;
 

@@ -1716,6 +1716,7 @@ static int handle_timeouts(struct libusb_context *ctx)
 /* Note: there is code duplication between handle_timeouts_locked and
  * handle_timeouts, as tranfer cancellation from the backend requires
  * flying_transfers locks that are not set wholesale */
+#ifndef OS_WINDOWS
 static int handle_timeouts_locked(struct libusb_context *ctx)
 {
 	int r;
@@ -1757,6 +1758,7 @@ static int handle_timeouts_locked(struct libusb_context *ctx)
 	}
 	return 0;
 }
+#endif
 
 static int handle_timeouts(struct libusb_context *ctx)
 {

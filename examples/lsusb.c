@@ -41,7 +41,11 @@ static void print_devs(libusb_device **devs)
 	}
 }
 
-int main(void)
+int
+#ifdef _MSC_VER
+__cdecl
+#endif
+main(void)
 {
 	libusb_device **devs;
 	int r;

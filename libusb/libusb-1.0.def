@@ -53,3 +53,4 @@ EXPORTS
 	libusb_get_next_timeout
 	libusb_get_pollfds
 	libusb_set_pollfd_notifiers
+	libusb_strerror

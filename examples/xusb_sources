@@ -1,0 +1,36 @@
+TARGETNAME=xusb
+TARGETTYPE=PROGRAM
+
+_NT_TARGET_VERSION= $(_NT_TARGET_VERSION_WINXP)
+
+!IFNDEF MSC_WARNING_LEVEL
+
+MSC_WARNING_LEVEL=/W3
+
+!ENDIF
+
+
+
+!IF "$(_BUILDARCH)"=="AMD64"
+
+PTHREAD_LIB=pthreadVC2_x64.lib
+
+!ELSE
+
+PTHREAD_LIB=pthreadVC2.lib
+
+!ENDIF
+
+
+
+USE_MSVCRT=1
+
+UMTYPE=console
+
+INCLUDES=..\..\msvc;..\..;$(DDK_INC_PATH)
+
+UMLIBS=..\..\msvc\$(PTHREAD_LIB) \
+	..\..\libusb\os\obj$(BUILD_ALT_DIR)\*\libusb-1.0.lib
+
+SOURCES=..\xusb.c
+
