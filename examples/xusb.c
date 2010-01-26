@@ -128,19 +128,19 @@ int display_xbox_status(libusb_device_handle *handle)
 {
 	int r;
 	uint8_t input_report[20];
-	printf("Retrieving XBox Input Report...\n");
+	printf("\nReading XBox Input Report...\n");
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 20, 1000));
-	printf("D-pad: %02X\n", input_report[2]&0x0F);
-	printf("Start:%d, Back:%d, Left Stick Press:%d, Right Stick Press:%d\n", B(input_report[2]&0x10), B(input_report[2]&0x20),
+	printf("   D-pad: %02X\n", input_report[2]&0x0F);
+	printf("   Start:%d, Back:%d, Left Stick Press:%d, Right Stick Press:%d\n", B(input_report[2]&0x10), B(input_report[2]&0x20),
 		B(input_report[2]&0x40), B(input_report[2]&0x80));
 	// A, B, X, Y, Black, White are pressure sensitive
-	printf("A:%d, B:%d, X:%d, Y:%d, White:%d, Black:%d\n", input_report[4], input_report[5], 
+	printf("   A:%d, B:%d, X:%d, Y:%d, White:%d, Black:%d\n", input_report[4], input_report[5], 
 		input_report[6], input_report[7], input_report[9], input_report[8]);
-	printf("Left Trigger: %d, Right Trigger: %d\n", input_report[10], input_report[11]);
-	printf("Left Analog (X,Y): (%d,%d)\n", (int16_t)((input_report[13]<<8)|input_report[12]), 
+	printf("   Left Trigger: %d, Right Trigger: %d\n", input_report[10], input_report[11]);
+	printf("   Left Analog (X,Y): (%d,%d)\n", (int16_t)((input_report[13]<<8)|input_report[12]), 
 		(int16_t)((input_report[15]<<8)|input_report[14]));
-	printf("Right Analog (X,Y): (%d,%d)\n", (int16_t)((input_report[17]<<8)|input_report[16]), 
+	printf("   Right Analog (X,Y): (%d,%d)\n", (int16_t)((input_report[17]<<8)|input_report[16]), 
 		(int16_t)((input_report[19]<<8)|input_report[18]));
 	return 0;
 }
@@ -150,7 +150,7 @@ int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_t right
 	int r;
 	uint8_t output_report[6];
 
-	printf("Writing XBox Controller Output Report...\n");
+	printf("\nWriting XBox Controller Output Report...\n");
 
 	memset(output_report, 0, sizeof(output_report));
 	output_report[1] = sizeof(output_report);
@@ -200,7 +200,7 @@ int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, ui
 	memcpy(cbw.CBWCB, cdb, cdb_len);
 
 	CALL_CHECK(libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, 15+cdb_len, &size, 1000));
-	printf("sent %d bytes (confirmed %d)\n", 15+cdb_len, size);
+	printf("   sent %d bytes (confirmed %d)\n", 15+cdb_len, size);
 	return 0;
 }
 
@@ -211,15 +211,15 @@ int get_mass_storage_status(libusb_device_handle *handle, uint8_t endpoint, uint
 
 	CALL_CHECK(libusb_bulk_transfer(handle, endpoint, (unsigned char*)&csw, 13, &size, 1000));
 	if (size != 13) {
-		perr("get_mass_storage_status: received %d bytes (expected 13)\n", size);
+		perr("   get_mass_storage_status: received %d bytes (expected 13)\n", size);
 		return -1;
 	}
 	if (csw.dCSWTag != expected_tag) {
-		perr("get_mass_storage_status: mismatched tags (expected %08X, received %08X)\n",
+		perr("   get_mass_storage_status: mismatched tags (expected %08X, received %08X)\n",
 			expected_tag, csw.dCSWTag);
 		return -1;
 	}
-	printf("Mass Storage Status: %02X (%s)\n", csw.bCSWStatus, csw.bCSWStatus?"FAILED":"Success");
+	printf("   Mass Storage Status: %02X (%s)\n", csw.bCSWStatus, csw.bCSWStatus?"FAILED":"Success");
 	if (csw.dCSWTag != expected_tag)
 		return -1;
 	if (csw.bCSWStatus)
@@ -236,7 +236,7 @@ void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoi
 	int size;
 
 	// Request Sense
-	printf("Request Sense...\n");
+	printf("Request Sense:\n");
 	memset(sense, 0, sizeof(sense));
 	memset(cdb, 0, sizeof(cdb));
 	cdb[0] = 0x03;	// Request Sense
@@ -244,18 +244,18 @@ void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoi
 
 	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, 0x12, &expected_tag);
 	libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&sense, 0x12, &size, 1000);
-	printf("received %d bytes\n", size);
+	printf("   received %d bytes\n", size);
 
 	if ((sense[0] != 0x70) && (sense[0] != 0x71)) {
-		perr("ERROR No sense data\n");
+		perr("   ERROR No sense data\n");
 	} else {
-		perr("ERROR Sense: %02X %02X %02X\n", sense[2]&0x0F, sense[12], sense[13]);
+		perr("   ERROR Sense: %02X %02X %02X\n", sense[2]&0x0F, sense[12], sense[13]);
 	}
 	get_mass_storage_status(handle, endpoint_in, expected_tag);
 }
 
 // Mass Storage device to test bulk transfers (non destructive test)
-int test_mass_storage(libusb_device_handle *handle)
+int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoint_out)
 {
 	int r, i, size;
 	uint8_t lun;
@@ -272,47 +272,48 @@ int test_mass_storage(libusb_device_handle *handle)
 	printf("Sending Mass Storage Reset...\n");
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		BOMS_RESET, 0, 0, NULL, 0, 1000));
-	printf("Getting Max LUN...\n");
+	printf("Reading Max LUN:\n");
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		BOMS_GET_MAX_LUN, 0, 0, &lun, 1, 1000));
-	printf("  Max LUN = %d\n", lun);
+	printf("   Max LUN = %d\n", lun);
 
 	// Send Inquiry
-	printf("Sending Inquiry...\n");
+	printf("Sending Inquiry:\n");
 	memset(buffer, 0, sizeof(buffer));
 	memset(cdb, 0, sizeof(cdb));
 	cdb[0] = 0x12;	// Inquiry
 	cdb[4] = 0x60;	// Inquiry data size
 
-	send_mass_storage_command(handle, 0x01, 0, cdb, LIBUSB_ENDPOINT_IN, 0x60, &expected_tag);
-	CALL_CHECK(libusb_bulk_transfer(handle, 0x81, (unsigned char*)&buffer, 0x60, &size, 1000));
-	printf("received %d bytes\n", size);
-	printf("VID:PID:REV:SPE %s:%s:%s:%s\n", &buffer[8], &buffer[16], &buffer[32], &buffer[38]);
-	if (get_mass_storage_status(handle, 0x81, expected_tag) == -2) {
-		get_sense(handle, 0x81, 0x01);
+	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, 0x60, &expected_tag);
+	CALL_CHECK(libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&buffer, 0x60, &size, 1000));
+	printf("   received %d bytes\n", size);
+	printf("   VID:PID:REV:SPE %s:%s:%s:%s\n", &buffer[8], &buffer[16], &buffer[32], &buffer[38]);
+	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
+		get_sense(handle, endpoint_in, 0x01);
 	}
 
-
 	// Read capacity
-	printf("Reading Capacity...\n");
+	printf("Reading Capacity:\n");
 	memset(buffer, 0, sizeof(buffer));
 	memset(cdb, 0, sizeof(cdb));
 	cdb[0] = 0x25;	// Read Capacity
 
-	send_mass_storage_command(handle, 0x01, 0, cdb, LIBUSB_ENDPOINT_IN, 0x08, &expected_tag);
-	CALL_CHECK(libusb_bulk_transfer(handle, 0x81, (unsigned char*)&buffer, 0x08, &size, 1000));
-	printf("received %d bytes\n", size);
+	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, 0x08, &expected_tag);
+	CALL_CHECK(libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&buffer, 0x08, &size, 1000));
+	printf("   received %d bytes\n", size);
 	max_lba = be_to_int32(&buffer[0]);
 	block_size = be_to_int32(&buffer[4]);
 	device_size = ((double)(max_lba+1))*block_size/(1024*1024*1024);
-	printf("Max LBA: %08X, Block Size: %08X (%.2f GB)\n", max_lba, block_size, device_size);
-	if (get_mass_storage_status(handle, 0x81, expected_tag) == -2) {
-		get_sense(handle, 0x81, 0x01);
+	printf("   Max LBA: %08X, Block Size: %08X (%.2f GB)\n", max_lba, block_size, device_size);
+	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
+		get_sense(handle, endpoint_in, 0x01);
 	}
 
+	size = (block_size > sizeof(buffer))?sizeof(buffer):block_size;
+
 	// Send Read
-	printf("Try to read 512 bytes...\n");
-	memset(buffer, 0, sizeof(buffer));
+	printf("Attempting to read %d bytes:\n", size);
+	memset(buffer, 0, size);
 	memset(cdb, 0, sizeof(cdb));
 
 //	cdb[0] = 0x28;	// Read(10)
@@ -321,11 +322,11 @@ int test_mass_storage(libusb_device_handle *handle)
 	cdb[0] = 0xA8;	// Read(12)
 	cdb[8] = 0x02;	// 0x200 bytes
 
-	send_mass_storage_command(handle, 0x01, 0, cdb, LIBUSB_ENDPOINT_IN, 0x200, &expected_tag);
-	libusb_bulk_transfer(handle, 0x81, (unsigned char*)&buffer, 0x200, &size, 5000);
-	printf("READ: received %d bytes\n", size);
-	if (get_mass_storage_status(handle, 0x81, expected_tag) == -2) {
-		get_sense(handle, 0x81, 0x01);
+	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, size, &expected_tag);
+	libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&buffer, size, &size, 5000);
+	printf("   READ: received %d bytes\n", size);
+	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
+		get_sense(handle, endpoint_in, 0x01);
 	} else {
 		for(i=0; i<0x10; i++) {
 			printf(" %02X", buffer[i]);
@@ -341,7 +342,7 @@ int display_plantronics_status(libusb_device_handle *handle)
 {
 	int r;
 	uint8_t input_report[2];
-	printf("Reading Plantronics Input Report...\n");
+	printf("\nReading Plantronics Input Report...\n");
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 2, 5000);
 	if (r >= 0) {
@@ -364,7 +365,7 @@ int display_sidewinder_status(libusb_device_handle *handle)
 {
 	int r;
 	uint8_t input_report[6];
-	printf("Reading SideWinder Input Report.\n");
+	printf("\nReading SideWinder Input Report.\n");
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 6, 5000);
 	if (r >= 0) {
@@ -393,6 +394,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	int test_scsi = 0;
 	struct libusb_device_descriptor dev_desc;
 	char string[128];
+	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
 
 	printf("Opening device...\n");
 	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
@@ -404,20 +406,20 @@ int test_device(uint16_t vid, uint16_t pid)
 
 	dev = libusb_get_device(handle);
 
-	printf("reading device descriptor...\n");
+	printf("\nReading device descriptor:\n");
 	CALL_CHECK(libusb_get_device_descriptor(dev, &dev_desc));
-	printf("length = %d\n", dev_desc.bLength);
-	printf("device class = %d\n", dev_desc.bDeviceClass);
-	printf("ser num = %d\n", dev_desc.iSerialNumber);
-	printf("VID:PID %04X:%04X\n", dev_desc.idVendor, dev_desc.idProduct);
-	printf("bcdDevice = %04X\n", dev_desc.bcdDevice);
-	printf("iMan:iProd:iSer %d:%d:%d\n", dev_desc.iManufacturer, dev_desc.iProduct, dev_desc.iSerialNumber);
-	printf("num confs = %d\n", dev_desc.bNumConfigurations);
+	printf("            length: %d\n", dev_desc.bLength);
+	printf("      device class: %d\n", dev_desc.bDeviceClass);
+	printf("               S/N: %d\n", dev_desc.iSerialNumber);
+	printf("           VID:PID: %04X:%04X\n", dev_desc.idVendor, dev_desc.idProduct);
+	printf("         bcdDevice: %04X\n", dev_desc.bcdDevice);
+	printf("   iMan:iProd:iSer: %d:%d:%d\n", dev_desc.iManufacturer, dev_desc.iProduct, dev_desc.iSerialNumber);
+	printf("          nb confs: %d\n", dev_desc.bNumConfigurations);
 
-	printf("reading configuration descriptor...\n");
+	printf("\nReading configuration descriptors:\n");
 	CALL_CHECK(libusb_get_config_descriptor(dev, 0, &conf_desc));
 	nb_ifaces = conf_desc->bNumInterfaces;
-	printf("num interfaces = %d\n", nb_ifaces);
+	printf("   nb interfaces = %d\n", nb_ifaces);
 	for (i=0; i<conf_desc->bNumInterfaces; i++) {
 		for (j=0; j<conf_desc->usb_interface[i].num_altsetting; j++) {
 			printf("interface[%d].altsetting[%d]: num endpoints = %d\n", 
@@ -435,6 +437,16 @@ int test_device(uint16_t vid, uint16_t pid)
 			for (k=0; k<conf_desc->usb_interface[i].altsetting[j].bNumEndpoints; k++) {
 				endpoint = &conf_desc->usb_interface[i].altsetting[j].endpoint[k];
 				printf("       endpoint[%d].address: %02X\n", k, endpoint->bEndpointAddress);
+				// Set the first IN/OUT endpoints found as default for testing
+				if (endpoint->bEndpointAddress & LIBUSB_ENDPOINT_IN) {
+					if (!endpoint_in) {
+						endpoint_in = endpoint->bEndpointAddress;
+					}
+				} else {
+					if (!endpoint_out) {
+						endpoint_out = endpoint->bEndpointAddress;
+					}
+				}
 				printf("           max packet size: %04X\n", endpoint->wMaxPacketSize);
 				printf("          polling interval: %02X\n", endpoint->bInterval);
 			}
@@ -446,7 +458,7 @@ int test_device(uint16_t vid, uint16_t pid)
 #ifndef OS_WINDOWS
 	for (iface = 0; iface < nb_ifaces; iface++)
 	{
-		printf("Claiming interface %d...\n", iface);
+		printf("\nClaiming interface %d...\n", iface);
 		r = libusb_claim_interface(handle, iface);
 		if (r != LIBUSB_SUCCESS) {
 			if (iface == 0) {
@@ -465,10 +477,10 @@ int test_device(uint16_t vid, uint16_t pid)
 	r = libusb_get_string_descriptor(handle, 0, 0, string, 128);
 	if (r > 0) {
 		nb_strings = string[0];
-		printf("Retrieving string descriptors...\n");
+		printf("\nReading string descriptors:\n");
 		for (i=1; i<nb_strings; i++) {
 			if (libusb_get_string_descriptor_ascii(handle, (uint8_t)i, string, 128) >= 0) {
-				printf("string (%d/%d): \"%s\"\n", i, nb_strings-1, string);
+				printf("   String (%d/%d): \"%s\"\n", i, nb_strings-1, string);
 			}
 		}
 	}
@@ -491,9 +503,10 @@ int test_device(uint16_t vid, uint16_t pid)
 	}
 
 	if (test_scsi) {
-		CALL_CHECK(test_mass_storage(handle));
+		CALL_CHECK(test_mass_storage(handle, endpoint_in, endpoint_out));
 	}
 
+	printf("\n");
 	for (iface = 0; iface<nb_ifaces; iface++) {
 		printf("Releasing interface %d...\n", iface);
 		libusb_release_interface(handle, iface);
