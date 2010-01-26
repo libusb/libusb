@@ -1624,7 +1624,7 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
  * \param errcode the error code whose description is desired
  * \returns a short description of the error code in English
  */
-const char* libusb_strerror(enum libusb_error errcode)
+API_EXPORTED const char* libusb_strerror(enum libusb_error errcode)
 {
     switch (errcode)
     {
