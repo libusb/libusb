@@ -2,7 +2,8 @@ To compile libusb 1.0 using either Microsoft Visual Studio or the Windows DDK
 
 Note 1: For Visual Studio, 3 sets of solution files are provided depending on 
 whether you are running MSVC6, Visual Studio 2008 (MSVC9) or Visual Studio 2005 
-(MSVC8). For the DDK, the 'sources' file is located in libusb\os\.
+(MSVC8). For the DDK, just run ddk_build.cmd from a DDK build environment 
+command prompt.
 
 Note 2: In the text below, (Win32) means "when producing 32 bit binaries" and
 (x64) "when producing 64 bit binaries". This is independent of whether your 
@@ -32,6 +33,10 @@ platform is actually 32 or 64 bit.
 
 - To run the 64 bit executables, you need to either have pthreadVC2_x64.dll
   in your executable directory or in C:\Windows\System32 (again, not a typo).
+  
+Alternativaly, precompiled pthread-win32 binaries for 64bit and 32 bit
+platforms, as well as the necessary headers can be obtained frome:
+http://libusb.org/raw-attachment/wiki/windows_backend/pthread-win32_libusb.zip
 
 - Edit config_msvc.h according to your needs (you might want to comment out
   ENABLE_DEBUG_LOGGING).
@@ -43,9 +48,6 @@ you will need to ensure that the default library paths for your project point
 to a directory that contains setupapi.lib and ole32.lib.
 If needed, these libraries can be obtained by downloading either the latest 
 Windows SDK or the DDK.
-
-The default solution is set to produce the static library and statically 
-linked binaries. The DLL is currently built as a standalone project.
 
 For additional information, please refer to:
   http://libusb.org/wiki/windows_backend

@@ -53,10 +53,15 @@ inline static int perr(char const *format, ...)
 	return r;
 }
 
-#define ERR_EXIT(errcode) do { perr("  %s\n", libusb_strerror(errcode)); return -1; } while (0)
+#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror(errcode)); return -1; } while (0)
 #define CALL_CHECK(fcall) do { r=fcall; if (r < 0) ERR_EXIT(r); } while (0);
 #define B(x) (((x)!=0)?1:0)
 #define be_to_int32(buf) (((buf)[0]<<24)|((buf)[1]<<16)|((buf)[2]<<8)|(buf)[3])
+
+#define RETRY_MAX                     5
+#define REQUEST_SENSE_LENGTH          0x12
+#define INQUIRY_LENGTH                0x24
+#define READ_CAPACITY_LENGTH          0x08
 
 // HID Class-Specific Requests values. See section 7.2 of the HID specifications
 #define HID_GET_REPORT                0x01
@@ -196,20 +201,34 @@ int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, ui
 	cbw.dCBWDataTransferLength = data_length;
 	cbw.bmCBWFlags = direction;
 	cbw.bCBWLUN = lun;
+	// Subclass is 1 or 6 => cdb_len
 	cbw.bCBWCBLength = cdb_len;
 	memcpy(cbw.CBWCB, cdb, cdb_len);
 
-	CALL_CHECK(libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, 15+cdb_len, &size, 1000));
-	printf("   sent %d bytes (confirmed %d)\n", 15+cdb_len, size);
+	CALL_CHECK(libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, sizeof(cbw), &size, 1000));
+	printf("   sent %d CDB bytes\n", cdb_len);
 	return 0;
 }
 
 int get_mass_storage_status(libusb_device_handle *handle, uint8_t endpoint, uint32_t expected_tag)
 {
-	int r, size;
+	int i, r, size;
 	struct command_status_wrapper csw;
 
-	CALL_CHECK(libusb_bulk_transfer(handle, endpoint, (unsigned char*)&csw, 13, &size, 1000));
+	// The device is allowed to STALL this transfer. If it does, you have to
+	// clear the stall and try again.
+	i = 0;
+	do {
+		r = libusb_bulk_transfer(handle, endpoint, (unsigned char*)&csw, 13, &size, 1000);
+		if (r == LIBUSB_ERROR_PIPE) {
+			libusb_clear_halt(handle, endpoint);
+		}
+		i++;
+	} while ((r == LIBUSB_ERROR_PIPE) && (i<RETRY_MAX));
+	if (r != LIBUSB_SUCCESS) {
+		perr("   get_mass_storage_status: %s\n", libusb_strerror(r));
+		return -1;
+	}
 	if (size != 13) {
 		perr("   get_mass_storage_status: received %d bytes (expected 13)\n", size);
 		return -1;
@@ -219,12 +238,22 @@ int get_mass_storage_status(libusb_device_handle *handle, uint8_t endpoint, uint
 			expected_tag, csw.dCSWTag);
 		return -1;
 	}
+	// Strictly speaking, we should also should check dCSWSignature for validity, which we don't.
 	printf("   Mass Storage Status: %02X (%s)\n", csw.bCSWStatus, csw.bCSWStatus?"FAILED":"Success");
 	if (csw.dCSWTag != expected_tag)
 		return -1;
-	if (csw.bCSWStatus)
-		return -2;	// request Get Sense
+	if (csw.bCSWStatus) {
+		// REQUEST SENSE is appropriate only if bCSWStatus is 1, meaning that the
+		// command failed somehow.  Larger values (2 in particular) mean that
+		// the command couldn't be understood.
+		if (csw.bCSWStatus == 1)
+			return -2;	// request Get Sense
+		else
+			return -1;
+	}
 
+	// In theory we also should check dCSWDataResidue.  But lots of devices
+	// set it wrongly.
 	return 0;
 }
 
@@ -240,10 +269,10 @@ void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoi
 	memset(sense, 0, sizeof(sense));
 	memset(cdb, 0, sizeof(cdb));
 	cdb[0] = 0x03;	// Request Sense
-	cdb[4] = 0x12;
+	cdb[4] = REQUEST_SENSE_LENGTH;
 
-	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, 0x12, &expected_tag);
-	libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&sense, 0x12, &size, 1000);
+	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, REQUEST_SENSE_LENGTH, &expected_tag);
+	libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&sense, REQUEST_SENSE_LENGTH, &size, 1000);
 	printf("   received %d bytes\n", size);
 
 	if ((sense[0] != 0x70) && (sense[0] != 0x71)) {
@@ -251,30 +280,37 @@ void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoi
 	} else {
 		perr("   ERROR Sense: %02X %02X %02X\n", sense[2]&0x0F, sense[12], sense[13]);
 	}
+	// Strictly speaking, the get_mass_storage_status() call should come
+	// before these perr() lines.  If the status is nonzero then we must
+	// assume there's no data in the buffer.  For xusb it doesn't matter.
 	get_mass_storage_status(handle, endpoint_in, expected_tag);
 }
 
 // Mass Storage device to test bulk transfers (non destructive test)
 int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoint_out)
 {
-	int r, i, size;
+	int r, size;
 	uint8_t lun;
 	uint32_t expected_tag;
-	uint32_t max_lba, block_size;
+	uint32_t i, max_lba, block_size;
 	double device_size;
 	uint8_t cdb[16];	// SCSI Command Descriptor Block
 	uint8_t buffer[512];
-	if (buffer == NULL) {
-		perr("failed to allocate mass storage test buffer\n");
-		return -1;
-	}
 
-	printf("Sending Mass Storage Reset...\n");
+/*	printf("Sending Mass Storage Reset...\n");
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		BOMS_RESET, 0, 0, NULL, 0, 1000));
+*/
 	printf("Reading Max LUN:\n");
-	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
-		BOMS_GET_MAX_LUN, 0, 0, &lun, 1, 1000));
+	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
+		BOMS_GET_MAX_LUN, 0, 0, &lun, 1, 1000);
+	// Some devices send a STALL instead of the actual value. 
+	// In such cases we should set lun to 0.
+	if (r == 0) {
+		lun = 0;
+	} else if (r < 0) {
+		perr("   Failed: %s", libusb_strerror(r));
+	}
 	printf("   Max LUN = %d\n", lun);
 
 	// Send Inquiry
@@ -282,14 +318,15 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	memset(buffer, 0, sizeof(buffer));
 	memset(cdb, 0, sizeof(cdb));
 	cdb[0] = 0x12;	// Inquiry
-	cdb[4] = 0x60;	// Inquiry data size
+	cdb[4] = INQUIRY_LENGTH;
 
-	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, 0x60, &expected_tag);
-	CALL_CHECK(libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&buffer, 0x60, &size, 1000));
+	send_mass_storage_command(handle, endpoint_out, lun, cdb, LIBUSB_ENDPOINT_IN, INQUIRY_LENGTH, &expected_tag);
+	CALL_CHECK(libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&buffer, INQUIRY_LENGTH, &size, 1000));
 	printf("   received %d bytes\n", size);
-	printf("   VID:PID:REV:SPE %s:%s:%s:%s\n", &buffer[8], &buffer[16], &buffer[32], &buffer[38]);
+	// The following strings are not zero terminated
+	printf("   VID:PID:REV \"%8s\":\"%8s\":\"%4s\"\n", &buffer[8], &buffer[16], &buffer[32]);
 	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
-		get_sense(handle, endpoint_in, 0x01);
+		get_sense(handle, endpoint_in, endpoint_out);
 	}
 
 	// Read capacity
@@ -298,15 +335,15 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	memset(cdb, 0, sizeof(cdb));
 	cdb[0] = 0x25;	// Read Capacity
 
-	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, 0x08, &expected_tag);
-	CALL_CHECK(libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&buffer, 0x08, &size, 1000));
+	send_mass_storage_command(handle, endpoint_out, lun, cdb, LIBUSB_ENDPOINT_IN, READ_CAPACITY_LENGTH, &expected_tag);
+	CALL_CHECK(libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&buffer, READ_CAPACITY_LENGTH, &size, 1000));
 	printf("   received %d bytes\n", size);
 	max_lba = be_to_int32(&buffer[0]);
 	block_size = be_to_int32(&buffer[4]);
 	device_size = ((double)(max_lba+1))*block_size/(1024*1024*1024);
 	printf("   Max LBA: %08X, Block Size: %08X (%.2f GB)\n", max_lba, block_size, device_size);
 	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
-		get_sense(handle, endpoint_in, 0x01);
+		get_sense(handle, endpoint_in, endpoint_out);
 	}
 
 	size = (block_size > sizeof(buffer))?sizeof(buffer):block_size;
@@ -316,19 +353,18 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	memset(buffer, 0, size);
 	memset(cdb, 0, sizeof(cdb));
 
-//	cdb[0] = 0x28;	// Read(10)
-//	cdb[7] = 0x02;	// 0x200 bytes
+	cdb[0] = 0x28;	// Read(10)
+	cdb[8] = 0x01;	// 1 block
 
-	cdb[0] = 0xA8;	// Read(12)
-	cdb[8] = 0x02;	// 0x200 bytes
-
-	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, size, &expected_tag);
+	send_mass_storage_command(handle, endpoint_out, lun, cdb, LIBUSB_ENDPOINT_IN, size, &expected_tag);
 	libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&buffer, size, &size, 5000);
 	printf("   READ: received %d bytes\n", size);
 	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
-		get_sense(handle, endpoint_in, 0x01);
+		get_sense(handle, endpoint_in, endpoint_out);
 	} else {
-		for(i=0; i<0x10; i++) {
+		for (i=0; i<block_size; i++) {
+			if (!(i%0x10))
+				printf("\n  ");
 			printf(" %02X", buffer[i]);
 		}
 		printf("\n");
@@ -346,14 +382,14 @@ int display_plantronics_status(libusb_device_handle *handle)
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 2, 5000);
 	if (r >= 0) {
-		printf("  OK\n");
+		printf("   OK\n");
 	} else {
 		switch(r) {
 		case LIBUSB_ERROR_TIMEOUT:
-			printf("  Timeout! Please make sure you press the mute button within the 5 seconds allocated...\n");
+			printf("   Timeout! Please make sure you press the mute button within the 5 seconds allocated...\n");
 			break;
 		default:
-			printf("  Error: %d\n", r);
+			printf("   Error: %d\n", r);
 			break;
 		}
 	}
@@ -369,14 +405,14 @@ int display_sidewinder_status(libusb_device_handle *handle)
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 6, 5000);
 	if (r >= 0) {
-		printf("  OK\n");
+		printf("   OK\n");
 	} else {
 		switch(r) {
 		case LIBUSB_ERROR_TIMEOUT:
-			printf("  Timeout! Please make sure you use the joystick within the 5 seconds allocated...\n\n");
+			printf("   Timeout! Please make sure you use the joystick within the 5 seconds allocated...\n\n");
 			break;
 		default:
-			printf("  Error: %d\n", r);
+			printf("   Error: %d\n", r);
 			break;
 		}
 	}
@@ -400,7 +436,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
 
 	if (handle == NULL) {
-		perr("  failed.\n");
+		perr("  Failed.\n");
 		return -1;
 	}
 
@@ -419,7 +455,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	printf("\nReading configuration descriptors:\n");
 	CALL_CHECK(libusb_get_config_descriptor(dev, 0, &conf_desc));
 	nb_ifaces = conf_desc->bNumInterfaces;
-	printf("   nb interfaces = %d\n", nb_ifaces);
+	printf("             nb interfaces: %d\n", nb_ifaces);
 	for (i=0; i<conf_desc->bNumInterfaces; i++) {
 		for (j=0; j<conf_desc->usb_interface[i].num_altsetting; j++) {
 			printf("interface[%d].altsetting[%d]: num endpoints = %d\n", 
@@ -430,7 +466,8 @@ int test_device(uint16_t vid, uint16_t pid)
 				conf_desc->usb_interface[i].altsetting[j].bInterfaceProtocol);
 			if ( (conf_desc->usb_interface[i].altsetting[j].bInterfaceClass == LIBUSB_CLASS_MASS_STORAGE) 
 			  && ( (conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass == 0x01)
-			  || (conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass == 0x06) ) ) {
+			  || (conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass == 0x06) ) 
+			  && (conf_desc->usb_interface[i].altsetting[j].bInterfaceProtocol == 0x50) ) {
 				// Mass storage devices that can use basic SCSI commands
 				test_scsi = -1;
 			}
@@ -463,9 +500,9 @@ int test_device(uint16_t vid, uint16_t pid)
 		if (r != LIBUSB_SUCCESS) {
 			if (iface == 0) {
 				// Maybe we need to detach the driver
-				perr("failed. Trying to detach driver...\n");
+				perr("   Failed. Trying to detach driver...\n");
 				libusb_detach_kernel_driver(handle, iface);
-				printf("Claiming interface again...\n");
+				printf("   Claiming interface again...\n");
 				libusb_claim_interface(handle, iface);
 			} else {
 				printf("failed.\n");
