@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <inttypes.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 
@@ -39,7 +40,11 @@
 #else
 #include <unistd.h>
 #define	msleep(msecs) usleep(1000*msecs)
+#ifndef sscanf_s
+#define sscanf_s sscanf
 #endif
+#endif
+
 
 inline static int perr(char const *format, ...)
 {
@@ -123,6 +128,7 @@ enum test_type {
 	USE_JTAG,
 	USE_HID,
 	USE_SIDEWINDER,
+	USE_PLANTRONICS,
 } test_mode;
 uint16_t VID, PID;
 
@@ -289,13 +295,14 @@ void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoi
 // Mass Storage device to test bulk transfers (non destructive test)
 int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoint_out)
 {
-	int r, size;
+	int r;
 	uint8_t lun;
 	uint32_t expected_tag;
-	uint32_t i, max_lba, block_size;
+	uint32_t i, size, max_lba, block_size;
 	double device_size;
 	uint8_t cdb[16];	// SCSI Command Descriptor Block
-	uint8_t buffer[512];
+	uint8_t buffer[64];
+	unsigned char *data;
 
 /*	printf("Sending Mass Storage Reset...\n");
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
@@ -346,26 +353,30 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 		get_sense(handle, endpoint_in, endpoint_out);
 	}
 
-	size = (block_size > sizeof(buffer))?sizeof(buffer):block_size;
+	data = malloc(block_size);
+	if (data == NULL) {
+		perr("   unable to allocate data buffer\n");
+		return -1;
+	}
 
 	// Send Read
-	printf("Attempting to read %d bytes:\n", size);
-	memset(buffer, 0, size);
+	printf("Attempting to read %d bytes:\n", block_size);
+	memset(data, 0, block_size);
 	memset(cdb, 0, sizeof(cdb));
 
 	cdb[0] = 0x28;	// Read(10)
 	cdb[8] = 0x01;	// 1 block
 
-	send_mass_storage_command(handle, endpoint_out, lun, cdb, LIBUSB_ENDPOINT_IN, size, &expected_tag);
-	libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&buffer, size, &size, 5000);
+	send_mass_storage_command(handle, endpoint_out, lun, cdb, LIBUSB_ENDPOINT_IN, block_size, &expected_tag);
+	libusb_bulk_transfer(handle, endpoint_in, data, block_size, &size, 5000);
 	printf("   READ: received %d bytes\n", size);
 	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
 		get_sense(handle, endpoint_in, endpoint_out);
 	} else {
-		for (i=0; i<block_size; i++) {
+		for (i=0; i<size; i++) {
 			if (!(i%0x10))
 				printf("\n  ");
-			printf(" %02X", buffer[i]);
+			printf(" %02X", data[i]);
 		}
 		printf("\n");
 	}
@@ -532,7 +543,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	case USE_SIDEWINDER:
 		display_sidewinder_status(handle);
 		break;
-	case USE_HID:
+	case USE_PLANTRONICS:
 		display_plantronics_status(handle);
 		break;
 	default:
@@ -562,21 +573,24 @@ __cdecl
 main(int argc, char** argv)
 {
 	int r;
+	unsigned tmp_vid, tmp_pid;
 
 	// Default test = Microsoft XBox Controller Type S - 1 interface
 	VID = 0x045E;
 	PID = 0x0289;
 	test_mode = USE_XBOX;
 
-	if (argc == 2) {
+	if (argc >= 2) {
 		if ((argv[1][0] != '-') || (argv[1][1] == 'h')) {
-			printf("usage: %s [-h] [-i] [-j] [-k] [-l] [-s] [-x]\n", argv[0]);
+			printf("usage: %s [-h] [-i] [-j] [-k] [-l] [-s] [-x] [vid:pid]\n", argv[0]);
 			printf("   -h: display usage\n");
-			printf("   -i: test IBM HID Optical Mouse\n");
+			printf("   -i: test HID device\n");
 			printf("   -j: test OLIMEX ARM-USB-TINY JTAG, 2 channel composite device\n");
-			printf("   -k: test Generic 2 GB USB Key\n");
+			printf("   -k: test Mass Storage USB device\n");
+			printf("   -l: test Plantronics HID device\n");
 			printf("   -s: test Microsoft Sidwinder Precision Pro\n");
 			printf("   -x: test Microsoft XBox Controller Type S (default)\n");
+
 			return 0;
 		}
 		switch(argv[1][1]) {
@@ -602,7 +616,7 @@ main(int argc, char** argv)
 			// Plantronics DSP 400, 2 channel HID composite device - 1 HID interface
 			VID = 0x047F;
 			PID = 0x0CA1;
-			test_mode = USE_HID;
+			test_mode = USE_PLANTRONICS;
 			break;
 		case 's':
 			// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
@@ -612,6 +626,15 @@ main(int argc, char** argv)
 			break;
 		default:
 			break;
+		}
+		if (argc == 3) {
+			if (sscanf_s(argv[2], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
+				printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
+				return 1;
+			}
+			VID = (uint16_t)tmp_vid;
+			PID = (uint16_t)tmp_pid;
+			printf("%04X:%04X\n", VID, PID);
 		}
 	}
 
