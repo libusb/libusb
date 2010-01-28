@@ -64,7 +64,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2.lib"
+				AdditionalDependencies="setupapi.lib pthreadVC2.lib ole32.lib advapi32.lib"
 				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories=".\msvc"
@@ -142,7 +142,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2.lib"
+				AdditionalDependencies="setupapi.lib pthreadVC2.lib ole32.lib advapi32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories=".\msvc"
