@@ -160,6 +160,7 @@ static inline BOOLEAN guid_eq(const GUID *guid1, const GUID *guid2) {
 	return false;
 }
 
+#if 0
 static char* guid_to_string(const GUID guid)
 {
 static char guid_string[GUID_STRING_LENGTH];
@@ -170,6 +171,7 @@ static char guid_string[GUID_STRING_LENGTH];
 		guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
 	return guid_string;
 }
+#endif
 
 /*
  * Converts a windows error to human readable string
@@ -3236,7 +3238,6 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	bool direction_in, ret;
 	int current_interface;
 	DWORD size;
-	int r = LIBUSB_ERROR_INVALID_PARAM;
 
 	CHECK_HID_AVAILABLE;
 
@@ -3284,9 +3285,7 @@ static int hid_abort_transfers(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
-	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)transfer->dev_handle->os_priv;
-	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
 	HANDLE hid_handle;
 	int current_interface;
 
@@ -3301,9 +3300,7 @@ static int hid_abort_transfers(struct usbi_transfer *itransfer)
 
 static int hid_reset_device(struct libusb_device_handle *dev_handle)
 {
-	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
-	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	HANDLE hid_handle;
 	int current_interface;
 

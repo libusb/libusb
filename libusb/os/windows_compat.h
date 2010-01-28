@@ -62,11 +62,11 @@ struct winfd {
 };
 extern const struct winfd INVALID_WINFD;
 
-int pipe_for_poll(int pipefd[2]);
-int poll(struct pollfd *fds, unsigned int nfds, int timeout);
-ssize_t write_for_poll(int fd, const void *buf, size_t count);
-ssize_t read_for_poll(int fd, void *buf, size_t count);
-int close_for_poll(int fd);
+int _libusb_pipe(int pipefd[2]);
+int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout);
+ssize_t _libusb_write(int fd, const void *buf, size_t count);
+ssize_t _libusb_read(int fd, void *buf, size_t count);
+int _libusb_close(int fd);
 
 void init_polling(void);
 void exit_polling(void);

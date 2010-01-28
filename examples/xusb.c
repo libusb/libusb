@@ -40,11 +40,11 @@
 #else
 #include <unistd.h>
 #define	msleep(msecs) usleep(1000*msecs)
-#ifndef sscanf_s
-#define sscanf_s sscanf
-#endif
 #endif
 
+#if !defined(_MSC_VER)
+#define sscanf_s sscanf
+#endif
 
 inline static int perr(char const *format, ...)
 {

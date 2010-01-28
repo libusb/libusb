@@ -268,7 +268,7 @@ __inline void _init_read_marker(int index)
 /*
  * Create an async I/O anonymous pipe (that can be used for sync as well)
  */
-int pipe_for_poll(int filedes[2])
+int _libusb_pipe(int filedes[2])
 {
 	int i, j;
 	HANDLE handle[2];
@@ -526,7 +526,7 @@ struct winfd overlapped_to_winfd(OVERLAPPED* overlapped)
  * Currently, this function only accepts one of POLLIN or POLLOUT per fd
  * (but you can create multiple fds from the same handle for read and write)
  */
-int poll(struct pollfd *fds, unsigned int nfds, int timeout)
+int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 {
 	unsigned i, triggered = 0;
 	int index, object_index;
@@ -635,7 +635,7 @@ int poll(struct pollfd *fds, unsigned int nfds, int timeout)
  *
  * Note that this function will also close the associated handle
  */
-int close_for_poll(int fd)
+int _libusb_close(int fd)
 {
 	int index;
 	HANDLE handle;
@@ -667,7 +667,7 @@ int close_for_poll(int fd)
  * - binary mode only
  * - no append mode
  */
-ssize_t write_for_poll(int fd, const void *buf, size_t count)
+ssize_t _libusb_write(int fd, const void *buf, size_t count)
 {
 	int index;
 	DWORD wr_count;
@@ -743,7 +743,7 @@ out:
  * synchronous read for custom poll (works on Windows file handles that
  * have been opened with the FILE_FLAG_OVERLAPPED flag)
  */
-ssize_t read_for_poll(int fd, void *buf, size_t count)
+ssize_t _libusb_read(int fd, void *buf, size_t count)
 {
 	int index;
 	DWORD rd_count;

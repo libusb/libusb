@@ -41,10 +41,11 @@
 #else
 #include <unistd.h>
 #include <poll.h>
-#define write_for_poll write
-#define read_for_poll read
-#define close_for_poll close
-#define pipe_for_poll pipe
+#define _libusb_write write
+#define _libusb_read read
+#define _libusb_close close
+#define _libusb_pipe pipe
+#define _libusb_poll poll
 #endif
 
 #ifdef USBI_TIMERFD_AVAILABLE
@@ -1027,7 +1028,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	list_init(&ctx->pollfds);
 
 	/* FIXME should use an eventfd on kernels that support it */
-	r = pipe_for_poll(ctx->ctrl_pipe);
+	r = _libusb_pipe(ctx->ctrl_pipe);
 	if (r < 0)
 		return LIBUSB_ERROR_OTHER;
 
@@ -1057,12 +1058,12 @@ int usbi_io_init(struct libusb_context *ctx)
 void usbi_io_exit(struct libusb_context *ctx)
 {
 	usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
-	close_for_poll(ctx->ctrl_pipe[0]);
-	close_for_poll(ctx->ctrl_pipe[1]);
+	_libusb_close(ctx->ctrl_pipe[0]);
+	_libusb_close(ctx->ctrl_pipe[1]);
 #ifdef USBI_TIMERFD_AVAILABLE
 	if (usbi_using_timerfd(ctx)) {
 		usbi_remove_pollfd(ctx, ctx->timerfd);
-		close(ctx->timerfd);
+		_libusb_close(ctx->timerfd);
 	}
 #endif
 	pthread_mutex_destroy(&ctx->flying_transfers_lock);
@@ -1882,7 +1883,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		timeout_ms++;
 
 	usbi_dbg("poll() %d fds with timeout in %dms", nfds, timeout_ms);
-	r = poll(fds, nfds, timeout_ms);
+	r = _libusb_poll(fds, nfds, timeout_ms);
 	usbi_dbg("poll() returned %d", r);
 	if (r == 0) {
 		free(fds);
