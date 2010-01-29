@@ -39,16 +39,16 @@ extern "C" {
  * \param x the host-endian value to convert
  * \returns the value in little-endian byte order
  */
-#define libusb_cpu_to_le16(x) ({ \
-	union { \
-		uint8_t  b8[2]; \
-		uint16_t b16; \
-	} _tmp; \
-	uint16_t _tmp2 = (uint16_t)(x); \
-	_tmp.b8[1] = _tmp2 >> 8; \
-	_tmp.b8[0] = _tmp2 & 0xff; \
-	_tmp.b16; \
-})
+static inline uint16_t libusb_cpu_to_le16(const uint16_t x)
+{
+	union {
+		uint8_t  b8[2];
+		uint16_t b16;
+	} _tmp;
+	_tmp.b8[1] = x >> 8;
+	_tmp.b8[0] = x & 0xff;
+	return _tmp.b16;
+}
 
 /** \def libusb_le16_to_cpu
  * \ingroup misc
