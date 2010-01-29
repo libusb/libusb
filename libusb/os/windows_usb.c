@@ -34,11 +34,6 @@
 #include <inttypes.h>
 #include <objbase.h>  // for string to GUID conv. requires libole32.a
 
-/* Prevent compilation problems on Windows platforms */
-#if defined(interface)
-#undef interface
-#endif
-
 #include "libusbi.h"
 #include "windows_compat.h"
 #include "windows_usb.h"
@@ -343,7 +338,7 @@ static void windows_assign_endpoints(struct libusb_device *dev, int iface, int a
 	const struct libusb_interface_descriptor *if_desc;
 
 	if (libusb_get_config_descriptor(dev, 0, &conf_desc) == LIBUSB_SUCCESS) {
-		if_desc = &conf_desc->usb_interface[iface].altsetting[altsetting];
+		if_desc = &conf_desc->interface[iface].altsetting[altsetting];
 		safe_free(priv->usb_interface[iface].endpoint);
 		priv->usb_interface[iface].endpoint = malloc(if_desc->bNumEndpoints);
 		if (priv->usb_interface[iface].endpoint != NULL) {
@@ -1058,7 +1053,6 @@ enum libusb_hid_report_type {
 			}
 		}
 		if (sanitized_short[j] == 0) {
-			// TODO: change this to debug?
 			usbi_warn(ctx, "failure to read interface number for %s. Using default value %d", 
 				sanitized_short, interface_number);
 		}
@@ -2402,20 +2396,18 @@ static int winusb_abort_transfers(struct usbi_transfer *itransfer)
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)transfer->dev_handle->os_priv;
-	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
+	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	HANDLE winusb_handle;
 	int current_interface;
 
 	CHECK_WINUSB_AVAILABLE;
 
-	// TODO: why don't we use transfer_priv->interface_number here???
-	current_interface = interface_by_endpoint(priv, handle_priv, transfer->endpoint);
-	if (current_interface < 0) {
-		usbi_err(ctx, "unable to match endpoint to an open interface - cancelling abort");
+	current_interface = transfer_priv->interface_number;
+	if ((current_interface < 0) || (current_interface >= USB_MAXINTERFACES)) {
+		usbi_err(ctx, "program assertion failed: invalid interface_number");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
-
-	usbi_dbg("matched endpoint %02X with interface %d", transfer->endpoint, current_interface);
+	usbi_dbg("will use interface %d", current_interface);
 
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 

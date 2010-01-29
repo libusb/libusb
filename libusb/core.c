@@ -692,7 +692,7 @@ static const struct libusb_endpoint_descriptor *find_endpoint(
 {
 	int iface_idx;
 	for (iface_idx = 0; iface_idx < config->bNumInterfaces; iface_idx++) {
-		const struct libusb_interface *iface = &config->usb_interface[iface_idx];
+		const struct libusb_interface *iface = &config->interface[iface_idx];
 		int altsetting_idx;
 
 		for (altsetting_idx = 0; altsetting_idx < iface->num_altsetting;

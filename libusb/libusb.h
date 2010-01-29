@@ -32,12 +32,17 @@
 #include <time.h>
 #include <limits.h>
 
-// Work around for existing libusb 1.0 code that might have used "interface"
-// instead of the newer "usb_interface", in libusb_config_descriptor.
-// "interface" was changed to "usb_interface" to work around macro redefinition 
-// issues on Windows platforms.
-#if !defined(OS_WINDOWS) && !defined(interface)
-#define interface usb_interface
+// 'interface' might be defined as a macro on Windows, so we need to undefine
+// it so as not to break the current libusb API, because libusb_config_descriptor
+// has an 'interface' member
+// As this could still be problematic if you include windows.h after libusb.h in 
+// your sources, we attempt to detect that as well.
+#if defined(OS_WINDOWS)
+#if !defined(interface) && !defined(_WINDOWS_)
+#error "Please make sure you include both windows.h and libusb.h in your source, in that order."
+#elif defined(interface)
+#undef interface
+#endif
 #endif
 
 // MSVC doesn't know ssize_t
@@ -513,7 +518,7 @@ struct libusb_config_descriptor {
 
 	/** Array of interfaces supported by this configuration. The length of
 	 * this array is determined by the bNumInterfaces field. */
-	const struct libusb_interface *usb_interface;
+	const struct libusb_interface *interface;
 
 	/** Extra descriptors. If libusb encounters unknown configuration
 	 * descriptors, it will store them here, should you wish to parse them. */

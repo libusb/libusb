@@ -315,12 +315,12 @@ err:
 
 static void clear_configuration(struct libusb_config_descriptor *config)
 {
-	if (config->usb_interface) {
+	if (config->interface) {
 		int i;
 		for (i = 0; i < config->bNumInterfaces; i++)
 			clear_interface((struct libusb_interface *)
-				config->usb_interface + i);
-		free((void *) config->usb_interface);
+				config->interface + i);
+		free((void *) config->interface);
 	}
 	if (config->extra)
 		free((void *) config->extra);
@@ -347,8 +347,8 @@ static int parse_configuration(struct libusb_context *ctx,
 
 	tmp = config->bNumInterfaces * sizeof(struct libusb_interface);
 	usb_interface = malloc(tmp);
-	config->usb_interface = usb_interface;
-	if (!config->usb_interface)
+	config->interface = usb_interface;
+	if (!config->interface)
 		return LIBUSB_ERROR_NO_MEM;
 
 	memset(usb_interface, 0, tmp);

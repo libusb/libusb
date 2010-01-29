@@ -32,8 +32,6 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include <libusb/libusb.h>
-
 #ifdef OS_WINDOWS
 #include <windows.h>
 #define msleep(msecs) Sleep(msecs)
@@ -42,9 +40,15 @@
 #define	msleep(msecs) usleep(1000*msecs)
 #endif
 
+#include <libusb/libusb.h>
+
 #if !defined(_MSC_VER)
 #define sscanf_s sscanf
 #endif
+
+// Future versions of libusb will use usb_interface instead of interface
+// in libusb_config_descriptor => catter for that
+#define usb_interface interface
 
 inline static int perr(char const *format, ...)
 {
@@ -178,7 +182,7 @@ int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, ui
 {
 	static uint32_t tag = 1;
 	uint8_t cdb_len;
-	int r, size;
+	int i, r, size;
 	struct command_block_wrapper cbw;
 
 	if (cdb == NULL) {
@@ -211,8 +215,20 @@ int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, ui
 	cbw.bCBWCBLength = cdb_len;
 	memcpy(cbw.CBWCB, cdb, cdb_len);
 
-	CALL_CHECK(libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, sizeof(cbw), &size, 1000));
-	printf("   sent %d CDB bytes\n", cdb_len);
+	i = 0;
+	do {
+		r = libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, sizeof(cbw), &size, 1000);
+		if (r == LIBUSB_ERROR_PIPE) {
+			libusb_clear_halt(handle, endpoint);
+		}
+		i++;
+	} while ((r == LIBUSB_ERROR_PIPE) && (i<RETRY_MAX));
+	if (r != LIBUSB_SUCCESS) {
+		perr("   send_mass_storage_command: %s\n", libusb_strerror(r));
+		return -1;
+	}	
+	
+	printf("   sent %d CDB bytes (%d)\n", cdb_len,sizeof(cbw));
 	return 0;
 }
 
