@@ -28,8 +28,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <sched.h>
-#include <pthread.h>
+#include <process.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <objbase.h>  // for string to GUID conv. requires libole32.a
@@ -42,23 +41,6 @@
 #pragma warning(disable:28719)
 #endif
 
-// These GUIDs appear undefined on MinGW32
-#if !defined(GUID_DEVINTERFACE_USB_HOST_CONTROLLER)
-	// http://msdn.microsoft.com/en-us/library/bb663109.aspx
-	const GUID GUID_DEVINTERFACE_USB_HOST_CONTROLLER = {  0x3ABF6F2D, 0x71C4, 0x462A, {0x8A, 0x92, 0x1E, 0x68, 0x61, 0xE6, 0xAF, 0x27} };
-#endif
-
-#if !defined(GUID_DEVINTERFACE_USB_DEVICE)
-	// http://msdn.microsoft.com/en-us/library/bb663093.aspx
-	const GUID GUID_DEVINTERFACE_USB_DEVICE = {  0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED} };
-#endif
-
-// Additional GUID constants.
-const GUID GUID_NULL          = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} };
-const GUID GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
-const GUID GUID_LIBUSB_WINUSB = { 0x78a1c341, 0x4539, 0x11d3, {0xb8, 0x8d, 0x00, 0xc0, 0x4f, 0xad, 0x51, 0x71} };
-const GUID GUID_COMPOSITE     = { 0x36fc9e60, 0xc465, 0x11cf, {0x80, 0x56, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00} };
-
 // The 2 macros below are used in conjunction with safe loops.
 #define LOOP_CHECK(fcall) { r=fcall; if (r != LIBUSB_SUCCESS) continue; }
 #define LOOP_BREAK(err) { r=err; continue; } 
@@ -66,6 +48,7 @@ const GUID GUID_COMPOSITE     = { 0x36fc9e60, 0xc465, 0x11cf, {0x80, 0x56, 0x44,
 // Helper prototypes
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
 static int windows_clock_gettime(int clk_id, struct timespec *tp);
+unsigned __stdcall windows_clock_gettime_threaded(void* param);
 // WinUSB API prototypes
 static int winusb_init(struct libusb_context *ctx);
 static int winusb_exit(void);
@@ -114,8 +97,17 @@ static int composite_reset_device(struct libusb_device_handle *dev_handle);
 struct windows_hcd_priv* hcd_root = NULL;
 uint64_t hires_frequency, hires_ticks_to_ps;
 const uint64_t epoch_time = 116444736000000000;	// 1970.01.01 00:00:000 in MS Filetime
-DWORD_PTR old_affinity_mask;
 enum windows_version windows_version = WINDOWS_UNSUPPORTED;
+// Concurrency
+static int concurrent_usage = -1;
+// Timer thread 
+// NB: index 0 is for monotonic, 1 is for real-time clock and 2 is for the thread exit event
+HANDLE timer_thread = NULL;
+HANDLE timer_mutex[2] = {NULL, NULL};
+struct timespec timer_tp[2];
+volatile LONG request_count[3] = {0, 0, 1};	// last one must be > 0
+HANDLE timer_request[3] = { NULL, NULL, NULL };
+HANDLE timer_response[2] = { NULL, NULL };
 // API globals
 bool api_winusb_available = false;
 #define CHECK_WINUSB_AVAILABLE do { if (!api_winusb_available) return LIBUSB_ERROR_ACCESS; } while (0)
@@ -158,7 +150,7 @@ static inline BOOLEAN guid_eq(const GUID *guid1, const GUID *guid2) {
 #if 0
 static char* guid_to_string(const GUID guid)
 {
-static char guid_string[GUID_STRING_LENGTH];
+	static char guid_string[MAX_GUID_STRING_LENGTH];
 	
 	sprintf(guid_string, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
 		(unsigned int)guid.Data1, guid.Data2, guid.Data3, 
@@ -365,102 +357,165 @@ static int windows_init(struct libusb_context *ctx)
 	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
 	GUID guid;
 	libusb_bus_t bus;
-	int i, r = LIBUSB_SUCCESS;
-	LARGE_INTEGER li_frequency;
+	int i, r = LIBUSB_ERROR_OTHER;
 	OSVERSIONINFO os_version;
+	HANDLE semaphore;
+	struct windows_hcd_priv** _hcd_cur;
+	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
-	// We maintain a chained list of the Host Controllers found
-	struct windows_hcd_priv** _hcd_cur = &hcd_root;
-
-	// If our HCD list is populated, we don't need to re-init
-	if (hcd_root != NULL) {
-		usbi_dbg("init already occured.");
-		return LIBUSB_SUCCESS;
+	sprintf(sem_name, "libusb_init%08X", GetCurrentProcessId()&0xFFFFFFFF);
+	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
+	if (semaphore == NULL) {
+		usbi_err(ctx, "could not create semaphore: %s", windows_error_str(0));
+		return LIBUSB_ERROR_OTHER;
 	}
 
-	// Detect OS version
-	memset(&os_version, 0, sizeof(OSVERSIONINFO));
-	os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-	windows_version = WINDOWS_UNSUPPORTED;
-	if ((GetVersionEx(&os_version) != 0) && (os_version.dwPlatformId == VER_PLATFORM_WIN32_NT)) {
-		if ((os_version.dwMajorVersion == 5) && (os_version.dwMinorVersion == 1)) {
-			windows_version = WINDOWS_XP;
-		} else if (os_version.dwMajorVersion >= 6) {
-			windows_version = WINDOWS_VISTA_AND_LATER;
+	// A successful wait brings our semaphore count to 0 (unsignaled)
+	// => any concurent wait stalls until the semaphore's release
+	if (WaitForSingleObject(semaphore, INFINITE) != WAIT_OBJECT_0) {
+		usbi_err(ctx, "failure to access semaphore: %s", windows_error_str(0));
+		CloseHandle(semaphore);
+		return LIBUSB_ERROR_OTHER;
+    }
+ 
+	// NB: concurrent usage supposes that init calls are equally balanced with
+	// exit calls. If init is called more than exit, we will not exit properly
+	if ( ++concurrent_usage == 0 ) {	// First init?
+		_hcd_cur = &hcd_root;
+
+		// Detect OS version
+		memset(&os_version, 0, sizeof(OSVERSIONINFO));
+		os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+		windows_version = WINDOWS_UNSUPPORTED;
+		if ((GetVersionEx(&os_version) != 0) && (os_version.dwPlatformId == VER_PLATFORM_WIN32_NT)) {
+			if ((os_version.dwMajorVersion == 5) && (os_version.dwMinorVersion == 1)) {
+				windows_version = WINDOWS_XP;
+			} else if (os_version.dwMajorVersion >= 6) {
+				windows_version = WINDOWS_VISTA_AND_LATER;
+			}
 		}
-	}
-	if (windows_version ==  WINDOWS_UNSUPPORTED) {
-		usbi_err(ctx, "This version of Windows is NOT supported");
-		return LIBUSB_ERROR_NOT_SUPPORTED;
-	}
-
-	// Initialize pollable file descriptors
-	init_polling();
-
-	// Initialize the low level APIs
-	for (i=0; i<USB_API_MAX; i++) {
-		r = usb_api_backend[i].init(ctx);
-		if (r != LIBUSB_SUCCESS) {
-			return r;
-		}
-	}
-
-	// Because QueryPerformanceCounter might report different values when 
-	// running on different cores, we glue the libusb main thread to the
-	// first core to prevent timing discrepancies.
-	// TODO? create a seperate thread for timer and detect single core
-	old_affinity_mask = SetThreadAffinityMask(GetCurrentThread(), 0);
-
-	// Find out if we have access to a monotonic (hires) timer
-	if (!QueryPerformanceFrequency(&li_frequency)) {
-		usbi_dbg("no hires timer available on this platform");
-		hires_frequency = 0;
-		hires_ticks_to_ps = 0;	
-	} else {
-		hires_frequency = li_frequency.QuadPart;
-		// The hires frequency can go as high as 4 GHz, so we'll use a conversion
-		// to picoseconds to compute the tv_nsecs part in clock_gettime
-		hires_ticks_to_ps =  1000000000000 / hires_frequency; 
-		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
-	}
-
-	guid = GUID_DEVINTERFACE_USB_HOST_CONTROLLER;
-
-	for (bus = 0; ; bus++)
-	{
-		// safe loop: free up any (unprotected) dynamic resource
-		// NB: this is always executed before breaking the loop
-		safe_free(dev_interface_details);
-		safe_free(*_hcd_cur);
-
-		dev_interface_details = get_interface_details(ctx, &dev_info, NULL, guid, bus);
-		// safe loop: end of loop condition
-		if ((dev_interface_details == NULL) || (r != LIBUSB_SUCCESS))
-			break;
-
-		// Will need to change storage and size of libusb_bus_t if this ever occurs
-		if (bus == LIBUSB_BUS_MAX) {
-			usbi_warn(ctx, "program assertion failed - found more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
-			continue;
+		if (windows_version ==  WINDOWS_UNSUPPORTED) {
+			usbi_err(ctx, "This version of Windows is NOT supported");
+			r = LIBUSB_ERROR_NOT_SUPPORTED;
+			goto init_exit;
 		}
 
-		// Allocate and init a new priv structure to hold our data
-		if ((*_hcd_cur = malloc(sizeof(struct windows_hcd_priv))) == NULL) {
-			usbi_err(ctx, "could not allocate private structure for bus %u. aborting.", bus);
-			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+		// Initialize pollable file descriptors
+		init_polling();
+
+		// Initialize the low level APIs
+		for (i=0; i<USB_API_MAX; i++) {
+			r = usb_api_backend[i].init(ctx);
+			if (r != LIBUSB_SUCCESS) {
+				goto init_exit;
+			}
 		}
-		windows_hcd_priv_init(*_hcd_cur);
-		(*_hcd_cur)->path = sanitize_path(dev_interface_details->DevicePath);
 
-		_hcd_cur = &((*_hcd_cur)->next);
+		// Because QueryPerformanceCounter might report different values when 
+		// running on different cores, we create a separate thread for the timer
+		// calls, which we glue to the first core always to prevent timing discrepancies.
+		r = LIBUSB_ERROR_NO_MEM;
+		for (i = 0; i < 3; i++) {
+			timer_request[i] = CreateEvent(NULL, TRUE, FALSE, NULL);
+			if (timer_request[i] == NULL) {
+				usbi_err(ctx, "could not create timer request event %d - aborting", i);
+				goto init_exit;
+			}
+			if (i==2)
+				break; // 3rd event has no matching parts, because it's for quitting the thread.
+			timer_response[i] = CreateSemaphore(NULL, 0, MAX_TIMER_SEMAPHORES, NULL);
+			if (timer_request[i] == NULL) {
+				usbi_err(ctx, "could not create timer response semaphore %d - aborting", i);
+				goto init_exit;
+			}
+			timer_mutex[i] = CreateMutex(NULL, FALSE, NULL);
+			if (timer_mutex[i] == NULL) {
+				usbi_err(ctx, "could not create timer mutex %d - aborting", i);
+				goto init_exit;
+			}
+		}
+		timer_thread = (HANDLE)_beginthreadex(NULL, 0, windows_clock_gettime_threaded, NULL, 0, NULL);
+		if (timer_thread == NULL) {
+			usbi_err(ctx, "Unable to create timer thread - aborting");
+			goto init_exit;
+		}
+		SetThreadAffinityMask(timer_thread, 0);
+
+		guid = GUID_DEVINTERFACE_USB_HOST_CONTROLLER;
+
+		r = LIBUSB_SUCCESS;
+		for (bus = 0; ; bus++)
+		{
+			// safe loop: free up any (unprotected) dynamic resource
+			// NB: this is always executed before breaking the loop
+			safe_free(dev_interface_details);
+			safe_free(*_hcd_cur);
+
+			dev_interface_details = get_interface_details(ctx, &dev_info, NULL, guid, bus);
+			// safe loop: end of loop condition
+			if ((dev_interface_details == NULL) || (r != LIBUSB_SUCCESS))
+				break;
+
+			// Will need to change storage and size of libusb_bus_t if this ever occurs
+			if (bus == LIBUSB_BUS_MAX) {
+				usbi_warn(ctx, "program assertion failed - found more than %d buses, skipping the rest.", LIBUSB_BUS_MAX);
+				continue;
+			}
+
+			// Allocate and init a new priv structure to hold our data
+			if ((*_hcd_cur = malloc(sizeof(struct windows_hcd_priv))) == NULL) {
+				usbi_err(ctx, "could not allocate private structure for bus %u. aborting.", bus);
+				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+			}
+			windows_hcd_priv_init(*_hcd_cur);
+			(*_hcd_cur)->path = sanitize_path(dev_interface_details->DevicePath);
+
+			_hcd_cur = &((*_hcd_cur)->next);
+		}
+		// TODO: event thread for hotplug (see darwin source)
 	}
-
-	// TODO: event thread for hotplug (see darwin source)
 
 	if (hcd_root == NULL)
-		return LIBUSB_ERROR_NO_DEVICE;
+		r = LIBUSB_ERROR_NO_DEVICE;
 	else 
-		return LIBUSB_SUCCESS;
+		r = LIBUSB_SUCCESS;
+
+init_exit: // Holds semaphore here.
+	if(!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
+		if (timer_thread) {
+			SetEvent(timer_request[2]); // actually the signal to quit the thread.
+			if (WAIT_OBJECT_0 != WaitForSingleObject(timer_thread, INFINITE)) {
+				usbi_warn(ctx, "could not wait for timer thread to quit");
+				TerminateThread(timer_thread, 1); // shouldn't happen, but we're destroying 
+				                                  // all objects it might have held anyway.
+			}
+			CloseHandle(timer_thread);
+			timer_thread = NULL;
+		}
+		for (i = 0; i < 3; i++) {
+			if (timer_request[i]) {
+				CloseHandle(timer_request[i]);
+				timer_request[i] = NULL;
+			}
+			if (i==2)
+				break; // 3rd event has no matching parts, because it's for quitting the thread.
+			if (timer_response[i]) {
+				CloseHandle(timer_response[i]);
+				timer_response[i] = NULL;
+			}
+			if (timer_mutex[i]) {
+				CloseHandle(timer_mutex[i]);
+				timer_mutex[i] = NULL;
+			}
+		}
+	}
+
+	if (r != LIBUSB_SUCCESS)
+		--concurrent_usage; // Not expected to call libusb_exit if we failed.
+
+	ReleaseSemaphore(semaphore, 1, NULL);	// increase count back to 1
+	CloseHandle(semaphore);
+	return r;
 }
 
 /*
@@ -879,7 +934,7 @@ enum libusb_hid_report_type {
 	SP_DEVINFO_DATA dev_info_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
 	HKEY key;
-	WCHAR guid_string_w[GUID_STRING_LENGTH];
+	WCHAR guid_string_w[MAX_GUID_STRING_LENGTH];
 	GUID guid, class_guid;
 	GUID guid_table[MAX_USB_DEVICES];
 	char* sanitized_path[MAX_USB_DEVICES];
@@ -1268,7 +1323,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 							if (priv->hid == NULL) {
 								usbi_err(ctx, "could not allocate HID data for %s, skipping", 
 									dev_interface_details->DevicePath);
-								priv->apib = &usb_api_backend[USB_API_TEMPLATE];
+								priv->apib = &usb_api_backend[USB_API_UNSUPPORTED];
 								safe_free(priv->path);
 							} else {
 								set_hid_device(ctx, priv);
@@ -1345,23 +1400,68 @@ static void windows_exit(void)
 {
 	struct windows_hcd_priv* hcd_tmp;
 	int i;
+	HANDLE semaphore;
+	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
-	while (hcd_root != NULL)
-	{
-		hcd_tmp = hcd_root;	// Keep a copy for free
-		hcd_root = hcd_root->next;
-		windows_hcd_priv_release(hcd_tmp);
-		safe_free(hcd_tmp);
+	sprintf(sem_name, "libusb_init%08X", GetCurrentProcessId()&0xFFFFFFFF);
+	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
+	if (semaphore == NULL) {
+		return;
 	}
 
-	for (i=0; i<USB_API_MAX; i++) {
-		usb_api_backend[i].exit();
+	// A successful wait brings our semaphore count to 0 (unsignaled)
+	// => any concurent wait stalls until the semaphore release
+	if (WaitForSingleObject(semaphore, INFINITE) != WAIT_OBJECT_0) {
+		CloseHandle(semaphore);
+		return;
+    }
+ 
+	// Only works if exits and inits are balanced exactly
+	if (--concurrent_usage < 0) {	// Last exit
+		while (hcd_root != NULL)
+		{
+			hcd_tmp = hcd_root;	// Keep a copy for free
+			hcd_root = hcd_root->next;
+			windows_hcd_priv_release(hcd_tmp);
+			safe_free(hcd_tmp);
+		}
+
+		for (i=0; i<USB_API_MAX; i++) {
+			usb_api_backend[i].exit();
+		}
+		exit_polling();
+
+		if (timer_thread) {
+			SetEvent(timer_request[2]); // actually the signal to quit the thread.
+			if (WAIT_OBJECT_0 != WaitForSingleObject(timer_thread, INFINITE)) {
+				usbi_dbg("could not wait for timer thread to quit");
+				TerminateThread(timer_thread, 1);
+			}
+			CloseHandle(timer_thread);
+			timer_thread = NULL;
+		}
+		for (i = 0; i < 3; i++) {
+			if (timer_request[i]) {
+				CloseHandle(timer_request[i]);
+				timer_request[i] = NULL;
+			}
+			if (i==2)
+				break; // 3rd event has no matching parts, because it's for quitting the thread.
+			if (timer_response[i]) {
+				CloseHandle(timer_response[i]);
+				timer_response[i] = NULL;
+			}
+			if (timer_mutex[i]) {
+				CloseHandle(timer_mutex[i]);
+				timer_mutex[i] = NULL;
+			}
+		}
+
+		// TODO: delete event thread for hotplug (see darwin source)
 	}
-	exit_polling();
 
-	SetThreadAffinityMask(GetCurrentThread(), old_affinity_mask);
-
-	// TODO: delete event thread for hotplug (see darwin source)
+	ReleaseSemaphore(semaphore, 1, NULL);	// increase count back to 1
+	CloseHandle(semaphore);
 }
 
 static int windows_get_device_descriptor(struct libusb_device *dev, unsigned char *buffer, int *host_endian)
@@ -1752,34 +1852,114 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 /*
  * Monotonic and real time functions
  */
-static int windows_clock_gettime(int clk_id, struct timespec *tp)
+unsigned __stdcall windows_clock_gettime_threaded(void* param)
 {
-	LARGE_INTEGER hires_counter;
+	LARGE_INTEGER hires_counter, li_frequency;
 	FILETIME ftime;
 	ULARGE_INTEGER rtime;
+	LONG nb_responses;
+	int i, timer_index;
 
-	switch(clk_id) {
-	case USBI_CLOCK_MONOTONIC:
+	// Find out if we have access to a monotonic (hires) timer
+	if (!QueryPerformanceFrequency(&li_frequency)) {
+		usbi_dbg("no hires timer available on this platform");
+		hires_frequency = 0;
+		hires_ticks_to_ps = 0;	
+	} else {
+		hires_frequency = li_frequency.QuadPart;
+		// The hires frequency can go as high as 4 GHz, so we'll use a conversion
+		// to picoseconds to compute the tv_nsecs part in clock_gettime
+		hires_ticks_to_ps =  1000000000000 / hires_frequency; 
+		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
+	}
+	while (1) {
+		timer_index = WaitForMultipleObjects(3, timer_request, FALSE, INFINITE) - WAIT_OBJECT_0;
+		if (request_count[timer_index] == 0) {
+			// Request already handled
+			ResetEvent(timer_request[timer_index]);
+			// There's still a possiblity that a thread sends a request between the
+			// time we test request_count[] == 0 and we reset the event, in which case
+			// the request would be ignored. The simple solution to that is to test
+			// request_count again and process requests if non zero.
+			if (request_count[timer_index] == 0)
+				continue;
+		}
+		i = 0;
+		switch (timer_index) {
+		case 0: // monotonic clock
 		// If hires_frequency is set, we have an hires monotonic timer available
 		if ((hires_frequency != 0) && (QueryPerformanceCounter(&hires_counter) != 0))
 		{
-			tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
-			tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency)/1000) * hires_ticks_to_ps);
-			return LIBUSB_SUCCESS;
-		}	
-		// make sure we fall through to real-time if we can't get hires timer
+			WaitForSingleObject(timer_mutex[i], INFINITE);
+			timer_tp[i].tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
+			timer_tp[i].tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency)/1000) * hires_ticks_to_ps);
+			ReleaseMutex(timer_mutex[i]);
+			goto send_response;
+		}
+		i--;	// make sure we fall through and return real-time if we can't get monotonic
+		case 1: // real-time clock
+			i++;
+			// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
+			// Note however that our resolution is bounded by the Windows system time 
+			// functions and is at best of the order of 1 ms (or, usually, worse)
+			GetSystemTimeAsFileTime(&ftime);
+			rtime.LowPart = ftime.dwLowDateTime;
+			rtime.HighPart = ftime.dwHighDateTime;
+			rtime.QuadPart -= epoch_time;
+			WaitForSingleObject(timer_mutex[i], INFINITE);
+			timer_tp[i].tv_sec = (long)(rtime.QuadPart / 10000000);
+			timer_tp[i].tv_nsec = (long)((rtime.QuadPart % 10000000)*100);
+			ReleaseMutex(timer_mutex[i]);
+			goto send_response;
+		case 2: // time to quit
+			usbi_dbg("timer thread quitting");
+			return 0;
+		default:
+			usbi_dbg("failure to wait on requests: %s", windows_error_str(0));
+			continue;
+		send_response:
+			nb_responses = InterlockedExchange((LONG*)&request_count[i], 0);
+			if ( (nb_responses) 
+			  && (ReleaseSemaphore(timer_response[i], nb_responses, NULL) == 0) ) {
+				usbi_dbg("unable to release timer semaphore %d: %s", windows_error_str(0));
+			}
+			continue;
+		}
+	}
+	usbi_dbg("ERROR: broken timer thread");
+	return 1;
+}
+
+static int windows_clock_gettime(int clk_id, struct timespec *tp)
+{
+	int i;
+	DWORD r;
+	i = -1;
+	switch(clk_id) {
 	case USBI_CLOCK_REALTIME:
-		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
-		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
-		// Note however that our resolution is bounded by the Windows system time 
-		// functions and is at best of the order of 1 ms (or, usually, worse)
-		GetSystemTimeAsFileTime(&ftime);
-		rtime.LowPart = ftime.dwLowDateTime;
-		rtime.HighPart = ftime.dwHighDateTime;
-		rtime.QuadPart -= epoch_time;
-		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
-		tp->tv_nsec = (long)((rtime.QuadPart % 10000000)*100);
-		return LIBUSB_SUCCESS;
+		i++;
+		// fall through
+	case USBI_CLOCK_MONOTONIC:
+		i++;
+		while (1) {
+			InterlockedIncrement((LONG*)&request_count[i]);
+			SetEvent(timer_request[i]);
+			// TODO: adjust the timeout/make it dynamic?
+			r = WaitForSingleObject(timer_response[i], 100);
+			switch(r) {
+			case WAIT_OBJECT_0:
+				WaitForSingleObject(timer_mutex[i], INFINITE);
+				*tp = timer_tp[i];
+				ReleaseMutex(timer_mutex[i]);
+				return LIBUSB_SUCCESS;
+			case WAIT_TIMEOUT:
+				usbi_dbg("could not obtain a timer value within reasonable timeframe - too much load?");
+				break;
+			default:
+				usbi_dbg("WaitForSingleObject failed: %s", windows_error_str(0));
+				return LIBUSB_ERROR_OTHER;
+			}
+		}
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
@@ -1881,10 +2061,9 @@ static int unsupported_abort_transfers(struct usbi_transfer *itransfer) {
 
 const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	{
-		"UNSUPPORTED",
+		USB_API_UNSUPPORTED,
+		&CLASS_GUID_UNSUPPORTED,
 		"_UNSUPPORTED_",
-		&GUID_NULL,
-		USB_API_TEMPLATE,
 		unsupported_init,
 		unsupported_exit,
 		unsupported_open,
@@ -1900,10 +2079,9 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		unsupported_abort_control,
 		unsupported_abort_transfers,
 	}, {
-		"Composite",
-		"usbccgp",
-		&GUID_COMPOSITE,
 		USB_API_COMPOSITE,
+		&CLASS_GUID_COMPOSITE,
+		"usbccgp",
 		composite_init,
 		composite_exit,
 		composite_open,
@@ -1919,10 +2097,9 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		composite_abort_control,
 		composite_abort_transfers,
 	}, {
-		"WinUSB",
-		"WinUSB",
-		&GUID_LIBUSB_WINUSB,
 		USB_API_WINUSB,
+		&CLASS_GUID_LIBUSB_WINUSB,
+		"WinUSB",
 		winusb_init,
 		winusb_exit,
 		winusb_open,
@@ -1938,10 +2115,9 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		winusb_abort_control,
 		winusb_abort_transfers,
 	}, {
-		"HID",
-		"HidUsb",
-		&GUID_HID,
 		USB_API_HID,
+		&CLASS_GUID_HID,
+		"HidUsb",
 		hid_init,
 		hid_exit,
 		hid_open,
@@ -1989,7 +2165,6 @@ static int winusb_init(struct libusb_context *ctx)
 
 static int winusb_exit(void) 
 {
-	api_winusb_available = false;
 	return LIBUSB_SUCCESS;
 }
 
@@ -2919,7 +3094,6 @@ static int hid_init(struct libusb_context *ctx)
 
 static int hid_exit(void) 
 {
-	api_hid_available = false;
 	return LIBUSB_SUCCESS;
 }
 
@@ -2951,7 +3125,6 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 		  && (priv->usb_interface[i].apib->id == USB_API_HID) ) {
 			hid_handle = CreateFileA(priv->usb_interface[i].path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, 
 				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
-			usbi_dbg("hid_handle = %p", hid_handle);
 			/*
 			 * http://www.lvr.com/hidfaq.htm: Why do I receive "Access denied" when attempting to access my HID?
 			 * "Windows 2000 and later have exclusive read/write access to HIDs that are configured as a system 

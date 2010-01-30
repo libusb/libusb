@@ -62,6 +62,7 @@ extern char *_strdup(const char *strSource);
 #define safe_strdup _strdup
 #define safe_sprintf _snprintf
 #define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
+#define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
 inline void upperize(char* str) {
 	size_t i;
 	if (str == NULL) return;
@@ -74,25 +75,45 @@ inline void upperize(char* str) {
 #define MAX_USB_STRING_LENGTH       128
 #define MAX_HID_REPORT_SIZE         1024
 #define MAX_HID_DESCRIPTOR_SIZE     256
-
+#define MAX_GUID_STRING_LENGTH      40
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
+#define MAX_TIMER_SEMAPHORES        128
 #define ERR_BUFFER_SIZE             256
-#define GUID_STRING_LENGTH          40
 
 // Handle code for HID interface that have been claimed ("dibs")
 #define INTERFACE_CLAIMED           ((HANDLE)0xD1B5)
 // Additional return code for HID operations that completed synchronously
 #define LIBUSB_COMPLETED            (LIBUSB_SUCCESS + 1)
 
-#define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
+// http://msdn.microsoft.com/en-us/library/bb663109.aspx
+// http://msdn.microsoft.com/en-us/library/bb663093.aspx
+#if !defined(GUID_DEVINTERFACE_USB_HOST_CONTROLLER)
+const GUID GUID_DEVINTERFACE_USB_HOST_CONTROLLER = { 0x3ABF6F2D, 0x71C4, 0x462A, {0x8A, 0x92, 0x1E, 0x68, 0x61, 0xE6, 0xAF, 0x27} };
+#endif
+#if !defined(GUID_DEVINTERFACE_USB_DEVICE)
+const GUID GUID_DEVINTERFACE_USB_DEVICE = { 0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED} };
+#endif
 
-// This is used to support multiple kernel drivers and USB APIs in Windows.
+
+/*
+ * Multiple USB API backend support
+ */
+#define USB_API_UNSUPPORTED 0
+#define USB_API_COMPOSITE   1
+#define USB_API_WINUSB      2
+#define USB_API_HID         3
+#define USB_API_MAX         4
+
+const GUID CLASS_GUID_UNSUPPORTED   = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x57, 0xDA} };
+const GUID CLASS_GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
+const GUID CLASS_GUID_LIBUSB_WINUSB = { 0x78A1C341, 0x4539, 0x11D3, {0xB8, 0x8D, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71} };
+const GUID CLASS_GUID_COMPOSITE     = { 0x36FC9E60, 0xC465, 0x11cF, {0x80, 0x56, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00} };
+
 struct windows_usb_api_backend {
-	const char *name;        // A human-readable name for your backend, e.g. "WinUSB"
-	const char *driver_name; // Driver's name, without .sys, e.g. "usbccgp"
-	const GUID *class_guid;  // The Class GUID (for fallback in case the driver name cannot be read)
 	const uint8_t id;
+	const GUID *class_guid;  // The Class GUID (for fallback in case the driver name cannot be read)
+	const char *driver_name; // Driver name, without .sys, e.g. "usbccgp"
 	int (*init)(struct libusb_context *ctx);
 	int (*exit)(void);
 	int (*open)(struct libusb_device_handle *dev_handle);
@@ -109,11 +130,6 @@ struct windows_usb_api_backend {
 	int (*abort_transfers)(struct usbi_transfer *itransfer);
 };
 
-#define USB_API_TEMPLATE    0
-#define USB_API_COMPOSITE   1
-#define USB_API_WINUSB      2
-#define USB_API_HID         3
-#define USB_API_MAX         4
 extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
 
 #define PRINT_UNSUPPORTED_API(fname)        \
@@ -126,6 +142,7 @@ enum windows_version {
 	WINDOWS_XP,
 	WINDOWS_VISTA_AND_LATER,
 };
+
 
 /*
  * private structures definition
@@ -219,7 +236,7 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 	p->parent_dev = NULL;
 	p->connection_index = 0;
 	p->path = NULL;
-	p->apib = &usb_api_backend[USB_API_TEMPLATE];
+	p->apib = &usb_api_backend[USB_API_UNSUPPORTED];
 	p->composite_api_flags = 0;
 	p->hid = NULL;
 	p->active_config = 0;
@@ -227,7 +244,7 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 	memset(&(p->dev_descriptor), 0, sizeof(USB_DEVICE_DESCRIPTOR));
 	for (i=0; i<USB_MAXINTERFACES; i++) {
 		p->usb_interface[i].path = NULL;
-		p->usb_interface[i].apib = &usb_api_backend[USB_API_TEMPLATE];
+		p->usb_interface[i].apib = &usb_api_backend[USB_API_UNSUPPORTED];
 		p->usb_interface[i].nb_endpoints = 0;
 		p->usb_interface[i].endpoint = NULL;
 	}
@@ -254,7 +271,7 @@ static inline struct windows_device_priv *__device_priv(struct libusb_device *de
 
 struct interface_handle_t {
 	HANDLE dev_handle; // WinUSB needs an extra handle for the file
-	HANDLE api_handle;  // used by the API to communicate with the device
+	HANDLE api_handle; // used by the API to communicate with the device
 };
 
 struct windows_device_handle_priv {
@@ -388,7 +405,7 @@ CMAPI CONFIGRET WINAPI CM_Get_Device_IDW(
 #endif /* UNICODE */
 
 #define IOCTL_USB_GET_HUB_CAPABILITIES_EX \
-	CTL_CODE( FILE_DEVICE_USB, USB_GET_HUB_CAPABILITIES_EX, METHOD_BUFFERED, FILE_ANY_ACCESS)
+  CTL_CODE( FILE_DEVICE_USB, USB_GET_HUB_CAPABILITIES_EX, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 #define IOCTL_USB_GET_HUB_CAPABILITIES \
   CTL_CODE(FILE_DEVICE_USB, USB_GET_HUB_CAPABILITIES, METHOD_BUFFERED, FILE_ANY_ACCESS)

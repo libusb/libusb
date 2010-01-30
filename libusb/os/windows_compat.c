@@ -71,7 +71,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <pthread.h>
 #include <io.h>
 
 #include "windows_compat.h"
@@ -129,7 +128,7 @@ const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE, FALSE};
 struct winfd poll_fd[MAX_FDS];
 // internal fd data
 struct {
-	pthread_mutex_t mutex;  // thread mutex lock for fds
+	CRITICAL_SECTION mutex; // lock for fds
 	BYTE marker;            // 1st byte of a read_for_poll operation gets stored here
 
 } _poll_fd[MAX_FDS];
@@ -137,25 +136,25 @@ struct {
 // globals
 BOOLEAN is_polling_set = FALSE;
 LONG pipe_number = 0;
+static volatile LONG compat_spinlock = 0;
 
 // Init
 void init_polling(void)
 {
 	int i;
-	if (is_polling_set) {
-		// The sleep 1 sec is to give enough time for our initialization
-		// below to finish, should concurrent simultaneous inits be issued 
-		// from multiple threads - we don't want the second init to return
-		// before the first has had time to complete its job.
-		Sleep(1000);
-		return;
+
+	while (InterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
+		SleepEx(0, TRUE);
 	}
-	is_polling_set = TRUE;
-	for (i=0; i<MAX_FDS; i++) {
-		poll_fd[i] = INVALID_WINFD;
-		_poll_fd[i].marker = 0;
-		pthread_mutex_init(&_poll_fd[i].mutex, NULL);
+	if (!is_polling_set) {
+		for (i=0; i<MAX_FDS; i++) {
+			poll_fd[i] = INVALID_WINFD;
+			_poll_fd[i].marker = 0;
+			InitializeCriticalSection(&_poll_fd[i].mutex);
+		}
+		is_polling_set = TRUE;
 	}
+	compat_spinlock = 0;
 }
 
 // Internal function to retrieve the table index (and lock the fd mutex)
@@ -168,7 +167,12 @@ int _fd_to_index_and_lock(int fd)
 
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd == fd) {
-			pthread_mutex_lock(&_poll_fd[i].mutex);
+			EnterCriticalSection(&_poll_fd[i].mutex);
+			// fd might have changed before we got to critical
+			if (poll_fd[i].fd != fd) {
+				LeaveCriticalSection(&_poll_fd[i].mutex);
+				continue;
+			}
 			return i;
 		}
 	}
@@ -218,26 +222,31 @@ void reset_overlapped(OVERLAPPED *overlapped)
 void exit_polling(void)
 {
 	int i;
-	if (!is_polling_set)
-		return;
-	is_polling_set = FALSE;
 
-	for (i=0; i<MAX_FDS; i++) {
-		// Cancel any async I/O (handle can be invalid)
-		CancelIo(poll_fd[i].handle);
-		// If anything was pending on that I/O, it should be
-		// terminating, and we should be able to access the fd
-		// mutex lock before too long
-		pthread_mutex_lock(&_poll_fd[i].mutex);
-		if ( (poll_fd[i].fd > 0) && (poll_fd[i].handle != INVALID_HANDLE_VALUE) && (poll_fd[i].handle != 0)
-		  && (GetFileType(poll_fd[i].handle) == FILE_TYPE_UNKNOWN) ) {
-			_close(poll_fd[i].fd);
-		}
-		free_overlapped(poll_fd[i].overlapped);
-		poll_fd[i] = INVALID_WINFD;
-		pthread_mutex_unlock(&_poll_fd[i].mutex);
-		pthread_mutex_destroy(&_poll_fd[i].mutex);
+	while (InterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
+		SleepEx(0, TRUE);
 	}
+	if (is_polling_set) {
+		is_polling_set = FALSE;
+
+		for (i=0; i<MAX_FDS; i++) {
+			// Cancel any async I/O (handle can be invalid)
+			CancelIo(poll_fd[i].handle);
+			// If anything was pending on that I/O, it should be
+			// terminating, and we should be able to access the fd
+			// mutex lock before too long
+			EnterCriticalSection(&_poll_fd[i].mutex);
+			if ( (poll_fd[i].fd > 0) && (poll_fd[i].handle != INVALID_HANDLE_VALUE) && (poll_fd[i].handle != 0)
+			  && (GetFileType(poll_fd[i].handle) == FILE_TYPE_UNKNOWN) ) {
+				_close(poll_fd[i].fd);
+			}
+			free_overlapped(poll_fd[i].overlapped);
+			poll_fd[i] = INVALID_WINFD;
+			LeaveCriticalSection(&_poll_fd[i].mutex);
+			DeleteCriticalSection(&_poll_fd[i].mutex);
+		}
+	}
+	compat_spinlock = 0;
 }
 
 /*
@@ -325,7 +334,13 @@ int _libusb_pipe(int filedes[2])
 
 	for (i=0, j=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd < 0) {
-			pthread_mutex_lock(&_poll_fd[i].mutex);
+			EnterCriticalSection(&_poll_fd[i].mutex);
+			// fd might have been allocated before we got to critical
+			if (poll_fd[i].fd >= 0) {
+				LeaveCriticalSection(&_poll_fd[i].mutex);
+				continue;
+			}
+
 			poll_fd[i].fd = filedes[j];
 			poll_fd[i].handle = handle[j];
 			poll_fd[i].overlapped = (j==0)?overlapped0:overlapped1;
@@ -337,7 +352,7 @@ int _libusb_pipe(int filedes[2])
 				// so that we get read event notifications
 				_init_read_marker(i);
 			}
-			pthread_mutex_unlock(&_poll_fd[i].mutex);
+			LeaveCriticalSection(&_poll_fd[i].mutex);
 			if (j>=2) {
 				return 0;
 			}
@@ -409,12 +424,17 @@ struct winfd create_fd_for_poll(HANDLE handle, int access_mode)
 
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd < 0) {
-			pthread_mutex_lock(&_poll_fd[i].mutex);
+			EnterCriticalSection(&_poll_fd[i].mutex);
+			// fd might have been removed before we got to critical
+			if (poll_fd[i].fd >= 0) {
+				LeaveCriticalSection(&_poll_fd[i].mutex);
+				continue;
+			}
 			wfd.fd = fd;
 			wfd.handle = handle;
 			wfd.overlapped = overlapped;
 			memcpy(&poll_fd[i], &wfd, sizeof(struct winfd));
-			pthread_mutex_unlock(&_poll_fd[i].mutex);
+			LeaveCriticalSection(&_poll_fd[i].mutex);
 			return wfd;
 		}
 	}
@@ -452,7 +472,7 @@ void free_fd_for_poll(int fd)
 		return;
 	}
 	_free_index(index);
-	pthread_mutex_unlock(&_poll_fd[index].mutex);
+	LeaveCriticalSection(&_poll_fd[index].mutex);
 }
 
 /*
@@ -470,9 +490,14 @@ struct winfd fd_to_winfd(int fd)
 
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd == fd) {
-			pthread_mutex_lock(&_poll_fd[i].mutex);
+			EnterCriticalSection(&_poll_fd[i].mutex);
+			// fd might have been deleted before we got to critical
+			if (poll_fd[i].fd != fd) {
+				LeaveCriticalSection(&_poll_fd[i].mutex);
+				continue;
+			}
 			memcpy(&wfd, &poll_fd[i], sizeof(struct winfd));
-			pthread_mutex_unlock(&_poll_fd[i].mutex);
+			LeaveCriticalSection(&_poll_fd[i].mutex);
 			return wfd;
 		}
 	}
@@ -491,9 +516,14 @@ struct winfd handle_to_winfd(HANDLE handle)
 
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].handle == handle) {
-			pthread_mutex_lock(&_poll_fd[i].mutex);
+			EnterCriticalSection(&_poll_fd[i].mutex);
+			// fd might have been deleted before we got to critical
+			if (poll_fd[i].handle != handle) {
+				LeaveCriticalSection(&_poll_fd[i].mutex);
+				continue;
+			}
 			memcpy(&wfd, &poll_fd[i], sizeof(struct winfd));
-			pthread_mutex_unlock(&_poll_fd[i].mutex);
+			LeaveCriticalSection(&_poll_fd[i].mutex);
 			return wfd;
 		}
 	}
@@ -512,9 +542,14 @@ struct winfd overlapped_to_winfd(OVERLAPPED* overlapped)
 
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].overlapped == overlapped) {
-			pthread_mutex_lock(&_poll_fd[i].mutex);
+			EnterCriticalSection(&_poll_fd[i].mutex);
+			// fd might have been deleted before we got to critical
+			if (poll_fd[i].overlapped != overlapped) {
+				LeaveCriticalSection(&_poll_fd[i].mutex);
+				continue;
+			}
 			memcpy(&wfd, &poll_fd[i], sizeof(struct winfd));
-			pthread_mutex_unlock(&_poll_fd[i].mutex);
+			LeaveCriticalSection(&_poll_fd[i].mutex);
 			return wfd;
 		}
 	}
@@ -559,7 +594,7 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
 			if (index >= 0) {
-				pthread_mutex_unlock(&_poll_fd[index].mutex);
+				LeaveCriticalSection(&_poll_fd[index].mutex);
 			}
 			printb("poll: invalid fd\n");
 			return -1;
@@ -570,7 +605,7 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
 			printb("poll: attempted POLLIN on fd[%d] without READ access\n", i);
-			pthread_mutex_unlock(&_poll_fd[index].mutex);
+			LeaveCriticalSection(&_poll_fd[index].mutex);
 			return -1;
 		}
 
@@ -578,7 +613,7 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
 			printb("poll: attempted POLLOUT on fd[%d] without WRITE access\n", i);
-			pthread_mutex_unlock(&_poll_fd[index].mutex);
+			LeaveCriticalSection(&_poll_fd[index].mutex);
 			return -1;
 		}
 		
@@ -596,7 +631,7 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			handle_to_index[nb_handles_to_wait_on] = i;
 			nb_handles_to_wait_on++;
 		}
-		pthread_mutex_unlock(&_poll_fd[index].mutex);
+		LeaveCriticalSection(&_poll_fd[index].mutex);
 	}
 
 	if (triggered != 0)
@@ -616,7 +651,7 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			fds[i].revents = fds[i].events;
 			triggered++;
 			if (index >= 0) {
-				pthread_mutex_unlock(&_poll_fd[index].mutex);
+				LeaveCriticalSection(&_poll_fd[index].mutex);
 			}
 		} else if (ret == WAIT_TIMEOUT) {
 			printb("  timed out\n");
@@ -654,7 +689,7 @@ int _libusb_close(int fd)
 		} else {
 			errno = 0;
 		}
-		pthread_mutex_unlock(&_poll_fd[index].mutex);
+		LeaveCriticalSection(&_poll_fd[index].mutex);
 	}
 	return errno?-1:0;
 }
@@ -684,7 +719,7 @@ ssize_t _libusb_write(int fd, const void *buf, size_t count)
 	  || (poll_fd[index].rw != RW_WRITE) ) {
 		errno = EBADF;
 		if (index >= 0) {
-			pthread_mutex_unlock(&_poll_fd[index].mutex);
+			LeaveCriticalSection(&_poll_fd[index].mutex);
 		}
 		return -1;
 	}
@@ -731,10 +766,10 @@ ssize_t _libusb_write(int fd, const void *buf, size_t count)
 out:
 	if (errno) {
 		reset_overlapped(poll_fd[index].overlapped);
-		pthread_mutex_unlock(&_poll_fd[index].mutex);
+		LeaveCriticalSection(&_poll_fd[index].mutex);
 		return -1;
 	} else {
-		pthread_mutex_unlock(&_poll_fd[index].mutex);
+		LeaveCriticalSection(&_poll_fd[index].mutex);
 		return (ssize_t)wr_count;
 	}
 }
@@ -830,7 +865,7 @@ ssize_t _libusb_read(int fd, void *buf, size_t count)
 out:
 	// Setup pending read I/O for the marker
 	_init_read_marker(index);
-	pthread_mutex_unlock(&_poll_fd[index].mutex);
+	LeaveCriticalSection(&_poll_fd[index].mutex);
 	if (errno)
 		return -1;
 	else
