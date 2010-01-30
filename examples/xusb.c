@@ -42,7 +42,7 @@
 #define	msleep(msecs) usleep(1000*msecs)
 #endif
 
-#if !defined(_MSC_VER)
+#if !defined(_MSC_VER) || _MSC_VER<=1200
 #define sscanf_s sscanf
 #endif
 
