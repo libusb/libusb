@@ -32,6 +32,8 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include <libusb/libusb.h>
+
 #ifdef OS_WINDOWS
 #include <windows.h>
 #define msleep(msecs) Sleep(msecs)
@@ -39,8 +41,6 @@
 #include <unistd.h>
 #define	msleep(msecs) usleep(1000*msecs)
 #endif
-
-#include <libusb/libusb.h>
 
 #if !defined(_MSC_VER)
 #define sscanf_s sscanf

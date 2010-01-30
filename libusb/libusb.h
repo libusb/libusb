@@ -32,20 +32,20 @@
 #include <time.h>
 #include <limits.h>
 
-// 'interface' might be defined as a macro on Windows, so we need to undefine
-// it so as not to break the current libusb API, because libusb_config_descriptor
-// has an 'interface' member
-// As this could still be problematic if you include windows.h after libusb.h in 
-// your sources, we attempt to detect that as well.
-#if defined(OS_WINDOWS)
-#if !defined(interface) && !defined(_WINDOWS_)
-#error "Please make sure you include both windows.h and libusb.h in your source, in that order."
-#elif defined(interface)
-#undef interface
-#endif
+/* 'interface' might be defined as a macro on Windows, so we need to
+ * undefine it so as not to break the current libusb API, because 
+ * libusb_config_descriptor has an 'interface' member
+ * As this can be problematic if you include windows.h after libusb.h
+ * in your sources, we force windows.h to be included first. */
+#if !defined(_WINDOWS_)
+#include <windows.h>
 #endif
 
-// MSVC doesn't know ssize_t
+#if defined(interface)
+#undef interface
+#endif
+
+/* MSVC doesn't know ssize_t */
 #if !defined(ssize_t)
 #if defined (_WIN64)
 #define ssize_t __int64
