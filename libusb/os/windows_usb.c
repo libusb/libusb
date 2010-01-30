@@ -363,7 +363,7 @@ static int windows_init(struct libusb_context *ctx)
 	struct windows_hcd_priv** _hcd_cur;
 	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
-	sprintf(sem_name, "libusb_init%08X", GetCurrentProcessId()&0xFFFFFFFF);
+	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
 	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		usbi_err(ctx, "could not create semaphore: %s", windows_error_str(0));
@@ -1403,7 +1403,7 @@ static void windows_exit(void)
 	HANDLE semaphore;
 	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
-	sprintf(sem_name, "libusb_init%08X", GetCurrentProcessId()&0xFFFFFFFF);
+	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
 	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		return;

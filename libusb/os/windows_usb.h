@@ -49,6 +49,8 @@
 // cygwin produces a warning unless these prototypes are defined
 extern int _snprintf(char *buffer, size_t count, const char *format, ...);
 extern char *_strdup(const char *strSource);
+// _beginthreadex is MSVCRT => unavailable for cygwin. Fallback to using CreateThread
+#define _beginthreadex(a, b, c, d, e, f) CreateThread(a, b, (LPTHREAD_START_ROUTINE)c, d, e, f)
 #endif
 #define safe_free(p) do {if (p != NULL) {free(p); p = NULL;}} while(0)
 #define safe_closehandle(h) do {if (h != INVALID_HANDLE_VALUE) {CloseHandle(h); h = INVALID_HANDLE_VALUE;}} while(0)
