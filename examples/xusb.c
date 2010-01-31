@@ -217,7 +217,8 @@ int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, ui
 
 	i = 0;
 	do {
-		r = libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, sizeof(cbw), &size, 1000);
+		// The transfer length must always be exactly 31 bytes.
+		r = libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, 31, &size, 1000);
 		if (r == LIBUSB_ERROR_PIPE) {
 			libusb_clear_halt(handle, endpoint);
 		}
@@ -318,12 +319,9 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	double device_size;
 	uint8_t cdb[16];	// SCSI Command Descriptor Block
 	uint8_t buffer[64];
+	char vid[9], pid[9], rev[5];
 	unsigned char *data;
 
-/*	printf("Sending Mass Storage Reset...\n");
-	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
-		BOMS_RESET, 0, 0, NULL, 0, 1000));
-*/
 	printf("Reading Max LUN:\n");
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		BOMS_GET_MAX_LUN, 0, 0, &lun, 1, 1000);
@@ -347,7 +345,15 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	CALL_CHECK(libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&buffer, INQUIRY_LENGTH, &size, 1000));
 	printf("   received %d bytes\n", size);
 	// The following strings are not zero terminated
-	printf("   VID:PID:REV \"%8s\":\"%8s\":\"%4s\"\n", &buffer[8], &buffer[16], &buffer[32]);
+	for (i=0; i<8; i++) {
+		vid[i] = buffer[8+i];
+		pid[i] = buffer[16+i];
+		rev[i/2] = buffer[32+i/2];	// instead of another loop
+	}
+	vid[8] = 0;
+	pid[8] = 0;
+	rev[4] = 0;
+	printf("   VID:PID:REV \"%8s\":\"%8s\":\"%4s\"\n", vid, pid, rev);
 	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
 		get_sense(handle, endpoint_in, endpoint_out);
 	}
@@ -590,11 +596,18 @@ main(int argc, char** argv)
 {
 	int r;
 	unsigned tmp_vid, tmp_pid;
+	uint16_t endian_test = 0xBE00;
 
 	// Default test = Microsoft XBox Controller Type S - 1 interface
 	VID = 0x045E;
 	PID = 0x0289;
 	test_mode = USE_XBOX;
+
+	if (((uint8_t*)&endian_test)[0] == 0xBE) {
+		printf("Despite their natural superiority for end users, big endian\n"
+			"CPUs are not supported with this program, sorry.\n");
+		return 0;
+	}
 
 	if (argc >= 2) {
 		if ((argv[1][0] != '-') || (argv[1][1] == 'h')) {
