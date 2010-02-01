@@ -754,6 +754,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 		if ((i > nb_ports) || (r != LIBUSB_SUCCESS))
 			break;
 
+		memset(&conn_info, 0, sizeof(conn_info));
 		// For non HCDs, check if the node on this port is a hub or a regular device
 		if (!is_hcd) {
 			size = sizeof(USB_NODE_CONNECTION_INFORMATION);
@@ -1071,6 +1072,7 @@ enum libusb_hid_report_type {
 	found = false;
 	for (i = 0; i<USB_MAXINTERFACES; i++)
 	{
+		memset(&child_devinst, 0, sizeof(DEVINST));	// prevents /W4 warning
 		if (i == 0) {
 			r = CM_Get_Child(&child_devinst, devinst, 0);
 		} else {
@@ -1960,10 +1962,8 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 				return LIBUSB_ERROR_OTHER;
 			}
 		}
-	default:
-		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-	return LIBUSB_ERROR_OTHER;
+	return LIBUSB_ERROR_INVALID_PARAM;
 }
 
 
@@ -2921,7 +2921,7 @@ static int _hid_get_descriptor(struct hid_device_priv* dev, HANDLE hid_handle, i
 		return LIBUSB_ERROR_INVALID_PARAM;
 	case LIBUSB_DT_PHYSICAL:
 		usbi_dbg("LIBUSB_DT_PHYSICAL");
-		if (HidD_GetPhysicalDescriptor(hid_handle, data, (ULONG)size))
+		if (HidD_GetPhysicalDescriptor(hid_handle, data, (ULONG)*size))
 			return LIBUSB_COMPLETED;
 		return LIBUSB_ERROR_OTHER;
 	}

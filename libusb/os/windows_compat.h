@@ -21,6 +21,11 @@
  */
 #pragma once
 
+#if defined(_MSC_VER)
+// disable /W4 MSVC warnings that are benign
+#pragma warning(disable:4127) // conditional expression is constant
+#endif
+
 #if !defined(ssize_t)
 #if defined (_WIN64)
 #define ssize_t __int64

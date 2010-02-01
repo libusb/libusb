@@ -20,6 +20,14 @@
 
 #pragma once
 
+#if defined(_MSC_VER)
+// disable /W4 MSVC warnings that are benign
+#pragma warning(disable:4127) // conditional expression is constant
+#pragma warning(disable:4100) // unreferenced formal parameter
+#pragma warning(disable:4214) // bit field types other than int
+#pragma warning(disable:4201) // nameless struct/union
+#endif
+
 // Windows API default is uppercase - ugh!
 #if !defined(bool)
 #define bool BOOL
@@ -84,7 +92,7 @@ inline void upperize(char* str) {
 #define ERR_BUFFER_SIZE             256
 
 // Handle code for HID interface that have been claimed ("dibs")
-#define INTERFACE_CLAIMED           ((HANDLE)0xD1B5)
+#define INTERFACE_CLAIMED           ((HANDLE)(LONG_PTR)0xD1B5)
 // Additional return code for HID operations that completed synchronously
 #define LIBUSB_COMPLETED            (LIBUSB_SUCCESS + 1)
 
@@ -597,23 +605,23 @@ typedef struct _USB_HUB_CAPABILITIES_EX {
   typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name
 
 #define DLL_LOAD(dll, name, ret_on_failure)                   \
-  do {                                                        \
-  HMODULE h = GetModuleHandle(#dll);                          \
-  if(!h)                                                      \
-    h = LoadLibrary(#dll);                                    \
-  if(!h) {                                                    \
-    if(ret_on_failure)                                        \
-      return LIBUSB_ERROR_OTHER;                             \
-    else break; }                                             \
-  if((name = (__dll_##name##_t)GetProcAddress(h, #name)))     \
-    break;                                                    \
-  if((name = (__dll_##name##_t)GetProcAddress(h, #name "A"))) \
-    break;                                                    \
-  if((name = (__dll_##name##_t)GetProcAddress(h, #name "W"))) \
-    break;                                                    \
-  if(ret_on_failure)                                          \
-    return LIBUSB_ERROR_OTHER;                               \
-  } while(0)
+	do {                                                      \
+		HMODULE h = GetModuleHandle(#dll);                    \
+	if (!h)                                                   \
+		h = LoadLibrary(#dll);                                \
+	if (!h) {                                                 \
+		if (ret_on_failure) { return LIBUSB_ERROR_OTHER; }    \
+		else { break; }                                       \
+	}                                                         \
+	name = (__dll_##name##_t)GetProcAddress(h, #name);        \
+	if (name) break;                                          \
+	name = (__dll_##name##_t)GetProcAddress(h, #name "A");    \
+	if (name) break;                                          \
+	name = (__dll_##name##_t)GetProcAddress(h, #name "W");    \
+	if (name) break;                                          \
+	if(ret_on_failure)                                        \
+		return LIBUSB_ERROR_OTHER;                            \
+	} while(0)
 
 
 /* winusb.dll interface */
