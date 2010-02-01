@@ -19,6 +19,7 @@
  */
 
 #include <errno.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -51,7 +52,7 @@ int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest,
 				*dp++ = *sp++;
 				break;
 			case 'w':	/* 16-bit word, convert from little endian to CPU */
-				dp += ((unsigned long)dp & 1);	/* Align to word boundary */
+				dp += ((uintptr_t)dp & 1);	/* Align to word boundary */
 
 				if (host_endian) {
 					memcpy(dp, sp, 2);

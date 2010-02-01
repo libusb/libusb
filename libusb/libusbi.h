@@ -25,6 +25,7 @@
 
 #include <poll.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <time.h>
 
 #include <libusb.h>
@@ -45,7 +46,7 @@ struct list_head {
  * 	member - the list_head element in "type"
  */
 #define list_entry(ptr, type, member) \
-	((type *)((char *)(ptr) - (unsigned long)(&((type *)0L)->member)))
+	((type *)((uintptr_t)(ptr) - (uintptr_t)(&((type *)0L)->member)))
 
 /* Get each entry from a list
  *	pos - A structure pointer has a "member" element
