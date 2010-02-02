@@ -75,9 +75,8 @@ int _libusb_close(int fd);
 
 void init_polling(void);
 void exit_polling(void);
-struct winfd create_fd_for_poll(HANDLE handle, int access_mode);
-void free_fd_for_poll(int fd);
-void free_overlapped_for_poll(int fd);
+struct winfd _libusb_create_fd(HANDLE handle, int access_mode);
+void _libusb_free_fd(int fd);
 struct winfd fd_to_winfd(int fd);
 struct winfd handle_to_winfd(HANDLE handle);
 struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);

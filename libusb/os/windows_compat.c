@@ -29,26 +29,26 @@
  * For USB pollable async I/O, you would typically:
  * - obtain a Windows HANDLE to a file or device that has been opened in
  *   OVERLAPPED mode
- * - call create_fd_for_poll with this handle to obtain a custom fd.
+ * - call _libusb_create_fd with this handle to obtain a custom fd.
  *   Note that if you need simultaneous R/W access, you need to call create_fd
  *   twice, once in _O_RDONLY and once in _O_WRONLY mode to obtain 2 separate
  *   pollable fds
  * - leave the core functions call the poll routine and flag POLLIN/POLLOUT
  * 
  * For pipe pollable synchronous I/O (read end polling only), you would:
- * - create an anonymous pipe with pipe_for_poll to obtain 2 fds (r & w)
- * - use write_for_poll / read_for_poll to write to either end of the pipe
+ * - create an anonymous pipe with _libusb_pipe to obtain 2 fds (r & w)
+ * - use _libusb_write / _libusb_read to write to either end of the pipe
  * - use poll to check for data to read
- * Note that the read_for_poll/write_for_poll function actually perform 
+ * Note that the _libusb_read/_libusb_write function actually perform 
  * asynchronous I/O internally, and could potentially be modified to support
  * O_NON_BLOCK
  *
- * The way the polling on read_for_poll works is by splitting all read I/O
+ * The way the polling on _libusb_read works is by splitting all read I/O
  * into a dual 1 byte/n-1 bytes asynchronous read operation.
  * The 1 byte data (called the marker), is always armed for asynchronous
  * readout, so that as soon as data becomes available, an OVERLAPPED event
  * will be flagged, which poll can report.
- * Then during the read_for_poll routine itself, this 1 byte marker is copied
+ * Then during the _libusb_read routine itself, this 1 byte marker is copied
  * to the buffer, along with the rest of the data.
  *
  * Note that, since most I/O is buffered, being notified when only the first
@@ -56,7 +56,7 @@
  * rest of the data should be available in system buffers by the time read
  * is called.
  *
- * Also note that if you don't use read_for_poll to read inbound data, but
+ * Also note that if you don't use _libusb_read to read inbound data, but
  * use the OVERLAPPED directly (which is what we do in the USB async I/O 
  * functions), the marker is not used at all.
  */
@@ -129,7 +129,7 @@ struct winfd poll_fd[MAX_FDS];
 // internal fd data
 struct {
 	CRITICAL_SECTION mutex; // lock for fds
-	BYTE marker;            // 1st byte of a read_for_poll operation gets stored here
+	BYTE marker;            // 1st byte of a _libusb_read operation gets stored here
 
 } _poll_fd[MAX_FDS];
 
@@ -386,7 +386,7 @@ out1:
  * read and one for write. Using a single R/W fd is unsupported and will
  * produce unexpected results
  */
-struct winfd create_fd_for_poll(HANDLE handle, int access_mode)
+struct winfd _libusb_create_fd(HANDLE handle, int access_mode)
 {
 	int i, fd;
 	struct winfd wfd = INVALID_WINFD;
@@ -399,7 +399,7 @@ struct winfd create_fd_for_poll(HANDLE handle, int access_mode)
 	}
 
 	if ((access_mode != _O_RDONLY) && (access_mode != _O_WRONLY)) {
-		printb("create_fd_for_poll: only one of _O_RDONLY or _O_WRONLY are supported.\n"
+		printb("_libusb_create_fd: only one of _O_RDONLY or _O_WRONLY are supported.\n"
 			"If you want to poll for R/W simultaneously, create multiple fds from the same handle.\n");
 		return INVALID_WINFD;
 	}
@@ -461,7 +461,7 @@ void _free_index(int index)
  *
  * Note that the associated Windows handle is not closed by this call
  */
-void free_fd_for_poll(int fd)
+void _libusb_free_fd(int fd)
 {
 	int index;
 
@@ -584,7 +584,7 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		if ((fds[i].events & ~POLLIN) && (!(fds[i].events & POLLOUT))) {
 			fds[i].revents |= POLLERR;
 			errno = EACCES;
-			printb("poll: unsupported set of events\n");
+			printb("_libusb_poll: unsupported set of events\n");
 			return -1;
 		}
 
@@ -596,7 +596,7 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			if (index >= 0) {
 				LeaveCriticalSection(&_poll_fd[index].mutex);
 			}
-			printb("poll: invalid fd\n");
+			printb("_libusb_poll: invalid fd\n");
 			return -1;
 		}
 
@@ -604,7 +604,7 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		if ((fds[i].events & POLLIN) && (poll_fd[index].rw != RW_READ)) {
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
-			printb("poll: attempted POLLIN on fd[%d] without READ access\n", i);
+			printb("_libusb_poll: attempted POLLIN on fd[%d] without READ access\n", i);
 			LeaveCriticalSection(&_poll_fd[index].mutex);
 			return -1;
 		}
@@ -612,12 +612,12 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		if ((fds[i].events & POLLOUT) && (poll_fd[index].rw != RW_WRITE)) {
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
-			printb("poll: attempted POLLOUT on fd[%d] without WRITE access\n", i);
+			printb("_libusb_poll: attempted POLLOUT on fd[%d] without WRITE access\n", i);
 			LeaveCriticalSection(&_poll_fd[index].mutex);
 			return -1;
 		}
 		
-		printb("poll: fd[%d]=%d (overlapped = %p) got events %04X\n", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
+		printb("_libusb_poll: fd[%d]=%d (overlapped = %p) got events %04X\n", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
 
 		// The following macro only works if overlapped I/O was reported pending
 		if ( (HasOverlappedIoCompleted(poll_fd[index].overlapped))
@@ -639,7 +639,7 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 
 	// If nothing was triggered, wait on all fds that require it
 	if (nb_handles_to_wait_on != 0)	{
-		printb("poll: starting %d ms wait for %d handles...\n", timeout, (int)nb_handles_to_wait_on);
+		printb("_libusb_poll: starting %d ms wait for %d handles...\n", timeout, (int)nb_handles_to_wait_on);
 		ret = WaitForMultipleObjects(nb_handles_to_wait_on, handles_to_wait_on, 
 			FALSE, (timeout==-1)?INFINITE:(DWORD)timeout);
 
@@ -726,11 +726,11 @@ ssize_t _libusb_write(int fd, const void *buf, size_t count)
 
 	// For sync mode, we shouldn't get pending async write I/O
 	if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
-		printb("write_for_poll: previous write I/O was flagged pending!\n");
+		printb("_libusb_write: previous write I/O was flagged pending!\n");
 		CancelIo(poll_fd[index].handle);
 	}
 
-	printb("write_for_poll: writing %d bytes to fd=%d\n", count, poll_fd[index].fd);
+	printb("_libusb_write: writing %d bytes to fd=%d\n", count, poll_fd[index].fd);
 
 	reset_overlapped(poll_fd[index].overlapped);
 	if (!WriteFile(poll_fd[index].handle, buf, (DWORD)count, &wr_count, poll_fd[index].overlapped)) {
@@ -744,7 +744,7 @@ ssize_t _libusb_write(int fd, const void *buf, size_t count)
 					errno = 0;
 					goto out;
 				} else {
-					printb("write_for_poll: GetOverlappedResult failed with error %d\n", (int)GetLastError());
+					printb("_libusb_write: GetOverlappedResult failed with error %d\n", (int)GetLastError());
 					errno = EIO;
 					goto out;
 				}
@@ -754,7 +754,7 @@ ssize_t _libusb_write(int fd, const void *buf, size_t count)
 			}
 		} else {
 			// I/O started and failed
-			printb("write_for_poll: WriteFile failed with error %d\n", (int)GetLastError());
+			printb("_libusb_write: WriteFile failed with error %d\n", (int)GetLastError());
 			errno = EIO;
 			goto out;
 		}
@@ -806,7 +806,7 @@ ssize_t _libusb_read(int fd, void *buf, size_t count)
 	// still waiting for completion => force completion
 	if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
 		if (WaitForSingleObject(poll_fd[index].overlapped->hEvent, INFINITE) != WAIT_OBJECT_0) {
-			printb("read_for_poll: waiting for marker failed: %d\n", (int)GetLastError());
+			printb("_libusb_read: waiting for marker failed: %d\n", (int)GetLastError());
 			errno = EIO;
 			goto out;
 		}
@@ -815,19 +815,19 @@ ssize_t _libusb_read(int fd, void *buf, size_t count)
 	// Find out if we've read the first byte
 	if (!GetOverlappedResult(poll_fd[index].handle,	poll_fd[index].overlapped, &rd_count, FALSE)) {
 		if (GetLastError() != ERROR_MORE_DATA) {
-			printb("read_for_poll: readout of marker failed: %d\n", (int)GetLastError());
+			printb("_libusb_read: readout of marker failed: %d\n", (int)GetLastError());
 			errno = EIO;
 			goto out;
 		} else {
-			printb("read_for_poll: readout of marker reported more data\n");
+			printb("_libusb_read: readout of marker reported more data\n");
 		}
 	}
 
-	printb("read_for_poll: count = %d, rd_count(marker) = %d\n", count, (int)rd_count);
+	printb("_libusb_read: count = %d, rd_count(marker) = %d\n", count, (int)rd_count);
 
 	// We should have our marker by now
 	if (rd_count != 1) {
-		printb("read_for_poll: unexpected number of bytes for marker (%d)\n", (int)rd_count);
+		printb("_libusb_read: unexpected number of bytes for marker (%d)\n", (int)rd_count);
 		errno = EIO;
 		goto out;
 	}
@@ -841,22 +841,22 @@ ssize_t _libusb_read(int fd, void *buf, size_t count)
 			if(GetLastError() == ERROR_IO_PENDING) {
 				if (!GetOverlappedResult(poll_fd[index].handle,	poll_fd[index].overlapped, &rd_count, TRUE)) {
 					// TODO: handle more data!
-					printb("read_for_poll: readout of supplementary data failed: %d\n", (int)GetLastError());
+					printb("_libusb_read: readout of supplementary data failed: %d\n", (int)GetLastError());
 					errno = EIO;
 					goto out;
 				}
 			} else {
-				printb("read_for_poll: could not start blocking read of supplementary: %d\n", (int)GetLastError());
+				printb("_libusb_read: could not start blocking read of supplementary: %d\n", (int)GetLastError());
 				errno = EIO;
 				goto out;
 			}
 		}
 		// If ReadFile completed synchronously, we're fine too
 
-		printb("read_for_poll: rd_count(supplementary ) = %d\n", (int)rd_count);
+		printb("_libusb_read: rd_count(supplementary ) = %d\n", (int)rd_count);
 
 		if ((rd_count+1) != count) {
-			printb("read_for_poll: wanted %d-1, got %d\n", count, (int)rd_count);
+			printb("_libusb_read: wanted %d-1, got %d\n", count, (int)rd_count);
 			errno = EIO;
 			goto out;
 		}

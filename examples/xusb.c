@@ -136,6 +136,19 @@ enum test_type {
 } test_mode;
 uint16_t VID, PID;
 
+void display_buffer_hex(unsigned char *buffer, unsigned size) 
+{
+	unsigned i;
+
+	for (i=0; i<size; i++) {
+		if (!(i%0x10))
+			printf("\n  ");
+		printf(" %02X", buffer[i]);
+	}
+	printf("\n");
+}
+
+
 // The XBOX Controller is really a HID device that got its  HID Report Descriptors 
 // removed by Microsoft.
 // Input/Output reports described at http://euc.jp/periphs/xbox-controller.ja.html
@@ -261,7 +274,7 @@ int get_mass_storage_status(libusb_device_handle *handle, uint8_t endpoint, uint
 			expected_tag, csw.dCSWTag);
 		return -1;
 	}
-	// Strictly speaking, we should also should check dCSWSignature for validity, which we don't.
+	// For this test, we ignore the dCSWSignature check for validity...
 	printf("   Mass Storage Status: %02X (%s)\n", csw.bCSWStatus, csw.bCSWStatus?"FAILED":"Success");
 	if (csw.dCSWTag != expected_tag)
 		return -1;
@@ -395,12 +408,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
 		get_sense(handle, endpoint_in, endpoint_out);
 	} else {
-		for (i=0; i<size; i++) {
-			if (!(i%0x10))
-				printf("\n  ");
-			printf(" %02X", data[i]);
-		}
-		printf("\n");
+		display_buffer_hex(data, size);
 	}
 
 	return 0;
@@ -434,6 +442,8 @@ int display_sidewinder_status(libusb_device_handle *handle)
 {
 	int r;
 	uint8_t input_report[6];
+	unsigned char buffer[8];
+	int size;
 	printf("\nReading SideWinder Input Report.\n");
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 6, 5000);
@@ -448,6 +458,14 @@ int display_sidewinder_status(libusb_device_handle *handle)
 			printf("   Error: %d\n", r);
 			break;
 		}
+	}
+	// Attempt a bulk read from endpoint 0 (this should just return a raw input report)
+	printf("\nTesting bulk read (raw input report)...\n");
+	r = libusb_bulk_transfer(handle, 0x81, buffer, 8, &size, 5000);
+	if (r >= 0) {
+		display_buffer_hex(buffer, size);
+	} else {
+		printf("   %s\n", libusb_strerror(r));
 	}
 	return 0;
 }

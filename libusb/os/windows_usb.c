@@ -1641,7 +1641,7 @@ static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 
 	usbi_remove_pollfd(ITRANSFER_CTX(itransfer), transfer_priv->pollable_fd.fd);
-	free_fd_for_poll(transfer_priv->pollable_fd.fd);
+	_libusb_free_fd(transfer_priv->pollable_fd.fd);
 }
 
 static int submit_bulk_transfer(struct usbi_transfer *itransfer)
@@ -1839,7 +1839,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 				io_result = GetLastError();
 			}
 			usbi_remove_pollfd(ctx, transfer_priv->pollable_fd.fd);
-			free_fd_for_poll(transfer_priv->pollable_fd.fd);
+			_libusb_free_fd(transfer_priv->pollable_fd.fd);
 			windows_handle_callback(transfer, io_result, io_size);
 		} else {
 			usbi_err(ctx, "could not find a matching transfer for fd %x", fds[i]);
@@ -2422,7 +2422,7 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("will use interface %d", current_interface);
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	wfd = create_fd_for_poll(winusb_handle, _O_RDONLY);	
+	wfd = _libusb_create_fd(winusb_handle, _O_RDONLY);	
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -2430,7 +2430,7 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	if (!WinUsb_ControlTransfer(wfd.handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, wfd.overlapped)) {
 		if(GetLastError() != ERROR_IO_PENDING) {
 			usbi_err(ctx, "WinUsb_ControlTransfer failed: %s", windows_error_str(0));
-			free_fd_for_poll(wfd.fd);
+			_libusb_free_fd(wfd.fd);
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
@@ -2498,7 +2498,7 @@ static int winusb_submit_bulk_transfer(struct usbi_transfer *itransfer)
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = create_fd_for_poll(winusb_handle, direction_in?_O_RDONLY:_O_WRONLY);	
+	wfd = _libusb_create_fd(winusb_handle, direction_in?_O_RDONLY:_O_WRONLY);	
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -2513,7 +2513,7 @@ static int winusb_submit_bulk_transfer(struct usbi_transfer *itransfer)
 	if (!ret) {
 		if(GetLastError() != ERROR_IO_PENDING) {
 			usbi_err(ctx, "WinUsb_Pipe Transfer failed: %s", windows_error_str(0));
-			free_fd_for_poll(wfd.fd);
+			_libusb_free_fd(wfd.fd);
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
@@ -2620,7 +2620,7 @@ static int winusb_reset_device(struct libusb_device_handle *dev_handle)
 		{
 			// Cancel any pollable I/O
 			usbi_remove_pollfd(ctx, wfd.fd);
-			free_fd_for_poll(wfd.fd);
+			_libusb_free_fd(wfd.fd);
 			wfd = handle_to_winfd(winusb_handle);
 		} 
 
@@ -3320,7 +3320,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("will use interface %d", current_interface);
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	wfd = create_fd_for_poll(hid_handle, _O_RDONLY);	
+	wfd = _libusb_create_fd(hid_handle, _O_RDONLY);	
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3386,7 +3386,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 		transfer_priv->pollable_fd = wfd;
 		transfer_priv->interface_number = (uint8_t)current_interface;
 	} else {
-		free_fd_for_poll(wfd.fd);
+		_libusb_free_fd(wfd.fd);
 	}
 
 	return r;
@@ -3403,6 +3403,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	bool direction_in, ret;
 	int current_interface;
 	DWORD size;
+	unsigned char buf[256];
 
 	CHECK_HID_AVAILABLE;
 
@@ -3417,7 +3418,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = create_fd_for_poll(hid_handle, direction_in?_O_RDONLY:_O_WRONLY);	
+	wfd = _libusb_create_fd(hid_handle, direction_in?_O_RDONLY:_O_WRONLY);	
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3432,7 +3433,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	if (!ret) {
 		if(GetLastError() != ERROR_IO_PENDING) {
 			usbi_err(ctx, "HID transfer failed: %s", windows_error_str(0));
-			free_fd_for_poll(wfd.fd);
+			_libusb_free_fd(wfd.fd);
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
