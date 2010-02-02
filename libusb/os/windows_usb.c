@@ -1508,7 +1508,7 @@ static int windows_get_active_config_descriptor(struct libusb_device *dev, unsig
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	// config index is zero based
-	return windows_get_config_descriptor(dev, priv->active_config-1, buffer, len, host_endian);
+	return windows_get_config_descriptor(dev, (uint8_t)(priv->active_config-1), buffer, len, host_endian);
 }
 
 static int windows_open(struct libusb_device_handle *dev_handle)
@@ -1658,7 +1658,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	}
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
-		(transfer->endpoint & LIBUSB_ENDPOINT_IN)?POLLIN:POLLOUT);
+		(short)((transfer->endpoint & LIBUSB_ENDPOINT_IN)?POLLIN:POLLOUT));
 
 	return LIBUSB_SUCCESS;
 }
@@ -1677,7 +1677,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	}
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
-		(transfer->endpoint & LIBUSB_ENDPOINT_IN)?POLLIN:POLLOUT);
+		(short)((transfer->endpoint & LIBUSB_ENDPOINT_IN)?POLLIN:POLLOUT));
 
 	return LIBUSB_SUCCESS;
 }
@@ -2251,7 +2251,7 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 			return LIBUSB_ERROR_ACCESS;
 		}
 
-		if (!WinUsb_GetAssociatedInterface(winusb_handle, (UCHAR)iface-1, 
+		if (!WinUsb_GetAssociatedInterface(winusb_handle, (UCHAR)(iface-1), 
 			&handle_priv->interface_handle[iface].api_handle)) {
 			handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
 			switch(GetLastError()) {
