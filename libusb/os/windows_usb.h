@@ -147,13 +147,6 @@ extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
 		#fname "'");                        \
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 
-enum windows_version {
-	WINDOWS_UNSUPPORTED,
-	WINDOWS_XP,
-	WINDOWS_VISTA_AND_LATER,
-};
-
-
 /*
  * private structures definition
  * with inline pseudo constructors/destructors

@@ -60,11 +60,6 @@
  * use the OVERLAPPED directly (which is what we do in the USB async I/O 
  * functions), the marker is not used at all.
  */
-
-/*
- * TODO: Once MinGW supports it (or for other compilation platforms) use
- * CancelIoEx instead of CancelIo for Vista and later platforms
- */
 #include <windows.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -137,6 +132,24 @@ struct {
 BOOLEAN is_polling_set = FALSE;
 LONG pipe_number = 0;
 static volatile LONG compat_spinlock = 0;
+
+// Attempt to use CancelIoEx on platforms and environments supporting it
+// NB: this fucntion doesn't care about the validity of the handles
+__inline BOOL cancel_io(int index)
+{
+	if ((index < 0) || (index >= MAX_FDS)) {
+		return FALSE;
+	}
+	if (windows_version < WINDOWS_VISTA_AND_LATER) {
+		return CancelIo(poll_fd[index].handle);
+	}
+	// cygwin and MinGW don't have Ex for now...
+#if !defined(_MSC_VER)
+	return CancelIo(poll_fd[index].handle);
+#else
+	return CancelIoEx(poll_fd[index].handle, poll_fd[index].overlapped);
+#endif
+}
 
 // Init
 void init_polling(void)
@@ -231,7 +244,7 @@ void exit_polling(void)
 
 		for (i=0; i<MAX_FDS; i++) {
 			// Cancel any async I/O (handle can be invalid)
-			CancelIo(poll_fd[i].handle);
+			cancel_io(i);
 			// If anything was pending on that I/O, it should be
 			// terminating, and we should be able to access the fd
 			// mutex lock before too long
@@ -257,7 +270,7 @@ void exit_polling(void)
 __inline void _init_read_marker(int index) 
 {
 	// Cancel any read operation in progress
-	CancelIo(poll_fd[index].handle);
+	cancel_io(index);
 	// Setup a new async read on our marker
 	reset_overlapped(poll_fd[index].overlapped);
 	if (!ReadFile(poll_fd[index].handle, &_poll_fd[index].marker, 1, NULL, poll_fd[index].overlapped)) {
@@ -268,7 +281,10 @@ __inline void _init_read_marker(int index)
 	} else {
 		// We got some sync I/O. We'll pretend it's async and set overlapped manually
 		printb("_init_read_marker: marker readout completed before exit!\n");
-		// TODO: check IO_PENDING cleared?
+		if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
+			printb("_init_read_marker: completed I/O still flagged as pending\n");
+			poll_fd[index].overlapped->Internal = 0;
+		}
 		SetEvent(poll_fd[index].overlapped->hEvent);
 		poll_fd[index].overlapped->InternalHigh = 1;
 	}
@@ -298,8 +314,11 @@ int _libusb_pipe(int filedes[2])
 		return -1;
 	}
 
-	our_pipe_number  = InterlockedIncrement(&pipe_number) - 1; // - 1 to mirror postfix operation inside _snprintf
-	our_pipe_number &= 0xFFFF; // Could warn if this was necessary (ToDo)
+	our_pipe_number = InterlockedIncrement(&pipe_number) - 1; // - 1 to mirror postfix operation inside _snprintf
+	if (our_pipe_number >= 0x10000) {
+		fprintf(stderr, "_libusb_pipe: program assertion failed - more than 65536 pipes were used");
+		our_pipe_number &= 0xFFFF;
+	}
 	_snprintf(pipe_name, sizeof(pipe_name), "\\\\.\\pipe\\libusb%08x%04x", (unsigned)GetCurrentProcessId(), our_pipe_number);
 
 	// Read end of the pipe
@@ -446,7 +465,7 @@ struct winfd _libusb_create_fd(HANDLE handle, int access_mode)
 void _free_index(int index)
 {
 	// Cancel any async IO (Don't care about the validity of our handles for this)
-	CancelIo(poll_fd[index].handle);
+	cancel_io(index);
 	// close fake handle for devices
 	if ( (poll_fd[index].handle != INVALID_HANDLE_VALUE) && (poll_fd[index].handle != 0)
 	  && (GetFileType(poll_fd[index].handle) == FILE_TYPE_UNKNOWN) ) {
@@ -729,7 +748,7 @@ ssize_t _libusb_write(int fd, const void *buf, size_t count)
 	// For sync mode, we shouldn't get pending async write I/O
 	if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
 		printb("_libusb_write: previous write I/O was flagged pending!\n");
-		CancelIo(poll_fd[index].handle);
+		cancel_io(index);
 	}
 
 	printb("_libusb_write: writing %d bytes to fd=%d\n", count, poll_fd[index].fd);
@@ -842,7 +861,9 @@ ssize_t _libusb_read(int fd, void *buf, size_t count)
 		if (!ReadFile(poll_fd[index].handle, (char*)buf+1, (DWORD)(count-1), &rd_count, poll_fd[index].overlapped)) {
 			if(GetLastError() == ERROR_IO_PENDING) {
 				if (!GetOverlappedResult(poll_fd[index].handle,	poll_fd[index].overlapped, &rd_count, TRUE)) {
-					// TODO: handle more data!
+					if (GetLastError() == ERROR_MORE_DATA) {
+						printb("_libusb_read: could not fetch all data\n");
+					}
 					printb("_libusb_read: readout of supplementary data failed: %d\n", (int)GetLastError());
 					errno = EIO;
 					goto out;

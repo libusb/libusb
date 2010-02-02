@@ -34,6 +34,13 @@
 #endif
 #endif
 
+enum windows_version {
+	WINDOWS_UNSUPPORTED,
+	WINDOWS_XP,
+	WINDOWS_VISTA_AND_LATER,
+};
+extern enum windows_version windows_version;
+
 #define MAX_FDS     256
 
 #define POLLIN      0x0001    /* There is data to read */

@@ -394,7 +394,7 @@ static int windows_init(struct libusb_context *ctx)
 				windows_version = WINDOWS_VISTA_AND_LATER;
 			}
 		}
-		if (windows_version ==  WINDOWS_UNSUPPORTED) {
+		if (windows_version == WINDOWS_UNSUPPORTED) {
 			usbi_err(ctx, "This version of Windows is NOT supported");
 			r = LIBUSB_ERROR_NOT_SUPPORTED;
 			goto init_exit;
@@ -3403,7 +3403,6 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	bool direction_in, ret;
 	int current_interface;
 	DWORD size;
-	unsigned char buf[256];
 
 	CHECK_HID_AVAILABLE;
 
