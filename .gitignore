@@ -21,7 +21,9 @@ config.log
 config.status
 config.sub
 *.swp
+doxygen.cfg
 lsusb
+xusb
 dpfp
 *.pc
 fpusb-*.tar.bz2
