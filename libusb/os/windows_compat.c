@@ -674,6 +674,7 @@ int _libusb_close(int fd)
 {
 	int index;
 	HANDLE handle;
+	int r = -1;
 
 	CHECK_INIT_POLLING;
 
@@ -687,11 +688,11 @@ int _libusb_close(int fd)
 		if (CloseHandle(handle) == 0) {
 			errno = EIO;
 		} else {
-			errno = 0;
+			r     = 0;
 		}
 		LeaveCriticalSection(&_poll_fd[index].mutex);
 	}
-	return errno?-1:0;
+	return r;
 }
 
 /*
@@ -706,6 +707,7 @@ ssize_t _libusb_write(int fd, const void *buf, size_t count)
 {
 	int index;
 	DWORD wr_count;
+	int r = -1;
 
 	CHECK_INIT_POLLING;
 
@@ -741,7 +743,7 @@ ssize_t _libusb_write(int fd, const void *buf, size_t count)
 			case WAIT_OBJECT_0:
 				if (GetOverlappedResult(poll_fd[index].handle, 
 					poll_fd[index].overlapped, &wr_count, FALSE)) {
-					errno = 0;
+					r     = 0;
 					goto out;
 				} else {
 					printb("_libusb_write: GetOverlappedResult failed with error %d\n", (int)GetLastError());
@@ -761,10 +763,10 @@ ssize_t _libusb_write(int fd, const void *buf, size_t count)
 	}
 
 	// I/O started and completed synchronously
-	errno = 0;
+	r     = 0;
 
 out:
-	if (errno) {
+	if (r) {
 		reset_overlapped(poll_fd[index].overlapped);
 		LeaveCriticalSection(&_poll_fd[index].mutex);
 		return -1;
@@ -782,9 +784,9 @@ ssize_t _libusb_read(int fd, void *buf, size_t count)
 {
 	int index;
 	DWORD rd_count;
+	int r = -1;
 
 	CHECK_INIT_POLLING;
-	errno = 0;
 
 	if (count == 0) {
 		return 0;
@@ -862,11 +864,13 @@ ssize_t _libusb_read(int fd, void *buf, size_t count)
 		}
 	}
 
+	r = 0;
+
 out:
 	// Setup pending read I/O for the marker
 	_init_read_marker(index);
 	LeaveCriticalSection(&_poll_fd[index].mutex);
-	if (errno)
+	if (r)
 		return -1;
 	else
 		return count;
