@@ -67,10 +67,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <io.h>
-#if defined(_MSC_VER) && (_MSC_VER > 1200)
-// For VER_PRODUCTBUILD used in the cancel_io inline
-#include <ntverp.h>
-#endif
 
 #include "windows_compat.h"
 
@@ -137,22 +133,20 @@ BOOLEAN is_polling_set = FALSE;
 LONG pipe_number = 0;
 static volatile LONG compat_spinlock = 0;
 
-// Attempt to use CancelIoEx on platforms and environments supporting it
-// NB: this fucntion doesn't care about the validity of the handles
+// CancelIoEx, available on Vista and later only, provides the ability to cancel
+// a single transfer (OVERLAPPED) when used. As it may not be part of any of the 
+// platform headers, we hook into the Kernel32 system DLL directly to seek it.
+static BOOL (__stdcall *pCancelIoEx)(HANDLE, LPOVERLAPPED) = NULL;
 __inline BOOL cancel_io(int index)
 {
 	if ((index < 0) || (index >= MAX_FDS)) {
 		return FALSE;
 	}
-	if (windows_version < WINDOWS_VISTA_AND_LATER) {
+	if (pCancelIoEx != NULL) {
+		return (*pCancelIoEx)(poll_fd[index].handle, poll_fd[index].overlapped);
+	} else {
 		return CancelIo(poll_fd[index].handle);
 	}
-	// cygwin and MinGW don't have Ex for now...
-#if !defined(_MSC_VER) || !defined(VER_PRODUCTBUILD) || (VER_PRODUCTBUILD<6000)
-	return CancelIo(poll_fd[index].handle);
-#else
-	return CancelIoEx(poll_fd[index].handle, poll_fd[index].overlapped);
-#endif
 }
 
 // Init
@@ -164,6 +158,10 @@ void init_polling(void)
 		SleepEx(0, TRUE);
 	}
 	if (!is_polling_set) {
+		pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
+			GetProcAddress(GetModuleHandle("KERNEL32"), "CancelIoEx");
+		printb("init_polling: Will use CancelIo%s for I/O cancellation\n", 
+			(pCancelIoEx != NULL)?"Ex":"");
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
 			_poll_fd[i].marker = 0;
