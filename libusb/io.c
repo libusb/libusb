@@ -35,10 +35,7 @@
 #include <sys/time.h>
 #endif
 #include <time.h>
-#ifdef OS_WINDOWS
-#include <windows.h>
-#include "os/windows_compat.h"
-#else
+#ifndef OS_WINDOWS
 #include <unistd.h>
 #include <poll.h>
 #define _libusb_write write

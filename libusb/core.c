@@ -29,10 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#ifdef OS_WINDOWS
-#include <windows.h>
-#include "os/windows_compat.h"
-#else
+#ifndef OS_WINDOWS
 #include <unistd.h>
 #include <poll.h>
 #define _libusb_write write
