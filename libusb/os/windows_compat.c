@@ -67,6 +67,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <io.h>
+#if defined(_MSC_VER) && (_MSC_VER > 1200)
+// For VER_PRODUCTBUILD used in the cancel_io inline
+#include <ntverp.h>
+#endif
 
 #include "windows_compat.h"
 
@@ -144,7 +148,7 @@ __inline BOOL cancel_io(int index)
 		return CancelIo(poll_fd[index].handle);
 	}
 	// cygwin and MinGW don't have Ex for now...
-#if !defined(_MSC_VER)
+#if !defined(_MSC_VER) || !defined(VER_PRODUCTBUILD) || (VER_PRODUCTBUILD<6000)
 	return CancelIo(poll_fd[index].handle);
 #else
 	return CancelIoEx(poll_fd[index].handle, poll_fd[index].overlapped);
@@ -159,6 +163,7 @@ void init_polling(void)
 	while (InterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
 		SleepEx(0, TRUE);
 	}
+	printf("\n\n\nver prod = %d\n\n\n", VER_PRODUCTBUILD);
 	if (!is_polling_set) {
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
