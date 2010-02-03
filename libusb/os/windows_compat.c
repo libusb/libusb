@@ -163,7 +163,6 @@ void init_polling(void)
 	while (InterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
 		SleepEx(0, TRUE);
 	}
-	printf("\n\n\nver prod = %d\n\n\n", VER_PRODUCTBUILD);
 	if (!is_polling_set) {
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
