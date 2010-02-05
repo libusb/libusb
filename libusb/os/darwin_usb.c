@@ -262,6 +262,7 @@ static void darwin_clear_iterator (io_iterator_t iter) {
 static void *event_thread_main (void *arg0) {
   IOReturn kresult;
   struct libusb_context *ctx = (struct libusb_context *)arg0;
+  CFRunLoopRef runloop;
 
   /* hotplug (device removal) source */
   CFRunLoopSourceRef     libusb_notification_cfsource;
@@ -270,7 +271,8 @@ static void *event_thread_main (void *arg0) {
 
   usbi_info (ctx, "creating hotplug event source");
 
-  CFRetain (CFRunLoopGetCurrent ());
+  runloop = CFRunLoopGetCurrent ();
+  CFRetain (runloop);
 
   /* add the notification port to the run loop */
   libusb_notification_port     = IONotificationPortCreate (libusb_darwin_mp);
@@ -306,7 +308,7 @@ static void *event_thread_main (void *arg0) {
   CFRunLoopSourceInvalidate (libusb_notification_cfsource);
   IONotificationPortDestroy (libusb_notification_port);
 
-  CFRelease (CFRunLoopGetCurrent ());
+  CFRelease (runloop);
 
   libusb_darwin_acfl = NULL;
 
