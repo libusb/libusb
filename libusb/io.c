@@ -1277,6 +1277,8 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		if (r < 0)
 			r = LIBUSB_ERROR_OTHER;
 	}
+#else
+	(void)first;
 #endif
 
 out:
