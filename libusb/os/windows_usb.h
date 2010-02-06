@@ -52,6 +52,9 @@
 #if !defined(SPDRP_ADDRESS)
 #define SPDRP_ADDRESS	28
 #endif
+#if !defined(SPDRP_INSTALL_STATE)
+#define SPDRP_INSTALL_STATE	34
+#endif
 
 #if defined(__CYGWIN__ )
 // cygwin produces a warning unless these prototypes are defined
@@ -89,6 +92,7 @@ inline void upperize(char* str) {
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
 #define MAX_TIMER_SEMAPHORES        128
+#define TIMER_REQUEST_RETRY_MS		100
 #define ERR_BUFFER_SIZE             256
 
 // Handle code for HID interface that have been claimed ("dibs")
@@ -138,13 +142,14 @@ struct windows_usb_api_backend {
 	int (*submit_control_transfer)(struct usbi_transfer *itransfer);
 	int (*abort_control)(struct usbi_transfer *itransfer);
 	int (*abort_transfers)(struct usbi_transfer *itransfer);
+	int (*copy_transfer_data)(struct usbi_transfer *itransfer, uint32_t io_size);
 };
 
 extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
 
-#define PRINT_UNSUPPORTED_API(fname)        \
-	usbi_dbg("unsupported API call for '"   \
-		#fname "'");                        \
+#define PRINT_UNSUPPORTED_API(fname)              \
+	usbi_dbg("unsupported API call for '"         \
+		#fname "' (unrecognized device driver)"); \
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 
 /*
@@ -292,6 +297,8 @@ static inline struct windows_device_handle_priv *__device_handle_priv(
 struct windows_transfer_priv {
 	struct winfd pollable_fd;
 	uint8_t interface_number;
+	uint8_t *hid_buffer;	// 1 byte extended data buffer, required for HID
+	size_t hid_expected_size;
 };
 
 

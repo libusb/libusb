@@ -46,6 +46,17 @@
 #define sscanf_s sscanf
 #endif
 
+#if !defined(bool)
+#define bool int
+#endif
+#if !defined(true)
+#define true (1 == 1)
+#endif
+#if !defined(false)
+#define false (!true)
+#endif
+
+
 // Future versions of libusb will use usb_interface instead of interface
 // in libusb_config_descriptor => catter for that
 #define usb_interface interface
@@ -131,8 +142,6 @@ enum test_type {
 	USE_KEY,
 	USE_JTAG,
 	USE_HID,
-	USE_SIDEWINDER,
-	USE_PLANTRONICS,
 } test_mode;
 uint16_t VID, PID;
 
@@ -414,59 +423,106 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	return 0;
 }
 
-// Plantronics (HID)
-int display_plantronics_status(libusb_device_handle *handle)
+// HID
+int get_hid_input_record_size(uint8_t *hid_report_descriptor, int size)
 {
-	int r;
-	uint8_t input_report[2];
-	printf("\nReading Plantronics Input Report...\n");
-	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
-		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 2, 5000);
-	if (r >= 0) {
-		printf("   OK\n");
-	} else {
-		switch(r) {
-		case LIBUSB_ERROR_TIMEOUT:
-			printf("   Timeout! Please make sure you press the mute button within the 5 seconds allocated...\n");
+	uint8_t i, j = 0;
+	int record_size[2] = {0, 0};
+	int nb_bits = 0, nb_items = 0;
+	bool found_bits, found_items, found_direction;
+
+	found_bits = false;
+	found_items = false;
+	found_direction = false;
+	for (i = hid_report_descriptor[0]+1; i < size; i += 2) {
+		switch (hid_report_descriptor[i]) {
+		case 0x75:	// bitsize
+			nb_bits = hid_report_descriptor[i+1];
+			found_bits = true;
+			break;
+		case 0x95:	// count
+			nb_items  = hid_report_descriptor[i+1];
+			found_items = true;
+			break;
+		case 0x81:	// input
+			found_direction = true;
+			j = 0;
+			break;
+		case 0x91:	// output
+			found_direction = true;
+			j = 1;
+			break;
+		case 0xC0:	// end of collection
+			nb_items = 0;
+			nb_bits = 0;
 			break;
 		default:
-			printf("   Error: %d\n", r);
-			break;
+			continue;
+		}
+		if (found_direction) {
+			found_bits = false;
+			found_items = false;
+			found_direction = false;
+			record_size[j] += nb_items*nb_bits;
 		}
 	}
-	return 0;
+	return (record_size[0]+7)/8;
 }
 
-// SideWinder (HID)
-int display_sidewinder_status(libusb_device_handle *handle)
+int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 {
-	int r;
-	uint8_t input_report[6];
-	unsigned char buffer[8];
-	int size;
-	printf("\nReading SideWinder Input Report.\n");
+	int r, size;
+	uint8_t hid_report_descriptor[256];
+	uint8_t *input_report;
+
+	printf("\nReading HID Report Descriptors:\n");
+	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_RECIPIENT_INTERFACE, 
+		LIBUSB_REQUEST_GET_DESCRIPTOR, LIBUSB_DT_REPORT<<8, 0, hid_report_descriptor, 256, 1000);
+	if (r < 0) {
+		printf("failed\n");
+	} else {
+		display_buffer_hex(hid_report_descriptor, r);
+		size = get_hid_input_record_size(hid_report_descriptor, r);
+
+#if !defined(OS_WINDOWS)
+		// TOFIX: get_hid_input_record_size still needs some improvements on Linux
+		if ((VID == 0x045E) && (PID = 0x0008))
+			size++;
+#endif
+		printf("\n   Input Report Length: %d\n", size);
+	}
+
+	input_report = calloc(size, 1);
+	if (input_report == NULL) {
+		return -1;
+	}
+
+	printf("\nReading Input Report...\n");
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
-		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 6, 5000);
+		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, (uint16_t)size, 5000);
 	if (r >= 0) {
-		printf("   OK\n");
+		display_buffer_hex(input_report, size);
 	} else {
 		switch(r) {
 		case LIBUSB_ERROR_TIMEOUT:
-			printf("   Timeout! Please make sure you use the joystick within the 5 seconds allocated...\n\n");
+			printf("   Timeout! Please make sure you act on the device within the 5 seconds allocated...\n");
 			break;
 		default:
 			printf("   Error: %d\n", r);
 			break;
 		}
 	}
+
 	// Attempt a bulk read from endpoint 0 (this should just return a raw input report)
-	printf("\nTesting bulk read (raw input report)...\n");
-	r = libusb_bulk_transfer(handle, 0x81, buffer, 8, &size, 5000);
+	printf("\nTesting bulk read using endpoint %02X...\n", endpoint_in);
+	r = libusb_bulk_transfer(handle, endpoint_in, input_report, size, &size, 5000);
 	if (r >= 0) {
-		display_buffer_hex(buffer, size);
+		display_buffer_hex(input_report, size);
 	} else {
 		printf("   %s\n", libusb_strerror(r));
 	}
+
+	free(input_report);
 	return 0;
 }
 
@@ -525,15 +581,11 @@ int test_device(uint16_t vid, uint16_t pid)
 			for (k=0; k<conf_desc->usb_interface[i].altsetting[j].bNumEndpoints; k++) {
 				endpoint = &conf_desc->usb_interface[i].altsetting[j].endpoint[k];
 				printf("       endpoint[%d].address: %02X\n", k, endpoint->bEndpointAddress);
-				// Set the first IN/OUT endpoints found as default for testing
+				// Use the last IN/OUT endpoints found as default for testing
 				if (endpoint->bEndpointAddress & LIBUSB_ENDPOINT_IN) {
-					if (!endpoint_in) {
-						endpoint_in = endpoint->bEndpointAddress;
-					}
+					endpoint_in = endpoint->bEndpointAddress;
 				} else {
-					if (!endpoint_out) {
-						endpoint_out = endpoint->bEndpointAddress;
-					}
+					endpoint_out = endpoint->bEndpointAddress;
 				}
 				printf("           max packet size: %04X\n", endpoint->wMaxPacketSize);
 				printf("          polling interval: %02X\n", endpoint->bInterval);
@@ -580,11 +632,8 @@ int test_device(uint16_t vid, uint16_t pid)
 		msleep(2000);
 		CALL_CHECK(set_xbox_actuators(handle, 0, 0));
 		break;
-	case USE_SIDEWINDER:
-		display_sidewinder_status(handle);
-		break;
-	case USE_PLANTRONICS:
-		display_plantronics_status(handle);
+	case USE_HID:
+		test_hid(handle, endpoint_in);
 		break;
 	default:
 		break;
@@ -634,8 +683,8 @@ main(int argc, char** argv)
 			printf("   -i: test HID device\n");
 			printf("   -j: test OLIMEX ARM-USB-TINY JTAG, 2 channel composite device\n");
 			printf("   -k: test Mass Storage USB device\n");
-			printf("   -l: test Plantronics HID device\n");
-			printf("   -s: test Microsoft Sidwinder Precision Pro\n");
+			printf("   -l: test Plantronics Headset (HID)\n");
+			printf("   -s: test Microsoft Sidewinder Precision Pro (HID)\n");
 			printf("   -x: test Microsoft XBox Controller Type S (default)\n");
 
 			return 0;
@@ -663,13 +712,13 @@ main(int argc, char** argv)
 			// Plantronics DSP 400, 2 channel HID composite device - 1 HID interface
 			VID = 0x047F;
 			PID = 0x0CA1;
-			test_mode = USE_PLANTRONICS;
+			test_mode = USE_HID;
 			break;
 		case 's':
 			// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
 			VID = 0x045E;
 			PID = 0x0008;
-			test_mode = USE_SIDEWINDER;
+			test_mode = USE_HID;
 			break;
 		default:
 			break;

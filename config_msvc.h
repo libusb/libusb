@@ -12,6 +12,9 @@
 /* Windows backend */
 #define OS_WINDOWS /**/
 
+/* use HidD_Get(In/Out)putReport instead of (Read/Write)File for HID */
+/* #undef HID_USE_LAST_REPORTS */
+
 /* Name of package */
 #define PACKAGE "libusb"
 
