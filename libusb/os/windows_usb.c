@@ -2766,7 +2766,7 @@ static int _hid_get_device_descriptor(struct hid_device_priv* dev, void *data, s
 static int _hid_get_config_descriptor(struct hid_device_priv* dev, void *data, size_t *size)
 {
 	char num_endpoints = 0;
-	int config_total_len = 0;
+	size_t config_total_len = 0;
 	char tmp[HID_MAX_CONFIG_DESC_SIZE];
 	struct libusb_config_descriptor *cd;
 	struct libusb_interface_descriptor *id;
@@ -2843,7 +2843,7 @@ static int _hid_get_string_descriptor(struct hid_device_priv* dev, int index,
                                       void *data, size_t *size)
 {
 	void *tmp = NULL;
-	int tmp_size = 0;
+	size_t tmp_size = 0;
 
 	/* language ID, EN-US */
 	char string_langid[] = {
