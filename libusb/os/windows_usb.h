@@ -172,7 +172,7 @@ static inline void windows_hcd_priv_release(struct windows_hcd_priv* p) {
 	safe_free(p->path);
 }
 
-// TODO: move hid desc to libusb.h?
+// TODO (v2+): move hid desc to libusb.h?
 struct libusb_hid_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
