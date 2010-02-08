@@ -2974,7 +2974,7 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 						   struct windows_transfer_priv *tp, size_t *size, OVERLAPPED* overlapped)
 {
 	uint8_t *buf;
-	DWORD read_size = ((DWORD)*size) + 1;
+	DWORD read_size = (DWORD)(*size + 1);
 	int r = LIBUSB_SUCCESS;
 
 	if (tp->hid_buffer != NULL) {
@@ -2990,12 +2990,14 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	if (buf == NULL) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
-
+	buf[0] = (uint8_t)id;
+	usbi_dbg("report ID: %02X", buf[0]);
 	// NB: HidD_GetInputReport returns the last Input Report read whereas ReadFile
 	// waits for input to be generated => in case your HID device requires human 
 	// action to generate a report, it may wait indefinitely. 
 #if !defined(HID_USE_LAST_REPORTS)
 	// Use ReadFile instead of HidD_GetInputReport for async I/O
+	tp->hid_expected_size = read_size;	// read_size is modified below!
 	if (!ReadFile(hid_handle, buf, read_size+1, &read_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
 			usbi_dbg("Failed to Read HID Input Report: %s", windows_error_str(0));
@@ -3003,7 +3005,6 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 			return LIBUSB_ERROR_IO;
 		}
 		tp->hid_buffer = buf;
-		tp->hid_expected_size = read_size;
 		return LIBUSB_SUCCESS;
 	}
 #else
@@ -3056,6 +3057,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	}
 
 	buf[0] = (uint8_t)id;
+	usbi_dbg("report ID: %02X", buf[0]);
 	memcpy(buf + 1, data, *size);
 
 #if !defined(HID_USE_LAST_REPORTS)
@@ -3516,7 +3518,9 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	if (transfer_priv->hid_buffer == NULL) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
-	
+	// TODO: can we figure out report ID here?
+	transfer_priv->hid_buffer[0] = 0;
+
 	if (direction_in) {
 		usbi_dbg("reading %d bytes", transfer->length+1);
 		ret = ReadFile(hid_handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
