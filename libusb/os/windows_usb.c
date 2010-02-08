@@ -1021,6 +1021,8 @@ enum libusb_hid_report_type {
 			if (dev_interface_details == NULL)
 				break;
 
+//			usbi_dbg("processing: %s", dev_interface_details->DevicePath);
+
 			// HID devices (and possibly other classes) have an extra indirection
 			// for an USB path we can recognize
 			if (j == HID_DEVICE_INTERFACE_GUID_INDEX) {
@@ -1051,6 +1053,15 @@ enum libusb_hid_report_type {
 			if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_SERVICE, 
 				NULL, (BYTE*)driver, MAX_KEY_LENGTH, &size)) {
 				driver[0] = 0;
+			}
+
+//			usbi_dbg("driver: %s", driver);
+			// Temporary fix for composite mouse and hid keyboards
+			// TODO: something better
+			if (safe_strcmp(driver, "kbdhid") == 0) {
+				strcpy(driver, "HidUsb");
+			} else if (safe_strcmp(driver, "mouhid") == 0) {
+				strcpy(driver, "HidUsb");
 			}
 
 			for (api=USB_API_WINUSB; api<USB_API_MAX; api++) {
