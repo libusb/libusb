@@ -584,18 +584,22 @@ struct winfd overlapped_to_winfd(OVERLAPPED* overlapped)
  */
 int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 {
-	unsigned i, triggered = 0;
-	int index, object_index;
-	HANDLE *handles_to_wait_on = malloc(nfds*sizeof(HANDLE));
-	int *handle_to_index = malloc(nfds*sizeof(int));
+	unsigned i;
+	int index, object_index, triggered;
+	HANDLE *handles_to_wait_on;
+	int *handle_to_index;
 	DWORD nb_handles_to_wait_on = 0;
 	DWORD ret;
 
 	CHECK_INIT_POLLING;
 
+	triggered = 0;
+	handles_to_wait_on = malloc(nfds*sizeof(HANDLE));
+	handle_to_index = malloc(nfds*sizeof(int));
 	if ((handles_to_wait_on == NULL) || (handle_to_index == NULL)) {
 		errno = ENOMEM;
-		return -1;
+		triggered = -1;
+		goto poll_exit;
 	}
 
 	for (i = 0; i < nfds; ++i) {
@@ -606,7 +610,8 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			fds[i].revents |= POLLERR;
 			errno = EACCES;
 			printb("_libusb_poll: unsupported set of events\n");
-			return -1;
+			triggered = -1;
+			goto poll_exit;
 		}
 
 		index = _fd_to_index_and_lock(fds[i].fd);
@@ -618,7 +623,8 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 				LeaveCriticalSection(&_poll_fd[index].mutex);
 			}
 			printb("_libusb_poll: invalid fd\n");
-			return -1;
+			triggered = -1;
+			goto poll_exit;
 		}
 
 		// IN or OUT must match our fd direction
@@ -627,7 +633,8 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			errno = EBADF;
 			printb("_libusb_poll: attempted POLLIN on fd[%d] without READ access\n", i);
 			LeaveCriticalSection(&_poll_fd[index].mutex);
-			return -1;
+			triggered = -1;
+			goto poll_exit;
 		}
 
 		if ((fds[i].events & POLLOUT) && (poll_fd[index].rw != RW_WRITE)) {
@@ -635,7 +642,8 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			errno = EBADF;
 			printb("_libusb_poll: attempted POLLOUT on fd[%d] without WRITE access\n", i);
 			LeaveCriticalSection(&_poll_fd[index].mutex);
-			return -1;
+			triggered = -1;
+			goto poll_exit;
 		}
 		
 		printb("_libusb_poll: fd[%d]=%d (overlapped = %p) got events %04X\n", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
@@ -655,11 +663,8 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		LeaveCriticalSection(&_poll_fd[index].mutex);
 	}
 
-	if (triggered != 0)
-		return triggered;
-
 	// If nothing was triggered, wait on all fds that require it
-	if (nb_handles_to_wait_on != 0)	{
+	if ((triggered == 0) && (nb_handles_to_wait_on != 0)) {
 		printb("_libusb_poll: starting %d ms wait for %d handles...\n", timeout, (int)nb_handles_to_wait_on);
 		ret = WaitForMultipleObjects(nb_handles_to_wait_on, handles_to_wait_on, 
 			FALSE, (timeout==-1)?INFINITE:(DWORD)timeout);
@@ -676,13 +681,20 @@ int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			}
 		} else if (ret == WAIT_TIMEOUT) {
 			printb("  timed out\n");
-			return 0;	// 0 = timeout
+			triggered = 0;	// 0 = timeout
 		} else {
 			errno = EIO;
-			return -1;	// error
+			triggered = -1;	// error
 		}
 	}
 
+poll_exit:
+	if (handles_to_wait_on != NULL) {
+		free(handles_to_wait_on);
+	}
+	if (handle_to_index != NULL) {
+		free(handle_to_index);
+	}
 	return triggered;
 }
 
