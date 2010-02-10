@@ -1135,13 +1135,22 @@ enum libusb_hid_report_type {
 		for (j=0; j<nb_paths; j++) {
 			if ( (safe_strncmp(sanitized_path[j], sanitized_short, strlen(sanitized_short)) == 0)
 			  || (safe_strcmp(hid_path[j], sanitized_short) == 0 ) ) {
-				priv->usb_interface[interface_number].path = sanitized_path[j];
-				priv->usb_interface[interface_number].apib = &usb_api_backend[api_type[j]];
-				if ((api_type[j] == USB_API_HID) && (priv->hid == NULL)) {
-						priv->hid = calloc(1, sizeof(struct hid_device_priv));
+				// HID devices can have multiple collections (COL##) for each MI_## interface
+				if (priv->usb_interface[interface_number].path != NULL) {
+					usbi_dbg("interface_path[%d] already set - ignoring HID collection: %s", 
+						interface_number, sanitized_path[j]);
+					if (api_type[j] != USB_API_HID) {
+						usbi_warn(ctx, "program assertion failed - not an HID collection");
+					}
+				} else {
+					priv->usb_interface[interface_number].path = sanitized_path[j];
+					priv->usb_interface[interface_number].apib = &usb_api_backend[api_type[j]];
+					if ((api_type[j] == USB_API_HID) && (priv->hid == NULL)) {
+							priv->hid = calloc(1, sizeof(struct hid_device_priv));
+					}
+					priv->composite_api_flags |= 1<<api_type[j];
+					sanitized_path[j] = NULL;
 				}
-				priv->composite_api_flags |= 1<<api_type[j];
-				sanitized_path[j] = NULL;
 			}
 		}
 		safe_free(sanitized_short);
