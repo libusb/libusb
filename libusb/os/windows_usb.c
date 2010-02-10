@@ -352,6 +352,18 @@ static void windows_assign_endpoints(struct libusb_device *dev, int iface, int a
 	}
 }
 
+// Lookup for a match in the list of API driver names
+bool is_api_driver(char* driver, uint8_t api)
+{
+	uint8_t i;
+	for (i=0; i<usb_api_backend[api].nb_driver_names; i++) {
+		if (safe_strcmp(driver, usb_api_backend[api].driver_name_list[i]) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /*
  * init: libusb backend init function
  *
@@ -1021,8 +1033,6 @@ enum libusb_hid_report_type {
 			if (dev_interface_details == NULL)
 				break;
 
-//			usbi_dbg("processing: %s", dev_interface_details->DevicePath);
-
 			// HID devices (and possibly other classes) have an extra indirection
 			// for an USB path we can recognize
 			if (j == HID_DEVICE_INTERFACE_GUID_INDEX) {
@@ -1055,17 +1065,8 @@ enum libusb_hid_report_type {
 				driver[0] = 0;
 			}
 
-//			usbi_dbg("driver: %s", driver);
-			// Temporary fix for composite mouse and hid keyboards
-			// TODO: something better
-			if (safe_strcmp(driver, "kbdhid") == 0) {
-				strcpy(driver, "HidUsb");
-			} else if (safe_strcmp(driver, "mouhid") == 0) {
-				strcpy(driver, "HidUsb");
-			}
-
 			for (api=USB_API_WINUSB; api<USB_API_MAX; api++) {
-				if ( (safe_strcmp(driver, usb_api_backend[api].driver_name) == 0)
+				if ( (is_api_driver(driver, api))
 				  || (guid_eq(&class_guid, usb_api_backend[api].class_guid)) ) {
 					api_type[nb_paths] = api;
 					if (j == HID_DEVICE_INTERFACE_GUID_INDEX) {
@@ -1258,7 +1259,8 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	GUID guid;
 	DWORD size, reg_type, install_state, port_nr;
 	int	r = LIBUSB_SUCCESS;
-	unsigned i, j, k, api;
+	unsigned i, j, k;
+	uint8_t api;
 	bool found;
 
 	// TODO (v1.5): MI_## automated driver installation
@@ -1352,7 +1354,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				found = true;
 
 				for (api = 0; api<USB_API_MAX; api++) {
-					if (safe_strcmp(reg_key, usb_api_backend[api].driver_name) == 0) {
+					if (is_api_driver(reg_key, api)) {
 						priv->apib = &usb_api_backend[api];
 						switch(api) {
 						case USB_API_COMPOSITE:
@@ -2099,11 +2101,15 @@ static int unsupported_copy_transfer_data(struct usbi_transfer *itransfer, uint3
 	PRINT_UNSUPPORTED_API(copy_transfer_data);
 }
 
+const char* composite_driver_names[] = {"usbccgp"};
+const char* winusb_driver_names[] = {"WinUSB"};
+const char* hid_driver_names[] = {"HidUsb", "mouhid", "kbdhid"};
 const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	{
 		USB_API_UNSUPPORTED,
 		&CLASS_GUID_UNSUPPORTED,
-		"_UNSUPPORTED_",
+		NULL,
+		0,
 		unsupported_init,
 		unsupported_exit,
 		unsupported_open,
@@ -2122,7 +2128,8 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	}, {
 		USB_API_COMPOSITE,
 		&CLASS_GUID_COMPOSITE,
-		"usbccgp",
+		composite_driver_names,
+		1,
 		composite_init,
 		composite_exit,
 		composite_open,
@@ -2141,7 +2148,8 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	}, {
 		USB_API_WINUSB,
 		&CLASS_GUID_LIBUSB_WINUSB,
-		"WinUSB",
+		winusb_driver_names,
+		1,
 		winusb_init,
 		winusb_exit,
 		winusb_open,
@@ -2160,7 +2168,8 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	}, {
 		USB_API_HID,
 		&CLASS_GUID_HID,
-		"HidUsb",
+		hid_driver_names,
+		3,
 		hid_init,
 		hid_exit,
 		hid_open,

@@ -127,7 +127,8 @@ const GUID CLASS_GUID_COMPOSITE     = { 0x36FC9E60, 0xC465, 0x11cF, {0x80, 0x56,
 struct windows_usb_api_backend {
 	const uint8_t id;
 	const GUID *class_guid;  // The Class GUID (for fallback in case the driver name cannot be read)
-	const char *driver_name; // Driver name, without .sys, e.g. "usbccgp"
+	const char **driver_name_list; // Driver name, without .sys, e.g. "usbccgp"
+	const uint8_t nb_driver_names;
 	int (*init)(struct libusb_context *ctx);
 	int (*exit)(void);
 	int (*open)(struct libusb_device_handle *dev_handle);
