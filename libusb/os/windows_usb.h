@@ -298,7 +298,8 @@ static inline struct windows_device_handle_priv *__device_handle_priv(
 struct windows_transfer_priv {
 	struct winfd pollable_fd;
 	uint8_t interface_number;
-	uint8_t *hid_buffer;	// 1 byte extended data buffer, required for HID
+	uint8_t *hid_buffer; // 1 byte extended data buffer, required for HID
+	uint8_t *hid_dest;   // transfer buffer destination, required for HID
 	size_t hid_expected_size;
 };
 

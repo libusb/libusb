@@ -3034,6 +3034,7 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 			return LIBUSB_ERROR_IO;
 		}
 		tp->hid_buffer = buf;
+		tp->hid_dest = data; // copy dest, as not necessarily the start of the transfer buffer
 		return LIBUSB_SUCCESS;
 	}
 #else
@@ -3543,6 +3544,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
 	transfer_priv->hid_buffer = (uint8_t*)malloc(transfer->length+2);
+	transfer_priv->hid_dest = transfer->buffer;
 	transfer_priv->hid_expected_size = transfer->length+2;
 	if (transfer_priv->hid_buffer == NULL) {
 		return LIBUSB_ERROR_NO_MEM;
@@ -3666,8 +3668,12 @@ static int hid_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_s
 			corrected_size = (uint32_t)transfer_priv->hid_expected_size;
 			usbi_err(ctx, "OVERFLOW!");
 			r = LIBUSB_TRANSFER_OVERFLOW;
+		} else if (transfer_priv->hid_dest == NULL) {
+			usbi_err(ctx, "program assertion failed - copy destination address was not set");
+			r = LIBUSB_TRANSFER_ERROR;
+		} else {
+			memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer+1, corrected_size);
 		}
-		memcpy(transfer->buffer, transfer_priv->hid_buffer+1, corrected_size);
 		safe_free(transfer_priv->hid_buffer);
 	} else {
 		// No hid_buffer => transfer was sync and our size is good
