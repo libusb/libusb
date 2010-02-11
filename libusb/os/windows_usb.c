@@ -449,7 +449,7 @@ static int windows_init(struct libusb_context *ctx)
 			if (i==2)
 				break; // 3rd event has no matching parts, because it's for quitting the thread.
 			timer_response[i] = CreateSemaphore(NULL, 0, MAX_TIMER_SEMAPHORES, NULL);
-			if (timer_request[i] == NULL) {
+			if (timer_response[i] == NULL) {
 				usbi_err(ctx, "could not create timer response semaphore %d - aborting", i);
 				goto init_exit;
 			}
@@ -1921,6 +1921,10 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 	}
 	while (1) {
 		timer_index = WaitForMultipleObjects(3, timer_request, FALSE, INFINITE) - WAIT_OBJECT_0;
+		if (timer_index < 0 || timer_index > 2) {
+			usbi_dbg("failure to wait on requests: %s", windows_error_str(0));
+			continue;
+		}
 		if (request_count[timer_index] == 0) {
 			// Request already handled
 			ResetEvent(timer_request[timer_index]);
@@ -1961,9 +1965,6 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 		case 2: // time to quit
 			usbi_dbg("timer thread quitting");
 			return 0;
-		default:
-			usbi_dbg("failure to wait on requests: %s", windows_error_str(0));
-			continue;
 		send_response:
 			nb_responses = InterlockedExchange((LONG*)&request_count[i], 0);
 			if ( (nb_responses) 
