@@ -213,8 +213,11 @@ struct hid_device_priv {
 	uint16_t vid;
 	uint16_t pid;
 	uint8_t config;
-	uint16_t output_report_size;
+	uint8_t input_report_id;
+	uint8_t output_report_id;
+	uint8_t feature_report_id;
 	uint16_t input_report_size;
+	uint16_t output_report_size;
 	uint16_t feature_report_size;
 	WCHAR man_string[MAX_USB_STRING_LENGTH];
 	WCHAR prod_string[MAX_USB_STRING_LENGTH];
@@ -721,6 +724,49 @@ typedef struct {
   USHORT NumberFeatureDataIndices;
 } HIDP_CAPS, *PHIDP_CAPS;
 
+typedef enum _HIDP_REPORT_TYPE {
+  HidP_Input,
+  HidP_Output,
+  HidP_Feature
+} HIDP_REPORT_TYPE;
+
+typedef struct _HIDP_VALUE_CAPS {
+  USAGE  UsagePage;
+  UCHAR  ReportID;
+  BOOLEAN  IsAlias;
+  USHORT  BitField;
+  USHORT  LinkCollection;
+  USAGE  LinkUsage;
+  USAGE  LinkUsagePage;
+  BOOLEAN  IsRange;
+  BOOLEAN  IsStringRange;
+  BOOLEAN  IsDesignatorRange;
+  BOOLEAN  IsAbsolute;
+  BOOLEAN  HasNull;
+  UCHAR  Reserved;
+  USHORT  BitSize;
+  USHORT  ReportCount;
+  USHORT  Reserved2[5];
+  ULONG  UnitsExp;
+  ULONG  Units;
+  LONG  LogicalMin, LogicalMax;
+  LONG  PhysicalMin, PhysicalMax;
+    union {
+      struct {
+        USAGE  UsageMin, UsageMax;
+        USHORT  StringMin, StringMax;
+        USHORT  DesignatorMin, DesignatorMax;
+        USHORT  DataIndexMin, DataIndexMax;
+      } Range;
+      struct {
+        USAGE  Usage, Reserved1;
+        USHORT  StringIndex, Reserved2;
+        USHORT  DesignatorIndex, Reserved3;
+        USHORT  DataIndex, Reserved4;
+      } NotRange;
+    };
+} HIDP_VALUE_CAPS, *PHIDP_VALUE_CAPS;
+
 DLL_DECLARE(WINAPI, BOOL, HidD_GetAttributes, (HANDLE, PHIDD_ATTRIBUTES));
 DLL_DECLARE(WINAPI, VOID, HidD_GetHidGuid, (LPGUID));
 DLL_DECLARE(WINAPI, BOOL, HidD_GetPreparsedData, (HANDLE, PHIDP_PREPARSED_DATA *));
@@ -736,3 +782,4 @@ DLL_DECLARE(WINAPI, BOOL, HidD_GetPhysicalDescriptor, (HANDLE, PVOID, ULONG));
 DLL_DECLARE(WINAPI, BOOL, HidD_GetInputReport, (HANDLE, PVOID, ULONG));
 DLL_DECLARE(WINAPI, BOOL, HidD_SetOutputReport, (HANDLE, PVOID, ULONG));
 DLL_DECLARE(WINAPI, BOOL, HidD_FlushQueue, (HANDLE));
+DLL_DECLARE(WINAPI, BOOL, HidP_GetValueCaps, (HIDP_REPORT_TYPE, PHIDP_VALUE_CAPS, PULONG, PHIDP_PREPARSED_DATA));

@@ -3025,7 +3025,7 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 		return LIBUSB_ERROR_NO_MEM;
 	}
 	buf[0] = (uint8_t)id;
-	usbi_dbg("report ID: %02X", buf[0]);
+	usbi_dbg("report ID: 0x%02X", buf[0]);
 	// NB: HidD_GetInputReport returns the last Input Report read whereas ReadFile
 	// waits for input to be generated => in case your HID device requires human 
 	// action to generate a report, it may wait indefinitely. 
@@ -3092,7 +3092,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	}
 
 	buf[0] = (uint8_t)id;
-	usbi_dbg("report ID: %02X", buf[0]);
+	usbi_dbg("report ID: 0x%02X", buf[0]);
 	memcpy(buf + 1, data, *size);
 
 #if !defined(USE_HIDD_FOR_REPORTS)
@@ -3211,6 +3211,7 @@ static int hid_init(struct libusb_context *ctx)
 	DLL_LOAD(hid.dll, HidD_GetInputReport, FALSE);
 	DLL_LOAD(hid.dll, HidD_SetOutputReport, FALSE);
 	DLL_LOAD(hid.dll, HidD_FlushQueue, TRUE);
+	DLL_LOAD(hid.dll, HidP_GetValueCaps, TRUE);
 
 	api_hid_available = true;
 	return LIBUSB_SUCCESS; 
@@ -3233,8 +3234,10 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 	HIDD_ATTRIBUTES hid_attributes;
 	PHIDP_PREPARSED_DATA preparsed_data = NULL;
 	HIDP_CAPS capabilities;
+	HIDP_VALUE_CAPS *value_caps;
 
 	HANDLE hid_handle = INVALID_HANDLE_VALUE;
+	ULONG size;
 	int i;
 
 	CHECK_HID_AVAILABLE;
@@ -3297,6 +3300,54 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 		if (HidP_GetCaps(preparsed_data, &capabilities) != HIDP_STATUS_SUCCESS) {
 			usbi_err(ctx, "could not parse HID capabilities (HidP_GetCaps)");
 			break;
+		}
+		// Get the default input and output report IDs to use with interrupt
+		size = capabilities.NumberInputValueCaps;
+		usbi_dbg("%d HID input report value(s) found", size);
+		priv->hid->input_report_id = 0;
+		if (size > 0) {
+			value_caps = malloc(size * sizeof(HIDP_VALUE_CAPS));
+			if ( (value_caps != NULL) 
+			  && (HidP_GetValueCaps(HidP_Input, value_caps, &size, preparsed_data) == HIDP_STATUS_SUCCESS)
+			  && (size >= 1) ) {
+				priv->hid->input_report_id = value_caps[0].ReportID;
+				for (i=1; i<(int)size; i++) {
+					if (value_caps[i].ReportID != priv->hid->input_report_id) {
+						usbi_warn(ctx, "multiple input report IDs found for HID");
+						usbi_warn(ctx, " will only handle report ID 0x%02X for interrupt transfers",
+							priv->hid->input_report_id);
+						break;
+					}
+				}
+				usbi_dbg("will use report ID 0x%02X for interrupt transfers", priv->hid->input_report_id);
+			} else {
+				usbi_warn(ctx, "could process input report IDs");
+			}
+			safe_free(value_caps);
+		}
+
+		size = capabilities.NumberOutputValueCaps;
+		usbi_dbg("%d HID output report value(s) found", size);
+		priv->hid->output_report_id = 0;
+		if (size > 0) {
+			value_caps = malloc(size * sizeof(HIDP_VALUE_CAPS));
+			if ( (value_caps != NULL) 
+			  && (HidP_GetValueCaps(HidP_Output, value_caps, &size, preparsed_data) == HIDP_STATUS_SUCCESS)
+			  && (size >= 1) ) {
+				priv->hid->output_report_id = value_caps[0].ReportID;
+				for (i=1; i<(int)size; i++) {
+					if (value_caps[i].ReportID != priv->hid->output_report_id) {
+						usbi_warn(ctx, "multiple output report IDs found for HID");
+						usbi_warn(ctx, " will only handle report ID 0x%02X for interrupt transfers",
+							priv->hid->output_report_id);
+						break;
+					}
+				}
+				usbi_dbg("will use report ID 0x%02X for interrupt transfers", priv->hid->output_report_id);
+			} else {
+				usbi_warn(ctx, "could process output report IDs");
+			}
+			safe_free(value_caps);
 		}
 		priv->hid->output_report_size = capabilities.OutputReportByteLength;
 		priv->hid->input_report_size = capabilities.InputReportByteLength;
@@ -3554,14 +3605,13 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	if (transfer_priv->hid_buffer == NULL) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
-	// TODO: can we figure out report ID here?
-	transfer_priv->hid_buffer[0] = 0;
-
 	if (direction_in) {
-		usbi_dbg("reading %d bytes", transfer->length+1);
+		transfer_priv->hid_buffer[0] = priv->hid->input_report_id;
+		usbi_dbg("reading %d bytes (report ID: 0x%02X)", transfer->length+1, transfer_priv->hid_buffer[0]);
 		ret = ReadFile(hid_handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
 	} else {
-		usbi_dbg("writing %d bytes", transfer->length+1);
+		transfer_priv->hid_buffer[0] = priv->hid->output_report_id;
+		usbi_dbg("writing %d bytes (report ID: 0x%02X)", transfer->length+1, transfer_priv->hid_buffer[0]);
 		transfer_priv->hid_buffer[0] = 0;
 		ret = WriteFile(hid_handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
 	}
