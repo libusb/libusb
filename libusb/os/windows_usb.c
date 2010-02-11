@@ -19,8 +19,13 @@
  */
 
 // COMPILATION OPTIONS:
-// - Use HidD_Get(In/Out)putReport instead of (Read/Write)File for HID
-//#define HID_USE_LAST_REPORTS
+// - Use HidD_(G/S)et(In/Out)putReport instead of (Read/Write)File for HID
+//   Note that http://msdn.microsoft.com/en-us/library/ms789883.aspx: 
+//   "In addition, some devices might not support HidD_GetInputReport, 
+//    and will become unresponsive if this routine is used."
+//   => Don't blame libusb if you can't read or write HID reports when the
+//   option below is enabled.
+//#define USE_HIDD_FOR_REPORTS
 // - Should libusb automatically claim the interfaces it requires?
 #define AUTO_CLAIM
 
@@ -3024,7 +3029,7 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	// NB: HidD_GetInputReport returns the last Input Report read whereas ReadFile
 	// waits for input to be generated => in case your HID device requires human 
 	// action to generate a report, it may wait indefinitely. 
-#if !defined(HID_USE_LAST_REPORTS)
+#if !defined(USE_HIDD_FOR_REPORTS)
 	// Use ReadFile instead of HidD_GetInputReport for async I/O
 	tp->hid_expected_size = read_size;	// read_size is modified below!
 	if (!ReadFile(hid_handle, buf, read_size+1, &read_size, overlapped)) {
@@ -3090,7 +3095,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	usbi_dbg("report ID: %02X", buf[0]);
 	memcpy(buf + 1, data, *size);
 
-#if !defined(HID_USE_LAST_REPORTS)
+#if !defined(USE_HIDD_FOR_REPORTS)
 	// Une WriteFile instead of HidD_SetOutputReport for async I/O
 	if (!WriteFile(hid_handle, buf, write_size, &write_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
