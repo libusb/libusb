@@ -115,13 +115,13 @@ enum windows_version windows_version = WINDOWS_UNSUPPORTED;
 // Concurrency
 static int concurrent_usage = -1;
 // Timer thread 
-// NB: index 0 is for monotonic, 1 is for real-time clock and 2 is for the thread exit event
+// NB: index 0 is for monotonic and 1 is for the thread exit event
 HANDLE timer_thread = NULL;
-HANDLE timer_mutex[2] = {NULL, NULL};
-struct timespec timer_tp[2];
-volatile LONG request_count[3] = {0, 0, 1};	// last one must be > 0
-HANDLE timer_request[3] = { NULL, NULL, NULL };
-HANDLE timer_response[2] = { NULL, NULL };
+HANDLE timer_mutex = NULL;
+struct timespec timer_tp;
+volatile LONG request_count[2] = {0, 1};	// last one must be > 0
+HANDLE timer_request[2] = { NULL, NULL };
+HANDLE timer_response = NULL;
 // API globals
 bool api_winusb_available = false;
 #define CHECK_WINUSB_AVAILABLE do { if (!api_winusb_available) return LIBUSB_ERROR_ACCESS; } while (0)
@@ -440,24 +440,22 @@ static int windows_init(struct libusb_context *ctx)
 		// running on different cores, we create a separate thread for the timer
 		// calls, which we glue to the first core always to prevent timing discrepancies.
 		r = LIBUSB_ERROR_NO_MEM;
-		for (i = 0; i < 3; i++) {
+		for (i = 0; i < 2; i++) {
 			timer_request[i] = CreateEvent(NULL, TRUE, FALSE, NULL);
 			if (timer_request[i] == NULL) {
 				usbi_err(ctx, "could not create timer request event %d - aborting", i);
 				goto init_exit;
 			}
-			if (i==2)
-				break; // 3rd event has no matching parts, because it's for quitting the thread.
-			timer_response[i] = CreateSemaphore(NULL, 0, MAX_TIMER_SEMAPHORES, NULL);
-			if (timer_response[i] == NULL) {
-				usbi_err(ctx, "could not create timer response semaphore %d - aborting", i);
-				goto init_exit;
-			}
-			timer_mutex[i] = CreateMutex(NULL, FALSE, NULL);
-			if (timer_mutex[i] == NULL) {
-				usbi_err(ctx, "could not create timer mutex %d - aborting", i);
-				goto init_exit;
-			}
+		}
+		timer_response = CreateSemaphore(NULL, 0, MAX_TIMER_SEMAPHORES, NULL);
+		if (timer_response == NULL) {
+			usbi_err(ctx, "could not create timer response semaphore - aborting");
+			goto init_exit;
+		}
+		timer_mutex = CreateMutex(NULL, FALSE, NULL);
+		if (timer_mutex == NULL) {
+			usbi_err(ctx, "could not create timer mutex - aborting");
+			goto init_exit;
 		}
 		timer_thread = (HANDLE)_beginthreadex(NULL, 0, windows_clock_gettime_threaded, NULL, 0, NULL);
 		if (timer_thread == NULL) {
@@ -508,7 +506,7 @@ static int windows_init(struct libusb_context *ctx)
 init_exit: // Holds semaphore here.
 	if(!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
 		if (timer_thread) {
-			SetEvent(timer_request[2]); // actually the signal to quit the thread.
+			SetEvent(timer_request[1]); // actually the signal to quit the thread.
 			if (WAIT_OBJECT_0 != WaitForSingleObject(timer_thread, INFINITE)) {
 				usbi_warn(ctx, "could not wait for timer thread to quit");
 				TerminateThread(timer_thread, 1); // shouldn't happen, but we're destroying 
@@ -517,21 +515,19 @@ init_exit: // Holds semaphore here.
 			CloseHandle(timer_thread);
 			timer_thread = NULL;
 		}
-		for (i = 0; i < 3; i++) {
+		for (i = 0; i < 2; i++) {
 			if (timer_request[i]) {
 				CloseHandle(timer_request[i]);
 				timer_request[i] = NULL;
 			}
-			if (i==2)
-				break; // 3rd event has no matching parts, because it's for quitting the thread.
-			if (timer_response[i]) {
-				CloseHandle(timer_response[i]);
-				timer_response[i] = NULL;
-			}
-			if (timer_mutex[i]) {
-				CloseHandle(timer_mutex[i]);
-				timer_mutex[i] = NULL;
-			}
+		}
+		if (timer_response) {
+			CloseHandle(timer_response);
+			timer_response = NULL;
+		}
+		if (timer_mutex) {
+			CloseHandle(timer_mutex);
+			timer_mutex = NULL;
 		}
 	}
 
@@ -1479,7 +1475,7 @@ static void windows_exit(void)
 		exit_polling();
 
 		if (timer_thread) {
-			SetEvent(timer_request[2]); // actually the signal to quit the thread.
+			SetEvent(timer_request[1]); // actually the signal to quit the thread.
 			if (WAIT_OBJECT_0 != WaitForSingleObject(timer_thread, INFINITE)) {
 				usbi_dbg("could not wait for timer thread to quit");
 				TerminateThread(timer_thread, 1);
@@ -1487,21 +1483,19 @@ static void windows_exit(void)
 			CloseHandle(timer_thread);
 			timer_thread = NULL;
 		}
-		for (i = 0; i < 3; i++) {
+		for (i = 0; i < 2; i++) {
 			if (timer_request[i]) {
 				CloseHandle(timer_request[i]);
 				timer_request[i] = NULL;
 			}
-			if (i==2)
-				break; // 3rd event has no matching parts, because it's for quitting the thread.
-			if (timer_response[i]) {
-				CloseHandle(timer_response[i]);
-				timer_response[i] = NULL;
-			}
-			if (timer_mutex[i]) {
-				CloseHandle(timer_mutex[i]);
-				timer_mutex[i] = NULL;
-			}
+		}
+		if (timer_response) {
+			CloseHandle(timer_response);
+			timer_response = NULL;
+		}
+		if (timer_mutex) {
+			CloseHandle(timer_mutex);
+			timer_mutex = NULL;
 		}
 	}
 
@@ -1902,12 +1896,10 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 unsigned __stdcall windows_clock_gettime_threaded(void* param)
 {
 	LARGE_INTEGER hires_counter, li_frequency;
-	FILETIME ftime;
-	ULARGE_INTEGER rtime;
 	LONG nb_responses;
-	int i, timer_index;
+	int timer_index;
 
-	// Find out if we have access to a monotonic (hires) timer
+	// Init - find out if we have access to a monotonic (hires) timer
 	if (!QueryPerformanceFrequency(&li_frequency)) {
 		usbi_dbg("no hires timer available on this platform");
 		hires_frequency = 0;
@@ -1919,9 +1911,11 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 		hires_ticks_to_ps =  1000000000000 / hires_frequency; 
 		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
 	}
+
+	// Main loop - wait for requests
 	while (1) {
-		timer_index = WaitForMultipleObjects(3, timer_request, FALSE, INFINITE) - WAIT_OBJECT_0;
-		if (timer_index < 0 || timer_index > 2) {
+		timer_index = WaitForMultipleObjects(2, timer_request, FALSE, INFINITE) - WAIT_OBJECT_0;
+		if ( (timer_index != 0) && (timer_index != 1) ) {
 			usbi_dbg("failure to wait on requests: %s", windows_error_str(0));
 			continue;
 		}
@@ -1935,43 +1929,29 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 			if (request_count[timer_index] == 0)
 				continue;
 		}
-		i = 0;
 		switch (timer_index) {
-		case 0: // monotonic clock
-		// If hires_frequency is set, we have an hires monotonic timer available
-		if ((hires_frequency != 0) && (QueryPerformanceCounter(&hires_counter) != 0))
-		{
-			WaitForSingleObject(timer_mutex[i], INFINITE);
-			timer_tp[i].tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
-			timer_tp[i].tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency)/1000) * hires_ticks_to_ps);
-			ReleaseMutex(timer_mutex[i]);
-			goto send_response;
-		}
-		i--;	// make sure we fall through and return real-time if we can't get monotonic
-		case 1: // real-time clock
-			i++;
-			// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
-			// Note however that our resolution is bounded by the Windows system time 
-			// functions and is at best of the order of 1 ms (or, usually, worse)
-			GetSystemTimeAsFileTime(&ftime);
-			rtime.LowPart = ftime.dwLowDateTime;
-			rtime.HighPart = ftime.dwHighDateTime;
-			rtime.QuadPart -= epoch_time;
-			WaitForSingleObject(timer_mutex[i], INFINITE);
-			timer_tp[i].tv_sec = (long)(rtime.QuadPart / 10000000);
-			timer_tp[i].tv_nsec = (long)((rtime.QuadPart % 10000000)*100);
-			ReleaseMutex(timer_mutex[i]);
-			goto send_response;
-		case 2: // time to quit
-			usbi_dbg("timer thread quitting");
-			return 0;
-		send_response:
-			nb_responses = InterlockedExchange((LONG*)&request_count[i], 0);
+		case 0:
+			WaitForSingleObject(timer_mutex, INFINITE);
+			// Requests to this thread are for hires always
+			if (QueryPerformanceCounter(&hires_counter) != 0) {
+				timer_tp.tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
+				timer_tp.tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency)/1000) * hires_ticks_to_ps);
+			} else {
+				// Fallback to real-time if we can't get monotonic value
+				// Note that real-time clock does not wait on the mutex or this thread.
+				windows_clock_gettime(USBI_CLOCK_REALTIME, &timer_tp);
+			}
+			ReleaseMutex(timer_mutex);
+
+			nb_responses = InterlockedExchange((LONG*)&request_count[0], 0);
 			if ( (nb_responses) 
-			  && (ReleaseSemaphore(timer_response[i], nb_responses, NULL) == 0) ) {
+			  && (ReleaseSemaphore(timer_response, nb_responses, NULL) == 0) ) {
 				usbi_dbg("unable to release timer semaphore %d: %s", windows_error_str(0));
 			}
 			continue;
+		case 1: // time to quit
+			usbi_dbg("timer thread quitting");
+			return 0;
 		}
 	}
 	usbi_dbg("ERROR: broken timer thread");
@@ -1980,35 +1960,47 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 
 static int windows_clock_gettime(int clk_id, struct timespec *tp)
 {
-	int i;
+	FILETIME ftime;
+	ULARGE_INTEGER rtime;
 	DWORD r;
-	i = -1;
 	switch(clk_id) {
-	case USBI_CLOCK_REALTIME:
-		i++;
-		// fall through
 	case USBI_CLOCK_MONOTONIC:
-		i++;
-		while (1) {
-			InterlockedIncrement((LONG*)&request_count[i]);
-			SetEvent(timer_request[i]);
-			r = WaitForSingleObject(timer_response[i], TIMER_REQUEST_RETRY_MS);
-			switch(r) {
-			case WAIT_OBJECT_0:
-				WaitForSingleObject(timer_mutex[i], INFINITE);
-				*tp = timer_tp[i];
-				ReleaseMutex(timer_mutex[i]);
-				return LIBUSB_SUCCESS;
-			case WAIT_TIMEOUT:
-				usbi_dbg("could not obtain a timer value within reasonable timeframe - too much load?");
-				break;
-			default:
-				usbi_dbg("WaitForSingleObject failed: %s", windows_error_str(0));
-				return LIBUSB_ERROR_OTHER;
+		if (hires_frequency != 0) {
+			while (1) {
+				InterlockedIncrement((LONG*)&request_count[0]);
+				SetEvent(timer_request[0]);
+				r = WaitForSingleObject(timer_response, TIMER_REQUEST_RETRY_MS);
+				switch(r) {
+				case WAIT_OBJECT_0:
+					WaitForSingleObject(timer_mutex, INFINITE);
+					*tp = timer_tp;
+					ReleaseMutex(timer_mutex);
+					return LIBUSB_SUCCESS;
+				case WAIT_TIMEOUT:
+					usbi_dbg("could not obtain a timer value within reasonable timeframe - too much load?");
+					break; // Retry until successful
+				default:
+					usbi_dbg("WaitForSingleObject failed: %s", windows_error_str(0));
+					return LIBUSB_ERROR_OTHER;
+				}
 			}
 		}
+		// Fall through and return real-time if monotonic was not detected @ timer init
+	case USBI_CLOCK_REALTIME:
+		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
+		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
+		// Note however that our resolution is bounded by the Windows system time 
+		// functions and is at best of the order of 1 ms (or, usually, worse)
+		GetSystemTimeAsFileTime(&ftime);
+		rtime.LowPart = ftime.dwLowDateTime;
+		rtime.HighPart = ftime.dwHighDateTime;
+		rtime.QuadPart -= epoch_time;
+		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
+		tp->tv_nsec = (long)((rtime.QuadPart % 10000000)*100);
+		return LIBUSB_SUCCESS;
+	default:
+		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-	return LIBUSB_ERROR_INVALID_PARAM;
 }
 
 
