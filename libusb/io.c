@@ -1132,7 +1132,7 @@ static int add_to_flying_list(struct usbi_transfer *transfer)
 	}
 
 	/* otherwise, find appropriate place in list */
-	list_for_each_entry(cur, &ctx->flying_transfers, list) {
+	list_for_each_entry(cur, &ctx->flying_transfers, list, struct usbi_transfer) {
 		/* find first timeout that occurs after the transfer in question */
 		struct timeval *cur_tv = &cur->timeout;
 
@@ -1331,7 +1331,7 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 {
 	struct usbi_transfer *transfer;
 
-	list_for_each_entry(transfer, &ctx->flying_transfers, list) {
+	list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
 		struct timeval *cur_tv = &transfer->timeout;
 
 		/* if we've reached transfers of infinite timeout, then we have no
@@ -1732,7 +1732,7 @@ static int handle_timeouts_locked(struct libusb_context *ctx)
 
 	/* iterate through flying transfers list, finding all transfers that
 	 * have expired timeouts */
-	list_for_each_entry(transfer, &ctx->flying_transfers, list) {
+	list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
 		struct timeval *cur_tv = &transfer->timeout;
 
 		/* if we've reached transfers of infinite timeout, we're all done */
@@ -1803,7 +1803,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	int timeout_ms;
 
 	usbi_mutex_lock(&ctx->pollfds_lock);
-	list_for_each_entry(ipollfd, &ctx->pollfds, list)
+	list_for_each_entry(ipollfd, &ctx->pollfds, list, struct usbi_pollfd)
 		nfds++;
 
 	/* TODO: malloc when number of fd's changes, not on every poll */
@@ -1813,7 +1813,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	list_for_each_entry(ipollfd, &ctx->pollfds, list) {
+	list_for_each_entry(ipollfd, &ctx->pollfds, list, struct usbi_pollfd) {
 		struct libusb_pollfd *pollfd = &ipollfd->pollfd;
 		int fd = pollfd->fd;
 		i++;
@@ -2127,7 +2127,7 @@ API_EXPORTED int libusb_get_next_timeout(libusb_context *ctx,
 	}
 
 	/* find next transfer which hasn't already been processed as timed out */
-	list_for_each_entry(transfer, &ctx->flying_transfers, list) {
+	list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
 		if (!(transfer->flags & USBI_TRANSFER_TIMED_OUT)) {
 			found = 1;
 			break;
@@ -2229,7 +2229,7 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
 
 	usbi_dbg("remove fd %d", fd);
 	usbi_mutex_lock(&ctx->pollfds_lock);
-	list_for_each_entry(ipollfd, &ctx->pollfds, list)
+	list_for_each_entry(ipollfd, &ctx->pollfds, list, struct usbi_pollfd)
 		if (ipollfd->pollfd.fd == fd) {
 			found = 1;
 			break;
@@ -2269,14 +2269,14 @@ API_EXPORTED const struct libusb_pollfd **libusb_get_pollfds(
 	USBI_GET_CONTEXT(ctx);
 
 	usbi_mutex_lock(&ctx->pollfds_lock);
-	list_for_each_entry(ipollfd, &ctx->pollfds, list)
+	list_for_each_entry(ipollfd, &ctx->pollfds, list, struct usbi_pollfd)
 		cnt++;
 
 	ret = calloc(cnt + 1, sizeof(struct libusb_pollfd *));
 	if (!ret)
 		goto out;
 
-	list_for_each_entry(ipollfd, &ctx->pollfds, list)
+	list_for_each_entry(ipollfd, &ctx->pollfds, list, struct usbi_pollfd)
 		ret[i++] = (struct libusb_pollfd *) ipollfd;
 	ret[cnt] = NULL;
 
@@ -2312,7 +2312,7 @@ void usbi_handle_disconnect(struct libusb_device_handle *handle)
 	while (1) {
 		usbi_mutex_lock(&HANDLE_CTX(handle)->flying_transfers_lock);
 		to_cancel = NULL;
-		list_for_each_entry(cur, &HANDLE_CTX(handle)->flying_transfers, list)
+		list_for_each_entry(cur, &HANDLE_CTX(handle)->flying_transfers, list, struct usbi_transfer)
 			if (__USBI_TRANSFER_TO_LIBUSB_TRANSFER(cur)->dev_handle == handle) {
 				to_cancel = cur;
 				break;

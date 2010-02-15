@@ -560,7 +560,7 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	struct libusb_device *ret = NULL;
 
 	usbi_mutex_lock(&ctx->usb_devs_lock);
-	list_for_each_entry(dev, &ctx->usb_devs, list)
+	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device)
 		if (dev->session_data == session_id) {
 			ret = dev;
 			break;
