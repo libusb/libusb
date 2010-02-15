@@ -1351,7 +1351,7 @@ API_EXPORTED int libusb_reset_device(libusb_device_handle *dev)
  * perform I/O.
  *
  * \param dev a device handle
- * \param interface the interface to check
+ * \param interface_number the interface to check
  * \returns 0 if no kernel driver is active
  * \returns 1 if a kernel driver is active
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
@@ -1359,11 +1359,11 @@ API_EXPORTED int libusb_reset_device(libusb_device_handle *dev)
  * \see libusb_detach_kernel_driver()
  */
 API_EXPORTED int libusb_kernel_driver_active(libusb_device_handle *dev,
-	int interface)
+	int interface_number)
 {
-	usbi_dbg("interface %d", interface);
+	usbi_dbg("interface %d", interface_number);
 	if (usbi_backend->kernel_driver_active)
-		return usbi_backend->kernel_driver_active(dev, interface);
+		return usbi_backend->kernel_driver_active(dev, interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
@@ -1373,7 +1373,7 @@ API_EXPORTED int libusb_kernel_driver_active(libusb_device_handle *dev,
  * able to claim the interface and perform I/O.
  *
  * \param dev a device handle
- * \param interface the interface to detach the driver from
+ * \param interface_number the interface to detach the driver from
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
  * \returns LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
@@ -1382,11 +1382,11 @@ API_EXPORTED int libusb_kernel_driver_active(libusb_device_handle *dev,
  * \see libusb_kernel_driver_active()
  */
 API_EXPORTED int libusb_detach_kernel_driver(libusb_device_handle *dev,
-	int interface)
+	int interface_number)
 {
-	usbi_dbg("interface %d", interface);
+	usbi_dbg("interface %d", interface_number);
 	if (usbi_backend->detach_kernel_driver)
-		return usbi_backend->detach_kernel_driver(dev, interface);
+		return usbi_backend->detach_kernel_driver(dev, interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
@@ -1396,7 +1396,7 @@ API_EXPORTED int libusb_detach_kernel_driver(libusb_device_handle *dev,
  * using libusb_detach_kernel_driver().
  *
  * \param dev a device handle
- * \param interface the interface to attach the driver from
+ * \param interface_number the interface to attach the driver from
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
  * \returns LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
@@ -1407,11 +1407,11 @@ API_EXPORTED int libusb_detach_kernel_driver(libusb_device_handle *dev,
  * \see libusb_kernel_driver_active()
  */
 API_EXPORTED int libusb_attach_kernel_driver(libusb_device_handle *dev,
-	int interface)
+	int interface_number)
 {
-	usbi_dbg("interface %d", interface);
+	usbi_dbg("interface %d", interface_number);
 	if (usbi_backend->attach_kernel_driver)
-		return usbi_backend->attach_kernel_driver(dev, interface);
+		return usbi_backend->attach_kernel_driver(dev, interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
