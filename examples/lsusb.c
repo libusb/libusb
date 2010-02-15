@@ -21,6 +21,7 @@
 #include <sys/types.h>
 
 #include <libusb/libusb.h>
+#include <libusb/os/driver_install.h>
 
 static void print_devs(libusb_device **devs)
 {
@@ -50,6 +51,15 @@ main(void)
 	libusb_device **devs;
 	int r;
 	ssize_t cnt;
+	struct driver_info *drv_info;
+
+	drv_info = list_driverless();
+	for (; drv_info != NULL; drv_info = drv_info->next) {
+		printf("%s\n", drv_info->desc);
+		printf("  %s\n", drv_info->vid);
+		printf("  %s\n", drv_info->pid);
+		printf("  %s\n", drv_info->mi);
+	}
 
 	r = libusb_init(NULL);
 	if (r < 0)

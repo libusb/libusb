@@ -82,6 +82,8 @@ inline void upperize(char* str) {
 	for (i=0; i<strlen(str); i++)
 		str[i] = (char)toupper((int)str[i]);
 }
+extern char* sanitize_path(const char* path);
+extern char *windows_error_str(uint32_t retval);
 
 #define MAX_CTRL_BUFFER_LENGTH      4096
 #define MAX_USB_DEVICES             256
@@ -100,16 +102,6 @@ inline void upperize(char* str) {
 // Additional return code for HID operations that completed synchronously
 #define LIBUSB_COMPLETED            (LIBUSB_SUCCESS + 1)
 
-// http://msdn.microsoft.com/en-us/library/bb663109.aspx
-// http://msdn.microsoft.com/en-us/library/bb663093.aspx
-#if !defined(GUID_DEVINTERFACE_USB_HOST_CONTROLLER)
-const GUID GUID_DEVINTERFACE_USB_HOST_CONTROLLER = { 0x3ABF6F2D, 0x71C4, 0x462A, {0x8A, 0x92, 0x1E, 0x68, 0x61, 0xE6, 0xAF, 0x27} };
-#endif
-#if !defined(GUID_DEVINTERFACE_USB_DEVICE)
-const GUID GUID_DEVINTERFACE_USB_DEVICE = { 0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED} };
-#endif
-
-
 /*
  * Multiple USB API backend support
  */
@@ -118,11 +110,6 @@ const GUID GUID_DEVINTERFACE_USB_DEVICE = { 0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0
 #define USB_API_WINUSB      2
 #define USB_API_HID         3
 #define USB_API_MAX         4
-
-const GUID CLASS_GUID_UNSUPPORTED   = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x57, 0xDA} };
-const GUID CLASS_GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
-const GUID CLASS_GUID_LIBUSB_WINUSB = { 0x78A1C341, 0x4539, 0x11D3, {0xB8, 0x8D, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71} };
-const GUID CLASS_GUID_COMPOSITE     = { 0x36FC9E60, 0xC465, 0x11cF, {0x80, 0x56, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00} };
 
 struct windows_usb_api_backend {
 	const uint8_t id;
@@ -385,6 +372,13 @@ typedef enum _USB_HUB_NODE {
 	UsbHub,
 	UsbMIParent
 } USB_HUB_NODE;
+
+typedef enum _DEVICE_INSTALL_STATE {
+  InstallStateInstalled,
+  InstallStateNeedsReinstall,
+  InstallStateFailedInstall,
+  InstallStateFinishInstall
+} DEVICE_INSTALL_STATE, *PDEVICE_INSTALL_STATE;
 
 CMAPI CONFIGRET WINAPI CM_Get_Parent(
   /*OUT*/ PDEVINST  pdnDevInst,

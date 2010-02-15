@@ -106,6 +106,18 @@ static int composite_abort_control(struct usbi_transfer *itransfer);
 static int composite_reset_device(struct libusb_device_handle *dev_handle);
 static int composite_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size);
 
+// http://msdn.microsoft.com/en-us/library/bb663109.aspx
+// http://msdn.microsoft.com/en-us/library/bb663093.aspx
+#if !defined(GUID_DEVINTERFACE_USB_HOST_CONTROLLER)
+const GUID GUID_DEVINTERFACE_USB_HOST_CONTROLLER = { 0x3ABF6F2D, 0x71C4, 0x462A, {0x8A, 0x92, 0x1E, 0x68, 0x61, 0xE6, 0xAF, 0x27} };
+#endif
+#if !defined(GUID_DEVINTERFACE_USB_DEVICE)
+const GUID GUID_DEVINTERFACE_USB_DEVICE = { 0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED} };
+#endif
+const GUID CLASS_GUID_UNSUPPORTED   = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x57, 0xDA} };
+const GUID CLASS_GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
+const GUID CLASS_GUID_LIBUSB_WINUSB = { 0x78A1C341, 0x4539, 0x11D3, {0xB8, 0x8D, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71} };
+const GUID CLASS_GUID_COMPOSITE     = { 0x36FC9E60, 0xC465, 0x11cF, {0x80, 0x56, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00} };
 
 // Global variables
 struct windows_hcd_priv* hcd_root = NULL;
@@ -161,24 +173,11 @@ static inline BOOLEAN guid_eq(const GUID *guid1, const GUID *guid2) {
 	return false;
 }
 
-#if 0
-static char* guid_to_string(const GUID guid)
-{
-	static char guid_string[MAX_GUID_STRING_LENGTH];
-	
-	sprintf(guid_string, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
-		(unsigned int)guid.Data1, guid.Data2, guid.Data3, 
-		guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
-		guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
-	return guid_string;
-}
-#endif
-
 /*
  * Converts a windows error to human readable string
  * uses retval as errorcode, or, if 0, use GetLastError()
  */
-static char *windows_error_str(uint32_t retval)
+char *windows_error_str(uint32_t retval)
 {
 static char err_string[ERR_BUFFER_SIZE];
 
@@ -208,7 +207,7 @@ static char err_string[ERR_BUFFER_SIZE];
  * Sanitize Microsoft's paths: convert to uppercase, add prefix and fix backslashes.
  * Return an allocated sanitized string or NULL on error.
  */
-static char* sanitize_path(const char* path)
+char* sanitize_path(const char* path)
 {
 	const char root_prefix[] = "\\\\.\\";
 	size_t j, size, root_size;
@@ -1001,6 +1000,7 @@ enum libusb_hid_report_type {
 			continue;
 		}
 		CLSIDFromString(guid_string_w, &guid);
+//usbi_dbg("GUID: %s", guid_to_string(guid));
 
 		// identical device interface GUIDs are not supposed to happen, but are a real possibility
 		// => check and ignore duplicates
@@ -1033,7 +1033,7 @@ enum libusb_hid_report_type {
 			dev_interface_details = get_interface_details(ctx, &dev_info, &dev_info_data, guid, i);
 			if (dev_interface_details == NULL)
 				break;
-
+usbi_dbg("%s", dev_interface_details->DevicePath);
 			// HID devices (and possibly other classes) have an extra indirection
 			// for an USB path we can recognize
 			if (j == HID_DEVICE_INTERFACE_GUID_INDEX) {
@@ -1263,6 +1263,8 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	unsigned i, j, k;
 	uint8_t api;
 	bool found;
+
+//	list_driverless(ctx);
 
 	// TODO (v1.5): MI_## automated driver installation
 	guid = GUID_DEVINTERFACE_USB_DEVICE; 
