@@ -44,6 +44,7 @@
 
 static mach_port_t  libusb_darwin_mp = 0; /* master port */
 static CFRunLoopRef libusb_darwin_acfl = NULL; /* async cf loop */
+static int initCount = 0;
 
 /* async event thread */
 static pthread_t libusb_darwin_at;
@@ -309,33 +310,37 @@ static void *event_thread_main (void *arg0) {
 static int darwin_init(struct libusb_context *ctx) {
   IOReturn kresult;
 
-  /* Create the master port for talking to IOKit */
-  if (!libusb_darwin_mp) {
-    kresult = IOMasterPort (MACH_PORT_NULL, &libusb_darwin_mp);
+  if (!(initCount++)) {
+    /* Create the master port for talking to IOKit */
+    if (!libusb_darwin_mp) {
+      kresult = IOMasterPort (MACH_PORT_NULL, &libusb_darwin_mp);
 
-    if (kresult != kIOReturnSuccess || !libusb_darwin_mp)
-      return darwin_to_libusb (kresult);
+      if (kresult != kIOReturnSuccess || !libusb_darwin_mp)
+	return darwin_to_libusb (kresult);
+    }
+
+    pthread_create (&libusb_darwin_at, NULL, event_thread_main, (void *)ctx);
+
+    while (!libusb_darwin_acfl)
+      usleep (10);
   }
-
-  pthread_create (&libusb_darwin_at, NULL, event_thread_main, (void *)ctx);
-
-  while (!libusb_darwin_acfl)
-    usleep (10);
 
   return 0;
 }
 
 static void darwin_exit (void) {
-  void *ret;
+  if (!(--initCount)) {
+    void *ret;
 
-  /* stop the async runloop */
-  CFRunLoopStop (libusb_darwin_acfl);
-  pthread_join (libusb_darwin_at, &ret);
+    /* stop the async runloop */
+    CFRunLoopStop (libusb_darwin_acfl);
+    pthread_join (libusb_darwin_at, &ret);
 
-  if (libusb_darwin_mp)
-    mach_port_deallocate(mach_task_self(), libusb_darwin_mp);
+    if (libusb_darwin_mp)
+      mach_port_deallocate(mach_task_self(), libusb_darwin_mp);
 
-  libusb_darwin_mp = 0;
+    libusb_darwin_mp = 0;
+  }
 }
 
 static int darwin_get_device_descriptor(struct libusb_device *dev, unsigned char *buffer, int *host_endian) {
