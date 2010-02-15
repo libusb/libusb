@@ -9,9 +9,12 @@ struct driver_info {
 	char vid[9];
 	char pid[9];
 	char mi[6];
-	GUID dev_guid;
 };
 
 struct driver_info *list_driverless(void);
 char* guid_to_string(const GUID guid);
+int create_inf(struct driver_info* drv_info, char* path);
+int install_device(char* path);
+
+
 

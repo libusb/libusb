@@ -219,7 +219,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2.lib"
+				AdditionalDependencies="setupapi.lib pthreadVC2.lib difxapi.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="..\msvc"
 				GenerateDebugInformation="true"
@@ -299,7 +299,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib"
+				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib difxapi.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="..\msvc"
 				GenerateDebugInformation="true"

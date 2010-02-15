@@ -55,11 +55,12 @@ main(void)
 
 	drv_info = list_driverless();
 	for (; drv_info != NULL; drv_info = drv_info->next) {
-		printf("%s\n", drv_info->desc);
-		printf("  %s\n", drv_info->vid);
-		printf("  %s\n", drv_info->pid);
-		printf("  %s\n", drv_info->mi);
+		if (create_inf(drv_info, "C:\\test") == 0) {
+			install_device("C:\\test\\libusb_device.inf");
+		}
 	}
+
+//	return 0;
 
 	r = libusb_init(NULL);
 	if (r < 0)
