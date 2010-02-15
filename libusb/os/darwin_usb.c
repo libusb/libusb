@@ -1,6 +1,6 @@
 /*
  * darwin backend for libusb 1.0
- * Copyright (C) 2008-2009 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright (C) 2008-2010 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -84,6 +84,8 @@ static const char *darwin_error_str (int result) {
     return "device not responding";
   case kIOReturnOverrun:
     return "data overrun";
+  case kIOReturnCannotWire:
+    return "physical memory can not be wired down";
   default:
     return "unknown error";
   }
@@ -122,7 +124,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
 
   int8_t i, iface;
 
-  _usbi_log (HANDLE_CTX(dev_handle), LOG_LEVEL_INFO, "converting ep address 0x%02x to pipeRef and interface", ep);
+  usbi_info (HANDLE_CTX(dev_handle), "converting ep address 0x%02x to pipeRef and interface", ep);
 
   for (iface = 0 ; iface < USB_MAXINTERFACES ; iface++) {
     cInterface = &priv->interfaces[iface];
@@ -132,7 +134,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
 	if (cInterface->endpoint_addrs[i] == ep) {
 	  *pipep = i + 1;
 	  *ifcp = iface;
-	  _usbi_log (HANDLE_CTX(dev_handle), LOG_LEVEL_INFO, "pipe %d on interface %d matches", *pipep, *ifcp);
+	  usbi_info (HANDLE_CTX(dev_handle), "pipe %d on interface %d matches", *pipep, *ifcp);
 	  return 0;
 	}
       }
@@ -140,7 +142,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
   }
 
   /* No pipe found with the correct endpoint address */
-  _usbi_log (HANDLE_CTX(dev_handle), LOG_LEVEL_WARNING, "no pipeRef found with endpoint address 0x%02x.", ep);
+  usbi_warn (HANDLE_CTX(dev_handle), "no pipeRef found with endpoint address 0x%02x.", ep);
   
   return -1;
 }
@@ -219,7 +221,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
   CFTypeRef locationCF;
   UInt32 message;
 
-  _usbi_log (ctx, LOG_LEVEL_INFO, "a device has been detached");
+  usbi_info (ctx, "a device has been detached");
 
   while ((device = IOIteratorNext (rem_devices)) != 0) {
     /* get the location from the i/o registry */
@@ -262,7 +264,7 @@ static void *event_thread_main (void *arg0) {
   io_notification_port_t libusb_notification_port;
   io_iterator_t          libusb_rem_device_iterator;
 
-  _usbi_log (ctx, LOG_LEVEL_INFO, "creating hotplug event source");
+  usbi_info (ctx, "creating hotplug event source");
 
   CFRetain (CFRunLoopGetCurrent ());
 
@@ -278,7 +280,7 @@ static void *event_thread_main (void *arg0) {
 					      (void *)ctx, &libusb_rem_device_iterator);
  
   if (kresult != kIOReturnSuccess) {
-    _usbi_log (ctx, LOG_LEVEL_ERROR, "could not add hotplug event source: %s", darwin_error_str (kresult));
+    usbi_err (ctx, "could not add hotplug event source: %s", darwin_error_str (kresult));
 
     pthread_exit ((void *)kresult);
   }
@@ -289,12 +291,12 @@ static void *event_thread_main (void *arg0) {
   /* let the main thread know about the async runloop */
   libusb_darwin_acfl = CFRunLoopGetCurrent ();
 
-  _usbi_log (ctx, LOG_LEVEL_INFO, "libopenusb/darwin.c event_thread_main: thread ready to receive events");
+  usbi_info (ctx, "libopenusb/darwin.c event_thread_main: thread ready to receive events");
 
   /* run the runloop */
   CFRunLoopRun();
 
-  _usbi_log (ctx, LOG_LEVEL_INFO, "libopenusb/darwin.c event_thread_main: thread exiting");
+  usbi_info (ctx, "libopenusb/darwin.c event_thread_main: thread exiting");
 
   /* delete notification port */
   CFRunLoopSourceInvalidate (libusb_notification_cfsource);
@@ -405,7 +407,7 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
   if (!priv->device) {
     kresult = darwin_get_device (priv->location, &device);
     if (kresult || !device) {
-      _usbi_log (DEVICE_CTX (dev), LOG_LEVEL_ERROR, "could not find device: %s", darwin_error_str (kresult));
+      usbi_err (DEVICE_CTX (dev), "could not find device: %s", darwin_error_str (kresult));
 
       return darwin_to_libusb (kresult);
     }
@@ -504,7 +506,7 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     /* catch buggy hubs (which appear to be virtual). Apple's own USB prober has problems with these devices. */
     if (libusb_le16_to_cpu (priv->dev_descriptor.idProduct) != idProduct) {
       /* not a valid device */
-      _usbi_log (ctx, LOG_LEVEL_WARNING, "idProduct from iokit (%04x) does not match idProduct in descriptor (%04x). skipping device",
+      usbi_warn (ctx, "idProduct from iokit (%04x) does not match idProduct in descriptor (%04x). skipping device",
 		 idProduct, libusb_le16_to_cpu (priv->dev_descriptor.idProduct));
       libusb_unref_device(dev);
       return -1;
@@ -574,7 +576,7 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
   if (0 == dpriv->open_count) {
     kresult = darwin_get_device (dpriv->location, &darwin_device);
     if (kresult) {
-      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "could not find device: %s", darwin_error_str (kresult));
+      usbi_err (HANDLE_CTX (dev_handle), "could not find device: %s", darwin_error_str (kresult));
       return darwin_to_libusb (kresult);
     }
 
@@ -584,7 +586,7 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
     kresult = (*(dpriv->device))->USBDeviceOpenSeize (dpriv->device);
 
     if (kresult != kIOReturnSuccess) {
-      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "USBDeviceOpen: %s", darwin_error_str(kresult));
+      usbi_err (HANDLE_CTX (dev_handle), "USBDeviceOpen: %s", darwin_error_str(kresult));
 
       switch (kresult) {
       case kIOReturnExclusiveAccess:
@@ -621,7 +623,7 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
 
   usbi_add_pollfd(HANDLE_CTX(dev_handle), priv->fds[0], POLLIN);
 
-  _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_INFO, "device open for access");
+  usbi_info (HANDLE_CTX (dev_handle), "device open for access");
 
   return 0;
 }
@@ -634,7 +636,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
 
   if (dpriv->open_count == 0) {
     /* something is probably very wrong if this is the case */
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "Close called on a device that was not open!\n");
+    usbi_err (HANDLE_CTX (dev_handle), "Close called on a device that was not open!\n");
     return;
   }
 
@@ -658,7 +660,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
       if (kresult) {
 	/* Log the fact that we had a problem closing the file, however failing a
 	 * close isn't really an error, so return success anyway */
-	_usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "USBDeviceClose: %s", darwin_error_str(kresult));
+	usbi_err (HANDLE_CTX (dev_handle), "USBDeviceClose: %s", darwin_error_str(kresult));
       }
     }
   
@@ -666,7 +668,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
     if (kresult) {
       /* Log the fact that we had a problem closing the file, however failing a
        * close isn't really an error, so return success anyway */
-      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "Release: %s", darwin_error_str(kresult));
+      usbi_err (HANDLE_CTX (dev_handle), "Release: %s", darwin_error_str(kresult));
     }
 
     dpriv->device = NULL;
@@ -757,12 +759,12 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
   u_int16_t dont_care2;
   int i;
 
-  _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_INFO, "building table of endpoints.");
+  usbi_info (HANDLE_CTX (dev_handle), "building table of endpoints.");
   
   /* retrieve the total number of endpoints on this interface */
   kresult = (*(cInterface->interface))->GetNumEndpoints(cInterface->interface, &numep);
   if (kresult) {
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "can't get number of endpoints for interface: %s", darwin_error_str(kresult));
+    usbi_err (HANDLE_CTX (dev_handle), "can't get number of endpoints for interface: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
   }
 
@@ -772,12 +774,12 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
 							    &dont_care2, &dont_care3);
 
     if (kresult != kIOReturnSuccess) {
-      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "error getting pipe information for pipe %d: %s", i, darwin_error_str(kresult));
+      usbi_err (HANDLE_CTX (dev_handle), "error getting pipe information for pipe %d: %s", i, darwin_error_str(kresult));
 
       return darwin_to_libusb (kresult);
     }
 
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_INFO, "interface: %i pipe %i: dir: %i number: %i", iface, i, direction, number);
+    usbi_info (HANDLE_CTX (dev_handle), "interface: %i pipe %i: dir: %i number: %i", iface, i, direction, number);
 
     cInterface->endpoint_addrs[i - 1] = ((direction << 7 & LIBUSB_ENDPOINT_DIR_MASK) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
   }
@@ -811,50 +813,50 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
        be configured. Otherwise, we need to do it ourselves, or there
        will be no interfaces for the device. */
 
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_INFO, "no interface found; selecting configuration" );
+    usbi_info (HANDLE_CTX (dev_handle), "no interface found; selecting configuration" );
 
     kresult = (*(dpriv->device))->GetNumberOfConfigurations (dpriv->device, &nConfig);
     if (kresult != kIOReturnSuccess) {
-      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "GetNumberOfConfigurations: %s", darwin_error_str(kresult));
+      usbi_err (HANDLE_CTX (dev_handle), "GetNumberOfConfigurations: %s", darwin_error_str(kresult));
       return darwin_to_libusb(kresult);
     }
     
     if (nConfig < 1) {
-      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "GetNumberOfConfigurations: no configurations");
+      usbi_err (HANDLE_CTX (dev_handle), "GetNumberOfConfigurations: no configurations");
       return LIBUSB_ERROR_OTHER;
     }
 
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_INFO, "device has %d configuration%s. using the first",
+    usbi_info (HANDLE_CTX (dev_handle), "device has %d configuration%s. using the first",
 	      (int)nConfig, (nConfig > 1 ? "s" : "") );
 
     /* Always use the first configuration */
     kresult = (*(dpriv->device))->GetConfigurationDescriptorPtr (dpriv->device, 0, &configDesc);
     if (kresult != kIOReturnSuccess) {
-      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "GetConfigurationDescriptorPtr: %s",
+      usbi_err (HANDLE_CTX (dev_handle), "GetConfigurationDescriptorPtr: %s",
 		darwin_error_str(kresult));
 
       new_config = 1;
     } else
       new_config = configDesc->bConfigurationValue;
 
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_INFO, "new configuration value is %d", new_config);
+    usbi_info (HANDLE_CTX (dev_handle), "new configuration value is %d", new_config);
 
     /* set the configuration */
     kresult = darwin_set_configuration (dev_handle, new_config);
     if (kresult != LIBUSB_SUCCESS) {
-      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "could not set configuration");
+      usbi_err (HANDLE_CTX (dev_handle), "could not set configuration");
       return kresult;
     }
 
     kresult = darwin_get_interface (dpriv->device, iface, &usbInterface);
     if (kresult) {
-      _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "darwin_get_interface: %s", darwin_error_str(kresult));
+      usbi_err (HANDLE_CTX (dev_handle), "darwin_get_interface: %s", darwin_error_str(kresult));
       return darwin_to_libusb (kresult);
     }
   }
 
   if (!usbInterface) {
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "interface not found");
+    usbi_err (HANDLE_CTX (dev_handle), "interface not found");
     return LIBUSB_ERROR_NOT_FOUND;
   }
   
@@ -862,12 +864,12 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
   kresult = IOCreatePlugInInterfaceForService (usbInterface, kIOUSBInterfaceUserClientTypeID,
 					       kIOCFPlugInInterfaceID, &plugInInterface, &score);
   if (kresult) {
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "IOCreatePlugInInterfaceForService: %s", darwin_error_str(kresult));
+    usbi_err (HANDLE_CTX (dev_handle), "IOCreatePlugInInterfaceForService: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
   }
 
   if (!plugInInterface) {
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "plugin interface not found");
+    usbi_err (HANDLE_CTX (dev_handle), "plugin interface not found");
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
@@ -879,7 +881,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
 					       CFUUIDGetUUIDBytes(kIOUSBInterfaceInterfaceID),
 					       (LPVOID)&cInterface->interface);
   if (kresult || !cInterface->interface) {
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "QueryInterface: %s", darwin_error_str(kresult));
+    usbi_err (HANDLE_CTX (dev_handle), "QueryInterface: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
   }
   
@@ -889,7 +891,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
   /* claim the interface */
   kresult = (*(cInterface->interface))->USBInterfaceOpen(cInterface->interface);
   if (kresult) {
-    _usbi_log(HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "USBInterfaceOpen: %s", darwin_error_str(kresult));
+    usbi_err (HANDLE_CTX (dev_handle), "USBInterfaceOpen: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
   }
 
@@ -898,7 +900,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
   if (kresult) {
     /* this should not happen */
     darwin_release_interface (dev_handle, iface);
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "could not build endpoint table");
+    usbi_err (HANDLE_CTX (dev_handle), "could not build endpoint table");
     return kresult;
   }
 
@@ -907,7 +909,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
   /* create async event source */
   kresult = (*(cInterface->interface))->CreateInterfaceAsyncEventSource (cInterface->interface, &cInterface->cfSource);
   if (kresult != kIOReturnSuccess) {
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "could not create async event source");
+    usbi_err (HANDLE_CTX (dev_handle), "could not create async event source");
 
     /* can't continue without an async event source */
     (void)darwin_release_interface (dev_handle, iface);
@@ -918,7 +920,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
   /* add the cfSource to the async thread's run loop */
   CFRunLoopAddSource(libusb_darwin_acfl, cInterface->cfSource, kCFRunLoopDefaultMode);
 
-  _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_INFO, "interface opened");
+  usbi_info (HANDLE_CTX (dev_handle), "interface opened");
 
   return 0;
 }
@@ -945,11 +947,11 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, int
 
   kresult = (*(cInterface->interface))->USBInterfaceClose(cInterface->interface);
   if (kresult)
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "USBInterfaceClose: %s", darwin_error_str(kresult));
+    usbi_err (HANDLE_CTX (dev_handle), "USBInterfaceClose: %s", darwin_error_str(kresult));
 
   kresult = (*(cInterface->interface))->Release(cInterface->interface);
   if (kresult != kIOReturnSuccess)
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "Release: %s", darwin_error_str(kresult));
+    usbi_err (HANDLE_CTX (dev_handle), "Release: %s", darwin_error_str(kresult));
 
   cInterface->interface = IO_OBJECT_NULL;
 
@@ -975,7 +977,7 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
   if (kresult) {
     /* this should not happen */
     darwin_release_interface (dev_handle, iface);
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "could not build endpoint table");
+    usbi_err (HANDLE_CTX (dev_handle), "could not build endpoint table");
     return kresult;
   }
 
@@ -992,7 +994,7 @@ static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
 
   /* determine the interface/endpoint to use */
   if (ep_to_pipeRef (dev_handle, endpoint, &pipeRef, &iface) != 0) {
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "endpoint not found on any open interface");
+    usbi_err (HANDLE_CTX (dev_handle), "endpoint not found on any open interface");
 
     return LIBUSB_ERROR_NOT_FOUND;
   }
@@ -1006,7 +1008,7 @@ static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
   kresult = (*(cInterface->interface))->ClearPipeStallBothEnds(cInterface->interface, pipeRef);
 #endif
   if (kresult)
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "ClearPipeStall: %s", darwin_error_str (kresult));
+    usbi_err (HANDLE_CTX (dev_handle), "ClearPipeStall: %s", darwin_error_str (kresult));
 
   return darwin_to_libusb (kresult);
 }
@@ -1017,7 +1019,7 @@ static int darwin_reset_device(struct libusb_device_handle *dev_handle) {
 
   kresult = (*(dpriv->device))->ResetDevice (dpriv->device);
   if (kresult)
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "ResetDevice: %s", darwin_error_str (kresult));
+    usbi_err (HANDLE_CTX (dev_handle), "ResetDevice: %s", darwin_error_str (kresult));
 
   return darwin_to_libusb (kresult);
 }
@@ -1030,7 +1032,7 @@ static int darwin_kernel_driver_active(struct libusb_device_handle *dev_handle, 
 
   kresult = darwin_get_interface (dpriv->device, interface, &usbInterface);
   if (kresult) {
-    _usbi_log (HANDLE_CTX (dev_handle), LOG_LEVEL_ERROR, "darwin_get_interface: %s", darwin_error_str(kresult));
+    usbi_err (HANDLE_CTX (dev_handle), "darwin_get_interface: %s", darwin_error_str(kresult));
 
     return darwin_to_libusb (kresult);
   }
@@ -1077,7 +1079,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   is_read = transfer->endpoint & LIBUSB_ENDPOINT_IN;
   
   if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
-    _usbi_log (TRANSFER_CTX (transfer), LOG_LEVEL_ERROR, "endpoint not found on any open interface");
+    usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
 
     return LIBUSB_ERROR_NOT_FOUND;
   }
@@ -1108,8 +1110,8 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   }
 
   if (ret)
-    _usbi_log (TRANSFER_CTX (transfer), LOG_LEVEL_ERROR, "bulk transfer failed (dir = %s): %s", is_read ? "In" : "Out",
-	       darwin_error_str(ret));
+    usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", is_read ? "In" : "Out",
+	       darwin_error_str(ret), ret);
 
   return darwin_to_libusb (ret);
 }
@@ -1142,7 +1144,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
 
   /* determine the interface/endpoint to use */
   if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
-    _usbi_log (TRANSFER_CTX (transfer), LOG_LEVEL_ERROR, "endpoint not found on any open interface");
+    usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
 
     return LIBUSB_ERROR_NOT_FOUND;
   }
@@ -1152,7 +1154,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   /* Last but not least we need the bus frame number */
   kresult = (*(cInterface->interface))->GetBusFrameNumber(cInterface->interface, &frame, &atTime);
   if (kresult) {
-    _usbi_log (TRANSFER_CTX (transfer), LOG_LEVEL_ERROR, "failed to get bus frame number: %d", kresult);
+    usbi_err (TRANSFER_CTX (transfer), "failed to get bus frame number: %d", kresult);
     free(tpriv->isoc_framelist);
     tpriv->isoc_framelist = NULL;
 
@@ -1173,7 +1175,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
 							      itransfer);
 
   if (kresult != kIOReturnSuccess) {
-    _usbi_log (TRANSFER_CTX (transfer), LOG_LEVEL_ERROR, "isochronous transfer failed (dir: %s): %s", is_read ? "In" : "Out",
+    usbi_err (TRANSFER_CTX (transfer), "isochronous transfer failed (dir: %s): %s", is_read ? "In" : "Out",
 	       darwin_error_str(kresult));
     free (tpriv->isoc_framelist);
     tpriv->isoc_framelist = NULL;
@@ -1208,7 +1210,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   kresult = (*(dpriv->device))->DeviceRequestAsyncTO(dpriv->device, &(tpriv->req), darwin_async_io_callback, itransfer);
 
   if (kresult != kIOReturnSuccess)
-    _usbi_log (TRANSFER_CTX (transfer), LOG_LEVEL_ERROR, "control request failed: %s", darwin_error_str(kresult));
+    usbi_err (TRANSFER_CTX (transfer), "control request failed: %s", darwin_error_str(kresult));
   
   return darwin_to_libusb (kresult);
 }
@@ -1225,7 +1227,7 @@ static int darwin_submit_transfer(struct usbi_transfer *itransfer) {
   case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
     return submit_iso_transfer(itransfer);
   default:
-    _usbi_log (TRANSFER_CTX(transfer), LOG_LEVEL_ERROR, "unknown endpoint type %d", transfer->type);
+    usbi_err (TRANSFER_CTX(transfer), "unknown endpoint type %d", transfer->type);
     return LIBUSB_ERROR_INVALID_PARAM;
   }
 }
@@ -1235,7 +1237,7 @@ static int cancel_control_transfer(struct usbi_transfer *itransfer) {
   struct darwin_device_priv *dpriv = (struct darwin_device_priv *)transfer->dev_handle->dev->os_priv;
   IOReturn kresult;
 
-  _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_INFO, "WARNING: aborting all transactions control pipe");
+  usbi_info (ITRANSFER_CTX (itransfer), "WARNING: aborting all transactions control pipe");
 
   kresult = (*(dpriv->device))->USBDeviceAbortPipeZero (dpriv->device);
 
@@ -1250,19 +1252,19 @@ static int darwin_abort_transfers (struct usbi_transfer *itransfer) {
   IOReturn kresult;
 
   if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
-    _usbi_log (TRANSFER_CTX (transfer), LOG_LEVEL_ERROR, "endpoint not found on any open interface");
+    usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
 
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
   cInterface = &priv->interfaces[iface];
 
-  _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_INFO, "WARNING: aborting all transactions on interface %d pipe %d", iface, pipeRef);
+  usbi_info (ITRANSFER_CTX (itransfer), "WARNING: aborting all transactions on interface %d pipe %d", iface, pipeRef);
 
   /* abort transactions */
   (*(cInterface->interface))->AbortPipe (cInterface->interface, pipeRef);
   
-  _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_INFO, "calling clear pipe stall to clear the data toggle bit");
+  usbi_info (ITRANSFER_CTX (itransfer), "calling clear pipe stall to clear the data toggle bit");
 
   /* clear the data toggle bit */
 #if (InterfaceVersion < 190)
@@ -1286,7 +1288,7 @@ static int darwin_cancel_transfer(struct usbi_transfer *itransfer) {
   case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
     return darwin_abort_transfers (itransfer);
   default:
-    _usbi_log (TRANSFER_CTX(transfer), LOG_LEVEL_ERROR, "unknown endpoint type %d", transfer->type);
+    usbi_err (TRANSFER_CTX(transfer), "unknown endpoint type %d", transfer->type);
     return LIBUSB_ERROR_INVALID_PARAM;
   }
 }
@@ -1307,7 +1309,7 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
   UInt32 message;
 
-  _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_INFO, "an async io operation has completed");
+  usbi_info (ITRANSFER_CTX (itransfer), "an async io operation has completed");
 
   /* send a completion message to the device's file descriptor */
   message = MESSAGE_ASYNC_IO_COMPLETE;
@@ -1320,7 +1322,7 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 static void darwin_bulk_callback (struct usbi_transfer *itransfer, kern_return_t result, UInt32 io_size) {
   enum libusb_transfer_status status;
 
-  _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_INFO, "handling bulk completion with status %d", result);
+  usbi_info (ITRANSFER_CTX (itransfer), "handling bulk completion with status %d", result);
 
   switch (result) {
   case kIOReturnSuccess:
@@ -1331,17 +1333,17 @@ static void darwin_bulk_callback (struct usbi_transfer *itransfer, kern_return_t
     usbi_handle_transfer_cancellation(itransfer);
     return;
   case kIOUSBPipeStalled:
-    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_WARNING, "bulk error. pipe is stalled");
+    usbi_warn (ITRANSFER_CTX (itransfer), "bulk error. pipe is stalled");
     status = LIBUSB_TRANSFER_STALL;
     
     break;
   case kIOReturnOverrun:
-    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_ERROR, "bulk error. data overrun", darwin_error_str (result));
+    usbi_err (ITRANSFER_CTX (itransfer), "bulk error. data overrun", darwin_error_str (result));
     status = LIBUSB_TRANSFER_OVERFLOW;
 
     break;
   default:
-    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_ERROR, "bulk error = %s (value = 0x%08x)", darwin_error_str (result), result);
+    usbi_err (ITRANSFER_CTX (itransfer), "bulk error = %s (value = 0x%08x)", darwin_error_str (result), result);
     status = LIBUSB_TRANSFER_ERROR;
   }
 
@@ -1353,7 +1355,7 @@ static void darwin_isoc_callback (struct usbi_transfer *itransfer, kern_return_t
   struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
   int i, status;
 
-  _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_INFO, "handling isoc completion with status %d", result);
+  usbi_info (ITRANSFER_CTX (itransfer), "handling isoc completion with status %d", result);
 
   if (result == kIOReturnSuccess && tpriv->isoc_framelist) {
     /* copy isochronous results back */
@@ -1373,17 +1375,17 @@ static void darwin_isoc_callback (struct usbi_transfer *itransfer, kern_return_t
     usbi_handle_transfer_cancellation(itransfer);
     return;
   case kIOUSBPipeStalled:
-    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_WARNING, "unsupported control request");
+    usbi_warn (ITRANSFER_CTX (itransfer), "unsupported control request");
     status = LIBUSB_TRANSFER_STALL;
 
     break;
   case kIOReturnOverrun:
-    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_ERROR, "bulk error. data overrun", darwin_error_str (result));
+    usbi_err (ITRANSFER_CTX (itransfer), "bulk error. data overrun", darwin_error_str (result));
     status = LIBUSB_TRANSFER_OVERFLOW;
 
     break;
   default:
-    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_ERROR, "control error = %s", darwin_error_str (result));
+    usbi_err (ITRANSFER_CTX (itransfer), "control error = %s", darwin_error_str (result));
     status = LIBUSB_TRANSFER_ERROR;
   }
 
@@ -1393,7 +1395,7 @@ static void darwin_isoc_callback (struct usbi_transfer *itransfer, kern_return_t
 static void darwin_control_callback (struct usbi_transfer *itransfer, kern_return_t result, UInt32 io_size) {
   int status;
 
-  _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_INFO, "handling control completion with status %d", result);
+  usbi_info (ITRANSFER_CTX (itransfer), "handling control completion with status %d", result);
 
   switch (result) {
   case kIOReturnSuccess:
@@ -1404,12 +1406,12 @@ static void darwin_control_callback (struct usbi_transfer *itransfer, kern_retur
     usbi_handle_transfer_cancellation(itransfer);
     return;
   case kIOUSBPipeStalled:
-    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_WARNING, "unsupported control request");
+    usbi_warn (ITRANSFER_CTX (itransfer), "unsupported control request");
     status = LIBUSB_TRANSFER_STALL;
     
     break;
   default:
-    _usbi_log (ITRANSFER_CTX (itransfer), LOG_LEVEL_ERROR, "control error = %s", darwin_error_str (result));
+    usbi_err (ITRANSFER_CTX (itransfer), "control error = %s", darwin_error_str (result));
     status = LIBUSB_TRANSFER_ERROR;
   }
 
@@ -1431,7 +1433,7 @@ static void darwin_handle_callback (struct usbi_transfer *itransfer, kern_return
     darwin_isoc_callback (itransfer, result);
     break;
   default:
-    _usbi_log (TRANSFER_CTX(transfer), LOG_LEVEL_ERROR, "unknown endpoint type %d", transfer->type);
+    usbi_err (TRANSFER_CTX(transfer), "unknown endpoint type %d", transfer->type);
   }
 }
 
@@ -1448,7 +1450,7 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds
     struct libusb_device_handle *handle;
     struct darwin_device_handle_priv *hpriv = NULL;
 
-    _usbi_log (ctx, LOG_LEVEL_INFO, "checking fd %i with revents = %x", fds[i], pollfd->revents);
+    usbi_info (ctx, "checking fd %i with revents = %x", fds[i], pollfd->revents);
 
     if (!pollfd->revents)
       continue;
@@ -1491,7 +1493,7 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds
       darwin_handle_callback (itransfer, kresult, io_size);
       break;
     default:
-      _usbi_log (ctx, LOG_LEVEL_ERROR, "unknown message received from device pipe");
+      usbi_err (ctx, "unknown message received from device pipe");
     }
   }
 
