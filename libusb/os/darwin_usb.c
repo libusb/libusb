@@ -441,12 +441,13 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
   UInt16                address, idVendor, idProduct;
   UInt8                 bDeviceClass, bDeviceSubClass;
   IOUSBDevRequest      req;
-  int ret;
+  int ret, need_unref = 0;
 
   dev = usbi_get_device_by_session_id(ctx, locationID);
   if (!dev) {
-    _usbi_log (ctx, LOG_LEVEL_INFO, "allocating new device for location 0x%08x", locationID);
+    usbi_info (ctx, "allocating new device for location 0x%08x", locationID);
     dev = usbi_alloc_device(ctx, locationID);
+    need_unref = 1;
     if (!dev)
       return LIBUSB_ERROR_NO_MEM;
 
@@ -497,8 +498,9 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     (*device)->USBDeviceClose (device);
 
     if (ret != kIOReturnSuccess) {
-      _usbi_log (ctx, LOG_LEVEL_WARNING, "could not retrieve device descriptor: %s. skipping device", darwin_error_str (ret));
-      libusb_unref_device(dev);
+      usbi_warn (ctx, "could not retrieve device descriptor: %s. skipping device", darwin_error_str (ret));
+      if (need_unref)
+	libusb_unref_device(dev);
       return -1;
     }
     /**** end: retrieve device descriptors ****/
@@ -522,13 +524,14 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     ret = usbi_sanitize_device(dev);
 
     if (ret < 0) {
-      libusb_unref_device(dev);
+      if (need_unref)
+	libusb_unref_device(dev);
       return -1;
     }
   } else {
     priv = (struct darwin_device_priv *)dev->os_priv;
 
-    _usbi_log (ctx, LOG_LEVEL_INFO, "using existing device for location 0x%08x", locationID);
+    usbi_info (ctx, "using existing device for location 0x%08x", locationID);
   }
 
   /* append the device to the list of discovered devices */
@@ -538,8 +541,11 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     
   *_discdevs = discdevs;
   
-  _usbi_log (ctx, LOG_LEVEL_INFO, "found device with address %d at %s", dev->device_address, priv->sys_path);
+  usbi_info (ctx, "found device with address %d at %s", dev->device_address, priv->sys_path);
   
+  if (need_unref)
+    libusb_unref_device(dev);
+
   return 0;
 }
 
