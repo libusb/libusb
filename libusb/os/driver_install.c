@@ -266,7 +266,6 @@ int install_device(char* path)
 
 	r = DriverPackagePreinstall(path, DRIVER_PACKAGE_LEGACY_MODE|DRIVER_PACKAGE_REPAIR);
 	// Will fail if inf not signed, unless DRIVER_PACKAGE_LEGACY_MODE is specified.
-	// Will fail if no cat file has been created
 	// r = 87 ERROR_INVALID_PARAMETER on path == NULL
 	// r = 2 ERROR_FILE_NOT_FOUND if no inf in path
 	// r = 5 ERROR_ACCESS_DENIED if needs admin elevation
@@ -274,6 +273,7 @@ int install_device(char* path)
 	// r = 0xE0000304 ERROR_INVALID_CATALOG_DATA => no cat
 	// r = 0xE0000247 if user decided not to install on warnings
 	// r = 0x800B0100 ERROR_WRONG_INF_STYLE => missing cat entry in inf
+	// r = 0xB7 => missing DRIVER_PACKAGE_REPAIR flag
 
 	usbi_dbg("ret = %X", r);
 	return 0;
