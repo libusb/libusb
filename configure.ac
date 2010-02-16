@@ -20,6 +20,7 @@ case $host in
 	AC_MSG_RESULT([Linux])
 	backend="linux"
 	AC_CHECK_LIB(rt, clock_gettime)
+	AM_CFLAGS="-pthread"
 	AM_LDFLAGS=""
 	;;
 *-darwin*)
@@ -28,6 +29,7 @@ case $host in
 	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
 	AC_MSG_RESULT([Darwin/MacOS X])
 	backend="darwin"
+	AM_CFLAGS="-pthread"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
 *)
@@ -120,7 +122,7 @@ AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
 	nopointersign_cflags="-Wno-pointer-sign", nopointersign_cflags="")
 CFLAGS="$saved_cflags"
 
-AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
+AM_CFLAGS="$AM_CFLAGS -std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
 
 AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)

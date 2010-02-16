@@ -1775,7 +1775,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status = LIBUSB_TRANSFER_COMPLETED;
 	int r = 0;
 
-	pthread_mutex_lock(&itransfer->lock);
+	usbi_mutex_lock(&itransfer->lock);
 	usbi_dbg("handling completion status %d of bulk urb %d/%d", urb->status,
 		urb_idx + 1, num_urbs);
 
@@ -1819,7 +1819,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 			if (tpriv->reap_action == CANCELLED) {
 				free(tpriv->urbs);
 				tpriv->urbs = NULL;
-				pthread_mutex_unlock(&itransfer->lock);
+				usbi_mutex_unlock(&itransfer->lock);
 				r = usbi_handle_transfer_cancellation(itransfer);
 				goto out_unlock;
 			}
@@ -1897,10 +1897,10 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 completed:
 	free(tpriv->urbs);
 	tpriv->urbs = NULL;
-	pthread_mutex_unlock(&itransfer->lock);
+	usbi_mutex_unlock(&itransfer->lock);
 	return usbi_handle_transfer_completion(itransfer, status);
 out_unlock:
-	pthread_mutex_unlock(&itransfer->lock);
+	usbi_mutex_unlock(&itransfer->lock);
 	return r;
 }
 
@@ -1914,7 +1914,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	int urb_idx = 0;
 	int i;
 
-	pthread_mutex_lock(&itransfer->lock);
+	usbi_mutex_lock(&itransfer->lock);
 	for (i = 0; i < num_urbs; i++) {
 		if (urb == tpriv->iso_urbs[i]) {
 			urb_idx = i + 1;
@@ -1923,7 +1923,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	}
 	if (urb_idx == 0) {
 		usbi_err(TRANSFER_CTX(transfer), "could not locate urb!");
-		pthread_mutex_unlock(&itransfer->lock);
+		usbi_mutex_unlock(&itransfer->lock);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
@@ -1951,10 +1951,10 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 			usbi_dbg("CANCEL: last URB handled, reporting");
 			free_iso_urbs(tpriv);
 			if (tpriv->reap_action == CANCELLED) {
-				pthread_mutex_unlock(&itransfer->lock);
+				usbi_mutex_unlock(&itransfer->lock);
 				return usbi_handle_transfer_cancellation(itransfer);
 			} else {
-				pthread_mutex_unlock(&itransfer->lock);
+				usbi_mutex_unlock(&itransfer->lock);
 				return usbi_handle_transfer_completion(itransfer,
 					LIBUSB_TRANSFER_ERROR);
 			}
@@ -1981,12 +1981,12 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	if (urb_idx == num_urbs) {
 		usbi_dbg("last URB in transfer --> complete!");
 		free_iso_urbs(tpriv);
-		pthread_mutex_unlock(&itransfer->lock);
+		usbi_mutex_unlock(&itransfer->lock);
 		return usbi_handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
 	}
 
 out:
-	pthread_mutex_unlock(&itransfer->lock);
+	usbi_mutex_unlock(&itransfer->lock);
 	return 0;
 }
 
@@ -1996,7 +1996,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 	int status;
 
-	pthread_mutex_lock(&itransfer->lock);
+	usbi_mutex_lock(&itransfer->lock);
 	usbi_dbg("handling completion status %d", urb->status);
 
 	if (urb->status == 0)
@@ -2008,7 +2008,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 				"cancel: unrecognised urb status %d", urb->status);
 		free(tpriv->urbs);
 		tpriv->urbs = NULL;
-		pthread_mutex_unlock(&itransfer->lock);
+		usbi_mutex_unlock(&itransfer->lock);
 		return usbi_handle_transfer_cancellation(itransfer);
 	}
 
@@ -2036,7 +2036,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 
 	free(tpriv->urbs);
 	tpriv->urbs = NULL;
-	pthread_mutex_unlock(&itransfer->lock);
+	usbi_mutex_unlock(&itransfer->lock);
 	return usbi_handle_transfer_completion(itransfer, status);
 }
 
@@ -2087,7 +2087,7 @@ static int op_handle_events(struct libusb_context *ctx,
 	int r;
 	int i = 0;
 
-	pthread_mutex_lock(&ctx->open_devs_lock);
+	usbi_mutex_lock(&ctx->open_devs_lock);
 	for (i = 0; i < nfds && num_ready > 0; i++) {
 		struct pollfd *pollfd = &fds[i];
 		struct libusb_device_handle *handle;
@@ -2118,7 +2118,7 @@ static int op_handle_events(struct libusb_context *ctx,
 
 	r = 0;
 out:
-	pthread_mutex_unlock(&ctx->open_devs_lock);
+	usbi_mutex_unlock(&ctx->open_devs_lock);
 	return r;
 }
 
