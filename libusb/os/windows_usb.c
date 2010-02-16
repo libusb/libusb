@@ -1805,7 +1805,12 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 
 	switch(io_result) {
 	case NO_ERROR:
-		status = priv->apib->copy_transfer_data(itransfer, io_size);
+		if (transfer->endpoint & LIBUSB_ENDPOINT_IN) {
+			// copy_transfer_data() is only needed on read operations
+			status = priv->apib->copy_transfer_data(itransfer, io_size);
+		} else {
+			status = LIBUSB_TRANSFER_COMPLETED;
+		}
 		break;
 	case ERROR_GEN_FAILURE:
 		usbi_dbg("detected endpoint stall");
@@ -3296,7 +3301,7 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 		}
 		// Get the default input and output report IDs to use with interrupt
 		size = capabilities.NumberInputValueCaps;
-		usbi_dbg("%d HID input report value(s) found", size);
+		usbi_dbg("%d HID input report value(s) found:", size);
 		priv->hid->input_report_id = 0;
 		if (size > 0) {
 			value_caps = malloc(size * sizeof(HIDP_VALUE_CAPS));
@@ -3306,21 +3311,21 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 				priv->hid->input_report_id = value_caps[0].ReportID;
 				for (i=1; i<(int)size; i++) {
 					if (value_caps[i].ReportID != priv->hid->input_report_id) {
-						usbi_warn(ctx, "multiple input report IDs found for HID");
-						usbi_warn(ctx, " will only handle report ID 0x%02X for interrupt transfers",
+						usbi_warn(ctx, "  multiple input report IDs found for HID:");
+						usbi_warn(ctx, "  will only handle report ID 0x%02X for interrupt transfers",
 							priv->hid->input_report_id);
 						break;
 					}
 				}
-				usbi_dbg("will use report ID 0x%02X for interrupt transfers", priv->hid->input_report_id);
+				usbi_dbg("  will use report ID 0x%02X for interrupt transfers", priv->hid->input_report_id);
 			} else {
-				usbi_warn(ctx, "could process input report IDs");
+				usbi_warn(ctx, "  could not process input report IDs");
 			}
 			safe_free(value_caps);
 		}
 
 		size = capabilities.NumberOutputValueCaps;
-		usbi_dbg("%d HID output report value(s) found", size);
+		usbi_dbg("%d HID output report value(s) found:", size);
 		priv->hid->output_report_id = 0;
 		if (size > 0) {
 			value_caps = malloc(size * sizeof(HIDP_VALUE_CAPS));
@@ -3330,8 +3335,8 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 				priv->hid->output_report_id = value_caps[0].ReportID;
 				for (i=1; i<(int)size; i++) {
 					if (value_caps[i].ReportID != priv->hid->output_report_id) {
-						usbi_warn(ctx, "multiple output report IDs found for HID");
-						usbi_warn(ctx, " will only handle report ID 0x%02X for interrupt transfers",
+						usbi_warn(ctx, "  multiple output report IDs found for HID:");
+						usbi_warn(ctx, "  will only handle report ID 0x%02X for interrupt transfers",
 							priv->hid->output_report_id);
 						break;
 					}
@@ -3604,6 +3609,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 		ret = ReadFile(hid_handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
 	} else {
 		transfer_priv->hid_buffer[0] = priv->hid->output_report_id;
+		memcpy(transfer_priv->hid_buffer+1, transfer->buffer, transfer->length);
 		usbi_dbg("writing %d bytes (report ID: 0x%02X)", transfer->length+1, transfer_priv->hid_buffer[0]);
 		transfer_priv->hid_buffer[0] = 0;
 		ret = WriteFile(hid_handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
@@ -3616,7 +3622,11 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
-		safe_free(transfer_priv->hid_buffer);
+		// Only write operations that completed synchronously need to free up
+		// hid_buffer. For reads, copy_transfer_data() handles that process.
+		if (transfer->endpoint & LIBUSB_ENDPOINT_OUT) {
+			safe_free(transfer_priv->hid_buffer);
+		}
 		if (size == 0) {
 			usbi_err(ctx, "program assertion failed - no data was transferred");
 			size = 1;
@@ -3626,7 +3636,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 			r = LIBUSB_ERROR_OVERFLOW;
 		}
 		wfd.completed_synchronously = true;
-		wfd.overlapped->InternalHigh = size - 1;
+		wfd.overlapped->InternalHigh = size;
 	}
 
 	transfer_priv->pollable_fd = wfd;
