@@ -1805,12 +1805,7 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 
 	switch(io_result) {
 	case NO_ERROR:
-		if (transfer->endpoint & LIBUSB_ENDPOINT_IN) {
-			// copy_transfer_data() is only needed on read operations
-			status = priv->apib->copy_transfer_data(itransfer, io_size);
-		} else {
-			status = LIBUSB_TRANSFER_COMPLETED;
-		}
+		status = priv->apib->copy_transfer_data(itransfer, io_size);
 		break;
 	case ERROR_GEN_FAILURE:
 		usbi_dbg("detected endpoint stall");
