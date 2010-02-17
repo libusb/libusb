@@ -1676,8 +1676,6 @@ static void windows_destroy_device(struct libusb_device *dev)
 static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
-
-	usbi_remove_pollfd(ITRANSFER_CTX(itransfer), transfer_priv->pollable_fd.fd);
 	_libusb_free_fd(transfer_priv->pollable_fd.fd);
 	safe_free(transfer_priv->hid_buffer);
 }
@@ -1777,22 +1775,17 @@ static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
-	windows_clear_transfer_priv(itransfer);	// Cancel polling
-
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
-		windows_abort_control(itransfer);
-		break;
+		return windows_abort_control(itransfer);
 	case LIBUSB_TRANSFER_TYPE_BULK:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		windows_abort_transfers(itransfer);
-		break;
+		return windows_abort_transfers(itransfer);
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "unknown endpoint type %d", transfer->type);
-		break;
+		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-	return usbi_handle_transfer_cancellation(itransfer);
 }
 
 static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size) 
@@ -1801,7 +1794,7 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
 	int status;
 
-	usbi_dbg("handling I/O completion with status %d", io_result);
+	usbi_dbg("handling I/O completion with errcode %d", io_result);
 
 	switch(io_result) {
 	case NO_ERROR:
@@ -1811,12 +1804,21 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 		usbi_dbg("detected endpoint stall");
 		status = LIBUSB_TRANSFER_STALL;
 		break;
+	case ERROR_OPERATION_ABORTED:
+		if (itransfer->flags | USBI_TRANSFER_TIMED_OUT) {
+			usbi_dbg("detected timeout");
+			status = LIBUSB_TRANSFER_TIMED_OUT;
+		} else {
+			usbi_dbg("detected operation aborted");
+			status = LIBUSB_TRANSFER_CANCELLED;
+		}
+		break;
 	default:
-		usbi_err(ITRANSFER_CTX(itransfer), "I/O error: %s", windows_error_str(0));
+		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error: %s", windows_error_str(0));
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	}
-
+	windows_clear_transfer_priv(itransfer);	// Cancel polling
 	usbi_handle_transfer_completion(itransfer, status);
 }
 
