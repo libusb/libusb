@@ -1579,10 +1579,10 @@ static int windows_get_configuration(struct libusb_device_handle *dev_handle, in
  * from http://msdn.microsoft.com/en-us/library/ms793522.aspx: "The port driver 
  * does not currently expose a service that allows higher-level drivers to set 
  * the configuration."
- * TODO (>v1): See what users of devices with multiple confs report with this call
  */
 static int windows_set_configuration(struct libusb_device_handle *dev_handle, int config)
 {
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	int r = LIBUSB_SUCCESS;
 
 	if (config >= USB_MAXCONFIG)
@@ -1593,6 +1593,9 @@ static int windows_set_configuration(struct libusb_device_handle *dev_handle, in
 		LIBUSB_REQUEST_SET_CONFIGURATION, (uint16_t)config,
 		0, NULL, 0, 1000);
 
+	if (r == LIBUSB_SUCCESS) {
+		priv->active_config = config;
+	}
 	return r;
 }
 
@@ -3347,6 +3350,7 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 		priv->hid->output_report_size = capabilities.OutputReportByteLength;
 		priv->hid->input_report_size = capabilities.InputReportByteLength;
 		priv->hid->feature_report_size = capabilities.FeatureReportByteLength;
+		usbi_dbg("input_report_size: %d, output_report_size: %d, feature_report_size: %d", priv->hid->input_report_size, priv->hid->output_report_size, priv->hid->feature_report_size);
 
 		// Fetch string descriptors
 		HidD_GetManufacturerString(hid_handle, priv->hid->man_string, 
