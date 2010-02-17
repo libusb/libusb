@@ -495,7 +495,7 @@ static int windows_init(struct libusb_context *ctx)
 
 			_hcd_cur = &((*_hcd_cur)->next);
 		}
-		// TODO (v2): thread for hotplug (see darwin source)
+		// TODO (2nd official release): thread for hotplug (see darwin source)
 	}
 
 	if (hcd_root == NULL)
@@ -562,7 +562,7 @@ static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
 		usbi_dbg("active config: %d", priv->active_config);
 	} else {
 		// USB devices that don't have a config value are usually missing a driver
-		// TODO (v1.5): use this for automated driver installation
+		// TODO (after first official release): use this for automated driver installation
 		// NB: SetupDiGetDeviceRegistryProperty w/ SPDRP_INSTALL_STATE would tell us
 		// if the driver is properly installed, but driverless devices don't seem to
 		// be enumerable by SetupDi...
@@ -1264,7 +1264,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	uint8_t api;
 	bool found;
 
-	// TODO (v1.5): MI_## automated driver installation
+	// TODO (after first official release): MI_## automated driver installation
 	guid = GUID_DEVINTERFACE_USB_DEVICE; 
 	for (i = 0; ; i++)	
 	{
@@ -2670,7 +2670,7 @@ static int winusb_abort_transfers(struct usbi_transfer *itransfer)
  * IOCTL_USB_HUB_CYCLE_PORT ioctl was removed from Vista => the best we can do is 
  * cycle the pipes (and even then, the control pipe can not be reset using WinUSB)
  */
-// TODO (v2): see if we can force eject the device and redetect it (reuse hotplug?)
+// TODO (2nd official release): see if we can force eject the device and redetect it (reuse hotplug?)
 static int winusb_reset_device(struct libusb_device_handle *dev_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
