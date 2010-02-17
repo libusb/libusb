@@ -3125,6 +3125,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 static int _hid_get_feature(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data, size_t *size)
 {
 	uint8_t buf[HID_MAX_REPORT_SIZE + 1];
+	uint32_t r;
 
 	if (*size >MAX_HID_REPORT_SIZE)
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -3135,12 +3136,20 @@ static int _hid_get_feature(struct hid_device_priv* dev, HANDLE hid_handle, int 
 	if (HidD_GetFeature(hid_handle, buf, (ULONG)*size)) {
 		return LIBUSB_COMPLETED;
 	}
-	return LIBUSB_ERROR_OTHER;
+	r = GetLastError();
+	switch (r) {
+	case ERROR_INVALID_FUNCTION:
+		return LIBUSB_ERROR_NOT_FOUND;
+	default: 
+		usbi_dbg("error %s", windows_error_str(r));
+		return LIBUSB_ERROR_OTHER;
+	}
 }
 
 static int _hid_set_feature(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data, size_t *size)
 {
 	uint8_t buf[HID_MAX_REPORT_SIZE + 1];
+	uint32_t r;
 
 	if (*size >MAX_HID_REPORT_SIZE)
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -3152,7 +3161,14 @@ static int _hid_set_feature(struct hid_device_priv* dev, HANDLE hid_handle, int 
 	if (HidD_SetFeature(hid_handle, buf, (ULONG)*size)) {
 		return LIBUSB_COMPLETED;
 	}
-	return LIBUSB_ERROR_OTHER;
+	r = GetLastError();
+	switch (r) {
+	case ERROR_INVALID_FUNCTION:
+		return LIBUSB_ERROR_NOT_FOUND;
+	default: 
+		usbi_dbg("error %s", windows_error_str(r));
+		return LIBUSB_ERROR_OTHER;
+	}
 }
 
 static int _hid_class_request(struct hid_device_priv* dev, HANDLE hid_handle, int request_type,
@@ -3180,8 +3196,8 @@ static int _hid_class_request(struct hid_device_priv* dev, HANDLE hid_handle, in
 		&& report_type == HID_REPORT_TYPE_FEATURE)
 		return _hid_set_feature(dev, hid_handle, report_id, data, size);
 
-	if (LIBUSB_REQ_OUT(request_type)
-		&& request == HID_REQ_SET_REPORT 
+	if (LIBUSB_REQ_IN(request_type)
+		&& request == HID_REQ_GET_REPORT 
 		&& report_type == HID_REPORT_TYPE_FEATURE)
 		return _hid_get_feature(dev, hid_handle, report_id, data, size);
 
@@ -3301,7 +3317,7 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 		}
 		// Get the default input and output report IDs to use with interrupt
 		size = capabilities.NumberInputValueCaps;
-		usbi_dbg("%d HID input report value(s) found:", size);
+		usbi_dbg("%d HID input report value(s) found", size);
 		priv->hid->input_report_id = 0;
 		if (size > 0) {
 			value_caps = malloc(size * sizeof(HIDP_VALUE_CAPS));
@@ -3325,7 +3341,7 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 		}
 
 		size = capabilities.NumberOutputValueCaps;
-		usbi_dbg("%d HID output report value(s) found:", size);
+		usbi_dbg("%d HID output report value(s) found", size);
 		priv->hid->output_report_id = 0;
 		if (size > 0) {
 			value_caps = malloc(size * sizeof(HIDP_VALUE_CAPS));
@@ -3347,10 +3363,9 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 			}
 			safe_free(value_caps);
 		}
-		priv->hid->output_report_size = capabilities.OutputReportByteLength;
 		priv->hid->input_report_size = capabilities.InputReportByteLength;
+		priv->hid->output_report_size = capabilities.OutputReportByteLength;
 		priv->hid->feature_report_size = capabilities.FeatureReportByteLength;
-		usbi_dbg("input_report_size: %d, output_report_size: %d, feature_report_size: %d", priv->hid->input_report_size, priv->hid->output_report_size, priv->hid->feature_report_size);
 
 		// Fetch string descriptors
 		HidD_GetManufacturerString(hid_handle, priv->hid->man_string, 
