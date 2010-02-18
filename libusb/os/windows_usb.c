@@ -28,6 +28,10 @@
 //#define USE_HIDD_FOR_REPORTS
 // - Should libusb automatically claim the interfaces it requires?
 #define AUTO_CLAIM
+// - Forces instant overlapped completion on timeouts: can prevents extensive
+//   wait in poll, after a timeout, but might affect subsequent API calls.
+//   ***USE AT YOUR OWN RISKS***
+//#define FORCE_INSTANT_TIMEOUTS
 
 #if defined(_MSC_VER)
 #include <config_msvc.h>
@@ -1594,7 +1598,7 @@ static int windows_set_configuration(struct libusb_device_handle *dev_handle, in
 		0, NULL, 0, 1000);
 
 	if (r == LIBUSB_SUCCESS) {
-		priv->active_config = config;
+		priv->active_config = (uint8_t)config;
 	}
 	return r;
 }
@@ -1777,7 +1781,14 @@ static int windows_abort_transfers(struct usbi_transfer *itransfer)
 static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 
+#if defined(FORCE_INSTANT_TIMEOUTS)
+	// Forces instant overlapped completion on timeouts - use at your own risks
+	if (itransfer->flags | USBI_TRANSFER_TIMED_OUT) {
+		transfer_priv->pollable_fd.overlapped->Internal &= ~STATUS_PENDING;
+	}
+#endif
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
 		return windows_abort_control(itransfer);
@@ -1806,6 +1817,10 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 	case ERROR_GEN_FAILURE:
 		usbi_dbg("detected endpoint stall");
 		status = LIBUSB_TRANSFER_STALL;
+		break;
+	case ERROR_SEM_TIMEOUT:
+		usbi_dbg("detected semaphore timeout");
+		status = LIBUSB_TRANSFER_TIMED_OUT;
 		break;
 	case ERROR_OPERATION_ABORTED:
 		if (itransfer->flags | USBI_TRANSFER_TIMED_OUT) {
