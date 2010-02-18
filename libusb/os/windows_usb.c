@@ -744,7 +744,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 	char *tmp_str = NULL, *path_str = NULL;
 	unsigned long session_id;
 	libusb_devaddr_t devaddr = 0;
-	struct windows_device_priv *priv, *parent_priv; 
+	struct windows_device_priv *priv, *parent_priv;
 
 	// obviously, root (HCD) hubs have no parent
 	is_hcd = (parent_dev == NULL);
@@ -876,6 +876,10 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 		if (dev) {
 			usbi_dbg("using existing device for session %ld", session_id);
 			priv = __device_priv(dev);
+			// Because we are rebuilding the list, there's no guarantee 
+			// the parent device pointer is still the same.
+			// Other device data should still be reusable
+			priv->parent_dev = parent_dev;
 		} else {
 			usbi_dbg("allocating new device for session %ld", session_id);
 			if ((dev = usbi_alloc_device(ctx, session_id)) == NULL) { 
@@ -3372,7 +3376,7 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 						break;
 					}
 				}
-				usbi_dbg("will use report ID 0x%02X for interrupt transfers", priv->hid->output_report_id);
+				usbi_dbg("  will use report ID 0x%02X for interrupt transfers", priv->hid->output_report_id);
 			} else {
 				usbi_warn(ctx, "could process output report IDs");
 			}
