@@ -1785,9 +1785,9 @@ static int windows_abort_transfers(struct usbi_transfer *itransfer)
 static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+#if defined(FORCE_INSTANT_TIMEOUTS)
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 
-#if defined(FORCE_INSTANT_TIMEOUTS)
 	// Forces instant overlapped completion on timeouts - use at your own risks
 	if (itransfer->flags | USBI_TRANSFER_TIMED_OUT) {
 		transfer_priv->pollable_fd.overlapped->Internal &= ~STATUS_PENDING;
