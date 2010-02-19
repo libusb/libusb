@@ -1559,6 +1559,12 @@ static int windows_get_active_config_descriptor(struct libusb_device *dev, unsig
 static int windows_open(struct libusb_device_handle *dev_handle)
 {
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
+
+	if (priv->apib == NULL) {
+		usbi_err(ctx, "program assertion failed - device is not initialized");
+		return LIBUSB_ERROR_NO_DEVICE;
+	}
 
 	return priv->apib->open(dev_handle);
 }
