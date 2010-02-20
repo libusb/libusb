@@ -1,6 +1,7 @@
 /*
  * windows backend for libusb 1.0
- * Copyright (c) 2009 Pete Batard <pbatard@gmail.com>
+ * Copyright (c) 2009-2010 Pete Batard <pbatard@gmail.com>
+ * With contributions from Michael Plante, Orin Eman et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
  *
  * This library is free software; you can redistribute it and/or

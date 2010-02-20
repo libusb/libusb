@@ -1,6 +1,8 @@
 /*
- * xusb: libusb-winusb specific test program, (c) 2009 Pete Batard
- * based on lsusb, copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
+ * xusb: libusb-winusb specific test program
+ * Copyright (c) 2009-2010 Pete Batard <pbatard@gmail.com>
+ * Based on lsusb, copyright (c) 2007 Daniel Drake <dsd@gentoo.org>
+ * With contributions to Mass Storage test by Alan Stern.
  *
  * This test program tries to access an USB device through WinUSB. 
  * To access your device, modify this source and add your VID/PID.

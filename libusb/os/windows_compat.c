@@ -1,7 +1,7 @@
 /*
  * Windows compat: POSIX compatibility wrapper
- * Copyright (C) 2009 Pete Batard <pbatard@gmail.com>
- *
+ * Copyright (C) 2009-2010 Pete Batard <pbatard@gmail.com>
+ * With contributions from Michael Plante, Orin Eman et al.
  * Parts of poll implementation from libusb-win32, by Stephan Meyer et al.
  *
  * This library is free software; you can redistribute it and/or
