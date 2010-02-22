@@ -3,6 +3,7 @@
  * Copyright (c) 2009-2010 Pete Batard <pbatard@gmail.com>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
+ * Major code testing contribution by Xiaofan Chen
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -3150,51 +3151,75 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 
 static int _hid_get_feature(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data, size_t *size)
 {
-	uint8_t buf[HID_MAX_REPORT_SIZE + 1];
-	uint32_t r;
+	uint8_t *buf;
+	ULONG read_size = (ULONG)(*size + 1);
+	int r = LIBUSB_ERROR_OTHER;
+	uint32_t err;
 
-	if (*size >MAX_HID_REPORT_SIZE)
+	if (*size > MAX_HID_REPORT_SIZE)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
+	buf = (uint8_t*)calloc(1, read_size);
+	if (buf == NULL) {
+		return LIBUSB_ERROR_NO_MEM;
+	}
 	buf[0] = (uint8_t)id;
+	usbi_dbg("report ID: 0x%02X", buf[0]);
 
-	*size += 1;
-	if (HidD_GetFeature(hid_handle, buf, (ULONG)*size)) {
-		return LIBUSB_COMPLETED;
+	if (HidD_GetFeature(hid_handle, buf, read_size)) {
+		if (buf[0] != id) {
+			usbi_dbg("program assertion failed - mismatched report ID (got %02X instead of %02X)",
+				buf[0], id);
+		}
+		memcpy(data, buf+1, read_size);
+		r = LIBUSB_COMPLETED;
+	} else {
+		err = GetLastError();
+		switch (err) {
+		case ERROR_INVALID_FUNCTION:
+			r = LIBUSB_ERROR_NOT_FOUND;
+		default: 
+			usbi_dbg("error %s", windows_error_str(r));
+			r = LIBUSB_ERROR_OTHER;
+		}
 	}
-	r = GetLastError();
-	switch (r) {
-	case ERROR_INVALID_FUNCTION:
-		return LIBUSB_ERROR_NOT_FOUND;
-	default: 
-		usbi_dbg("error %s", windows_error_str(r));
-		return LIBUSB_ERROR_OTHER;
-	}
+	safe_free(buf);
+	return r;
 }
 
 static int _hid_set_feature(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data, size_t *size)
 {
-	uint8_t buf[HID_MAX_REPORT_SIZE + 1];
-	uint32_t r;
+	uint8_t *buf;
+	uint32_t err;
+	int r = LIBUSB_ERROR_OTHER;
+	ULONG write_size = (ULONG)(*size + 1);
 
 	if (*size >MAX_HID_REPORT_SIZE)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
+	buf = (uint8_t*)malloc(write_size);
+	if (buf == NULL) {
+		return LIBUSB_ERROR_NO_MEM;
+	}
 	buf[0] = (uint8_t)id;
-	memcpy(buf + 1, data, *size);
+	usbi_dbg("report ID: 0x%02X", buf[0]);
 
-	*size += 1;
-	if (HidD_SetFeature(hid_handle, buf, (ULONG)*size)) {
-		return LIBUSB_COMPLETED;
+	memcpy(buf+1, data, *size);
+
+	if (HidD_SetFeature(hid_handle, buf, write_size)) {
+		r = LIBUSB_COMPLETED;
+	} else {
+		err = GetLastError();
+		switch (err) {
+		case ERROR_INVALID_FUNCTION:
+			r = LIBUSB_ERROR_NOT_FOUND;
+		default: 
+			usbi_dbg("error %s", windows_error_str(r));
+			r = LIBUSB_ERROR_OTHER;
+		}
 	}
-	r = GetLastError();
-	switch (r) {
-	case ERROR_INVALID_FUNCTION:
-		return LIBUSB_ERROR_NOT_FOUND;
-	default: 
-		usbi_dbg("error %s", windows_error_str(r));
-		return LIBUSB_ERROR_OTHER;
-	}
+	safe_free(buf);
+	return r;
 }
 
 static int _hid_class_request(struct hid_device_priv* dev, HANDLE hid_handle, int request_type,
