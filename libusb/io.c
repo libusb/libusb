@@ -29,13 +29,7 @@
 #endif
 #include <time.h>
 #ifndef OS_WINDOWS
-#include <unistd.h>
-#include <poll.h>
-#define _libusb_write write
-#define _libusb_read read
-#define _libusb_close close
-#define _libusb_pipe pipe
-#define _libusb_poll poll
+#include "os/unistd_posix.h"
 #endif
 
 #ifdef USBI_TIMERFD_AVAILABLE
