@@ -127,7 +127,7 @@ SOURCE=.\libusb\os\windows_usb.c
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
 # Begin Source File
 
-SOURCE=.\config_msvc.h
+SOURCE=.\msvc\config.h
 # End Source File
 # Begin Source File
 
