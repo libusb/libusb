@@ -1,7 +1,7 @@
 /*
  * Windows compat: POSIX compatibility wrapper
- * Copyright (C) 2009 Pete Batard <pbatard@gmail.com>
- *
+ * Copyright (C) 2009-2010 Pete Batard <pbatard@gmail.com>
+ * With contributions from Michael Plante, Orin Eman et al.
  * Parts of poll implementation from libusb-win32, by Stephan Meyer et al.
  *
  * This library is free software; you can redistribute it and/or
@@ -43,6 +43,7 @@ extern enum windows_version windows_version;
 
 #define MAX_FDS     256
 
+#if !defined(__CYGWIN__)
 #define POLLIN      0x0001    /* There is data to read */
 #define POLLPRI     0x0002    /* There is urgent data to read */
 #define POLLOUT     0x0004    /* Writing now will not block */
@@ -55,6 +56,7 @@ struct pollfd {
     short events;     /* requested events */
     short revents;    /* returned events */
 };
+#endif
 typedef unsigned int nfds_t;
 
 // access modes
@@ -74,16 +76,16 @@ struct winfd {
 };
 extern const struct winfd INVALID_WINFD;
 
-int _libusb_pipe(int pipefd[2]);
-int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout);
-ssize_t _libusb_write(int fd, const void *buf, size_t count);
-ssize_t _libusb_read(int fd, void *buf, size_t count);
-int _libusb_close(int fd);
+int usbi_pipe(int pipefd[2]);
+int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout);
+ssize_t usbi_write(int fd, const void *buf, size_t count);
+ssize_t usbi_read(int fd, void *buf, size_t count);
+int usbi_close(int fd);
 
 void init_polling(void);
 void exit_polling(void);
-struct winfd _libusb_create_fd(HANDLE handle, int access_mode);
-void _libusb_free_fd(int fd);
+struct winfd usbi_create_fd(HANDLE handle, int access_mode);
+void usbi_free_fd(int fd);
 struct winfd fd_to_winfd(int fd);
 struct winfd handle_to_winfd(HANDLE handle);
 struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);
@@ -129,3 +131,4 @@ do {                                                    \
 	}                                                   \
 } while (0)
 #endif
+

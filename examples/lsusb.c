@@ -18,7 +18,6 @@
  */
 
 #include <stdio.h>
-#include <sys/types.h>
 
 #include <libusb/libusb.h>
 #include <libusb/os/driver_install.h>

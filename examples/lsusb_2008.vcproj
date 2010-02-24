@@ -65,7 +65,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib difxapi.lib driver_resources.res"
+				AdditionalDependencies="setupapi.lib difxapi.lib driver_resources.res"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="..\msvc;$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
 				GenerateDebugInformation="true"
@@ -142,7 +142,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib difxapi.lib driver_resources.res"
+				AdditionalDependencies="setupapi.lib difxapi.lib driver_resources.res"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="..\msvc;$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
 				GenerateDebugInformation="true"
@@ -219,7 +219,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib difxapi.lib driver_resources.res"
+				AdditionalDependencies="setupapi.lib difxapi.lib driver_resources.res"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="..\msvc;$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
 				GenerateDebugInformation="true"
@@ -299,7 +299,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib difxapi.lib driver_resources.res"
+				AdditionalDependencies="setupapi.lib difxapi.lib driver_resources.res"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="..\msvc;$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
 				GenerateDebugInformation="true"

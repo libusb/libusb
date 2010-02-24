@@ -24,13 +24,12 @@
 #include <stdint.h>
 #ifdef _MSC_VER
 #define inline __inline
-#include <time.h>
 #else
 #include <sys/time.h>
 #endif
 #include <sys/types.h>
-#include <time.h>
 #include <limits.h>
+#include <time.h>
 
 /* 'interface' might be defined as a macro on Windows, so we need to
  * undefine it so as not to break the current libusb API, because 
@@ -659,9 +658,9 @@ enum libusb_error {
 
 	/** Other error */
 	LIBUSB_ERROR_OTHER = -99
-    
-    /* IMPORTANT: when adding new values to this enum, remember to update the
-                  libusb_strerror() function implementation! */
+
+	/* IMPORTANT: when adding new values to this enum, remember to
+	   update the libusb_strerror() function implementation! */
 };
 
 /** \ingroup asyncio
@@ -1173,8 +1172,8 @@ static inline int libusb_get_descriptor(libusb_device_handle *dev,
 	uint8_t desc_type, uint8_t desc_index, unsigned char *data, int length)
 {
 	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
-		LIBUSB_REQUEST_GET_DESCRIPTOR, (desc_type << 8) | desc_index, 0, data,
-		(uint16_t) length, 1000);
+		LIBUSB_REQUEST_GET_DESCRIPTOR, (desc_type << 8) | desc_index,
+		0, data, (uint16_t)length, 1000);
 }
 
 /** \ingroup desc
@@ -1195,7 +1194,8 @@ static inline int libusb_get_string_descriptor(libusb_device_handle *dev,
 	uint8_t desc_index, uint16_t langid, unsigned char *data, int length)
 {
 	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
-		LIBUSB_REQUEST_GET_DESCRIPTOR, (LIBUSB_DT_STRING << 8) | desc_index,
+		LIBUSB_REQUEST_GET_DESCRIPTOR,
+		(uint16_t)((LIBUSB_DT_STRING << 8) | desc_index),
 		langid, data, (uint16_t)length, 1000);
 }
 

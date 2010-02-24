@@ -92,6 +92,7 @@ static void *poll_thread_main(void *arg)
 
 	printf("poll thread shutting down\n");
 	pthread_exit(NULL);
+	return NULL;
 }
 
 static int find_dpfp_device(void)
@@ -443,7 +444,9 @@ static void sighandler(int signum)
 
 int main(void)
 {
+#ifndef __MINGW32__
 	struct sigaction sigact;
+#endif
 	int r = 1;
 
 	r = libusb_init(NULL);
@@ -474,13 +477,17 @@ int main(void)
 		goto out_deinit;
 
 	/* async from here onwards */
-
+#ifndef __MINGW32__
 	sigact.sa_handler = sighandler;
 	sigemptyset(&sigact.sa_mask);
 	sigact.sa_flags = 0;
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
 	sigaction(SIGQUIT, &sigact, NULL);
+#else
+	signal(SIGINT, sighandler);
+	signal(SIGTERM, sighandler);
+#endif
 
 	r = pthread_create(&poll_thread, NULL, poll_thread_main, NULL);
 	if (r)

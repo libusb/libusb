@@ -1,6 +1,8 @@
 /*
- * xusb: libusb-winusb specific test program, (c) 2009 Pete Batard
- * based on lsusb, copyright (C) 2007 Daniel Drake <dsd@gentoo.org>
+ * xusb: libusb-winusb specific test program
+ * Copyright (c) 2009-2010 Pete Batard <pbatard@gmail.com>
+ * Based on lsusb, copyright (c) 2007 Daniel Drake <dsd@gentoo.org>
+ * With contributions to Mass Storage test by Alan Stern.
  *
  * This test program tries to access an USB device through WinUSB. 
  * To access your device, modify this source and add your VID/PID.
@@ -20,13 +22,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifdef _MSC_VER
-#include <config_msvc.h>
-#else
 #include <config.h>
-#endif
 #include <stdio.h>
-#include <sys/types.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +32,6 @@
 #include <libusb/libusb.h>
 
 #ifdef OS_WINDOWS
-#include <windows.h>
 #define msleep(msecs) Sleep(msecs)
 #else
 #include <unistd.h>
@@ -497,6 +493,17 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		return -1;
 	}
 
+	printf("\nReading Feature Report...\n");
+	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
+		HID_GET_REPORT, (HID_REPORT_TYPE_FEATURE<<8)|0, 0, input_report, (uint16_t)size, 5000);
+	if (r >= 0) {
+		display_buffer_hex(input_report, size);
+	} else if (r == LIBUSB_ERROR_NOT_FOUND) {
+		printf("   No Feature Report available for this device\n");
+	} else {
+		printf("   Error: %s\n", libusb_strerror(r));
+	}
+
 	printf("\nReading Input Report...\n");
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, (uint16_t)size, 5000);
@@ -508,7 +515,7 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 			printf("   Timeout! Please make sure you act on the device within the 5 seconds allocated...\n");
 			break;
 		default:
-			printf("   Error: %d\n", r);
+			printf("   Error: %s\n", libusb_strerror(r));
 			break;
 		}
 	}
@@ -614,10 +621,10 @@ int test_device(uint16_t vid, uint16_t pid)
 	}
 #endif
 
+	printf("\nReading string descriptors:\n");
 	r = libusb_get_string_descriptor(handle, 0, 0, string, 128);
 	if (r > 0) {
 		nb_strings = string[0];
-		printf("\nReading string descriptors:\n");
 		for (i=1; i<nb_strings; i++) {
 			if (libusb_get_string_descriptor_ascii(handle, (uint8_t)i, string, 128) >= 0) {
 				printf("   String (%d/%d): \"%s\"\n", i, nb_strings-1, string);

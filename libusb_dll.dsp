@@ -43,7 +43,7 @@ RSC=rc.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "LIBUSB_DLL_EXPORTS" /YX /FD /c
-# ADD CPP /nologo /MD /W3 /GX /O2 /I "msvc" /I "libusb" /I "." /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /FR /FD /EHsc /c
+# ADD CPP /nologo /MD /W3 /GX /O2 /I "msvc" /I "libusb" /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /FR /FD /EHsc /c
 # ADD BASE MTL /nologo /D "NDEBUG" /mktyplib203 /win32
 # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
@@ -53,7 +53,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /dll /machine:I386
-# ADD LINK32 pthreadVC2.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "D:/Program Files/Microsoft SDK/Lib/setupapi.lib" /nologo /dll /machine:I386 /out:"Win32/Release/dll/libusb-1.0.dll"
+# ADD LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "D:/Program Files/Microsoft SDK/Lib/setupapi.lib" /nologo /dll /machine:I386 /out:"Win32/Release/dll/libusb-1.0.dll"
 
 !ELSEIF  "$(CFG)" == "libusb_dll - Win32 Debug"
 
@@ -69,7 +69,7 @@ LINK32=link.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /D "LIBUSB_DLL_EXPORTS" /YX /FD /GZ /c
-# ADD CPP /nologo /Gz /MDd /W3 /Gm /GX /ZI /Od /I "msvc" /I "libusb" /I "." /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /FR /FD /EHsc /c
+# ADD CPP /nologo /Gz /MDd /W3 /Gm /GX /ZI /Od /I "msvc" /I "libusb" /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /FR /FD /EHsc /c
 # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /win32
 # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
@@ -79,7 +79,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo /n
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /dll /debug /machine:I386 /pdbtype:sept
-# ADD LINK32 pthreadVC2d.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "D:/Program Files/Microsoft SDK/Lib/setupapi.lib" /nologo /dll /debug /machine:I386 /out:"Win32/Debug/dll/libusb-1.0_debug.dll"
+# ADD LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "D:/Program Files/Microsoft SDK/Lib/setupapi.lib" /nologo /dll /debug /machine:I386 /out:"Win32/Debug/dll/libusb-1.0_debug.dll"
 # SUBTRACT LINK32 /pdb:none /incremental:no
 
 !ENDIF 
@@ -127,6 +127,10 @@ SOURCE=.\libusb\sync.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\libusb\os\threads_windows.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\libusb\os\windows_compat.c
 # End Source File
 # Begin Source File
@@ -139,7 +143,7 @@ SOURCE=.\libusb\os\windows_usb.c
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
 # Begin Source File
 
-SOURCE=.\config_msvc.h
+SOURCE=.\msvc\config.h
 # End Source File
 # Begin Source File
 
@@ -160,6 +164,14 @@ SOURCE=.\libusb\os\linux_usbfs.h
 # Begin Source File
 
 SOURCE=.\msvc\resource.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\libusb\os\threads_posix.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\libusb\os\threads_windows.h
 # End Source File
 # Begin Source File
 
