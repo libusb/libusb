@@ -60,15 +60,13 @@
  * use the OVERLAPPED directly (which is what we do in the USB async I/O 
  * functions), the marker is not used at all.
  */
-#include <windows.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <io.h>
 
-#include "libusbi.h"
+#include <libusbi.h>
 
 // Uncomment to debug the polling layer
 //#define DEBUG_WINDOWS_COMPAT

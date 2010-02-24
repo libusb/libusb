@@ -46,7 +46,7 @@
 #include <inttypes.h>
 #include <objbase.h>  // for string to GUID conv. requires libole32.a
 
-#include "libusbi.h"
+#include <libusbi.h>
 #include "windows_compat.h"
 #include "windows_usb.h"
 
