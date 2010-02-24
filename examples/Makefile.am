@@ -1,5 +1,12 @@
 INCLUDES = -I$(top_srcdir)
-noinst_PROGRAMS = xusb lsusb dpfp dpfp_threaded
+
+if POSIX_THREADS
+DPFP_SRC = dpfp dpfp_threaded
+else
+DPFP_SRC = dpfp
+endif
+
+noinst_PROGRAMS = xusb lsusb $(DPFP_SRC)
 
 lsusb_SOURCES = lsusb.c
 lsusb_LDADD = ../libusb/libusb-1.0.la -lusb-1.0
