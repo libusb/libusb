@@ -24,7 +24,6 @@
 
 #include <config.h>
 #include <stdio.h>
-#include <sys/types.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,7 +32,6 @@
 #include <libusb/libusb.h>
 
 #ifdef OS_WINDOWS
-#include <windows.h>
 #define msleep(msecs) Sleep(msecs)
 #else
 #include <unistd.h>

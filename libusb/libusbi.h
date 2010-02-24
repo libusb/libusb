@@ -23,7 +23,6 @@
 
 #include <config.h>
 #include <stddef.h>
-#include <time.h>
 #if !defined(OS_WINDOWS) || defined(__CYGWIN__)
 #include <poll.h>
 #endif

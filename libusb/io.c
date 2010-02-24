@@ -21,13 +21,9 @@
 #include <config.h>
 #include <errno.h>
 #include <signal.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#if !defined(_MSC_VER)
-#include <sys/time.h>
-#endif
-#include <time.h>
+
 #ifndef OS_WINDOWS
 #include "os/unistd_posix.h"
 #endif
@@ -36,7 +32,7 @@
 #include <sys/timerfd.h>
 #endif
 
-#include "libusbi.h"
+#include <libusbi.h>
 
 /**
  * \page io Synchronous and asynchronous device I/O

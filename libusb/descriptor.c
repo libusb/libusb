@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "libusbi.h"
+#include <libusbi.h>
 
 #define DESC_HEADER_LENGTH		2
 #define DEVICE_DESC_LENGTH		18

@@ -24,13 +24,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #ifndef OS_WINDOWS
 #include "os/unistd_posix.h"
 #endif
 
-#include "libusb.h"
-#include "libusbi.h"
+#include <libusbi.h>
 
 #if defined(OS_LINUX)
 const struct usbi_os_backend * const usbi_backend = &linux_usbfs_backend;
