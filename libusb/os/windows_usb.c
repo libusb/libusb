@@ -35,11 +35,7 @@
 //   ***USE AT YOUR OWN RISKS***
 //#define FORCE_INSTANT_TIMEOUTS
 
-#if defined(_MSC_VER)
-#include <config_msvc.h>
-#else
 #include <config.h>
-#endif
 #include <windows.h>
 #include <setupapi.h>
 #include <ctype.h>
@@ -1876,7 +1872,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 	struct usbi_transfer *transfer;
 	DWORD io_size, io_result;
 
-	pthread_mutex_lock(&ctx->open_devs_lock);
+	usbi_mutex_lock(&ctx->open_devs_lock);
 	for (i = 0; i < nfds && num_ready > 0; i++) {
 
 		usbi_dbg("checking fd %d with revents = %04x", fds[i].fd, fds[i].revents);
@@ -1918,7 +1914,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 		}
 	}
 
-	pthread_mutex_unlock(&ctx->open_devs_lock);
+	usbi_mutex_unlock(&ctx->open_devs_lock);
 	return LIBUSB_SUCCESS;
 }
 

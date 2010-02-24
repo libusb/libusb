@@ -18,11 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifdef _MSC_VER
-#include <config_msvc.h>
-#else
 #include <config.h>
-#endif
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -53,7 +49,7 @@ const struct usbi_os_backend * const usbi_backend = &windows_backend;
 #endif
 
 struct libusb_context *usbi_default_context = NULL;
-static pthread_mutex_t default_context_lock = PTHREAD_MUTEX_INITIALIZER;
+usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 
 /**
  * \mainpage libusb-1.0 API Reference
@@ -518,7 +514,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	if (!dev)
 		return NULL;
 
-	r = pthread_mutex_init(&dev->lock, NULL);
+	r = usbi_mutex_init(&dev->lock, NULL);
 	if (r) {
 		free(dev);
 		return NULL;
@@ -529,9 +525,9 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	dev->session_data = session_id;
 	memset(&dev->os_priv, 0, priv_size);
 
-	pthread_mutex_lock(&ctx->usb_devs_lock);
+	usbi_mutex_lock(&ctx->usb_devs_lock);
 	list_add(&dev->list, &ctx->usb_devs);
-	pthread_mutex_unlock(&ctx->usb_devs_lock);
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
 	return dev;
 }
 
@@ -571,13 +567,13 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	struct libusb_device *dev;
 	struct libusb_device *ret = NULL;
 
-	pthread_mutex_lock(&ctx->usb_devs_lock);
+	usbi_mutex_lock(&ctx->usb_devs_lock);
 	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device)
 		if (dev->session_data == session_id) {
 			ret = dev;
 			break;
 		}
-	pthread_mutex_unlock(&ctx->usb_devs_lock);
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
 
 	return ret;
 }
@@ -812,9 +808,9 @@ API_EXPORTED int libusb_get_max_iso_packet_size(libusb_device *dev,
  */
 API_EXPORTED libusb_device *libusb_ref_device(libusb_device *dev)
 {
-	pthread_mutex_lock(&dev->lock);
+	usbi_mutex_lock(&dev->lock);
 	dev->refcnt++;
-	pthread_mutex_unlock(&dev->lock);
+	usbi_mutex_unlock(&dev->lock);
 	return dev;
 }
 
@@ -830,9 +826,9 @@ API_EXPORTED void libusb_unref_device(libusb_device *dev)
 	if (!dev)
 		return;
 
-	pthread_mutex_lock(&dev->lock);
+	usbi_mutex_lock(&dev->lock);
 	refcnt = --dev->refcnt;
-	pthread_mutex_unlock(&dev->lock);
+	usbi_mutex_unlock(&dev->lock);
 
 	if (refcnt == 0) {
 		usbi_dbg("destroy device %d.%d", dev->bus_number, dev->device_address);
@@ -840,9 +836,9 @@ API_EXPORTED void libusb_unref_device(libusb_device *dev)
 		if (usbi_backend->destroy_device)
 			usbi_backend->destroy_device(dev);
 
-		pthread_mutex_lock(&dev->ctx->usb_devs_lock);
+		usbi_mutex_lock(&dev->ctx->usb_devs_lock);
 		list_del(&dev->list);
-		pthread_mutex_unlock(&dev->ctx->usb_devs_lock);
+		usbi_mutex_unlock(&dev->ctx->usb_devs_lock);
 
 		free(dev);
 	}
@@ -880,7 +876,7 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	if (!_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
-	r = pthread_mutex_init(&_handle->lock, NULL);
+	r = usbi_mutex_init(&_handle->lock, NULL);
 	if (r) {
 		free(_handle);
 		return LIBUSB_ERROR_OTHER;
@@ -893,14 +889,14 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	r = usbi_backend->open(_handle);
 	if (r < 0) {
 		libusb_unref_device(dev);
-		pthread_mutex_destroy(&_handle->lock);
+		usbi_mutex_destroy(&_handle->lock);
 		free(_handle);
 		return (int)r;
 	}
 
-	pthread_mutex_lock(&ctx->open_devs_lock);
+	usbi_mutex_lock(&ctx->open_devs_lock);
 	list_add(&_handle->list, &ctx->open_devs);
-	pthread_mutex_unlock(&ctx->open_devs_lock);
+	usbi_mutex_unlock(&ctx->open_devs_lock);
 	*handle = _handle;
 
 
@@ -912,17 +908,17 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	 * so that it picks up the new fd, and then continues. */
 
 	/* record that we are messing with poll fds */
-	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	usbi_mutex_lock(&ctx->pollfd_modify_lock);
 	ctx->pollfd_modify++;
-	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
 
 	/* write some data on control pipe to interrupt event handlers */
 	r = _libusb_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
 	if (r <= 0) {
 		usbi_warn(ctx, "internal signalling write failed");
-		pthread_mutex_lock(&ctx->pollfd_modify_lock);
+		usbi_mutex_lock(&ctx->pollfd_modify_lock);
 		ctx->pollfd_modify--;
-		pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+		usbi_mutex_unlock(&ctx->pollfd_modify_lock);
 		return 0;
 	}
 
@@ -935,9 +931,9 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 		usbi_warn(ctx, "internal signalling read failed");
 
 	/* we're done with modifying poll fds */
-	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	usbi_mutex_lock(&ctx->pollfd_modify_lock);
 	ctx->pollfd_modify--;
-	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
 
 	/* Release event handling lock and wake up event waiters */
 	libusb_unlock_events(ctx);
@@ -999,13 +995,13 @@ out:
 static void do_close(struct libusb_context *ctx,
 	struct libusb_device_handle *dev_handle)
 {
-	pthread_mutex_lock(&ctx->open_devs_lock);
+	usbi_mutex_lock(&ctx->open_devs_lock);
 	list_del(&dev_handle->list);
-	pthread_mutex_unlock(&ctx->open_devs_lock);
+	usbi_mutex_unlock(&ctx->open_devs_lock);
 
 	usbi_backend->close(dev_handle);
 	libusb_unref_device(dev_handle->dev);
-	pthread_mutex_destroy(&dev_handle->lock);
+	usbi_mutex_destroy(&dev_handle->lock);
 	free(dev_handle);
 }
 
@@ -1039,18 +1035,18 @@ API_EXPORTED void libusb_close(libusb_device_handle *dev_handle)
 	 * descriptor from the polling loop. */
 
 	/* record that we are messing with poll fds */
-	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	usbi_mutex_lock(&ctx->pollfd_modify_lock);
 	ctx->pollfd_modify++;
-	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
 
 	/* write some data on control pipe to interrupt event handlers */
 	r = _libusb_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
 	if (r <= 0) {
 		usbi_warn(ctx, "internal signalling write failed, closing anyway");
 		do_close(ctx, dev_handle);
-		pthread_mutex_lock(&ctx->pollfd_modify_lock);
+		usbi_mutex_lock(&ctx->pollfd_modify_lock);
 		ctx->pollfd_modify--;
-		pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+		usbi_mutex_unlock(&ctx->pollfd_modify_lock);
 		return;
 	}
 
@@ -1066,9 +1062,9 @@ API_EXPORTED void libusb_close(libusb_device_handle *dev_handle)
 	do_close(ctx, dev_handle);
 
 	/* we're done with modifying poll fds */
-	pthread_mutex_lock(&ctx->pollfd_modify_lock);
+	usbi_mutex_lock(&ctx->pollfd_modify_lock);
 	ctx->pollfd_modify--;
-	pthread_mutex_unlock(&ctx->pollfd_modify_lock);
+	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
 
 	/* Release event handling lock and wake up event waiters */
 	libusb_unlock_events(ctx);
@@ -1215,7 +1211,7 @@ API_EXPORTED int libusb_claim_interface(libusb_device_handle *dev,
 	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	pthread_mutex_lock(&dev->lock);
+	usbi_mutex_lock(&dev->lock);
 	if (dev->claimed_interfaces & (1 << interface_number))
 		goto out;
 
@@ -1224,7 +1220,7 @@ API_EXPORTED int libusb_claim_interface(libusb_device_handle *dev,
 		dev->claimed_interfaces |= 1 << interface_number;
 
 out:
-	pthread_mutex_unlock(&dev->lock);
+	usbi_mutex_unlock(&dev->lock);
 	return r;
 }
 
@@ -1252,7 +1248,7 @@ API_EXPORTED int libusb_release_interface(libusb_device_handle *dev,
 	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	pthread_mutex_lock(&dev->lock);
+	usbi_mutex_lock(&dev->lock);
 	if (!(dev->claimed_interfaces & (1 << interface_number))) {
 		r = LIBUSB_ERROR_NOT_FOUND;
 		goto out;
@@ -1263,7 +1259,7 @@ API_EXPORTED int libusb_release_interface(libusb_device_handle *dev,
 		dev->claimed_interfaces &= ~(1 << interface_number);
 
 out:
-	pthread_mutex_unlock(&dev->lock);
+	usbi_mutex_unlock(&dev->lock);
 	return r;
 }
 
@@ -1296,12 +1292,12 @@ API_EXPORTED int libusb_set_interface_alt_setting(libusb_device_handle *dev,
 	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	pthread_mutex_lock(&dev->lock);
+	usbi_mutex_lock(&dev->lock);
 	if (!(dev->claimed_interfaces & (1 << interface_number))) {
-		pthread_mutex_unlock(&dev->lock);
+		usbi_mutex_unlock(&dev->lock);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
-	pthread_mutex_unlock(&dev->lock);
+	usbi_mutex_unlock(&dev->lock);
 
 	return usbi_backend->set_interface_altsetting(dev, interface_number,
 		alternate_setting);
@@ -1472,12 +1468,23 @@ API_EXPORTED void libusb_set_debug(libusb_context *ctx, int level)
 API_EXPORTED int libusb_init(libusb_context **context)
 {
 	char *dbg = getenv("LIBUSB_DEBUG");
-	struct libusb_context *ctx = malloc(sizeof(*ctx));
+	struct libusb_context *ctx;
 	int r;
 
-	if (!ctx)
+	usbi_mutex_static_lock(&default_context_lock);
+	if (!context && usbi_default_context) {
+		usbi_mutex_static_unlock(&default_context_lock);
+		return 0; /* using default; nothing to do. */
+	}
+	ctx = malloc(sizeof(*ctx));
+	if (!ctx) {
+		usbi_mutex_static_unlock(&default_context_lock);
 		return LIBUSB_ERROR_NO_MEM;
+	}
 	memset(ctx, 0, sizeof(*ctx));
+#ifdef USBI_TIMERFD_AVAILABLE
+	ctx->timerfd = -1;
+#endif
 
 	if (dbg) {
 		ctx->debug = atoi(dbg);
@@ -1487,16 +1494,16 @@ API_EXPORTED int libusb_init(libusb_context **context)
 
 	usbi_dbg("");
 
+	usbi_mutex_init(&ctx->usb_devs_lock, NULL);
+	usbi_mutex_init(&ctx->open_devs_lock, NULL);
+	list_init(&ctx->usb_devs);
+	list_init(&ctx->open_devs);
+
 	if (usbi_backend->init) {
 		r = usbi_backend->init(ctx);
 		if (r)
 			goto err;
 	}
-
-	pthread_mutex_init(&ctx->usb_devs_lock, NULL);
-	pthread_mutex_init(&ctx->open_devs_lock, NULL);
-	list_init(&ctx->usb_devs);
-	list_init(&ctx->open_devs);
 
 	r = usbi_io_init(ctx);
 	if (r < 0) {
@@ -1505,24 +1512,20 @@ API_EXPORTED int libusb_init(libusb_context **context)
 		goto err;
 	}
 
-	pthread_mutex_lock(&default_context_lock);
 	if (!usbi_default_context) {
 		usbi_dbg("created default context");
 		usbi_default_context = ctx;
-	} else if (!context) {
-		pthread_mutex_unlock(&default_context_lock);
-		libusb_exit(ctx); /* free superfluous context; use default context */
-		return 0;
 	}
-	pthread_mutex_unlock(&default_context_lock);
+	usbi_mutex_static_unlock(&default_context_lock);
 
 	if (context)
 		*context = ctx;
 	return 0;
 
 err:
-	pthread_mutex_destroy(&ctx->open_devs_lock);
-	pthread_mutex_destroy(&ctx->usb_devs_lock);
+	usbi_mutex_static_unlock(&default_context_lock);
+	usbi_mutex_destroy(&ctx->open_devs_lock);
+	usbi_mutex_destroy(&ctx->usb_devs_lock);
 	free(ctx);
 	return r;
 }
@@ -1546,15 +1549,15 @@ API_EXPORTED void libusb_exit(struct libusb_context *ctx)
 	if (usbi_backend->exit)
 		usbi_backend->exit();
 
-	pthread_mutex_lock(&default_context_lock);
+	usbi_mutex_static_lock(&default_context_lock);
 	if (ctx == usbi_default_context) {
 		usbi_dbg("freeing default context");
 		usbi_default_context = NULL;
 	}
-	pthread_mutex_unlock(&default_context_lock);
+	usbi_mutex_static_unlock(&default_context_lock);
 
-	pthread_mutex_destroy(&ctx->open_devs_lock);
-	pthread_mutex_destroy(&ctx->usb_devs_lock);
+	usbi_mutex_destroy(&ctx->open_devs_lock);
+	usbi_mutex_destroy(&ctx->usb_devs_lock);
 	free(ctx);
 }
 
@@ -1617,8 +1620,8 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
  * Returns a constant string with an English short description of the given
  * error code. The caller should never free() the returned pointer since it
  * points to a constant string.
- * The returned string is encoded in ASCII form and always starts with a capital 
- * letter and ends without any dot.
+ * The returned string is encoded in ASCII form and always starts with a
+ * capital letter and ends without any dot.
  * \param errcode the error code whose description is desired
  * \returns a short description of the error code in English
  */

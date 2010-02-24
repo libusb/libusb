@@ -22,11 +22,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifdef _MSC_VER
-#include <config_msvc.h>
-#else
 #include <config.h>
-#endif
 #include <stdio.h>
 #include <sys/types.h>
 #include <inttypes.h>

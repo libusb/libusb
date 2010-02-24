@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
+				AdditionalIncludeDirectories=".\msvc;.\libusb"
 				PreprocessorDefinitions="_WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -62,9 +62,8 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2.lib"
+				AdditionalDependencies="setupapi.lib"
 				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
-				AdditionalLibraryDirectories=".\msvc"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
 				GenerateDebugInformation="true"
@@ -117,7 +116,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
+				AdditionalIncludeDirectories=".\msvc;.\libusb"
 				PreprocessorDefinitions="_WIN32;_WIN64;_DEBUG;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -136,9 +135,8 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib"
+				AdditionalDependencies="setupapi.lib"
 				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
-				AdditionalLibraryDirectories=".\msvc"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
 				GenerateDebugInformation="true"
@@ -192,7 +190,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
+				AdditionalIncludeDirectories=".\msvc;.\libusb"
 				PreprocessorDefinitions="_WIN32;_LIB;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -210,9 +208,8 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2.lib"
+				AdditionalDependencies="setupapi.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
-				AdditionalLibraryDirectories=".\msvc"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
 			/>
@@ -266,7 +263,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories=".\msvc;.\libusb;.\"
+				AdditionalIncludeDirectories=".\msvc;.\libusb"
 				PreprocessorDefinitions="_WIN32;_WIN64;_LIB;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -284,9 +281,8 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib"
+				AdditionalDependencies="setupapi.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
-				AdditionalLibraryDirectories=".\msvc"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
 			/>
@@ -338,6 +334,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\libusb\os\threads_windows.c"
+				>
+			</File>
+			<File
 				RelativePath=".\libusb\os\windows_compat.c"
 				>
 			</File>
@@ -361,6 +361,10 @@
 			</File>
 			<File
 				RelativePath=".\libusb\libusbi.h"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\os\threads_windows.h"
 				>
 			</File>
 			<File

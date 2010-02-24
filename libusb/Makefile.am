@@ -1,8 +1,14 @@
 lib_LTLIBRARIES = libusb-1.0.la
 
-LINUX_USBFS_SRC = os/linux_usbfs.h os/linux_usbfs.c
-DARWIN_USB_SRC = os/darwin_usb.h os/darwin_usb.c
-WINDOWS_USB_SRC = os/windows_usb.h os/windows_usb.c os/windows_compat.h os/windows_compat.c
+if POSIX_THREADS
+THREADS_SRC = os/threads_posix.h
+else
+THREADS_SRC = os/threads_windows.h os/threads_windows.c
+endif
+
+LINUX_USBFS_SRC = $(THREADS_SRC) os/linux_usbfs.h os/linux_usbfs.c
+DARWIN_USB_SRC = $(THREADS_SRC) os/darwin_usb.h os/darwin_usb.c
+WINDOWS_USB_SRC = $(THREADS_SRC) os/windows_usb.h os/windows_usb.c os/windows_compat.h os/windows_compat.c
 
 EXTRA_DIST = $(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) $(WINDOWS_USB_SRC)
 

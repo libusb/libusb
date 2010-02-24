@@ -68,7 +68,7 @@
 #include <stdint.h>
 #include <io.h>
 
-#include "windows_compat.h"
+#include "libusbi.h"
 
 // Uncomment to debug the polling layer
 //#define DEBUG_WINDOWS_COMPAT
@@ -88,7 +88,7 @@
 #pragma warning(disable:28719)
 #endif
 
-#if defined(__CYGWIN__ )
+#if defined(__CYGWIN__)
 // cygwin produces a warning unless these prototypes are defined
 extern int _close(int fd);
 extern int _snprintf(char *buffer, size_t count, const char *format, ...);

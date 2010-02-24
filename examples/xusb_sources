@@ -11,26 +11,13 @@ MSC_WARNING_LEVEL=/W3
 
 
 
-!IF "$(_BUILDARCH)"=="AMD64"
-
-PTHREAD_LIB=pthreadVC2_x64.lib
-
-!ELSE
-
-PTHREAD_LIB=pthreadVC2.lib
-
-!ENDIF
-
-
-
 USE_MSVCRT=1
 
 UMTYPE=console
 
 INCLUDES=..\..\msvc;..\..;$(DDK_INC_PATH)
 
-UMLIBS=..\..\msvc\$(PTHREAD_LIB) \
-	..\..\libusb\os\obj$(BUILD_ALT_DIR)\*\libusb-1.0.lib
+UMLIBS=..\..\libusb\os\obj$(BUILD_ALT_DIR)\*\libusb-1.0.lib
 
 SOURCES=..\xusb.c
 
