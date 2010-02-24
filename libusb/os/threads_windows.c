@@ -23,7 +23,7 @@
 #include <errno.h>
 #include <stdarg.h>
 
-#include <libusbi.h>
+#include "libusbi.h"
 
 
 int usbi_mutex_init(usbi_mutex_t *mutex,

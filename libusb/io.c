@@ -32,7 +32,7 @@
 #include <sys/timerfd.h>
 #endif
 
-#include <libusbi.h>
+#include "libusbi.h"
 
 /**
  * \page io Synchronous and asynchronous device I/O

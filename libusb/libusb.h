@@ -22,14 +22,14 @@
 #define __LIBUSB_H__
 
 #include <stdint.h>
-#include <limits.h>
-#include <time.h>
 #ifdef _MSC_VER
 #define inline __inline
 #else
 #include <sys/time.h>
 #endif
 #include <sys/types.h>
+#include <limits.h>
+#include <time.h>
 
 /* 'interface' might be defined as a macro on Windows, so we need to
  * undefine it so as not to break the current libusb API, because 
