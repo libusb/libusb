@@ -60,7 +60,7 @@ main(void)
 		}
 	}
 
-//	return 0;
+	return 0;
 
 	r = libusb_init(NULL);
 	if (r < 0)

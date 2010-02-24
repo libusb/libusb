@@ -79,6 +79,19 @@ const char inf[] = "DeviceClassGUID = \"{78a1c341-4539-11d3-b88d-00c04fad5171}\"
 	"WinUSBCoInstaller2.dll=2\n" \
 	"WdfCoInstaller01009.dll=2\n";
 
+
+struct res {
+	char* id;
+	char* subdir;
+	char* name;
+};
+
+const struct res resource[] = { {"AMD64_DLL1" , "amd64", "WdfCoInstaller01009.dll"},
+								{"AMD64_DLL2" , "amd64", "winusbcoinstaller2.dll"},
+								{"X86_DLL1", "x86", "WdfCoInstaller01009.dll"},
+								{"X86_DLL2", "x86", "winusbcoinstaller2.dll"} };
+const int nb_resources = sizeof(resource)/sizeof(resource[0]);
+
 char* guid_to_string(const GUID guid)
 {
 	static char guid_string[MAX_GUID_STRING_LENGTH];
@@ -157,11 +170,12 @@ struct driver_info* list_driverless(void)
 			continue;
 		}
 */
+		// TODO: can't always get a device desc => provide one
 		if ( (!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_DEVICEDESC, 
 			&reg_type, (BYTE*)desc, MAX_KEY_LENGTH, &size)) ) {
 			usbi_warn(NULL, "could not read device description for %d: %s", 
 				i, windows_error_str(0));
-			continue;
+//			continue;
 		}
 
 		r = CM_Get_Device_ID(dev_info_data.DevInst, path, MAX_PATH_LENGTH, 0);
@@ -217,6 +231,66 @@ struct driver_info* list_driverless(void)
 	return ret;
 }
 
+// TODO: dynamic res addon
+int extract_dlls(char* path)
+{
+	HANDLE h;
+	HGLOBAL h_load;
+	void *data;
+	DWORD size;
+	char filename[MAX_PATH_LENGTH];
+	FILE* fd;
+	int i;
+
+	for (i=0; i< nb_resources; i++) {
+		h = FindResource(NULL, resource[i].id, "DLL");
+		if (h == NULL) {
+			usbi_dbg("could not find resource %s", resource[i].id);
+			return -1;
+		}
+		h_load = LoadResource(NULL, h);
+		if (h_load == NULL) {
+			usbi_dbg("could not load resource %s", resource[i].id);
+			return -1;
+		}
+		data = LockResource(h_load);
+		if (data == NULL) {
+			usbi_dbg("could not access data for %s", resource[i].id);
+			return -1;
+		}
+		size = SizeofResource(NULL, h);
+		if (size == 0) {
+			usbi_dbg("could not access size of %s", resource[i].id);
+			return -1;
+		}
+
+		safe_strcpy(filename, MAX_PATH_LENGTH, path);
+		safe_strcat(filename, MAX_PATH_LENGTH, "\\");
+		safe_strcat(filename, MAX_PATH_LENGTH, resource[i].subdir);
+
+		if ( (_access(filename, 02) != 0) && (CreateDirectory(filename, 0) == 0) ) {
+			usbi_err(NULL, "could not access directory: %s", filename);
+			return -1;
+		}
+		safe_strcat(filename, MAX_PATH_LENGTH, "\\");
+		safe_strcat(filename, MAX_PATH_LENGTH, resource[i].name);
+		
+	
+		fd = fopen(filename, "wb");
+		if (fd == NULL) {
+			usbi_err(NULL, "failed to create file: %s", filename);
+			return -1;
+		}
+
+		fwrite(data, size, 1, fd);
+		fclose(fd);
+	}
+
+	usbi_dbg("so far, so good");
+	return 0;
+
+}
+
 // Create an inf and extract coinstallers in the directory pointed by path
 int create_inf(struct driver_info* drv_info, char* path)
 {
@@ -233,6 +307,8 @@ int create_inf(struct driver_info* drv_info, char* path)
 		usbi_err(NULL, "could not access directory: %s", path);
 		return -1;
 	}
+
+	extract_dlls(path);
 
 	safe_strcpy(filename, MAX_PATH_LENGTH, path);
 	safe_strcat(filename, MAX_PATH_LENGTH, "\\libusb_device.inf");
@@ -263,6 +339,8 @@ int create_inf(struct driver_info* drv_info, char* path)
 int install_device(char* path)
 {
 	DWORD r;
+	BOOL reboot_needed;
+//	INSTALLERINFO installer_info;
 
 	r = DriverPackagePreinstall(path, DRIVER_PACKAGE_LEGACY_MODE|DRIVER_PACKAGE_REPAIR);
 	// Will fail if inf not signed, unless DRIVER_PACKAGE_LEGACY_MODE is specified.
@@ -274,7 +352,39 @@ int install_device(char* path)
 	// r = 0xE0000247 if user decided not to install on warnings
 	// r = 0x800B0100 ERROR_WRONG_INF_STYLE => missing cat entry in inf
 	// r = 0xB7 => missing DRIVER_PACKAGE_REPAIR flag
+	switch(r) {
+	case ERROR_INVALID_PARAMETER:
+		usbi_err(NULL, "invalid path");
+		return -1;
+	case ERROR_FILE_NOT_FOUND:
+		usbi_err(NULL, "unable to find inf file on %s", path);
+		return -1;
+	case ERROR_ACCESS_DENIED:
+		usbi_err(NULL, "this process needs to be run with administrative privileges");
+		return -1;
+	case ERROR_WRONG_INF_STYLE:
+	case ERROR_GENERAL_SYNTAX:
+		usbi_err(NULL, "the syntax of the inf is invalid");
+		return -1;
+	case ERROR_INVALID_CATALOG_DATA:
+		usbi_err(NULL, "unable to locate cat file");
+		return -1;
+	case ERROR_DRIVER_STORE_ADD_FAILED:
+		usbi_err(NULL, "cancelled by user");
+		return -1;
+	// TODO: make DRIVER_PACKAGE_REPAIR optional
+	case ERROR_ALREADY_EXISTS:
+		usbi_err(NULL, "driver already exists");
+		return -1;
+	default:
+		usbi_err(NULL, "unhandled error %X", r);
+		return -1;
+	}
 
+	// TODO: use 
+	r = DriverPackageInstall(path, DRIVER_PACKAGE_LEGACY_MODE|DRIVER_PACKAGE_REPAIR,
+		NULL, &reboot_needed);
 	usbi_dbg("ret = %X", r);
+
 	return 0;
 }

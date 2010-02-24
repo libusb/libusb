@@ -65,9 +65,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2.lib"
+				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib difxapi.lib driver_resources.res"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="..\msvc"
+				AdditionalLibraryDirectories="..\msvc;$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
@@ -142,9 +142,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib"
+				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib difxapi.lib driver_resources.res"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="..\msvc"
+				AdditionalLibraryDirectories="..\msvc;$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
@@ -219,9 +219,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2.lib difxapi.lib"
+				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib difxapi.lib driver_resources.res"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="..\msvc"
+				AdditionalLibraryDirectories="..\msvc;$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
@@ -299,9 +299,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib difxapi.lib"
+				AdditionalDependencies="setupapi.lib pthreadVC2_x64.lib difxapi.lib driver_resources.res"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="..\msvc"
+				AdditionalLibraryDirectories="..\msvc;$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
