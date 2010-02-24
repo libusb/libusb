@@ -3,10 +3,10 @@
 
 #include <unistd.h>
 #include <poll.h>
-#define _libusb_write write
-#define _libusb_read read
-#define _libusb_close close
-#define _libusb_pipe pipe
-#define _libusb_poll poll
+#define usbi_write write
+#define usbi_read read
+#define usbi_close close
+#define usbi_pipe pipe
+#define usbi_poll poll
 
 #endif /* __LIBUSB_UNISTD_POSIX_H__ */

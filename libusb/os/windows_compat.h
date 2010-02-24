@@ -76,16 +76,16 @@ struct winfd {
 };
 extern const struct winfd INVALID_WINFD;
 
-int _libusb_pipe(int pipefd[2]);
-int _libusb_poll(struct pollfd *fds, unsigned int nfds, int timeout);
-ssize_t _libusb_write(int fd, const void *buf, size_t count);
-ssize_t _libusb_read(int fd, void *buf, size_t count);
-int _libusb_close(int fd);
+int usbi_pipe(int pipefd[2]);
+int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout);
+ssize_t usbi_write(int fd, const void *buf, size_t count);
+ssize_t usbi_read(int fd, void *buf, size_t count);
+int usbi_close(int fd);
 
 void init_polling(void);
 void exit_polling(void);
-struct winfd _libusb_create_fd(HANDLE handle, int access_mode);
-void _libusb_free_fd(int fd);
+struct winfd usbi_create_fd(HANDLE handle, int access_mode);
+void usbi_free_fd(int fd);
 struct winfd fd_to_winfd(int fd);
 struct winfd handle_to_winfd(HANDLE handle);
 struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);

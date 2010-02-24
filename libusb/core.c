@@ -907,7 +907,7 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
 
 	/* write some data on control pipe to interrupt event handlers */
-	r = _libusb_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
+	r = usbi_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
 	if (r <= 0) {
 		usbi_warn(ctx, "internal signalling write failed");
 		usbi_mutex_lock(&ctx->pollfd_modify_lock);
@@ -920,7 +920,7 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	libusb_lock_events(ctx);
 
 	/* read the dummy data */
-	r = _libusb_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+	r = usbi_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
 	if (r <= 0)
 		usbi_warn(ctx, "internal signalling read failed");
 
@@ -1034,7 +1034,7 @@ API_EXPORTED void libusb_close(libusb_device_handle *dev_handle)
 	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
 
 	/* write some data on control pipe to interrupt event handlers */
-	r = _libusb_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
+	r = usbi_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
 	if (r <= 0) {
 		usbi_warn(ctx, "internal signalling write failed, closing anyway");
 		do_close(ctx, dev_handle);
@@ -1048,7 +1048,7 @@ API_EXPORTED void libusb_close(libusb_device_handle *dev_handle)
 	libusb_lock_events(ctx);
 
 	/* read the dummy data */
-	r = _libusb_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+	r = usbi_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
 	if (r <= 0)
 		usbi_warn(ctx, "internal signalling read failed, closing anyway");
 

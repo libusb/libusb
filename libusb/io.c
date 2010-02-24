@@ -1010,7 +1010,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	list_init(&ctx->pollfds);
 
 	/* FIXME should use an eventfd on kernels that support it */
-	p = _libusb_pipe(ctx->ctrl_pipe);
+	p = usbi_pipe(ctx->ctrl_pipe);
 	if (p < 0) {
 		r = LIBUSB_ERROR_OTHER;
 		goto err;
@@ -1039,12 +1039,12 @@ int usbi_io_init(struct libusb_context *ctx)
 err:
 #ifdef USBI_TIMERFD_AVAILABLE
 	if (ctx->timerfd != -1)
-		_libusb_close(ctx->timerfd);
+		usbi_close(ctx->timerfd);
 #endif
 	if (0 == p) {
 		usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
-		_libusb_close(ctx->ctrl_pipe[0]);
-		_libusb_close(ctx->ctrl_pipe[1]);
+		usbi_close(ctx->ctrl_pipe[0]);
+		usbi_close(ctx->ctrl_pipe[1]);
 	}
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
 	usbi_mutex_destroy(&ctx->pollfds_lock);
@@ -1058,12 +1058,12 @@ err:
 void usbi_io_exit(struct libusb_context *ctx)
 {
 	usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
-	_libusb_close(ctx->ctrl_pipe[0]);
-	_libusb_close(ctx->ctrl_pipe[1]);
+	usbi_close(ctx->ctrl_pipe[0]);
+	usbi_close(ctx->ctrl_pipe[1]);
 #ifdef USBI_TIMERFD_AVAILABLE
 	if (usbi_using_timerfd(ctx)) {
 		usbi_remove_pollfd(ctx, ctx->timerfd);
-		_libusb_close(ctx->timerfd);
+		usbi_close(ctx->timerfd);
 	}
 #endif
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
@@ -1829,7 +1829,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		timeout_ms++;
 
 	usbi_dbg("poll() %d fds with timeout in %dms", nfds, timeout_ms);
-	r = _libusb_poll(fds, nfds, timeout_ms);
+	r = usbi_poll(fds, nfds, timeout_ms);
 	usbi_dbg("poll() returned %d", r);
 	if (r == 0) {
 		free(fds);
