@@ -3174,9 +3174,11 @@ static int _hid_get_feature(struct hid_device_priv* dev, HANDLE hid_handle, int 
 		switch (err) {
 		case ERROR_INVALID_FUNCTION:
 			r = LIBUSB_ERROR_NOT_FOUND;
+			break;
 		default: 
-			usbi_dbg("error %s", windows_error_str(r));
+			usbi_dbg("error %s", windows_error_str(err));
 			r = LIBUSB_ERROR_OTHER;
+			break;
 		}
 	}
 	safe_free(buf);
