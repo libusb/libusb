@@ -721,12 +721,13 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		object_index = ret-WAIT_OBJECT_0;
 		if ((object_index >= 0) && ((DWORD)object_index < nb_handles_to_wait_on)) {
 #if defined(DYNAMIC_FDS)
-			if ((DWORD)object_index == nb_handles_to_wait_on)
-			// Detected fd update while we were waiting
-			// => flag a poll interruption
-			errno = EINTR;
-			triggered = -1;
-			goto poll_exit;
+			if ((DWORD)object_index == nb_handles_to_wait_on) {
+				// Detected fd update while we were waiting
+				// => flag a poll interruption
+				errno = EINTR;
+				triggered = -1;
+				goto poll_exit;
+			}
 #endif
 			printb("  completed after wait\n");
 			i = handle_to_index[object_index];
