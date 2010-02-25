@@ -68,6 +68,9 @@
 
 #include <libusbi.h>
 
+// Uncomment to have poll return with EINTR as soon as a new transfer (fd) is added (EXPERIMENTAL)
+//#define DYNAMIC_FDS
+
 // Uncomment to debug the polling layer
 //#define DEBUG_WINDOWS_COMPAT
 #if defined(DEBUG_WINDOWS_COMPAT)
@@ -128,6 +131,9 @@ struct {
 
 // globals
 BOOLEAN is_polling_set = FALSE;
+#if defined(DYNAMIC_FDS)
+HANDLE fd_update = INVALID_HANDLE_VALUE;
+#endif
 LONG pipe_number = 0;
 static volatile LONG compat_spinlock = 0;
 
@@ -165,6 +171,14 @@ void init_polling(void)
 			_poll_fd[i].marker = 0;
 			InitializeCriticalSection(&_poll_fd[i].mutex);
 		}
+#if defined(DYNAMIC_FDS)
+		// We need to create an update event so that poll is warned when there
+		// are new/deleted fds during a timeout wait operation
+		fd_update = CreateEvent(NULL, TRUE, FALSE, NULL);
+		if (fd_update == NULL) {
+			fprintf(stderr, "init_polling: unable to create update event");
+		}
+#endif
 		is_polling_set = TRUE;
 	}
 	compat_spinlock = 0;
@@ -255,6 +269,10 @@ void exit_polling(void)
 			}
 			free_overlapped(poll_fd[i].overlapped);
 			poll_fd[i] = INVALID_WINFD;
+#if defined(DYNAMIC_FDS)
+			CloseHandle(fd_update);
+			fd_update = INVALID_HANDLE_VALUE;
+#endif
 			LeaveCriticalSection(&_poll_fd[i].mutex);
 			DeleteCriticalSection(&_poll_fd[i].mutex);
 		}
@@ -372,6 +390,10 @@ int usbi_pipe(int filedes[2])
 				_init_read_marker(i);
 			}
 			LeaveCriticalSection(&_poll_fd[i].mutex);
+#if defined(DYNAMIC_FDS)
+			// Notify poll that fds have been updated
+			SetEvent(fd_update);
+#endif
 			if (j>=2) {
 				return 0;
 			}
@@ -454,6 +476,10 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 			wfd.overlapped = overlapped;
 			memcpy(&poll_fd[i], &wfd, sizeof(struct winfd));
 			LeaveCriticalSection(&_poll_fd[i].mutex);
+#if defined(DYNAMIC_FDS)
+			// Notify poll that fds have been updated
+			SetEvent(fd_update);
+#endif
 			return wfd;
 		}
 	}
@@ -492,6 +518,10 @@ void usbi_free_fd(int fd)
 	}
 	_free_index(index);
 	LeaveCriticalSection(&_poll_fd[index].mutex);
+#if defined(DYNAMIC_FDS)
+	// Notify poll that fds have been updated
+	SetEvent(fd_update);
+#endif
 }
 
 /*
@@ -589,10 +619,16 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 	DWORD nb_handles_to_wait_on = 0;
 	DWORD ret;
 
+#if defined(DYNAMIC_FDS)
+	// Technically, we could fail to detect a new fd that was created 
+	// after the gathering of fds for poll and the Reset below...
+	ResetEvent(fd_update);
+#endif
+
 	CHECK_INIT_POLLING;
 
 	triggered = 0;
-	handles_to_wait_on = malloc(nfds*sizeof(HANDLE));
+	handles_to_wait_on = malloc((nfds+1)*sizeof(HANDLE));	// +1 for fd_update
 	handle_to_index = malloc(nfds*sizeof(int));
 	if ((handles_to_wait_on == NULL) || (handle_to_index == NULL)) {
 		errno = ENOMEM;
@@ -662,13 +698,28 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 	}
 
 	// If nothing was triggered, wait on all fds that require it
-	if ((triggered == 0) && (nb_handles_to_wait_on != 0)) {
-		printb("usbi_poll: starting %d ms wait for %d handles...\n", timeout, (int)nb_handles_to_wait_on);
+	if ((timeout != 0) && (triggered == 0) && (nb_handles_to_wait_on != 0)) {
+#if defined(DYNAMIC_FDS)
+		// Register for fd update notifications
+		handles_to_wait_on[nb_handles_to_wait_on++] = fd_update;
+#endif
+		if (timeout < 0) {
+			printb("usbi_poll: starting infinite wait for %d handles...\n", (int)nb_handles_to_wait_on);
+		} else {
+			printb("usbi_poll: starting %d ms wait for %d handles...\n", timeout, (int)nb_handles_to_wait_on);
+		}
 		ret = WaitForMultipleObjects(nb_handles_to_wait_on, handles_to_wait_on, 
-			FALSE, (timeout==-1)?INFINITE:(DWORD)timeout);
-
+			FALSE, (timeout<0)?INFINITE:(DWORD)timeout);
 		object_index = ret-WAIT_OBJECT_0;
 		if ((object_index >= 0) && ((DWORD)object_index < nb_handles_to_wait_on)) {
+#if defined(DYNAMIC_FDS)
+			if ((DWORD)object_index == nb_handles_to_wait_on)
+			// Detected fd update while we were waiting
+			// => flag a poll interruption
+			errno = EINTR;
+			triggered = -1;
+			goto poll_exit;
+#endif
 			printb("  completed after wait\n");
 			i = handle_to_index[object_index];
 			index = _fd_to_index_and_lock(fds[i].fd);
@@ -794,7 +845,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 	}
 
 	// I/O started and completed synchronously
-	r     = 0;
+	r = 0;
 
 out:
 	if (r) {
