@@ -71,6 +71,9 @@
 // Uncomment to have poll return with EINTR as soon as a new transfer (fd) is added (EXPERIMENTAL)
 //#define DYNAMIC_FDS
 
+// Force non buffered stdio for logging
+#define NONBUFFERED_STDIO
+
 // Uncomment to debug the polling layer
 //#define DEBUG_WINDOWS_COMPAT
 #if defined(DEBUG_WINDOWS_COMPAT)
@@ -162,6 +165,11 @@ void init_polling(void)
 		SleepEx(0, TRUE);
 	}
 	if (!is_polling_set) {
+#if defined(NONBUFFERED_STDIO)
+		// Windows's default is to buffer stdio - fix that
+		setvbuf(stdout, NULL, _IONBF,0);
+		setvbuf(stderr, NULL, _IONBF,0);
+#endif
 		pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
 			GetProcAddress(GetModuleHandle("KERNEL32"), "CancelIoEx");
 		printb("init_polling: Will use CancelIo%s for I/O cancellation\n", 
