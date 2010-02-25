@@ -22,7 +22,7 @@
 			Name="Debug|Win32"
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
-			ConfigurationType="1"
+			ConfigurationType="4"
 			InheritedPropertySheets=".\ddk_directory.vsprops"
 			CharacterSet="2"
 			>
@@ -61,15 +61,11 @@
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
-				Name="VCLinkerTool"
-				GenerateDebugInformation="true"
-				TargetMachine="1"
+				Name="VCLibrarianTool"
+				AdditionalOptions="/MACHINE:X86"
 			/>
 			<Tool
 				Name="VCALinkTool"
-			/>
-			<Tool
-				Name="VCManifestTool"
 			/>
 			<Tool
 				Name="VCXDCMakeTool"
@@ -81,9 +77,6 @@
 				Name="VCFxCopTool"
 			/>
 			<Tool
-				Name="VCAppVerifierTool"
-			/>
-			<Tool
 				Name="VCPostBuildEventTool"
 			/>
 		</Configuration>
@@ -91,7 +84,7 @@
 			Name="Debug|x64"
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
-			ConfigurationType="1"
+			ConfigurationType="4"
 			InheritedPropertySheets=".\ddk_directory.vsprops"
 			CharacterSet="2"
 			>
@@ -131,15 +124,11 @@
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
-				Name="VCLinkerTool"
-				GenerateDebugInformation="true"
-				TargetMachine="17"
+				Name="VCLibrarianTool"
+				AdditionalOptions="/MACHINE:X86"
 			/>
 			<Tool
 				Name="VCALinkTool"
-			/>
-			<Tool
-				Name="VCManifestTool"
 			/>
 			<Tool
 				Name="VCXDCMakeTool"
@@ -149,9 +138,6 @@
 			/>
 			<Tool
 				Name="VCFxCopTool"
-			/>
-			<Tool
-				Name="VCAppVerifierTool"
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
@@ -203,6 +189,7 @@
 			/>
 			<Tool
 				Name="VCLibrarianTool"
+				AdditionalOptions="/MACHINE:X86"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -268,6 +255,7 @@
 			/>
 			<Tool
 				Name="VCLibrarianTool"
+				AdditionalOptions="/MACHINE:X86"
 			/>
 			<Tool
 				Name="VCALinkTool"

@@ -1,8 +1,4 @@
-#if defined(_MSC_VER)
-#include <config_msvc.h>
-#else
 #include <config.h>
-#endif
 #include <windows.h>
 #include <setupapi.h>
 #include <io.h>
