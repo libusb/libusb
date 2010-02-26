@@ -831,6 +831,7 @@ API_EXPORTED void libusb_unref_device(libusb_device *dev)
 		usbi_mutex_lock(&dev->ctx->usb_devs_lock);
 		list_del(&dev->list);
 		usbi_mutex_unlock(&dev->ctx->usb_devs_lock);
+		usbi_mutex_destroy(&dev->lock);
 
 		free(dev);
 	}

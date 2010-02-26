@@ -62,7 +62,7 @@ int usbi_mutex_lock(usbi_mutex_t *mutex) {
 }
 int usbi_mutex_unlock(usbi_mutex_t *mutex) {
 	if(!mutex)               return ((errno=EINVAL));
-	if(!ReleaseMutex(mutex)) return ((errno=EPERM ));
+	if(!ReleaseMutex(*mutex)) return ((errno=EPERM ));
 	return 0;
 }
 
