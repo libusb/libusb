@@ -77,15 +77,9 @@
 // Uncomment to debug the polling layer
 //#define DEBUG_WINDOWS_COMPAT
 #if defined(DEBUG_WINDOWS_COMPAT)
-#define printb printf
+#define poll_dbg usbi_dbg
 #else
-// MSVC6 cannot use a variadic argument and non MSVC
-// compilers produce warnings if parenthesis are ommitted.
-#if defined(_MSC_VER)
-#define printb
-#else
-#define printb(...)
-#endif
+#define poll_dbg
 #endif
 
 #if defined(_PREFAST_)
@@ -113,7 +107,7 @@ static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 		access = GENERIC_READ|GENERIC_WRITE;
 		break;
 	default:
-		printb("_open_osfhandle (emulated): unuspported access mode\n");
+		usbi_err(NULL, "unuspported access mode");
 		return -1;
 	}
 	return cygwin_attach_handle_to_fd("/dev/null", -1, (HANDLE)osfhandle, -1, access);
@@ -172,7 +166,7 @@ void init_polling(void)
 #endif
 		pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
 			GetProcAddress(GetModuleHandle("KERNEL32"), "CancelIoEx");
-		printb("init_polling: Will use CancelIo%s for I/O cancellation\n", 
+		usbi_dbg("Will use CancelIo%s for I/O cancellation", 
 			(pCancelIoEx != NULL)?"Ex":"");
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
@@ -184,7 +178,7 @@ void init_polling(void)
 		// are new/deleted fds during a timeout wait operation
 		fd_update = CreateEvent(NULL, TRUE, FALSE, NULL);
 		if (fd_update == NULL) {
-			fprintf(stderr, "init_polling: unable to create update event");
+			usbi_err(NULL, "unable to create update event");
 		}
 #endif
 		is_polling_set = TRUE;
@@ -301,14 +295,14 @@ __inline void _init_read_marker(int index)
 	reset_overlapped(poll_fd[index].overlapped);
 	if (!ReadFile(poll_fd[index].handle, &_poll_fd[index].marker, 1, NULL, poll_fd[index].overlapped)) {
 		if(GetLastError() != ERROR_IO_PENDING) {
-			printb("_init_read_marker: didn't get IO_PENDING!\n");
+			usbi_warn(NULL, "didn't get IO_PENDING!");
 			reset_overlapped(poll_fd[index].overlapped);
 		}
 	} else {
 		// We got some sync I/O. We'll pretend it's async and set overlapped manually
-		printb("_init_read_marker: marker readout completed before exit!\n");
+		poll_dbg("marker readout completed before exit!");
 		if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
-			printb("_init_read_marker: completed I/O still flagged as pending\n");
+			usbi_warn(NULL, "completed I/O still flagged as pending");
 			poll_fd[index].overlapped->Internal = 0;
 		}
 		SetEvent(poll_fd[index].overlapped->hEvent);
@@ -342,7 +336,7 @@ int usbi_pipe(int filedes[2])
 
 	our_pipe_number = InterlockedIncrement(&pipe_number) - 1; // - 1 to mirror postfix operation inside _snprintf
 	if (our_pipe_number >= 0x10000) {
-		fprintf(stderr, "usbi_pipe: program assertion failed - more than 65536 pipes were used");
+		usbi_warn(NULL, "program assertion failed - more than 65536 pipes were used");
 		our_pipe_number &= 0xFFFF;
 	}
 	_snprintf(pipe_name, sizeof(pipe_name), "\\\\.\\pipe\\libusb%08x%04x", (unsigned)GetCurrentProcessId(), our_pipe_number);
@@ -351,21 +345,21 @@ int usbi_pipe(int filedes[2])
 	handle[0] = CreateNamedPipeA(pipe_name, PIPE_ACCESS_INBOUND|FILE_FLAG_OVERLAPPED,
 		PIPE_TYPE_MESSAGE|PIPE_READMODE_MESSAGE, 1, 4096, 4096, 0, NULL);
 	if (handle[0] == INVALID_HANDLE_VALUE) {
-		printb("Could not create pipe (read end): errcode %d\n", (int)GetLastError());
+		usbi_err(NULL, "could not create pipe (read end): errcode %d", (int)GetLastError());
 		goto out1;
 	}
 	filedes[0] = _open_osfhandle((intptr_t)handle[0], _O_RDONLY);
-	printb("filedes[0] = %d\n", filedes[0]);
+	poll_dbg("filedes[0] = %d", filedes[0]);
 
 	// Write end of the pipe
 	handle[1] = CreateFileA(pipe_name, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
 		FILE_ATTRIBUTE_NORMAL|FILE_FLAG_OVERLAPPED, NULL);
 	if (handle[1] == INVALID_HANDLE_VALUE) {
-		printb("Could not create pipe (write end): errcode %d\n", (int)GetLastError());
+		usbi_err(NULL, "could not create pipe (write end): errcode %d", (int)GetLastError());
 		goto out2;
 	}
 	filedes[1] = _open_osfhandle((intptr_t)handle[1], _O_WRONLY);
-	printb("filedes[1] = %d\n", filedes[1]);
+	poll_dbg("filedes[1] = %d", filedes[1]);
 
 	// Create an OVERLAPPED for each end
 	overlapped0->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -448,8 +442,8 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 	}
 
 	if ((access_mode != _O_RDONLY) && (access_mode != _O_WRONLY)) {
-		printb("usbi_create_fd: only one of _O_RDONLY or _O_WRONLY are supported.\n"
-			"If you want to poll for R/W simultaneously, create multiple fds from the same handle.\n");
+		usbi_warn(NULL, "usbi_create_fd: only one of _O_RDONLY or _O_WRONLY are supported.\n"
+			"If you want to poll for R/W simultaneously, create multiple fds from the same handle.");
 		return INVALID_WINFD;
 	}
 	if (access_mode == _O_RDONLY) {
@@ -651,7 +645,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		if ((fds[i].events & ~POLLIN) && (!(fds[i].events & POLLOUT))) {
 			fds[i].revents |= POLLERR;
 			errno = EACCES;
-			printb("usbi_poll: unsupported set of events\n");
+			usbi_warn(NULL, "unsupported set of events");
 			triggered = -1;
 			goto poll_exit;
 		}
@@ -664,7 +658,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			if (index >= 0) {
 				LeaveCriticalSection(&_poll_fd[index].mutex);
 			}
-			printb("usbi_poll: invalid fd\n");
+			usbi_warn(NULL, "invalid fd");
 			triggered = -1;
 			goto poll_exit;
 		}
@@ -673,7 +667,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		if ((fds[i].events & POLLIN) && (poll_fd[index].rw != RW_READ)) {
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
-			printb("usbi_poll: attempted POLLIN on fd[%d] without READ access\n", i);
+			usbi_warn(NULL, "attempted POLLIN on fd[%d] without READ access", i);
 			LeaveCriticalSection(&_poll_fd[index].mutex);
 			triggered = -1;
 			goto poll_exit;
@@ -682,18 +676,18 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		if ((fds[i].events & POLLOUT) && (poll_fd[index].rw != RW_WRITE)) {
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
-			printb("usbi_poll: attempted POLLOUT on fd[%d] without WRITE access\n", i);
+			usbi_warn(NULL, "attempted POLLOUT on fd[%d] without WRITE access", i);
 			LeaveCriticalSection(&_poll_fd[index].mutex);
 			triggered = -1;
 			goto poll_exit;
 		}
 		
-		printb("usbi_poll: fd[%d]=%d (overlapped = %p) got events %04X\n", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
+		poll_dbg("fd[%d]=%d (overlapped = %p) got events %04X", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
 
 		// The following macro only works if overlapped I/O was reported pending
 		if ( (HasOverlappedIoCompleted(poll_fd[index].overlapped))
 		  || (poll_fd[index].completed_synchronously) ) {
-			printb("  completed\n");
+			poll_dbg("  completed");
 			// checks above should ensure this works:
 			fds[i].revents = fds[i].events;
 			triggered++;
@@ -712,9 +706,9 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		handles_to_wait_on[nb_handles_to_wait_on++] = fd_update;
 #endif
 		if (timeout < 0) {
-			printb("usbi_poll: starting infinite wait for %d handles...\n", (int)nb_handles_to_wait_on);
+			poll_dbg("starting infinite wait for %d handles...", (int)nb_handles_to_wait_on);
 		} else {
-			printb("usbi_poll: starting %d ms wait for %d handles...\n", timeout, (int)nb_handles_to_wait_on);
+			poll_dbg("starting %d ms wait for %d handles...", timeout, (int)nb_handles_to_wait_on);
 		}
 		ret = WaitForMultipleObjects(nb_handles_to_wait_on, handles_to_wait_on, 
 			FALSE, (timeout<0)?INFINITE:(DWORD)timeout);
@@ -729,7 +723,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 				goto poll_exit;
 			}
 #endif
-			printb("  completed after wait\n");
+			poll_dbg("  completed after wait");
 			i = handle_to_index[object_index];
 			index = _fd_to_index_and_lock(fds[i].fd);
 			fds[i].revents = fds[i].events;
@@ -738,7 +732,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 				LeaveCriticalSection(&_poll_fd[index].mutex);
 			}
 		} else if (ret == WAIT_TIMEOUT) {
-			printb("  timed out\n");
+			poll_dbg("  timed out");
 			triggered = 0;	// 0 = timeout
 		} else {
 			errno = EIO;
@@ -819,11 +813,11 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 
 	// For sync mode, we shouldn't get pending async write I/O
 	if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
-		printb("usbi_write: previous write I/O was flagged pending!\n");
+		usbi_warn(NULL, "usbi_write: previous write I/O was flagged pending!");
 		cancel_io(index);
 	}
 
-	printb("usbi_write: writing %d bytes to fd=%d\n", count, poll_fd[index].fd);
+	poll_dbg("writing %d bytes to fd=%d", count, poll_fd[index].fd);
 
 	reset_overlapped(poll_fd[index].overlapped);
 	if (!WriteFile(poll_fd[index].handle, buf, (DWORD)count, &wr_count, poll_fd[index].overlapped)) {
@@ -837,7 +831,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 					r     = 0;
 					goto out;
 				} else {
-					printb("usbi_write: GetOverlappedResult failed with error %d\n", (int)GetLastError());
+					usbi_warn(NULL, "GetOverlappedResult failed with error %d", (int)GetLastError());
 					errno = EIO;
 					goto out;
 				}
@@ -847,7 +841,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 			}
 		} else {
 			// I/O started and failed
-			printb("usbi_write: WriteFile failed with error %d\n", (int)GetLastError());
+			usbi_warn(NULL, "WriteFile failed with error %d", (int)GetLastError());
 			errno = EIO;
 			goto out;
 		}
@@ -899,7 +893,7 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 	// still waiting for completion => force completion
 	if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
 		if (WaitForSingleObject(poll_fd[index].overlapped->hEvent, INFINITE) != WAIT_OBJECT_0) {
-			printb("usbi_read: waiting for marker failed: %d\n", (int)GetLastError());
+			usbi_warn(NULL, "waiting for marker failed: %d", (int)GetLastError());
 			errno = EIO;
 			goto out;
 		}
@@ -908,19 +902,19 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 	// Find out if we've read the first byte
 	if (!GetOverlappedResult(poll_fd[index].handle,	poll_fd[index].overlapped, &rd_count, FALSE)) {
 		if (GetLastError() != ERROR_MORE_DATA) {
-			printb("usbi_read: readout of marker failed: %d\n", (int)GetLastError());
+			usbi_warn(NULL, "readout of marker failed: %d", (int)GetLastError());
 			errno = EIO;
 			goto out;
 		} else {
-			printb("usbi_read: readout of marker reported more data\n");
+			usbi_warn(NULL, "readout of marker reported more data");
 		}
 	}
 
-	printb("usbi_read: count = %d, rd_count(marker) = %d\n", count, (int)rd_count);
+	poll_dbg("count = %d, rd_count(marker) = %d", count, (int)rd_count);
 
 	// We should have our marker by now
 	if (rd_count != 1) {
-		printb("usbi_read: unexpected number of bytes for marker (%d)\n", (int)rd_count);
+		usbi_warn(NULL, "unexpected number of bytes for marker (%d)", (int)rd_count);
 		errno = EIO;
 		goto out;
 	}
@@ -934,24 +928,24 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 			if(GetLastError() == ERROR_IO_PENDING) {
 				if (!GetOverlappedResult(poll_fd[index].handle,	poll_fd[index].overlapped, &rd_count, TRUE)) {
 					if (GetLastError() == ERROR_MORE_DATA) {
-						printb("usbi_read: could not fetch all data\n");
+						usbi_warn(NULL, "could not fetch all data");
 					}
-					printb("usbi_read: readout of supplementary data failed: %d\n", (int)GetLastError());
+					usbi_warn(NULL, "readout of supplementary data failed: %d", (int)GetLastError());
 					errno = EIO;
 					goto out;
 				}
 			} else {
-				printb("usbi_read: could not start blocking read of supplementary: %d\n", (int)GetLastError());
+				usbi_warn(NULL, "could not start blocking read of supplementary: %d", (int)GetLastError());
 				errno = EIO;
 				goto out;
 			}
 		}
 		// If ReadFile completed synchronously, we're fine too
 
-		printb("usbi_read: rd_count(supplementary ) = %d\n", (int)rd_count);
+		poll_dbg("rd_count(supplementary ) = %d", (int)rd_count);
 
 		if ((rd_count+1) != count) {
-			printb("usbi_read: wanted %d-1, got %d\n", count, (int)rd_count);
+			poll_dbg("wanted %d-1, got %d", count, (int)rd_count);
 			errno = EIO;
 			goto out;
 		}
