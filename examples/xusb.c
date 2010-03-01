@@ -533,8 +533,8 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	}
 
 	// Attempt a bulk read from endpoint 0 (this should just return a raw input report)
-	printf("\nTesting bulk read using endpoint %02X...\n", endpoint_in);
-	r = libusb_bulk_transfer(handle, endpoint_in, input_report, size, &size, 5000);
+	printf("\nTesting interrupt read using endpoint %02X...\n", endpoint_in);
+	r = libusb_interrupt_transfer(handle, endpoint_in, input_report, size, &size, 5000);
 	if (r >= 0) {
 		display_buffer_hex(input_report, size);
 	} else {
