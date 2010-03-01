@@ -553,6 +553,9 @@ int test_device(uint16_t vid, uint16_t pid)
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
 	int iface, nb_ifaces, nb_strings;
+#ifndef OS_WINDOWS
+	int iface_detached = -1;
+#endif
 	int test_scsi = 0;
 	struct libusb_device_descriptor dev_desc;
 	char string[128];
@@ -624,6 +627,7 @@ int test_device(uint16_t vid, uint16_t pid)
 				// Maybe we need to detach the driver
 				perr("   Failed. Trying to detach driver...\n");
 				libusb_detach_kernel_driver(handle, iface);
+				iface_detached = iface;
 				printf("   Claiming interface again...\n");
 				libusb_claim_interface(handle, iface);
 			} else {
@@ -667,6 +671,13 @@ int test_device(uint16_t vid, uint16_t pid)
 		printf("Releasing interface %d...\n", iface);
 		libusb_release_interface(handle, iface);
 	}
+
+#ifndef OS_WINDOWS
+	if (iface_detached >= 0) {
+		printf("Re-attaching kernel driver...\n");
+		libusb_attach_kernel_driver(handle, iface_detached);
+	}
+#endif
 
 	printf("Closing device...\n");
 	libusb_close(handle);
