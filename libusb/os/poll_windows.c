@@ -76,6 +76,18 @@
 // which should give the app an opportunity to resubmit a new fd set.
 //#define DYNAMIC_FDS
 
+#if defined(DEBUG_POLL_WINDOWS)
+#define poll_dbg usbi_dbg
+#else
+// MSVC6 cannot use a variadic argument and non MSVC
+// compilers produce warnings if parenthesis are ommitted.
+#if defined(_MSC_VER)
+#define poll_dbg
+#else
+#define poll_dbg(...)
+#endif
+#endif
+
 #if defined(_PREFAST_)
 #pragma warning(disable:28719)
 #endif
@@ -297,9 +309,7 @@ __inline void _init_read_marker(int index)
 		}
 	} else {
 		// We got some sync I/O. We'll pretend it's async and set overlapped manually
-#if defined(DEBUG_POLL_WINDOWS)
-		usbi_dbg("marker readout completed before exit!");
-#endif
+		poll_dbg("marker readout completed before exit!");
 		if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
 			usbi_warn(NULL, "completed I/O still flagged as pending");
 			poll_fd[index].overlapped->Internal = 0;
@@ -348,9 +358,7 @@ int usbi_pipe(int filedes[2])
 		goto out1;
 	}
 	filedes[0] = _open_osfhandle((intptr_t)handle[0], _O_RDONLY);
-#if defined(DEBUG_POLL_WINDOWS)
-	usbi_dbg("filedes[0] = %d", filedes[0]);
-#endif
+	poll_dbg("filedes[0] = %d", filedes[0]);
 
 	// Write end of the pipe
 	handle[1] = CreateFileA(pipe_name, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
@@ -360,9 +368,7 @@ int usbi_pipe(int filedes[2])
 		goto out2;
 	}
 	filedes[1] = _open_osfhandle((intptr_t)handle[1], _O_WRONLY);
-#if defined(DEBUG_POLL_WINDOWS)
-	usbi_dbg("filedes[1] = %d", filedes[1]);
-#endif
+	poll_dbg("filedes[1] = %d", filedes[1]);
 
 	// Create an OVERLAPPED for each end
 	overlapped0->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -694,16 +700,12 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			goto poll_exit;
 		}
 		
-#if defined(DEBUG_POLL_WINDOWS)
-		usbi_dbg("fd[%d]=%d (overlapped = %p) got events %04X", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
-#endif
+		poll_dbg("fd[%d]=%d (overlapped = %p) got events %04X", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
 
 		// The following macro only works if overlapped I/O was reported pending
 		if ( (HasOverlappedIoCompleted(poll_fd[index].overlapped))
 		  || (poll_fd[index].completed_synchronously) ) {
-#if defined(DEBUG_POLL_WINDOWS)
-			usbi_dbg("  completed");
-#endif
+			poll_dbg("  completed");
 			// checks above should ensure this works:
 			fds[i].revents = fds[i].events;
 			triggered++;
@@ -741,9 +743,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		}
 	}
 	usbi_mutex_unlock(&new_fd_mutex);
-#if defined(DEBUG_POLL_WINDOWS)
-	usbi_dbg("dynamic_fds: added %d extra handles", nb_extra_handles);
-#endif
+	poll_dbg("dynamic_fds: added %d extra handles", nb_extra_handles);
 #endif
 
 	// If nothing was triggered, wait on all fds that require it
@@ -753,13 +753,11 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		handles_to_wait_on[nb_handles_to_wait_on++] = fd_update;
 		nb_extra_handles++;
 #endif
-#if defined(DEBUG_POLL_WINDOWS)
 		if (timeout < 0) {
-			usbi_dbg("starting infinite wait for %d handles...", (int)nb_handles_to_wait_on);
+			poll_dbg("starting infinite wait for %d handles...", (int)nb_handles_to_wait_on);
 		} else {
-			usbi_dbg("starting %d ms wait for %d handles...", timeout, (int)nb_handles_to_wait_on);
+			poll_dbg("starting %d ms wait for %d handles...", timeout, (int)nb_handles_to_wait_on);
 		}
-#endif
 		ret = WaitForMultipleObjects(nb_handles_to_wait_on, handles_to_wait_on, 
 			FALSE, (timeout<0)?INFINITE:(DWORD)timeout);
 		object_index = ret-WAIT_OBJECT_0;
@@ -767,20 +765,16 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 #if defined(DYNAMIC_FDS)
 			if ((DWORD)object_index >= (nb_handles_to_wait_on-nb_extra_handles)) {
 				// Detected fd update => flag a poll interruption
-#if defined(DEBUG_POLL_WINDOWS)
 				if ((DWORD)object_index == (nb_handles_to_wait_on-1))
-					usbi_dbg("  dynamic_fds: fd_update event");
+					poll_dbg("  dynamic_fds: fd_update event");
 				else
-					usbi_dbg("  dynamic_fds: new fd I/O event");
-#endif
+					poll_dbg("  dynamic_fds: new fd I/O event");
 				errno = EINTR;
 				triggered = -1;
 				goto poll_exit;
 			}
 #endif
-#if defined(DEBUG_POLL_WINDOWS)
-			usbi_dbg("  completed after wait");
-#endif
+			poll_dbg("  completed after wait");
 			i = handle_to_index[object_index];
 			index = _fd_to_index_and_lock(fds[i].fd);
 			fds[i].revents = fds[i].events;
@@ -789,9 +783,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 				LeaveCriticalSection(&_poll_fd[index].mutex);
 			}
 		} else if (ret == WAIT_TIMEOUT) {
-#if defined(DEBUG_POLL_WINDOWS)
-			usbi_dbg("  timed out");
-#endif
+			poll_dbg("  timed out");
 			triggered = 0;	// 0 = timeout
 		} else {
 			errno = EIO;
@@ -881,9 +873,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 		cancel_io(index);
 	}
 
-#if defined(DEBUG_POLL_WINDOWS)
-	usbi_dbg("writing %d bytes to fd=%d", count, poll_fd[index].fd);
-#endif
+	poll_dbg("writing %d bytes to fd=%d", count, poll_fd[index].fd);
 
 	reset_overlapped(poll_fd[index].overlapped);
 	if (!WriteFile(poll_fd[index].handle, buf, (DWORD)count, &wr_count, poll_fd[index].overlapped)) {
@@ -976,9 +966,7 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 		}
 	}
 
-#if defined(DEBUG_POLL_WINDOWS)
-	usbi_dbg("count = %d, rd_count(marker) = %d", count, (int)rd_count);
-#endif
+	poll_dbg("count = %d, rd_count(marker) = %d", count, (int)rd_count);
 
 	// We should have our marker by now
 	if (rd_count != 1) {
@@ -1010,14 +998,10 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 		}
 		// If ReadFile completed synchronously, we're fine too
 
-#if defined(DEBUG_POLL_WINDOWS)
-		usbi_dbg("rd_count(supplementary ) = %d", (int)rd_count);
-#endif
+		poll_dbg("rd_count(supplementary ) = %d", (int)rd_count);
 
 		if ((rd_count+1) != count) {
-#if defined(DEBUG_POLL_WINDOWS)
-			usbi_dbg("wanted %d-1, got %d", count, (int)rd_count);
-#endif
+			poll_dbg("wanted %d-1, got %d", count, (int)rd_count);
 			errno = EIO;
 			goto out;
 		}
