@@ -79,7 +79,7 @@
 #if defined(DEBUG_POLL_WINDOWS)
 #define poll_dbg usbi_dbg
 #else
-#define poll_dbg
+#define poll_dbg(...)
 #endif
 
 #if defined(_PREFAST_)
