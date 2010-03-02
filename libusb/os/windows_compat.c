@@ -68,14 +68,14 @@
 
 #include <libusbi.h>
 
-// Uncomment to have poll return with EINTR as soon as a new transfer (fd) is added (EXPERIMENTAL)
+// Uncomment to debug the polling layer
+#define DEBUG_WINDOWS_COMPAT
+
+// Uncomment to have poll return with EINTR as soon as a new transfer (fd) is added
+// This should result in a LIBUSB_ERROR_INTERRUPTED being returned by libusb calls,
+// which should give the app an opportunity to resubmit a new fd set.
 //#define DYNAMIC_FDS
 
-// Force non buffered stdio for logging
-#define NONBUFFERED_STDIO
-
-// Uncomment to debug the polling layer
-//#define DEBUG_WINDOWS_COMPAT
 #if defined(DEBUG_WINDOWS_COMPAT)
 #define poll_dbg usbi_dbg
 #else
@@ -116,6 +116,8 @@ static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
 
+extern void usbi_fd_notification(struct libusb_context *ctx);
+
 // public fd data
 const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE, FALSE};
 struct winfd poll_fd[MAX_FDS];
@@ -129,7 +131,10 @@ struct {
 // globals
 BOOLEAN is_polling_set = FALSE;
 #if defined(DYNAMIC_FDS)
-HANDLE fd_update = INVALID_HANDLE_VALUE;
+HANDLE fd_update = INVALID_HANDLE_VALUE;	// event to notify poll of fd update
+HANDLE new_fd[MAX_FDS];		// overlapped event handlesm for fds created since last poll
+unsigned nb_new_fds = 0;	// nb new fds created since last poll
+usbi_mutex_t new_fd_mutex;	// mutex required for the above
 #endif
 LONG pipe_number = 0;
 static volatile LONG compat_spinlock = 0;
@@ -159,11 +164,6 @@ void init_polling(void)
 		SleepEx(0, TRUE);
 	}
 	if (!is_polling_set) {
-#if defined(NONBUFFERED_STDIO)
-		// Windows's default is to buffer stdio - fix that
-		setvbuf(stdout, NULL, _IONBF,0);
-		setvbuf(stderr, NULL, _IONBF,0);
-#endif
 		pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
 			GetProcAddress(GetModuleHandle("KERNEL32"), "CancelIoEx");
 		usbi_dbg("Will use CancelIo%s for I/O cancellation", 
@@ -180,6 +180,8 @@ void init_polling(void)
 		if (fd_update == NULL) {
 			usbi_err(NULL, "unable to create update event");
 		}
+		usbi_mutex_init(&new_fd_mutex, NULL);
+		nb_new_fds = 0;
 #endif
 		is_polling_set = TRUE;
 	}
@@ -272,6 +274,7 @@ void exit_polling(void)
 			free_overlapped(poll_fd[i].overlapped);
 			poll_fd[i] = INVALID_WINFD;
 #if defined(DYNAMIC_FDS)
+			usbi_mutex_destroy(&new_fd_mutex);
 			CloseHandle(fd_update);
 			fd_update = INVALID_HANDLE_VALUE;
 #endif
@@ -392,10 +395,6 @@ int usbi_pipe(int filedes[2])
 				_init_read_marker(i);
 			}
 			LeaveCriticalSection(&_poll_fd[i].mutex);
-#if defined(DYNAMIC_FDS)
-			// Notify poll that fds have been updated
-			SetEvent(fd_update);
-#endif
 			if (j>=2) {
 				return 0;
 			}
@@ -429,7 +428,7 @@ out1:
  * read and one for write. Using a single R/W fd is unsupported and will
  * produce unexpected results
  */
-struct winfd usbi_create_fd(HANDLE handle, int access_mode)
+struct winfd usbi_create_fd(HANDLE handle, int access_mode, struct libusb_context *ctx)
 {
 	int i, fd;
 	struct winfd wfd = INVALID_WINFD;
@@ -442,7 +441,7 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 	}
 
 	if ((access_mode != _O_RDONLY) && (access_mode != _O_WRONLY)) {
-		usbi_warn(NULL, "usbi_create_fd: only one of _O_RDONLY or _O_WRONLY are supported.\n"
+		usbi_warn(NULL, "only one of _O_RDONLY or _O_WRONLY are supported.\n"
 			"If you want to poll for R/W simultaneously, create multiple fds from the same handle.");
 		return INVALID_WINFD;
 	}
@@ -479,8 +478,16 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 			memcpy(&poll_fd[i], &wfd, sizeof(struct winfd));
 			LeaveCriticalSection(&_poll_fd[i].mutex);
 #if defined(DYNAMIC_FDS)
+			usbi_mutex_lock(&new_fd_mutex);
+			new_fd[nb_new_fds++] = overlapped->hEvent;
+			usbi_mutex_unlock(&new_fd_mutex);
 			// Notify poll that fds have been updated
 			SetEvent(fd_update);
+#else
+			// NOTE: For now, usbi_fd_notification is only called on fd creation, as
+			// fd deletion results in a CancelIo() event, which poll should detect.
+			// Will see if there's an actual justification to call this on delete...
+			usbi_fd_notification(ctx);
 #endif
 			return wfd;
 		}
@@ -520,10 +527,6 @@ void usbi_free_fd(int fd)
 	}
 	_free_index(index);
 	LeaveCriticalSection(&_poll_fd[index].mutex);
-#if defined(DYNAMIC_FDS)
-	// Notify poll that fds have been updated
-	SetEvent(fd_update);
-#endif
 }
 
 /*
@@ -619,12 +622,21 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 	HANDLE *handles_to_wait_on;
 	int *handle_to_index;
 	DWORD nb_handles_to_wait_on = 0;
+	DWORD nb_extra_handles = 0;
 	DWORD ret;
 
 #if defined(DYNAMIC_FDS)
-	// Technically, we could fail to detect a new fd that was created 
-	// after the gathering of fds for poll and the Reset below...
+	unsigned j;
+
+	// To address the possibility of missing new fds between the time the new
+	// pollable fd set is assembled, and the ResetEvent() call below, an 
+	// additional new_fd[] HANDLE table is used for any new fd that was created
+	// since the last call to poll (see below)
 	ResetEvent(fd_update);
+
+	// At this stage, any new fd creation will be detected through the fd_update
+	// event notification, and any previous creation that we may have missed 
+	// will be picked up through the existing new_fd[] table.
 #endif
 
 	CHECK_INIT_POLLING;
@@ -694,16 +706,46 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		} else {
 			handles_to_wait_on[nb_handles_to_wait_on] = poll_fd[index].overlapped->hEvent;
 			handle_to_index[nb_handles_to_wait_on] = i;
+#if defined(DYNAMIC_FDS)
+			// If this fd from the poll set is also part of the new_fd event handle table, remove it
+			usbi_mutex_lock(&new_fd_mutex);
+			for (j=0; j<nb_new_fds; j++) {
+				if (handles_to_wait_on[nb_handles_to_wait_on] == new_fd[j]) {
+					new_fd[j] = INVALID_HANDLE_VALUE;
+					break;
+				}
+			}
+			usbi_mutex_unlock(&new_fd_mutex);
+#endif
 			nb_handles_to_wait_on++;
 		}
 		LeaveCriticalSection(&_poll_fd[index].mutex);
 	}
+#if defined(DYNAMIC_FDS)
+	// Add this stage, new_fd[] should only contain events from fds that
+	// have been added since the last call to poll, but are not (yet) part
+	// of the pollable fd set. Typically, these would be from fds that have
+	// been created between the construction of the fd set and the calling
+	// of poll. 
+	// Event if we won't be able to return usable poll data on these events,
+	// make sure we monitor them to return an EINTR code
+	usbi_mutex_lock(&new_fd_mutex); // We could probably do without
+	for (i=0; i<nb_new_fds; i++) {
+		if (new_fd[i] != INVALID_HANDLE_VALUE) {
+			handles_to_wait_on[nb_handles_to_wait_on++] = new_fd[i];
+			nb_extra_handles++;
+		}
+	}
+	usbi_mutex_unlock(&new_fd_mutex);
+	poll_dbg("dynamic_fds: added %d extra handles", nb_extra_handles);
+#endif
 
 	// If nothing was triggered, wait on all fds that require it
 	if ((timeout != 0) && (triggered == 0) && (nb_handles_to_wait_on != 0)) {
 #if defined(DYNAMIC_FDS)
 		// Register for fd update notifications
 		handles_to_wait_on[nb_handles_to_wait_on++] = fd_update;
+		nb_extra_handles++;
 #endif
 		if (timeout < 0) {
 			poll_dbg("starting infinite wait for %d handles...", (int)nb_handles_to_wait_on);
@@ -715,9 +757,12 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		object_index = ret-WAIT_OBJECT_0;
 		if ((object_index >= 0) && ((DWORD)object_index < nb_handles_to_wait_on)) {
 #if defined(DYNAMIC_FDS)
-			if ((DWORD)object_index == (nb_handles_to_wait_on-1)) {
-				// Detected fd update while we were waiting
-				// => flag a poll interruption
+			if ((DWORD)object_index >= (nb_handles_to_wait_on-nb_extra_handles)) {
+				// Detected fd update => flag a poll interruption
+				if ((DWORD)object_index == (nb_handles_to_wait_on-1))
+					poll_dbg("  dynamic_fds: fd_update event");
+				else
+					poll_dbg("  dynamic_fds: new fd I/O event");
 				errno = EINTR;
 				triggered = -1;
 				goto poll_exit;
@@ -747,6 +792,11 @@ poll_exit:
 	if (handle_to_index != NULL) {
 		free(handle_to_index);
 	}
+#if defined(DYNAMIC_FDS)
+	usbi_mutex_lock(&new_fd_mutex);
+	nb_new_fds = 0;
+	usbi_mutex_unlock(&new_fd_mutex);
+#endif
 	return triggered;
 }
 

@@ -84,7 +84,7 @@ int usbi_close(int fd);
 
 void init_polling(void);
 void exit_polling(void);
-struct winfd usbi_create_fd(HANDLE handle, int access_mode);
+struct winfd usbi_create_fd(HANDLE handle, int access_mode, struct libusb_context *ctx);
 void usbi_free_fd(int fd);
 struct winfd fd_to_winfd(int fd);
 struct winfd handle_to_winfd(HANDLE handle);
