@@ -8,7 +8,7 @@ endif
 
 LINUX_USBFS_SRC = $(THREADS_SRC) os/poll_posix.h os/linux_usbfs.h os/linux_usbfs.c
 DARWIN_USB_SRC = $(THREADS_SRC) os/poll_posix.h os/darwin_usb.h os/darwin_usb.c
-WINDOWS_USB_SRC = $(THREADS_SRC) os/windows_compat.h os/windows_compat.c os/windows_usb.h os/windows_usb.c
+WINDOWS_USB_SRC = $(THREADS_SRC) os/poll_windows.h os/poll_windows.c os/windows_usb.h os/windows_usb.c
 
 EXTRA_DIST = $(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) $(WINDOWS_USB_SRC)
 

@@ -131,7 +131,7 @@ SOURCE=.\libusb\os\threads_windows.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\windows_compat.c
+SOURCE=.\libusb\os\poll_windows.c
 # End Source File
 # Begin Source File
 
@@ -175,7 +175,7 @@ SOURCE=.\libusb\os\threads_windows.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\windows_compat.h
+SOURCE=.\libusb\os\poll_windows.h
 # End Source File
 # Begin Source File
 

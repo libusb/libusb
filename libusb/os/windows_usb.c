@@ -47,7 +47,7 @@
 #include <objbase.h>  // for string to GUID conv. requires libole32.a
 
 #include <libusbi.h>
-#include "windows_compat.h"
+#include "poll_windows.h"
 #include "windows_usb.h"
 
 #if defined(_PREFAST_)

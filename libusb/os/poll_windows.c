@@ -1,5 +1,5 @@
 /*
- * Windows compat: POSIX compatibility wrapper
+ * poll_windows: poll compatibility wrapper for Windows
  * Copyright (C) 2009-2010 Pete Batard <pbatard@gmail.com>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of poll implementation from libusb-win32, by Stephan Meyer et al.
@@ -21,7 +21,7 @@
  */
 
 /*
- * Posix poll() and pipe() Windows compatibility layer for libusb 1.0
+ * poll() and pipe() Windows compatibility layer for libusb 1.0
  *
  * The way this layer works is by using OVERLAPPED with async I/O transfers, as
  * OVERLAPPED have an associated event which is flagged for I/O completion.
@@ -69,14 +69,14 @@
 #include <libusbi.h>
 
 // Uncomment to debug the polling layer
-#define DEBUG_WINDOWS_COMPAT
+//#define DEBUG_POLL_WINDOWS
 
 // Uncomment to have poll return with EINTR as soon as a new transfer (fd) is added
 // This should result in a LIBUSB_ERROR_INTERRUPTED being returned by libusb calls,
 // which should give the app an opportunity to resubmit a new fd set.
 //#define DYNAMIC_FDS
 
-#if defined(DEBUG_WINDOWS_COMPAT)
+#if defined(DEBUG_POLL_WINDOWS)
 #define poll_dbg usbi_dbg
 #else
 #define poll_dbg

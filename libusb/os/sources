@@ -23,7 +23,7 @@ SOURCES=..\core.c \
 	..\io.c \
 	..\sync.c \
 	threads_windows.c \
-	windows_compat.c \
+	poll_windows.c \
 	windows_usb.c \
 	libusb-1.0.rc
 
