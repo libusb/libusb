@@ -905,7 +905,6 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device_handle *_handle;
 	size_t priv_size = usbi_backend->device_handle_priv_size;
-	unsigned char dummy = 1;
 	ssize_t r;
 	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
 

@@ -622,10 +622,10 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 	HANDLE *handles_to_wait_on;
 	int *handle_to_index;
 	DWORD nb_handles_to_wait_on = 0;
-	DWORD nb_extra_handles = 0;
 	DWORD ret;
 
 #if defined(DYNAMIC_FDS)
+	DWORD nb_extra_handles = 0;
 	unsigned j;
 
 	// To address the possibility of missing new fds between the time the new
