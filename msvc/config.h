@@ -1,5 +1,10 @@
 /* config.h.  Manual config for MSVC.  */
 
+#ifndef _MSC_VER
+#warn "msvc/config.h shouldn't be included for your development environment."
+#error "Please make sure the msvc/ directory is removed from your build path."
+#endif
+
 /* Default visibility */
 #define API_EXPORTED /**/
 
