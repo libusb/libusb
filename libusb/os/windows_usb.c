@@ -2535,7 +2535,7 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("will use interface %d", current_interface);
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	wfd = usbi_create_fd(winusb_handle, _O_RDONLY, ctx);	
+	wfd = usbi_create_fd(winusb_handle, _O_RDONLY, ctx);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -2611,7 +2611,7 @@ static int winusb_submit_bulk_transfer(struct usbi_transfer *itransfer)
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(winusb_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);	
+	wfd = usbi_create_fd(winusb_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3575,7 +3575,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("will use interface %d", current_interface);
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	wfd = usbi_create_fd(hid_handle, _O_RDONLY, ctx);	
+	wfd = usbi_create_fd(hid_handle, _O_RDONLY, ctx);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3677,7 +3677,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(hid_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);	
+	wfd = usbi_create_fd(hid_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}

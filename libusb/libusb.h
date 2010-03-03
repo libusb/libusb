@@ -28,8 +28,8 @@
 #include <sys/time.h>
 #endif
 #include <sys/types.h>
-#include <limits.h>
 #include <time.h>
+#include <limits.h>
 
 /* 'interface' might be defined as a macro on Windows, so we need to
  * undefine it so as not to break the current libusb API, because 

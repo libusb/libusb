@@ -163,6 +163,10 @@ SOURCE=.\libusb\os\linux_usbfs.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\libusb\os\poll_posix.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\msvc\resource.h
 # End Source File
 # Begin Source File

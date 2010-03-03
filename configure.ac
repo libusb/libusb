@@ -50,7 +50,7 @@ case $host in
 	AC_SUBST(OS_WINDOWS)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
-	threads="posix"	
+	threads="posix"
 	LIBS="-lpthread -lsetupapi -lole32"
 	AM_CFLAGS=""	
 	AM_LDFLAGS="-no-undefined"
