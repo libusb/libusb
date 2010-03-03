@@ -310,6 +310,32 @@ struct windows_transfer_priv {
 
 
 /*
+ * API macros - from libusb-win32 1.x
+ */
+#define DLL_DECLARE(api, ret, name, args)                    \
+  typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name
+
+#define DLL_LOAD(dll, name, ret_on_failure)                   \
+	do {                                                      \
+		HMODULE h = GetModuleHandle(#dll);                    \
+	if (!h)                                                   \
+		h = LoadLibrary(#dll);                                \
+	if (!h) {                                                 \
+		if (ret_on_failure) { return LIBUSB_ERROR_OTHER; }    \
+		else { break; }                                       \
+	}                                                         \
+	name = (__dll_##name##_t)GetProcAddress(h, #name);        \
+	if (name) break;                                          \
+	name = (__dll_##name##_t)GetProcAddress(h, #name "A");    \
+	if (name) break;                                          \
+	name = (__dll_##name##_t)GetProcAddress(h, #name "W");    \
+	if (name) break;                                          \
+	if(ret_on_failure)                                        \
+		return LIBUSB_ERROR_OTHER;                            \
+	} while(0)
+
+
+/*
  * Windows DDK API definitions. Most of it copied from MinGW's includes
  */
 typedef DWORD DEVNODE, DEVINST;
@@ -388,32 +414,12 @@ typedef enum _USB_HUB_NODE {
 	UsbMIParent
 } USB_HUB_NODE;
 
-CMAPI CONFIGRET WINAPI CM_Get_Parent(
-  /*OUT*/ PDEVINST  pdnDevInst,
-  /*IN*/ DEVINST  dnDevInst,
-  /*IN*/ ULONG  ulFlags);
-
-CMAPI CONFIGRET WINAPI CM_Get_Child(
-  /*OUT*/ PDEVINST  pdnDevInst,
-  /*IN*/ DEVINST  dnDevInst,
-  /*IN*/ ULONG  ulFlags);
-
-CMAPI CONFIGRET WINAPI CM_Get_Sibling(
-  /*OUT*/ PDEVINST  pdnDevInst,
-  /*IN*/ DEVINST  DevInst,
-  /*IN*/ ULONG  ulFlags);
-
-CMAPI CONFIGRET WINAPI CM_Get_Device_IDA(
-  /*IN*/ DEVINST  dnDevInst,
-  /*OUT*/ PCHAR  Buffer,
-  /*IN*/ ULONG  BufferLen,
-  /*IN*/ ULONG  ulFlags);
-
-CMAPI CONFIGRET WINAPI CM_Get_Device_IDW(
-  /*IN*/ DEVINST  dnDevInst,
-  /*OUT*/ PWCHAR  Buffer,
-  /*IN*/ ULONG  BufferLen,
-  /*IN*/ ULONG  ulFlags);
+/* Cfgmgr32.dll interface */
+DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Parent, (PDEVINST, DEVINST, ULONG));
+DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Child, (PDEVINST, DEVINST, ULONG));
+DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Sibling, (PDEVINST, DEVINST, ULONG));
+DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDA, (DEVINST, PCHAR, ULONG, ULONG));
+DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDW, (DEVINST, PWCHAR, ULONG, ULONG));
 
 #ifdef UNICODE
 #define CM_Get_Device_ID CM_Get_Device_IDW
@@ -602,34 +608,6 @@ typedef struct _USB_HUB_CAPABILITIES_EX {
 } USB_HUB_CAPABILITIES_EX, *PUSB_HUB_CAPABILITIES_EX;
 
 #pragma pack(pop)
-
-
-/*
- * API macros - from libusb-win32 1.x
- */
-
-#define DLL_DECLARE(api, ret, name, args)                    \
-  typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name
-
-#define DLL_LOAD(dll, name, ret_on_failure)                   \
-	do {                                                      \
-		HMODULE h = GetModuleHandle(#dll);                    \
-	if (!h)                                                   \
-		h = LoadLibrary(#dll);                                \
-	if (!h) {                                                 \
-		if (ret_on_failure) { return LIBUSB_ERROR_OTHER; }    \
-		else { break; }                                       \
-	}                                                         \
-	name = (__dll_##name##_t)GetProcAddress(h, #name);        \
-	if (name) break;                                          \
-	name = (__dll_##name##_t)GetProcAddress(h, #name "A");    \
-	if (name) break;                                          \
-	name = (__dll_##name##_t)GetProcAddress(h, #name "W");    \
-	if (name) break;                                          \
-	if(ret_on_failure)                                        \
-		return LIBUSB_ERROR_OTHER;                            \
-	} while(0)
-
 
 /* winusb.dll interface */
 

@@ -250,6 +250,20 @@ static char* sanitize_path(const char* path)
 }
 
 /*
+ * Cfgmgr32 API functions
+ */
+static int Cfgmgr32_init(void)
+{
+	DLL_LOAD(Cfgmgr32.dll, CM_Get_Parent, TRUE);
+	DLL_LOAD(Cfgmgr32.dll, CM_Get_Child, TRUE);
+	DLL_LOAD(Cfgmgr32.dll, CM_Get_Sibling, TRUE);
+	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDA, TRUE); 
+	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDW, TRUE);
+
+	return LIBUSB_SUCCESS;
+}
+
+/*
  * enumerate interfaces for a specific GUID
  *
  * Parameters:
@@ -389,6 +403,11 @@ static int windows_init(struct libusb_context *ctx)
 	HANDLE semaphore;
 	struct windows_hcd_priv** _hcd_cur;
 	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
+
+	if (Cfgmgr32_init() != LIBUSB_SUCCESS) {
+		usbi_err(ctx, "could not resolve Cfgmgr32.dll functions");
+		return LIBUSB_ERROR_OTHER;
+	}
 
 	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
 	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
