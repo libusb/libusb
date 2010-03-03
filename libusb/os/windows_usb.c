@@ -404,11 +404,6 @@ static int windows_init(struct libusb_context *ctx)
 	struct windows_hcd_priv** _hcd_cur;
 	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
-	if (Cfgmgr32_init() != LIBUSB_SUCCESS) {
-		usbi_err(ctx, "could not resolve Cfgmgr32.dll functions");
-		return LIBUSB_ERROR_OTHER;
-	}
-
 	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
 	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
@@ -448,6 +443,12 @@ static int windows_init(struct libusb_context *ctx)
 
 		// Initialize pollable file descriptors
 		init_polling();
+
+		// Load missing CFGMGR32.DLL imports
+		if (Cfgmgr32_init() != LIBUSB_SUCCESS) {
+			usbi_err(ctx, "could not resolve Cfgmgr32.dll functions");
+			return LIBUSB_ERROR_OTHER;
+		}
 
 		// Initialize the low level APIs
 		for (i=0; i<USB_API_MAX; i++) {
