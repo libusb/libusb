@@ -611,8 +611,10 @@ static int force_hcd_device_descriptor(struct libusb_device *dev, HANDLE handle)
 	priv->dev_descriptor.bLength = sizeof(USB_DEVICE_DESCRIPTOR);
 	priv->dev_descriptor.bDescriptorType = USB_DEVICE_DESCRIPTOR_TYPE;
 	dev->num_configurations = priv->dev_descriptor.bNumConfigurations = 1;
-	priv->dev_descriptor.idVendor = 0x1d6b;		// Linux Foundation root hub
 
+	// The following is used to set the VIS:PID of root HUBs similarly to what
+	// Linux does: 1d6b:0001 is for 1x root hubs, 1d6b:0002 for 2x
+	priv->dev_descriptor.idVendor = 0x1d6b;		// Linux Foundation root hub
 	if (windows_version >= WINDOWS_VISTA_AND_LATER) {
 		size = sizeof(USB_HUB_CAPABILITIES_EX);
 		if (DeviceIoControl(handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps_ex, 
@@ -629,9 +631,10 @@ static int force_hcd_device_descriptor(struct libusb_device *dev, HANDLE handle)
 			size, &hub_caps, size, &size, NULL)) {
 			usbi_warn(ctx, "could not read hub capabilities (std) for hub %s: %s", 
 				priv->path, windows_error_str(0));
-			return LIBUSB_ERROR_IO;
+			priv->dev_descriptor.idProduct = 1;	// Indicate 1x speed
+		} else {
+			priv->dev_descriptor.idProduct = hub_caps.HubIs2xCapable?2:1;
 		}
-		priv->dev_descriptor.idProduct = hub_caps.HubIs2xCapable?2:1;
 	}
 
 	return LIBUSB_SUCCESS;
@@ -870,7 +873,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 
 			// Open Hub
 			handle = CreateFileA(path_str, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 
-				FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
+				FILE_FLAG_OVERLAPPED, NULL);
 			if(handle == INVALID_HANDLE_VALUE) {
 				usbi_warn(ctx, "could not open hub %s: %s", path_str, windows_error_str(0));
 				continue;
@@ -1447,7 +1450,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 		}
 
 		handle = CreateFileA(hcd->path, GENERIC_WRITE, FILE_SHARE_WRITE,
-			NULL, OPEN_EXISTING, FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_OVERLAPPED, NULL);
+			NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 		if (handle == INVALID_HANDLE_VALUE) {
 			usbi_warn(ctx, "could not open bus %u, skipping: %s", bus, windows_error_str(0));
 			continue;
