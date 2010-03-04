@@ -112,7 +112,7 @@ static int composite_copy_transfer_data(struct usbi_transfer *itransfer, uint32_
 // Global variables
 struct windows_hcd_priv* hcd_root = NULL;
 uint64_t hires_frequency, hires_ticks_to_ps;
-const uint64_t epoch_time = 116444736000000000;	// 1970.01.01 00:00:000 in MS Filetime
+const uint64_t epoch_time = UINT64_C(116444736000000000);	// 1970.01.01 00:00:000 in MS Filetime
 enum windows_version windows_version = WINDOWS_UNSUPPORTED;
 // Concurrency
 static int concurrent_usage = -1;
@@ -1951,12 +1951,12 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 	if (!QueryPerformanceFrequency(&li_frequency)) {
 		usbi_dbg("no hires timer available on this platform");
 		hires_frequency = 0;
-		hires_ticks_to_ps = 0;	
+		hires_ticks_to_ps = UINT64_C(0);	
 	} else {
 		hires_frequency = li_frequency.QuadPart;
 		// The hires frequency can go as high as 4 GHz, so we'll use a conversion
 		// to picoseconds to compute the tv_nsecs part in clock_gettime
-		hires_ticks_to_ps =  1000000000000 / hires_frequency; 
+		hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency; 
 		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
 	}
 
