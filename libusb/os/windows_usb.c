@@ -759,7 +759,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 	USB_HUB_NAME_FIXED s_hubname;
 	USB_NODE_CONNECTION_INFORMATION conn_info;
 	USB_NODE_INFORMATION hub_node;
-	bool is_hcd;	
+	bool is_hcd, need_unref = false;	
 	int i, r;
 	LPCWSTR wstr;
 	char *tmp_str = NULL, *path_str = NULL;
@@ -792,7 +792,10 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 	for (i = 1, r = LIBUSB_SUCCESS; ; i++)
 	{
 		// safe loop: release all dynamic resources 
-		safe_unref_device(dev);
+		if (need_unref) {
+			safe_unref_device(dev);
+			need_unref = false;
+		}
 		safe_free(tmp_str);
 		safe_free(path_str);
 		safe_closehandle(handle);
@@ -906,6 +909,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			if ((dev = usbi_alloc_device(ctx, session_id)) == NULL) { 
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
+			need_unref = true;
 
 			LOOP_CHECK(initialize_device(dev, busnum, devaddr, path_str, i, 
 				conn_info.CurrentConfigurationValue, parent_dev));
