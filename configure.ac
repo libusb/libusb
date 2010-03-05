@@ -44,6 +44,7 @@ case $host in
 	LIBS="-lsetupapi -lole32"
 	AM_CFLAGS="-Wshadow"	
 	AM_LDFLAGS="-no-undefined -avoid-version"
+	AC_CHECK_TOOL(RC, windres, no)
 	;;
 *-cygwin*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
@@ -54,6 +55,7 @@ case $host in
 	LIBS="-lpthread -lsetupapi -lole32"
 	AM_CFLAGS=""	
 	AM_LDFLAGS="-no-undefined -avoid-version"
+	AC_CHECK_TOOL(RC, windres, no)
 	;;	
 *)
 	AC_MSG_ERROR([unsupported operating system])
