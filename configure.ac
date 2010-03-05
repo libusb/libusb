@@ -43,7 +43,7 @@ case $host in
 	threads="windows"
 	LIBS="-lsetupapi -lole32"
 	AM_CFLAGS="-Wshadow"	
-	AM_LDFLAGS="-no-undefined"
+	AM_LDFLAGS="-no-undefined -avoid-version"
 	;;
 *-cygwin*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
@@ -53,7 +53,7 @@ case $host in
 	threads="posix"
 	LIBS="-lpthread -lsetupapi -lole32"
 	AM_CFLAGS=""	
-	AM_LDFLAGS="-no-undefined"
+	AM_LDFLAGS="-no-undefined -avoid-version"
 	;;	
 *)
 	AC_MSG_ERROR([unsupported operating system])
@@ -65,9 +65,9 @@ AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" == "xwindows"])
 AM_CONDITIONAL([POSIX_THREADS], [test "x$threads" == "xposix"])
 
 # Library versioning
-lt_major="0"
-lt_revision="0"
-lt_age="0"
+lt_major="1"
+lt_revision="2"
+lt_age="3"
 AC_SUBST(lt_major)
 AC_SUBST(lt_revision)
 AC_SUBST(lt_age)
