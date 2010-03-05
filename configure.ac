@@ -65,9 +65,9 @@ AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" == "xwindows"])
 AM_CONDITIONAL([POSIX_THREADS], [test "x$threads" == "xposix"])
 
 # Library versioning
-lt_major="1"
-lt_revision="2"
-lt_age="3"
+lt_major="0"
+lt_revision="0"
+lt_age="0"
 AC_SUBST(lt_major)
 AC_SUBST(lt_revision)
 AC_SUBST(lt_age)
