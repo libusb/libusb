@@ -114,7 +114,7 @@ SOURCE=".\libusb\libusb-1.0.def"
 # End Source File
 # Begin Source File
 
-SOURCE=".\msvc\libusb-1.0.rc"
+SOURCE=".\libusb\libusb-1.0.rc"
 # End Source File
 # Begin Source File
 

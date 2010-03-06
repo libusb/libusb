@@ -4,12 +4,10 @@ if Test%BUILD_ALT_DIR%==Test goto usage
 set version=1.0
 
 cd libusb\os
-copy /y ..\..\msvc\libusb-%version%.rc .
 @echo on
 build -cZ
 @echo off
 if errorlevel 1 goto builderror
-del libusb-%version%.rc
 cd ..\..
 
 set cpudir=i386
@@ -94,7 +92,6 @@ goto done
 
 
 :builderror
-del libusb-%version%.rc
 cd ..\..
 echo Build failed
 goto done
