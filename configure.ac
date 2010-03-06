@@ -66,14 +66,6 @@ AM_CONDITIONAL([OS_DARWIN], [test "x$backend" == "xdarwin"])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" == "xwindows"])
 AM_CONDITIONAL([POSIX_THREADS], [test "x$threads" == "xposix"])
 
-# Library versioning
-lt_major="0"
-lt_revision="0"
-lt_age="0"
-AC_SUBST(lt_major)
-AC_SUBST(lt_revision)
-AC_SUBST(lt_age)
-
 # timerfd
 AC_CHECK_HEADER([sys/timerfd.h], [timerfd_h=1], [timerfd_h=0])
 AC_ARG_ENABLE([timerfd],
