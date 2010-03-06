@@ -167,10 +167,6 @@ SOURCE=.\libusb\os\poll_posix.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\msvc\resource.h
-# End Source File
-# Begin Source File
-
 SOURCE=.\libusb\os\threads_posix.h
 # End Source File
 # Begin Source File
