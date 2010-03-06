@@ -302,7 +302,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\os\windows_compat.c"
+				RelativePath=".\libusb\os\poll_windows.c"
 				>
 			</File>
 			<File
@@ -332,7 +332,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\os\windows_compat.h"
+				RelativePath=".\libusb\os\poll_windows.h"
 				>
 			</File>
 			<File

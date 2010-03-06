@@ -50,6 +50,7 @@
 				RuntimeLibrary="1"
 				WarningLevel="3"
 				DebugInformationFormat="4"
+				CallingConvention="2"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -123,6 +124,7 @@
 				RuntimeLibrary="1"
 				WarningLevel="3"
 				DebugInformationFormat="3"
+				CallingConvention="2"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -196,6 +198,7 @@
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
 				DebugInformationFormat="3"
+				CallingConvention="2"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -269,6 +272,7 @@
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
 				DebugInformationFormat="3"
+				CallingConvention="2"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -330,15 +334,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\libusb\os\poll_windows.c"
+				>
+			</File>
+			<File
 				RelativePath=".\libusb\sync.c"
 				>
 			</File>
 			<File
 				RelativePath=".\libusb\os\threads_windows.c"
-				>
-			</File>
-			<File
-				RelativePath=".\libusb\os\windows_compat.c"
 				>
 			</File>
 			<File
@@ -364,11 +368,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\os\threads_windows.h"
+				RelativePath=".\libusb\os\poll_windows.h"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\os\windows_compat.h"
+				RelativePath=".\libusb\os\threads_windows.h"
 				>
 			</File>
 			<File

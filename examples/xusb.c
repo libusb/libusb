@@ -191,7 +191,7 @@ int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_t right
 	output_report[5] = right;
 
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
-		HID_SET_REPORT, (HID_REPORT_TYPE_OUTPUT<<8)|0x00, 0, output_report,06, 1000));
+		HID_SET_REPORT, (HID_REPORT_TYPE_OUTPUT<<8)|0x00, 0, output_report, 06, 1000));
 	return 0;
 }
 
@@ -247,7 +247,7 @@ int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, ui
 		return -1;
 	}	
 	
-	printf("   sent %d CDB bytes (%d)\n", cdb_len,sizeof(cbw));
+	printf("   sent %d CDB bytes\n", cdb_len);
 	return 0;
 }
 
@@ -423,6 +423,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 int get_hid_input_record_size(uint8_t *hid_report_descriptor, int size)
 {
 	uint8_t i, j = 0;
+	uint8_t offset;
 	int record_size[2] = {0, 0};
 	int nb_bits = 0, nb_items = 0;
 	bool found_bits, found_items, found_direction;
@@ -430,7 +431,10 @@ int get_hid_input_record_size(uint8_t *hid_report_descriptor, int size)
 	found_bits = false;
 	found_items = false;
 	found_direction = false;
-	for (i = hid_report_descriptor[0]+1; i < size; i += 2) {
+	for (i = hid_report_descriptor[0]+1; i < size; i += offset) {
+		offset = (hid_report_descriptor[i]&0x03) + 1;
+		if (offset == 4)
+			offset = 5;
 		switch (hid_report_descriptor[i]) {
 		case 0x75:	// bitsize
 			nb_bits = hid_report_descriptor[i+1];
@@ -476,15 +480,10 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		LIBUSB_REQUEST_GET_DESCRIPTOR, LIBUSB_DT_REPORT<<8, 0, hid_report_descriptor, 256, 1000);
 	if (r < 0) {
 		printf("failed\n");
+		return -1;
 	} else {
 		display_buffer_hex(hid_report_descriptor, r);
 		size = get_hid_input_record_size(hid_report_descriptor, r);
-
-#if !defined(OS_WINDOWS)
-		// TOFIX: get_hid_input_record_size still needs some improvements on Linux
-		if ((VID == 0x045E) && (PID = 0x0008))
-			size++;
-#endif
 		printf("\n   Input Report Length: %d\n", size);
 	}
 
@@ -498,10 +497,19 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		HID_GET_REPORT, (HID_REPORT_TYPE_FEATURE<<8)|0, 0, input_report, (uint16_t)size, 5000);
 	if (r >= 0) {
 		display_buffer_hex(input_report, size);
-	} else if (r == LIBUSB_ERROR_NOT_FOUND) {
-		printf("   No Feature Report available for this device\n");
 	} else {
-		printf("   Error: %s\n", libusb_strerror(r));
+		switch(r) {		
+		case LIBUSB_ERROR_NOT_FOUND:
+			printf("   No Feature Report available for this device\n");
+			break;
+		case LIBUSB_ERROR_PIPE:
+			printf("   Detected stall - resetting pipe...\n");
+			libusb_clear_halt(handle, 0);
+			break;
+		default:
+			printf("   Error: %s\n", libusb_strerror(r));
+			break;
+		}
 	}
 
 	printf("\nReading Input Report...\n");
@@ -514,6 +522,10 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		case LIBUSB_ERROR_TIMEOUT:
 			printf("   Timeout! Please make sure you act on the device within the 5 seconds allocated...\n");
 			break;
+		case LIBUSB_ERROR_PIPE:
+			printf("   Detected stall - resetting pipe...\n");
+			libusb_clear_halt(handle, 0);
+			break;
 		default:
 			printf("   Error: %s\n", libusb_strerror(r));
 			break;
@@ -521,8 +533,8 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	}
 
 	// Attempt a bulk read from endpoint 0 (this should just return a raw input report)
-	printf("\nTesting bulk read using endpoint %02X...\n", endpoint_in);
-	r = libusb_bulk_transfer(handle, endpoint_in, input_report, size, &size, 5000);
+	printf("\nTesting interrupt read using endpoint %02X...\n", endpoint_in);
+	r = libusb_interrupt_transfer(handle, endpoint_in, input_report, size, &size, 5000);
 	if (r >= 0) {
 		display_buffer_hex(input_report, size);
 	} else {
@@ -541,6 +553,9 @@ int test_device(uint16_t vid, uint16_t pid)
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
 	int iface, nb_ifaces, nb_strings;
+#ifndef OS_WINDOWS
+	int iface_detached = -1;
+#endif
 	int test_scsi = 0;
 	struct libusb_device_descriptor dev_desc;
 	char string[128];
@@ -612,6 +627,7 @@ int test_device(uint16_t vid, uint16_t pid)
 				// Maybe we need to detach the driver
 				perr("   Failed. Trying to detach driver...\n");
 				libusb_detach_kernel_driver(handle, iface);
+				iface_detached = iface;
 				printf("   Claiming interface again...\n");
 				libusb_claim_interface(handle, iface);
 			} else {
@@ -655,6 +671,13 @@ int test_device(uint16_t vid, uint16_t pid)
 		printf("Releasing interface %d...\n", iface);
 		libusb_release_interface(handle, iface);
 	}
+
+#ifndef OS_WINDOWS
+	if (iface_detached >= 0) {
+		printf("Re-attaching kernel driver...\n");
+		libusb_attach_kernel_driver(handle, iface_detached);
+	}
+#endif
 
 	printf("Closing device...\n");
 	libusb_close(handle);

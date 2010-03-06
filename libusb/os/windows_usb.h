@@ -84,8 +84,6 @@ inline void upperize(char* str) {
 	for (i=0; i<strlen(str); i++)
 		str[i] = (char)toupper((int)str[i]);
 }
-extern char* sanitize_path(const char* path);
-extern char *windows_error_str(uint32_t retval);
 
 #define MAX_CTRL_BUFFER_LENGTH      4096
 #define MAX_USB_DEVICES             256
@@ -297,6 +295,32 @@ struct windows_transfer_priv {
 
 
 /*
+ * API macros - from libusb-win32 1.x
+ */
+#define DLL_DECLARE(api, ret, name, args)                    \
+  typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name
+
+#define DLL_LOAD(dll, name, ret_on_failure)                   \
+	do {                                                      \
+		HMODULE h = GetModuleHandle(#dll);                    \
+	if (!h)                                                   \
+		h = LoadLibrary(#dll);                                \
+	if (!h) {                                                 \
+		if (ret_on_failure) { return LIBUSB_ERROR_OTHER; }    \
+		else { break; }                                       \
+	}                                                         \
+	name = (__dll_##name##_t)GetProcAddress(h, #name);        \
+	if (name) break;                                          \
+	name = (__dll_##name##_t)GetProcAddress(h, #name "A");    \
+	if (name) break;                                          \
+	name = (__dll_##name##_t)GetProcAddress(h, #name "W");    \
+	if (name) break;                                          \
+	if(ret_on_failure)                                        \
+		return LIBUSB_ERROR_OTHER;                            \
+	} while(0)
+
+
+/*
  * Windows DDK API definitions. Most of it copied from MinGW's includes
  */
 typedef DWORD DEVNODE, DEVINST;
@@ -306,11 +330,11 @@ typedef RETURN_TYPE	CONFIGRET;
 
 #define CR_SUCCESS                              0x00000000
 #define CR_NO_SUCH_DEVNODE                      0x0000000D
-#if defined(_CFGMGR32_)
-#define CMAPI DECLSPEC_EXPORT
-#else
-#define CMAPI DECLSPEC_IMPORT
-#endif
+//#if defined(_CFGMGR32_)
+//#define CMAPI DECLSPEC_EXPORT
+//#else
+//#define CMAPI DECLSPEC_IMPORT
+//#endif
 
 #define USB_DEVICE_DESCRIPTOR_TYPE              LIBUSB_DT_DEVICE
 #define USB_CONFIGURATION_DESCRIPTOR_TYPE       LIBUSB_DT_CONFIG
@@ -375,39 +399,12 @@ typedef enum _USB_HUB_NODE {
 	UsbMIParent
 } USB_HUB_NODE;
 
-typedef enum _DEVICE_INSTALL_STATE {
-  InstallStateInstalled,
-  InstallStateNeedsReinstall,
-  InstallStateFailedInstall,
-  InstallStateFinishInstall
-} DEVICE_INSTALL_STATE, *PDEVICE_INSTALL_STATE;
-
-CMAPI CONFIGRET WINAPI CM_Get_Parent(
-  /*OUT*/ PDEVINST  pdnDevInst,
-  /*IN*/ DEVINST  dnDevInst,
-  /*IN*/ ULONG  ulFlags);
-
-CMAPI CONFIGRET WINAPI CM_Get_Child(
-  /*OUT*/ PDEVINST  pdnDevInst,
-  /*IN*/ DEVINST  dnDevInst,
-  /*IN*/ ULONG  ulFlags);
-
-CMAPI CONFIGRET WINAPI CM_Get_Sibling(
-  /*OUT*/ PDEVINST  pdnDevInst,
-  /*IN*/ DEVINST  DevInst,
-  /*IN*/ ULONG  ulFlags);
-
-CMAPI CONFIGRET WINAPI CM_Get_Device_IDA(
-  /*IN*/ DEVINST  dnDevInst,
-  /*OUT*/ PCHAR  Buffer,
-  /*IN*/ ULONG  BufferLen,
-  /*IN*/ ULONG  ulFlags);
-
-CMAPI CONFIGRET WINAPI CM_Get_Device_IDW(
-  /*IN*/ DEVINST  dnDevInst,
-  /*OUT*/ PWCHAR  Buffer,
-  /*IN*/ ULONG  BufferLen,
-  /*IN*/ ULONG  ulFlags);
+/* Cfgmgr32.dll interface */
+DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Parent, (PDEVINST, DEVINST, ULONG));
+DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Child, (PDEVINST, DEVINST, ULONG));
+DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Sibling, (PDEVINST, DEVINST, ULONG));
+DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDA, (DEVINST, PCHAR, ULONG, ULONG));
+DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDW, (DEVINST, PWCHAR, ULONG, ULONG));
 
 #ifdef UNICODE
 #define CM_Get_Device_ID CM_Get_Device_IDW
@@ -596,34 +593,6 @@ typedef struct _USB_HUB_CAPABILITIES_EX {
 } USB_HUB_CAPABILITIES_EX, *PUSB_HUB_CAPABILITIES_EX;
 
 #pragma pack(pop)
-
-
-/*
- * API macros - from libusb-win32 1.x
- */
-
-#define DLL_DECLARE(api, ret, name, args)                    \
-  typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name
-
-#define DLL_LOAD(dll, name, ret_on_failure)                   \
-	do {                                                      \
-		HMODULE h = GetModuleHandle(#dll);                    \
-	if (!h)                                                   \
-		h = LoadLibrary(#dll);                                \
-	if (!h) {                                                 \
-		if (ret_on_failure) { return LIBUSB_ERROR_OTHER; }    \
-		else { break; }                                       \
-	}                                                         \
-	name = (__dll_##name##_t)GetProcAddress(h, #name);        \
-	if (name) break;                                          \
-	name = (__dll_##name##_t)GetProcAddress(h, #name "A");    \
-	if (name) break;                                          \
-	name = (__dll_##name##_t)GetProcAddress(h, #name "W");    \
-	if (name) break;                                          \
-	if(ret_on_failure)                                        \
-		return LIBUSB_ERROR_OTHER;                            \
-	} while(0)
-
 
 /* winusb.dll interface */
 

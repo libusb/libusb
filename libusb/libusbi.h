@@ -178,10 +178,10 @@ void inline usbi_dbg(const char *format, ...)
 #include <os/threads_posix.h>
 #elif defined(OS_WINDOWS) && (defined(__CYGWIN__) || defined(USE_PTHREAD))
 #include <os/threads_posix.h>
-#include <os/windows_compat.h>
+#include <os/poll_windows.h>
 #elif defined(OS_WINDOWS)
 #include <os/threads_windows.h>
-#include <os/windows_compat.h>
+#include <os/poll_windows.h>
 #endif
 
 extern struct libusb_context *usbi_default_context;

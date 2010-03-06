@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #ifndef OS_WINDOWS
-#include "os/unistd_posix.h"
+#include "os/poll_posix.h"
 #endif
 
 #include "libusbi.h"
@@ -832,8 +832,53 @@ API_EXPORTED void libusb_unref_device(libusb_device *dev)
 		list_del(&dev->list);
 		usbi_mutex_unlock(&dev->ctx->usb_devs_lock);
 
+		usbi_mutex_destroy(&dev->lock);
 		free(dev);
 	}
+}
+
+/*
+ * Interrupt the iteration of the event handling thread, so that it picks
+ * up the new fd.
+ */
+void usbi_fd_notification(struct libusb_context *ctx)
+{
+	unsigned char dummy = 1;
+	ssize_t r;
+
+	if (ctx == NULL)
+		return;
+
+	/* record that we are messing with poll fds */
+	usbi_mutex_lock(&ctx->pollfd_modify_lock);
+	ctx->pollfd_modify++;
+	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+
+	/* write some data on control pipe to interrupt event handlers */
+	r = usbi_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
+	if (r <= 0) {
+		usbi_warn(ctx, "internal signalling write failed");
+		usbi_mutex_lock(&ctx->pollfd_modify_lock);
+		ctx->pollfd_modify--;
+		usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+		return;	
+	}
+
+	/* take event handling lock */
+	libusb_lock_events(ctx);
+
+	/* read the dummy data */
+	r = usbi_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+	if (r <= 0)
+		usbi_warn(ctx, "internal signalling read failed");
+
+	/* we're done with modifying poll fds */
+	usbi_mutex_lock(&ctx->pollfd_modify_lock);
+	ctx->pollfd_modify--;
+	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+
+	/* Release event handling lock and wake up event waiters */
+	libusb_unlock_events(ctx);
 }
 
 /** \ingroup dev
@@ -860,7 +905,6 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device_handle *_handle;
 	size_t priv_size = usbi_backend->device_handle_priv_size;
-	unsigned char dummy = 1;
 	ssize_t r;
 	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
 
@@ -899,36 +943,7 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	 * or infinite timeout. We want to interrupt that iteration of the loop,
 	 * so that it picks up the new fd, and then continues. */
 
-	/* record that we are messing with poll fds */
-	usbi_mutex_lock(&ctx->pollfd_modify_lock);
-	ctx->pollfd_modify++;
-	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
-
-	/* write some data on control pipe to interrupt event handlers */
-	r = usbi_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
-	if (r <= 0) {
-		usbi_warn(ctx, "internal signalling write failed");
-		usbi_mutex_lock(&ctx->pollfd_modify_lock);
-		ctx->pollfd_modify--;
-		usbi_mutex_unlock(&ctx->pollfd_modify_lock);
-		return 0;
-	}
-
-	/* take event handling lock */
-	libusb_lock_events(ctx);
-
-	/* read the dummy data */
-	r = usbi_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
-	if (r <= 0)
-		usbi_warn(ctx, "internal signalling read failed");
-
-	/* we're done with modifying poll fds */
-	usbi_mutex_lock(&ctx->pollfd_modify_lock);
-	ctx->pollfd_modify--;
-	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
-
-	/* Release event handling lock and wake up event waiters */
-	libusb_unlock_events(ctx);
+	usbi_fd_notification(ctx);
 
 	return 0;
 }

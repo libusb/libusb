@@ -25,7 +25,7 @@
 #include <string.h>
 
 #ifndef OS_WINDOWS
-#include "os/unistd_posix.h"
+#include "os/poll_posix.h"
 #endif
 
 #ifdef USBI_TIMERFD_AVAILABLE
