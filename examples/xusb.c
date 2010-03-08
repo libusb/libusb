@@ -154,7 +154,7 @@ void display_buffer_hex(unsigned char *buffer, unsigned size)
 }
 
 
-// The XBOX Controller is really a HID device that got its  HID Report Descriptors 
+// The XBOX Controller is really a HID device that got its HID Report Descriptors 
 // removed by Microsoft.
 // Input/Output reports described at http://euc.jp/periphs/xbox-controller.ja.html
 int display_xbox_status(libusb_device_handle *handle)
@@ -691,7 +691,10 @@ __cdecl
 #endif
 main(int argc, char** argv)
 {
+	int show_help = 0;
+	int got_vidpid = 0;
 	int r;
+	size_t i, arglen1, arglen2;
 	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
 
@@ -707,61 +710,92 @@ main(int argc, char** argv)
 	}
 
 	if (argc >= 2) {
-		if ((argv[1][0] != '-') || (argv[1][1] == 'h')) {
-			printf("usage: %s [-h] [-i] [-j] [-k] [-l] [-s] [-x] [vid:pid]\n", argv[0]);
-			printf("   -h: display usage\n");
-			printf("   -i: test HID device\n");
-			printf("   -j: test OLIMEX ARM-USB-TINY JTAG, 2 channel composite device\n");
-			printf("   -k: test Mass Storage USB device\n");
-			printf("   -l: test Plantronics Headset (HID)\n");
-			printf("   -s: test Microsoft Sidewinder Precision Pro (HID)\n");
-			printf("   -x: test Microsoft XBox Controller Type S (default)\n");
+		arglen1 = strlen(argv[1]);
+		if ( ((argv[1][0] == '-') || (argv[1][0] == '/'))
+		  && (arglen1 >= 2) ) {
+			switch(argv[1][1]) {
+			case 'i':
+				// IBM HID Optical mouse - 1 interface
+				VID = 0x04B3;
+				PID = 0x3108;
+				test_mode = USE_HID;
+				break;
+			case 'j':
+				// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
+				VID = 0x15BA;
+				PID = 0x0004;
+				test_mode = USE_JTAG;
+				break;
+			case 'k':
+				// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
+				VID = 0x0204;
+				PID = 0x6025;
+				test_mode = USE_KEY;
+				break;
+			case 'l':
+				// Plantronics DSP 400, 2 channel HID composite device - 1 HID interface
+				VID = 0x047F;
+				PID = 0x0CA1;
+				test_mode = USE_HID;
+				break;
+			case 's':
+				// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
+				VID = 0x045E;
+				PID = 0x0008;
+				test_mode = USE_HID;
+				break;
+			default:
+				show_help = -1;
+				break;
+			}
+		} else {
+			for (i=0; i<arglen1; i++) {
+				if (argv[1][i] == ':')
+					break;
+			}
+			if (i != arglen1) {
+				if (sscanf_s(argv[1], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
+					printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
+					return 1;
+				}
+				VID = (uint16_t)tmp_vid;
+				PID = (uint16_t)tmp_pid;
+				test_mode = USE_KEY;
+				got_vidpid = -1;
+			} else {
+				show_help = -1;
+			}
+		}
+	}
 
-			return 0;
+	if ((argc == 3) && (!got_vidpid)) {
+		arglen2 = strlen(argv[2]);
+		for (i=0; i<arglen2; i++) {
+			if (argv[2][i] == ':')
+				break;
 		}
-		switch(argv[1][1]) {
-		case 'i':
-			// IBM HID Optical mouse - 1 interface
-			VID = 0x04B3;
-			PID = 0x3108;
-			test_mode = USE_HID;
-			break;
-		case 'j':
-			// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
-			VID = 0x15BA;
-			PID = 0x0004;
-			test_mode = USE_JTAG;
-			break;
-		case 'k':
-			// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
-			VID = 0x0204;
-			PID = 0x6025;
-			test_mode = USE_KEY;
-			break;
-		case 'l':
-			// Plantronics DSP 400, 2 channel HID composite device - 1 HID interface
-			VID = 0x047F;
-			PID = 0x0CA1;
-			test_mode = USE_HID;
-			break;
-		case 's':
-			// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
-			VID = 0x045E;
-			PID = 0x0008;
-			test_mode = USE_HID;
-			break;
-		default:
-			break;
-		}
-		if (argc == 3) {
+		if (i != arglen2) {
 			if (sscanf_s(argv[2], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
 				printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
 				return 1;
 			}
 			VID = (uint16_t)tmp_vid;
 			PID = (uint16_t)tmp_pid;
-			printf("%04X:%04X\n", VID, PID);
+		} else {
+			show_help = -1;
 		}
+	}
+
+	if ((show_help) || (argc == 1) || (argc >= 4)) {
+		printf("usage: %s [-h] [-i] [-j] [-k] [-l] [-s] [-x] [vid:pid]\n", argv[0]);
+		printf("   -h: display usage\n");
+		printf("   -i: test HID device\n");
+		printf("   -j: test OLIMEX ARM-USB-TINY JTAG, 2 channel composite device\n");
+		printf("   -k: test Mass Storage USB device\n");
+		printf("   -l: test Plantronics Headset (HID)\n");
+		printf("   -s: test Microsoft Sidewinder Precision Pro (HID)\n");
+		printf("   -x: test Microsoft XBox Controller Type S (default)\n");
+		return 0;
 	}
 
 	r = libusb_init(NULL);
