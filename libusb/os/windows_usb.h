@@ -85,6 +85,7 @@ inline void upperize(char* str) {
 		str[i] = (char)toupper((int)str[i]);
 }
 
+#define HCNUM_TO_CHECK              10
 #define MAX_CTRL_BUFFER_LENGTH      4096
 #define MAX_USB_DEVICES             256
 #define MAX_USB_STRING_LENGTH       128
@@ -118,16 +119,19 @@ const GUID GUID_DEVINTERFACE_USB_DEVICE = { 0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0
 #define USB_API_UNSUPPORTED 0
 #define USB_API_COMPOSITE   1
 #define USB_API_WINUSB      2
-#define USB_API_HID         3
-#define USB_API_MAX         4
+#define USB_API_LIBUSB0     3
+#define USB_API_HID         4
+#define USB_API_MAX         5
 
-const GUID CLASS_GUID_UNSUPPORTED   = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x57, 0xDA} };
-const GUID CLASS_GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
-const GUID CLASS_GUID_LIBUSB_WINUSB = { 0x78A1C341, 0x4539, 0x11D3, {0xB8, 0x8D, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71} };
-const GUID CLASS_GUID_COMPOSITE     = { 0x36FC9E60, 0xC465, 0x11cF, {0x80, 0x56, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00} };
+const GUID CLASS_GUID_UNSUPPORTED    = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x57, 0xDA} };
+const GUID CLASS_GUID_HID            = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
+const GUID CLASS_GUID_LIBUSB_WINUSB  = { 0x78A1C341, 0x4539, 0x11D3, {0xB8, 0x8D, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71} };
+const GUID CLASS_GUID_LIBUSB_LIBUSB0 = { 0xEB781AAF, 0x9C70, 0x4523, {0xA5, 0xDF, 0x64, 0x2A, 0x87, 0xEC, 0xA5, 0x67} };
+const GUID CLASS_GUID_COMPOSITE      = { 0x36FC9E60, 0xC465, 0x11cF, {0x80, 0x56, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00} };
 
 struct windows_usb_api_backend {
 	const uint8_t id;
+	const char *backend_name;
 	const GUID *class_guid;  // The Class GUID (for fallback in case the driver name cannot be read)
 	const char **driver_name_list; // Driver name, without .sys, e.g. "usbccgp"
 	const uint8_t nb_driver_names;
@@ -243,6 +247,7 @@ struct windows_device_priv {
 	uint8_t active_config;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
 	unsigned char **config_descriptor;  // list of pointers to the cached config descriptors
+	uint8_t libusb0_matched;			// Flag indicating libusb0 driver has set the path
 };
 
 static inline void windows_device_priv_init(struct windows_device_priv* p) {
@@ -312,6 +317,7 @@ struct windows_transfer_priv {
 /*
  * API macros - from libusb-win32 1.x
  */
+
 #define DLL_DECLARE(api, ret, name, args)                    \
   typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name
 
@@ -382,6 +388,12 @@ typedef RETURN_TYPE	CONFIGRET;
 #ifndef METHOD_BUFFERED
 #define METHOD_BUFFERED                         0
 #endif
+#ifndef METHOD_IN_DIRECT
+#define METHOD_IN_DIRECT                        1
+#endif
+#ifndef METHOD_OUT_DIRECT
+#define METHOD_OUT_DIRECT                       2
+#endif
 #ifndef FILE_ANY_ACCESS
 #define FILE_ANY_ACCESS                         0x00000000
 #endif
@@ -415,6 +427,7 @@ typedef enum _USB_HUB_NODE {
 } USB_HUB_NODE;
 
 /* Cfgmgr32.dll interface */
+
 DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Parent, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Child, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Sibling, (PDEVINST, DEVINST, ULONG));
@@ -622,9 +635,9 @@ typedef struct _USB_HUB_CAPABILITIES_EX {
 #define AUTO_SUSPEND            0x81
 #define SUSPEND_DELAY           0x83
 #define DEVICE_SPEED            0x01
-#define LowSpeed                0x01
-#define FullSpeed               0x02
-#define HighSpeed               0x03 
+#define wuLowSpeed              0x01
+#define wuFullSpeed             0x02
+#define wuHighSpeed             0x03 
 
 typedef enum _USBD_PIPE_TYPE {
 	UsbdPipeTypeControl,
@@ -669,6 +682,18 @@ DLL_DECLARE(WINAPI, BOOL, WinUsb_ControlTransfer, (WINUSB_INTERFACE_HANDLE, WINU
 DLL_DECLARE(WINAPI, BOOL, WinUsb_ResetPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
 DLL_DECLARE(WINAPI, BOOL, WinUsb_AbortPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
 DLL_DECLARE(WINAPI, BOOL, WinUsb_FlushPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
+
+/*
+ * libusb0 API definitions from libusb0-win32.
+ */
+
+#include "driver/driver_api.h"
+
+#define LIBUSB0_DEFAULT_TIMEOUT 5000
+#define LIBUSB0_DEVICE_NAME "\\\\.\\libusb0-"
+#define LIBUSB0_BUS_NAME "bus-0"
+#define LIBUSB0_DEVICE_NAME_MAX 256
+#define LIBUSB0_MAX_DEVICES 256
 
 /* hid.dll interface */
 

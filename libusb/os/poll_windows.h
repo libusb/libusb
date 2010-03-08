@@ -36,6 +36,7 @@
 
 enum windows_version {
 	WINDOWS_UNSUPPORTED,
+	WINDOWS_2K,
 	WINDOWS_XP,
 	WINDOWS_VISTA_AND_LATER,
 };
