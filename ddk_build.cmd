@@ -20,7 +20,7 @@ set destType=x64
 set srcPath=libusb\os\obj%BUILD_ALT_DIR%\%cpudir%
 
 set dstPath=%destType%\Debug
-if %_BuildType%==chk goto isDebug
+if %DDKBUILDENV%==chk goto isDebug
 set dstPath=%destType%\Release
 :isDebug
 
