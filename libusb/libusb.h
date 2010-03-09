@@ -593,6 +593,8 @@ typedef struct libusb_device_handle libusb_device_handle;
 /** \ingroup misc
  * Error codes. Most libusb functions return 0 on success or one of these
  * codes on failure.
+ * You can use libusb_strerror() to retrieve a short string description of
+ * a libusb_error enumeration value.
  */
 enum libusb_error {
 	/** Success (no error) */
@@ -636,6 +638,9 @@ enum libusb_error {
 
 	/** Other error */
 	LIBUSB_ERROR_OTHER = -99
+
+	/* IMPORTANT: when adding new values to this enum, remember to
+	   update the libusb_strerror() function implementation! */
 };
 
 /** \ingroup asyncio
@@ -774,6 +779,7 @@ struct libusb_transfer {
 int libusb_init(libusb_context **ctx);
 void libusb_exit(libusb_context *ctx);
 void libusb_set_debug(libusb_context *ctx, int level);
+const char *libusb_strerror(enum libusb_error errcode);
 
 ssize_t libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);
