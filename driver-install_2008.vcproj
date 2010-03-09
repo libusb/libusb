@@ -275,11 +275,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\msvc\resource.h"
-				>
-			</File>
-			<File
-				RelativePath="libusb\os\windows_usb.h"
+				RelativePath=".\libusb\os\windows_usb.h"
 				>
 			</File>
 		</Filter>

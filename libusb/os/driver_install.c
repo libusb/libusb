@@ -88,6 +88,7 @@ const struct res resource[] = { {"AMD64_DLL1" , "amd64", "WdfCoInstaller01009.dl
 								{"X86_DLL2", "x86", "winusbcoinstaller2.dll"} };
 const int nb_resources = sizeof(resource)/sizeof(resource[0]);
 
+extern char* sanitize_path(const char* path);
 char* guid_to_string(const GUID guid)
 {
 	static char guid_string[MAX_GUID_STRING_LENGTH];
@@ -109,6 +110,19 @@ void free_di(struct driver_info *start)
 	}
 }
 
+bool cfgmgr32_available = false;
+
+static int init_cfgmgr32(void)
+{
+	DLL_LOAD(Cfgmgr32.dll, CM_Get_Parent, TRUE);
+	DLL_LOAD(Cfgmgr32.dll, CM_Get_Child, TRUE);
+	DLL_LOAD(Cfgmgr32.dll, CM_Get_Sibling, TRUE);
+	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDA, TRUE); 
+	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDW, TRUE);
+
+	return LIBUSB_SUCCESS;
+}
+
 struct driver_info* list_driverless(void)
 {
 	unsigned i, j;
@@ -125,6 +139,10 @@ struct driver_info* list_driverless(void)
 	char driver[MAX_DESC_LENGTH];
 	struct driver_info *ret = NULL, *cur = NULL, *drv_info;
 	bool driverless;
+
+	if (!cfgmgr32_available) {
+		init_cfgmgr32();
+	}
 
 	// List all connected USB devices
 	dev_info = SetupDiGetClassDevs(NULL, "USB", NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
@@ -166,6 +184,7 @@ struct driver_info* list_driverless(void)
 			continue;
 		}
 */
+
 		// TODO: can't always get a device desc => provide one
 		if ( (!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_DEVICEDESC, 
 			&reg_type, (BYTE*)desc, MAX_KEY_LENGTH, &size)) ) {
@@ -180,7 +199,9 @@ struct driver_info* list_driverless(void)
 				i, r);
 			continue;
 		}
+
 		sanitized_short = sanitize_path(path);
+
 		if (sanitized_short == NULL) {
 			usbi_err(NULL, "could not sanitize path for device %d", i);
 			continue;
@@ -224,6 +245,7 @@ struct driver_info* list_driverless(void)
 			token = strtok (NULL, "#&");
 		}
 	}
+
 	return ret;
 }
 

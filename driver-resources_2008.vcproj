@@ -285,10 +285,6 @@
 				>
 			</File>
 		</Filter>
-		<File
-			RelativePath=".\msvc\resource.h"
-			>
-		</File>
 	</Files>
 	<Globals>
 	</Globals>
