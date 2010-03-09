@@ -11,17 +11,16 @@
 #include "windows_usb.h"
 #include "driver_install.h"
 
-const char inf[] = "DeviceClassGUID = \"{78a1c341-4539-11d3-b88d-00c04fad5171}\"\n" \
-	"Date = \"01/08/2010\"\n\n" \
+const char inf[] = "Date = \"03/08/2010\"\n\n" \
 	"ProviderName = \"libusb 1.0\"\n" \
 	"WinUSB_SvcDesc = \"WinUSB Driver Service\"\n" \
 	"DiskName = \"libusb (WinUSB) Device Install Disk\"\n" \
 	"ClassName = \"libusb (WinUSB) devices\"\n\n" \
 	"[Version]\n" \
-	"DriverVer = %Date%\n" \
+	"DriverVer = %Date%,1\n" \
 	"Signature = \"$Windows NT$\"\n" \
 	"Class = %ClassName%\n" \
-	"ClassGuid = %DeviceClassGUID%\n" \
+	"ClassGuid = {78a1c341-4539-11d3-b88d-00c04fad5171}\n" \
 	"Provider = %ProviderName%\n" \
 	"CatalogFile = libusb_device.cat\n\n" \
 	"[ClassInstall32]\n" \
@@ -67,13 +66,15 @@ const char inf[] = "DeviceClassGUID = \"{78a1c341-4539-11d3-b88d-00c04fad5171}\"
 	"CoInstallers_CopyFiles=11\n\n" \
 	"[SourceDisksNames]\n" \
 	"1 = %DiskName%,,,\\x86\n" \
-	"2 = %DiskName%,,,\\amd64\n\n" \
+	"2 = %DiskName%,,,\\amd64\n" \
+	"3 = %DiskName%,,,\\ia64\n\n" \
 	"[SourceDisksFiles.x86]\n" \
 	"WinUSBCoInstaller2.dll=1\n" \
 	"WdfCoInstaller01009.dll=1\n\n" \
 	"[SourceDisksFiles.amd64]\n" \
 	"WinUSBCoInstaller2.dll=2\n" \
-	"WdfCoInstaller01009.dll=2\n";
+	"WdfCoInstaller01009.dll=2\n\n" \
+	"[SourceDisksFiles.ia64]\n";
 
 
 struct res {
@@ -337,6 +338,8 @@ int create_inf(struct driver_info* drv_info, char* path)
 		return -1;
 	}
 
+	fprintf(fd, "; libusb_device.inf\n");
+	fprintf(fd, "; Copyright (c) 2010 libusb (GNU LGPL)\n");
 	fprintf(fd, "[Strings]\n");
 	fprintf(fd, "DeviceName = \"%s\"\n", drv_info->desc);
 	fprintf(fd, "DeviceID = \"%s&%s", drv_info->vid, drv_info->pid);
@@ -347,7 +350,7 @@ int create_inf(struct driver_info* drv_info, char* path)
 	}
 	CoCreateGuid(&guid);
 	fprintf(fd, "DeviceGUID = \"%s\"\n", guid_to_string(guid));
-	fwrite(inf, sizeof(inf), 1, fd);
+	fwrite(inf, sizeof(inf)-1, 1, fd);
 	return 0;
 
 	// TODO: extract coinstaller files from resource
