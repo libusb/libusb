@@ -3248,7 +3248,7 @@ static int libusb0_submit_iso_transfer(struct usbi_transfer *itransfer) {
 	libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(libusb0_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);	
+	wfd = usbi_create_fd(libusb0_handle, direction_in?_O_RDONLY:_O_WRONLY);	
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3461,7 +3461,7 @@ static int libusb0_submit_control_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("will use interface %d", current_interface);
 	libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 
-	wfd = usbi_create_fd(libusb0_handle, _O_RDONLY, ctx);	
+	wfd = usbi_create_fd(libusb0_handle, _O_RDONLY);	
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3546,7 +3546,7 @@ static int libusb0_submit_bulk_transfer(struct usbi_transfer *itransfer)
 	libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(libusb0_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);	
+	wfd = usbi_create_fd(libusb0_handle, direction_in?_O_RDONLY:_O_WRONLY);	
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
