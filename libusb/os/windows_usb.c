@@ -676,8 +676,10 @@ static int force_hcd_device_descriptor(struct libusb_device *dev, HANDLE handle)
 	priv->dev_descriptor.bLength = sizeof(USB_DEVICE_DESCRIPTOR);
 	priv->dev_descriptor.bDescriptorType = USB_DEVICE_DESCRIPTOR_TYPE;
 	dev->num_configurations = priv->dev_descriptor.bNumConfigurations = 1;
-	priv->dev_descriptor.idVendor = 0x1d6b;		// Linux Foundation root hub
 
+	// The following is used to set the VIS:PID of root HUBs similarly to what
+	// Linux does: 1d6b:0001 is for 1x root hubs, 1d6b:0002 for 2x
+	priv->dev_descriptor.idVendor = 0x1d6b;		// Linux Foundation root hub
 	if (windows_version >= WINDOWS_VISTA_AND_LATER) {
 		size = sizeof(USB_HUB_CAPABILITIES_EX);
 		if (DeviceIoControl(handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps_ex, 
@@ -694,8 +696,7 @@ static int force_hcd_device_descriptor(struct libusb_device *dev, HANDLE handle)
 			size, &hub_caps, size, &size, NULL)) {
 			usbi_warn(ctx, "could not read hub capabilities (std) for hub %s: %s", 
 				priv->path, windows_error_str(0));
-			/* Hmm. */
-			priv->dev_descriptor.idProduct = 0;
+			priv->dev_descriptor.idProduct = 1;	// Indicate 1x speed
 		} else {
 			priv->dev_descriptor.idProduct = hub_caps.HubIs2xCapable?2:1;
 		}
@@ -823,7 +824,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 	USB_HUB_NAME_FIXED s_hubname;
 	USB_NODE_CONNECTION_INFORMATION conn_info;
 	USB_NODE_INFORMATION hub_node;
-	bool is_hcd;	
+	bool is_hcd, need_unref = false;	
 	int i, r;
 	LPCWSTR wstr;
 	char *tmp_str = NULL, *path_str = NULL;
@@ -856,7 +857,10 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 	for (i = 1, r = LIBUSB_SUCCESS; ; i++)
 	{
 		// safe loop: release all dynamic resources 
-		safe_unref_device(dev);
+		if (need_unref) {
+			safe_unref_device(dev);
+			need_unref = false;
+		}
 		safe_free(tmp_str);
 		safe_free(path_str);
 		safe_closehandle(handle);
@@ -969,6 +973,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 			if ((dev = usbi_alloc_device(ctx, session_id)) == NULL) { 
 				LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 			}
+			need_unref = true;
 
 			LOOP_CHECK(initialize_device(dev, busnum, devaddr, path_str, i, 
 				conn_info.CurrentConfigurationValue, parent_dev));
@@ -2097,12 +2102,12 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 	if (!QueryPerformanceFrequency(&li_frequency)) {
 		usbi_dbg("no hires timer available on this platform");
 		hires_frequency = 0;
-		hires_ticks_to_ps = 0;	
+		hires_ticks_to_ps = UINT64_C(0);	
 	} else {
 		hires_frequency = li_frequency.QuadPart;
 		// The hires frequency can go as high as 4 GHz, so we'll use a conversion
 		// to picoseconds to compute the tv_nsecs part in clock_gettime
-		hires_ticks_to_ps =  UINT64_C(1000000000000) / hires_frequency; 
+		hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency; 
 		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
 	}
 
@@ -2708,7 +2713,7 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("will use interface %d", current_interface);
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	wfd = usbi_create_fd(winusb_handle, _O_RDONLY, ctx);	
+	wfd = usbi_create_fd(winusb_handle, _O_RDONLY, ctx);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -2784,7 +2789,7 @@ static int winusb_submit_bulk_transfer(struct usbi_transfer *itransfer)
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(winusb_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);	
+	wfd = usbi_create_fd(winusb_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -4486,7 +4491,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("will use interface %d", current_interface);
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	wfd = usbi_create_fd(hid_handle, _O_RDONLY, ctx);	
+	wfd = usbi_create_fd(hid_handle, _O_RDONLY, ctx);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -4588,7 +4593,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(hid_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);	
+	wfd = usbi_create_fd(hid_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}

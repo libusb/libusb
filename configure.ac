@@ -43,17 +43,19 @@ case $host in
 	threads="windows"
 	LIBS="-lsetupapi -lole32"
 	AM_CFLAGS="-Wshadow"	
-	AM_LDFLAGS="-no-undefined"
+	AM_LDFLAGS="-no-undefined -avoid-version"
+	AC_CHECK_TOOL(RC, windres, no)
 	;;
 *-cygwin*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
 	AC_SUBST(OS_WINDOWS)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
-	threads="posix"	
+	threads="posix"
 	LIBS="-lpthread -lsetupapi -lole32"
 	AM_CFLAGS=""	
-	AM_LDFLAGS="-no-undefined"
+	AM_LDFLAGS="-no-undefined -avoid-version"
+	AC_CHECK_TOOL(RC, windres, no)
 	;;	
 *)
 	AC_MSG_ERROR([unsupported operating system])
@@ -63,14 +65,6 @@ AM_CONDITIONAL([OS_LINUX], [test "x$backend" == "xlinux"])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" == "xdarwin"])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" == "xwindows"])
 AM_CONDITIONAL([POSIX_THREADS], [test "x$threads" == "xposix"])
-
-# Library versioning
-lt_major="0"
-lt_revision="0"
-lt_age="0"
-AC_SUBST(lt_major)
-AC_SUBST(lt_revision)
-AC_SUBST(lt_age)
 
 # timerfd
 AC_CHECK_HEADER([sys/timerfd.h], [timerfd_h=1], [timerfd_h=0])

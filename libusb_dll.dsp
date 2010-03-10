@@ -53,7 +53,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /dll /machine:I386
-# ADD LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "D:/Program Files/Microsoft SDK/Lib/setupapi.lib" /nologo /dll /machine:I386 /out:"Win32/Release/dll/libusb-1.0.dll"
+# ADD LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib setupapi.lib /nologo /dll /machine:I386 /out:"Win32/Release/dll/libusb-1.0.dll"
 
 !ELSEIF  "$(CFG)" == "libusb_dll - Win32 Debug"
 
@@ -79,7 +79,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo /n
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /dll /debug /machine:I386 /pdbtype:sept
-# ADD LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "D:/Program Files/Microsoft SDK/Lib/setupapi.lib" /nologo /dll /debug /machine:I386 /out:"Win32/Debug/dll/libusb-1.0_debug.dll"
+# ADD LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib setupapi.lib /nologo /dll /debug /machine:I386 /out:"Win32/Debug/dll/libusb-1.0_debug.dll"
 # SUBTRACT LINK32 /pdb:none /incremental:no
 
 !ENDIF 
@@ -114,7 +114,7 @@ SOURCE=".\libusb\libusb-1.0.def"
 # End Source File
 # Begin Source File
 
-SOURCE=".\msvc\libusb-1.0.rc"
+SOURCE=".\libusb\libusb-1.0.rc"
 # End Source File
 # Begin Source File
 
@@ -163,7 +163,7 @@ SOURCE=.\libusb\os\linux_usbfs.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\msvc\resource.h
+SOURCE=.\libusb\os\poll_posix.h
 # End Source File
 # Begin Source File
 

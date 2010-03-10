@@ -1,5 +1,5 @@
-#ifndef __LIBUSB_UNISTD_POSIX_H__
-#define __LIBUSB_UNISTD_POSIX_H__
+#ifndef __LIBUSB_POLL_POSIX_H__
+#define __LIBUSB_POLL_POSIX_H__
 
 #include <unistd.h>
 #include <poll.h>
@@ -9,4 +9,4 @@
 #define usbi_pipe pipe
 #define usbi_poll poll
 
-#endif /* __LIBUSB_UNISTD_POSIX_H__ */
+#endif /* __LIBUSB_POLL_POSIX_H__ */

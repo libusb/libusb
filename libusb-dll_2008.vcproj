@@ -388,7 +388,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\msvc\libusb-1.0.rc"
+				RelativePath=".\libusb\libusb-1.0.rc"
 				>
 			</File>
 		</Filter>

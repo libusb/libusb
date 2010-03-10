@@ -147,6 +147,10 @@ SOURCE=.\libusb\os\linux_usbfs.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\libusb\os\poll_posix.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\libusb\os\threads_posix.h
 # End Source File
 # Begin Source File
