@@ -70,12 +70,6 @@
 
 // Uncomment to debug the polling layer
 #define DEBUG_POLL_WINDOWS
-
-// Uncomment to have poll return with EINTR as soon as a new transfer (fd) is added
-// This should result in a LIBUSB_ERROR_INTERRUPTED being returned by libusb calls,
-// which should give the app an opportunity to resubmit a new fd set.
-//#define DYNAMIC_FDS
-
 #if defined(DEBUG_POLL_WINDOWS)
 #define poll_dbg usbi_dbg
 #else
@@ -121,8 +115,6 @@ static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 #endif
 
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
-
-extern void usbi_fd_notification(struct libusb_context *ctx);
 
 // public fd data
 const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE, FALSE};
@@ -434,7 +426,7 @@ out1:
  * read and one for write. Using a single R/W fd is unsupported and will
  * produce unexpected results
  */
-struct winfd usbi_create_fd(HANDLE handle, int access_mode, struct libusb_context *ctx)
+struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 {
 	int i, fd;
 	struct winfd wfd = INVALID_WINFD;
@@ -489,11 +481,6 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode, struct libusb_contex
 			usbi_mutex_unlock(&new_fd_mutex);
 			// Notify poll that fds have been updated
 			SetEvent(fd_update);
-#else
-			// NOTE: For now, usbi_fd_notification is only called on fd creation, as
-			// fd deletion results in a CancelIo() event, which poll should detect.
-			// Will see if there's an actual justification to call this on delete...
-//			usbi_fd_notification(ctx);
 #endif
 			return wfd;
 		}
