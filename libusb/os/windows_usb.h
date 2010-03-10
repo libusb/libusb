@@ -345,11 +345,6 @@ typedef RETURN_TYPE	CONFIGRET;
 
 #define CR_SUCCESS                              0x00000000
 #define CR_NO_SUCH_DEVNODE                      0x0000000D
-//#if defined(_CFGMGR32_)
-//#define CMAPI DECLSPEC_EXPORT
-//#else
-//#define CMAPI DECLSPEC_IMPORT
-//#endif
 
 #define USB_DEVICE_DESCRIPTOR_TYPE              LIBUSB_DT_DEVICE
 #define USB_CONFIGURATION_DESCRIPTOR_TYPE       LIBUSB_DT_CONFIG
