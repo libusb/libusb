@@ -15,7 +15,7 @@ set destType=x64
 :isI386
 
 set dstPath=%destType%\Debug
-if %DDKBUILDENV%==chk goto isDebug
+if %_BuildType%==chk goto isDebug
 set dstPath=%destType%\Release
 :isDebug
 
