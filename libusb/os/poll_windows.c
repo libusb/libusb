@@ -69,7 +69,7 @@
 #include <libusbi.h>
 
 // Uncomment to debug the polling layer
-//#define DEBUG_POLL_WINDOWS
+#define DEBUG_POLL_WINDOWS
 
 // Uncomment to have poll return with EINTR as soon as a new transfer (fd) is added
 // This should result in a LIBUSB_ERROR_INTERRUPTED being returned by libusb calls,
@@ -493,7 +493,7 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode, struct libusb_contex
 			// NOTE: For now, usbi_fd_notification is only called on fd creation, as
 			// fd deletion results in a CancelIo() event, which poll should detect.
 			// Will see if there's an actual justification to call this on delete...
-			usbi_fd_notification(ctx);
+//			usbi_fd_notification(ctx);
 #endif
 			return wfd;
 		}

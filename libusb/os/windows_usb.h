@@ -1,7 +1,7 @@
 /*
  * Windows backend for libusb 1.0
  * Copyright (C) 2009-2010 Pete Batard <pbatard@gmail.com>
- * With contributions from Michael Plante, Orin Eman et al.
+ * With contributions from Michael Plante, Orin Eman, Graeme W. Gill et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
  * Major code testing contribution by Xiaofan Chen
  *

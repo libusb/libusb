@@ -1,0 +1,33 @@
+TARGETNAME = libusb0
+TARGETPATH = obj 
+TARGETTYPE = DRIVER
+USER_C_FLAGS = /O2
+TARGETLIBS = $(DDK_LIB_PATH)\usbd.lib
+C_DEFINES = /DVERSION_MAJOR=0 /DVERSION_MINOR=1 /DVERSION_MICRO=12 \
+            /DVERSION_NANO=1 /DRC_VERSION=0,1,12,1 \
+            /DRC_VERSION_STR="\"0.1.12.1\""
+
+SOURCES = abort_endpoint.c \
+claim_interface.c \
+clear_feature.c \
+dispatch.c \
+driver_registry.c \
+get_configuration.c \
+get_descriptor.c \
+get_interface.c \
+get_status.c \
+ioctl.c \
+libusb_driver.c \
+pnp.c \
+power.c \
+release_interface.c \
+reset_device.c \
+reset_endpoint.c \
+set_configuration.c \
+set_descriptor.c \
+set_feature.c \
+set_interface.c \
+transfer.c \
+vendor_request.c \
+driver_debug.c \
+libusb_driver_rc.rc

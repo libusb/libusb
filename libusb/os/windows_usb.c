@@ -1,7 +1,7 @@
 /*
  * windows backend for libusb 1.0
  * Copyright (c) 2009-2010 Pete Batard <pbatard@gmail.com>
- * With contributions from Michael Plante, Orin Eman et al.
+ * With contributions from Michael Plante, Orin Eman, Graeme W. Gill et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
  * Major code testing contribution by Xiaofan Chen
  *
@@ -78,6 +78,8 @@ static int winusb_abort_control(struct usbi_transfer *itransfer);
 static int winusb_reset_device(struct libusb_device_handle *dev_handle);
 static int winusb_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size);
 // libusb0 API prototypes
+static int libusb0_io_sync(HANDLE dev, unsigned int code, void *out, int out_size,
+                        void *in, int in_size, int *ret);
 static int libusb0_init(struct libusb_context *ctx);
 static int libusb0_exit(void);
 static int libusb0_open(struct libusb_device_handle *dev_handle);
@@ -147,7 +149,6 @@ bool api_libusb0_available = false;
 #define CHECK_LIBUSB0_AVAILABLE do { if (!api_libusb0_available) return LIBUSB_ERROR_ACCESS; } while (0)
 bool api_hid_available = false;
 #define CHECK_HID_AVAILABLE do { if (!api_hid_available) return LIBUSB_ERROR_ACCESS; } while (0)
-
 
 /*
  * Converts a WCHAR string to UTF8 (allocate returned string)
@@ -1872,6 +1873,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
 		(short)((transfer->endpoint & LIBUSB_ENDPOINT_IN)?POLLIN:POLLOUT));
+	usbi_fd_notification(ctx);
 
 	return LIBUSB_SUCCESS;
 }
@@ -1891,6 +1893,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
 		(short)((transfer->endpoint & LIBUSB_ENDPOINT_IN)?POLLIN:POLLOUT));
+	usbi_fd_notification(ctx);
 
 	return LIBUSB_SUCCESS;
 }
@@ -1909,6 +1912,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	}
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, POLLIN);
+	usbi_fd_notification(ctx);
 
 	return LIBUSB_SUCCESS;
 
@@ -3101,16 +3105,15 @@ static int libusb0_claim_interface(struct libusb_device_handle *dev_handle, int 
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	bool is_composite = (priv->apib->id == USB_API_COMPOSITE);
 	HANDLE libusb0_handle;
-	USB_INTERFACE_DESCRIPTOR if_desc;
-	UCHAR policy;
-	uint8_t endpoint_address;
-	int i;
 	libusb0_request req;
 	int ret;
 
 	CHECK_LIBUSB0_AVAILABLE;
 
 //printf("~1 libusb0 claim_interface() called\n");
+
+	libusb0_handle = handle_priv->interface_handle[0].dev_handle;
+
 	// interfaces for composite devices are always independent, therefore 
 	// "alt" interfaces are only found on non-composite
 	if ((!is_composite) && (iface != 0)) {
@@ -3122,7 +3125,6 @@ static int libusb0_claim_interface(struct libusb_device_handle *dev_handle, int 
 
 //printf("~1 inteface 0 hasn't been claimed, so claim it\n");
 #if defined(AUTO_CLAIM)
-			libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 			memset(&req, 0, sizeof(req));
 			req.interface.interface = 0;
 
@@ -3211,7 +3213,6 @@ static int libusb0_submit_iso_transfer(struct usbi_transfer *itransfer) {
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)transfer->dev_handle->os_priv;
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
-	int num_packets = transfer->num_iso_packets;
 	HANDLE libusb0_handle;
 	bool direction_in, ret;
 	int current_interface;
@@ -3305,7 +3306,6 @@ static int libusb0_submit_control_transfer(struct usbi_transfer *itransfer)
 	int req_size;
 	libusb0_request *req;
 	struct winfd wfd;
-	int ret;
 
 	CHECK_LIBUSB0_AVAILABLE;
 
@@ -3579,7 +3579,6 @@ static int libusb0_clear_halt(struct libusb_device_handle *dev_handle, unsigned 
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
-	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	HANDLE libusb0_handle;
 	libusb0_request req;
 	int ret;
@@ -3605,7 +3604,6 @@ static int libusb0_abort_control(struct usbi_transfer *itransfer)
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)transfer->dev_handle->os_priv;
-	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	HANDLE libusb0_handle;
 	libusb0_request req;
 	int ret;
@@ -3631,7 +3629,6 @@ static int libusb0_abort_transfers(struct usbi_transfer *itransfer)
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)transfer->dev_handle->os_priv;
-	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	HANDLE libusb0_handle;
 	libusb0_request req;
 	int ret;
@@ -3656,7 +3653,6 @@ static int libusb0_reset_device(struct libusb_device_handle *dev_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
-	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	HANDLE libusb0_handle;
 	libusb0_request req;
 	int ret;

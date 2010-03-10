@@ -1,0 +1,53 @@
+/* LIBUSB-WIN32, Generic Windows USB Library
+ * Copyright (c) 2002-2005 Stephan Meyer <ste_meyer@web.de>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+#include <winver.h>
+
+#define RT_MANIFEST 24
+#define ID_MANIFEST 1
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION    RC_VERSION
+PRODUCTVERSION RC_VERSION
+FILEFLAGSMASK  0x3FL
+FILEFLAGS      0x0L
+FILEOS         VOS_NT_WINDOWS32
+FILETYPE       RC_FILE_TYPE
+FILESUBTYPE    RC_FILE_SUB_TYPE
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"  
+        BEGIN
+            VALUE "CompanyName",     "http://libusb-win32.sourceforge.net"
+            VALUE "FileDescription", RC_PRODUCT_STR
+            VALUE "FileVersion",     RC_VERSION_STR
+            VALUE "InternalName",    RC_FILE_NAME_STR
+            VALUE "LegalCopyright",  "@ 2002-2005 S. Meyer, <ste_meyer@web.de>"
+            VALUE "OriginalFilename",RC_FILE_NAME_STR
+            VALUE "ProductName",     RC_PRODUCT_STR
+            VALUE "ProductVersion",  RC_VERSION_STR
+        END
+    END
+
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+

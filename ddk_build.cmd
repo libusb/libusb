@@ -1,16 +1,11 @@
 @echo off
+
+@rem ==================== setup ======================
+
+@rem Compatibility with older DDK environments:
+if defined DDKBUILDENV set _BuildType=%DDKBUILDENV%
+
 if Test%BUILD_ALT_DIR%==Test goto usage
-
-set version=1.0
-
-cd libusb\os
-copy /y ..\..\msvc\libusb-%version%.rc .
-@echo on
-build -cZ
-@echo off
-if errorlevel 1 goto builderror
-del libusb-%version%.rc
-cd ..\..
 
 set cpudir=i386
 set destType=Win32
@@ -18,8 +13,6 @@ if %_BUILDARCH%==x86 goto isI386
 set cpudir=amd64
 set destType=x64
 :isI386
-
-set srcPath=libusb\os\obj%BUILD_ALT_DIR%\%cpudir%
 
 set dstPath=%destType%\Debug
 if %_BuildType%==chk goto isDebug
@@ -38,9 +31,26 @@ mkdir %dstPath%\dll
 if exist %dstPath%\lib goto md5
 md %dstPath%\lib
 :md5
-if exist %dstPath%\examples goto md6
-md %dstPath%\examples
+if exist %dstPath%\sys goto md6
+md %dstPath%\sys
 :md6
+if exist %dstPath%\examples goto md7
+md %dstPath%\examples
+:md7
+
+@rem ==================== libusb ======================
+set version=1.0
+
+cd libusb\os
+copy /y ..\..\msvc\libusb-%version%.rc .
+@echo on
+build -cZ
+@echo off
+if errorlevel 1 goto builderror
+del libusb-%version%.rc
+cd ..\..
+
+set srcPath=libusb\os\obj%BUILD_ALT_DIR%\%cpudir%
 @echo on
 
 copy %srcPath%\libusb-%version%.dll %dstPath%\dll
@@ -49,12 +59,29 @@ copy %srcPath%\libusb-%version%.lib %dstPath%\lib
 
 @echo off
 
-if exist examples\lsusb_ddkbuild goto md7
+@rem ==================== libusb0.sys ======================
+cd libusb\os\driver
+@echo on
+build -cZ
+@echo off
+if errorlevel 1 goto buildlsusberror
+cd ..\..\..
+
+set srcPath=libusb\os\driver\obj%BUILD_ALT_DIR%\%cpudir%
+@echo on
+
+copy %srcPath%\libusb0.sys %dstPath%\sys
+
+@echo off
+
+@rem ==================== example lsusb ======================
+if exist examples\lsusb_ddkbuild goto md8
 md examples\lsusb_ddkbuild
-:md7
+:md8
 
 cd examples\lsusb_ddkbuild
 copy ..\lsusb_sources sources
+copy ..\makefile makefile
 @echo on
 build -cZ
 @echo off
@@ -69,12 +96,14 @@ copy %srcPath%\lsusb.pdb %dstPath%\examples
 
 @echo off
 
-if exist examples\xusb_ddkbuild goto md8
+@rem ==================== example xusb ======================
+if exist examples\xusb_ddkbuild goto md9
 md examples\xusb_ddkbuild
-:md8
+:md9
 
 cd examples\xusb_ddkbuild
 copy ..\xusb_sources sources
+copy ..\makefile makefile
 @echo on
 build -cZ
 @echo off
@@ -89,9 +118,8 @@ copy %srcPath%\xusb.pdb %dstPath%\examples
 
 @echo off
 
-
+@rem ==================== cleanup ======================
 goto done
-
 
 :builderror
 del libusb-%version%.rc

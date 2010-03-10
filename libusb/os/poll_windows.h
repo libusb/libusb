@@ -91,6 +91,8 @@ struct winfd fd_to_winfd(int fd);
 struct winfd handle_to_winfd(HANDLE handle);
 struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);
 
+void usbi_fd_notification(struct libusb_context *ctx);
+
 // When building using the MSDDK and sources
 #if defined(DDKBUILD)
 #if !defined(timeval)

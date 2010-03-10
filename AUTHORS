@@ -2,6 +2,9 @@ Copyright (C) 2007-2009 Daniel Drake <dsd@gentoo.org>
 Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
 Copyright (C) 2008-2010 Nathan Hjelm <hjelmn@users.sourceforge.net>
 
+Windows Kernel Driver:
+Stephan Meyer, <ste_meyer@web.de>
+
 Other contributors:
 Alex Vatchenko
 Artem Egorkine
@@ -16,4 +19,5 @@ Mikhail Gusarov
 Rob Walker
 Toby Peterson
 Vasily Khoruzhick
+Graeme W. Gill
 

@@ -1,0 +1,13 @@
+claim_interface.c
+driver_debug.c
+driver_debug.h
+driver_registry.c
+get_descriptor.c
+ioctl.c
+libusb_driver.c
+libusb_driver.h
+pnp.bak.c
+pnp.c
+release_interface.c
+set_configuration.c
+set_interface.c
