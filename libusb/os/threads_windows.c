@@ -194,11 +194,13 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 
 	TIMESPEC_TO_TIMEVAL(&targ_time, abstime);
 	timersub(&targ_time, &cur_time, &delta_time);
-	if(delta_time.tv_sec <= 0) // abstime already passed?
+	if(delta_time.tv_sec < 0) // abstime already passed?
 		millis = 0;
 	else {
 		millis  = delta_time.tv_usec/1000;
 		millis += delta_time.tv_sec *1000;
+		if (delta_time.tv_usec % 1000) // round up to next millisecond
+			millis++;
 	}
 
 	return usbi_cond_intwait(cond, mutex, millis);
