@@ -6,10 +6,12 @@
 #include <inttypes.h>
 #include <objbase.h>  // for GUID ops. requires libole32.a
 #include <api/difxapi.h>
+#include <api/shellapi.h>
 
 #include "libusbi.h"
 #include "windows_usb.h"
 #include "driver_install.h"
+
 
 const char inf[] = "Date = \"03/08/2010\"\n\n" \
 	"ProviderName = \"libusb 1.0\"\n" \
@@ -352,60 +354,29 @@ int create_inf(struct driver_info* drv_info, char* path)
 	fprintf(fd, "DeviceGUID = \"%s\"\n", guid_to_string(guid));
 	fwrite(inf, sizeof(inf)-1, 1, fd);
 	return 0;
-
-	// TODO: extract coinstaller files from resource
-	// TODO: create cat file for XP?
 }
 
+// TODO: extract driver-installer.exe into the dest dir
 int install_device(char* path)
 {
-	DWORD r;
-	BOOL reboot_needed;
-//	INSTALLERINFO installer_info;
+	SHELLEXECUTEINFO shExecInfo;
+	char exename[MAX_PATH_LENGTH];
+	safe_strcpy(exename, MAX_PATH_LENGTH, path);
+	safe_strcat(exename, MAX_PATH_LENGTH, "\\driver-installer.exe");
 
-	r = DriverPackagePreinstall(path, DRIVER_PACKAGE_LEGACY_MODE|DRIVER_PACKAGE_REPAIR);
-	// Will fail if inf not signed, unless DRIVER_PACKAGE_LEGACY_MODE is specified.
-	// r = 87 ERROR_INVALID_PARAMETER on path == NULL
-	// r = 2 ERROR_FILE_NOT_FOUND if no inf in path
-	// r = 5 ERROR_ACCESS_DENIED if needs admin elevation
-	// r = 0xE0000003 ERROR_GENERAL_SYNTAX the syntax of the inf is invalid
-	// r = 0xE0000304 ERROR_INVALID_CATALOG_DATA => no cat
-	// r = 0xE0000247 if user decided not to install on warnings
-	// r = 0x800B0100 ERROR_WRONG_INF_STYLE => missing cat entry in inf
-	// r = 0xB7 => missing DRIVER_PACKAGE_REPAIR flag
-	switch(r) {
-	case ERROR_INVALID_PARAMETER:
-		usbi_err(NULL, "invalid path");
-		return -1;
-	case ERROR_FILE_NOT_FOUND:
-		usbi_err(NULL, "unable to find inf file on %s", path);
-		return -1;
-	case ERROR_ACCESS_DENIED:
-		usbi_err(NULL, "this process needs to be run with administrative privileges");
-		return -1;
-	case ERROR_WRONG_INF_STYLE:
-	case ERROR_GENERAL_SYNTAX:
-		usbi_err(NULL, "the syntax of the inf is invalid");
-		return -1;
-	case ERROR_INVALID_CATALOG_DATA:
-		usbi_err(NULL, "unable to locate cat file");
-		return -1;
-	case ERROR_DRIVER_STORE_ADD_FAILED:
-		usbi_err(NULL, "cancelled by user");
-		return -1;
-	// TODO: make DRIVER_PACKAGE_REPAIR optional
-	case ERROR_ALREADY_EXISTS:
-		usbi_err(NULL, "driver already exists");
-		return -1;
-	default:
-		usbi_err(NULL, "unhandled error %X", r);
-		return -1;
-	}
+	shExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
 
-	// TODO: use 
-	r = DriverPackageInstall(path, DRIVER_PACKAGE_LEGACY_MODE|DRIVER_PACKAGE_REPAIR,
-		NULL, &reboot_needed);
-	usbi_dbg("ret = %X", r);
+	shExecInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
+	shExecInfo.hwnd = NULL;
+	shExecInfo.lpVerb = "runas";
+	shExecInfo.lpFile = exename;
+	shExecInfo.lpParameters = NULL;
+	shExecInfo.lpDirectory = path;
+	shExecInfo.nShow = SW_MAXIMIZE;
+	shExecInfo.hInstApp = NULL;
 
+	ShellExecuteEx(&shExecInfo);
+
+	usbi_dbg("hProcess = %p",  shExecInfo.hProcess);
 	return 0;
 }

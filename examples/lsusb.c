@@ -55,7 +55,7 @@ main(void)
 	drv_info = list_driverless();
 	for (; drv_info != NULL; drv_info = drv_info->next) {
 		if (create_inf(drv_info, "C:\\test") == 0) {
-			install_device("C:\\test\\libusb_device.inf");
+			install_device("C:\\test");
 		}
 	}
 

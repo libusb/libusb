@@ -23,6 +23,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "driver-install", "driver-in
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "driver-resources", "driver-resources_2008.vcproj", "{BA852F82-4329-4CBE-82AA-9947FB48AD83}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "driver-installer", "driver-installer_2008.vcproj", "{9B1C561E-F95B-4849-A7AA-A4350E227C20}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -70,6 +72,12 @@ Global
 		{BA852F82-4329-4CBE-82AA-9947FB48AD83}.Release|Win32.ActiveCfg = Release|Win32
 		{BA852F82-4329-4CBE-82AA-9947FB48AD83}.Release|Win32.Build.0 = Release|Win32
 		{BA852F82-4329-4CBE-82AA-9947FB48AD83}.Release|x64.ActiveCfg = Release|x64
+		{9B1C561E-F95B-4849-A7AA-A4350E227C20}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9B1C561E-F95B-4849-A7AA-A4350E227C20}.Debug|Win32.Build.0 = Debug|Win32
+		{9B1C561E-F95B-4849-A7AA-A4350E227C20}.Debug|x64.ActiveCfg = Debug|Win32
+		{9B1C561E-F95B-4849-A7AA-A4350E227C20}.Release|Win32.ActiveCfg = Release|Win32
+		{9B1C561E-F95B-4849-A7AA-A4350E227C20}.Release|Win32.Build.0 = Release|Win32
+		{9B1C561E-F95B-4849-A7AA-A4350E227C20}.Release|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
