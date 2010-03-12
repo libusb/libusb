@@ -1518,7 +1518,6 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			if (handle == INVALID_HANDLE_VALUE) {
 				continue;
 			}
-//printf("~1 opened '%s' OK\n",dev_name);
 
 			/* retrieve device descriptor */
 			req.descriptor.type = LIBUSB_DT_DEVICE;
@@ -1557,7 +1556,6 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				                             sizeof(USB_DEVICE_DESCRIPTOR)) == 0) {
 
 
-//printf("~1 overwriting '%s' with '%s'\n",priv->path,filename);
 					free(priv->path);
 					priv->path = safe_strdup(filename);
 				 	priv->libusb0_matched = 1;
@@ -3025,7 +3023,6 @@ static int libusb0_open(struct libusb_device_handle *dev_handle)
 	CHECK_LIBUSB0_AVAILABLE;
 
 	// libusb0 has a single handle for the device
-//printf("~1 path '%s' apiid %d\n",priv->path,priv->apib->id);
 	if ( (priv->path != NULL) 
 	  && (priv->apib->id == USB_API_LIBUSB0) ) {
 		char dev_name[LIBUSB0_DEVICE_NAME_MAX], *p;
@@ -3035,7 +3032,7 @@ static int libusb0_open(struct libusb_device_handle *dev_handle)
 		p = strstr(dev_name, "--");
 
 		if (!p) {
-			usbi_err(ctx, "invalid device name '%s'", priv->path);
+			usbi_err(ctx, "libusb0_open: invalid device name '%s'", priv->path);
 			return LIBUSB_ERROR_OTHER;
 		}
 		*p = 0;
@@ -3048,7 +3045,7 @@ static int libusb0_open(struct libusb_device_handle *dev_handle)
 				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 
 			if (libusb0_handle == INVALID_HANDLE_VALUE) {
-				usbi_err(ctx, "could not open device %s : %s", dev_name, windows_error_str(0));
+				usbi_err(ctx, "libusb0_open: could not open device %s : %s", dev_name, windows_error_str(0));
 				switch(GetLastError()) {
 				case ERROR_FILE_NOT_FOUND:	// The device was disconnected
 					return LIBUSB_ERROR_NO_DEVICE;
@@ -3072,7 +3069,7 @@ static int libusb0_open(struct libusb_device_handle *dev_handle)
 										 &req, sizeof(libusb0_request), 
 										 &req, sizeof(libusb0_request), &ret) != LIBUSB_SUCCESS 
 			 || (ret < sizeof(libusb0_request))) {
-				usbi_err(ctx,"getting driver version failed (got %d expected %d)",ret,sizeof(libusb0_request));
+				usbi_err(ctx,"libusb0_open: getting driver version failed (got %d expected %d)",ret,sizeof(libusb0_request));
 		} else {
 			usbi_info(ctx,"usb_os_init: driver version: %d.%d.%d.%d",
 									req.version.major, req.version.minor, 
@@ -3084,7 +3081,7 @@ static int libusb0_open(struct libusb_device_handle *dev_handle)
 			if(libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_SET_DEBUG_LEVEL, 
 											 &req, sizeof(libusb0_request), 
 											 NULL, 0, NULL)) {
-				usbi_err(ctx,"usb_os_init: setting debug level failed");
+				usbi_err(ctx,"libusb0_open: setting debug level failed");
 			} else {
 				usbi_dbg("setting debug level %d succeeded", req.debug.level);
 			}
@@ -3123,20 +3120,16 @@ static int libusb0_claim_interface(struct libusb_device_handle *dev_handle, int 
 
 	CHECK_LIBUSB0_AVAILABLE;
 
-//printf("~1 libusb0 claim_interface() called\n");
-
 	libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 
 	// interfaces for composite devices are always independent, therefore 
 	// "alt" interfaces are only found on non-composite
 	if ((!is_composite) && (iface != 0)) {
 
-//printf("~1 not composite\n");
 		// It is a requirement on Windows that to claim an interface >= 1 
-		// on a non-composite WinUSB device, you must first have claimed interface 0
+		// on a non-composite device, you must first have claimed interface 0 ???
 		if (handle_priv->interface_handle[0].api_handle == 0) {	// Not claimed
 
-//printf("~1 inteface 0 hasn't been claimed, so claim it\n");
 #if defined(AUTO_CLAIM)
 			memset(&req, 0, sizeof(req));
 			req.interface.interface = 0;
@@ -3153,25 +3146,21 @@ static int libusb0_claim_interface(struct libusb_device_handle *dev_handle, int 
 			return LIBUSB_ERROR_ACCESS;
 #endif
 		}
-//printf("~1 claiming inteface %d\n",iface);
 		if (handle_priv->interface_handle[iface].api_handle == 0) {		// Not claimed
 			memset(&req, 0, sizeof(req));
 			req.interface.interface = iface;
-//printf("~1 inteface %d hasn't been claimed, so claim it\n",iface);
 		
 			if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_CLAIM_INTERFACE, 
 			                     &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
 		
-				usbi_err(ctx, "could not claim interface %d: %s", iface, libusb_strerror(ret));
+				usbi_err(ctx, "libusb0_claim_interface: could not claim interface %d: %s", iface, libusb_strerror(ret));
 				return ret;
 			}
 			handle_priv->interface_handle[iface].api_handle = (HANDLE)1;
 		}
 	} else {
-//printf("~1 claiming composite inteface %d or iface 0\n",iface);
 		// composite device (independent interfaces) or interface 0
 		if (handle_priv->interface_handle[iface].api_handle == 0) {
-//printf("~1 inteface %d hasn't been claimed, so claim it\n",iface);
 			libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 			memset(&req, 0, sizeof(req));
 			req.interface.interface = iface;
@@ -3179,7 +3168,7 @@ static int libusb0_claim_interface(struct libusb_device_handle *dev_handle, int 
 			if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_CLAIM_INTERFACE, 
 			                     &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
 		
-				usbi_err(ctx, "could not claim interface %d: %s", iface, libusb_strerror(ret));
+				usbi_err(ctx, "libusb0_claim_interface: could not claim interface %d: %s", iface, libusb_strerror(ret));
 				return ret;
 			}
 			handle_priv->interface_handle[iface].api_handle = (HANDLE)1;
@@ -3239,7 +3228,7 @@ static int libusb0_submit_iso_transfer(struct usbi_transfer *itransfer) {
 
 	current_interface = interface_by_endpoint(priv, handle_priv, transfer->endpoint);
 	if (current_interface < 0) {
-		usbi_err(ctx, "unable to match endpoint to an open interface - cancelling transfer");
+		usbi_err(ctx, "ibusb0_submit_iso_transfer: unable to match endpoint to an open interface - cancelling transfer");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
@@ -3278,7 +3267,7 @@ static int libusb0_submit_iso_transfer(struct usbi_transfer *itransfer) {
                       transfer->length, NULL, wfd.overlapped);
 	} else {
 
-		usbi_dbg("reading %d bytes of %d packet size", transfer->length,req.endpoint.packet_size);
+		usbi_dbg("writing %d bytes of %d packet size", transfer->length,req.endpoint.packet_size);
 		ret = DeviceIoControl(libusb0_handle, 
                       LIBUSB0_IOCTL_ISOCHRONOUS_WRITE,
                       &req, sizeof(libusb0_request), 
@@ -3288,7 +3277,7 @@ static int libusb0_submit_iso_transfer(struct usbi_transfer *itransfer) {
 
 	if (!ret) {
 		if(GetLastError() != ERROR_IO_PENDING) {
-			usbi_err(ctx, "WinUsb_Pipe Transfer failed: %s", windows_error_str(0));
+			usbi_err(ctx, "ibusb0_submit_iso_transfer: transfer failed: %s", windows_error_str(0));
 			usbi_free_fd(wfd.fd);
 			return LIBUSB_ERROR_IO;
 		}
@@ -3341,7 +3330,7 @@ static int libusb0_submit_control_transfer(struct usbi_transfer *itransfer)
 		}
 	}
 	if (current_interface == USB_MAXINTERFACES) {
-		usbi_err(ctx, "no active interface");
+		usbi_err(ctx, "libusb0_submit_control_transfer: no active interface");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 #else
@@ -3468,7 +3457,7 @@ static int libusb0_submit_control_transfer(struct usbi_transfer *itransfer)
 
 	if (!DeviceIoControl(wfd.handle, code, req, req_size, data, in_size, NULL, wfd.overlapped)) {
 		if(GetLastError() != ERROR_IO_PENDING) {
-			usbi_err(ctx, "DeviceIoControl failed: %s", windows_error_str(0));
+			usbi_err(ctx, "libusb0_submit_control_transfer: DeviceIoControl failed: %s", windows_error_str(0));
 			usbi_free_fd(wfd.fd);
 			free(req);
 			return LIBUSB_ERROR_IO;
@@ -3501,7 +3490,7 @@ static int libusb0_set_interface_altsetting(struct libusb_device_handle *dev_han
 
 	libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 	if (handle_priv->interface_handle[iface].api_handle == 0) {
-		usbi_err(ctx, "interface must be claimed first");
+		usbi_err(ctx, "libusb0_set_interface_altsetting: interface must be claimed first");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
@@ -3511,7 +3500,7 @@ static int libusb0_set_interface_altsetting(struct libusb_device_handle *dev_han
 
 	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_SET_INTERFACE, 
 			                   &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
-		usbi_err(ctx, "libusb0_set_interface_altsetting intfc %d alt %d failed: %s", iface, altsetting, libusb_strerror(ret));
+		usbi_err(ctx, "libusb0_set_interface_altsetting: intfc %d alt %d failed: %s", iface, altsetting, libusb_strerror(ret));
 		return ret;
 	}
 
@@ -3537,7 +3526,7 @@ static int libusb0_submit_bulk_transfer(struct usbi_transfer *itransfer)
 
 	current_interface = interface_by_endpoint(priv, handle_priv, transfer->endpoint);
 	if (current_interface < 0) {
-		usbi_err(ctx, "unable to match endpoint to an open interface - cancelling transfer");
+		usbi_err(ctx, "libusb0_submit_bulk_transfer: unable to match endpoint to an open interface - cancelling transfer");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
@@ -3573,7 +3562,7 @@ static int libusb0_submit_bulk_transfer(struct usbi_transfer *itransfer)
 
 	if (!ret) {
 		if(GetLastError() != ERROR_IO_PENDING) {
-			usbi_err(ctx, "WinUsb_Pipe Transfer failed: %s", windows_error_str(0));
+			usbi_err(ctx, "libusb0_submit_bulk_transfer: transfer failed: %s", windows_error_str(0));
 			usbi_free_fd(wfd.fd);
 			return LIBUSB_ERROR_IO;
 		}
@@ -3605,7 +3594,7 @@ static int libusb0_clear_halt(struct libusb_device_handle *dev_handle, unsigned 
 
 	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_RESET_ENDPOINT, &req, 
 	                    sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
-		usbi_err(ctx, "libus0 reset endpoint 0x%02x failed: %s", endpoint, libusb_strerror(ret));
+		usbi_err(ctx, "libusb0_clear_halt: 0x%02x failed: %s", endpoint, libusb_strerror(ret));
 		return ret;
 	}
 
@@ -3630,7 +3619,7 @@ static int libusb0_abort_control(struct usbi_transfer *itransfer)
 
 	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_ABORT_ENDPOINT, 
 			                   &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
-		usbi_err(ctx, "libusb0_abort_control failed: %s", libusb_strerror(ret));
+		usbi_err(ctx, "libusb0_abort_control: failed: %s", libusb_strerror(ret));
 		return ret;
 	}
 
@@ -3655,7 +3644,7 @@ static int libusb0_abort_transfers(struct usbi_transfer *itransfer)
 
 	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_ABORT_ENDPOINT, 
 			                   &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
-		usbi_err(ctx, "libusb0_abort_transfer endpoint 0x%02x failed: %s", transfer->endpoint, libusb_strerror(ret));
+		usbi_err(ctx, "libusb0_abort_transfer: endpoint 0x%02x failed: %s", transfer->endpoint, libusb_strerror(ret));
 		return ret;
 	}
 
@@ -3678,7 +3667,7 @@ static int libusb0_reset_device(struct libusb_device_handle *dev_handle)
 
 	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_RESET_DEVICE, 
 			                   &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
-		usbi_err(ctx, "libusb0_reset_device failed: %s", libusb_strerror(ret));
+		usbi_err(ctx, "libusb0_reset_device: failed: %s", libusb_strerror(ret));
 		return ret;
 	}
 

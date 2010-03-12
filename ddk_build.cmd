@@ -43,6 +43,8 @@ set version=1.0
 
 cd libusb\os
 copy /y ..\..\msvc\libusb-%version%.rc .
+copy /y ..\libusb-%version%.def .
+copy /y makefile.ddk makefile
 @echo on
 build -cZ
 @echo off
@@ -61,6 +63,7 @@ copy %srcPath%\libusb-%version%.lib %dstPath%\lib
 
 @rem ==================== libusb0.sys ======================
 cd libusb\os\driver
+copy /y makefile.ddk makefile
 @echo on
 build -cZ
 @echo off
@@ -81,7 +84,7 @@ md examples\lsusb_ddkbuild
 
 cd examples\lsusb_ddkbuild
 copy ..\lsusb_sources sources
-copy ..\makefile makefile
+copy ..\makefile.ddk makefile
 @echo on
 build -cZ
 @echo off
@@ -103,7 +106,7 @@ md examples\xusb_ddkbuild
 
 cd examples\xusb_ddkbuild
 copy ..\xusb_sources sources
-copy ..\makefile makefile
+copy ..\makefile.ddk makefile
 @echo on
 build -cZ
 @echo off
