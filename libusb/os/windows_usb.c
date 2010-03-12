@@ -3282,7 +3282,7 @@ static int libusb0_submit_iso_transfer(struct usbi_transfer *itransfer) {
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
-		wfd.completed_synchronously = true;
+		wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
 		wfd.overlapped->InternalHigh = (DWORD)transfer->length;
 	}
 
@@ -3463,7 +3463,7 @@ static int libusb0_submit_control_transfer(struct usbi_transfer *itransfer)
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
-		wfd.completed_synchronously = true;
+		wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
 		wfd.overlapped->InternalHigh = (DWORD)size;
 	}
 
@@ -3567,7 +3567,7 @@ static int libusb0_submit_bulk_transfer(struct usbi_transfer *itransfer)
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
-		wfd.completed_synchronously = true;
+		wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
 		wfd.overlapped->InternalHigh = (DWORD)transfer->length;
 	}
 
