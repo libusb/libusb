@@ -117,7 +117,7 @@ static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
 
 // public fd data
-const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE, FALSE};
+const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE};
 struct winfd poll_fd[MAX_FDS];
 // internal fd data
 struct {
@@ -389,7 +389,6 @@ int usbi_pipe(int filedes[2])
 			poll_fd[i].handle = handle[j];
 			poll_fd[i].overlapped = (j==0)?overlapped0:overlapped1;
 			poll_fd[i].rw = RW_READ+j;
-			poll_fd[i].completed_synchronously = FALSE;
 			j++;
 			if (j==1) {
 				// Start a 1 byte nonblocking read operation
@@ -702,7 +701,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 
 		// The following macro only works if overlapped I/O was reported pending
 		if ( (HasOverlappedIoCompleted(poll_fd[index].overlapped))
-		  || (poll_fd[index].completed_synchronously) ) {
+		  || (HasOverlappedIoCompletedSync(poll_fd[index].overlapped)) ) {
 			poll_dbg("  completed");
 			// checks above should ensure this works:
 			fds[i].revents = fds[i].events;

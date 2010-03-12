@@ -39,6 +39,13 @@
 #endif
 #endif
 
+// Handle synchronous completion through the overlapped structure
+#if !defined(STATUS_REPARSE)	// reuse the REPARSE status code
+#define STATUS_REPARSE ((NTSTATUS)0x00000104L)
+#endif
+#define STATUS_COMPLETED_SYNCHRONOUSLY	STATUS_REPARSE
+#define HasOverlappedIoCompletedSync(lpOverlapped)	(((DWORD)(lpOverlapped)->Internal) == STATUS_COMPLETED_SYNCHRONOUSLY)
+
 enum windows_version {
 	WINDOWS_UNSUPPORTED,
 	WINDOWS_2K,
@@ -78,7 +85,6 @@ struct winfd {
 	HANDLE handle;                  // what we need to attach overlapped to the I/O op, so we can poll it
 	OVERLAPPED* overlapped;         // what will report our I/O status
 	enum rw_type rw;                // I/O transfer direction: read *XOR* write (NOT BOTH)
-	BOOLEAN completed_synchronously;// flag for async transfers that completed during request
 };
 extern const struct winfd INVALID_WINFD;
 
