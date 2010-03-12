@@ -26,6 +26,11 @@
 #pragma warning(disable:4127) // conditional expression is constant
 #endif
 
+// Uncomment to have poll return with EINTR as soon as a new transfer (fd) is added
+// This should result in a LIBUSB_ERROR_INTERRUPTED being returned by libusb calls,
+// which should give the app an opportunity to resubmit a new fd set.
+//#define DYNAMIC_FDS
+
 #if !defined(ssize_t)
 #if defined (_WIN64)
 #define ssize_t __int64
@@ -84,7 +89,7 @@ int usbi_close(int fd);
 
 void init_polling(void);
 void exit_polling(void);
-struct winfd usbi_create_fd(HANDLE handle, int access_mode, struct libusb_context *ctx);
+struct winfd usbi_create_fd(HANDLE handle, int access_mode);
 void usbi_free_fd(int fd);
 struct winfd fd_to_winfd(int fd);
 struct winfd handle_to_winfd(HANDLE handle);

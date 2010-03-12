@@ -58,6 +58,8 @@
 #define LOOP_CHECK(fcall) { r=fcall; if (r != LIBUSB_SUCCESS) continue; }
 #define LOOP_BREAK(err) { r=err; continue; } 
 
+extern void usbi_fd_notification(struct libusb_context *ctx);
+
 // Helper prototypes
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
 static int windows_clock_gettime(int clk_id, struct timespec *tp);
@@ -1737,6 +1739,9 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
 		(short)((transfer->endpoint & LIBUSB_ENDPOINT_IN)?POLLIN:POLLOUT));
+#if !defined(DYNAMIC_FDS)
+	usbi_fd_notification(ctx);
+#endif
 
 	return LIBUSB_SUCCESS;
 }
@@ -1756,6 +1761,9 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
 		(short)((transfer->endpoint & LIBUSB_ENDPOINT_IN)?POLLIN:POLLOUT));
+#if !defined(DYNAMIC_FDS)
+	usbi_fd_notification(ctx);
+#endif
 
 	return LIBUSB_SUCCESS;
 }
@@ -1774,6 +1782,9 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	}
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, POLLIN);
+#if !defined(DYNAMIC_FDS)
+	usbi_fd_notification(ctx);
+#endif
 
 	return LIBUSB_SUCCESS;
 
@@ -2543,7 +2554,7 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("will use interface %d", current_interface);
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	wfd = usbi_create_fd(winusb_handle, _O_RDONLY, ctx);
+	wfd = usbi_create_fd(winusb_handle, _O_RDONLY);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -2619,7 +2630,7 @@ static int winusb_submit_bulk_transfer(struct usbi_transfer *itransfer)
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(winusb_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);
+	wfd = usbi_create_fd(winusb_handle, direction_in?_O_RDONLY:_O_WRONLY);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3583,7 +3594,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("will use interface %d", current_interface);
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	wfd = usbi_create_fd(hid_handle, _O_RDONLY, ctx);
+	wfd = usbi_create_fd(hid_handle, _O_RDONLY);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3685,7 +3696,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(hid_handle, direction_in?_O_RDONLY:_O_WRONLY, ctx);
+	wfd = usbi_create_fd(hid_handle, direction_in?_O_RDONLY:_O_WRONLY);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
