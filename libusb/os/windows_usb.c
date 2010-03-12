@@ -1933,10 +1933,10 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 
 		if (found) {
 			// Handle async requests that completed synchronously first
-			if (transfer_priv->pollable_fd.completed_synchronously) {
+			if (HasOverlappedIoCompletedSync(transfer_priv->pollable_fd.overlapped)) {
 				io_result = NO_ERROR;
 				io_size = (DWORD)transfer_priv->pollable_fd.overlapped->InternalHigh;
-			// Regular saync overlapped
+			// Regular async overlapped
 			} else if (GetOverlappedResult(transfer_priv->pollable_fd.handle, 
 				transfer_priv->pollable_fd.overlapped, &io_size, false)) {
 				io_result = NO_ERROR;
@@ -2566,7 +2566,7 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
-		wfd.completed_synchronously = true;
+		wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
 		wfd.overlapped->InternalHigh = (DWORD)size;
 	}
 
@@ -2649,7 +2649,7 @@ static int winusb_submit_bulk_transfer(struct usbi_transfer *itransfer)
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
-		wfd.completed_synchronously = true;
+		wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
 		wfd.overlapped->InternalHigh = (DWORD)transfer->length;
 	}
 
@@ -3649,7 +3649,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 
 	if (r == LIBUSB_COMPLETED) {
 		// Force request to be completed synchronously. Transferred size has been set by previous call
-		wfd.completed_synchronously = true;
+		wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
 		// http://msdn.microsoft.com/en-us/library/ms684342%28VS.85%29.aspx
 		// set InternalHigh to the number of bytes transferred
 		wfd.overlapped->InternalHigh = (DWORD)size;
@@ -3738,7 +3738,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 			usbi_err(ctx, "OVERFLOW!");
 			r = LIBUSB_ERROR_OVERFLOW;
 		}
-		wfd.completed_synchronously = true;
+		wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
 		wfd.overlapped->InternalHigh = size;
 	}
 
