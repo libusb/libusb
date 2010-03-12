@@ -55,10 +55,10 @@ main(void)
 	drv_info = list_driverless();
 	for (; drv_info != NULL; drv_info = drv_info->next) {
 		if (create_inf(drv_info, "C:\\test") == 0) {
-			install_device("C:\\test");
+			run_installer("C:\\test");
 		}
 	}
-
+	update_drivers();
 	return 0;
 
 	r = libusb_init(NULL);

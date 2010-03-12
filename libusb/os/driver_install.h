@@ -14,7 +14,8 @@ struct driver_info {
 struct driver_info *list_driverless(void);
 char* guid_to_string(const GUID guid);
 int create_inf(struct driver_info* drv_info, char* path);
-int install_device(char* path);
+int run_installer(char* path);
+int update_drivers(void);
 
 
 
