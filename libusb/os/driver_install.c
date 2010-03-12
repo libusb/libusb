@@ -11,6 +11,7 @@
 #include "libusbi.h"
 #include "windows_usb.h"
 #include "driver_install.h"
+#include "driver-installer.h"
 
 #define INF_NAME "libusb-device.inf"
 
@@ -79,7 +80,6 @@ const char inf[] = "Date = \"03/08/2010\"\n\n" \
 	"WdfCoInstaller01009.dll=2\n\n" \
 	"[SourceDisksFiles.ia64]\n";
 
-
 struct res {
 	char* id;
 	char* subdir;
@@ -91,8 +91,11 @@ const struct res resource[] = { {"AMD64_DLL1" , "amd64", "WdfCoInstaller01009.dl
 								{"X86_DLL1", "x86", "WdfCoInstaller01009.dll"},
 								{"X86_DLL2", "x86", "winusbcoinstaller2.dll"} };
 const int nb_resources = sizeof(resource)/sizeof(resource[0]);
-
 extern char* sanitize_path(const char* path);
+
+HANDLE pipe = INVALID_HANDLE_VALUE;
+char* req_device_id;
+
 char* guid_to_string(const GUID guid)
 {
 	static char guid_string[MAX_GUID_STRING_LENGTH];
@@ -123,8 +126,6 @@ static int init_cfgmgr32(void)
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Sibling, TRUE);
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDA, TRUE); 
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDW, TRUE);
-	DLL_LOAD(Cfgmgr32.dll, CM_Locate_DevNode, TRUE);
-	DLL_LOAD(Cfgmgr32.dll, CM_Reenumerate_DevNode, TRUE);
 
 	return LIBUSB_SUCCESS;
 }
@@ -225,6 +226,9 @@ struct driver_info* list_driverless(void)
 			cur->next = drv_info;
 		}
 		cur = drv_info;
+
+		// sanitized path should NOT be used as device id
+		drv_info->device_id = strdup(path);
 
 		safe_strcpy(drv_info->desc, sizeof(drv_info->desc), desc);
 
@@ -363,21 +367,50 @@ int create_inf(struct driver_info* drv_info, char* path)
 	return 0;
 }
 
+
+int process_message(char* buffer, DWORD size)
+{
+	DWORD junk;
+
+	if (size <= 0)
+		return -1;
+
+	switch(buffer[0])
+	{
+	case IC_GET_DEVICE_ID:
+		usbi_dbg("got request for device_id");
+		WriteFile(pipe, req_device_id, strlen(req_device_id), &junk, NULL);
+		break;
+	case IC_PRINT_MESSAGE:
+		if (size < 2) {
+			usbi_err(NULL, "print_message: no data");
+			return -1;
+		}
+		usbi_dbg("[installer process] %s", buffer+1);
+		break;
+	default:
+		usbi_err(NULL, "unrecognized installer message");
+		return -1;
+	}
+	return 0;
+}
+
 // TODO: extract driver-installer.exe into the dest dir
-int run_installer(char* path)
+int run_installer(char* path, char* device_id)
 {
 	SHELLEXECUTEINFO shExecInfo;
 	char exename[MAX_PATH_LENGTH];
 	HANDLE handle[2] = {INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE};
-	HANDLE pipe = INVALID_HANDLE_VALUE;
 	OVERLAPPED overlapped;
-	int r, ret;
+	int r;
 	DWORD rd_count;
-	char buffer[256];
+#define BUFSIZE 256
+	char buffer[BUFSIZE];
 
+	req_device_id = device_id;
 
 	// Use a pipe to communicate with our installer
-	pipe = CreateNamedPipe("\\\\.\\pipe\\libusb-installer", PIPE_ACCESS_INBOUND|FILE_FLAG_OVERLAPPED,
+	pipe = CreateNamedPipe("\\\\.\\pipe\\libusb-installer", PIPE_ACCESS_DUPLEX|FILE_FLAG_OVERLAPPED,
 		PIPE_TYPE_MESSAGE|PIPE_READMODE_MESSAGE, 1, 4096, 4096, 0, NULL);
 	if (pipe == INVALID_HANDLE_VALUE) {
 		usbi_err(NULL, "could not create read pipe: errcode %d", (int)GetLastError());
@@ -387,7 +420,7 @@ int run_installer(char* path)
 	// Set the overlapped for messaging
 	memset(&overlapped, 0, sizeof(OVERLAPPED));
 	handle[0] = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!handle[0]) {
+	if(handle[0] == NULL) {
 		r = -1; goto out;
 	}
 	overlapped.hEvent = handle[0];
@@ -404,8 +437,9 @@ int run_installer(char* path)
 	// if INF_NAME ever has a space, it will be seen as multiple parameters
 	shExecInfo.lpParameters = INF_NAME;
 	shExecInfo.lpDirectory = path;
+	// TODO: hide
+//	shExecInfo.nShow = SW_NORMAL;
 	shExecInfo.nShow = SW_HIDE;
-	// SW_NORMAL;
 	shExecInfo.hInstApp = NULL;
 
 	ShellExecuteEx(&shExecInfo);
@@ -417,54 +451,53 @@ int run_installer(char* path)
 	handle[1] = shExecInfo.hProcess;
 
 	while (1) {
-		if (!ReadFile(pipe, buffer, 256, &rd_count, &overlapped)) {
+		if (ReadFile(pipe, buffer, 256, &rd_count, &overlapped)) {
+			// Message was read synchronously
+			process_message(buffer, rd_count);
+		} else {
 			switch(GetLastError()) {
 			case ERROR_BROKEN_PIPE: 
 				// The pipe has been ended - wait for installer to finish
 				WaitForSingleObject(handle[1], INFINITE);
-				usbi_dbg("hProcess1 = %p terminated",  shExecInfo.hProcess);
 				r = 0; goto out;
 			case ERROR_PIPE_LISTENING:
 				// Wait for installer to open the pipe 
 				Sleep(100);
 				continue;
 			case ERROR_IO_PENDING:
-				break;
-			default:
-				usbi_err(NULL, "pipe read message failed: %d", (int)GetLastError());
-				continue;
-			}
-
-			// We have IO_PENDING
-			switch(WaitForMultipleObjects(2, handle, FALSE, INFINITE)) {
-			case WAIT_OBJECT_0: // Pipe event
-				if (!GetOverlappedResult(pipe, &overlapped, &rd_count, FALSE)) {
-					switch(GetLastError()) {
-					case ERROR_BROKEN_PIPE: 
-						// The pipe has been ended - wait for installer to finish
-						WaitForSingleObject(handle[1], INFINITE);
-						usbi_dbg("hProcess3 = %p terminated",  shExecInfo.hProcess);
-						r = 0; goto out;
-					case ERROR_MORE_DATA:
-						usbi_warn(NULL, "message overflow");
-						break;
-					default:
-						usbi_warn(NULL, "message async read error: %d", (int)GetLastError());
-						break;
+				switch(WaitForMultipleObjects(2, handle, FALSE, INFINITE)) {
+				case WAIT_OBJECT_0: // Pipe event
+					if (GetOverlappedResult(pipe, &overlapped, &rd_count, FALSE)) {
+						// Message was read asynchronously
+						process_message(buffer, rd_count);
+					} else {
+						switch(GetLastError()) {
+						case ERROR_BROKEN_PIPE: 
+							// The pipe has been ended - wait for installer to finish
+							WaitForSingleObject(handle[1], INFINITE);
+							r = 0; goto out;
+						case ERROR_MORE_DATA:
+							usbi_warn(NULL, "program assertion failed: message overflow");
+							process_message(buffer, rd_count);
+							break;
+						default:
+							usbi_err(NULL, "could not read from pipe (async): %d", (int)GetLastError());
+							break;
+						}
 					}
-				} else {
-					usbi_dbg("async: %s", buffer);
+					break;
+				case WAIT_OBJECT_0+1:
+					// installer process terminated
+					r = 0; goto out;
+				default:
+					usbi_err(NULL, "could not read from pipe (wait): %d", (int)GetLastError());
+					break;
 				}
 				break;
-			case WAIT_OBJECT_0+1:
-				usbi_dbg("hProcess2 = %p terminated",  shExecInfo.hProcess);
-				r = 0; goto out;
 			default:
-				usbi_dbg("are?");
+				usbi_err(NULL, "could not read from pipe (sync): %d", (int)GetLastError());
 				break;
 			}
-		} else {
-			usbi_dbg(" sync: %s", buffer);
 		}
 	}
 out:
@@ -474,27 +507,4 @@ out:
 	return r;
 }
 
-// TODO: use devinst from setupdi and pass it as param to driver-installer.exe
-int update_drivers(void)
-{
-	DEVINST     devInst;
-	CONFIGRET   status;
-
-	usbi_dbg("updating drivers, please wait...");
-	// Get the root devnode.
-	status = CM_Locate_DevNode(&devInst, NULL, 0);
-	if (status != CR_SUCCESS) {
-		printf("failed to locate root devnode: %x\n", status);
-		return -1;
-	}
-
-	// Needs admin privileges, but even with admin and the 
-	// http://support.microsoft.com/kb/259697 doesn't work!!!
-	status = CM_Reenumerate_DevNode(devInst, 0);
-	if (status != CR_SUCCESS) {
-		printf("failed to re-enumerate nodes: %x\n", status);
-		return -1;
-	}
-
-	return 0;
-}
+//TODO: add a call to free strings & list
