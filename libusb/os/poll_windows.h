@@ -41,7 +41,7 @@
 
 // Handle synchronous completion through the overlapped structure
 #if !defined(STATUS_REPARSE)	// reuse the REPARSE status code
-#define STATUS_REPARSE ((NTSTATUS)0x00000104L)
+#define STATUS_REPARSE ((LONG)0x00000104L)
 #endif
 #define STATUS_COMPLETED_SYNCHRONOUSLY	STATUS_REPARSE
 #define HasOverlappedIoCompletedSync(lpOverlapped)	(((DWORD)(lpOverlapped)->Internal) == STATUS_COMPLETED_SYNCHRONOUSLY)
