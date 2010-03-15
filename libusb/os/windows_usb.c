@@ -2555,6 +2555,7 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 
 	wfd = usbi_create_fd(winusb_handle, _O_RDONLY);
+	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -2631,16 +2632,17 @@ static int winusb_submit_bulk_transfer(struct usbi_transfer *itransfer)
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
 	wfd = usbi_create_fd(winusb_handle, direction_in?_O_RDONLY:_O_WRONLY);
+	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
 	if (direction_in) {
 		usbi_dbg("reading %d bytes", transfer->length);
-		ret = WinUsb_ReadPipe(winusb_handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
+		ret = WinUsb_ReadPipe(wfd.handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
 	} else {
 		usbi_dbg("writing %d bytes", transfer->length);
-		ret = WinUsb_WritePipe(winusb_handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
+		ret = WinUsb_WritePipe(wfd.handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
 	}
 	if (!ret) {
 		if(GetLastError() != ERROR_IO_PENDING) {
@@ -3593,7 +3595,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 
 	usbi_dbg("will use interface %d", current_interface);
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
-
+	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	wfd = usbi_create_fd(hid_handle, _O_RDONLY);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
@@ -3603,7 +3605,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 	case LIBUSB_REQUEST_TYPE_STANDARD:
 		switch(setup->request) {
 		case LIBUSB_REQUEST_GET_DESCRIPTOR:
-			r = _hid_get_descriptor(priv->hid, hid_handle, LIBUSB_REQ_RECIPIENT(setup->request_type), 
+			r = _hid_get_descriptor(priv->hid, wfd.handle, LIBUSB_REQ_RECIPIENT(setup->request_type), 
 				(setup->value >> 8) & 0xFF, setup->value & 0xFF, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, &size);
 			break;
 		case LIBUSB_REQUEST_GET_CONFIGURATION:
@@ -3638,7 +3640,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 		}
 		break;
     case LIBUSB_REQUEST_TYPE_CLASS:
-      r =_hid_class_request(priv->hid, hid_handle, setup->request_type, setup->request, setup->value,
+      r =_hid_class_request(priv->hid, wfd.handle, setup->request_type, setup->request, setup->value,
 		  setup->index, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, transfer_priv,
 		  &size, wfd.overlapped);
       break;
@@ -3697,6 +3699,7 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
 	wfd = usbi_create_fd(hid_handle, direction_in?_O_RDONLY:_O_WRONLY);
+	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3709,13 +3712,13 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	if (direction_in) {
 		transfer_priv->hid_buffer[0] = priv->hid->input_report_id;
 		usbi_dbg("reading %d bytes (report ID: 0x%02X)", transfer->length+1, transfer_priv->hid_buffer[0]);
-		ret = ReadFile(hid_handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
+		ret = ReadFile(wfd.handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
 	} else {
 		transfer_priv->hid_buffer[0] = priv->hid->output_report_id;
 		memcpy(transfer_priv->hid_buffer+1, transfer->buffer, transfer->length);
 		usbi_dbg("writing %d bytes (report ID: 0x%02X)", transfer->length+1, transfer_priv->hid_buffer[0]);
 		transfer_priv->hid_buffer[0] = 0;
-		ret = WriteFile(hid_handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
+		ret = WriteFile(wfd.handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
 	}
 	if (!ret) {
 		if (GetLastError() != ERROR_IO_PENDING) {
