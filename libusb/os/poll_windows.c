@@ -117,13 +117,15 @@ static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
 
 // public fd data
-const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE, FALSE};
+const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE};
 struct winfd poll_fd[MAX_FDS];
 // internal fd data
 struct {
 	CRITICAL_SECTION mutex; // lock for fds
 	BYTE marker;            // 1st byte of a usbi_read operation gets stored here
-
+	// Additional variables for XP CancelIoEx partial emulation
+	HANDLE original_handle;
+	DWORD thread_id;
 } _poll_fd[MAX_FDS];
 
 // globals
@@ -146,11 +148,19 @@ __inline BOOL cancel_io(int index)
 	if ((index < 0) || (index >= MAX_FDS)) {
 		return FALSE;
 	}
+
+	if ( (poll_fd[index].fd < 0) || (poll_fd[index].handle == INVALID_HANDLE_VALUE)
+	  || (poll_fd[index].handle == 0) || (poll_fd[index].overlapped == NULL) ) {
+		return TRUE;
+	}
 	if (pCancelIoEx != NULL) {
 		return (*pCancelIoEx)(poll_fd[index].handle, poll_fd[index].overlapped);
-	} else {
+	}
+	if (_poll_fd[index].thread_id == GetCurrentThreadId()) {
 		return CancelIo(poll_fd[index].handle);
 	}
+	usbi_warn(NULL, "Unable to cancel I/O that was started from another thread");
+	return FALSE;
 }
 
 // Init
@@ -169,6 +179,8 @@ void init_polling(void)
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
 			_poll_fd[i].marker = 0;
+			_poll_fd[i].original_handle = INVALID_HANDLE_VALUE;
+			_poll_fd[i].thread_id = 0;
 			InitializeCriticalSection(&_poll_fd[i].mutex);
 		}
 #if defined(DYNAMIC_FDS)
@@ -385,7 +397,6 @@ int usbi_pipe(int filedes[2])
 			poll_fd[i].handle = handle[j];
 			poll_fd[i].overlapped = (j==0)?overlapped0:overlapped1;
 			poll_fd[i].rw = RW_READ+j;
-			poll_fd[i].completed_synchronously = FALSE;
 			j++;
 			if (j==1) {
 				// Start a 1 byte nonblocking read operation
@@ -471,7 +482,19 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 				continue;
 			}
 			wfd.fd = fd;
-			wfd.handle = handle;
+			// Attempt to emulate some of the CancelIoEx behaviour on platforms
+			// that don't have it
+			if (pCancelIoEx == NULL) {
+				_poll_fd[i].thread_id = GetCurrentThreadId();
+				_poll_fd[i].original_handle = handle;
+				if (!DuplicateHandle(GetCurrentProcess(), handle, GetCurrentProcess(),
+					&wfd.handle, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
+					usbi_warn(NULL, "could not duplicate handle for CancelIo - using orignal one");
+					wfd.handle = handle;
+				}
+			} else {
+				wfd.handle = handle;
+			}
 			wfd.overlapped = overlapped;
 			memcpy(&poll_fd[i], &wfd, sizeof(struct winfd));
 			LeaveCriticalSection(&_poll_fd[i].mutex);
@@ -500,6 +523,9 @@ void _free_index(int index)
 		_close(poll_fd[index].fd);
 	}
 	free_overlapped(poll_fd[index].overlapped);
+	CloseHandle(_poll_fd[index].original_handle);
+	_poll_fd[index].original_handle = INVALID_HANDLE_VALUE;
+	_poll_fd[index].thread_id = 0;
 	poll_fd[index] = INVALID_WINFD;
 }
 
@@ -691,7 +717,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 
 		// The following macro only works if overlapped I/O was reported pending
 		if ( (HasOverlappedIoCompleted(poll_fd[index].overlapped))
-		  || (poll_fd[index].completed_synchronously) ) {
+		  || (HasOverlappedIoCompletedSync(poll_fd[index].overlapped)) ) {
 			poll_dbg("  completed");
 			// checks above should ensure this works:
 			fds[i].revents = fds[i].events;
