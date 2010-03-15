@@ -179,7 +179,7 @@ void init_polling(void)
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
 			_poll_fd[i].marker = 0;
-			_poll_fd[i].original_handle = INVALID_HANDLE_VALUE;
+			_poll_fd[i].handle = INVALID_HANDLE_VALUE;
 			_poll_fd[i].thread_id = 0;
 			InitializeCriticalSection(&_poll_fd[i].mutex);
 		}
@@ -525,8 +525,8 @@ void _free_index(int index)
 		_close(poll_fd[index].fd);
 	}
 	free_overlapped(poll_fd[index].overlapped);
-	CloseHandle(_poll_fd[index].original_handle);
-	_poll_fd[index].original_handle = INVALID_HANDLE_VALUE;
+	CloseHandle(_poll_fd[index].handle);
+	_poll_fd[index].handle = INVALID_HANDLE_VALUE;
 	_poll_fd[index].thread_id = 0;
 	poll_fd[index] = INVALID_WINFD;
 }
