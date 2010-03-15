@@ -13,7 +13,7 @@
 #include <fcntl.h>
 #include <io.h>
 #include <stdarg.h>
-#include "driver-installer.h"
+#include "driver_installer.h"
 
 /*
  * API macros - from libusb-win32 1.x

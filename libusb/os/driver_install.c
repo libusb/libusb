@@ -11,7 +11,7 @@
 #include "libusbi.h"
 #include "windows_usb.h"
 #include "driver_install.h"
-#include "driver-installer.h"
+#include "driver_installer.h"
 
 #define INF_NAME "libusb-device.inf"
 
@@ -91,7 +91,9 @@ const struct res resource[] = { {"AMD64_DLL1" , "amd64", "WdfCoInstaller01009.dl
 								{"X86_DLL1", "x86", "WdfCoInstaller01009.dll"},
 								{"X86_DLL2", "x86", "winusbcoinstaller2.dll"} };
 const int nb_resources = sizeof(resource)/sizeof(resource[0]);
+// TODO: remove if not needed
 extern char* sanitize_path(const char* path);
+extern char *windows_error_str(uint32_t retval);
 
 HANDLE pipe = INVALID_HANDLE_VALUE;
 char* req_device_id;
@@ -133,7 +135,7 @@ static int init_cfgmgr32(void)
 struct driver_info* list_driverless(void)
 {
 	unsigned i, j;
-	DWORD size, reg_type, install_state;
+	DWORD size, reg_type;
 	CONFIGRET r;
 	HDEVINFO dev_info;
 	SP_DEVINFO_DATA dev_info_data;
@@ -228,7 +230,7 @@ struct driver_info* list_driverless(void)
 		cur = drv_info;
 
 		// sanitized path should NOT be used as device id
-		drv_info->device_id = strdup(path);
+		drv_info->device_id = _strdup(path);
 
 		safe_strcpy(drv_info->desc, sizeof(drv_info->desc), desc);
 

@@ -271,11 +271,11 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\libusb\os\driver-installer.h"
+				RelativePath=".\libusb\os\driver_install.h"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\os\driver_install.h"
+				RelativePath=".\libusb\os\driver_installer.h"
 				>
 			</File>
 			<File

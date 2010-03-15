@@ -25,11 +25,11 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 //
 // DLL
 //
-
-AMD64_DLL1              DLL                     "E:\\WinDDK\\7600.16385.0\\redist\\wdf\\amd64\\WdfCoInstaller01009.dll"
-AMD64_DLL2              DLL                     "E:\\WinDDK\\7600.16385.0\\redist\\winusb\\amd64\\winusbcoinstaller2.dll"
-X86_DLL1                DLL                     "E:\\WinDDK\\7600.16385.0\\redist\\wdf\\x86\\WdfCoInstaller01009.dll"
-X86_DLL2                DLL                     "E:\\WinDDK\\7600.16385.0\\redist\\winusb\\x86\\winusbcoinstaller2.dll"
+// Make sure you set the path to your DDK as an include directory for the files below
+AMD64_DLL1              DLL                     "redist\\wdf\\amd64\\WdfCoInstaller01009.dll"
+AMD64_DLL2              DLL                     "redist\\winusb\\amd64\\winusbcoinstaller2.dll"
+X86_DLL1                DLL                     "redist\\wdf\\x86\\WdfCoInstaller01009.dll"
+X86_DLL2                DLL                     "redist\\winusb\\x86\\winusbcoinstaller2.dll"
 #endif    // English (U.S.) resources
 /////////////////////////////////////////////////////////////////////////////
 
