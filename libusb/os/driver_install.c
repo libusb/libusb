@@ -89,14 +89,18 @@ struct res {
 const struct res resource[] = { {"AMD64_DLL1" , "amd64", "WdfCoInstaller01009.dll"},
 								{"AMD64_DLL2" , "amd64", "winusbcoinstaller2.dll"},
 								{"X86_DLL1", "x86", "WdfCoInstaller01009.dll"},
-								{"X86_DLL2", "x86", "winusbcoinstaller2.dll"} };
+								{"X86_DLL2", "x86", "winusbcoinstaller2.dll"},
+								{"AMD64_INSTALLER", ".", "installer_x64.exe"},
+								{"X86_INSTALLER", ".", "installer_x86.exe"} };
 const int nb_resources = sizeof(resource)/sizeof(resource[0]);
-// TODO: remove if not needed
-extern char* sanitize_path(const char* path);
 extern char *windows_error_str(uint32_t retval);
 
 HANDLE pipe = INVALID_HANDLE_VALUE;
 char* req_device_id;
+
+// for 64 bit platforms detection
+static BOOL (__stdcall *pIsWow64Process)(HANDLE, PBOOL) = NULL;
+
 
 char* guid_to_string(const GUID guid)
 {
@@ -128,7 +132,6 @@ static int init_cfgmgr32(void)
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Sibling, TRUE);
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDA, TRUE); 
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDW, TRUE);
-
 	return LIBUSB_SUCCESS;
 }
 
@@ -163,7 +166,6 @@ struct driver_info* list_driverless(void)
 	for (i = 0; ; i++)
 	{
 		driverless = false;
-		safe_free(sanitized_short);
 
 		dev_info_data.cbSize = sizeof(dev_info_data);
 		if (!SetupDiEnumDeviceInfo(dev_info, i, &dev_info_data)) {
@@ -209,13 +211,7 @@ struct driver_info* list_driverless(void)
 			continue;
 		}
 
-		sanitized_short = sanitize_path(path);
-
-		if (sanitized_short == NULL) {
-			usbi_err(NULL, "could not sanitize path for device %d", i);
-			continue;
-		}
-		usbi_dbg("Driverless USB device (%d): %s", i, sanitized_short);
+		usbi_dbg("Driverless USB device (%d): %s", i, path);
 
 		drv_info = calloc(1, sizeof(struct driver_info));
 		if (drv_info == NULL) {
@@ -229,12 +225,12 @@ struct driver_info* list_driverless(void)
 		}
 		cur = drv_info;
 
-		// sanitized path should NOT be used as device id
+		// duplicate for device id
 		drv_info->device_id = _strdup(path);
 
 		safe_strcpy(drv_info->desc, sizeof(drv_info->desc), desc);
 
-		token = strtok (sanitized_short, "#&");
+		token = strtok (path, "\\#&");
 		while(token != NULL) {
 			for (j = 0; j < 3; j++) {
 				if (safe_strncmp(token, prefix[j], strlen(prefix[j])) == 0) {
@@ -254,15 +250,14 @@ struct driver_info* list_driverless(void)
 					}
 				}
 			}
-			token = strtok (NULL, "#&");
+			token = strtok (NULL, "\\#&");
 		}
 	}
 
 	return ret;
 }
 
-// TODO: dynamic res addon
-int extract_dlls(char* path)
+int extract_binaries(char* path)
 {
 	HANDLE h;
 	HGLOBAL h_load;
@@ -273,7 +268,7 @@ int extract_dlls(char* path)
 	int i;
 
 	for (i=0; i< nb_resources; i++) {
-		h = FindResource(NULL, resource[i].id, "DLL");
+		h = FindResource(NULL, resource[i].id, "BIN");
 		if (h == NULL) {
 			usbi_dbg("could not find resource %s", resource[i].id);
 			return -1;
@@ -322,6 +317,7 @@ int extract_dlls(char* path)
 }
 
 // Create an inf and extract coinstallers in the directory pointed by path
+// TODO: optional directory deletion
 int create_inf(struct driver_info* drv_info, char* path)
 {
 	char filename[MAX_PATH_LENGTH];
@@ -338,7 +334,7 @@ int create_inf(struct driver_info* drv_info, char* path)
 		return -1;
 	}
 
-	extract_dlls(path);
+	extract_binaries(path);
 
 	safe_strcpy(filename, MAX_PATH_LENGTH, path);
 	safe_strcat(filename, MAX_PATH_LENGTH, "\\");
@@ -369,7 +365,6 @@ int create_inf(struct driver_info* drv_info, char* path)
 	return 0;
 }
 
-
 int process_message(char* buffer, DWORD size)
 {
 	DWORD junk;
@@ -397,7 +392,6 @@ int process_message(char* buffer, DWORD size)
 	return 0;
 }
 
-// TODO: extract driver-installer.exe into the dest dir
 int run_installer(char* path, char* device_id)
 {
 	SHELLEXECUTEINFO shExecInfo;
@@ -406,10 +400,25 @@ int run_installer(char* path, char* device_id)
 	OVERLAPPED overlapped;
 	int r;
 	DWORD rd_count;
+	BOOL is_x64 = false;
 #define BUFSIZE 256
 	char buffer[BUFSIZE];
 
 	req_device_id = device_id;
+
+	// Detect whether if we should run the 64 bit installer, without
+	// relying on external libs
+	if (sizeof(uintptr_t) < 8) {
+		// This application is not 64 bit, but it might be 32 bit
+		// running in WOW64
+		pIsWow64Process = (BOOL (__stdcall *)(HANDLE, PBOOL))
+			GetProcAddress(GetModuleHandle("KERNEL32"), "IsWow64Process");
+		if (pIsWow64Process != NULL) {
+			(*pIsWow64Process)(GetCurrentProcess(), &is_x64);
+		} 
+	} else {
+		is_x64 = true;
+	}
 
 	// Use a pipe to communicate with our installer
 	pipe = CreateNamedPipe("\\\\.\\pipe\\libusb-installer", PIPE_ACCESS_DUPLEX|FILE_FLAG_OVERLAPPED,
@@ -428,7 +437,12 @@ int run_installer(char* path, char* device_id)
 	overlapped.hEvent = handle[0];
 
 	safe_strcpy(exename, MAX_PATH_LENGTH, path);
-	safe_strcat(exename, MAX_PATH_LENGTH, "\\driver-installer.exe");
+	// TODO: fallback to x86 if x64 unavailable
+	if (is_x64) {
+		safe_strcat(exename, MAX_PATH_LENGTH, "\\installer_x64.exe");
+	} else {
+		safe_strcat(exename, MAX_PATH_LENGTH, "\\installer_x86.exe");
+	}
 
 	shExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
 

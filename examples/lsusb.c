@@ -58,7 +58,6 @@ main(void)
 			run_installer("C:\\test", drv_info->device_id);
 		}
 	}
-//	update_drivers();
 	return 0;
 
 	r = libusb_init(NULL);

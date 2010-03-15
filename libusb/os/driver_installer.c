@@ -212,6 +212,8 @@ int update_driver(char* device_id)
 	return 0;
 }
 
+
+// TODO: allow commandline options
 int main(int argc, char** argv)
 {
 	DWORD r;
@@ -220,6 +222,8 @@ int main(int argc, char** argv)
 	char path[MAX_PATH_LENGTH];
 	char log[MAX_PATH_LENGTH];
 	FILE *fd;
+	OSVERSIONINFO os_version;
+	DWORD legacy_flag;
 
 	// Connect to the messaging pipe
 	pipe = CreateFile("\\\\.\\pipe\\libusb-installer", GENERIC_READ|GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
@@ -256,10 +260,16 @@ int main(int argc, char** argv)
 
 	device_id = req_device_id();
 
+	// using DRIVER_PACKAGE_LEGACY_MODE generates a warning on Vista and later
+	if ( (GetVersionEx(&os_version) != 0)
+	  && (os_version.dwPlatformId == VER_PLATFORM_WIN32_NT) ) {
+		legacy_flag = (os_version.dwMajorVersion >= 6)?0:DRIVER_PACKAGE_LEGACY_MODE;
+	}
+
 	plog("Installing driver - please wait...");
 	DIFXAPISetLogCallback(log_callback, NULL);
 	// TODO: set app dependency?
-	r = DriverPackageInstall(path, DRIVER_PACKAGE_LEGACY_MODE|DRIVER_PACKAGE_REPAIR|DRIVER_PACKAGE_FORCE,
+	r = DriverPackageInstall(path, legacy_flag|DRIVER_PACKAGE_REPAIR|DRIVER_PACKAGE_FORCE,
 		NULL, &reboot_needed);
 	DIFXAPISetLogCallback(NULL, NULL);
 	// Will fail if inf not signed, unless DRIVER_PACKAGE_LEGACY_MODE is specified.
