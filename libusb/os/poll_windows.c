@@ -272,9 +272,7 @@ void exit_polling(void)
 
 		for (i=0; i<MAX_FDS; i++) {
 			// Cancel any async I/O (handle can be invalid)
-			if (!HasOverlappedIoCompleted(poll_fd[i].overlapped)) {
-				cancel_io(i);
-			}
+			cancel_io(i);
 			// If anything was pending on that I/O, it should be
 			// terminating, and we should be able to access the fd
 			// mutex lock before too long
@@ -305,9 +303,8 @@ void exit_polling(void)
 __inline void _init_read_marker(int index) 
 {
 	// Cancel any read operation in progress
-	if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
-		cancel_io(index);
-	}
+	cancel_io(index);
+
 	// Setup a new async read on our marker
 	reset_overlapped(poll_fd[index].overlapped);
 	if (!ReadFile(poll_fd[index].handle, &_poll_fd[index].marker, 1, NULL, poll_fd[index].overlapped)) {
@@ -520,14 +517,8 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 void _free_index(int index)
 {
 	// Cancel any async IO (Don't care about the validity of our handles for this)
-	// This could cause a problem with the libusb0.sys back end and there is
-	// no CancelIoEx(), because we may be in a different thread to the
-	// one that is using this fd, and we could kill another threads
-	// io by mistake!
-	// 
-	if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
-		cancel_io(index);
-	}
+	cancel_io(index);
+
 	// close fake handle for devices
 	if ( (poll_fd[index].handle != INVALID_HANDLE_VALUE) && (poll_fd[index].handle != 0)
 	  && (GetFileType(poll_fd[index].handle) == FILE_TYPE_UNKNOWN) ) {
