@@ -117,7 +117,7 @@ static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
 
 // public fd data
-const struct winfd INVALID_WINFD = {-1, NULL, NULL, RW_NONE};
+const struct winfd INVALID_WINFD = {-1, INVALID_HANDLE_VALUE, NULL, RW_NONE};
 struct winfd poll_fd[MAX_FDS];
 // internal fd data
 struct {
@@ -179,7 +179,7 @@ void init_polling(void)
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
 			_poll_fd[i].marker = 0;
-			_poll_fd[i].handle = INVALID_HANDLE_VALUE;
+			_poll_fd[i].original_handle = INVALID_HANDLE_VALUE;
 			_poll_fd[i].thread_id = 0;
 			InitializeCriticalSection(&_poll_fd[i].mutex);
 		}
@@ -282,6 +282,12 @@ void exit_polling(void)
 				_close(poll_fd[i].fd);
 			}
 			free_overlapped(poll_fd[i].overlapped);
+			if (pCancelIoEx == NULL) {
+				// Close duplicate handle
+				if (_poll_fd[i].original_handle != INVALID_HANDLE_VALUE) {
+					CloseHandle(poll_fd[i].handle);
+				}
+			}
 			poll_fd[i] = INVALID_WINFD;
 #if defined(DYNAMIC_FDS)
 			usbi_mutex_destroy(&new_fd_mutex);
@@ -486,11 +492,14 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 			// that don't have it
 			if (pCancelIoEx == NULL) {
 				_poll_fd[i].thread_id = GetCurrentThreadId();
-				_poll_fd[i].original_handle = handle;
 				if (!DuplicateHandle(GetCurrentProcess(), handle, GetCurrentProcess(),
 					&wfd.handle, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
-					usbi_warn(NULL, "could not duplicate handle for CancelIo - using orignal one");
+					usbi_warn(NULL, "could not duplicate handle for CancelIo - using original one");
 					wfd.handle = handle;
+					// Make sure we won't close the original handle on fd deletion then
+					_poll_fd[i].original_handle = INVALID_HANDLE_VALUE;
+				} else {
+					_poll_fd[i].original_handle = handle;
 				}
 			} else {
 				wfd.handle = handle;
@@ -522,10 +531,15 @@ void _free_index(int index)
 	  && (GetFileType(poll_fd[index].handle) == FILE_TYPE_UNKNOWN) ) {
 		_close(poll_fd[index].fd);
 	}
+	// close the duplicate handle (if we have an actual duplicate)
+	if (pCancelIoEx == NULL) {
+		if (_poll_fd[index].original_handle != INVALID_HANDLE_VALUE) {
+			CloseHandle(poll_fd[index].handle);
+		}
+		_poll_fd[index].original_handle = INVALID_HANDLE_VALUE;
+		_poll_fd[index].thread_id = 0;
+	}
 	free_overlapped(poll_fd[index].overlapped);
-	CloseHandle(_poll_fd[index].handle);
-	_poll_fd[index].handle = INVALID_HANDLE_VALUE;
-	_poll_fd[index].thread_id = 0;
 	poll_fd[index] = INVALID_WINFD;
 }
 
