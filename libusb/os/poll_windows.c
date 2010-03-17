@@ -143,6 +143,7 @@ static volatile LONG compat_spinlock = 0;
 // a single transfer (OVERLAPPED) when used. As it may not be part of any of the 
 // platform headers, we hook into the Kernel32 system DLL directly to seek it.
 static BOOL (__stdcall *pCancelIoEx)(HANDLE, LPOVERLAPPED) = NULL;
+#define CancelIoEx_Available (pCancelIoEx != NULL)
 __inline BOOL cancel_io(int index)
 {
 	if ((index < 0) || (index >= MAX_FDS)) {
@@ -153,7 +154,7 @@ __inline BOOL cancel_io(int index)
 	  || (poll_fd[index].handle == 0) || (poll_fd[index].overlapped == NULL) ) {
 		return TRUE;
 	}
-	if (pCancelIoEx != NULL) {
+	if (CancelIoEx_Available) {
 		return (*pCancelIoEx)(poll_fd[index].handle, poll_fd[index].overlapped);
 	}
 	if (_poll_fd[index].thread_id == GetCurrentThreadId()) {
@@ -175,7 +176,7 @@ void init_polling(void)
 		pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
 			GetProcAddress(GetModuleHandle("KERNEL32"), "CancelIoEx");
 		usbi_dbg("Will use CancelIo%s for I/O cancellation", 
-			(pCancelIoEx != NULL)?"Ex":"");
+			CancelIoEx_Available?"Ex":"");
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
 			_poll_fd[i].marker = 0;
@@ -282,7 +283,7 @@ void exit_polling(void)
 				_close(poll_fd[i].fd);
 			}
 			free_overlapped(poll_fd[i].overlapped);
-			if (pCancelIoEx == NULL) {
+			if (!CancelIoEx_Available) {
 				// Close duplicate handle
 				if (_poll_fd[i].original_handle != INVALID_HANDLE_VALUE) {
 					CloseHandle(poll_fd[i].handle);
@@ -491,7 +492,7 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 			wfd.fd = fd;
 			// Attempt to emulate some of the CancelIoEx behaviour on platforms
 			// that don't have it
-			if (pCancelIoEx == NULL) {
+			if (!CancelIoEx_Available) {
 				_poll_fd[i].thread_id = GetCurrentThreadId();
 				if (!DuplicateHandle(GetCurrentProcess(), handle, GetCurrentProcess(),
 					&wfd.handle, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
@@ -534,7 +535,7 @@ void _free_index(int index)
 		_close(poll_fd[index].fd);
 	}
 	// close the duplicate handle (if we have an actual duplicate)
-	if (pCancelIoEx == NULL) {
+	if (!CancelIoEx_Available) {
 		if (_poll_fd[index].original_handle != INVALID_HANDLE_VALUE) {
 			CloseHandle(poll_fd[index].handle);
 		}
