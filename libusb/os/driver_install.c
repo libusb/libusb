@@ -1,6 +1,6 @@
 #include <config.h>
 #include <windows.h>
-#include <setupapi.h>
+#include <api/setupapi.h>
 #include <io.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -15,7 +15,25 @@
 
 #define INF_NAME "libusb-device.inf"
 
-const char inf[] = "Date = \"03/08/2010\"\n\n" \
+/*
+ * For the retrieval of the device description on Windows 7
+ */
+#ifndef DEVPROPKEY_DEFINED
+typedef struct {
+    GUID  fmtid;
+    ULONG pid;
+} DEVPROPKEY;
+#endif
+
+const DEVPROPKEY DEVPKEY_Device_BusReportedDeviceDesc = {
+	{ 0x540b947e, 0x8b40, 0x45bc, {0xa8, 0xa2, 0x6a, 0x0b, 0x89, 0x4c, 0xbd, 0xa2} }, 4 };
+
+DLL_DECLARE(WINAPI, BOOL, SetupDiGetDeviceProperty, (HDEVINFO, PSP_DEVINFO_DATA, CONST DEVPROPKEY*, ULONG*, PBYTE, DWORD, PDWORD, DWORD));
+
+/*
+ * inf templates
+ */
+const char winusb_inf[] = "Dater = \"03/08/2010\"\n\n" \
 	"ProviderName = \"libusb 1.0\"\n" \
 	"WinUSB_SvcDesc = \"WinUSB Driver Service\"\n" \
 	"DiskName = \"libusb (WinUSB) Device Install Disk\"\n" \
@@ -80,6 +98,13 @@ const char inf[] = "Date = \"03/08/2010\"\n\n" \
 	"WdfCoInstaller01009.dll=2\n\n" \
 	"[SourceDisksFiles.ia64]\n";
 
+const char libusb_inf[] = "NOT IMPLEMENTED YET\n";
+
+const char* inf[2] = {winusb_inf, libusb_inf};
+
+/*
+ * resources needed by the installer 
+ */
 struct res {
 	char* id;
 	char* subdir;
@@ -93,14 +118,21 @@ const struct res resource[] = { {"AMD64_DLL1" , "amd64", "WdfCoInstaller01009.dl
 								{"AMD64_INSTALLER", ".", "installer_x64.exe"},
 								{"X86_INSTALLER", ".", "installer_x86.exe"} };
 const int nb_resources = sizeof(resource)/sizeof(resource[0]);
+
+/*
+ * useful external functions
+ */
 extern char *windows_error_str(uint32_t retval);
-
-HANDLE pipe = INVALID_HANDLE_VALUE;
-char* req_device_id;
-
+extern char *wchar_to_utf8(LPCWSTR wstr);
 // for 64 bit platforms detection
 static BOOL (__stdcall *pIsWow64Process)(HANDLE, PBOOL) = NULL;
 
+/*
+ * Global variables
+ */
+HANDLE pipe = INVALID_HANDLE_VALUE;
+char* req_device_id;
+bool dlls_available = false;
 
 char* guid_to_string(const GUID guid)
 {
@@ -123,15 +155,15 @@ void free_di(struct driver_info *start)
 	}
 }
 
-bool cfgmgr32_available = false;
 
-static int init_cfgmgr32(void)
+static int init_dlls(void)
 {
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Parent, TRUE);
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Child, TRUE);
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Sibling, TRUE);
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDA, TRUE); 
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDW, TRUE);
+	DLL_LOAD(Setupapi.dll, SetupDiGetDeviceProperty, FALSE);
 	return LIBUSB_SUCCESS;
 }
 
@@ -139,6 +171,8 @@ struct driver_info* list_driverless(void)
 {
 	unsigned i, j;
 	DWORD size, reg_type;
+	DEVPROPTYPE devprop_type;
+	OSVERSIONINFO os_version;
 	CONFIGRET r;
 	HDEVINFO dev_info;
 	SP_DEVINFO_DATA dev_info_data;
@@ -147,13 +181,13 @@ struct driver_info* list_driverless(void)
 	char *prefix[3] = {"VID_", "PID_", "MI_"};
 	char *token;
 	char path[MAX_PATH_LENGTH];
-	char desc[MAX_DESC_LENGTH];
+	WCHAR desc[MAX_DESC_LENGTH];
 	char driver[MAX_DESC_LENGTH];
 	struct driver_info *ret = NULL, *cur = NULL, *drv_info;
 	bool driverless;
 
-	if (!cfgmgr32_available) {
-		init_cfgmgr32();
+	if (!dlls_available) {
+		init_dlls();
 	}
 
 	// List all connected USB devices
@@ -174,45 +208,15 @@ struct driver_info* list_driverless(void)
 
 		// SPDRP_DRIVER seems to do a better job at detecting driverless devices than
 		// SPDRP_INSTALL_STATE
-		if ( SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_DRIVER, 
+		if (SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_DRIVER, 
 			&reg_type, (BYTE*)driver, MAX_KEY_LENGTH, &size)) {
 			// Driverless devices should return an error
+			// TODO: should we also return devices that have a driver?
 			continue;
 		}
 //		usbi_dbg("driver: %s", driver);
-/*
-		if ( (!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_INSTALL_STATE, 
-			&reg_type, (BYTE*)&install_state, 4, &size)) 
-		  && (size != 4) ) {
-			usbi_warn(NULL, "could not detect installation state of driver for %d: %s", 
-				i, windows_error_str(0));
-			continue;
-		} 
-		usbi_dbg("install state: %d", install_state);
-		if ( (install_state != InstallStateFailedInstall)
-		  && (SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_DRIVER, 
-			&reg_type, (BYTE*)driver, MAX_KEY_LENGTH, &size) != ERROR_INVALID_DATA) ) {
-			continue;
-		}
-*/
 
-		// TODO: can't always get a device desc => provide one
-		if ( (!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_DEVICEDESC, 
-			&reg_type, (BYTE*)desc, MAX_KEY_LENGTH, &size)) ) {
-			usbi_warn(NULL, "could not read device description for %d: %s", 
-				i, windows_error_str(0));
-//			continue;
-		}
-
-		r = CM_Get_Device_ID(dev_info_data.DevInst, path, MAX_PATH_LENGTH, 0);
-		if (r != CR_SUCCESS) {
-			usbi_err(NULL, "could not retrieve simple path for device %d: CR error %d", 
-				i, r);
-			continue;
-		}
-
-		usbi_dbg("Driverless USB device (%d): %s", i, path);
-
+		// Allocate a driver_info struct to store our data
 		drv_info = calloc(1, sizeof(struct driver_info));
 		if (drv_info == NULL) {
 			free_di(ret);
@@ -225,10 +229,45 @@ struct driver_info* list_driverless(void)
 		}
 		cur = drv_info;
 
-		// duplicate for device id
+		// Retrieve device ID. This is needed to re-enumerate our device and force
+		// the final driver installation
+		r = CM_Get_Device_ID(dev_info_data.DevInst, path, MAX_PATH_LENGTH, 0);
+		if (r != CR_SUCCESS) {
+			usbi_err(NULL, "could not retrieve simple path for device %d: CR error %d", 
+				i, r);
+			continue;
+		} else {
+			usbi_dbg("Driverless USB device (%d): %s", i, path);
+		}
 		drv_info->device_id = _strdup(path);
 
-		safe_strcpy(drv_info->desc, sizeof(drv_info->desc), desc);
+		// Retreive the device description as reported by the device itself
+		memset(&os_version, 0, sizeof(OSVERSIONINFO));
+		os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+		if ( (GetVersionEx(&os_version) != 0) 
+		  && (os_version.dwBuildNumber < 7000) ) {
+			// On Vista and earlier, we can use SPDRP_DEVICEDESC
+			if (!SetupDiGetDeviceRegistryPropertyW(dev_info, &dev_info_data, SPDRP_DEVICEDESC, 
+				&reg_type, (BYTE*)desc, 2*MAX_DESC_LENGTH, &size)) {
+				usbi_warn(NULL, "could not read device description for %d: %s", 
+					i, windows_error_str(0));
+				desc[0] = 0;
+			}
+		} else {
+			// On Windows 7, the information we want ("Bus reported device decsription") is 
+			// accessed through DEVPKEY_Device_BusReportedDeviceDesc
+			if (SetupDiGetDeviceProperty == NULL) {
+				usbi_warn(NULL, "failed to locate SetupDiGetDeviceProperty() is Setupapi.dll");
+				desc[0] = 0;
+			} else if (!SetupDiGetDeviceProperty(dev_info, &dev_info_data, &DEVPKEY_Device_BusReportedDeviceDesc,
+				&devprop_type, (BYTE*)desc, 2*MAX_DESC_LENGTH, &size, 0)) {
+				usbi_warn(NULL, "could not read device description for %d (Win7): %s", 
+					i, windows_error_str(0));
+				desc[0] = 0;
+			}
+		}
+		drv_info->desc = wchar_to_utf8(desc);
+		usbi_dbg("Device description: %s", drv_info->desc);
 
 		token = strtok (path, "\\#&");
 		while(token != NULL) {
@@ -318,15 +357,20 @@ int extract_binaries(char* path)
 
 // Create an inf and extract coinstallers in the directory pointed by path
 // TODO: optional directory deletion
-int create_inf(struct driver_info* drv_info, char* path)
+int create_inf(struct driver_info* drv_info, char* path, int type)
 {
 	char filename[MAX_PATH_LENGTH];
 	FILE* fd;
 	GUID guid;
 
 	// TODO? create a reusable temp dir if path is NULL?
-	if ((path == NULL) || (drv_info == NULL))
+	if ((path == NULL) || (drv_info == NULL)) {
 		return -1;
+	}
+
+	if ((type < USE_WINUSB) && (type > USE_LIBUSB)) {
+		return -1;
+	}
 
 	// Try to create directory if it doesn't exist
 	if ( (_access(path, 02) != 0) && (CreateDirectory(path, 0) == 0) ) {
@@ -358,7 +402,7 @@ int create_inf(struct driver_info* drv_info, char* path)
 	}
 	CoCreateGuid(&guid);
 	fprintf(fd, "DeviceGUID = \"%s\"\n", guid_to_string(guid));
-	fwrite(inf, sizeof(inf)-1, 1, fd);
+	fwrite(inf[type], strlen(inf[type]), 1, fd);
 	fclose(fd);
 
 	usbi_dbg("succesfully created %s", filename);
@@ -417,6 +461,7 @@ int run_installer(char* path, char* device_id)
 			(*pIsWow64Process)(GetCurrentProcess(), &is_x64);
 		} 
 	} else {
+		// TODO: warn at compile time about redist of 64 bit app
 		is_x64 = true;
 	}
 
@@ -461,7 +506,7 @@ int run_installer(char* path, char* device_id)
 	ShellExecuteEx(&shExecInfo);
 
 	if (shExecInfo.hProcess == NULL) {
-		usbi_dbg("Installer did not run");
+		usbi_dbg("user chose not to run the installer");
 		r = -1; goto out;
 	}
 	handle[1] = shExecInfo.hProcess;

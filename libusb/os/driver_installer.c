@@ -261,6 +261,8 @@ int main(int argc, char** argv)
 	device_id = req_device_id();
 
 	// using DRIVER_PACKAGE_LEGACY_MODE generates a warning on Vista and later
+	memset(&os_version, 0, sizeof(OSVERSIONINFO));
+	os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
 	if ( (GetVersionEx(&os_version) != 0)
 	  && (os_version.dwPlatformId == VER_PLATFORM_WIN32_NT) ) {
 		legacy_flag = (os_version.dwMajorVersion >= 6)?0:DRIVER_PACKAGE_LEGACY_MODE;
@@ -274,8 +276,9 @@ int main(int argc, char** argv)
 	DIFXAPISetLogCallback(NULL, NULL);
 	// Will fail if inf not signed, unless DRIVER_PACKAGE_LEGACY_MODE is specified.
 	// r = 87 ERROR_INVALID_PARAMETER on path == NULL
-	// r = 2 ERROR_FILE_NOT_FOUND if no inf in path
+	// r = 2 ERROR_FILE_NOT_FOUND => failed to open inf
 	// r = 5 ERROR_ACCESS_DENIED if needs admin elevation
+	// r = 0xD ERROR_INVALID_DATA => inf is missing some data
 	// r = 0xE0000003 ERROR_GENERAL_SYNTAX the syntax of the inf is invalid or the inf is empty
 	// r = 0xE0000304 ERROR_INVALID_CATALOG_DATA => no cat
 	// r = 0xE000023F ERROR_NO_AUTHENTICODE_CATALOG => user cancelled on warnings
@@ -297,11 +300,12 @@ int main(int argc, char** argv)
 		plog("invalid path");
 		goto out;
 	case ERROR_FILE_NOT_FOUND:
-		plog("unable to find inf file on %s", path);
+		plog("failed to open %s", path);
 		goto out;
 	case ERROR_ACCESS_DENIED:
 		plog("this process needs to be run with administrative privileges");
 		goto out;
+	case ERROR_INVALID_DATA:
 	case ERROR_WRONG_INF_STYLE:
 	case ERROR_GENERAL_SYNTAX:
 		plog("the syntax of the inf is invalid");

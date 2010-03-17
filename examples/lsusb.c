@@ -54,7 +54,7 @@ main(void)
 
 	drv_info = list_driverless();
 	for (; drv_info != NULL; drv_info = drv_info->next) {
-		if (create_inf(drv_info, "C:\\test") == 0) {
+		if (create_inf(drv_info, "C:\\test", USE_WINUSB) == 0) {
 			run_installer("C:\\test", drv_info->device_id);
 		}
 	}

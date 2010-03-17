@@ -301,7 +301,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib difxapi.lib driver_resources.res"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="..\msvc;$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources"
+				AdditionalLibraryDirectories="..\msvc;&quot;$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\driver-resources&quot;"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
