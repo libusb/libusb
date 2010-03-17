@@ -1831,7 +1831,7 @@ static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 
 	// Forces instant overlapped completion on timeouts - use at your own risks
-	if (itransfer->flags | USBI_TRANSFER_TIMED_OUT) {
+	if (itransfer->flags & USBI_TRANSFER_TIMED_OUT) {
 		transfer_priv->pollable_fd.overlapped->Internal &= ~STATUS_PENDING;
 	}
 #endif
@@ -1869,7 +1869,7 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 		status = LIBUSB_TRANSFER_TIMED_OUT;
 		break;
 	case ERROR_OPERATION_ABORTED:
-		if (itransfer->flags | USBI_TRANSFER_TIMED_OUT) {
+		if (itransfer->flags & USBI_TRANSFER_TIMED_OUT) {
 			usbi_dbg("detected timeout");
 			status = LIBUSB_TRANSFER_TIMED_OUT;
 		} else {
