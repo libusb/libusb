@@ -35,30 +35,9 @@
  *   pollable fds
  * - leave the core functions call the poll routine and flag POLLIN/POLLOUT
  * 
- * For pipe pollable synchronous I/O (read end polling only), you would:
- * - create an anonymous pipe with usbi_pipe to obtain 2 fds (r & w)
- * - use usbi_write / usbi_read to write to either end of the pipe
- * - use poll to check for data to read
- * Note that the usbi_read/usbi_write function actually perform 
- * asynchronous I/O internally, and could potentially be modified to support
- * O_NON_BLOCK
- *
- * The way the polling on usbi_read works is by splitting all read I/O
- * into a dual 1 byte/n-1 bytes asynchronous read operation.
- * The 1 byte data (called the marker), is always armed for asynchronous
- * readout, so that as soon as data becomes available, an OVERLAPPED event
- * will be flagged, which poll can report.
- * Then during the usbi_read routine itself, this 1 byte marker is copied
- * to the buffer, along with the rest of the data.
- *
- * Note that, since most I/O is buffered, being notified when only the first
- * byte of data is available is unlikely to delay read operations, since the
- * rest of the data should be available in system buffers by the time read
- * is called.
- *
- * Also note that if you don't use usbi_read to read inbound data, but
- * use the OVERLAPPED directly (which is what we do in the USB async I/O 
- * functions), the marker is not used at all.
+ * The pipe pollable synchronous I/O works using the overlapped event associated
+ * with a fake pipe. The read/write functions are only meant to be used in that
+ * context.
  */
 #include <errno.h>
 #include <fcntl.h>
@@ -132,7 +111,7 @@ struct {
 BOOLEAN is_polling_set = FALSE;
 #if defined(DYNAMIC_FDS)
 HANDLE fd_update = INVALID_HANDLE_VALUE;	// event to notify poll of fd update
-HANDLE new_fd[MAX_FDS];		// overlapped event handlesm for fds created since last poll
+HANDLE new_fd[MAX_FDS];		// overlapped event handles for fds created since last poll
 unsigned nb_new_fds = 0;	// nb new fds created since last poll
 usbi_mutex_t new_fd_mutex;	// mutex required for the above
 #endif
@@ -303,68 +282,37 @@ void exit_polling(void)
 }
 
 /*
- * sets the async I/O read on our 1 byte marker
- *
- * requires a valid index
- */
-__inline void _init_read_marker(int index) 
-{
-	// Cancel any read operation in progress
-	cancel_io(index);
-
-	// Setup a new async read on our marker
-	reset_overlapped(poll_fd[index].overlapped);
-	if (!ReadFile(poll_fd[index].handle, &_poll_fd[index].marker, 1, NULL, poll_fd[index].overlapped)) {
-		if(GetLastError() != ERROR_IO_PENDING) {
-			usbi_warn(NULL, "didn't get IO_PENDING!");
-			reset_overlapped(poll_fd[index].overlapped);
-		}
-	} else {
-		// We got some sync I/O. We'll pretend it's async and set overlapped manually
-		poll_dbg("marker readout completed before exit!");
-		if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
-			usbi_warn(NULL, "completed I/O still flagged as pending");
-			poll_fd[index].overlapped->Internal = 0;
-		}
-		SetEvent(poll_fd[index].overlapped->hEvent);
-		poll_fd[index].overlapped->InternalHigh = 1;
-	}
-}
-
-/*
- * Create an async I/O anonymous pipe (that can be used for sync as well)
+ * Create a fake pipe.
+ * As libusb only uses pipes for signaling, all we need from a pipe is an
+ * event. To that extent, we only create wfd's and overlapped's as a means
+ * to access that event.
  */
 int usbi_pipe(int filedes[2])
 {
 	int i, j;
 	HANDLE handle[2];
-	OVERLAPPED *overlapped0, *overlapped1;
-	char pipe_name[] = "\\\\.\\pipe\\libusb000000000000";
-	LONG our_pipe_number;
+	OVERLAPPED* overlapped[2];
 
 	CHECK_INIT_POLLING;
 
-	overlapped0 = calloc(1, sizeof(OVERLAPPED));
-	if (overlapped0 == NULL) {
+	// We must use 2 separate overlapped, else we'll crash when trying to
+	// free the same overlapped twice on closure
+	overlapped[0] = calloc(1, sizeof(OVERLAPPED));
+	if (overlapped[0] == NULL) {
 		return -1;
 	}
+	// The read end must have status pending for signaling to work in poll
+	overlapped[0]->Internal = STATUS_PENDING;
 
-	overlapped1 = calloc(1, sizeof(OVERLAPPED));
-	if (overlapped1 == NULL) {
-		free(overlapped0);
-		return -1;
+	overlapped[1] = calloc(1, sizeof(OVERLAPPED));
+	if (overlapped[1] == NULL) {
+		goto out0;
 	}
+	// Not so important for the write end...
+	overlapped[1]->Internal = STATUS_PENDING;
 
-	our_pipe_number = InterlockedIncrement(&pipe_number) - 1; // - 1 to mirror postfix operation inside _snprintf
-	if (our_pipe_number >= 0x10000) {
-		usbi_warn(NULL, "program assertion failed - more than 65536 pipes were used");
-		our_pipe_number &= 0xFFFF;
-	}
-	_snprintf(pipe_name, sizeof(pipe_name), "\\\\.\\pipe\\libusb%08x%04x", (unsigned)GetCurrentProcessId(), our_pipe_number);
-
-	// Read end of the pipe
-	handle[0] = CreateNamedPipeA(pipe_name, PIPE_ACCESS_INBOUND|FILE_FLAG_OVERLAPPED,
-		PIPE_TYPE_MESSAGE|PIPE_READMODE_MESSAGE, 1, 4096, 4096, 0, NULL);
+	// Read end of the "pipe"
+	handle[0] = CreateFileA("NUL", 0, 0, NULL, OPEN_EXISTING, 0, NULL);
 	if (handle[0] == INVALID_HANDLE_VALUE) {
 		usbi_err(NULL, "could not create pipe (read end): errcode %d", (int)GetLastError());
 		goto out1;
@@ -372,9 +320,8 @@ int usbi_pipe(int filedes[2])
 	filedes[0] = _open_osfhandle((intptr_t)handle[0], _O_RDONLY);
 	poll_dbg("filedes[0] = %d", filedes[0]);
 
-	// Write end of the pipe
-	handle[1] = CreateFileA(pipe_name, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
-		FILE_ATTRIBUTE_NORMAL|FILE_FLAG_OVERLAPPED, NULL);
+	// Write end of the "pipe"
+	handle[1] = CreateFileA("NUL", 0, 0, NULL, OPEN_EXISTING, 0, NULL);
 	if (handle[1] == INVALID_HANDLE_VALUE) {
 		usbi_err(NULL, "could not create pipe (write end): errcode %d", (int)GetLastError());
 		goto out2;
@@ -382,15 +329,13 @@ int usbi_pipe(int filedes[2])
 	filedes[1] = _open_osfhandle((intptr_t)handle[1], _O_WRONLY);
 	poll_dbg("filedes[1] = %d", filedes[1]);
 
-	// Create an OVERLAPPED for each end
-	overlapped0->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!overlapped0->hEvent) {
+	// Use the same event for both overlapped
+	// Note: manual reset must be true (second param) as the reset occurs in read
+	overlapped[0]->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!overlapped[0]->hEvent) {
 		goto out3;
 	}
-	overlapped1->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!overlapped1->hEvent) {
-		goto out4;
-	}
+	overlapped[1]->hEvent = overlapped[0]->hEvent;
 
 	for (i=0, j=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd < 0) {
@@ -403,14 +348,9 @@ int usbi_pipe(int filedes[2])
 
 			poll_fd[i].fd = filedes[j];
 			poll_fd[i].handle = handle[j];
-			poll_fd[i].overlapped = (j==0)?overlapped0:overlapped1;
+			poll_fd[i].overlapped = overlapped[j];
 			poll_fd[i].rw = RW_READ+j;
 			j++;
-			if (j==1) {
-				// Start a 1 byte nonblocking read operation
-				// so that we get read event notifications
-				_init_read_marker(i);
-			}
 			LeaveCriticalSection(&_poll_fd[i].mutex);
 			if (j>=2) {
 				return 0;
@@ -418,16 +358,15 @@ int usbi_pipe(int filedes[2])
 		}
 	}
 
-	CloseHandle(overlapped1->hEvent);
-out4:
-	CloseHandle(overlapped0->hEvent);
+	CloseHandle(overlapped[0]->hEvent);
 out3:
 	CloseHandle(handle[1]);
 out2:
 	CloseHandle(handle[0]);
 out1:
-	free(overlapped1);
-	free(overlapped0);
+	free(overlapped[1]);
+out0:
+	free(overlapped[0]);
 	return -1;
 }
 
@@ -859,7 +798,7 @@ int usbi_close(int fd)
 		if (CloseHandle(handle) == 0) {
 			errno = EIO;
 		} else {
-			r     = 0;
+			r = 0;
 		}
 		LeaveCriticalSection(&_poll_fd[index].mutex);
 	}
@@ -867,26 +806,20 @@ int usbi_close(int fd)
 }
 
 /*
- * synchronous write for custom poll (works on Windows file handles that
- * have been opened with the FILE_FLAG_OVERLAPPED flag)
- *
- * Current restrictions: 
- * - binary mode only
- * - no append mode
+ * synchronous write for fake "pipe" signaling
  */
 ssize_t usbi_write(int fd, const void *buf, size_t count)
 {
 	int index;
-	DWORD wr_count;
-	int r = -1;
 
 	CHECK_INIT_POLLING;
 
-	index = _fd_to_index_and_lock(fd);
-
-	if (count == 0) {
-		return 0;
+	if (count != sizeof(unsigned char)) {
+		usbi_err(NULL, "this function should only used for signaling");
+		return -1;
 	}
+
+	index = _fd_to_index_and_lock(fd);
 
 	if ( (index < 0) || (poll_fd[index].overlapped == NULL) 
 	  || (poll_fd[index].rw != RW_WRITE) ) {
@@ -897,70 +830,26 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 		return -1;
 	}
 
-	// For sync mode, we shouldn't get pending async write I/O
-	if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
-		usbi_warn(NULL, "usbi_write: previous write I/O was flagged pending!");
-		cancel_io(index);
-	}
+	poll_dbg("Set pipe event");
+	SetEvent(poll_fd[index].overlapped->hEvent);
 
-	poll_dbg("writing %d bytes to fd=%d", count, poll_fd[index].fd);
-
-	reset_overlapped(poll_fd[index].overlapped);
-	if (!WriteFile(poll_fd[index].handle, buf, (DWORD)count, &wr_count, poll_fd[index].overlapped)) {
-		if(GetLastError() == ERROR_IO_PENDING) {
-			// I/O started but is not completed => wait till completion
-			switch(WaitForSingleObject(poll_fd[index].overlapped->hEvent, INFINITE)) 
-			{
-			case WAIT_OBJECT_0:
-				if (GetOverlappedResult(poll_fd[index].handle, 
-					poll_fd[index].overlapped, &wr_count, FALSE)) {
-					r     = 0;
-					goto out;
-				} else {
-					usbi_warn(NULL, "GetOverlappedResult failed with error %d", (int)GetLastError());
-					errno = EIO;
-					goto out;
-				}
-			default:
-				errno = EIO;
-				goto out;
-			}
-		} else {
-			// I/O started and failed
-			usbi_warn(NULL, "WriteFile failed with error %d", (int)GetLastError());
-			errno = EIO;
-			goto out;
-		}
-	}
-
-	// I/O started and completed synchronously
-	r = 0;
-
-out:
-	if (r) {
-		reset_overlapped(poll_fd[index].overlapped);
-		LeaveCriticalSection(&_poll_fd[index].mutex);
-		return -1;
-	} else {
-		LeaveCriticalSection(&_poll_fd[index].mutex);
-		return (ssize_t)wr_count;
-	}
+	LeaveCriticalSection(&_poll_fd[index].mutex);
+	return sizeof(unsigned char);
 }
 
 /*
- * synchronous read for custom poll (works on Windows file handles that
- * have been opened with the FILE_FLAG_OVERLAPPED flag)
+ * synchronous read for fake "pipe" signaling
  */
 ssize_t usbi_read(int fd, void *buf, size_t count)
 {
 	int index;
-	DWORD rd_count;
-	int r = -1;
+	ssize_t r = -1;
 
 	CHECK_INIT_POLLING;
 
-	if (count == 0) {
-		return 0;
+	if (count != sizeof(unsigned char)) {
+		usbi_err(NULL, "this function should only used for signaling");
+		return -1;
 	}
 
 	index = _fd_to_index_and_lock(fd);
@@ -975,76 +864,18 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 		goto out;
 	}
 
-
-	// still waiting for completion => force completion
-	if (!HasOverlappedIoCompleted(poll_fd[index].overlapped)) {
-		if (WaitForSingleObject(poll_fd[index].overlapped->hEvent, INFINITE) != WAIT_OBJECT_0) {
-			usbi_warn(NULL, "waiting for marker failed: %d", (int)GetLastError());
-			errno = EIO;
-			goto out;
-		}
-	}
-
-	// Find out if we've read the first byte
-	if (!GetOverlappedResult(poll_fd[index].handle,	poll_fd[index].overlapped, &rd_count, FALSE)) {
-		if (GetLastError() != ERROR_MORE_DATA) {
-			usbi_warn(NULL, "readout of marker failed: %d", (int)GetLastError());
-			errno = EIO;
-			goto out;
-		} else {
-			usbi_warn(NULL, "readout of marker reported more data");
-		}
-	}
-
-	poll_dbg("count = %d, rd_count(marker) = %d", count, (int)rd_count);
-
-	// We should have our marker by now
-	if (rd_count != 1) {
-		usbi_warn(NULL, "unexpected number of bytes for marker (%d)", (int)rd_count);
+	if (WaitForSingleObject(poll_fd[index].overlapped->hEvent, INFINITE) != WAIT_OBJECT_0) {
+		usbi_warn(NULL, "waiting for event failed: %d", (int)GetLastError());
 		errno = EIO;
 		goto out;
 	}
 
-	((BYTE*)buf)[0] = _poll_fd[index].marker;
+	poll_dbg("Cleared pipe event");
+	ResetEvent(poll_fd[index].overlapped->hEvent);
 
-	// Read supplementary bytes if needed (blocking)
-	if (count > 1) {
-		reset_overlapped(poll_fd[index].overlapped);
-		if (!ReadFile(poll_fd[index].handle, (char*)buf+1, (DWORD)(count-1), &rd_count, poll_fd[index].overlapped)) {
-			if(GetLastError() == ERROR_IO_PENDING) {
-				if (!GetOverlappedResult(poll_fd[index].handle,	poll_fd[index].overlapped, &rd_count, TRUE)) {
-					if (GetLastError() == ERROR_MORE_DATA) {
-						usbi_warn(NULL, "could not fetch all data");
-					}
-					usbi_warn(NULL, "readout of supplementary data failed: %d", (int)GetLastError());
-					errno = EIO;
-					goto out;
-				}
-			} else {
-				usbi_warn(NULL, "could not start blocking read of supplementary: %d", (int)GetLastError());
-				errno = EIO;
-				goto out;
-			}
-		}
-		// If ReadFile completed synchronously, we're fine too
-
-		poll_dbg("rd_count(supplementary ) = %d", (int)rd_count);
-
-		if ((rd_count+1) != count) {
-			poll_dbg("wanted %d-1, got %d", count, (int)rd_count);
-			errno = EIO;
-			goto out;
-		}
-	}
-
-	r = 0;
+	r = sizeof(unsigned char);
 
 out:
-	// Setup pending read I/O for the marker
-	_init_read_marker(index);
 	LeaveCriticalSection(&_poll_fd[index].mutex);
-	if (r)
-		return -1;
-	else
-		return count;
+	return r;
 }
