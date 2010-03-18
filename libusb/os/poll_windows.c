@@ -25,7 +25,7 @@
  *
  * The way this layer works is by using OVERLAPPED with async I/O transfers, as
  * OVERLAPPED have an associated event which is flagged for I/O completion.
- * 
+ *
  * For USB pollable async I/O, you would typically:
  * - obtain a Windows HANDLE to a file or device that has been opened in
  *   OVERLAPPED mode
@@ -34,7 +34,7 @@
  *   twice, once in _O_RDONLY and once in _O_WRONLY mode to obtain 2 separate
  *   pollable fds
  * - leave the core functions call the poll routine and flag POLLIN/POLLOUT
- * 
+ *
  * The pipe pollable synchronous I/O works using the overlapped event associated
  * with a fake pipe. The read/write functions are only meant to be used in that
  * context.
@@ -69,7 +69,7 @@
 // cygwin produces a warning unless these prototypes are defined
 extern int _close(int fd);
 extern int _snprintf(char *buffer, size_t count, const char *format, ...);
-extern int cygwin_attach_handle_to_fd(char *name, int fd, HANDLE handle, int bin, int access); 
+extern int cygwin_attach_handle_to_fd(char *name, int fd, HANDLE handle, int bin, int access);
 // _open_osfhandle() is not available on cygwin, but we can emulate
 // it for our needs with cygwin_attach_handle_to_fd()
 static inline int _open_osfhandle(intptr_t osfhandle, int flags)
@@ -119,7 +119,7 @@ LONG pipe_number = 0;
 static volatile LONG compat_spinlock = 0;
 
 // CancelIoEx, available on Vista and later only, provides the ability to cancel
-// a single transfer (OVERLAPPED) when used. As it may not be part of any of the 
+// a single transfer (OVERLAPPED) when used. As it may not be part of any of the
 // platform headers, we hook into the Kernel32 system DLL directly to seek it.
 static BOOL (__stdcall *pCancelIoEx)(HANDLE, LPOVERLAPPED) = NULL;
 #define CancelIoEx_Available (pCancelIoEx != NULL)
@@ -154,7 +154,7 @@ void init_polling(void)
 	if (!is_polling_set) {
 		pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
 			GetProcAddress(GetModuleHandle("KERNEL32"), "CancelIoEx");
-		usbi_dbg("Will use CancelIo%s for I/O cancellation", 
+		usbi_dbg("Will use CancelIo%s for I/O cancellation",
 			CancelIoEx_Available?"Ex":"");
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
@@ -200,7 +200,7 @@ int _fd_to_index_and_lock(int fd)
 	return -1;
 }
 
-OVERLAPPED *create_overlapped(void) 
+OVERLAPPED *create_overlapped(void)
 {
 	OVERLAPPED *overlapped = calloc(1, sizeof(OVERLAPPED));
 	if (overlapped == NULL) {
@@ -219,7 +219,7 @@ void free_overlapped(OVERLAPPED *overlapped)
 	if (overlapped == NULL)
 		return;
 
-	if ( (overlapped->hEvent != 0) 
+	if ( (overlapped->hEvent != 0)
 	  && (overlapped->hEvent != INVALID_HANDLE_VALUE) ) {
 		CloseHandle(overlapped->hEvent);
 	}
@@ -371,14 +371,14 @@ out0:
 }
 
 /*
- * Create both an fd and an OVERLAPPED from an open Windows handle, so that 
+ * Create both an fd and an OVERLAPPED from an open Windows handle, so that
  * it can be used with our polling function
  * The handle MUST support overlapped transfers (usually requires CreateFile
  * with FILE_FLAG_OVERLAPPED)
  * Return a pollable file descriptor struct, or INVALID_WINFD on error
  *
  * Note that the fd returned by this function is a per-transfer fd, rather
- * than a per-session fd and cannot be used for anything else but our 
+ * than a per-session fd and cannot be used for anything else but our
  * custom functions (the fd itself points to the NUL: device)
  * if you plan to do R/W on the same handle, you MUST create 2 fds: one for
  * read and one for write. Using a single R/W fd is unsupported and will
@@ -485,7 +485,7 @@ void _free_index(int index)
 }
 
 /*
- * Release a pollable file descriptor. 
+ * Release a pollable file descriptor.
  *
  * Note that the associated Windows handle is not closed by this call
  */
@@ -603,13 +603,13 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 	unsigned j;
 
 	// To address the possibility of missing new fds between the time the new
-	// pollable fd set is assembled, and the ResetEvent() call below, an 
+	// pollable fd set is assembled, and the ResetEvent() call below, an
 	// additional new_fd[] HANDLE table is used for any new fd that was created
 	// since the last call to poll (see below)
 	ResetEvent(fd_update);
 
 	// At this stage, any new fd creation will be detected through the fd_update
-	// event notification, and any previous creation that we may have missed 
+	// event notification, and any previous creation that we may have missed
 	// will be picked up through the existing new_fd[] table.
 #endif
 
@@ -667,7 +667,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			triggered = -1;
 			goto poll_exit;
 		}
-		
+
 		poll_dbg("fd[%d]=%d (overlapped = %p) got events %04X", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
 
 		// The following macro only works if overlapped I/O was reported pending
@@ -700,7 +700,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 	// have been added since the last call to poll, but are not (yet) part
 	// of the pollable fd set. Typically, these would be from fds that have
 	// been created between the construction of the fd set and the calling
-	// of poll. 
+	// of poll.
 	// Event if we won't be able to return usable poll data on these events,
 	// make sure we monitor them to return an EINTR code
 	usbi_mutex_lock(&new_fd_mutex); // We could probably do without
@@ -726,7 +726,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		} else {
 			poll_dbg("starting %d ms wait for %d handles...", timeout, (int)nb_handles_to_wait_on);
 		}
-		ret = WaitForMultipleObjects(nb_handles_to_wait_on, handles_to_wait_on, 
+		ret = WaitForMultipleObjects(nb_handles_to_wait_on, handles_to_wait_on,
 			FALSE, (timeout<0)?INFINITE:(DWORD)timeout);
 		object_index = ret-WAIT_OBJECT_0;
 		if ((object_index >= 0) && ((DWORD)object_index < nb_handles_to_wait_on)) {
@@ -820,7 +820,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 
 	index = _fd_to_index_and_lock(fd);
 
-	if ( (index < 0) || (poll_fd[index].overlapped == NULL) 
+	if ( (index < 0) || (poll_fd[index].overlapped == NULL)
 	  || (poll_fd[index].rw != RW_WRITE) ) {
 		errno = EBADF;
 		if (index >= 0) {
