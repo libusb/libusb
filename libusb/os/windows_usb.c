@@ -2062,6 +2062,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 
 		// Because a Windows OVERLAPPED is used for poll emulation, 
 		// a pollable fd is created and stored with each transfer
+		usbi_mutex_lock(&ctx->flying_transfers_lock); 
 		list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
 			transfer_priv = usbi_transfer_get_os_priv(transfer);
 			if (transfer_priv->pollable_fd.fd == fds[i].fd) {
@@ -2069,6 +2070,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 				break;
 			}
 		}
+		usbi_mutex_unlock(&ctx->flying_transfers_lock); 
 
 		if (found) {
 			// Handle async requests that completed synchronously first
