@@ -632,7 +632,7 @@ typedef struct _USB_HUB_CAPABILITIES_EX {
 #define DEVICE_SPEED            0x01
 #define wuLowSpeed              0x01
 #define wuFullSpeed             0x02
-#define wuHighSpeed             0x03 
+#define wuHighSpeed             0x03
 
 typedef enum _USBD_PIPE_TYPE {
 	UsbdPipeTypeControl,

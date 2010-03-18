@@ -519,7 +519,7 @@ static int windows_init(struct libusb_context *ctx)
 		/* Enumerate over possible Host Controller names, */
 		/* because Win2K has a bug where some don't show up via the GUID */
 		if (windows_version == WINDOWS_2K) {
-		
+
 			for (hcnum = 0; ; hcnum++)
 			{
 				HANDLE handle = INVALID_HANDLE_VALUE;
@@ -546,7 +546,7 @@ static int windows_init(struct libusb_context *ctx)
 					}
 					windows_hcd_priv_init(*_hcd_cur);
 					(*_hcd_cur)->path = sanitize_path(HCName);
-		
+
 					_hcd_cur = &((*_hcd_cur)->next);
 					CloseHandle(handle);
 				}
@@ -1379,13 +1379,13 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 
 		if (windows_version != WINDOWS_2K) {	/* Win2K doesn't support SPDRP_INSTALL_STATE */
 			// Check that the driver installation is OK
-			if ( (!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_INSTALL_STATE, 
-				&reg_type, (BYTE*)&install_state, 4, &size)) 
+			if ( (!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_INSTALL_STATE,
+				&reg_type, (BYTE*)&install_state, 4, &size))
 			  && (size != 4) ){
-				usbi_warn(ctx, "could not detect installation state of driver for %s: %s", 
+				usbi_warn(ctx, "could not detect installation state of driver for %s: %s",
 					dev_interface_details->DevicePath, windows_error_str(0));
 			} else if (install_state != 0) {
-				usbi_warn(ctx, "driver for device %s is reporting an issue (code: %d) - skipping", 
+				usbi_warn(ctx, "driver for device %s is reporting an issue (code: %d) - skipping",
 					dev_interface_details->DevicePath, install_state);
 				continue;
 			}
@@ -1496,7 +1496,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 
 	/* The libusb0 driver has it's own device names for the PCI devices it drives. */
 	/* There doesn't seem any simple way of matching these up to the names found above, */
-	/* but we do the best we can. For each libusb0 device, locate the first */ 
+	/* but we do the best we can. For each libusb0 device, locate the first */
 	/* not substituted matching device in our discovered devices. */
 	{
 		char dev_name[LIBUSB0_DEVICE_NAME_MAX];
@@ -1505,14 +1505,14 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 		HANDLE handle;
 		libusb0_request req;
 		USB_DEVICE_DESCRIPTOR dev_descriptor;
-	
+
 		for (i = 1; i < LIBUSB0_MAX_DEVICES; i++) {
 			ret = 0;
 
-			_snprintf(dev_name, sizeof(dev_name) - 1,"%s%04d", 
+			_snprintf(dev_name, sizeof(dev_name) - 1,"%s%04d",
 								LIBUSB0_DEVICE_NAME, i);
 
-			handle = CreateFile(dev_name, 0, 0, NULL, OPEN_EXISTING, 
+			handle = CreateFile(dev_name, 0, 0, NULL, OPEN_EXISTING,
 													FILE_FLAG_OVERLAPPED, NULL);
 
 			if (handle == INVALID_HANDLE_VALUE) {
@@ -1525,12 +1525,12 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			req.descriptor.index = 0;
 			req.descriptor.language_id = 0;
 			req.timeout = LIBUSB0_DEFAULT_TIMEOUT;
-			
+
 			if (LIBUSB_DT_DEVICE_SIZE != sizeof(USB_DEVICE_DESCRIPTOR))
 				usbi_err(ctx, "program assertion failed - Device Descripor structure is the wrong size");
 
-			if (libusb0_io_sync(handle, LIBUSB0_IOCTL_GET_DESCRIPTOR, 
-			                &req, sizeof(libusb0_request), 
+			if (libusb0_io_sync(handle, LIBUSB0_IOCTL_GET_DESCRIPTOR,
+			                &req, sizeof(libusb0_request),
 			                &dev_descriptor, LIBUSB_DT_DEVICE_SIZE, &ret) != LIBUSB_SUCCESS
 			 || ret < LIBUSB_DT_DEVICE_SIZE) {
 				usbi_err(ctx,"set_device_paths: couldn't read device descriptor");
@@ -1539,7 +1539,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			}
 			CloseHandle(handle);
 
-			_snprintf(filename, LIBUSB0_DEVICE_NAME_MAX - 1, "%s--0x%04x-0x%04x", 
+			_snprintf(filename, LIBUSB0_DEVICE_NAME_MAX - 1, "%s--0x%04x-0x%04x",
 								dev_name, dev_descriptor.idVendor, dev_descriptor.idProduct);
 
 			for (j=0; j<discdevs->len; j++) {
@@ -2968,7 +2968,7 @@ static int libusb0_io_sync(HANDLE dev, unsigned int code, void *out, int out_siz
 	OVERLAPPED ol;
 	DWORD _ret;
 
-	memset(&ol, 0, sizeof(ol));	
+	memset(&ol, 0, sizeof(ol));
 
 	if(ret)
 		*ret = 0;
@@ -2977,7 +2977,7 @@ static int libusb0_io_sync(HANDLE dev, unsigned int code, void *out, int out_siz
 
 	if(!ol.hEvent)
 		return LIBUSB_ERROR_NO_MEM;
-	
+
 	if(!DeviceIoControl(dev, code, out, out_size, in, in_size, NULL, &ol)) {
 		if(GetLastError() != ERROR_IO_PENDING) {
 			CloseHandle(ol.hEvent);
@@ -2991,7 +2991,7 @@ static int libusb0_io_sync(HANDLE dev, unsigned int code, void *out, int out_siz
 		CloseHandle(ol.hEvent);
 		return LIBUSB_SUCCESS;
 	}
-	
+
 	CloseHandle(ol.hEvent);
 	return LIBUSB_ERROR_IO;
 }
@@ -3005,7 +3005,7 @@ static int libusb0_init(struct libusb_context *ctx)
 	return LIBUSB_SUCCESS;
 }
 
-static int libusb0_exit(void) 
+static int libusb0_exit(void)
 {
 	return LIBUSB_SUCCESS;
 }
@@ -3013,7 +3013,7 @@ static int libusb0_exit(void)
 // NB: open and close must ensure that they only handle interface of
 // the right API type, as these functions can be called wholesale from
 // composite_open(), with interfaces belonging to different APIs
-static int libusb0_open(struct libusb_device_handle *dev_handle) 
+static int libusb0_open(struct libusb_device_handle *dev_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
@@ -3027,11 +3027,11 @@ static int libusb0_open(struct libusb_device_handle *dev_handle)
 	CHECK_LIBUSB0_AVAILABLE;
 
 	// libusb0 has a single handle for the device
-	if ( (priv->path != NULL) 
+	if ( (priv->path != NULL)
 	  && (priv->apib->id == USB_API_LIBUSB0) ) {
 		char dev_name[LIBUSB0_DEVICE_NAME_MAX], *p;
 
-		/* build the Windows file name from the unique device name */ 
+		/* build the Windows file name from the unique device name */
 		strcpy(dev_name, priv->path);
 		p = strstr(dev_name, "--");
 
@@ -3040,12 +3040,12 @@ static int libusb0_open(struct libusb_device_handle *dev_handle)
 			return LIBUSB_ERROR_OTHER;
 		}
 		*p = 0;
-		
-		libusb0_handle = CreateFileA(dev_name, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ, 
+
+		libusb0_handle = CreateFileA(dev_name, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ,
 			NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 		if (libusb0_handle == INVALID_HANDLE_VALUE) {
 
-			libusb0_handle = CreateFileA(dev_name, 0, FILE_SHARE_WRITE | FILE_SHARE_READ, 
+			libusb0_handle = CreateFileA(dev_name, 0, FILE_SHARE_WRITE | FILE_SHARE_READ,
 				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 
 			if (libusb0_handle == INVALID_HANDLE_VALUE) {
@@ -3070,20 +3070,20 @@ static int libusb0_open(struct libusb_device_handle *dev_handle)
 
 		/* Check the version number */
 		if(libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_GET_VERSION,
-										 &req, sizeof(libusb0_request), 
-										 &req, sizeof(libusb0_request), &ret) != LIBUSB_SUCCESS 
+										 &req, sizeof(libusb0_request),
+										 &req, sizeof(libusb0_request), &ret) != LIBUSB_SUCCESS
 			 || (ret < sizeof(libusb0_request))) {
 				usbi_err(ctx,"libusb0_open: getting driver version failed (got %d expected %d)",ret,sizeof(libusb0_request));
 		} else {
 			usbi_info(ctx,"usb_os_init: driver version: %d.%d.%d.%d",
-									req.version.major, req.version.minor, 
+									req.version.major, req.version.minor,
 									req.version.micro, req.version.nano);
 			/* set debug level */
 			req.timeout = 0;
 			req.debug.level = ctx->debug;
-		
-			if(libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_SET_DEBUG_LEVEL, 
-											 &req, sizeof(libusb0_request), 
+
+			if(libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_SET_DEBUG_LEVEL,
+											 &req, sizeof(libusb0_request),
 											 NULL, 0, NULL)) {
 				usbi_err(ctx,"libusb0_open: setting debug level failed");
 			} else {
@@ -3126,11 +3126,11 @@ static int libusb0_claim_interface(struct libusb_device_handle *dev_handle, int 
 
 	libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 
-	// interfaces for composite devices are always independent, therefore 
+	// interfaces for composite devices are always independent, therefore
 	// "alt" interfaces are only found on non-composite
 	if ((!is_composite) && (iface != 0)) {
 
-		// It is a requirement on Windows that to claim an interface >= 1 
+		// It is a requirement on Windows that to claim an interface >= 1
 		// on a non-composite device, you must first have claimed interface 0 ???
 		if (handle_priv->interface_handle[0].api_handle == 0) {	// Not claimed
 
@@ -3138,7 +3138,7 @@ static int libusb0_claim_interface(struct libusb_device_handle *dev_handle, int 
 			memset(&req, 0, sizeof(req));
 			req.interface.interface = 0;
 
-			if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_CLAIM_INTERFACE, 
+			if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_CLAIM_INTERFACE,
 			                     &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
 				usbi_warn(ctx, "failed to auto-claim interface 0 (required to claim %d with libusb0)", iface);
 				return LIBUSB_ERROR_ACCESS;
@@ -3153,10 +3153,10 @@ static int libusb0_claim_interface(struct libusb_device_handle *dev_handle, int 
 		if (handle_priv->interface_handle[iface].api_handle == 0) {		// Not claimed
 			memset(&req, 0, sizeof(req));
 			req.interface.interface = iface;
-		
-			if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_CLAIM_INTERFACE, 
+
+			if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_CLAIM_INTERFACE,
 			                     &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
-		
+
 				usbi_err(ctx, "libusb0_claim_interface: could not claim interface %d: %s", iface, libusb_strerror(ret));
 				return ret;
 			}
@@ -3168,10 +3168,10 @@ static int libusb0_claim_interface(struct libusb_device_handle *dev_handle, int 
 			libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 			memset(&req, 0, sizeof(req));
 			req.interface.interface = iface;
-		
-			if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_CLAIM_INTERFACE, 
+
+			if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_CLAIM_INTERFACE,
 			                     &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
-		
+
 				usbi_err(ctx, "libusb0_claim_interface: could not claim interface %d: %s", iface, libusb_strerror(ret));
 				return ret;
 			}
@@ -3202,7 +3202,7 @@ static int libusb0_release_interface(struct libusb_device_handle *dev_handle, in
 	req.interface.interface = iface;
 	req.timeout = LIBUSB0_DEFAULT_TIMEOUT;
 
-	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_RELEASE_INTERFACE, &req, 
+	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_RELEASE_INTERFACE, &req,
 	                    sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
 		usbi_err(ctx, "libusb0_release_interface %d failed: %s", iface, libusb_strerror(ret));
 		return ret;
@@ -3241,7 +3241,7 @@ static int libusb0_submit_iso_transfer(struct usbi_transfer *itransfer) {
 	libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(libusb0_handle, direction_in?_O_RDONLY:_O_WRONLY);	
+	wfd = usbi_create_fd(libusb0_handle, direction_in?_O_RDONLY:_O_WRONLY);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3264,17 +3264,17 @@ static int libusb0_submit_iso_transfer(struct usbi_transfer *itransfer) {
 
 	if (direction_in) {
 		usbi_dbg("reading %d bytes of %d packet size", transfer->length,req.endpoint.packet_size);
-		ret = DeviceIoControl(libusb0_handle, 
+		ret = DeviceIoControl(libusb0_handle,
                       LIBUSB0_IOCTL_ISOCHRONOUS_READ,
-                      &req, sizeof(libusb0_request), 
+                      &req, sizeof(libusb0_request),
                       transfer->buffer,
                       transfer->length, NULL, wfd.overlapped);
 	} else {
 
 		usbi_dbg("writing %d bytes of %d packet size", transfer->length,req.endpoint.packet_size);
-		ret = DeviceIoControl(libusb0_handle, 
+		ret = DeviceIoControl(libusb0_handle,
                       LIBUSB0_IOCTL_ISOCHRONOUS_WRITE,
-                      &req, sizeof(libusb0_request), 
+                      &req, sizeof(libusb0_request),
                       transfer->buffer,
                       transfer->length, NULL, wfd.overlapped);
 	}
@@ -3350,7 +3350,7 @@ static int libusb0_submit_control_transfer(struct usbi_transfer *itransfer)
 
 	req_size = !(request_type & LIBUSB_ENDPOINT_IN) ? sizeof(libusb0_request) + size
 		: sizeof(libusb0_request);
-	
+
 	if (!(req = malloc(req_size)))
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -3361,22 +3361,22 @@ static int libusb0_submit_control_transfer(struct usbi_transfer *itransfer)
 
 	switch(request_type & (0x03 << 5))
 		{
-		case LIBUSB_REQUEST_TYPE_STANDARD:			
+		case LIBUSB_REQUEST_TYPE_STANDARD:
 			switch(request)
 				{
-				case LIBUSB_REQUEST_GET_STATUS: 
+				case LIBUSB_REQUEST_GET_STATUS:
 					req->status.recipient = 0x1f & request_type;
 					req->status.index = index;
 					code = LIBUSB0_IOCTL_GET_STATUS;
 					break;
-			
+
 				case LIBUSB_REQUEST_CLEAR_FEATURE:
 					req->feature.recipient = 0x1f & request_type;
 					req->feature.feature = value;
 					req->feature.index = index;
 					code = LIBUSB0_IOCTL_CLEAR_FEATURE;
 					break;
-		
+
 				case LIBUSB_REQUEST_SET_FEATURE:
 					req->feature.recipient = 0x1f & request_type;
 					req->feature.feature = value;
@@ -3391,7 +3391,7 @@ static int libusb0_submit_control_transfer(struct usbi_transfer *itransfer)
 					req->descriptor.language_id = index;
 					code = LIBUSB0_IOCTL_GET_DESCRIPTOR;
 					break;
-		
+
 				case LIBUSB_REQUEST_SET_DESCRIPTOR:
 					req->descriptor.recipient = 0x1f & request_type;
 					req->descriptor.type = (value >> 8) & 0xFF;
@@ -3399,34 +3399,34 @@ static int libusb0_submit_control_transfer(struct usbi_transfer *itransfer)
 					req->descriptor.language_id = index;
 					code = LIBUSB0_IOCTL_SET_DESCRIPTOR;
 					break;
-		
+
 				case LIBUSB_REQUEST_GET_CONFIGURATION:
 					code = LIBUSB0_IOCTL_GET_CONFIGURATION;
 					break;
-			
-				case LIBUSB_REQUEST_SET_CONFIGURATION:		
+
+				case LIBUSB_REQUEST_SET_CONFIGURATION:
 					req->configuration.configuration = value;
 					code = LIBUSB0_IOCTL_SET_CONFIGURATION;
 					break;
-		
+
 				case LIBUSB_REQUEST_GET_INTERFACE:
 					req->interface.interface = index;
-					code = LIBUSB0_IOCTL_GET_INTERFACE;		
+					code = LIBUSB0_IOCTL_GET_INTERFACE;
 					break;
-			
+
 				case LIBUSB_REQUEST_SET_INTERFACE:
 					req->interface.interface = index;
 					req->interface.altsetting = value;
-					code = LIBUSB0_IOCTL_SET_INTERFACE;		
+					code = LIBUSB0_IOCTL_SET_INTERFACE;
 					break;
-		
+
 				default:
 					free(req);
 					return LIBUSB_ERROR_INVALID_PARAM;
 				}
 			break;
 
-		case LIBUSB_REQUEST_TYPE_VENDOR:	
+		case LIBUSB_REQUEST_TYPE_VENDOR:
 		case LIBUSB_REQUEST_TYPE_CLASS:
 
 			req->vendor.type = (request_type >> 5) & 0x03;
@@ -3454,7 +3454,7 @@ static int libusb0_submit_control_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("will use interface %d", current_interface);
 	libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 
-	wfd = usbi_create_fd(libusb0_handle, _O_RDONLY);	
+	wfd = usbi_create_fd(libusb0_handle, _O_RDONLY);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3502,7 +3502,7 @@ static int libusb0_set_interface_altsetting(struct libusb_device_handle *dev_han
 	req.interface.altsetting = altsetting;
 	req.timeout = LIBUSB0_DEFAULT_TIMEOUT;
 
-	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_SET_INTERFACE, 
+	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_SET_INTERFACE,
 			                   &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
 		usbi_err(ctx, "libusb0_set_interface_altsetting: intfc %d alt %d failed: %s", iface, altsetting, libusb_strerror(ret));
 		return ret;
@@ -3539,7 +3539,7 @@ static int libusb0_submit_bulk_transfer(struct usbi_transfer *itransfer)
 	libusb0_handle = handle_priv->interface_handle[0].dev_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(libusb0_handle, direction_in?_O_RDONLY:_O_WRONLY);	
+	wfd = usbi_create_fd(libusb0_handle, direction_in?_O_RDONLY:_O_WRONLY);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3549,17 +3549,17 @@ static int libusb0_submit_bulk_transfer(struct usbi_transfer *itransfer)
 
 	if (direction_in) {
 		usbi_dbg("reading bulk %d bytes from ep %02X", transfer->length, transfer->endpoint);
-		ret = DeviceIoControl(libusb0_handle, 
+		ret = DeviceIoControl(libusb0_handle,
                       LIBUSB0_IOCTL_INTERRUPT_OR_BULK_READ,
-                      &req, sizeof(libusb0_request), 
+                      &req, sizeof(libusb0_request),
                       transfer->buffer,
                       transfer->length, NULL, wfd.overlapped);
 	} else {
 
 		usbi_dbg("writing bulk %d bytes from ep %02X", transfer->length, transfer->endpoint);
-		ret = DeviceIoControl(libusb0_handle, 
+		ret = DeviceIoControl(libusb0_handle,
                       LIBUSB0_IOCTL_INTERRUPT_OR_BULK_WRITE,
-                      &req, sizeof(libusb0_request), 
+                      &req, sizeof(libusb0_request),
                       transfer->buffer,
                       transfer->length, NULL, wfd.overlapped);
 	}
@@ -3596,7 +3596,7 @@ static int libusb0_clear_halt(struct libusb_device_handle *dev_handle, unsigned 
 	req.endpoint.endpoint = (int)endpoint;
 	req.timeout = LIBUSB0_DEFAULT_TIMEOUT;
 
-	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_RESET_ENDPOINT, &req, 
+	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_RESET_ENDPOINT, &req,
 	                    sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
 		usbi_err(ctx, "libusb0_clear_halt: 0x%02x failed: %s", endpoint, libusb_strerror(ret));
 		return ret;
@@ -3621,7 +3621,7 @@ static int libusb0_abort_control(struct usbi_transfer *itransfer)
 	req.endpoint.endpoint = 0;
 	req.timeout = LIBUSB0_DEFAULT_TIMEOUT;
 
-	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_ABORT_ENDPOINT, 
+	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_ABORT_ENDPOINT,
 			                   &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
 		usbi_err(ctx, "libusb0_abort_control: failed: %s", libusb_strerror(ret));
 		return ret;
@@ -3646,7 +3646,7 @@ static int libusb0_abort_transfers(struct usbi_transfer *itransfer)
 	req.endpoint.endpoint = (int)transfer->endpoint;
 	req.timeout = LIBUSB0_DEFAULT_TIMEOUT;
 
-	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_ABORT_ENDPOINT, 
+	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_ABORT_ENDPOINT,
 			                   &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
 		usbi_err(ctx, "libusb0_abort_transfer: endpoint 0x%02x failed: %s", transfer->endpoint, libusb_strerror(ret));
 		return ret;
@@ -3669,7 +3669,7 @@ static int libusb0_reset_device(struct libusb_device_handle *dev_handle)
 
 	req.timeout = LIBUSB0_DEFAULT_TIMEOUT;
 
-	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_RESET_DEVICE, 
+	if ((ret = libusb0_io_sync(libusb0_handle, LIBUSB0_IOCTL_RESET_DEVICE,
 			                   &req, sizeof(libusb0_request), NULL, 0, NULL)) != LIBUSB_SUCCESS) {
 		usbi_err(ctx, "libusb0_reset_device: failed: %s", libusb_strerror(ret));
 		return ret;
@@ -3678,7 +3678,7 @@ static int libusb0_reset_device(struct libusb_device_handle *dev_handle)
 	return LIBUSB_SUCCESS;
 }
 
-static int libusb0_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size) 
+static int libusb0_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size)
 {
 	itransfer->transferred += io_size;
 	return LIBUSB_TRANSFER_COMPLETED;
