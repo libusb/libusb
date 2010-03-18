@@ -2257,6 +2257,7 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
 API_EXPORTED const struct libusb_pollfd **libusb_get_pollfds(
 	libusb_context *ctx)
 {
+#ifndef OS_WINDOWS
 	struct libusb_pollfd **ret = NULL;
 	struct usbi_pollfd *ipollfd;
 	size_t i = 0;
@@ -2278,6 +2279,11 @@ API_EXPORTED const struct libusb_pollfd **libusb_get_pollfds(
 out:
 	usbi_mutex_unlock(&ctx->pollfds_lock);
 	return (const struct libusb_pollfd **) ret;
+#else
+	usbi_err(ctx, "external polling of libusb's internal descriptors "\
+		"is not yet supported on Windows platforms");
+	return NULL;
+#endif
 }
 
 /* Backends call this from handle_events to report disconnection of a device.
