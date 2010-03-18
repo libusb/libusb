@@ -861,7 +861,7 @@ void usbi_fd_notification(struct libusb_context *ctx)
 		usbi_mutex_lock(&ctx->pollfd_modify_lock);
 		ctx->pollfd_modify--;
 		usbi_mutex_unlock(&ctx->pollfd_modify_lock);
-		return;	
+		return;
 	}
 
 	/* take event handling lock */

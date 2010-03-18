@@ -32,7 +32,7 @@
 #include <limits.h>
 
 /* 'interface' might be defined as a macro on Windows, so we need to
- * undefine it so as not to break the current libusb API, because 
+ * undefine it so as not to break the current libusb API, because
  * libusb_config_descriptor has an 'interface' member
  * As this can be problematic if you include windows.h after libusb.h
  * in your sources, we force windows.h to be included first. */

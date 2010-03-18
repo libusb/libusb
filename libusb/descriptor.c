@@ -176,7 +176,7 @@ static void clear_interface(struct libusb_interface *usb_interface)
 		free((void *) usb_interface->altsetting);
 		usb_interface->altsetting = NULL;
 	}
-	
+
 }
 
 static int parse_interface(libusb_context *ctx,
@@ -663,7 +663,7 @@ API_EXPORTED void libusb_free_config_descriptor(
 /** \ingroup desc
  * Retrieve a string descriptor in C style ASCII.
  *
- * Wrapper around libusb_get_string_descriptor(). Uses the first language 
+ * Wrapper around libusb_get_string_descriptor(). Uses the first language
  * supported by the device.
  *
  * \param dev a device handle

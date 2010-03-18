@@ -192,7 +192,7 @@ struct libusb_hid_descriptor {
 #define LIBUSB_DT_HID_SIZE              9
 #define HID_MAX_CONFIG_DESC_SIZE (LIBUSB_DT_CONFIG_SIZE + LIBUSB_DT_INTERFACE_SIZE \
 	+ LIBUSB_DT_HID_SIZE + 2 * LIBUSB_DT_ENDPOINT_SIZE)
-#define HID_MAX_REPORT_SIZE             1024 
+#define HID_MAX_REPORT_SIZE             1024
 #define HID_IN_EP                       0x81
 #define HID_OUT_EP                      0x02
 #define LIBUSB_REQ_RECIPIENT(request_type) ((request_type) & 0x1F)
@@ -240,7 +240,7 @@ struct windows_device_priv {
 		char *path;                     // each interface needs a Windows device interface path,
 		struct windows_usb_api_backend const *apib; // an API backend (multiple drivers support),
 		int8_t nb_endpoints;            // and a set of endpoint addresses (USB_MAXENDPOINTS)
-		uint8_t *endpoint;	            
+		uint8_t *endpoint;
 	} usb_interface[USB_MAXINTERFACES];
 	uint8_t composite_api_flags;        // HID and composite devices require additional data
 	struct hid_device_priv *hid;
@@ -462,7 +462,7 @@ DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDW, (DEVINST, PWCHAR, ULONG, ULONG
 // Most of the structures below need to be packed
 #pragma pack(push, 1)
 
-typedef struct _USB_INTERFACE_DESCRIPTOR { 
+typedef struct _USB_INTERFACE_DESCRIPTOR {
   UCHAR  bLength;
   UCHAR  bDescriptorType;
   UCHAR  bInterfaceNumber;
@@ -474,7 +474,7 @@ typedef struct _USB_INTERFACE_DESCRIPTOR {
   UCHAR  iInterface;
 } USB_INTERFACE_DESCRIPTOR, *PUSB_INTERFACE_DESCRIPTOR;
 
-typedef struct _USB_CONFIGURATION_DESCRIPTOR { 
+typedef struct _USB_CONFIGURATION_DESCRIPTOR {
   UCHAR  bLength;
   UCHAR  bDescriptorType;
   USHORT  wTotalLength;
@@ -499,7 +499,7 @@ typedef struct _USB_CONFIGURATION_DESCRIPTOR_SHORT {
 	USB_CONFIGURATION_DESCRIPTOR data;
 } USB_CONFIGURATION_DESCRIPTOR_SHORT;
 
-typedef struct _USB_ENDPOINT_DESCRIPTOR { 
+typedef struct _USB_ENDPOINT_DESCRIPTOR {
   UCHAR  bLength;
   UCHAR  bDescriptorType;
   UCHAR  bEndpointAddress;
@@ -697,7 +697,7 @@ typedef void* PHIDP_PREPARSED_DATA;
 
 #pragma pack(1)
 typedef struct {
-	ULONG Size; 
+	ULONG Size;
 	USHORT VendorID;
 	USHORT ProductID;
 	USHORT VersionNumber;

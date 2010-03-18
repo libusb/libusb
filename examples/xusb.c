@@ -4,7 +4,7 @@
  * Based on lsusb, copyright (c) 2007 Daniel Drake <dsd@gentoo.org>
  * With contributions to Mass Storage test by Alan Stern.
  *
- * This test program tries to access an USB device through WinUSB. 
+ * This test program tries to access an USB device through WinUSB.
  * To access your device, modify this source and add your VID/PID.
  *
  * This library is free software; you can redistribute it and/or
@@ -141,7 +141,7 @@ enum test_type {
 } test_mode;
 uint16_t VID, PID;
 
-void display_buffer_hex(unsigned char *buffer, unsigned size) 
+void display_buffer_hex(unsigned char *buffer, unsigned size)
 {
 	unsigned i;
 
@@ -154,7 +154,7 @@ void display_buffer_hex(unsigned char *buffer, unsigned size)
 }
 
 
-// The XBOX Controller is really a HID device that got its HID Report Descriptors 
+// The XBOX Controller is really a HID device that got its HID Report Descriptors
 // removed by Microsoft.
 // Input/Output reports described at http://euc.jp/periphs/xbox-controller.ja.html
 int display_xbox_status(libusb_device_handle *handle)
@@ -162,18 +162,18 @@ int display_xbox_status(libusb_device_handle *handle)
 	int r;
 	uint8_t input_report[20];
 	printf("\nReading XBox Input Report...\n");
-	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
+	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 20, 1000));
 	printf("   D-pad: %02X\n", input_report[2]&0x0F);
 	printf("   Start:%d, Back:%d, Left Stick Press:%d, Right Stick Press:%d\n", B(input_report[2]&0x10), B(input_report[2]&0x20),
 		B(input_report[2]&0x40), B(input_report[2]&0x80));
 	// A, B, X, Y, Black, White are pressure sensitive
-	printf("   A:%d, B:%d, X:%d, Y:%d, White:%d, Black:%d\n", input_report[4], input_report[5], 
+	printf("   A:%d, B:%d, X:%d, Y:%d, White:%d, Black:%d\n", input_report[4], input_report[5],
 		input_report[6], input_report[7], input_report[9], input_report[8]);
 	printf("   Left Trigger: %d, Right Trigger: %d\n", input_report[10], input_report[11]);
-	printf("   Left Analog (X,Y): (%d,%d)\n", (int16_t)((input_report[13]<<8)|input_report[12]), 
+	printf("   Left Analog (X,Y): (%d,%d)\n", (int16_t)((input_report[13]<<8)|input_report[12]),
 		(int16_t)((input_report[15]<<8)|input_report[14]));
-	printf("   Right Analog (X,Y): (%d,%d)\n", (int16_t)((input_report[17]<<8)|input_report[16]), 
+	printf("   Right Analog (X,Y): (%d,%d)\n", (int16_t)((input_report[17]<<8)|input_report[16]),
 		(int16_t)((input_report[19]<<8)|input_report[18]));
 	return 0;
 }
@@ -190,12 +190,12 @@ int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_t right
 	output_report[3] = left;
 	output_report[5] = right;
 
-	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
+	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
 		HID_SET_REPORT, (HID_REPORT_TYPE_OUTPUT<<8)|0x00, 0, output_report, 06, 1000));
 	return 0;
 }
 
-int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, uint8_t lun, 
+int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, uint8_t lun,
 	uint8_t *cdb, uint8_t direction, int data_length, uint32_t *ret_tag)
 {
 	static uint32_t tag = 1;
@@ -245,8 +245,8 @@ int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, ui
 	if (r != LIBUSB_SUCCESS) {
 		perr("   send_mass_storage_command: %s\n", libusb_strerror(r));
 		return -1;
-	}	
-	
+	}
+
 	printf("   sent %d CDB bytes\n", cdb_len);
 	return 0;
 }
@@ -341,9 +341,9 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	unsigned char *data;
 
 	printf("Reading Max LUN:\n");
-	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
+	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
 		BOMS_GET_MAX_LUN, 0, 0, &lun, 1, 1000);
-	// Some devices send a STALL instead of the actual value. 
+	// Some devices send a STALL instead of the actual value.
 	// In such cases we should set lun to 0.
 	if (r == 0) {
 		lun = 0;
@@ -476,7 +476,7 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	uint8_t *input_report;
 
 	printf("\nReading HID Report Descriptors:\n");
-	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_RECIPIENT_INTERFACE, 
+	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_RECIPIENT_INTERFACE,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, LIBUSB_DT_REPORT<<8, 0, hid_report_descriptor, 256, 1000);
 	if (r < 0) {
 		printf("failed\n");
@@ -493,12 +493,12 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	}
 
 	printf("\nReading Feature Report...\n");
-	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
+	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
 		HID_GET_REPORT, (HID_REPORT_TYPE_FEATURE<<8)|0, 0, input_report, (uint16_t)size, 5000);
 	if (r >= 0) {
 		display_buffer_hex(input_report, size);
 	} else {
-		switch(r) {		
+		switch(r) {
 		case LIBUSB_ERROR_NOT_FOUND:
 			printf("   No Feature Report available for this device\n");
 			break;
@@ -513,7 +513,7 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	}
 
 	printf("\nReading Input Report...\n");
-	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE, 
+	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, (uint16_t)size, 5000);
 	if (r >= 0) {
 		display_buffer_hex(input_report, size);
@@ -587,15 +587,15 @@ int test_device(uint16_t vid, uint16_t pid)
 	printf("             nb interfaces: %d\n", nb_ifaces);
 	for (i=0; i<conf_desc->bNumInterfaces; i++) {
 		for (j=0; j<conf_desc->usb_interface[i].num_altsetting; j++) {
-			printf("interface[%d].altsetting[%d]: num endpoints = %d\n", 
+			printf("interface[%d].altsetting[%d]: num endpoints = %d\n",
 				i, j, conf_desc->usb_interface[i].altsetting[j].bNumEndpoints);
-			printf("   Class.SubClass.Protocol: %02X.%02X.%02X\n", 
+			printf("   Class.SubClass.Protocol: %02X.%02X.%02X\n",
 				conf_desc->usb_interface[i].altsetting[j].bInterfaceClass,
 				conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass,
 				conf_desc->usb_interface[i].altsetting[j].bInterfaceProtocol);
-			if ( (conf_desc->usb_interface[i].altsetting[j].bInterfaceClass == LIBUSB_CLASS_MASS_STORAGE) 
+			if ( (conf_desc->usb_interface[i].altsetting[j].bInterfaceClass == LIBUSB_CLASS_MASS_STORAGE)
 			  && ( (conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass == 0x01)
-			  || (conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass == 0x06) ) 
+			  || (conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass == 0x06) )
 			  && (conf_desc->usb_interface[i].altsetting[j].bInterfaceProtocol == 0x50) ) {
 				// Mass storage devices that can use basic SCSI commands
 				test_scsi = -1;
@@ -647,7 +647,7 @@ int test_device(uint16_t vid, uint16_t pid)
 			}
 		}
 	}
-	
+
 	switch(test_mode) {
 	case USE_XBOX:
 		CALL_CHECK(display_xbox_status(handle));
