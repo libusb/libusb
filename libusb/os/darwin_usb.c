@@ -1203,10 +1203,10 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   /* IOUSBDeviceInterface expects the request in cpu endianess */
   tpriv->req.bmRequestType     = setup->bmRequestType;
   tpriv->req.bRequest          = setup->bRequest;
-  /* these values should already be in bus order */
-  tpriv->req.wValue            = setup->wValue;
-  tpriv->req.wIndex            = setup->wIndex;
-  tpriv->req.wLength           = setup->wLength;
+  /* these values should be in bus order from libusb_fill_control_setup */
+  tpriv->req.wValue            = OSSwapLittleToHostInt16 (setup->wValue);
+  tpriv->req.wIndex            = OSSwapLittleToHostInt16 (setup->wIndex);
+  tpriv->req.wLength           = OSSwapLittleToHostInt16 (setup->wLength);
   /* data is stored after the libusb control block */
   tpriv->req.pData             = transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
   tpriv->req.completionTimeout = transfer->timeout;
