@@ -335,7 +335,12 @@ int usbi_pipe(int filedes[2])
 	if(!overlapped[0]->hEvent) {
 		goto out3;
 	}
-	overlapped[1]->hEvent = overlapped[0]->hEvent;
+	// If we don't duplicate the event handle, MSVC's debug mode will complain on CloseHandle
+	if (!DuplicateHandle(GetCurrentProcess(), overlapped[0]->hEvent,
+		GetCurrentProcess(), &overlapped[1]->hEvent, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
+		usbi_err(NULL, "failed to duplicate pipe overlapped event handle: errcode %d", (int)GetLastError());
+		goto out4;
+	}
 
 	for (i=0, j=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd < 0) {
@@ -358,6 +363,8 @@ int usbi_pipe(int filedes[2])
 		}
 	}
 
+	CloseHandle(overlapped[1]->hEvent);
+out4:
 	CloseHandle(overlapped[0]->hEvent);
 out3:
 	CloseHandle(handle[1]);
@@ -790,7 +797,7 @@ int usbi_close(int fd)
 		errno = EBADF;
 	} else {
 		if (poll_fd[index].overlapped != NULL) {
-			// Shouldn't matter if we close the event twice
+			// Must be a different event for each end of the pipe
 			CloseHandle(poll_fd[index].overlapped->hEvent);
 			free(poll_fd[index].overlapped);
 		}
