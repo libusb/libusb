@@ -775,14 +775,11 @@ poll_exit:
 }
 
 /*
- * close a pollable fd
- *
- * Note that this function will also close the associated handle
+ * close a fake pipe fd
  */
 int usbi_close(int fd)
 {
 	int index;
-	HANDLE handle;
 	int r = -1;
 
 	CHECK_INIT_POLLING;
@@ -792,13 +789,17 @@ int usbi_close(int fd)
 	if (index < 0) {
 		errno = EBADF;
 	} else {
-		handle = poll_fd[index].handle;
-		_free_index(index);
-		if (CloseHandle(handle) == 0) {
+		if (poll_fd[index].overlapped != NULL) {
+			// Shouldn't matter if we close the event twice
+			CloseHandle(poll_fd[index].overlapped->hEvent);
+			free(poll_fd[index].overlapped);
+		}
+		if (CloseHandle(poll_fd[index].handle) == 0) {
 			errno = EIO;
 		} else {
 			r = 0;
 		}
+		poll_fd[index] = INVALID_WINFD;
 		LeaveCriticalSection(&_poll_fd[index].mutex);
 	}
 	return r;
