@@ -177,16 +177,16 @@ int usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex) {
 int usbi_cond_timedwait(usbi_cond_t *cond,
                         usbi_mutex_t *mutex,
                         const struct timespec *abstime) {
-	FILETIME ftime;
+	FILETIME filetime;
 	ULARGE_INTEGER rtime;
 	struct timeval targ_time, cur_time, delta_time;
 	struct timespec cur_time_ns;
 	DWORD millis;
 	extern const uint64_t epoch_time;
 
-	GetSystemTimeAsFileTime(&ftime);
-	rtime.LowPart   = ftime.dwLowDateTime;
-	rtime.HighPart  = ftime.dwHighDateTime;
+	GetSystemTimeAsFileTime(&filetime);
+	rtime.LowPart   = filetime.dwLowDateTime;
+	rtime.HighPart  = filetime.dwHighDateTime;
 	rtime.QuadPart -= epoch_time;
 	cur_time_ns.tv_sec = (long)(rtime.QuadPart / 10000000);
 	cur_time_ns.tv_nsec = (long)((rtime.QuadPart % 10000000)*100);

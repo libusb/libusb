@@ -2028,7 +2028,7 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 
 static int windows_clock_gettime(int clk_id, struct timespec *tp)
 {
-	FILETIME ftime;
+	FILETIME filetime;
 	ULARGE_INTEGER rtime;
 	DWORD r;
 	switch(clk_id) {
@@ -2059,9 +2059,9 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
 		// Note however that our resolution is bounded by the Windows system time
 		// functions and is at best of the order of 1 ms (or, usually, worse)
-		GetSystemTimeAsFileTime(&ftime);
-		rtime.LowPart = ftime.dwLowDateTime;
-		rtime.HighPart = ftime.dwHighDateTime;
+		GetSystemTimeAsFileTime(&filetime);
+		rtime.LowPart = filetime.dwLowDateTime;
+		rtime.HighPart = filetime.dwHighDateTime;
 		rtime.QuadPart -= epoch_time;
 		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
 		tp->tv_nsec = (long)((rtime.QuadPart % 10000000)*100);
