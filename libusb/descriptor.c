@@ -39,12 +39,12 @@
 
 /* set host_endian if the w values are already in host endian format,
  * as opposed to bus endian. */
-int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest,
-	int host_endian)
+int usbi_parse_descriptor(unsigned char *source, const char *descriptor,
+	void *dest, int host_endian)
 {
 	unsigned char *sp = source, *dp = dest;
 	uint16_t w;
-	char *cp;
+	const char *cp;
 
 	for (cp = descriptor; *cp; cp++) {
 		switch (*cp) {
