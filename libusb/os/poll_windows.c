@@ -153,7 +153,6 @@ void init_polling(void)
 	if (!is_polling_set) {
 		pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
 			GetProcAddress(GetModuleHandle("KERNEL32"), "CancelIoEx");
-		pCancelIoEx = NULL;
 		usbi_dbg("Will use CancelIo%s for I/O cancellation",
 			CancelIoEx_Available?"Ex":"");
 		for (i=0; i<MAX_FDS; i++) {
