@@ -806,6 +806,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 
 	poll_dbg("set pipe event (thread = %08X)", GetCurrentThreadId());
 	SetEvent(poll_fd[index].overlapped->hEvent);
+	poll_fd[index].overlapped->Internal = STATUS_WAIT_0;
 
 	LeaveCriticalSection(&_poll_fd[index].mutex);
 	return sizeof(unsigned char);
@@ -841,6 +842,7 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 
 	poll_dbg("clr pipe event (thread = %08X)", GetCurrentThreadId());
 	ResetEvent(poll_fd[index].overlapped->hEvent);
+	poll_fd[index].overlapped->Internal = STATUS_PENDING;
 
 	r = sizeof(unsigned char);
 
