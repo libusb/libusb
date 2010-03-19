@@ -33,11 +33,6 @@ The 32 bit binaries compiled either from Visual Studio or the DDK are placed in
 a Win32\ directory at the root of the library
 The 64 bit binaries are placed in an x64 directory
 
-- If needed, edit msvc/config.h according to your needs (you might want to
-  comment out ENABLE_DEBUG_LOGGING for instance).
-
-That's it! You should now be able to compile the solution.
-
 
 Troubleshooting
 ***************
