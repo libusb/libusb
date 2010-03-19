@@ -1035,7 +1035,7 @@ int usbi_io_init(struct libusb_context *ctx)
 err:
 #ifdef USBI_TIMERFD_AVAILABLE
 	if (ctx->timerfd != -1)
-		usbi_close(ctx->timerfd);
+		close(ctx->timerfd);
 #endif
 	if (0 == p) {
 		usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
@@ -1059,7 +1059,7 @@ void usbi_io_exit(struct libusb_context *ctx)
 #ifdef USBI_TIMERFD_AVAILABLE
 	if (usbi_using_timerfd(ctx)) {
 		usbi_remove_pollfd(ctx, ctx->timerfd);
-		usbi_close(ctx->timerfd);
+		close(ctx->timerfd);
 	}
 #endif
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
