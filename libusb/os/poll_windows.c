@@ -101,7 +101,6 @@ struct winfd poll_fd[MAX_FDS];
 // internal fd data
 struct {
 	CRITICAL_SECTION mutex; // lock for fds
-	BYTE marker;            // 1st byte of a usbi_read operation gets stored here
 	// Additional variables for XP CancelIoEx partial emulation
 	HANDLE original_handle;
 	DWORD thread_id;
@@ -154,11 +153,11 @@ void init_polling(void)
 	if (!is_polling_set) {
 		pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
 			GetProcAddress(GetModuleHandle("KERNEL32"), "CancelIoEx");
+		pCancelIoEx = NULL;
 		usbi_dbg("Will use CancelIo%s for I/O cancellation",
 			CancelIoEx_Available?"Ex":"");
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
-			_poll_fd[i].marker = 0;
 			_poll_fd[i].original_handle = INVALID_HANDLE_VALUE;
 			_poll_fd[i].thread_id = 0;
 			InitializeCriticalSection(&_poll_fd[i].mutex);
@@ -284,65 +283,42 @@ void exit_polling(void)
 /*
  * Create a fake pipe.
  * As libusb only uses pipes for signaling, all we need from a pipe is an
- * event. To that extent, we only create wfd's and overlapped's as a means
+ * event. To that extent, we create a single wfd and overlapped as a means
  * to access that event.
  */
 int usbi_pipe(int filedes[2])
 {
-	int i, j;
-	HANDLE handle[2];
-	OVERLAPPED* overlapped[2];
+	int i;
+	HANDLE handle;
+	OVERLAPPED* overlapped;
 
 	CHECK_INIT_POLLING;
 
-	// We must use 2 separate overlapped, else we'll crash when trying to
-	// free the same overlapped twice on closure
-	overlapped[0] = calloc(1, sizeof(OVERLAPPED));
-	if (overlapped[0] == NULL) {
+	overlapped = calloc(1, sizeof(OVERLAPPED));
+	if (overlapped == NULL) {
 		return -1;
 	}
-	// The read end must have status pending for signaling to work in poll
-	overlapped[0]->Internal = STATUS_PENDING;
-
-	overlapped[1] = calloc(1, sizeof(OVERLAPPED));
-	if (overlapped[1] == NULL) {
-		goto out0;
-	}
-	// Not so important for the write end...
-	overlapped[1]->Internal = STATUS_PENDING;
+	// The overlapped must have status pending for signaling to work in poll
+	overlapped->Internal = STATUS_PENDING;
 
 	// Read end of the "pipe"
-	handle[0] = CreateFileA("NUL", 0, 0, NULL, OPEN_EXISTING, 0, NULL);
-	if (handle[0] == INVALID_HANDLE_VALUE) {
-		usbi_err(NULL, "could not create pipe (read end): errcode %d", (int)GetLastError());
+	handle = CreateFileA("NUL", 0, 0, NULL, OPEN_EXISTING, 0, NULL);
+	if (handle == INVALID_HANDLE_VALUE) {
+		usbi_err(NULL, "could not create pipe: errcode %d", (int)GetLastError());
 		goto out1;
 	}
-	filedes[0] = _open_osfhandle((intptr_t)handle[0], _O_RDONLY);
-	poll_dbg("filedes[0] = %d", filedes[0]);
+	filedes[0] = _open_osfhandle((intptr_t)handle, _O_RDONLY);
+	// We can use the same handle for both ends
+	filedes[1] = filedes[0];
+	poll_dbg("pipe filedes = %d", filedes[0]);
 
-	// Write end of the "pipe"
-	handle[1] = CreateFileA("NUL", 0, 0, NULL, OPEN_EXISTING, 0, NULL);
-	if (handle[1] == INVALID_HANDLE_VALUE) {
-		usbi_err(NULL, "could not create pipe (write end): errcode %d", (int)GetLastError());
+	// Note: manual reset must be true (second param) as the reset occurs in read
+	overlapped->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!overlapped->hEvent) {
 		goto out2;
 	}
-	filedes[1] = _open_osfhandle((intptr_t)handle[1], _O_WRONLY);
-	poll_dbg("filedes[1] = %d", filedes[1]);
 
-	// Use the same event for both overlapped
-	// Note: manual reset must be true (second param) as the reset occurs in read
-	overlapped[0]->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!overlapped[0]->hEvent) {
-		goto out3;
-	}
-	// If we don't duplicate the event handle, MSVC's debug mode will complain on CloseHandle
-	if (!DuplicateHandle(GetCurrentProcess(), overlapped[0]->hEvent,
-		GetCurrentProcess(), &overlapped[1]->hEvent, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
-		usbi_err(NULL, "failed to duplicate pipe overlapped event handle: errcode %d", (int)GetLastError());
-		goto out4;
-	}
-
-	for (i=0, j=0; i<MAX_FDS; i++) {
+	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd < 0) {
 			EnterCriticalSection(&_poll_fd[i].mutex);
 			// fd might have been allocated before we got to critical
@@ -351,29 +327,22 @@ int usbi_pipe(int filedes[2])
 				continue;
 			}
 
-			poll_fd[i].fd = filedes[j];
-			poll_fd[i].handle = handle[j];
-			poll_fd[i].overlapped = overlapped[j];
-			poll_fd[i].rw = RW_READ+j;
-			j++;
+			poll_fd[i].fd = filedes[0];
+			poll_fd[i].handle = handle;
+			poll_fd[i].overlapped = overlapped;
+			// There's no polling on the write end, so we just use READ for our needs
+			poll_fd[i].rw = RW_READ;
+			_poll_fd[i].original_handle = INVALID_HANDLE_VALUE;
 			LeaveCriticalSection(&_poll_fd[i].mutex);
-			if (j>=2) {
-				return 0;
-			}
+			return 0;
 		}
 	}
 
-	CloseHandle(overlapped[1]->hEvent);
-out4:
-	CloseHandle(overlapped[0]->hEvent);
-out3:
-	CloseHandle(handle[1]);
+	CloseHandle(overlapped->hEvent);
 out2:
-	CloseHandle(handle[0]);
+	CloseHandle(handle);
 out1:
-	free(overlapped[1]);
-out0:
-	free(overlapped[0]);
+	free(overlapped);
 	return -1;
 }
 
@@ -828,8 +797,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 
 	index = _fd_to_index_and_lock(fd);
 
-	if ( (index < 0) || (poll_fd[index].overlapped == NULL)
-	  || (poll_fd[index].rw != RW_WRITE) ) {
+	if ( (index < 0) || (poll_fd[index].overlapped == NULL) ) {
 		errno = EBADF;
 		if (index >= 0) {
 			LeaveCriticalSection(&_poll_fd[index].mutex);
@@ -837,7 +805,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 		return -1;
 	}
 
-	poll_dbg("Set pipe event");
+	poll_dbg("set pipe event (thread = %08X)", GetCurrentThreadId());
 	SetEvent(poll_fd[index].overlapped->hEvent);
 
 	LeaveCriticalSection(&_poll_fd[index].mutex);
@@ -866,18 +834,13 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 		return -1;
 	}
 
-	if (poll_fd[index].rw != RW_READ) {
-		errno = EBADF;
-		goto out;
-	}
-
 	if (WaitForSingleObject(poll_fd[index].overlapped->hEvent, INFINITE) != WAIT_OBJECT_0) {
 		usbi_warn(NULL, "waiting for event failed: %d", (int)GetLastError());
 		errno = EIO;
 		goto out;
 	}
 
-	poll_dbg("Cleared pipe event");
+	poll_dbg("clr pipe event (thread = %08X)", GetCurrentThreadId());
 	ResetEvent(poll_fd[index].overlapped->hEvent);
 
 	r = sizeof(unsigned char);
