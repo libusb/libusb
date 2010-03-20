@@ -299,6 +299,7 @@ int usbi_pipe(int filedes[2])
 	}
 	// The overlapped must have status pending for signaling to work in poll
 	overlapped->Internal = STATUS_PENDING;
+	overlapped->InternalHigh = 0;
 
 	// Read end of the "pipe"
 	handle = CreateFileA("NUL", 0, 0, NULL, OPEN_EXISTING, 0, NULL);
@@ -671,7 +672,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		LeaveCriticalSection(&_poll_fd[index].mutex);
 	}
 #if defined(DYNAMIC_FDS)
-	// Add this stage, new_fd[] should only contain events from fds that
+	// At this stage, new_fd[] should only contain events from fds that
 	// have been added since the last call to poll, but are not (yet) part
 	// of the pollable fd set. Typically, these would be from fds that have
 	// been created between the construction of the fd set and the calling
@@ -807,6 +808,9 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 	poll_dbg("set pipe event (thread = %08X)", GetCurrentThreadId());
 	SetEvent(poll_fd[index].overlapped->hEvent);
 	poll_fd[index].overlapped->Internal = STATUS_WAIT_0;
+	// If two threads write on the pipe at the same time, we need to
+	// process two separate reads => use the overlapped as a counter
+	poll_fd[index].overlapped->InternalHigh++;
 
 	LeaveCriticalSection(&_poll_fd[index].mutex);
 	return sizeof(unsigned char);
@@ -841,8 +845,12 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 	}
 
 	poll_dbg("clr pipe event (thread = %08X)", GetCurrentThreadId());
-	ResetEvent(poll_fd[index].overlapped->hEvent);
-	poll_fd[index].overlapped->Internal = STATUS_PENDING;
+	poll_fd[index].overlapped->InternalHigh--;
+	// Don't reset unless we don't have any more events to process
+	if (poll_fd[index].overlapped->InternalHigh <= 0) {
+		ResetEvent(poll_fd[index].overlapped->hEvent);
+		poll_fd[index].overlapped->Internal = STATUS_PENDING;
+	}
 
 	r = sizeof(unsigned char);
 
