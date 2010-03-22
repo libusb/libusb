@@ -1946,7 +1946,9 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 				io_result = GetLastError();
 			}
 			usbi_remove_pollfd(ctx, transfer_priv->pollable_fd.fd);
-			usbi_free_fd(transfer_priv->pollable_fd.fd);
+			// let handle_callback free the event using the transfer wfd
+			// If you don't use the transfer wfd, you run a risk of trying to free a
+			// newly allocated wfd that took the place of the one from the transfer.
 			windows_handle_callback(transfer, io_result, io_size);
 		} else {
 			usbi_err(ctx, "could not find a matching transfer for fd %x", fds[i]);

@@ -613,6 +613,8 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		}
 
 		index = _fd_to_index_and_lock(fds[i].fd);
+		poll_dbg("fd[%d]=%d: (overlapped=%p) got events %04X", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
+
 		if ( (index < 0) || (poll_fd[index].handle == INVALID_HANDLE_VALUE)
 		  || (poll_fd[index].handle == 0) || (poll_fd[index].overlapped == NULL)) {
 			fds[i].revents |= POLLNVAL | POLLERR;
@@ -629,7 +631,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		if ((fds[i].events & POLLIN) && (poll_fd[index].rw != RW_READ)) {
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
-			usbi_warn(NULL, "attempted POLLIN on fd[%d] without READ access", i);
+			usbi_warn(NULL, "attempted POLLIN on fd without READ access");
 			LeaveCriticalSection(&_poll_fd[index].mutex);
 			triggered = -1;
 			goto poll_exit;
@@ -638,13 +640,11 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		if ((fds[i].events & POLLOUT) && (poll_fd[index].rw != RW_WRITE)) {
 			fds[i].revents |= POLLNVAL | POLLERR;
 			errno = EBADF;
-			usbi_warn(NULL, "attempted POLLOUT on fd[%d] without WRITE access", i);
+			usbi_warn(NULL, "attempted POLLOUT on fd without WRITE access");
 			LeaveCriticalSection(&_poll_fd[index].mutex);
 			triggered = -1;
 			goto poll_exit;
 		}
-
-		poll_dbg("fd[%d]=%d (overlapped = %p) got events %04X", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
 
 		// The following macro only works if overlapped I/O was reported pending
 		if ( (HasOverlappedIoCompleted(poll_fd[index].overlapped))
@@ -805,7 +805,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 		return -1;
 	}
 
-	poll_dbg("set pipe event (thread = %08X)", GetCurrentThreadId());
+	poll_dbg("set pipe event (fd = %d, thread = %08X)", index, GetCurrentThreadId());
 	SetEvent(poll_fd[index].overlapped->hEvent);
 	poll_fd[index].overlapped->Internal = STATUS_WAIT_0;
 	// If two threads write on the pipe at the same time, we need to
@@ -844,7 +844,7 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 		goto out;
 	}
 
-	poll_dbg("clr pipe event (thread = %08X)", GetCurrentThreadId());
+	poll_dbg("clr pipe event (fd = %d, thread = %08X)", index, GetCurrentThreadId());
 	poll_fd[index].overlapped->InternalHigh--;
 	// Don't reset unless we don't have any more events to process
 	if (poll_fd[index].overlapped->InternalHigh <= 0) {
