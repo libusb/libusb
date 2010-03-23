@@ -155,18 +155,22 @@ static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 
   long result;
   SInt32 score;
 
-  if (!IOIteratorIsValid (deviceIterator) || !(usbDevice = IOIteratorNext(deviceIterator)))
+  if (!IOIteratorIsValid (deviceIterator))
     return NULL;
-  
-  result = IOCreatePlugInInterfaceForService(usbDevice, kIOUSBDeviceUserClientTypeID,
-					     kIOCFPlugInInterfaceID, &plugInInterface,
-					     &score);
-  
-  if (result || !plugInInterface) {
-    usbi_dbg ("libusb/darwin.c usb_get_next_device: could not set up plugin for service: %s\n", darwin_error_str (result));
 
-    return NULL;
+
+  while ((usbDevice = IOIteratorNext(deviceIterator))) {
+    result = IOCreatePlugInInterfaceForService(usbDevice, kIOUSBDeviceUserClientTypeID,
+					       kIOCFPlugInInterfaceID, &plugInInterface,
+					       &score);
+    if (kIOReturnSuccess == result && plugInInterface)
+      break;
+
+    usbi_dbg ("libusb/darwin.c usb_get_next_device: could not set up plugin for service: %s\n", darwin_error_str (result));
   }
+
+  if (!usbDevice)
+    return NULL;
 
   (void)IOObjectRelease(usbDevice);
   (void)(*plugInInterface)->QueryInterface(plugInInterface, CFUUIDGetUUIDBytes(DeviceInterfaceID),
