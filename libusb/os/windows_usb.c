@@ -137,7 +137,7 @@ bool api_hid_available = false;
  * Converts a WCHAR string to UTF8 (allocate returned string)
  * Returns NULL on error
  */
-char* wchar_to_utf8(LPCWSTR wstr)
+static char* wchar_to_utf8(LPCWSTR wstr)
 {
 	int size;
 	char* str;
@@ -182,7 +182,7 @@ static char* guid_to_string(const GUID guid)
  * Converts a windows error to human readable string
  * uses retval as errorcode, or, if 0, use GetLastError()
  */
-char *windows_error_str(uint32_t retval)
+static char *windows_error_str(uint32_t retval)
 {
 static char err_string[ERR_BUFFER_SIZE];
 
