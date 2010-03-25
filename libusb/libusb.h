@@ -121,6 +121,12 @@ enum libusb_class_code {
 	/** Data class */
 	LIBUSB_CLASS_DATA = 10,
 
+	/** Wireless class */
+	LIBUSB_CLASS_WIRELESS = 0xe0,
+
+	/** Application class */
+	LIBUSB_CLASS_APPLICATION = 0xfe,
+
 	/** Class is vendor-specific */
 	LIBUSB_CLASS_VENDOR_SPEC = 0xff
 };

@@ -53,9 +53,6 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
 static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int iface);
 static int darwin_release_interface(struct libusb_device_handle *dev_handle, int iface);
 static int darwin_reset_device(struct libusb_device_handle *dev_handle);
-static void darwin_bulk_callback (struct usbi_transfer *itransfer, kern_return_t result, UInt32 io_size);
-static void darwin_isoc_callback (struct usbi_transfer *itransfer, kern_return_t result);
-static void darwin_control_callback (struct usbi_transfer *itransfer, kern_return_t result, UInt32 io_size);
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0);
 
 static const char *darwin_error_str (int result) {
@@ -158,18 +155,22 @@ static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 
   long result;
   SInt32 score;
 
-  if (!IOIteratorIsValid (deviceIterator) || !(usbDevice = IOIteratorNext(deviceIterator)))
+  if (!IOIteratorIsValid (deviceIterator))
     return NULL;
-  
-  result = IOCreatePlugInInterfaceForService(usbDevice, kIOUSBDeviceUserClientTypeID,
-					     kIOCFPlugInInterfaceID, &plugInInterface,
-					     &score);
-  
-  if (result || !plugInInterface) {
-    usbi_dbg ("libusb/darwin.c usb_get_next_device: could not set up plugin for service: %s\n", darwin_error_str (result));
 
-    return NULL;
+
+  while ((usbDevice = IOIteratorNext(deviceIterator))) {
+    result = IOCreatePlugInInterfaceForService(usbDevice, kIOUSBDeviceUserClientTypeID,
+					       kIOCFPlugInInterfaceID, &plugInInterface,
+					       &score);
+    if (kIOReturnSuccess == result && plugInInterface)
+      break;
+
+    usbi_dbg ("libusb/darwin.c usb_get_next_device: could not set up plugin for service: %s\n", darwin_error_str (result));
   }
+
+  if (!usbDevice)
+    return NULL;
 
   (void)IOObjectRelease(usbDevice);
   (void)(*plugInInterface)->QueryInterface(plugInInterface, CFUUIDGetUUIDBytes(DeviceInterfaceID),
@@ -1203,10 +1204,10 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   /* IOUSBDeviceInterface expects the request in cpu endianess */
   tpriv->req.bmRequestType     = setup->bmRequestType;
   tpriv->req.bRequest          = setup->bRequest;
-  /* these values should already be in bus order */
-  tpriv->req.wValue            = setup->wValue;
-  tpriv->req.wIndex            = setup->wIndex;
-  tpriv->req.wLength           = setup->wLength;
+  /* these values should be in bus order from libusb_fill_control_setup */
+  tpriv->req.wValue            = OSSwapLittleToHostInt16 (setup->wValue);
+  tpriv->req.wIndex            = OSSwapLittleToHostInt16 (setup->wIndex);
+  tpriv->req.wLength           = OSSwapLittleToHostInt16 (setup->wLength);
   /* data is stored after the libusb control block */
   tpriv->req.pData             = transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
   tpriv->req.completionTimeout = transfer->timeout;
@@ -1325,122 +1326,59 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
   write (priv->fds[1], &arg0, sizeof (UInt32));
 }
 
-static void darwin_bulk_callback (struct usbi_transfer *itransfer, kern_return_t result, UInt32 io_size) {
-  enum libusb_transfer_status status;
-
-  usbi_info (ITRANSFER_CTX (itransfer), "handling bulk completion with status %d", result);
-
+static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_t result) {
   switch (result) {
   case kIOReturnSuccess:
-    status = LIBUSB_TRANSFER_COMPLETED;
-    itransfer->transferred += io_size;
-    break;
+    return LIBUSB_TRANSFER_COMPLETED;
   case kIOReturnAborted:
-    usbi_handle_transfer_cancellation(itransfer);
-    return;
+    return LIBUSB_TRANSFER_CANCELLED;
   case kIOUSBPipeStalled:
-    usbi_warn (ITRANSFER_CTX (itransfer), "bulk error. pipe is stalled");
-    status = LIBUSB_TRANSFER_STALL;
-    
-    break;
+    usbi_warn (ITRANSFER_CTX (itransfer), "transfer error: pipe is stalled");
+    return LIBUSB_TRANSFER_STALL;
   case kIOReturnOverrun:
-    usbi_err (ITRANSFER_CTX (itransfer), "bulk error. data overrun", darwin_error_str (result));
-    status = LIBUSB_TRANSFER_OVERFLOW;
-
-    break;
+    usbi_err (ITRANSFER_CTX (itransfer), "transfer error: data overrun", darwin_error_str (result));
+    return LIBUSB_TRANSFER_OVERFLOW;
+  case kIOUSBTransactionTimeout:
+    usbi_err (ITRANSFER_CTX (itransfer), "transfer error: timed out");
+    return LIBUSB_TRANSFER_TIMED_OUT;
   default:
-    usbi_err (ITRANSFER_CTX (itransfer), "bulk error = %s (value = 0x%08x)", darwin_error_str (result), result);
-    status = LIBUSB_TRANSFER_ERROR;
+    usbi_err (ITRANSFER_CTX (itransfer), "transfer error: %s (value = 0x%08x)", darwin_error_str (result), result);
+    return LIBUSB_TRANSFER_ERROR;
   }
-
-  usbi_handle_transfer_completion(itransfer, status);
-}
-
-static void darwin_isoc_callback (struct usbi_transfer *itransfer, kern_return_t result) {
-  struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-  struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
-  int i, status;
-
-  usbi_info (ITRANSFER_CTX (itransfer), "handling isoc completion with status %d", result);
-
-  if (result == kIOReturnSuccess && tpriv->isoc_framelist) {
-    /* copy isochronous results back */
-
-    for (i = 0; i < transfer->num_iso_packets ; i++) {
-      struct libusb_iso_packet_descriptor *lib_desc = transfer->iso_packet_desc;
-      lib_desc->status = darwin_to_libusb (tpriv->isoc_framelist[i].frStatus);
-      lib_desc->actual_length = tpriv->isoc_framelist[i].frActCount;
-    }
-  }
-
-  switch (result) {
-  case kIOReturnSuccess:
-    status = LIBUSB_TRANSFER_COMPLETED;
-    break;
-  case kIOReturnAborted:
-    usbi_handle_transfer_cancellation(itransfer);
-    return;
-  case kIOUSBPipeStalled:
-    usbi_warn (ITRANSFER_CTX (itransfer), "unsupported control request");
-    status = LIBUSB_TRANSFER_STALL;
-
-    break;
-  case kIOReturnOverrun:
-    usbi_err (ITRANSFER_CTX (itransfer), "bulk error. data overrun", darwin_error_str (result));
-    status = LIBUSB_TRANSFER_OVERFLOW;
-
-    break;
-  default:
-    usbi_err (ITRANSFER_CTX (itransfer), "control error = %s", darwin_error_str (result));
-    status = LIBUSB_TRANSFER_ERROR;
-  }
-
-  usbi_handle_transfer_completion(itransfer, status);
-}
-
-static void darwin_control_callback (struct usbi_transfer *itransfer, kern_return_t result, UInt32 io_size) {
-  int status;
-
-  usbi_info (ITRANSFER_CTX (itransfer), "handling control completion with status %d", result);
-
-  switch (result) {
-  case kIOReturnSuccess:
-    status = LIBUSB_TRANSFER_COMPLETED;
-    itransfer->transferred += io_size;
-    break;
-  case kIOReturnAborted:
-    usbi_handle_transfer_cancellation(itransfer);
-    return;
-  case kIOUSBPipeStalled:
-    usbi_warn (ITRANSFER_CTX (itransfer), "unsupported control request");
-    status = LIBUSB_TRANSFER_STALL;
-    
-    break;
-  default:
-    usbi_err (ITRANSFER_CTX (itransfer), "control error = %s", darwin_error_str (result));
-    status = LIBUSB_TRANSFER_ERROR;
-  }
-
-  usbi_handle_transfer_completion(itransfer, status);
 }
 
 static void darwin_handle_callback (struct usbi_transfer *itransfer, kern_return_t result, UInt32 io_size) {
   struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+  struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
+  int isIsoc      = LIBUSB_TRANSFER_TYPE_ISOCHRONOUS == transfer->type;
+  int isBulk      = LIBUSB_TRANSFER_TYPE_BULK == transfer->type;
+  int isControl   = LIBUSB_TRANSFER_TYPE_CONTROL == transfer->type;
+  int isInterrupt = LIBUSB_TRANSFER_TYPE_INTERRUPT == transfer->type;
+  int i;
 
-  switch (transfer->type) {
-  case LIBUSB_TRANSFER_TYPE_CONTROL:
-    darwin_control_callback (itransfer, result, io_size);
-    break;
-  case LIBUSB_TRANSFER_TYPE_BULK:
-  case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-    darwin_bulk_callback (itransfer, result, io_size);
-    break;
-  case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-    darwin_isoc_callback (itransfer, result);
-    break;
-  default:
+  if (!isIsoc && !isBulk && !isControl && !isInterrupt) {
     usbi_err (TRANSFER_CTX(transfer), "unknown endpoint type %d", transfer->type);
+    return;
   }
+
+  usbi_info (ITRANSFER_CTX (itransfer), "handling %s completion with kernel status %d",
+	     isControl ? "control" : isBulk ? "bulk" : isIsoc ? "isoc" : "interrupt", result);
+
+  if (kIOReturnSuccess == result) {
+    if (isIsoc && tpriv->isoc_framelist) {
+      /* copy isochronous results back */
+
+      for (i = 0; i < transfer->num_iso_packets ; i++) {
+	struct libusb_iso_packet_descriptor *lib_desc = transfer->iso_packet_desc;
+	lib_desc->status = darwin_to_libusb (tpriv->isoc_framelist[i].frStatus);
+	lib_desc->actual_length = tpriv->isoc_framelist[i].frActCount;
+      }
+    } else if (!isIsoc)
+      itransfer->transferred += io_size;
+  }
+
+  /* it is ok to handle cancelled transfers without calling usbi_handle_transfer_cancellation (we catch timeout transfers) */
+  usbi_handle_transfer_completion (itransfer, darwin_transfer_status (itransfer, result));
 }
 
 static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds, int num_ready) {
