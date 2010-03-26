@@ -1,4 +1,4 @@
-AC_INIT([libusb], [1.0.6])
+AC_INIT([libusb], [1.0.7], [libusb-devel@lists.sourceforge.net], [libusb], [http://www.libusb.org])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([libusb/core.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -11,7 +11,6 @@ AC_PROG_LIBTOOL
 AC_C_INLINE
 AM_PROG_CC_C_O
 AC_DEFINE([_GNU_SOURCE], [], [Use GNU extensions])
-AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 
 AC_MSG_CHECKING([operating system])
 case $host in
@@ -20,6 +19,7 @@ case $host in
 	AC_SUBST(OS_LINUX)
 	AC_MSG_RESULT([Linux])
 	backend="linux"
+	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 	threads="posix"
 	AC_CHECK_LIB(rt, clock_gettime)
 	AM_CFLAGS="-pthread -Wshadow"
@@ -31,6 +31,7 @@ case $host in
 	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
 	AC_MSG_RESULT([Darwin/MacOS X])
 	backend="darwin"
+	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 	threads="posix"
 	AM_CFLAGS="-pthread -Wshadow"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
@@ -51,6 +52,7 @@ case $host in
 	AC_SUBST(OS_WINDOWS)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
+	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 	threads="posix"
 	LIBS="-lpthread -lsetupapi -lole32"
 	AM_CFLAGS=""	
