@@ -5,7 +5,7 @@ set version=1.0
 
 cd libusb\os
 @echo on
-build -cZ
+build -cwgZ
 @echo off
 if errorlevel 1 goto builderror
 cd ..\..
@@ -52,9 +52,9 @@ md examples\lsusb_ddkbuild
 :md7
 
 cd examples\lsusb_ddkbuild
-copy ..\lsusb_sources sources
+copy ..\lsusb_sources sources >NUL 2>&1
 @echo on
-build -cZ
+build -cwgZ
 @echo off
 if errorlevel 1 goto buildlsusberror
 cd ..\..
@@ -72,9 +72,9 @@ md examples\xusb_ddkbuild
 :md8
 
 cd examples\xusb_ddkbuild
-copy ..\xusb_sources sources
+copy ..\xusb_sources sources >NUL 2>&1
 @echo on
-build -cZ
+build -cwgZ
 @echo off
 if errorlevel 1 goto buildxusberror
 cd ..\..
