@@ -43,7 +43,7 @@ case $host in
 	backend="windows"
 	threads="windows"
 	LIBS="-lsetupapi -lole32"
-	AM_CFLAGS="-Wshadow"	
+	AM_CFLAGS="-Wshadow"
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
@@ -55,10 +55,10 @@ case $host in
 	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 	threads="posix"
 	LIBS="-lpthread -lsetupapi -lole32"
-	AM_CFLAGS=""	
+	AM_CFLAGS=""
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
-	;;	
+	;;
 *)
 	AC_MSG_ERROR([unsupported operating system])
 esac
