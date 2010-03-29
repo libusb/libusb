@@ -19,5 +19,8 @@ INCLUDES=..\..\msvc;..\..;$(DDK_INC_PATH)
 
 UMLIBS=..\..\libusb\os\obj$(BUILD_ALT_DIR)\*\libusb-1.0.lib
 
+TARGETLIBS=$(SDK_LIB_PATH)\setupapi.lib \
+           $(SDK_LIB_PATH)\ole32.lib
+
 SOURCES=..\xusb.c
 

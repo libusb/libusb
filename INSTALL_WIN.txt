@@ -14,16 +14,16 @@ If you are using Microsoft Visual Studio:
 Note that if you are using Visual Studio Express, you will not be able to
 compile the 64 bit version of the library.
 
-If you are using the freely available Windows DDK (Driver Development Kit)
+If you are using the freely available Windows DDK/WDK (Driver Development Kit)
 - If you want to debug the library, uncomment the ENABLE_DEBUG_LOGGING define
   in config.h
 - Open one of the relevant Free Build or Checked Build prompt for your target
   platform
-- Navigate to the directory where the source is located and run ddk_build.cmd
+- Navigate to the directory where the source is located and run 'ddk_build'
+- To produce a DLL rather than a static library, use: 'ddk_build DLL'
 
 Note that using the Windows DDK, it is possible to compile both the 32 and 64
-bit versions of the library. The DDK build is currently set to produce only the
-DLL however.
+bit versions of the library.
 
 
 Destination directories

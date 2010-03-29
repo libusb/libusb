@@ -1,5 +1,5 @@
+#TARGETTYPE is not defined, to allow selection between static lib or DLL with ddk_build
 TARGETNAME=libusb-1.0
-TARGETTYPE=DYNLINK
 
 DLLDEF=..\libusb-1.0.def
 

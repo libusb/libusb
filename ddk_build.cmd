@@ -1,9 +1,18 @@
 @echo off
+
+rem default builds static library. Pass argument 'DLL' to build a DLL
+
 if Test%BUILD_ALT_DIR%==Test goto usage
 
 set version=1.0
 
 cd libusb\os
+rem DLL or static lib selection (must use concatenation)
+set TARGET=LIBRARY
+if Test%1==TestDLL set TARGET=DYNLINK
+echo TARGETTYPE=%TARGET% > target
+copy target+libusb_sources sources >NUL 2>&1
+del target
 @echo on
 build -cwgZ
 @echo off
@@ -41,8 +50,10 @@ md %dstPath%\examples
 :md6
 @echo on
 
+@if NOT Test%1==TestDLL goto copylib
 copy %srcPath%\libusb-%version%.dll %dstPath%\dll
 copy %srcPath%\libusb-%version%.pdb %dstPath%\dll
+:copylib
 copy %srcPath%\libusb-%version%.lib %dstPath%\lib
 
 @echo off
@@ -108,6 +119,7 @@ goto done
 
 :usage
 echo ddk_build must be run in a WDK build environment
+pause
 goto done
 
 :done
