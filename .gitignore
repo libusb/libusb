@@ -25,6 +25,7 @@ doxygen.cfg
 lsusb
 xusb
 dpfp
+dpfp_threaded
 *.pc
 fpusb-*.tar.bz2
 fpusb-*.tar.gz
