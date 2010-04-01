@@ -410,7 +410,7 @@ static int windows_init(struct libusb_context *ctx)
 	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		usbi_err(ctx, "could not create semaphore: %s", windows_error_str(0));
-		return LIBUSB_ERROR_OTHER;
+		return LIBUSB_ERROR_NO_MEM;
 	}
 
 	// A successful wait brings our semaphore count to 0 (unsignaled)
@@ -418,7 +418,7 @@ static int windows_init(struct libusb_context *ctx)
 	if (WaitForSingleObject(semaphore, INFINITE) != WAIT_OBJECT_0) {
 		usbi_err(ctx, "failure to access semaphore: %s", windows_error_str(0));
 		CloseHandle(semaphore);
-		return LIBUSB_ERROR_OTHER;
+		return LIBUSB_ERROR_NO_MEM;
     }
 
 	// NB: concurrent usage supposes that init calls are equally balanced with
@@ -449,7 +449,7 @@ static int windows_init(struct libusb_context *ctx)
 		// Load missing CFGMGR32.DLL imports
 		if (Cfgmgr32_init() != LIBUSB_SUCCESS) {
 			usbi_err(ctx, "could not resolve Cfgmgr32.dll functions");
-			return LIBUSB_ERROR_OTHER;
+			return LIBUSB_ERROR_NOT_FOUND;
 		}
 
 		// Initialize the low level APIs

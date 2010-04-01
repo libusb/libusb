@@ -312,7 +312,7 @@ struct windows_transfer_priv {
 /*
  * API macros - from libusb-win32 1.x
  */
-#define DLL_DECLARE(api, ret, name, args)                    \
+#define DLL_DECLARE(api, ret, name, args)                     \
   typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name
 
 #define DLL_LOAD(dll, name, ret_on_failure)                   \
@@ -321,7 +321,7 @@ struct windows_transfer_priv {
 	if (!h)                                                   \
 		h = LoadLibrary(#dll);                                \
 	if (!h) {                                                 \
-		if (ret_on_failure) { return LIBUSB_ERROR_OTHER; }    \
+		if (ret_on_failure) { return LIBUSB_ERROR_NOT_FOUND; }\
 		else { break; }                                       \
 	}                                                         \
 	name = (__dll_##name##_t)GetProcAddress(h, #name);        \
@@ -331,7 +331,7 @@ struct windows_transfer_priv {
 	name = (__dll_##name##_t)GetProcAddress(h, #name "W");    \
 	if (name) break;                                          \
 	if(ret_on_failure)                                        \
-		return LIBUSB_ERROR_OTHER;                            \
+		return LIBUSB_ERROR_NOT_FOUND;                        \
 	} while(0)
 
 
