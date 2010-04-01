@@ -4,7 +4,13 @@ git clean -f -d -x
 # Not using debug (-g) in CFLAGS DRAMATICALLY reduces the size of the binaries
 export CFLAGS="-O2"
 echo `pwd`
-./autogen.sh
+(glibtoolize --version) < /dev/null > /dev/null 2>&1 && LIBTOOLIZE=glibtoolize || LIBTOOLIZE=libtoolize
+$LIBTOOLIZE --copy --force || exit 1
+aclocal || exit 1
+autoheader || exit 1
+autoconf || exit 1
+automake -a -c || exit 1
+./configure --enable-examples-build $*
 make
 cp examples/.libs/lsusb.exe e:/dailies/$date/MinGW32/examples
 cp examples/.libs/xusb.exe e:/dailies/$date/MinGW32/examples
