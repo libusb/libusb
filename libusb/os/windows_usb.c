@@ -452,12 +452,9 @@ static int windows_init(struct libusb_context *ctx)
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
 
-		// Initialize the low level APIs
+		// Initialize the low level APIs (we don't care about errors at this stage)
 		for (i=0; i<USB_API_MAX; i++) {
-			r = usb_api_backend[i].init(ctx);
-			if (r != LIBUSB_SUCCESS) {
-				goto init_exit;
-			}
+			usb_api_backend[i].init(ctx);
 		}
 
 		// Because QueryPerformanceCounter might report different values when
