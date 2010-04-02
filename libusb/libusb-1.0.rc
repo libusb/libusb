@@ -30,8 +30,8 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #define VER_MAJOR_STR   "1"
 #define VER_MINOR        0
 #define VER_MINOR_STR   "0"
-#define VER_MICRO        5
-#define VER_MICRO_STR   "5"
+#define VER_MICRO        7
+#define VER_MICRO_STR   "7"
 #define VER_NANO         0
 #define VER_NANO_STR    "0"
 #define VER_VERSION_STR VER_MAJOR_STR ", " VER_MINOR_STR ", " VER_MICRO_STR ", " VER_NANO_STR "\0"
