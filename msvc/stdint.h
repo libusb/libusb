@@ -96,14 +96,14 @@
 #endif /* _WCTYPE_T_DEFINED */
 
 /* 7.18.1.1  Exact-width integer types */
-typedef signed char int8_t;
-typedef unsigned char   uint8_t;
-typedef short  int16_t;
-typedef unsigned short  uint16_t;
-typedef int  int32_t;
-typedef unsigned   uint32_t;
-typedef long long  int64_t;
-typedef unsigned long long   uint64_t;
+typedef __int8 int8_t;
+typedef unsigned __int8   uint8_t;
+typedef __int16  int16_t;
+typedef unsigned __int16  uint16_t;
+typedef __int32  int32_t;
+typedef unsigned __int32  uint32_t;
+typedef __int64  int64_t;
+typedef unsigned __int64   uint64_t;
 
 /* 7.18.1.2  Minimum-width integer types */
 typedef signed char int_least8_t;
@@ -112,25 +112,25 @@ typedef short  int_least16_t;
 typedef unsigned short  uint_least16_t;
 typedef int  int_least32_t;
 typedef unsigned   uint_least32_t;
-typedef long long  int_least64_t;
-typedef unsigned long long   uint_least64_t;
+typedef __int64  int_least64_t;
+typedef unsigned __int64   uint_least64_t;
 
 /*  7.18.1.3  Fastest minimum-width integer types
  *  Not actually guaranteed to be fastest for all purposes
  *  Here we use the exact-width types for 8 and 16-bit ints.
  */
-typedef signed char int_fast8_t;
-typedef unsigned char uint_fast8_t;
-typedef short  int_fast16_t;
-typedef unsigned short  uint_fast16_t;
-typedef int  int_fast32_t;
-typedef unsigned  int  uint_fast32_t;
-typedef long long  int_fast64_t;
-typedef unsigned long long   uint_fast64_t;
+typedef __int8 int_fast8_t;
+typedef unsigned __int8 uint_fast8_t;
+typedef __int16  int_fast16_t;
+typedef unsigned __int16  uint_fast16_t;
+typedef __int32  int_fast32_t;
+typedef unsigned  __int32  uint_fast32_t;
+typedef __int64  int_fast64_t;
+typedef unsigned __int64   uint_fast64_t;
 
 /* 7.18.1.5  Greatest-width integer types */
-typedef long long  intmax_t;
-typedef unsigned long long   uintmax_t;
+typedef __int64  intmax_t;
+typedef unsigned __int64   uintmax_t;
 
 /* 7.18.2  Limits of specified-width integer types */
 #if !defined ( __cplusplus) || defined (__STDC_LIMIT_MACROS)
@@ -257,16 +257,16 @@ typedef unsigned long long   uintmax_t;
 #define INT32_C(val) (INT_LEAST32_MAX-INT_LEAST32_MAX+(val))
 /*  The 'trick' doesn't work in C89 for long long because, without
     suffix, (val) will be evaluated as int, not intmax_t */
-#define INT64_C(val) val##LL
+#define INT64_C(val) val##i64
 
 #define UINT8_C(val) (val)
 #define UINT16_C(val) (val)
-#define UINT32_C(val) (val##U)
-#define UINT64_C(val) val##ULL
+#define UINT32_C(val) (val##i32)
+#define UINT64_C(val) val##ui64
 
 /* 7.18.4.2  Macros for greatest-width integer constants */
-#define INTMAX_C(val) val##LL
-#define UINTMAX_C(val) val##ULL
+#define INTMAX_C(val) val##i64
+#define UINTMAX_C(val) val##ui64
 
 #endif  /* !defined ( __cplusplus) || defined __STDC_CONSTANT_MACROS */
 
