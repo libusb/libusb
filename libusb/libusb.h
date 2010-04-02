@@ -44,15 +44,6 @@
 #undef interface
 #endif
 
-/* MSVC doesn't know ssize_t */
-#if !defined(ssize_t)
-#if defined (_WIN64)
-#define ssize_t __int64
-#else
-#define ssize_t long
-#endif
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif

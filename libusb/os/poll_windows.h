@@ -31,14 +31,6 @@
 // which should give the app an opportunity to resubmit a new fd set.
 //#define DYNAMIC_FDS
 
-#if !defined(ssize_t)
-#if defined (_WIN64)
-#define ssize_t __int64
-#else
-#define ssize_t long
-#endif
-#endif
-
 // Handle synchronous completion through the overlapped structure
 #if !defined(STATUS_REPARSE)	// reuse the REPARSE status code
 #define STATUS_REPARSE ((LONG)0x00000104L)
