@@ -22,10 +22,10 @@
 #define __LIBUSBI_H__
 
 #include <config.h>
-#include <stddef.h>
 #if !defined(OS_WINDOWS) || defined(__CYGWIN__)
 #include <poll.h>
 #endif
+#include <stddef.h>
 
 #include <libusb.h>
 
