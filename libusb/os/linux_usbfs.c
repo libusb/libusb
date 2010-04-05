@@ -399,7 +399,7 @@ static int seek_to_next_config(struct libusb_context *ctx, int fd)
 	}
 
 	/* seek forward to end of config */
-	usbi_parse_descriptor(tmp, "bbwbb", &config, 1);
+	usbi_parse_descriptor(tmp, "bbwbb", &config, 0);
 	off = lseek(fd, config.wTotalLength - sizeof(tmp), SEEK_CUR);
 	if (off < 0) {
 		usbi_err(ctx, "seek failed ret=%d errno=%d", off, errno);
@@ -606,7 +606,7 @@ static int cache_active_config(struct libusb_device *dev, int fd,
 		return r;
 	}
 
-	usbi_parse_descriptor(tmp, "bbw", &config, 1);
+	usbi_parse_descriptor(tmp, "bbw", &config, 0);
 	buf = malloc(config.wTotalLength);
 	if (!buf)
 		return LIBUSB_ERROR_NO_MEM;
