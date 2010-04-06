@@ -3022,6 +3022,22 @@ static int _hid_get_report_descriptor(struct hid_device_priv* dev, void *data, s
 		/* output (data, variable, absolute) */
 		d[i++] = 0x91; d[i++] = 0x00;
 	}
+	/* feature report */
+	if (dev->feature_report_size) {
+		/* usage (vendor defined) */
+		d[i++] = 0x09; d[i++] = 0x03;
+		/* logical minimum (0) */
+		d[i++] = 0x15; d[i++] = 0x00;
+		/* logical maximum (255) */
+		d[i++] = 0x25; d[i++] = 0xFF;
+		/* report size (8 bits) */
+		d[i++] = 0x75; d[i++] = 0x08;
+		/* report count */
+		d[i++] = 0x95; d[i++] = (uint8_t)dev->feature_report_size - 1;
+		/* feature (data, variable, absolute) */
+		d[i++] = 0xb2; d[i++] = 0x02; d[i++] = 0x01;
+	}
+
 	/* end collection */
 	d[i++] = 0xC0;
 
@@ -3268,7 +3284,8 @@ static int _hid_class_request(struct hid_device_priv* dev, HANDLE hid_handle, in
 	int report_type = (value >> 8) & 0xFF;
 	int report_id = value & 0xFF;
 
-	if (LIBUSB_REQ_RECIPIENT(request_type) != LIBUSB_RECIPIENT_INTERFACE)
+	if ( (LIBUSB_REQ_RECIPIENT(request_type) != LIBUSB_RECIPIENT_INTERFACE)
+	  && (LIBUSB_REQ_RECIPIENT(request_type) != LIBUSB_RECIPIENT_DEVICE) )
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	if (LIBUSB_REQ_OUT(request_type)
@@ -3576,8 +3593,9 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 	safe_free(transfer_priv->hid_buffer);
 	size = transfer->length - LIBUSB_CONTROL_SETUP_SIZE;
 
-	if (size > MAX_CTRL_BUFFER_LENGTH)
+	if (size > MAX_CTRL_BUFFER_LENGTH) {
 		return LIBUSB_ERROR_INVALID_PARAM;
+	}
 
 	current_interface = get_valid_interface(transfer->dev_handle);
 	// Attempt to claim an interface if none was found
