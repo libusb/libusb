@@ -10,7 +10,7 @@ aclocal || exit 1
 autoheader || exit 1
 autoconf || exit 1
 automake -a -c || exit 1
-./configure --enable-examples-build $*
+./configure --enable-examples-build --enable-toggable-debug $*
 make
 cp examples/.libs/lsusb.exe e:/dailies/$date/MinGW32/examples
 cp examples/.libs/xusb.exe e:/dailies/$date/MinGW32/examples
