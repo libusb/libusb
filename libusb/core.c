@@ -1534,6 +1534,7 @@ API_EXPORTED int libusb_init(libusb_context **context)
 	return 0;
 
 err:
+	usbi_default_context = NULL;
 	usbi_mutex_static_unlock(&default_context_lock);
 	usbi_mutex_destroy(&ctx->open_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);

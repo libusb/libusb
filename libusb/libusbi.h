@@ -158,7 +158,7 @@ void inline usbi_err( struct libusb_context *ctx, const char *format, ...)
 	LOG_BODY(ctx,LOG_LEVEL_ERROR)
 
 void inline usbi_dbg(const char *format, ...)
-#ifdef ENABLE_DEBUG_LOGGING
+#if defined(ENABLE_DEBUG_LOGGING) || defined(INCLUDE_DEBUG_LOGGING)
 	LOG_BODY(NULL,LOG_LEVEL_DEBUG)
 #else
 { }
