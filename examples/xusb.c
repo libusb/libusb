@@ -717,7 +717,7 @@ main(int argc, char** argv)
 	int got_vidpid = 0;
 	int debug_mode = 0;
 	int j, r;
-	size_t i, arglen1, arglen2;
+	size_t i, arglen;
 	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
 
@@ -734,9 +734,9 @@ main(int argc, char** argv)
 
 	if (argc >= 2) {
 		for (j = 1; j<argc; j++) {
-			arglen1 = strlen(argv[j]);
+			arglen = strlen(argv[j]);
 			if ( ((argv[j][0] == '-') || (argv[j][0] == '/'))
-			  && (arglen1 >= 2) ) {
+			  && (arglen >= 2) ) {
 				switch(argv[j][1]) {
 				case 'd':
 					debug_mode = -1;
@@ -789,11 +789,11 @@ main(int argc, char** argv)
 					break;
 				}
 			} else {
-				for (i=0; i<arglen1; i++) {
+				for (i=0; i<arglen; i++) {
 					if (argv[j][i] == ':')
 						break;
 				}
-				if (i != arglen1) {
+				if (i != arglen) {
 					if (sscanf_s(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
 						printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
 						return 1;
