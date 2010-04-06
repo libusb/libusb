@@ -8,8 +8,11 @@
 /* Default visibility */
 #define API_EXPORTED /**/
 
-/* Debug message logging */
+/* Debug message logging (non toggable) */
 //#define ENABLE_DEBUG_LOGGING 1
+
+/* Debug message logging (toggable) */
+#define INCLUDE_DEBUG_LOGGING 1
 
 /* Message logging */
 #define ENABLE_LOGGING 1
