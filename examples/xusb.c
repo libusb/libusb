@@ -495,7 +495,7 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	}
 
 	if (size <= 0) {
-		printf("\nSkipping Feature Report readout (None detected)\n", size);
+		printf("\nSkipping Feature Report readout (None detected)\n");
 	} else {
 		report_buffer = calloc(size, 1);
 		if (report_buffer == NULL) {
@@ -526,7 +526,7 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 
 	size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_INPUT);
 	if (size <= 0) {
-		printf("\nSkipping Input Report readout (None detected)\n", size);
+		printf("\nSkipping Input Report readout (None detected)\n");
 	} else {
 		report_buffer = calloc(size, 1);
 		if (report_buffer == NULL) {
@@ -715,15 +715,16 @@ main(int argc, char** argv)
 {
 	int show_help = 0;
 	int got_vidpid = 0;
-	int r;
+	int debug_mode = 0;
+	int j, r;
 	size_t i, arglen1, arglen2;
 	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
 
-	// Default test = Microsoft XBox Controller Type S - 1 interface
-	VID = 0x045E;
-	PID = 0x0289;
-	test_mode = USE_XBOX;
+	// Default to HID, expecting VID:PID
+	VID = 0;
+	PID = 0;
+	test_mode = USE_HID;
 
 	if (((uint8_t*)&endian_test)[0] == 0xBE) {
 		printf("Despite their natural superiority for end users, big endian\n"
@@ -732,97 +733,100 @@ main(int argc, char** argv)
 	}
 
 	if (argc >= 2) {
-		arglen1 = strlen(argv[1]);
-		if ( ((argv[1][0] == '-') || (argv[1][0] == '/'))
-		  && (arglen1 >= 2) ) {
-			switch(argv[1][1]) {
-			case 'i':
-				// IBM HID Optical mouse - 1 interface
-				VID = 0x04B3;
-				PID = 0x3108;
-				test_mode = USE_HID;
-				break;
-			case 'j':
-				// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
-				VID = 0x15BA;
-				PID = 0x0004;
-				test_mode = USE_JTAG;
-				break;
-			case 'k':
-				// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
-				VID = 0x0204;
-				PID = 0x6025;
-				test_mode = USE_KEY;
-				break;
-			case 'l':
-				// Plantronics DSP 400, 2 channel HID composite device - 1 HID interface
-				VID = 0x047F;
-				PID = 0x0CA1;
-				test_mode = USE_HID;
-				break;
-			case 's':
-				// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
-				VID = 0x045E;
-				PID = 0x0008;
-				test_mode = USE_HID;
-				break;
-			default:
-				show_help = -1;
-				break;
-			}
-		} else {
-			for (i=0; i<arglen1; i++) {
-				if (argv[1][i] == ':')
+		for (j = 1; j<argc; j++) {
+			arglen1 = strlen(argv[j]);
+			if ( ((argv[j][0] == '-') || (argv[j][0] == '/'))
+			  && (arglen1 >= 2) ) {
+				switch(argv[j][1]) {
+				case 'd':
+					debug_mode = -1;
 					break;
-			}
-			if (i != arglen1) {
-				if (sscanf_s(argv[1], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
-					printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
-					return 1;
+				case 'i':
+					// IBM HID Optical mouse - 1 interface
+					if (!VID && !PID) {
+						VID = 0x04B3;
+						PID = 0x3108;
+					}
+					test_mode = USE_HID;
+					break;
+				case 'j':
+					// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
+					if (!VID && !PID) {
+						VID = 0x15BA;
+						PID = 0x0004;
+					}
+					test_mode = USE_JTAG;
+					break;
+				case 'k':
+					// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
+					if (!VID && !PID) {
+						VID = 0x0204;
+						PID = 0x6025;
+					}
+					test_mode = USE_KEY;
+					break;
+				// The following tests will force VID:PID if already provided
+				case 'l':
+					// Plantronics DSP 400, 2 channel HID composite device - 1 HID interface
+					VID = 0x047F;
+					PID = 0x0CA1;
+					test_mode = USE_HID;
+					break;
+				case 's':
+					// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
+					VID = 0x045E;
+					PID = 0x0008;
+					test_mode = USE_HID;
+					break;
+				case 'x':
+					// Microsoft XBox Controller Type S - 1 interface
+					VID = 0x045E;
+					PID = 0x0289;
+					test_mode = USE_XBOX;
+					break;
+				default:
+					show_help = -1;
+					break;
 				}
-				VID = (uint16_t)tmp_vid;
-				PID = (uint16_t)tmp_pid;
-				test_mode = USE_KEY;
-				got_vidpid = -1;
 			} else {
-				show_help = -1;
+				for (i=0; i<arglen1; i++) {
+					if (argv[j][i] == ':')
+						break;
+				}
+				if (i != arglen1) {
+					if (sscanf_s(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
+						printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
+						return 1;
+					}
+					VID = (uint16_t)tmp_vid;
+					PID = (uint16_t)tmp_pid;
+					got_vidpid = -1;
+				} else {
+					show_help = -1;
+				}
 			}
 		}
 	}
 
-	if ((argc == 3) && (!got_vidpid)) {
-		arglen2 = strlen(argv[2]);
-		for (i=0; i<arglen2; i++) {
-			if (argv[2][i] == ':')
-				break;
-		}
-		if (i != arglen2) {
-			if (sscanf_s(argv[2], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
-				printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
-				return 1;
-			}
-			VID = (uint16_t)tmp_vid;
-			PID = (uint16_t)tmp_pid;
-		} else {
-			show_help = -1;
-		}
-	}
-
-	if ((show_help) || (argc == 1) || (argc >= 4)) {
+	if ((show_help) || (argc == 1) || (argc >= 5)) {
 		printf("usage: %s [-h] [-i] [-j] [-k] [-l] [-s] [-x] [vid:pid]\n", argv[0]);
 		printf("   -h: display usage\n");
-		printf("   -i: test HID device\n");
-		printf("   -j: test OLIMEX ARM-USB-TINY JTAG, 2 channel composite device\n");
-		printf("   -k: test Mass Storage USB device\n");
-		printf("   -l: test Plantronics Headset (HID)\n");
-		printf("   -s: test Microsoft Sidewinder Precision Pro (HID)\n");
-		printf("   -x: test Microsoft XBox Controller Type S (default)\n");
+		printf("   -d: enable debug output (if library was compiled with debug enabled)\n");
+		printf("   -i: test generic HID device (default)\n");
+		printf("   -k: test generic Mass Storage USB device (using WinUSB)\n");
+		printf("   -j: test FTDI based JTAG device (using WinUSB)\n");
+		printf("   -l: test Plantronics Headset (using HID)\n");
+		printf("   -s: test Microsoft Sidewinder Precision Pro (using HID)\n");
+		printf("   -x: test Microsoft XBox Controller Type S (using WinUSB)\n");
 		return 0;
 	}
 
 	r = libusb_init(NULL);
 	if (r < 0)
 		return r;
+
+	if (debug_mode)
+		libusb_set_debug(NULL, 3);
 
 	test_device(VID, PID);
 
