@@ -420,17 +420,17 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 }
 
 // HID
-int get_hid_input_record_size(uint8_t *hid_report_descriptor, int size)
+int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int type)
 {
 	uint8_t i, j = 0;
 	uint8_t offset;
-	int record_size[2] = {0, 0};
+	int record_size[3] = {0, 0, 0};
 	int nb_bits = 0, nb_items = 0;
-	bool found_bits, found_items, found_direction;
+	bool found_bits, found_items, found_record_marker;
 
 	found_bits = false;
 	found_items = false;
-	found_direction = false;
+	found_record_marker = false;
 	for (i = hid_report_descriptor[0]+1; i < size; i += offset) {
 		offset = (hid_report_descriptor[i]&0x03) + 1;
 		if (offset == 4)
@@ -445,12 +445,16 @@ int get_hid_input_record_size(uint8_t *hid_report_descriptor, int size)
 			found_items = true;
 			break;
 		case 0x81:	// input
-			found_direction = true;
+			found_record_marker = true;
 			j = 0;
 			break;
 		case 0x91:	// output
-			found_direction = true;
+			found_record_marker = true;
 			j = 1;
+			break;
+		case 0xb2:	// feature
+			found_record_marker = true;
+			j = 2;
 			break;
 		case 0xC0:	// end of collection
 			nb_items = 0;
@@ -459,89 +463,107 @@ int get_hid_input_record_size(uint8_t *hid_report_descriptor, int size)
 		default:
 			continue;
 		}
-		if (found_direction) {
+		if (found_record_marker) {
 			found_bits = false;
 			found_items = false;
-			found_direction = false;
+			found_record_marker = false;
 			record_size[j] += nb_items*nb_bits;
 		}
 	}
-	return (record_size[0]+7)/8;
+	if ((type < HID_REPORT_TYPE_INPUT) || (type > HID_REPORT_TYPE_FEATURE)) {
+		return 0;
+	} else {
+		return (record_size[type - HID_REPORT_TYPE_INPUT]+7)/8;
+	}
 }
 
 int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 {
-	int r, size;
+	int r, size, descriptor_size;
 	uint8_t hid_report_descriptor[256];
-	uint8_t *input_report;
+	uint8_t *report_buffer;
 
 	printf("\nReading HID Report Descriptors:\n");
-	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_RECIPIENT_INTERFACE,
+	descriptor_size = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_RECIPIENT_INTERFACE,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, LIBUSB_DT_REPORT<<8, 0, hid_report_descriptor, 256, 1000);
-	if (r < 0) {
+	if (descriptor_size < 0) {
 		printf("failed\n");
 		return -1;
 	} else {
-		display_buffer_hex(hid_report_descriptor, r);
-		size = get_hid_input_record_size(hid_report_descriptor, r);
-		printf("\n   Input Report Length: %d\n", size);
+		display_buffer_hex(hid_report_descriptor, descriptor_size);
+		size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_FEATURE);
 	}
 
-	input_report = calloc(size, 1);
-	if (input_report == NULL) {
-		return -1;
-	}
-
-	printf("\nReading Feature Report...\n");
-	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
-		HID_GET_REPORT, (HID_REPORT_TYPE_FEATURE<<8)|0, 0, input_report, (uint16_t)size, 5000);
-	if (r >= 0) {
-		display_buffer_hex(input_report, size);
+	if (size <= 0) {
+		printf("\nSkipping Feature Report readout (None detected)\n", size);
 	} else {
-		switch(r) {
-		case LIBUSB_ERROR_NOT_FOUND:
-			printf("   No Feature Report available for this device\n");
-			break;
-		case LIBUSB_ERROR_PIPE:
-			printf("   Detected stall - resetting pipe...\n");
-			libusb_clear_halt(handle, 0);
-			break;
-		default:
-			printf("   Error: %s\n", libusb_strerror(r));
-			break;
+		report_buffer = calloc(size, 1);
+		if (report_buffer == NULL) {
+			return -1;
 		}
-	}
 
-	printf("\nReading Input Report...\n");
-	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
-		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, (uint16_t)size, 5000);
-	if (r >= 0) {
-		display_buffer_hex(input_report, size);
-	} else {
-		switch(r) {
-		case LIBUSB_ERROR_TIMEOUT:
-			printf("   Timeout! Please make sure you act on the device within the 5 seconds allocated...\n");
-			break;
-		case LIBUSB_ERROR_PIPE:
-			printf("   Detected stall - resetting pipe...\n");
-			libusb_clear_halt(handle, 0);
-			break;
-		default:
-			printf("   Error: %s\n", libusb_strerror(r));
-			break;
+		printf("\nReading Feature Report (length %d)...\n", size);
+		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+			HID_GET_REPORT, (HID_REPORT_TYPE_FEATURE<<8)|0, 0, report_buffer, (uint16_t)size, 5000);
+		if (r >= 0) {
+			display_buffer_hex(report_buffer, size);
+		} else {
+			switch(r) {
+			case LIBUSB_ERROR_NOT_FOUND:
+				printf("   No Feature Report available for this device\n");
+				break;
+			case LIBUSB_ERROR_PIPE:
+				printf("   Detected stall - resetting pipe...\n");
+				libusb_clear_halt(handle, 0);
+				break;
+			default:
+				printf("   Error: %s\n", libusb_strerror(r));
+				break;
+			}
 		}
+		free(report_buffer);
 	}
 
-	// Attempt a bulk read from endpoint 0 (this should just return a raw input report)
-	printf("\nTesting interrupt read using endpoint %02X...\n", endpoint_in);
-	r = libusb_interrupt_transfer(handle, endpoint_in, input_report, size, &size, 5000);
-	if (r >= 0) {
-		display_buffer_hex(input_report, size);
+	size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_INPUT);
+	if (size <= 0) {
+		printf("\nSkipping Input Report readout (None detected)\n", size);
 	} else {
-		printf("   %s\n", libusb_strerror(r));
-	}
+		report_buffer = calloc(size, 1);
+		if (report_buffer == NULL) {
+			return -1;
+		}
 
-	free(input_report);
+		printf("\nReading Input Report (length %d)...\n", size);
+		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+			HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, report_buffer, (uint16_t)size, 5000);
+		if (r >= 0) {
+			display_buffer_hex(report_buffer, size);
+		} else {
+			switch(r) {
+			case LIBUSB_ERROR_TIMEOUT:
+				printf("   Timeout! Please make sure you act on the device within the 5 seconds allocated...\n");
+				break;
+			case LIBUSB_ERROR_PIPE:
+				printf("   Detected stall - resetting pipe...\n");
+				libusb_clear_halt(handle, 0);
+				break;
+			default:
+				printf("   Error: %s\n", libusb_strerror(r));
+				break;
+			}
+		}
+
+		// Attempt a bulk read from endpoint 0 (this should just return a raw input report)
+		printf("\nTesting interrupt read using endpoint %02X...\n", endpoint_in);
+		r = libusb_interrupt_transfer(handle, endpoint_in, report_buffer, size, &size, 5000);
+		if (r >= 0) {
+			display_buffer_hex(report_buffer, size);
+		} else {
+			printf("   %s\n", libusb_strerror(r));
+		}
+
+		free(report_buffer);
+	}
 	return 0;
 }
 
