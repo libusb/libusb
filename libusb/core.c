@@ -1461,6 +1461,9 @@ API_EXPORTED int libusb_attach_kernel_driver(libusb_device_handle *dev,
 API_EXPORTED void libusb_set_debug(libusb_context *ctx, int level)
 {
 	USBI_GET_CONTEXT(ctx);
+	// ctx can be NULL if called before libusb_init
+	if (ctx == NULL)
+		return;
 	if (!ctx->debug_fixed)
 		ctx->debug = level;
 }
@@ -1499,6 +1502,11 @@ API_EXPORTED int libusb_init(libusb_context **context)
 			ctx->debug_fixed = 1;
 	}
 
+	// default context should be initialized before any call to usbi_dbg
+	if (!usbi_default_context) {
+		usbi_default_context = ctx;
+	}
+
 	usbi_dbg("");
 
 	usbi_mutex_init(&ctx->usb_devs_lock, NULL);
@@ -1519,10 +1527,6 @@ API_EXPORTED int libusb_init(libusb_context **context)
 		goto err;
 	}
 
-	if (!usbi_default_context) {
-		usbi_dbg("created default context");
-		usbi_default_context = ctx;
-	}
 	usbi_mutex_static_unlock(&default_context_lock);
 
 	if (context)
@@ -1576,6 +1580,8 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 
 #ifndef ENABLE_DEBUG_LOGGING
 	USBI_GET_CONTEXT(ctx);
+	if (ctx == NULL)
+		return;
 	if (!ctx->debug)
 		return;
 	if (level == LOG_LEVEL_WARNING && ctx->debug < 2)
