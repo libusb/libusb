@@ -1590,6 +1590,8 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 		return;
 	if (level == LOG_LEVEL_INFO && ctx->debug < 3)
 		return;
+	if (level == LOG_LEVEL_DEBUG && ctx->debug < 4)
+		return;
 #endif
 
 	switch (level) {
