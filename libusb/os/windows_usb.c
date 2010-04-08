@@ -3220,11 +3220,28 @@ static int _hid_get_feature(struct hid_device_priv* dev, HANDLE hid_handle, int 
 	usbi_dbg("report ID: 0x%02X", buf[0]);
 
 	if (HidD_GetFeature(hid_handle, buf, read_size)) {
-		if (buf[0] != id) {
-			usbi_dbg("program assertion failed - mismatched report ID (got %02X instead of %02X)",
-				buf[0], id);
+		// There is a major bug with HidD_GetFeature where the actual data payload starts
+		// at buf+0 when report IDs are in use by the device, but buf+1 otherwise.
+		// To try to work around this bug, we assume that if the id provided is
+		// nonzero, then report IDs are in use by the device
+		if (id != 0) {
+			// Try to compensate for a wrong assumption
+			if ((buf[read_size-1] != 0) && (buf[0] == 0)) {
+				usbi_warn(NULL, "program assertion failed - report ID provided but device does not");
+				usbi_warn(NULL, "seem to use report IDs. Compensating by shifting payload data");
+				memcpy(data, buf+1, read_size);
+			} else {
+				memcpy(data, buf, read_size);
+			}
+		} else {
+			if (buf[0] != 0) {
+				usbi_warn(NULL, "program assertion failed - report ID received (0x%02X) was", buf[0]);
+				usbi_warn(NULL, "supposed to be zero. Compensating by shifting payload data");
+				memcpy(data, buf, read_size);
+			} else {
+				memcpy(data, buf+1, read_size);
+			}
 		}
-		memcpy(data, buf+1, read_size);
 		r = LIBUSB_COMPLETED;
 	} else {
 		err = GetLastError();
