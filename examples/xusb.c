@@ -344,6 +344,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	char vid[9], pid[9], rev[5];
 	unsigned char *data;
 	FILE *fd;
+	size_t junk;
 
 	printf("Reading Max LUN:\n");
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
@@ -420,7 +421,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	} else {
 		display_buffer_hex(data, size);
 		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-			fwrite(data, 1, size, fd);
+			junk = fwrite(data, 1, size, fd);
 			fclose(fd);
 		}
 	}
@@ -495,6 +496,7 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	uint8_t hid_report_descriptor[256];
 	uint8_t *report_buffer;
 	FILE *fd;
+	size_t junk;
 
 	printf("\nReading HID Report Descriptors:\n");
 	descriptor_size = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_RECIPIENT_INTERFACE,
@@ -505,7 +507,7 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	} else {
 		display_buffer_hex(hid_report_descriptor, descriptor_size);
 		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-			fwrite(hid_report_descriptor, 1, descriptor_size, fd);
+			junk = fwrite(hid_report_descriptor, 1, descriptor_size, fd);
 			fclose(fd);
 		}
 		size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_FEATURE);
