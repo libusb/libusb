@@ -435,24 +435,27 @@ int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int type)
 		offset = (hid_report_descriptor[i]&0x03) + 1;
 		if (offset == 4)
 			offset = 5;
-		switch (hid_report_descriptor[i]) {
-		case 0x75:	// bitsize
+		switch (hid_report_descriptor[i] & 0xFC) {
+		case 0x74:	// bitsize
 			nb_bits = hid_report_descriptor[i+1];
 			found_bits = true;
 			break;
-		case 0x95:	// count
-			nb_items  = hid_report_descriptor[i+1];
+		case 0x94:	// count
+			nb_items = 0;
+			for (j=1; j<offset; j++) {
+				nb_items = ((uint32_t)hid_report_descriptor[i+j]) << (8*(j-1));
+			}
 			found_items = true;
 			break;
-		case 0x81:	// input
+		case 0x80:	// input
 			found_record_marker = true;
 			j = 0;
 			break;
-		case 0x91:	// output
+		case 0x90:	// output
 			found_record_marker = true;
 			j = 1;
 			break;
-		case 0xb2:	// feature
+		case 0xb0:	// feature
 			found_record_marker = true;
 			j = 2;
 			break;
