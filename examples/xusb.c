@@ -853,8 +853,8 @@ main(int argc, char** argv)
 	if (r < 0)
 		return r;
 
-	if (debug_mode)
-		libusb_set_debug(NULL, 3);
+	// Warnings = 2, Debug = 4
+	libusb_set_debug(NULL, debug_mode?4:2);
 
 	test_device(VID, PID);
 
