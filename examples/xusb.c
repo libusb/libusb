@@ -57,6 +57,10 @@
 // in libusb_config_descriptor => catter for that
 #define usb_interface interface
 
+// Global variables
+bool binary_dump = false;
+char binary_name[64];
+
 inline static int perr(char const *format, ...)
 {
 	va_list args;
@@ -339,6 +343,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	uint8_t buffer[64];
 	char vid[9], pid[9], rev[5];
 	unsigned char *data;
+	FILE *fd;
 
 	printf("Reading Max LUN:\n");
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
@@ -414,6 +419,10 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 		get_sense(handle, endpoint_in, endpoint_out);
 	} else {
 		display_buffer_hex(data, size);
+		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
+			fwrite(data, 1, size, fd);
+			fclose(fd);
+		}
 	}
 
 	return 0;
@@ -485,6 +494,7 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	int r, size, descriptor_size;
 	uint8_t hid_report_descriptor[256];
 	uint8_t *report_buffer;
+	FILE *fd;
 
 	printf("\nReading HID Report Descriptors:\n");
 	descriptor_size = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_RECIPIENT_INTERFACE,
@@ -494,6 +504,10 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		return -1;
 	} else {
 		display_buffer_hex(hid_report_descriptor, descriptor_size);
+		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
+			fwrite(hid_report_descriptor, 1, descriptor_size, fd);
+			fclose(fd);
+		}
 		size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_FEATURE);
 	}
 
@@ -581,7 +595,7 @@ int test_device(uint16_t vid, uint16_t pid)
 #ifndef OS_WINDOWS
 	int iface_detached = -1;
 #endif
-	int test_scsi = 0;
+	bool test_scsi = false;
 	struct libusb_device_descriptor dev_desc;
 	char string[128];
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
@@ -623,7 +637,7 @@ int test_device(uint16_t vid, uint16_t pid)
 			  || (conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass == 0x06) )
 			  && (conf_desc->usb_interface[i].altsetting[j].bInterfaceProtocol == 0x50) ) {
 				// Mass storage devices that can use basic SCSI commands
-				test_scsi = -1;
+				test_scsi = true;
 			}
 			for (k=0; k<conf_desc->usb_interface[i].altsetting[j].bNumEndpoints; k++) {
 				endpoint = &conf_desc->usb_interface[i].altsetting[j].endpoint[k];
@@ -716,9 +730,9 @@ __cdecl
 #endif
 main(int argc, char** argv)
 {
-	int show_help = 0;
-	int got_vidpid = 0;
-	int debug_mode = 0;
+	bool show_help = false;
+	bool got_vidpid = false;
+	bool debug_mode = false;
 	int j, r;
 	size_t i, arglen;
 	unsigned tmp_vid, tmp_pid;
@@ -742,7 +756,15 @@ main(int argc, char** argv)
 			  && (arglen >= 2) ) {
 				switch(argv[j][1]) {
 				case 'd':
-					debug_mode = -1;
+					debug_mode = true;
+					break;
+				case 'b':
+					strcat(binary_name, "raw.bin");
+					if (j+1 < argc) {
+						strncpy(binary_name, argv[j+1], 64);
+						j++;
+					}
+					binary_dump = true;
 					break;
 				case 'i':
 					// IBM HID Optical mouse - 1 interface
@@ -788,7 +810,7 @@ main(int argc, char** argv)
 					test_mode = USE_XBOX;
 					break;
 				default:
-					show_help = -1;
+					show_help = true;
 					break;
 				}
 			} else {
@@ -803,18 +825,19 @@ main(int argc, char** argv)
 					}
 					VID = (uint16_t)tmp_vid;
 					PID = (uint16_t)tmp_pid;
-					got_vidpid = -1;
+					got_vidpid = true;
 				} else {
-					show_help = -1;
+					show_help = true;
 				}
 			}
 		}
 	}
 
-	if ((show_help) || (argc == 1) || (argc >= 5)) {
-		printf("usage: %s [-h] [-i] [-j] [-k] [-l] [-s] [-x] [vid:pid]\n", argv[0]);
+	if ((show_help) || (argc == 1) || (argc > 7)) {
+		printf("usage: %s [-d] [-b [file]] [-h] [-i] [-j] [-k] [-l] [-s] [-x] [vid:pid]\n", argv[0]);
 		printf("   -h: display usage\n");
 		printf("   -d: enable debug output (if library was compiled with debug enabled)\n");
+		printf("   -b: dump raw HID report descriptor or Mass Storage first block to binary file\n");
 		printf("   -i: test generic HID device (default)\n");
 		printf("   -k: test generic Mass Storage USB device (using WinUSB)\n");
 		printf("   -j: test FTDI based JTAG device (using WinUSB)\n");
