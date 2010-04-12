@@ -27,7 +27,7 @@
 //    and will become unresponsive if this routine is used."
 //   => Don't blame libusb if you can't read or write HID reports when the
 //   option below is enabled.
-//#define USE_HIDD_FOR_REPORTS
+#define USE_HIDD_FOR_REPORTS
 // - Should libusb automatically claim the interfaces it requires?
 #define AUTO_CLAIM
 // - Forces instant overlapped completion on timeouts: can prevents extensive
@@ -3086,47 +3086,57 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 						   struct windows_transfer_priv *tp, size_t *size, OVERLAPPED* overlapped)
 {
 	uint8_t *buf;
-	DWORD read_size = (DWORD)(*size + 1);
+	DWORD read_size, expected_size = (DWORD)*size;
 	int r = LIBUSB_SUCCESS;
 
 	if (tp->hid_buffer != NULL) {
 		usbi_dbg("program assertion failed: hid_buffer is not NULL");
 	}
 
-	if (*size > MAX_HID_REPORT_SIZE) {
+	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
+		usbi_dbg("invalid size (%d)", *size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
+	// When report IDs are not in use, add an extra byte for the report ID
+	if (id==0) {
+		expected_size++;
+	}
+
 	// Add a trailing byte to detect overflows
-	buf = (uint8_t*)malloc(read_size+1);
+	buf = (uint8_t*)calloc(expected_size+1, 1);
 	if (buf == NULL) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
-	buf[0] = (uint8_t)id;
+	buf[0] = (uint8_t)id;	// Must be set always
 	usbi_dbg("report ID: 0x%02X", buf[0]);
-	// NB: HidD_GetInputReport returns the last Input Report read whereas ReadFile
-	// waits for input to be generated => in case your HID device requires human
-	// action to generate a report, it may wait indefinitely.
+
+	// NB: HidD_GetInputReport sends an request to the device for the Input Report
+	// (and blocks until response) whereas ReadFile waits for input to be generated
+	// asynchronously
 #if !defined(USE_HIDD_FOR_REPORTS)
 	// Use ReadFile instead of HidD_GetInputReport for async I/O
-	tp->hid_expected_size = read_size;	// read_size is modified below!
-	if (!ReadFile(hid_handle, buf, read_size+1, &read_size, overlapped)) {
+	// TODO: send a request paquet?
+	tp->hid_expected_size = expected_size;
+	if (!ReadFile(hid_handle, buf, expected_size+1, &read_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
 			usbi_dbg("Failed to Read HID Input Report: %s", windows_error_str(0));
 			safe_free(buf);
 			return LIBUSB_ERROR_IO;
 		}
+		// Asynchronous wait
 		tp->hid_buffer = buf;
 		tp->hid_dest = data; // copy dest, as not necessarily the start of the transfer buffer
 		return LIBUSB_SUCCESS;
 	}
 #else
-	// Nonblocking call to read the last report
-	if (!HidD_GetInputReport(hid_handle, buf, read_size)) {
+	// Synchronous request for the Input Report
+	if (!HidD_GetInputReport(hid_handle, buf, expected_size)) {
 		usbi_dbg("Failed to Read HID Input Report: %s", windows_error_str(0));
 		safe_free(buf);
 		return LIBUSB_ERROR_IO;
 	}
+	read_size = expected_size;	// Can't detect overflows with this API
 #endif
 	// Transfer completed synchronously => copy and discard extra buffer
 	if (read_size == 0) {
@@ -3134,17 +3144,23 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 		*size = 0;
 	} else {
 		if (buf[0] != id) {
-			usbi_dbg("program assertion failed - mismatched report ID (got %02X instead of %02X)",
-				buf[0], id);
+			usbi_warn(NULL, "mismatched report ID (data is %02X, parameter is %02X)", buf[0], id);
 		}
-		if ((size_t)read_size > *size+1) {
+		if ((size_t)read_size > expected_size) {
 			r = LIBUSB_ERROR_OVERFLOW;
 			usbi_dbg("OVERFLOW!");
 		} else {
 			r = LIBUSB_COMPLETED;
 		}
-		*size = ((size_t)read_size > *size)?*size:(size_t)read_size - 1;
-		memcpy(data, buf+1, *size);
+
+		if (id == 0) {
+			// Discard report ID
+			*size = MIN((size_t)read_size-1, *size);
+			memcpy(data, buf+1, *size);
+		} else {
+			*size = MIN((size_t)read_size, *size);
+			memcpy(data, buf, *size);
+		}
 	}
 	safe_free(buf);
 	return r;
@@ -3153,25 +3169,36 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data,
 						   struct windows_transfer_priv *tp, size_t *size, OVERLAPPED* overlapped)
 {
-	uint8_t *buf;
-	DWORD write_size = ((DWORD)*size) + 1;
+	uint8_t *buf = (uint8_t*)data;	// default is to use the data buffer as is
+	DWORD write_size= (DWORD)*size;
 
 	if (tp->hid_buffer != NULL) {
 		usbi_dbg("program assertion failed: hid_buffer is not NULL");
 	}
 
-	if (*size > MAX_HID_REPORT_SIZE) {
+	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
+		usbi_dbg("invalid size (%d)", *size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
-	buf = malloc(write_size);
-	if (buf == NULL) {
-		return LIBUSB_ERROR_NO_MEM;
+	usbi_dbg("report ID: 0x%02X", id);
+	// When report IDs are not used (i.e. when id == 0), we must add
+	// a null report ID. Otherwise, we just use original data buffer
+	if (id == 0) {
+		write_size++;
+		buf = calloc(write_size, 1);
+		if (buf == NULL) {
+			return LIBUSB_ERROR_NO_MEM;
+		}
+		buf[0] = 0;	// has a purpose, if we switch to malloc for perf
+		memcpy(buf + 1, data, *size);
+	} else if (buf[0] == id) {
+		buf = data;
+	} else {
+		usbi_warn(NULL, "mismatched report ID (data is %02X, parameter is %02X)", buf[0], id);
+		// Can't go on, as we might end up freeing "data" in hid_copy_transfer_data
+		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-
-	buf[0] = (uint8_t)id;
-	usbi_dbg("report ID: 0x%02X", buf[0]);
-	memcpy(buf + 1, data, *size);
 
 #if !defined(USE_HIDD_FOR_REPORTS)
 	// Une WriteFile instead of HidD_SetOutputReport for async I/O
@@ -3187,7 +3214,9 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 #else
 	if (!HidD_SetOutputReport(hid_handle, buf, write_size)) {
 		usbi_dbg("Failed to Write HID Output Report: %s", windows_error_str(0));
-		safe_free(buf);
+		if (id == 0) {
+			safe_free(buf);
+		}
 		return LIBUSB_ERROR_IO;
 	}
 #endif
@@ -3196,51 +3225,43 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 		usbi_dbg("program assertion failed - write completed synchronously, but no data was written");
 		*size = 0;
 	} else {
-		*size = write_size - 1;
+		*size = write_size - ((id == 0)?1:0);
 	}
-	safe_free(buf);
+	if (id == 0) {
+		safe_free(buf);
+	}
 	return LIBUSB_COMPLETED;
 }
 
 static int _hid_get_feature(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data, size_t *size)
 {
-	uint8_t *buf;
-	ULONG read_size = (ULONG)(*size + 1);
+	uint8_t *buf = (uint8_t*)data;	// default with report ID is to use data
+	ULONG read_size = (ULONG)*size;
 	int r = LIBUSB_ERROR_OTHER;
 	uint32_t err;
 
-	if (*size > MAX_HID_REPORT_SIZE)
+	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
+		usbi_dbg("invalid size (%d)", *size);
 		return LIBUSB_ERROR_INVALID_PARAM;
+	}
 
-	buf = (uint8_t*)calloc(1, read_size);
-	if (buf == NULL) {
-		return LIBUSB_ERROR_NO_MEM;
+	// When report IDs are not in use, we must prefix an extra zero ID
+	if (id == 0) {
+		read_size++;
+		buf = (uint8_t*)calloc(1, read_size);
+		if (buf == NULL) {
+			return LIBUSB_ERROR_NO_MEM;
+		}
 	}
 	buf[0] = (uint8_t)id;
 	usbi_dbg("report ID: 0x%02X", buf[0]);
 
 	if (HidD_GetFeature(hid_handle, buf, read_size)) {
-		// There is a major bug with HidD_GetFeature where the actual data payload starts
-		// at buf+0 when report IDs are in use by the device, but buf+1 otherwise.
-		// To try to work around this bug, we assume that if the id provided is
-		// nonzero, then report IDs are in use by the device
-		if (id != 0) {
-			// Try to compensate for a wrong assumption
-			if ((buf[read_size-1] != 0) && (buf[0] == 0)) {
-				usbi_warn(NULL, "program assertion failed - report ID provided but device does not");
-				usbi_warn(NULL, "seem to use report IDs. Compensating by shifting payload data");
-				memcpy(data, buf+1, read_size);
-			} else {
-				memcpy(data, buf, read_size);
-			}
-		} else {
-			if (buf[0] != 0) {
-				usbi_warn(NULL, "program assertion failed - report ID received (0x%02X) was", buf[0]);
-				usbi_warn(NULL, "supposed to be zero. Compensating by shifting payload data");
-				memcpy(data, buf, read_size);
-			} else {
-				memcpy(data, buf+1, read_size);
-			}
+		if (buf[0] != id) {
+			usbi_warn(NULL, "mismatched report ID (data is %02X, parameter is %02X)", buf[0], id);
+		}
+		if (id == 0) {
+			memcpy(data, buf+1, *size);
 		}
 		r = LIBUSB_COMPLETED;
 	} else {
@@ -3255,28 +3276,38 @@ static int _hid_get_feature(struct hid_device_priv* dev, HANDLE hid_handle, int 
 			break;
 		}
 	}
-	safe_free(buf);
+	if (id == 0) {
+		safe_free(buf);
+	}
 	return r;
 }
 
 static int _hid_set_feature(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data, size_t *size)
 {
-	uint8_t *buf;
+	uint8_t *buf = (uint8_t*)data;
 	uint32_t err;
 	int r = LIBUSB_ERROR_OTHER;
-	ULONG write_size = (ULONG)(*size + 1);
+	ULONG write_size = (ULONG)*size;
 
-	if (*size >MAX_HID_REPORT_SIZE)
+	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
+		usbi_dbg("invalid size (%d)", *size);
 		return LIBUSB_ERROR_INVALID_PARAM;
-
-	buf = (uint8_t*)malloc(write_size);
-	if (buf == NULL) {
-		return LIBUSB_ERROR_NO_MEM;
 	}
-	buf[0] = (uint8_t)id;
-	usbi_dbg("report ID: 0x%02X", buf[0]);
 
-	memcpy(buf+1, data, *size);
+	if (id == 0) {
+		write_size++;
+		buf = (uint8_t*)calloc(write_size, 1);
+		if (buf == NULL) {
+			return LIBUSB_ERROR_NO_MEM;
+		}
+		memcpy(buf+1, data, *size);
+		buf[0] = (uint8_t)id;
+	} else if (buf[0] != id) {
+		usbi_warn(NULL, "mismatched report ID (data is %02X, parameter is %02X)", buf[0], id);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	usbi_dbg("report ID: 0x%02X", buf[0]);
 
 	if (HidD_SetFeature(hid_handle, buf, write_size)) {
 		r = LIBUSB_COMPLETED;
@@ -3286,11 +3317,13 @@ static int _hid_set_feature(struct hid_device_priv* dev, HANDLE hid_handle, int 
 		case ERROR_INVALID_FUNCTION:
 			r = LIBUSB_ERROR_NOT_FOUND;
 		default:
-			usbi_dbg("error %s", windows_error_str(r));
+			usbi_dbg("error %s", windows_error_str(err));
 			r = LIBUSB_ERROR_OTHER;
 		}
 	}
-	safe_free(buf);
+	if (id == 0) {
+		safe_free(buf);
+	}
 	return r;
 }
 
@@ -3860,9 +3893,9 @@ static int hid_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_s
 	int r = LIBUSB_TRANSFER_COMPLETED;
 	uint32_t corrected_size = 0;
 
-	if (transfer_priv->hid_buffer != NULL) {
+	if ((transfer_priv->hid_buffer != NULL) && (transfer_priv->hid_buffer[0] == 0)) {
 		// If we have a valid hid_buffer, it means the transfer was async and
-		// we have an extra 1 byte report ID to discard in front
+		// we have an extra 1 byte report ID to discard in front if the report ID is 0
 		corrected_size = io_size-1;
 		if (corrected_size > transfer_priv->hid_expected_size) {
 			corrected_size = (uint32_t)transfer_priv->hid_expected_size;
