@@ -36,7 +36,7 @@
  * libusb_config_descriptor has an 'interface' member
  * As this can be problematic if you include windows.h after libusb.h
  * in your sources, we force windows.h to be included first. */
-#if defined(OS_WINDOWS) && !defined(_WINDOWS_)
+#if (defined(_MSC_VER) || defined(__MINGW32__) || defined(__CYGWIN__)) && !defined(_WINDOWS_)
 #include <windows.h>
 #endif
 
