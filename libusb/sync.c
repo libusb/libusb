@@ -68,7 +68,7 @@ static void ctrl_transfer_cb(struct libusb_transfer *transfer)
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failures
  */
-API_EXPORTED int libusb_control_transfer(libusb_device_handle *dev_handle,
+API_EXPORTED int LIBUSB_API libusb_control_transfer(libusb_device_handle *dev_handle,
 	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	unsigned char *data, uint16_t wLength, unsigned int timeout)
 {
@@ -251,7 +251,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failures
  */
-API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
+API_EXPORTED int LIBUSB_API libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *data, int length, int *transferred,
 	unsigned int timeout)
 {
@@ -300,7 +300,7 @@ API_EXPORTED int libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other error
  */
-API_EXPORTED int libusb_interrupt_transfer(
+API_EXPORTED int LIBUSB_API libusb_interrupt_transfer(
 	struct libusb_device_handle *dev_handle, unsigned char endpoint,
 	unsigned char *data, int length, int *transferred, unsigned int timeout)
 {
