@@ -1059,11 +1059,11 @@ static int darwin_kernel_driver_active(struct libusb_device_handle *dev_handle, 
 
 /* attaching/detaching kernel drivers is not currently supported (maybe in the future?) */
 static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle, int interface) {
-  return LIBUSB_ERROR_NOT_SUPPORTED;
+  return LIBUSB_SUCCESS;
 }
 
 static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, int interface) {
-  return LIBUSB_ERROR_NOT_SUPPORTED;
+  return LIBUSB_SUCCESS;
 }
 
 static void darwin_destroy_device(struct libusb_device *dev) {

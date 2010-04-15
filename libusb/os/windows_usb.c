@@ -1697,15 +1697,17 @@ static int windows_reset_device(struct libusb_device_handle *dev_handle)
 // The 3 functions below are unlikely to ever get supported on Windows
 static int windows_kernel_driver_active(struct libusb_device_handle *dev_handle, int iface)
 {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	return LIBUSB_SUCCESS;
 }
 
-static int windows_attach_kernel_driver(struct libusb_device_handle *dev_handle, int iface) {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+static int windows_attach_kernel_driver(struct libusb_device_handle *dev_handle, int iface)
+{
+	return LIBUSB_SUCCESS;
 }
 
-static int windows_detach_kernel_driver(struct libusb_device_handle *dev_handle, int iface) {
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+static int windows_detach_kernel_driver(struct libusb_device_handle *dev_handle, int iface)
+{
+	return LIBUSB_SUCCESS;
 }
 
 static void windows_destroy_device(struct libusb_device *dev)
