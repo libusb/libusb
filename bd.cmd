@@ -7,6 +7,7 @@ for %%A in (MS32 MS64 MinGW32) do mkdir E:\dailies\%DATE%\%%A
 for %%A in (MS32 MS64 MinGW32) do mkdir E:\dailies\%DATE%\%%A\lib
 for %%A in (MS32 MS64 MinGW32) do mkdir E:\dailies\%DATE%\%%A\dll
 for %%A in (MS32 MS64 MinGW32) do mkdir E:\dailies\%DATE%\%%A\examples
+copy libusb\libusb.h E:\dailies\%DATE%\
 
 set ORG_BUILD_ALT_DIR=%BUILD_ALT_DIR%
 set ORG_BUILDARCH=%_BUILDARCH%
