@@ -41,6 +41,7 @@
 enum windows_version {
 	WINDOWS_UNSUPPORTED,
 	WINDOWS_XP,
+	WINDOWS_2003,	// also includes XP 64
 	WINDOWS_VISTA_AND_LATER,
 };
 extern enum windows_version windows_version;

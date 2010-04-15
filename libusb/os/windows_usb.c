@@ -433,6 +433,8 @@ static int windows_init(struct libusb_context *ctx)
 		if ((GetVersionEx(&os_version) != 0) && (os_version.dwPlatformId == VER_PLATFORM_WIN32_NT)) {
 			if ((os_version.dwMajorVersion == 5) && (os_version.dwMinorVersion == 1)) {
 				windows_version = WINDOWS_XP;
+			} else if ((os_version.dwMajorVersion == 5) && (os_version.dwMinorVersion == 2)) {
+				windows_version = WINDOWS_2003;	// also includes XP 64
 			} else if (os_version.dwMajorVersion >= 6) {
 				windows_version = WINDOWS_VISTA_AND_LATER;
 			}
