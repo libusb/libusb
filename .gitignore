@@ -26,6 +26,7 @@ lsusb
 xusb
 dpfp
 dpfp_threaded
+.exe
 *.pc
 fpusb-*.tar.bz2
 fpusb-*.tar.gz

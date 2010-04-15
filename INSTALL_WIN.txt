@@ -54,7 +54,7 @@ Links
 
 Additional information related to the Windows backend:
   http://libusb.org/wiki/windows_backend
-  
+
 Latest Windows Driver (Development) Kit (DDK):
   http://www.microsoft.com/downloads/details.aspx?displaylang=en&FamilyID=36a2630f-5d56-43b5-b996-7633f2ec14ff
 
