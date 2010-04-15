@@ -32,7 +32,7 @@
  * may wish to consider using the \ref asyncio "asynchronous I/O API" instead.
  */
 
-static void ctrl_transfer_cb(struct libusb_transfer *transfer)
+static void LIBUSB_API ctrl_transfer_cb(struct libusb_transfer *transfer)
 {
 	int *completed = transfer->user_data;
 	*completed = 1;
@@ -141,7 +141,7 @@ API_EXPORTED int LIBUSB_API libusb_control_transfer(libusb_device_handle *dev_ha
 	return r;
 }
 
-static void bulk_transfer_cb(struct libusb_transfer *transfer)
+static void LIBUSB_API bulk_transfer_cb(struct libusb_transfer *transfer)
 {
 	int *completed = transfer->user_data;
 	*completed = 1;

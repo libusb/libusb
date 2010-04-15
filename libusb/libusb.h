@@ -735,7 +735,7 @@ struct libusb_transfer;
  * \param transfer The libusb_transfer struct the callback function is being
  * notified about.
  */
-typedef void (*libusb_transfer_cb_fn)(struct libusb_transfer *transfer);
+typedef void (LIBUSB_API *libusb_transfer_cb_fn)(struct libusb_transfer *transfer);
 
 /** \ingroup asyncio
  * The generic USB transfer structure. The user populates this structure and
