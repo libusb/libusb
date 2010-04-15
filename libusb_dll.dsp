@@ -123,15 +123,15 @@ SOURCE=.\libusb\os\linux_usbfs.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\libusb\os\poll_windows.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\libusb\sync.c
 # End Source File
 # Begin Source File
 
 SOURCE=.\libusb\os\threads_windows.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\libusb\os\poll_windows.c
 # End Source File
 # Begin Source File
 
@@ -167,15 +167,15 @@ SOURCE=.\libusb\os\poll_posix.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\libusb\os\poll_windows.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\libusb\os\threads_posix.h
 # End Source File
 # Begin Source File
 
 SOURCE=.\libusb\os\threads_windows.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\libusb\os\poll_windows.h
 # End Source File
 # Begin Source File
 
