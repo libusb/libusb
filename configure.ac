@@ -105,17 +105,17 @@ if test "x$log_enabled" != "xno"; then
 fi
 
 AC_ARG_ENABLE([debug-log], [AS_HELP_STRING([--enable-debug-log],
-	[enable non-toggable debug logging (default n)])],
+	[force all logging, including debug (default n)])],
 	[debug_log_enabled=$enableval],
 	[debug_log_enabled='no'])
 
 AC_ARG_ENABLE([toggable-debug], [AS_HELP_STRING([--enable-toggable-debug],
-	[enable toggable debug logging (default n)])],
+	[enable software control of debug logging (default n)])],
 	[toggable_debug=$enableval],
 	[toggable_debug='no'])
 
 if test "x$debug_log_enabled" != "xno"; then
-	AC_DEFINE([ENABLE_DEBUG_LOGGING], 1, [Debug message logging (non toggable)])
+	AC_DEFINE([ENABLE_DEBUG_LOGGING], 1, [Debug message logging (forced)])
 else
 	if test "x$toggable_debug" != "xno"; then
 		AC_DEFINE([INCLUDE_DEBUG_LOGGING], 1, [Debug message logging (toggable)])

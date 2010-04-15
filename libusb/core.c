@@ -1505,6 +1505,7 @@ API_EXPORTED int LIBUSB_API libusb_init(libusb_context **context)
 	// default context should be initialized before any call to usbi_dbg
 	if (!usbi_default_context) {
 		usbi_default_context = ctx;
+		usbi_dbg("created default context");
 	}
 
 	usbi_dbg("");
