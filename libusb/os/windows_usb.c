@@ -3169,7 +3169,7 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data,
 						   struct windows_transfer_priv *tp, size_t *size, OVERLAPPED* overlapped)
 {
-	uint8_t *buf = (uint8_t*)data;	// default is to use the data buffer as is
+	uint8_t *buf = NULL;
 	DWORD write_size= (DWORD)*size;
 
 	if (tp->hid_buffer != NULL) {
@@ -3186,18 +3186,21 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	// a null report ID. Otherwise, we just use original data buffer
 	if (id == 0) {
 		write_size++;
-		buf = calloc(write_size, 1);
-		if (buf == NULL) {
-			return LIBUSB_ERROR_NO_MEM;
-		}
-		buf[0] = 0;	// has a purpose, if we switch to malloc for perf
+	}
+	buf = malloc(write_size);
+	if (buf == NULL) {
+		return LIBUSB_ERROR_NO_MEM;
+	}
+	if (id == 0) {
+		buf[0] = 0;
 		memcpy(buf + 1, data, *size);
-	} else if (buf[0] == id) {
-		buf = data;
 	} else {
-		usbi_warn(NULL, "mismatched report ID (data is %02X, parameter is %02X)", buf[0], id);
-		// Can't go on, as we might end up freeing "data" in hid_copy_transfer_data
-		return LIBUSB_ERROR_INVALID_PARAM;
+		// This seems like a waste, but if we don't duplicate the
+		// data, we'll get issues when freeing hid_buffer
+		memcpy(buf, data, *size);
+		if (buf[0] != id) {
+			usbi_warn(NULL, "mismatched report ID (data is %02X, parameter is %02X)", buf[0], id);
+		}
 	}
 
 #if !defined(USE_HIDD_FOR_REPORTS)
@@ -3209,6 +3212,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 			return LIBUSB_ERROR_IO;
 		}
 		tp->hid_buffer = buf;
+		tp->hid_dest = NULL;
 		return LIBUSB_SUCCESS;
 	}
 #else
@@ -3227,9 +3231,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	} else {
 		*size = write_size - ((id == 0)?1:0);
 	}
-	if (id == 0) {
-		safe_free(buf);
-	}
+	safe_free(buf);
 	return LIBUSB_COMPLETED;
 }
 
@@ -3408,8 +3410,11 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 	HIDP_VALUE_CAPS *value_caps;
 
 	HANDLE hid_handle = INVALID_HANDLE_VALUE;
-	ULONG size;
-	int i;
+	int i, j;
+	// report IDs handling
+	ULONG size[3];
+	char* type[3] = {"input", "output", "feature"};
+	int nb_ids[2];	// zero and nonzero report IDs
 
 	CHECK_HID_AVAILABLE;
 	if (priv->hid == NULL) {
@@ -3472,54 +3477,44 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 			usbi_err(ctx, "could not parse HID capabilities (HidP_GetCaps)");
 			break;
 		}
-		// Get the default input and output report IDs to use with interrupt
-		size = capabilities.NumberInputValueCaps;
-		usbi_dbg("%d HID input report value(s) found", size);
-		priv->hid->input_report_id = 0;
-		if (size > 0) {
-			value_caps = malloc(size * sizeof(HIDP_VALUE_CAPS));
-			if ( (value_caps != NULL)
-			  && (HidP_GetValueCaps(HidP_Input, value_caps, &size, preparsed_data) == HIDP_STATUS_SUCCESS)
-			  && (size >= 1) ) {
-				priv->hid->input_report_id = value_caps[0].ReportID;
-				for (i=1; i<(int)size; i++) {
-					if (value_caps[i].ReportID != priv->hid->input_report_id) {
-						usbi_warn(ctx, "  multiple input report IDs found for HID:");
-						usbi_warn(ctx, "  will only handle report ID 0x%02X for interrupt transfers",
-							priv->hid->input_report_id);
-						break;
+
+		// Find out if interrupt will need report IDs
+		size[0] = capabilities.NumberInputValueCaps;
+		size[1] = capabilities.NumberOutputValueCaps;
+		size[2] = capabilities.NumberFeatureValueCaps;
+		for (j=0; j<3; j++) {
+			usbi_dbg("%d HID %s report value(s) found", size[j], type[j]);
+			priv->hid->uses_report_ids[j] = false;
+			if (size[j] > 0) {
+				value_caps = malloc(size[j] * sizeof(HIDP_VALUE_CAPS));
+				if ( (value_caps != NULL)
+				  && (HidP_GetValueCaps(j, value_caps, &size[j], preparsed_data) == HIDP_STATUS_SUCCESS)
+				  && (size[j] >= 1) ) {
+					nb_ids[0] = 0;
+					nb_ids[1] = 0;
+					for (i=0; i<(int)size[j]; i++) {
+						usbi_dbg("  Report ID: 0x%02X", value_caps[i].ReportID);
+						if (value_caps[i].ReportID != 0) {
+							nb_ids[1]++;
+						} else {
+							nb_ids[0]++;
+						}
 					}
+					if (nb_ids[1] != 0) {
+						if (nb_ids[0] != 0) {
+							usbi_warn(ctx, "program assertion failed: zero and nonzero report IDs used for %s",
+								type[j]);
+						}
+						priv->hid->uses_report_ids[j] = true;
+					}
+				} else {
+					usbi_warn(ctx, "  could not process %s report IDs", type[j]);
 				}
-				usbi_dbg("  will use report ID 0x%02X for interrupt transfers", priv->hid->input_report_id);
-			} else {
-				usbi_warn(ctx, "  could not process input report IDs");
+				safe_free(value_caps);
 			}
-			safe_free(value_caps);
 		}
 
-		size = capabilities.NumberOutputValueCaps;
-		usbi_dbg("%d HID output report value(s) found", size);
-		priv->hid->output_report_id = 0;
-		if (size > 0) {
-			value_caps = malloc(size * sizeof(HIDP_VALUE_CAPS));
-			if ( (value_caps != NULL)
-			  && (HidP_GetValueCaps(HidP_Output, value_caps, &size, preparsed_data) == HIDP_STATUS_SUCCESS)
-			  && (size >= 1) ) {
-				priv->hid->output_report_id = value_caps[0].ReportID;
-				for (i=1; i<(int)size; i++) {
-					if (value_caps[i].ReportID != priv->hid->output_report_id) {
-						usbi_warn(ctx, "  multiple output report IDs found for HID:");
-						usbi_warn(ctx, "  will only handle report ID 0x%02X for interrupt transfers",
-							priv->hid->output_report_id);
-						break;
-					}
-				}
-				usbi_dbg("  will use report ID 0x%02X for interrupt transfers", priv->hid->output_report_id);
-			} else {
-				usbi_warn(ctx, "could process output report IDs");
-			}
-			safe_free(value_caps);
-		}
+		// Set the report sizes
 		priv->hid->input_report_size = capabilities.InputReportByteLength;
 		priv->hid->output_report_size = capabilities.OutputReportByteLength;
 		priv->hid->feature_report_size = capabilities.FeatureReportByteLength;
@@ -3641,6 +3636,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 
 	transfer_priv->pollable_fd = INVALID_WINFD;
 	safe_free(transfer_priv->hid_buffer);
+	transfer_priv->hid_dest = NULL;
 	size = transfer->length - LIBUSB_CONTROL_SETUP_SIZE;
 
 	if (size > MAX_CTRL_BUFFER_LENGTH) {
@@ -3747,13 +3743,14 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	struct winfd wfd;
 	HANDLE hid_handle;
 	bool direction_in, ret;
-	int current_interface;
+	int current_interface, length;
 	DWORD size;
 	int r = LIBUSB_SUCCESS;
 
 	CHECK_HID_AVAILABLE;
 
 	transfer_priv->pollable_fd = INVALID_WINFD;
+	transfer_priv->hid_dest = NULL;
 	safe_free(transfer_priv->hid_buffer);
 
 	current_interface = interface_by_endpoint(priv, handle_priv, transfer->endpoint);
@@ -3772,22 +3769,34 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
-	transfer_priv->hid_buffer = (uint8_t*)malloc(transfer->length+2);
-	transfer_priv->hid_dest = transfer->buffer;
-	transfer_priv->hid_expected_size = transfer->length+2;
+
+	// If report IDs are not in use, an extra prefix byte must be added
+	if ( ((direction_in) && (!priv->hid->uses_report_ids[0]))
+	  || ((!direction_in) && (!priv->hid->uses_report_ids[1])) ) {
+		length = transfer->length+1;
+	} else {
+		length = transfer->length;
+	}
+	// Add a trailing byte to detect overflows on input
+	transfer_priv->hid_buffer = (uint8_t*)calloc(length+1, 1);
 	if (transfer_priv->hid_buffer == NULL) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
+	transfer_priv->hid_expected_size = length;
+
 	if (direction_in) {
-		transfer_priv->hid_buffer[0] = priv->hid->input_report_id;
-		usbi_dbg("reading %d bytes (report ID: 0x%02X)", transfer->length+1, transfer_priv->hid_buffer[0]);
-		ret = ReadFile(wfd.handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
+		transfer_priv->hid_dest = transfer->buffer;
+		usbi_dbg("reading %d bytes (report ID: 0x%02X)", length, transfer_priv->hid_buffer[0]);
+		ret = ReadFile(wfd.handle, transfer_priv->hid_buffer, length+1, &size, wfd.overlapped);
 	} else {
-		transfer_priv->hid_buffer[0] = priv->hid->output_report_id;
-		memcpy(transfer_priv->hid_buffer+1, transfer->buffer, transfer->length);
-		usbi_dbg("writing %d bytes (report ID: 0x%02X)", transfer->length+1, transfer_priv->hid_buffer[0]);
-		transfer_priv->hid_buffer[0] = 0;
-		ret = WriteFile(wfd.handle, transfer_priv->hid_buffer, transfer->length+1, &size, wfd.overlapped);
+		if (!priv->hid->uses_report_ids[1]) {
+			memcpy(transfer_priv->hid_buffer+1, transfer->buffer, transfer->length);
+		} else {
+			// We could actually do without the calloc and memcpy in this case
+			memcpy(transfer_priv->hid_buffer, transfer->buffer, transfer->length);
+		}
+		usbi_dbg("writing %d bytes (report ID: 0x%02X)", length, transfer_priv->hid_buffer[0]);
+		ret = WriteFile(wfd.handle, transfer_priv->hid_buffer, length, &size, wfd.overlapped);
 	}
 	if (!ret) {
 		if (GetLastError() != ERROR_IO_PENDING) {
@@ -3799,14 +3808,14 @@ static int hid_submit_bulk_transfer(struct usbi_transfer *itransfer) {
 	} else {
 		// Only write operations that completed synchronously need to free up
 		// hid_buffer. For reads, copy_transfer_data() handles that process.
-		if (transfer->endpoint & LIBUSB_ENDPOINT_OUT) {
+		if (!direction_in) {
 			safe_free(transfer_priv->hid_buffer);
 		}
 		if (size == 0) {
 			usbi_err(ctx, "program assertion failed - no data was transferred");
 			size = 1;
 		}
-		if (size > (size_t)transfer->length+1) {
+		if (size > (size_t)length) {
 			usbi_err(ctx, "OVERFLOW!");
 			r = LIBUSB_ERROR_OVERFLOW;
 		}
@@ -3891,26 +3900,29 @@ static int hid_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_s
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	int r = LIBUSB_TRANSFER_COMPLETED;
-	uint32_t corrected_size = 0;
+	uint32_t corrected_size = io_size;
 
-	if ((transfer_priv->hid_buffer != NULL) && (transfer_priv->hid_buffer[0] == 0)) {
-		// If we have a valid hid_buffer, it means the transfer was async and
-		// we have an extra 1 byte report ID to discard in front if the report ID is 0
-		corrected_size = io_size-1;
-		if (corrected_size > transfer_priv->hid_expected_size) {
-			corrected_size = (uint32_t)transfer_priv->hid_expected_size;
-			usbi_err(ctx, "OVERFLOW!");
-			r = LIBUSB_TRANSFER_OVERFLOW;
-		} else if (transfer_priv->hid_dest == NULL) {
-			usbi_err(ctx, "program assertion failed - copy destination address was not set");
-			r = LIBUSB_TRANSFER_ERROR;
-		} else {
-			memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer+1, corrected_size);
+	if (transfer_priv->hid_buffer != NULL) {
+		// If we have a valid hid_buffer, it means the transfer was async
+		if (transfer_priv->hid_dest != NULL) {	// Data readout
+			// First, check for overflow
+			if (corrected_size > transfer_priv->hid_expected_size) {
+				usbi_err(ctx, "OVERFLOW!");
+				corrected_size = (uint32_t)transfer_priv->hid_expected_size;
+				r = LIBUSB_TRANSFER_OVERFLOW;
+			}
+
+			if (transfer_priv->hid_buffer[0] == 0) {
+				// Discard the 1 byte report ID prefix
+				corrected_size--;
+				memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer+1, corrected_size);
+			} else {
+				memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer, corrected_size);
+			}
+			transfer_priv->hid_dest = NULL;
 		}
+		// For write, we just need to free the hid buffer
 		safe_free(transfer_priv->hid_buffer);
-	} else {
-		// No hid_buffer => transfer was sync and our size is good
-		corrected_size = io_size;
 	}
 	itransfer->transferred += corrected_size;
 	return r;

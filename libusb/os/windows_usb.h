@@ -215,9 +215,7 @@ struct hid_device_priv {
 	uint16_t vid;
 	uint16_t pid;
 	uint8_t config;
-	uint8_t input_report_id;
-	uint8_t output_report_id;
-	uint8_t feature_report_id;
+	bool uses_report_ids[3];	// input, ouptput, feature
 	uint16_t input_report_size;
 	uint16_t output_report_size;
 	uint16_t feature_report_size;
