@@ -31,6 +31,12 @@
 
 #include <libusb/libusb.h>
 
+#if defined(_MSC_VER)
+// The libusb library has a dependency on the setupapi and ole32 libs
+#pragma comment( lib, "setupapi.lib" )
+#pragma comment( lib, "ole32.lib" )
+#endif
+
 #ifdef OS_WINDOWS
 #define msleep(msecs) Sleep(msecs)
 #else
