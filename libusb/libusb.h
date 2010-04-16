@@ -907,7 +907,7 @@ static inline struct libusb_control_setup* LIBUSB_API libusb_control_transfer_ge
  * \ref libusb_control_setup::wLength "wLength" field of
  * \ref libusb_control_setup
  */
-static inline void LIBUSB_API libusb_fill_control_setup(unsigned char *buffer,
+static inline void libusb_fill_control_setup(unsigned char *buffer,
 	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	uint16_t wLength)
 {
@@ -951,7 +951,7 @@ void LIBUSB_API libusb_free_transfer(struct libusb_transfer *transfer);
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
-static inline void LIBUSB_API libusb_fill_control_transfer(
+static inline void libusb_fill_control_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char *buffer, libusb_transfer_cb_fn callback, void *user_data,
 	unsigned int timeout)
@@ -982,7 +982,7 @@ static inline void LIBUSB_API libusb_fill_control_transfer(
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
-static inline void LIBUSB_API libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
+static inline void libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
 	libusb_device_handle *dev_handle, unsigned char endpoint,
 	unsigned char *buffer, int length, libusb_transfer_cb_fn callback,
 	void *user_data, unsigned int timeout)
@@ -1010,7 +1010,7 @@ static inline void LIBUSB_API libusb_fill_bulk_transfer(struct libusb_transfer *
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
-static inline void LIBUSB_API libusb_fill_interrupt_transfer(
+static inline void libusb_fill_interrupt_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *buffer, int length,
 	libusb_transfer_cb_fn callback, void *user_data, unsigned int timeout)
@@ -1039,7 +1039,7 @@ static inline void LIBUSB_API libusb_fill_interrupt_transfer(
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
-static inline void LIBUSB_API libusb_fill_iso_transfer(struct libusb_transfer *transfer,
+static inline void libusb_fill_iso_transfer(struct libusb_transfer *transfer,
 	libusb_device_handle *dev_handle, unsigned char endpoint,
 	unsigned char *buffer, int length, int num_iso_packets,
 	libusb_transfer_cb_fn callback, void *user_data, unsigned int timeout)
@@ -1063,7 +1063,7 @@ static inline void LIBUSB_API libusb_fill_iso_transfer(struct libusb_transfer *t
  * \param length the length to set in each isochronous packet descriptor
  * \see libusb_get_max_packet_size()
  */
-static inline void LIBUSB_API libusb_set_iso_packet_lengths(
+static inline void libusb_set_iso_packet_lengths(
 	struct libusb_transfer *transfer, unsigned int length)
 {
 	int i;
@@ -1087,7 +1087,7 @@ static inline void LIBUSB_API libusb_set_iso_packet_lengths(
  * or NULL if the packet does not exist.
  * \see libusb_get_iso_packet_buffer_simple()
  */
-static inline unsigned char* LIBUSB_API libusb_get_iso_packet_buffer(
+static inline unsigned char *libusb_get_iso_packet_buffer(
 	struct libusb_transfer *transfer, unsigned int packet)
 {
 	int i;
@@ -1129,7 +1129,7 @@ static inline unsigned char* LIBUSB_API libusb_get_iso_packet_buffer(
  * or NULL if the packet does not exist.
  * \see libusb_get_iso_packet_buffer()
  */
-static inline unsigned char* LIBUSB_API libusb_get_iso_packet_buffer_simple(
+static inline unsigned char *libusb_get_iso_packet_buffer_simple(
 	struct libusb_transfer *transfer, unsigned int packet)
 {
 	int _packet;
@@ -1173,7 +1173,7 @@ int LIBUSB_API libusb_interrupt_transfer(libusb_device_handle *dev_handle,
  * \param length size of data buffer
  * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
  */
-static inline int LIBUSB_API libusb_get_descriptor(libusb_device_handle *dev,
+static inline int libusb_get_descriptor(libusb_device_handle *dev,
 	uint8_t desc_type, uint8_t desc_index, unsigned char *data, int length)
 {
 	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
@@ -1195,7 +1195,7 @@ static inline int LIBUSB_API libusb_get_descriptor(libusb_device_handle *dev,
  * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
  * \see libusb_get_string_descriptor_ascii()
  */
-static inline int LIBUSB_API libusb_get_string_descriptor(libusb_device_handle *dev,
+static inline int libusb_get_string_descriptor(libusb_device_handle *dev,
 	uint8_t desc_index, uint16_t langid, unsigned char *data, int length)
 {
 	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
