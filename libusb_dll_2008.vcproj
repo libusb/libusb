@@ -62,7 +62,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib"
+				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
@@ -135,7 +135,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib"
+				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
@@ -208,7 +208,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib"
+				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
@@ -281,7 +281,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib"
+				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
