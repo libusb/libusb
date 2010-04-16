@@ -1702,11 +1702,13 @@ static int windows_kernel_driver_active(struct libusb_device_handle *dev_handle,
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int windows_attach_kernel_driver(struct libusb_device_handle *dev_handle, int iface) {
+static int windows_attach_kernel_driver(struct libusb_device_handle *dev_handle, int iface)
+{
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int windows_detach_kernel_driver(struct libusb_device_handle *dev_handle, int iface) {
+static int windows_detach_kernel_driver(struct libusb_device_handle *dev_handle, int iface)
+{
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
