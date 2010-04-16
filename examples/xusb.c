@@ -32,9 +32,11 @@
 #include <libusb/libusb.h>
 
 #if defined(_MSC_VER)
-// The libusb library has a dependency on the setupapi and ole32 libs
+// On Windows, the libusb library has a dependency on the libraries below.
+// for MinGW/cygwin, make sure you link with -lsetupapi -lole32 -ladvapi32
 #pragma comment( lib, "setupapi.lib" )
 #pragma comment( lib, "ole32.lib" )
+#pragma comment( lib, "advapi32.lib" )
 #endif
 
 #ifdef OS_WINDOWS
