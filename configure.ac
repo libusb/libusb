@@ -42,7 +42,7 @@ case $host in
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	threads="windows"
-	LIBS="-lsetupapi -lole32"
+	LIBS="-lsetupapi -lole32 -ladvapi32"
 	AM_CFLAGS="-Wshadow"
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
@@ -54,7 +54,7 @@ case $host in
 	backend="windows"
 	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 	threads="posix"
-	LIBS="-lpthread -lsetupapi -lole32"
+	LIBS="-lpthread -lsetupapi -lole32 -ladvapi32"
 	AM_CFLAGS=""
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
