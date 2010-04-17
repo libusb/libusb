@@ -1368,6 +1368,7 @@ API_EXPORTED int LIBUSB_API libusb_reset_device(libusb_device_handle *dev)
  * \returns 0 if no kernel driver is active
  * \returns 1 if a kernel driver is active
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED on Windows
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_detach_kernel_driver()
  */
@@ -1383,7 +1384,8 @@ API_EXPORTED int LIBUSB_API libusb_kernel_driver_active(libusb_device_handle *de
 
 /** \ingroup dev
  * Detach a kernel driver from an interface. If successful, you will then be
- * able to claim the interface and perform I/O.
+ * able to claim the interface and perform I/O. This call is only effective
+ * on Linux and returns LIBUSB_ERROR_NOT_SUPPORTED on all other platforms.
  *
  * \param dev a device handle
  * \param interface_number the interface to detach the driver from
@@ -1391,6 +1393,7 @@ API_EXPORTED int LIBUSB_API libusb_kernel_driver_active(libusb_device_handle *de
  * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
  * \returns LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED on non Linux platforms
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_kernel_driver_active()
  */
@@ -1406,7 +1409,8 @@ API_EXPORTED int LIBUSB_API libusb_detach_kernel_driver(libusb_device_handle *de
 
 /** \ingroup dev
  * Re-attach an interface's kernel driver, which was previously detached
- * using libusb_detach_kernel_driver().
+ * using libusb_detach_kernel_driver(). This call is only effective on
+ * Linux and returns LIBUSB_ERROR_NOT_SUPPORTED on all other platforms.
  *
  * \param dev a device handle
  * \param interface_number the interface to attach the driver from
@@ -1414,6 +1418,7 @@ API_EXPORTED int LIBUSB_API libusb_detach_kernel_driver(libusb_device_handle *de
  * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
  * \returns LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED on non Linux platforms
  * \returns LIBUSB_ERROR_BUSY if the driver cannot be attached because the
  * interface is claimed by a program or driver
  * \returns another LIBUSB_ERROR code on other failure
