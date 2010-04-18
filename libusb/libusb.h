@@ -861,7 +861,7 @@ int LIBUSB_API libusb_attach_kernel_driver(libusb_device_handle *dev, int interf
  * \param transfer a transfer
  * \returns pointer to the first byte of the data section
  */
-static inline unsigned char* LIBUSB_API libusb_control_transfer_get_data(
+static inline unsigned char *libusb_control_transfer_get_data(
 	struct libusb_transfer *transfer)
 {
 	return transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
@@ -879,7 +879,7 @@ static inline unsigned char* LIBUSB_API libusb_control_transfer_get_data(
  * \param transfer a transfer
  * \returns a casted pointer to the start of the transfer data buffer
  */
-static inline struct libusb_control_setup* LIBUSB_API libusb_control_transfer_get_setup(
+static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
 	struct libusb_transfer *transfer)
 {
 	return (struct libusb_control_setup *) transfer->buffer;
