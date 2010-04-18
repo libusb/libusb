@@ -149,7 +149,7 @@ static int set_mode(unsigned char data)
 	return 0;
 }
 
-static void cb_mode_changed(struct libusb_transfer *transfer)
+static void LIBUSB_API cb_mode_changed(struct libusb_transfer *transfer)
 {
 	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
 		fprintf(stderr, "mode change transfer not completed!\n");
@@ -169,7 +169,7 @@ static int set_mode_async(unsigned char data)
 
 	if (!buf)
 		return -ENOMEM;
-	
+
 	transfer = libusb_alloc_transfer(0);
 	if (!transfer) {
 		free(buf);
@@ -208,7 +208,7 @@ static int do_sync_intr(unsigned char *data)
 }
 
 static int sync_intr(unsigned char type)
-{	
+{
 	int r;
 	unsigned char data[INTR_LENGTH];
 
@@ -276,7 +276,7 @@ static int next_state(void)
 	return 0;
 }
 
-static void cb_irq(struct libusb_transfer *transfer)
+static void LIBUSB_API cb_irq(struct libusb_transfer *transfer)
 {
 	unsigned char irqtype = transfer->buffer[0];
 
@@ -315,7 +315,7 @@ static void cb_irq(struct libusb_transfer *transfer)
 		do_exit = 2;
 }
 
-static void cb_img(struct libusb_transfer *transfer)
+static void LIBUSB_API cb_img(struct libusb_transfer *transfer)
 {
 	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
 		fprintf(stderr, "img transfer status %d?\n", transfer->status);
@@ -396,7 +396,7 @@ static int alloc_transfers(void)
 	img_transfer = libusb_alloc_transfer(0);
 	if (!img_transfer)
 		return -ENOMEM;
-	
+
 	irq_transfer = libusb_alloc_transfer(0);
 	if (!irq_transfer)
 		return -ENOMEM;
@@ -411,7 +411,7 @@ static int alloc_transfers(void)
 
 static void sighandler(int signum)
 {
-	do_exit = 1;	
+	do_exit = 1;
 }
 
 int main(void)
@@ -477,7 +477,7 @@ int main(void)
 	}
 
 	printf("shutting down...\n");
-	
+
 	if (irq_transfer) {
 		r = libusb_cancel_transfer(irq_transfer);
 		if (r < 0)
@@ -489,11 +489,11 @@ int main(void)
 		if (r < 0)
 			goto out_deinit;
 	}
-	
+
 	while (irq_transfer || img_transfer)
 		if (libusb_handle_events(NULL) < 0)
 			break;
-	
+
 	if (do_exit == 1)
 		r = 0;
 	else
