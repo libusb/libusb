@@ -1,10 +1,6 @@
 This file lists notable changes in each release. For the full history of all
 changes, see ChangeLog.
 
-2010-04-XX: v1.0.7
-* Bug fixes
-* Windows backend
-
 2009-11-22: v1.0.6
 * Bug fixes
 * Increase libusb_handle_events() timeout to 60s for powersaving
