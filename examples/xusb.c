@@ -736,11 +736,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	return 0;
 }
 
-int
-#ifdef _MSC_VER
-__cdecl
-#endif
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
 	bool show_help = false;
 	bool got_vidpid = false;
