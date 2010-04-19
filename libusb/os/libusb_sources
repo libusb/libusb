@@ -1,5 +1,7 @@
 #TARGETTYPE is not defined, to allow selection between static lib or DLL with ddk_build
 TARGETNAME=libusb-1.0
+#Must be set, else DLL build will look for libusb-1.0.def
+DLLDEF=
 
 !IFNDEF MSC_WARNING_LEVEL
 MSC_WARNING_LEVEL=/W3
@@ -8,8 +10,7 @@ MSC_WARNING_LEVEL=/W3
 USE_MSVCRT=1
 
 INCLUDES=..;..\..;..\..\msvc;$(DDK_INC_PATH)
-C_DEFINES = $(C_DEFINES) /DDDKBUILD
-#### NEED to conditionally (on DLL vs static) #define /DLIBUSB_DLL_BUILD
+C_DEFINES = $(C_DEFINES) $(LIBUSB_DEFINES) /DDDKBUILD
 
 TARGETLIBS=$(SDK_LIB_PATH)\kernel32.lib \
            $(SDK_LIB_PATH)\advapi32.lib \
@@ -24,4 +25,3 @@ SOURCES=..\core.c \
 	poll_windows.c \
 	windows_usb.c \
 	libusb-1.0.rc
-
