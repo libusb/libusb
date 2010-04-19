@@ -353,26 +353,40 @@ err_exit:
 /*
  * Populate the endpoints addresses of the device_priv interface helper structs
  */
-static void windows_assign_endpoints(struct libusb_device *dev, int iface, int altsetting)
+static int windows_assign_endpoints(struct libusb_device *dev, int iface, int altsetting)
 {
-	int i;
+	int i, r;
 	struct windows_device_priv *priv = __device_priv(dev);
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_interface_descriptor *if_desc;
 
-	if (libusb_get_config_descriptor(dev, 0, &conf_desc) == LIBUSB_SUCCESS) {
-		if_desc = &conf_desc->interface[iface].altsetting[altsetting];
-		safe_free(priv->usb_interface[iface].endpoint);
-		priv->usb_interface[iface].endpoint = malloc(if_desc->bNumEndpoints);
-		if (priv->usb_interface[iface].endpoint != NULL) {
-			priv->usb_interface[iface].nb_endpoints = if_desc->bNumEndpoints;
-			for (i=0; i<if_desc->bNumEndpoints; i++) {
-				priv->usb_interface[iface].endpoint[i] = if_desc->endpoint[i].bEndpointAddress;
-				usbi_dbg("(re)assigned endpoint %02X to interface %d", priv->usb_interface[iface].endpoint[i], iface);
-			}
-		}
-		libusb_free_config_descriptor(conf_desc);
+	r = libusb_get_config_descriptor(dev, 0, &conf_desc);
+	if (r != LIBUSB_SUCCESS) {
+		usbi_warn(NULL, "could not read config descriptor: error %d", r);
+		return r;
 	}
+
+	if_desc = &conf_desc->interface[iface].altsetting[altsetting];
+	safe_free(priv->usb_interface[iface].endpoint);
+
+	if (if_desc->bNumEndpoints == 0) {
+		usbi_dbg("no endpoints found for interface %d", iface);
+		return LIBUSB_SUCCESS;
+	}
+
+	priv->usb_interface[iface].endpoint = malloc(if_desc->bNumEndpoints);
+	if (priv->usb_interface[iface].endpoint == NULL) {
+		return LIBUSB_ERROR_NO_MEM;
+	}
+
+	priv->usb_interface[iface].nb_endpoints = if_desc->bNumEndpoints;
+	for (i=0; i<if_desc->bNumEndpoints; i++) {
+		priv->usb_interface[iface].endpoint[i] = if_desc->endpoint[i].bEndpointAddress;
+		usbi_dbg("(re)assigned endpoint %02X to interface %d", priv->usb_interface[iface].endpoint[i], iface);
+	}
+	libusb_free_config_descriptor(conf_desc);
+
+	return LIBUSB_SUCCESS;
 }
 
 // Lookup for a match in the list of API driver names
@@ -1653,7 +1667,7 @@ static int windows_claim_interface(struct libusb_device_handle *dev_handle, int 
 	r = priv->apib->claim_interface(dev_handle, iface);
 
 	if (r == LIBUSB_SUCCESS) {
-		windows_assign_endpoints(dev_handle->dev, iface, 0);
+		r = windows_assign_endpoints(dev_handle->dev, iface, 0);
 	}
 
 	return r;
@@ -1670,7 +1684,7 @@ static int windows_set_interface_altsetting(struct libusb_device_handle *dev_han
 	r = priv->apib->set_interface_altsetting(dev_handle, iface, altsetting);
 
 	if (r == LIBUSB_SUCCESS) {
-		windows_assign_endpoints(dev_handle->dev, iface, altsetting);
+		r = windows_assign_endpoints(dev_handle->dev, iface, altsetting);
 	}
 
 	return r;
