@@ -1,4 +1,4 @@
-AC_INIT([libusb], [1.0.6])
+AC_INIT([libusb], [1.0.7])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([libusb/core.c])
 AC_CONFIG_MACRO_DIR([m4])
