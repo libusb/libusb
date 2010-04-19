@@ -19,7 +19,8 @@ If you are using the freely available Windows DDK/WDK (Driver Development Kit)
   in config.h
 - Open one of the relevant Free Build or Checked Build prompt for your target
   platform
-- Navigate to the directory where the source is located and run 'ddk_build'
+- Navigate to the root directory of the distribution, where the ddk_build.cmd
+  file is located, and run 'ddk_build'
 - To produce a DLL rather than a static library, use: 'ddk_build DLL'
 
 Note that using the Windows DDK, it is possible to compile both the 32 and 64
