@@ -1,8 +1,6 @@
 #TARGETTYPE is not defined, to allow selection between static lib or DLL with ddk_build
 TARGETNAME=libusb-1.0
 
-DLLDEF=..\libusb-1.0.def
-
 !IFNDEF MSC_WARNING_LEVEL
 MSC_WARNING_LEVEL=/W3
 !ENDIF
@@ -11,6 +9,7 @@ USE_MSVCRT=1
 
 INCLUDES=..;..\..;..\..\msvc;$(DDK_INC_PATH)
 C_DEFINES = $(C_DEFINES) /DDDKBUILD
+#### NEED to conditionally (on DLL vs static) #define /DLIBUSB_DLL_BUILD
 
 TARGETLIBS=$(SDK_LIB_PATH)\kernel32.lib \
            $(SDK_LIB_PATH)\advapi32.lib \

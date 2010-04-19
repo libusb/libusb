@@ -44,7 +44,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
-				PreprocessorDefinitions="_WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;LIBUSB_DLL_BUILD"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -64,7 +64,6 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
-				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
 				GenerateDebugInformation="true"
 			/>
@@ -117,7 +116,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
-				PreprocessorDefinitions="_WIN32;_WIN64;_DEBUG;_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_WIN32;_WIN64;_DEBUG;_CRT_SECURE_NO_WARNINGS;LIBUSB_DLL_BUILD"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -137,7 +136,6 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
-				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
 				GenerateDebugInformation="true"
 			/>
@@ -191,7 +189,7 @@
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
-				PreprocessorDefinitions="_WIN32;_LIB;_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_WIN32;_LIB;_CRT_SECURE_NO_WARNINGS;LIBUSB_DLL_BUILD"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -210,7 +208,6 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
-				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
 			/>
 			<Tool
@@ -264,7 +261,7 @@
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
-				PreprocessorDefinitions="_WIN32;_WIN64;_LIB;_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_WIN32;_WIN64;_LIB;_CRT_SECURE_NO_WARNINGS;LIBUSB_DLL_BUILD"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
@@ -283,7 +280,6 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
-				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
 			/>
 			<Tool
@@ -379,10 +375,6 @@
 		<Filter
 			Name="Resource Files"
 			>
-			<File
-				RelativePath=".\libusb\libusb-1.0.def"
-				>
-			</File>
 			<File
 				RelativePath=".\libusb\libusb-1.0.rc"
 				>
