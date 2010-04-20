@@ -105,6 +105,8 @@ else
 	fi
 fi
 
+AC_CHECK_TYPES(struct timespec)
+
 # Message logging
 AC_ARG_ENABLE([log], [AS_HELP_STRING([--disable-log], [disable all logging])],
 	[log_enabled=$enableval],
