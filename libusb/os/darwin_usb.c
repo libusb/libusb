@@ -547,6 +547,9 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
   if (need_unref)
     libusb_unref_device(dev);
 
+  if (need_unref)
+    libusb_unref_device(dev);
+
   return 0;
 }
 

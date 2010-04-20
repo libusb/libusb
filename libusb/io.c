@@ -598,6 +598,13 @@ while (user_has_not_requested_exit)
  * these moments occur. This means that you need to adjust your
  * poll()/select() timeout accordingly.
  *
+ * libusb provides you with a set of file descriptors to poll and expects you
+ * to poll all of them, treating them as a single entity. The meaning of each
+ * file descriptor in the set is an internal implementation detail,
+ * platform-dependent and may vary from release to release. Don't try and
+ * interpret the meaning of the file descriptors, just do as libusb indicates,
+ * polling all of them at once.
+ *
  * In pseudo-code, you want something that looks like:
 \code
 // initialise libusb
