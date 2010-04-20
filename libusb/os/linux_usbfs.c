@@ -646,7 +646,8 @@ static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 		if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(DEVICE_CTX(dev),
+		/* we hit this error path frequently with buggy devices :( */
+		usbi_warn(DEVICE_CTX(dev),
 			"get_configuration failed ret=%d errno=%d", r, errno);
 		return LIBUSB_ERROR_IO;
 	}
@@ -716,7 +717,13 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 				"determine active configuration descriptor", path);
 		} else {
 			active_config = usbfs_get_active_config(dev, fd);
-			if (active_config < 0) {
+			if (active_config == LIBUSB_ERROR_IO) {
+				/* buggy devices sometimes fail to report their active config.
+				 * assume unconfigured and continue the probing */
+				usbi_warn(DEVICE_CTX(dev), "couldn't query active "
+					"configuration, assumung unconfigured");
+				device_configured = 0;
+			} else if (active_config < 0) {
 				close(fd);
 				return active_config;
 			} else if (active_config == 0) {
@@ -725,7 +732,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 				 * not support buggy devices in these circumstances.
 				 * stick to the specs: a configuration value of 0 means
 				 * unconfigured. */
-				usbi_dbg("assuming unconfigured device");
+				usbi_dbg("active cfg 0? assuming unconfigured device");
 				device_configured = 0;
 			}
 		}
