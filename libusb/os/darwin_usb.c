@@ -442,15 +442,21 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
   UInt16                address, idVendor, idProduct;
   UInt8                 bDeviceClass, bDeviceSubClass;
   IOUSBDevRequest      req;
-  int ret, need_unref = 0;
+  int ret = 0, need_unref = 0;
 
-  dev = usbi_get_device_by_session_id(ctx, locationID);
-  if (!dev) {
-    usbi_info (ctx, "allocating new device for location 0x%08x", locationID);
-    dev = usbi_alloc_device(ctx, locationID);
-    need_unref = 1;
-    if (!dev)
-      return LIBUSB_ERROR_NO_MEM;
+  do {
+    dev = usbi_get_device_by_session_id(ctx, locationID);
+    if (!dev) {
+      usbi_info (ctx, "allocating new device for location 0x%08x", locationID);
+      dev = usbi_alloc_device(ctx, locationID);
+      need_unref = 1;
+    } else
+      usbi_info (ctx, "using existing device for location 0x%08x", locationID);
+
+    if (!dev) {
+      ret = LIBUSB_ERROR_NO_MEM;
+      break;
+    }
 
     priv = (struct darwin_device_priv *)dev->os_priv;
 
@@ -500,10 +506,10 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
 
     if (ret != kIOReturnSuccess) {
       usbi_warn (ctx, "could not retrieve device descriptor: %s. skipping device", darwin_error_str (ret));
-      if (need_unref)
-	libusb_unref_device(dev);
-      return -1;
+      ret = -1;
+      break;
     }
+
     /**** end: retrieve device descriptors ****/
 
     /* catch buggy hubs (which appear to be virtual). Apple's own USB prober has problems with these devices. */
@@ -511,8 +517,8 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
       /* not a valid device */
       usbi_warn (ctx, "idProduct from iokit (%04x) does not match idProduct in descriptor (%04x). skipping device",
 		 idProduct, libusb_le16_to_cpu (priv->dev_descriptor.idProduct));
-      libusb_unref_device(dev);
-      return -1;
+      ret = -1;
+      break;
     }
 
     dev->bus_number     = locationID >> 24;
@@ -522,32 +528,26 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     priv->location = locationID;
     snprintf(priv->sys_path, 20, "%03i-%04x-%04x-%02x-%02x", address, idVendor, idProduct, bDeviceClass, bDeviceSubClass);
 
-    ret = usbi_sanitize_device(dev);
+    ret = usbi_sanitize_device (dev);
+    if (ret < 0)
+      break;
 
-    if (ret < 0) {
-      if (need_unref)
-	libusb_unref_device(dev);
-      return -1;
+    /* append the device to the list of discovered devices */
+    discdevs = discovered_devs_append(*_discdevs, dev);
+    if (!discdevs) {
+      ret = LIBUSB_ERROR_NO_MEM;
+      break;
     }
-  } else {
-    priv = (struct darwin_device_priv *)dev->os_priv;
 
-    usbi_info (ctx, "using existing device for location 0x%08x", locationID);
-  }
+    *_discdevs = discdevs;
 
-  /* append the device to the list of discovered devices */
-  discdevs = discovered_devs_append(*_discdevs, dev);
-  if (!discdevs)
-    return LIBUSB_ERROR_NO_MEM;
-
-  *_discdevs = discdevs;
-
-  usbi_info (ctx, "found device with address %d at %s", dev->device_address, priv->sys_path);
+    usbi_info (ctx, "found device with address %d at %s", dev->device_address, priv->sys_path);
+  } while (0);
 
   if (need_unref)
     libusb_unref_device(dev);
 
-  return 0;
+  return ret;
 }
 
 static int darwin_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs) {
