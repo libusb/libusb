@@ -21,6 +21,8 @@ AC_C_INLINE
 AM_PROG_CC_C_O
 AC_DEFINE([_GNU_SOURCE], [], [Use GNU extensions])
 
+AM_MAINTAINER_MODE
+
 AC_MSG_CHECKING([operating system])
 case $host in
 *-linux*)
