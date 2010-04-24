@@ -27,7 +27,7 @@
 
 
 int usbi_mutex_init(usbi_mutex_t *mutex,
-                    const usbi_mutexattr_t *attr) {
+					const usbi_mutexattr_t *attr) {
 	if(! mutex) return ((errno=EINVAL));
 	*mutex = CreateMutex(NULL, FALSE, NULL);
 	if(!*mutex) return ((errno=ENOMEM));
@@ -49,7 +49,7 @@ int usbi_mutex_trylock(usbi_mutex_t *mutex) {
 	if(result == WAIT_TIMEOUT)
 		return ((errno=EBUSY));
 	return ((errno=EINVAL)); // don't know how this would happen
-	                         //   so don't know proper errno
+							 //   so don't know proper errno
 }
 int usbi_mutex_lock(usbi_mutex_t *mutex) {
 	DWORD result;
@@ -58,7 +58,7 @@ int usbi_mutex_lock(usbi_mutex_t *mutex) {
 	if(result == WAIT_OBJECT_0 || result == WAIT_ABANDONED)
 		return 0; // acquired (ToDo: check that abandoned is ok)
 	return ((errno=EINVAL)); // don't know how this would happen
-	                         //   so don't know proper errno
+							 //   so don't know proper errno
 }
 int usbi_mutex_unlock(usbi_mutex_t *mutex) {
 	if(!mutex)                return ((errno=EINVAL));
@@ -82,7 +82,7 @@ int usbi_mutex_static_unlock(usbi_mutex_static_t *mutex) {
 
 
 int usbi_cond_init(usbi_cond_t *cond,
-                   const usbi_condattr_t *attr) {
+				   const usbi_condattr_t *attr) {
 	if(!cond)           return ((errno=EINVAL));
 	list_init(&cond->waiters    );
 	list_init(&cond->not_waiting);
@@ -175,8 +175,8 @@ int usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex) {
 	return usbi_cond_intwait(cond, mutex, INFINITE);
 }
 int usbi_cond_timedwait(usbi_cond_t *cond,
-                        usbi_mutex_t *mutex,
-                        const struct timespec *abstime) {
+						usbi_mutex_t *mutex,
+						const struct timespec *abstime) {
 	FILETIME filetime;
 	ULARGE_INTEGER rtime;
 	struct timeval targ_time, cur_time, delta_time;

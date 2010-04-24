@@ -45,8 +45,8 @@ typedef struct usbi_cond_t_ usbi_cond_t;
 #define HAVE_STRUCT_TIMESPEC 1
 #define _TIMESPEC_DEFINED 1
 struct timespec {
-        long tv_sec;
-        long tv_nsec;
+		long tv_sec;
+		long tv_nsec;
 };
 #endif /* HAVE_STRUCT_TIMESPEC | _TIMESPEC_DEFINED */
 
@@ -64,19 +64,19 @@ int usbi_mutex_static_unlock(usbi_mutex_static_t *mutex);
 
 
 int usbi_mutex_init(usbi_mutex_t *mutex,
-                    const usbi_mutexattr_t *attr);
+					const usbi_mutexattr_t *attr);
 int usbi_mutex_lock(usbi_mutex_t *mutex);
 int usbi_mutex_unlock(usbi_mutex_t *mutex);
 int usbi_mutex_trylock(usbi_mutex_t *mutex);
 int usbi_mutex_destroy(usbi_mutex_t *mutex);
 
 int usbi_cond_init(usbi_cond_t *cond,
-                   const usbi_condattr_t *attr);
+				   const usbi_condattr_t *attr);
 int usbi_cond_destroy(usbi_cond_t *cond);
 int usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex);
 int usbi_cond_timedwait(usbi_cond_t *cond,
-                        usbi_mutex_t *mutex,
-                        const struct timespec *abstime);
+						usbi_mutex_t *mutex,
+						const struct timespec *abstime);
 int usbi_cond_broadcast(usbi_cond_t *cond);
 int usbi_cond_signal(usbi_cond_t *cond);
 

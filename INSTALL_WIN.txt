@@ -45,7 +45,7 @@ If needed, these libraries can be obtained by installing either the latest
 Windows SDK or the DDK (Links provided at the end of this file).
 
 The 64 bit version of the library has been tested at least as much as the 32 bit
-version during development. Same goes for Windows 7 vs Vista/XP. 
+version during development. Same goes for Windows 7 vs Vista/XP.
 Therefore we do not expect specific issues related to using these targets with
 libusb.
 

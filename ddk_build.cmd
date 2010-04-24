@@ -15,7 +15,7 @@ set LIBDEF=
 goto libusb_common
 :libusb_dll
 set TARGET=DYNLINK
-set LIBDEF=/DLIBUSB_DLL_BUILD 
+set LIBDEF=/DLIBUSB_DLL_BUILD
 :libusb_common
 echo TARGETTYPE=%TARGET% > target
 echo LIBUSB_DEFINES=%LIBDEF% >> target

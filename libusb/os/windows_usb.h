@@ -724,20 +724,20 @@ typedef struct _HIDP_VALUE_CAPS {
   ULONG  Units;
   LONG  LogicalMin, LogicalMax;
   LONG  PhysicalMin, PhysicalMax;
-    union {
-      struct {
-        USAGE  UsageMin, UsageMax;
-        USHORT  StringMin, StringMax;
-        USHORT  DesignatorMin, DesignatorMax;
-        USHORT  DataIndexMin, DataIndexMax;
-      } Range;
-      struct {
-        USAGE  Usage, Reserved1;
-        USHORT  StringIndex, Reserved2;
-        USHORT  DesignatorIndex, Reserved3;
-        USHORT  DataIndex, Reserved4;
-      } NotRange;
-    };
+	union {
+	  struct {
+		USAGE  UsageMin, UsageMax;
+		USHORT  StringMin, StringMax;
+		USHORT  DesignatorMin, DesignatorMax;
+		USHORT  DataIndexMin, DataIndexMax;
+	  } Range;
+	  struct {
+		USAGE  Usage, Reserved1;
+		USHORT  StringIndex, Reserved2;
+		USHORT  DesignatorIndex, Reserved3;
+		USHORT  DataIndex, Reserved4;
+	  } NotRange;
+	};
 } HIDP_VALUE_CAPS, *PHIDP_VALUE_CAPS;
 
 DLL_DECLARE(WINAPI, BOOL, HidD_GetAttributes, (HANDLE, PHIDD_ATTRIBUTES));

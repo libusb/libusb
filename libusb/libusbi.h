@@ -54,15 +54,15 @@ struct list_head {
  *	type - the type of the first parameter
  */
 #define list_for_each_entry(pos, head, member, type)			\
-	for (pos = list_entry((head)->next, type, member);		\
-	     &pos->member != (head);					\
-	     pos = list_entry(pos->member.next, type, member))
+	for (pos = list_entry((head)->next, type, member);			\
+		 &pos->member != (head);								\
+		 pos = list_entry(pos->member.next, type, member))
 
-#define list_for_each_entry_safe(pos, n, head, member, type)		\
-        for (pos = list_entry((head)->next, type, member),		\
-		n = list_entry(pos->member.next, type, member);		\
-	     &pos->member != (head);					\
-	     pos = n, n = list_entry(n->member.next, type, member))
+#define list_for_each_entry_safe(pos, n, head, member, type)	\
+	for (pos = list_entry((head)->next, type, member),			\
+		 n = list_entry(pos->member.next, type, member);		\
+		 &pos->member != (head);								\
+		 pos = n, n = list_entry(n->member.next, type, member))
 
 #define list_empty(entry) ((entry)->next == (entry))
 

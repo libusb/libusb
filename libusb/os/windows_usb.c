@@ -547,7 +547,7 @@ init_exit: // Holds semaphore here.
 			if (WAIT_OBJECT_0 != WaitForSingleObject(timer_thread, INFINITE)) {
 				usbi_warn(ctx, "could not wait for timer thread to quit");
 				TerminateThread(timer_thread, 1); // shouldn't happen, but we're destroying
-				                                  // all objects it might have held anyway.
+												  // all objects it might have held anyway.
 			}
 			CloseHandle(timer_thread);
 			timer_thread = NULL;
@@ -2927,7 +2927,7 @@ static int _hid_get_config_descriptor(struct hid_device_priv* dev, void *data, s
 }
 
 static int _hid_get_string_descriptor(struct hid_device_priv* dev, int index,
-                                      void *data, size_t *size)
+									  void *data, size_t *size)
 {
 	void *tmp = NULL;
 	size_t tmp_size = 0;
@@ -3066,7 +3066,7 @@ static int _hid_get_report_descriptor(struct hid_device_priv* dev, void *data, s
 }
 
 static int _hid_get_descriptor(struct hid_device_priv* dev, HANDLE hid_handle, int recipient,
-                               int type, int index, void *data, size_t *size)
+							   int type, int index, void *data, size_t *size)
 {
 	switch(type) {
 	case LIBUSB_DT_DEVICE:
@@ -3348,7 +3348,7 @@ static int _hid_set_feature(struct hid_device_priv* dev, HANDLE hid_handle, int 
 }
 
 static int _hid_class_request(struct hid_device_priv* dev, HANDLE hid_handle, int request_type,
-                              int request, int value, int index, void *data, struct windows_transfer_priv *tp,
+							  int request, int value, int index, void *data, struct windows_transfer_priv *tp,
 							  size_t *size, OVERLAPPED* overlapped)
 {
 	int report_type = (value >> 8) & 0xFF;

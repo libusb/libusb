@@ -98,8 +98,8 @@ struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);
 #if defined(DDKBUILD)
 #if !defined(timeval)
 struct timeval {
-        long    tv_sec;         /* seconds */
-        long    tv_usec;        /* and microseconds */
+		long    tv_sec;         /* seconds */
+		long    tv_usec;        /* and microseconds */
 };
 #endif
 
@@ -109,8 +109,8 @@ struct timeval {
 
 #if !defined(timercmp)
 #define timercmp(tvp, uvp, cmp) \
-        ((tvp)->tv_sec cmp (uvp)->tv_sec || \
-         (tvp)->tv_sec == (uvp)->tv_sec && (tvp)->tv_usec cmp (uvp)->tv_usec)
+		((tvp)->tv_sec cmp (uvp)->tv_sec || \
+		 (tvp)->tv_sec == (uvp)->tv_sec && (tvp)->tv_usec cmp (uvp)->tv_usec)
 #endif
 
 #if !defined(timerclr)
