@@ -54,8 +54,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,6,0
- PRODUCTVERSION 1,0,6,0
+ FILEVERSION 1,0,7,0
+ PRODUCTVERSION 1,0,7,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -73,14 +73,14 @@ BEGIN
 			VALUE "Comments", "\0"
 			VALUE "CompanyName", "libusb.org\0"
 			VALUE "FileDescription", "libusb-1\0"
-			VALUE "FileVersion", "1.0.6"
+			VALUE "FileVersion", "1.0.7"
 			VALUE "InternalName", "libusb\0"
 			VALUE "LegalCopyright", "See individual source files, GNU LGPL v2.1 or later.\0"
 			VALUE "LegalTrademarks", "http://www.gnu.org/licenses/lgpl-2.1.html\0"
 			VALUE "OriginalFilename", VER_ORIGINALFILENAME_STR
 			VALUE "PrivateBuild", "\0"
 			VALUE "ProductName", "libusb-1\0"
-			VALUE "ProductVersion", "1.0.6"
+			VALUE "ProductVersion", "1.0.7"
 			VALUE "SpecialBuild", "\0"
 		END
 	END
