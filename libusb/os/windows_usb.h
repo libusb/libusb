@@ -235,6 +235,8 @@ struct windows_device_priv {
 		struct windows_usb_api_backend const *apib; // an API backend (multiple drivers support),
 		int8_t nb_endpoints;            // and a set of endpoint addresses (USB_MAXENDPOINTS)
 		uint8_t *endpoint;
+		bool restricted_functionality;	// indicates if the interface functionality is restricted
+										// by Windows (eg. HID keyboards or mice cannot do R/W)
 	} usb_interface[USB_MAXINTERFACES];
 	uint8_t composite_api_flags;        // HID and composite devices require additional data
 	struct hid_device_priv *hid;
@@ -259,6 +261,7 @@ static inline void windows_device_priv_init(struct windows_device_priv* p) {
 		p->usb_interface[i].apib = &usb_api_backend[USB_API_UNSUPPORTED];
 		p->usb_interface[i].nb_endpoints = 0;
 		p->usb_interface[i].endpoint = NULL;
+		p->usb_interface[i].restricted_functionality = false;
 	}
 }
 

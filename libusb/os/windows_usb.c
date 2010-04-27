@@ -2489,18 +2489,25 @@ static int winusb_release_interface(struct libusb_device_handle *dev_handle, int
 }
 
 /*
- * Return the first valid WinUSB handle, for control transfers
+ * Return the first valid interface (of the same API type), for control transfers
  */
-static int get_valid_interface(struct libusb_device_handle *dev_handle)
+static int get_valid_interface(struct libusb_device_handle *dev_handle, int api_id)
 {
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)dev_handle->os_priv;
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	int i;
+
+	if ((api_id < USB_API_WINUSB) || (api_id > USB_API_HID)) {
+		usbi_dbg("unsupported API ID");
+		return -1;
+	}
 
 	for (i=0; i<USB_MAXINTERFACES; i++) {
 		if ( (handle_priv->interface_handle[i].dev_handle != 0)
 		  && (handle_priv->interface_handle[i].dev_handle != INVALID_HANDLE_VALUE)
 		  && (handle_priv->interface_handle[i].api_handle != 0)
-		  && (handle_priv->interface_handle[i].api_handle != INVALID_HANDLE_VALUE)) {
+		  && (handle_priv->interface_handle[i].api_handle != INVALID_HANDLE_VALUE)
+		  && (priv->usb_interface[i].apib == &usb_api_backend[api_id]) ) {
 			return i;
 		}
 	}
@@ -2536,6 +2543,7 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)transfer->dev_handle->os_priv;
+	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
 	WINUSB_SETUP_PACKET *setup = (WINUSB_SETUP_PACKET *) transfer->buffer;
 	ULONG size;
 	HANDLE winusb_handle;
@@ -2550,12 +2558,14 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	if (size > MAX_CTRL_BUFFER_LENGTH)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	current_interface = get_valid_interface(transfer->dev_handle);
+	current_interface = get_valid_interface(transfer->dev_handle, USB_API_WINUSB);
 	// Attempt to claim an interface if none was found
 	if (current_interface < 0) {
 #if defined(AUTO_CLAIM)
 		for (current_interface=0; current_interface<USB_MAXINTERFACES; current_interface++) {
-			if (libusb_claim_interface(transfer->dev_handle, current_interface) == LIBUSB_SUCCESS) {
+			// Must claim an interface of the same API type
+			if ( (priv->usb_interface[current_interface].apib == &usb_api_backend[USB_API_WINUSB])
+			  && (libusb_claim_interface(transfer->dev_handle, current_interface) == LIBUSB_SUCCESS) ) {
 				usbi_warn(ctx, "auto-claimed interface %d for control request", current_interface);
 				break;
 			}
@@ -2563,12 +2573,9 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	}
 	if (current_interface == USB_MAXINTERFACES) {
 		usbi_err(ctx, "no active interface");
-		return LIBUSB_ERROR_NOT_FOUND;
-	}
-#else
-		return LIBUSB_ERROR_NOT_FOUND;
-	}
 #endif
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
 
 	usbi_dbg("will use interface %d", current_interface);
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
@@ -3467,6 +3474,7 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 						return LIBUSB_ERROR_IO;
 					}
 				}
+				priv->usb_interface[i].restricted_functionality = true;
 			}
 			handle_priv->interface_handle[i].api_handle = hid_handle;
 		}
@@ -3661,11 +3669,14 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
-	current_interface = get_valid_interface(transfer->dev_handle);
+	current_interface = get_valid_interface(transfer->dev_handle, USB_API_HID);
 	// Attempt to claim an interface if none was found
 	if (current_interface < 0) {
+#if defined(AUTO_CLAIM)
 		for (current_interface=0; current_interface<USB_MAXINTERFACES; current_interface++) {
-			if (libusb_claim_interface(transfer->dev_handle, current_interface) == LIBUSB_SUCCESS) {
+			// Must claim an interface of the same API type
+			if ( (priv->usb_interface[current_interface].apib == &usb_api_backend[USB_API_HID])
+			  && (libusb_claim_interface(transfer->dev_handle, current_interface) == LIBUSB_SUCCESS) ) {
 				usbi_warn(ctx, "auto-claimed interface %d for control request", current_interface);
 				break;
 			}
@@ -3673,6 +3684,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 	}
 	if (current_interface == USB_MAXINTERFACES) {
 		usbi_err(ctx, "no active interface");
+#endif
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
@@ -4016,13 +4028,20 @@ static int composite_submit_control_transfer(struct usbi_transfer *itransfer)
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
-	int i;
+	int i, pass;
 
-	// Interface doesn't matter for control. Might have to review this section
-	// for multiple drivers, if one API is better for control than another.
-	for (i=0; i<USB_MAXINTERFACES; i++) {
-		if (priv->usb_interface[i].path != NULL) {
-			return priv->usb_interface[i].apib->submit_control_transfer(itransfer);
+	// Interface shouldn't matter for control, but it does in practice, with Windows'
+	// restrictions with regards to accessing HID keyboards and mice. Try a 2 pass approach
+	for (pass = 0; pass < 2; pass++) {
+		for (i=0; i<USB_MAXINTERFACES; i++) {
+			if (priv->usb_interface[i].path != NULL) {
+				if ((pass == 0) && (priv->usb_interface[i].restricted_functionality)) {
+					usbi_dbg("trying to skip restricted interface #%d (HID keyboard or mouse?)", i);
+					continue;
+				}
+				usbi_dbg("using interface %d", i);
+				return priv->usb_interface[i].apib->submit_control_transfer(itransfer);
+			}
 		}
 	}
 
