@@ -666,8 +666,6 @@ int test_device(uint16_t vid, uint16_t pid)
 	}
 	libusb_free_config_descriptor(conf_desc);
 
-	// On Windows, autoclaim will sort things out
-#ifndef OS_WINDOWS
 	for (iface = 0; iface < nb_ifaces; iface++)
 	{
 		printf("\nClaiming interface %d...\n", iface);
@@ -686,7 +684,6 @@ int test_device(uint16_t vid, uint16_t pid)
 			perr("   Failed.\n");
 		}
 	}
-#endif
 
 	printf("\nReading string descriptors:\n");
 	r = libusb_get_string_descriptor(handle, 0, 0, string, 128);

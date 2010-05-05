@@ -29,7 +29,7 @@
 //   option below is enabled.
 #define USE_HIDD_FOR_REPORTS
 // - Should libusb automatically claim the interfaces it requires?
-#define AUTO_CLAIM
+//#define AUTO_CLAIM
 // - Forces instant overlapped completion on timeouts: can prevents extensive
 //   wait in poll, after a timeout, but might affect subsequent API calls.
 //   ***USE AT YOUR OWN RISKS***
