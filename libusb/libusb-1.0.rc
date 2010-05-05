@@ -1,57 +1,11 @@
-//Microsoft Developer Studio generated resource script.
-//
-
-#define APSTUDIO_READONLY_SYMBOLS
-/////////////////////////////////////////////////////////////////////////////
-//
-// Generated from the TEXTINCLUDE 2 resource.
-//
 #include "winresrc.h"
 
-/////////////////////////////////////////////////////////////////////////////
-#undef APSTUDIO_READONLY_SYMBOLS
-
-/////////////////////////////////////////////////////////////////////////////
-// English (U.S.) resources
-
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
-#ifdef _WIN32
-LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
-#pragma code_page(1252)
-#endif //_WIN32
-
 #ifdef _DEBUG
 #define VER_ORIGINALFILENAME_STR "libusb-1.0_debug.dll\0"
 #else
 #define VER_ORIGINALFILENAME_STR "libusb-1.0.dll\0"
 #endif
-
-#ifdef APSTUDIO_INVOKED
-/////////////////////////////////////////////////////////////////////////////
-//
-// TEXTINCLUDE
-//
-
-1 TEXTINCLUDE DISCARDABLE
-BEGIN
-	"#include ""winresrc.h""\r\n"
-	"\0"
-END
-
-2 TEXTINCLUDE DISCARDABLE
-BEGIN
-	"\r\n"
-	"\0"
-END
-
-#endif    // APSTUDIO_INVOKED
-
-
-#ifndef _MAC
-/////////////////////////////////////////////////////////////////////////////
-//
-// Version
-//
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 1,0,7,0
@@ -90,20 +44,4 @@ BEGIN
 	END
 END
 
-#endif    // !_MAC
-
-#endif    // English (U.S.) resources
-/////////////////////////////////////////////////////////////////////////////
-
-
-
-#ifndef APSTUDIO_INVOKED
-/////////////////////////////////////////////////////////////////////////////
-//
-// Generated from the TEXTINCLUDE 2 resource.
-//
-
-
-/////////////////////////////////////////////////////////////////////////////
-#endif    // not APSTUDIO_INVOKED
-
+#endif    // AFX
