@@ -1,6 +1,5 @@
 #include "winresrc.h"
 
-#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
 #ifdef _DEBUG
 #define VER_ORIGINALFILENAME_STR "libusb-1.0_debug.dll\0"
 #else
@@ -43,5 +42,3 @@ BEGIN
 		VALUE "Translation", 0x409, 1200
 	END
 END
-
-#endif    // AFX
