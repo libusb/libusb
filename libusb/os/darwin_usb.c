@@ -232,7 +232,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
     CFRelease (locationCF);
     IOObjectRelease (device);
 
-    pthread_mutex_lock(&ctx->open_devs_lock);
+    usbi_mutex_lock(&ctx->open_devs_lock);
     list_for_each_entry(handle, &ctx->open_devs, list) {
       dpriv = (struct darwin_device_priv *)handle->dev->os_priv;
 
@@ -245,7 +245,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
       }
     }
 
-    pthread_mutex_unlock(&ctx->open_devs_lock);
+    usbi_mutex_unlock(&ctx->open_devs_lock);
   }
 }
 
@@ -1388,7 +1388,7 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds
   int i = 0, ret;
   UInt32 message;
 
-  pthread_mutex_lock(&ctx->open_devs_lock);
+  usbi_mutex_lock(&ctx->open_devs_lock);
   for (i = 0; i < nfds && num_ready > 0; i++) {
     struct pollfd *pollfd = &fds[i];
     struct libusb_device_handle *handle;
@@ -1441,7 +1441,7 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds
     }
   }
 
-  pthread_mutex_unlock(&ctx->open_devs_lock);
+  usbi_mutex_unlock(&ctx->open_devs_lock);
 
   return 0;
 }

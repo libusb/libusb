@@ -24,7 +24,6 @@
 #include <config.h>
 
 #include <poll.h>
-#include <pthread.h>
 #include <stddef.h>
 #include <time.h>
 
@@ -138,6 +137,11 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level,
 #define ITRANSFER_CTX(transfer) \
 	(TRANSFER_CTX(__USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)))
 
+/* Internal abstraction for thread synchronization */
+#if defined(OS_LINUX) || defined(OS_DARWIN)
+#include <os/threads_posix.h>
+#endif
+
 extern struct libusb_context *usbi_default_context;
 
 struct libusb_context {
@@ -149,28 +153,28 @@ struct libusb_context {
 	int ctrl_pipe[2];
 
 	struct list_head usb_devs;
-	pthread_mutex_t usb_devs_lock;
+	usbi_mutex_t usb_devs_lock;
 
 	/* A list of open handles. Backends are free to traverse this if required.
 	 */
 	struct list_head open_devs;
-	pthread_mutex_t open_devs_lock;
+	usbi_mutex_t open_devs_lock;
 
 	/* this is a list of in-flight transfer handles, sorted by timeout 
 	 * expiration. URBs to timeout the soonest are placed at the beginning of
 	 * the list, URBs that will time out later are placed after, and urbs with
 	 * infinite timeout are always placed at the very end. */
 	struct list_head flying_transfers;
-	pthread_mutex_t flying_transfers_lock;
+	usbi_mutex_t flying_transfers_lock;
 
 	/* list of poll fds */
 	struct list_head pollfds;
-	pthread_mutex_t pollfds_lock;
+	usbi_mutex_t pollfds_lock;
 
 	/* a counter that is set when we want to interrupt event handling, in order
 	 * to modify the poll fd set. and a lock to protect it. */
 	unsigned int pollfd_modify;
-	pthread_mutex_t pollfd_modify_lock;
+	usbi_mutex_t pollfd_modify_lock;
 
 	/* user callbacks for pollfd changes */
 	libusb_pollfd_added_cb fd_added_cb;
@@ -178,15 +182,15 @@ struct libusb_context {
 	void *fd_cb_user_data;
 
 	/* ensures that only one thread is handling events at any one time */
-	pthread_mutex_t events_lock;
+	usbi_mutex_t events_lock;
 
 	/* used to see if there is an active thread doing event handling */
 	int event_handler_active;
 
 	/* used to wait for event completion in threads other than the one that is
 	 * event handling */
-	pthread_mutex_t event_waiters_lock;
-	pthread_cond_t event_waiters_cond;
+	usbi_mutex_t event_waiters_lock;
+	usbi_cond_t event_waiters_cond;
 
 #ifdef USBI_TIMERFD_AVAILABLE
 	/* used for timeout handling, if supported by OS.
@@ -204,7 +208,7 @@ struct libusb_context {
 struct libusb_device {
 	/* lock protects refcnt, everything else is finalized at initialization
 	 * time */
-	pthread_mutex_t lock;
+	usbi_mutex_t lock;
 	int refcnt;
 
 	struct libusb_context *ctx;
@@ -220,7 +224,7 @@ struct libusb_device {
 
 struct libusb_device_handle {
 	/* lock protects claimed_interfaces */
-	pthread_mutex_t lock;
+	usbi_mutex_t lock;
 	unsigned long claimed_interfaces;
 
 	struct list_head list;
@@ -262,7 +266,7 @@ struct usbi_transfer {
 	 * cancelling the transfer from another thread while you are processing
 	 * its completion (presumably there would be races within your OS backend
 	 * if this were possible). */
-	pthread_mutex_t lock;
+	usbi_mutex_t lock;
 };
 
 #define __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \

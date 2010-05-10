@@ -20,6 +20,8 @@ case $host in
 	AC_MSG_RESULT([Linux])
 	backend="linux"
 	AC_CHECK_LIB(rt, clock_gettime)
+	threads="posix"
+	THREAD_CFLAGS="-pthread"
 	AM_LDFLAGS=""
 	;;
 *-darwin*)
@@ -28,6 +30,8 @@ case $host in
 	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
 	AC_MSG_RESULT([Darwin/MacOS X])
 	backend="darwin"
+	threads="posix"
+	THREAD_CFLAGS="-pthread"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
 *)
@@ -36,6 +40,7 @@ esac
 
 AM_CONDITIONAL([OS_LINUX], [test "x$backend" == "xlinux"])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" == "xdarwin"])
+AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" == "xposix"])
 
 # Library versioning
 lt_major="0"
@@ -119,6 +124,8 @@ CFLAGS="$CFLAGS -Wno-pointer-sign"
 AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
 	nopointersign_cflags="-Wno-pointer-sign", nopointersign_cflags="")
 CFLAGS="$saved_cflags"
+
+AC_SUBST([THREAD_CFLAGS])
 
 AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
 
