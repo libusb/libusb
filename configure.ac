@@ -31,7 +31,7 @@ case $host in
 	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 	threads="posix"
 	AC_CHECK_LIB(rt, clock_gettime)
-	AM_CFLAGS="-pthread -Wshadow"
+	AM_CFLAGS="-Wshadow"
 	AM_LDFLAGS=""
 	;;
 *-darwin*)
@@ -42,7 +42,7 @@ case $host in
 	backend="darwin"
 	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 	threads="posix"
-	AM_CFLAGS="-pthread -Wshadow"
+	AM_CFLAGS="-Wshadow"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
 *-mingw*)
@@ -63,7 +63,7 @@ case $host in
 	backend="windows"
 	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 	threads="posix"
-	LIBS="-lpthread -lsetupapi -lole32 -ladvapi32"
+	LIBS="-lsetupapi -lole32 -ladvapi32"
 	AM_CFLAGS=""
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
@@ -164,6 +164,17 @@ CFLAGS="$CFLAGS -Wno-pointer-sign"
 AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
 	nopointersign_cflags="-Wno-pointer-sign", nopointersign_cflags="")
 CFLAGS="$saved_cflags"
+
+# check if -pthread is supported (some environments like cygwin don't support it)
+AC_MSG_CHECKING([whether compiler supports the -pthread option])
+if $CC -pthread 2>&1 | grep -q 'unrecognized option.*pthread'; then
+	AC_MSG_RESULT([no])
+	THREAD_CFLAGS=""
+else
+	AC_MSG_RESULT([yes])
+	THREAD_CFLAGS="-pthread"
+fi
+AC_SUBST([THREAD_CFLAGS])
 
 AM_CFLAGS="$AM_CFLAGS -std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags"
 
