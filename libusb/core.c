@@ -41,7 +41,7 @@ const struct usbi_os_backend * const usbi_backend = &windows_backend;
 #endif
 
 struct libusb_context *usbi_default_context = NULL;
-usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
+static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 
 /**
  * \mainpage libusb-1.0 API Reference

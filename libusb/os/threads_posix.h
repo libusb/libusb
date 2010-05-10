@@ -23,7 +23,7 @@
 
 #include <pthread.h>
 
-#define usbi_mutex_static_t		static pthread_mutex_t
+#define usbi_mutex_static_t		pthread_mutex_t
 #define USBI_MUTEX_INITIALIZER		PTHREAD_MUTEX_INITIALIZER
 #define usbi_mutex_static_lock		pthread_mutex_lock
 #define usbi_mutex_static_unlock	pthread_mutex_unlock
