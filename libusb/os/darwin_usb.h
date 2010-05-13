@@ -22,6 +22,7 @@
 
 #include "libusbi.h"
 
+#include <IOKit/IOTypes.h>
 #include <IOKit/IOCFBundle.h>
 #include <IOKit/usb/IOUSBLib.h>
 #include <IOKit/IOCFPlugIn.h>
@@ -110,6 +111,10 @@
 
 #error "IOUSBFamily is too old. Please upgrade your OS"
 
+#endif
+
+#if !defined(IO_OBJECT_NULL)
+#define IO_OBJECT_NULL ((io_object_t) 0)
 #endif
 
 typedef IOCFPlugInInterface *io_cf_plugin_ref_t;
