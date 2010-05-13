@@ -169,7 +169,7 @@ static int set_mode_async(unsigned char data)
 
 	if (!buf)
 		return -ENOMEM;
-	
+
 	transfer = libusb_alloc_transfer(0);
 	if (!transfer) {
 		free(buf);
@@ -208,7 +208,7 @@ static int do_sync_intr(unsigned char *data)
 }
 
 static int sync_intr(unsigned char type)
-{	
+{
 	int r;
 	unsigned char data[INTR_LENGTH];
 
@@ -396,7 +396,7 @@ static int alloc_transfers(void)
 	img_transfer = libusb_alloc_transfer(0);
 	if (!img_transfer)
 		return -ENOMEM;
-	
+
 	irq_transfer = libusb_alloc_transfer(0);
 	if (!irq_transfer)
 		return -ENOMEM;
@@ -411,7 +411,7 @@ static int alloc_transfers(void)
 
 static void sighandler(int signum)
 {
-	do_exit = 1;	
+	do_exit = 1;
 }
 
 int main(void)
@@ -470,7 +470,7 @@ int main(void)
 	}
 
 	printf("shutting down...\n");
-	
+
 	if (irq_transfer) {
 		r = libusb_cancel_transfer(irq_transfer);
 		if (r < 0)
@@ -482,11 +482,11 @@ int main(void)
 		if (r < 0)
 			goto out_deinit;
 	}
-	
+
 	while (irq_transfer || img_transfer)
 		if (libusb_handle_events(NULL) < 0)
 			break;
-	
+
 	if (do_exit == 1)
 		r = 0;
 	else

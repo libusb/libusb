@@ -39,10 +39,10 @@ struct list_head {
 	struct list_head *prev, *next;
 };
 
-/* Get an entry from the list 
- * 	ptr - the address of this list_head element in "type" 
+/* Get an entry from the list
+ * 	ptr - the address of this list_head element in "type"
  * 	type - the data type that contains "member"
- * 	member - the list_head element in "type" 
+ * 	member - the list_head element in "type"
  */
 #define list_entry(ptr, type, member) \
 	((type *)((char *)(ptr) - (unsigned long)(&((type *)0L)->member)))
@@ -160,7 +160,7 @@ struct libusb_context {
 	struct list_head open_devs;
 	usbi_mutex_t open_devs_lock;
 
-	/* this is a list of in-flight transfer handles, sorted by timeout 
+	/* this is a list of in-flight transfer handles, sorted by timeout
 	 * expiration. URBs to timeout the soonest are placed at the beginning of
 	 * the list, URBs that will time out later are placed after, and urbs with
 	 * infinite timeout are always placed at the very end. */
@@ -663,7 +663,7 @@ struct usbi_os_backend {
 	 */
 	int (*kernel_driver_active)(struct libusb_device_handle *handle,
 		int interface);
-	
+
 	/* Detach a kernel driver from an interface. Optional.
 	 *
 	 * After detaching a kernel driver, the interface should be available
