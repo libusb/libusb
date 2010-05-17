@@ -1015,12 +1015,14 @@ int usbi_io_init(struct libusb_context *ctx)
 
 	/* FIXME should use an eventfd on kernels that support it */
 	r = pipe(ctx->ctrl_pipe);
-	if (r < 0)
-		return LIBUSB_ERROR_OTHER;
+	if (r < 0) {
+		r = LIBUSB_ERROR_OTHER;
+		goto err;
+	}
 
 	r = usbi_add_pollfd(ctx, ctx->ctrl_pipe[0], POLLIN);
 	if (r < 0)
-		return r;
+		goto err_close_pipe;
 
 #ifdef USBI_TIMERFD_AVAILABLE
 	ctx->timerfd = timerfd_create(usbi_backend->get_timerfd_clockid(),
@@ -1030,7 +1032,7 @@ int usbi_io_init(struct libusb_context *ctx)
 		r = usbi_add_pollfd(ctx, ctx->timerfd, POLLIN);
 		if (r < 0) {
 			close(ctx->timerfd);
-			return r;
+			goto err_close_pipe;
 		}
 	} else {
 		usbi_dbg("timerfd not available (code %d error %d)", ctx->timerfd, errno);
@@ -1039,6 +1041,18 @@ int usbi_io_init(struct libusb_context *ctx)
 #endif
 
 	return 0;
+
+err_close_pipe:
+	close(ctx->ctrl_pipe[0]);
+	close(ctx->ctrl_pipe[1]);
+err:
+	usbi_mutex_destroy(&ctx->flying_transfers_lock);
+	usbi_mutex_destroy(&ctx->pollfds_lock);
+	usbi_mutex_destroy(&ctx->pollfd_modify_lock);
+	usbi_mutex_destroy(&ctx->events_lock);
+	usbi_mutex_destroy(&ctx->event_waiters_lock);
+	usbi_cond_destroy(&ctx->event_waiters_cond);
+	return r;
 }
 
 void usbi_io_exit(struct libusb_context *ctx)
@@ -1052,6 +1066,12 @@ void usbi_io_exit(struct libusb_context *ctx)
 		close(ctx->timerfd);
 	}
 #endif
+	usbi_mutex_destroy(&ctx->flying_transfers_lock);
+	usbi_mutex_destroy(&ctx->pollfds_lock);
+	usbi_mutex_destroy(&ctx->pollfd_modify_lock);
+	usbi_mutex_destroy(&ctx->events_lock);
+	usbi_mutex_destroy(&ctx->event_waiters_lock);
+	usbi_cond_destroy(&ctx->event_waiters_cond);
 }
 
 static int calculate_timeout(struct usbi_transfer *transfer)
@@ -1787,8 +1807,10 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 	/* TODO: malloc when number of fd's changes, not on every poll */
 	fds = malloc(sizeof(*fds) * nfds);
-	if (!fds)
+	if (!fds) {
+		usbi_mutex_unlock(&ctx->pollfds_lock);
 		return LIBUSB_ERROR_NO_MEM;
+	}
 
 	list_for_each_entry(ipollfd, &ctx->pollfds, list) {
 		struct libusb_pollfd *pollfd = &ipollfd->pollfd;
