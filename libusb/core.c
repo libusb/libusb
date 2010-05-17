@@ -596,8 +596,7 @@ API_EXPORTED ssize_t libusb_get_device_list(libusb_context *ctx,
 	struct discovered_devs *discdevs = discovered_devs_alloc();
 	struct libusb_device **ret;
 	int r = 0;
-	size_t i;
-	ssize_t len;
+	ssize_t i, len;
 	USBI_GET_CONTEXT(ctx);
 	usbi_dbg("");
 
@@ -864,6 +863,7 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	size_t priv_size = usbi_backend->device_handle_priv_size;
 	unsigned char dummy = 1;
 	int r;
+	ssize_t tmp;
 	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
 
 	_handle = malloc(sizeof(*_handle) + priv_size);
@@ -907,8 +907,8 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
 
 	/* write some data on control pipe to interrupt event handlers */
-	r = write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
-	if (r <= 0) {
+	tmp = write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
+	if (tmp <= 0) {
 		usbi_warn(ctx, "internal signalling write failed");
 		usbi_mutex_lock(&ctx->pollfd_modify_lock);
 		ctx->pollfd_modify--;
@@ -920,8 +920,8 @@ API_EXPORTED int libusb_open(libusb_device *dev, libusb_device_handle **handle)
 	libusb_lock_events(ctx);
 
 	/* read the dummy data */
-	r = read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
-	if (r <= 0)
+	tmp = read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+	if (tmp <= 0)
 		usbi_warn(ctx, "internal signalling read failed");
 
 	/* we're done with modifying poll fds */

@@ -1153,7 +1153,7 @@ static inline int libusb_get_descriptor(libusb_device_handle *dev,
 {
 	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, (desc_type << 8) | desc_index, 0, data,
-		length, 1000);
+		(uint16_t) length, 1000);
 }
 
 /** \ingroup desc
@@ -1175,7 +1175,7 @@ static inline int libusb_get_string_descriptor(libusb_device_handle *dev,
 {
 	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, (LIBUSB_DT_STRING << 8) | desc_index,
-		langid, data, length, 1000);
+		langid, data, (uint16_t) length, 1000);
 }
 
 int libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
