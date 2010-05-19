@@ -1031,6 +1031,7 @@ int usbi_io_init(struct libusb_context *ctx)
 		usbi_dbg("using timerfd for timeouts");
 		r = usbi_add_pollfd(ctx, ctx->timerfd, POLLIN);
 		if (r < 0) {
+			usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
 			close(ctx->timerfd);
 			goto err_close_pipe;
 		}
