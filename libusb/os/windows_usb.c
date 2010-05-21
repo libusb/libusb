@@ -50,6 +50,7 @@
 #include "poll_windows.h"
 #include "windows_usb.h"
 
+// The following prevents "banned API" errors when using the MS's WDK OACR/Prefast
 #if defined(_PREFAST_)
 #pragma warning(disable:28719)
 #endif

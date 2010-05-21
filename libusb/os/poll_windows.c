@@ -47,6 +47,12 @@
 
 #include <libusbi.h>
 
+// The following prevents "The function 'InitializeCriticalSection' must be called from within
+// a try/except block" errors when using the MS's WDK OACR/Prefast
+#if defined(_PREFAST_)
+#pragma warning(disable:28125)
+#endif
+
 // Uncomment to debug the polling layer
 //#define DEBUG_POLL_WINDOWS
 #if defined(DEBUG_POLL_WINDOWS)
