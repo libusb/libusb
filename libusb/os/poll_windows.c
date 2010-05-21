@@ -411,7 +411,7 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 				_poll_fd[i].thread_id = GetCurrentThreadId();
 				if (!DuplicateHandle(GetCurrentProcess(), handle, GetCurrentProcess(),
 					&wfd.handle, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
-					usbi_warn(NULL, "could not duplicate handle for CancelIo - using original one");
+					usbi_dbg("could not duplicate handle for CancelIo - using original one");
 					wfd.handle = handle;
 					// Make sure we won't close the original handle on fd deletion then
 					_poll_fd[i].original_handle = INVALID_HANDLE_VALUE;
