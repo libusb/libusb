@@ -29,7 +29,7 @@
 //   option below is enabled.
 #define USE_HIDD_FOR_REPORTS
 // - Should libusb automatically claim the interfaces it requires?
-//#define AUTO_CLAIM
+#define AUTO_CLAIM
 // - Forces instant overlapped completion on timeouts: can prevents extensive
 //   wait in poll, after a timeout, but might affect subsequent API calls.
 //   ***USE AT YOUR OWN RISKS***
@@ -2543,7 +2543,7 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)transfer->dev_handle->os_priv;
-#ifndef USE_HIDD_FOR_REPORTS
+#ifdef AUTO_CLAIM
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
 #endif
 	WINUSB_SETUP_PACKET *setup = (WINUSB_SETUP_PACKET *) transfer->buffer;
@@ -3649,7 +3649,7 @@ static int hid_set_interface_altsetting(struct libusb_device_handle *dev_handle,
 static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-#ifndef USE_HIDD_FOR_REPORTS
+#ifdef AUTO_CLAIM
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 #endif
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
