@@ -835,9 +835,9 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 				continue;
 			}
 
-			if (conn_info.DeviceAddress == 0) {
-				usbi_warn(ctx, "program assertion failed - device address is zero "
-					"(conflicts with root hub), ignoring device");
+			if (conn_info.DeviceAddress == LIBUSB_DEVADDR_MAX) {
+				usbi_warn(ctx, "program assertion failed - device address is %d "
+					"(conflicts with root hub), ignoring device", LIBUSB_DEVADDR_MAX);
 				continue;
 			}
 
@@ -846,7 +846,7 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 		else
 		{
 			// HCDs have only 1 node, and it's always a hub
-			conn_info.DeviceAddress = 0;
+			conn_info.DeviceAddress = LIBUSB_DEVADDR_MAX;	// using 0 can conflict with driverless devices
 			conn_info.DeviceIsHub = true;
 			conn_info.CurrentConfigurationValue = 1;
 		}
@@ -902,7 +902,8 @@ static int usb_enumerate_hub(struct libusb_context *ctx, struct discovered_devs 
 		// Generate a session ID
 		// Will need to change the session_id computation if this assertion fails
 		if (conn_info.DeviceAddress > LIBUSB_DEVADDR_MAX) {
-			usbi_warn(ctx, "program assertion failed - device address is greater than 255, ignoring device");
+			usbi_warn(ctx, "program assertion failed - device address is greater than %d, ignoring device",
+				LIBUSB_DEVADDR_MAX);
 			continue;
 		} else {
 			devaddr = (uint8_t)conn_info.DeviceAddress;
