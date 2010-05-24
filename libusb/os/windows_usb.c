@@ -3739,6 +3739,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	struct windows_device_handle_priv *handle_priv = __device_handle_priv(transfer->dev_handle);
 	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
+	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	WINUSB_SETUP_PACKET *setup = (WINUSB_SETUP_PACKET *) transfer->buffer;
 	HANDLE hid_handle;
 	struct winfd wfd;
@@ -3796,6 +3797,7 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 			if (setup->value == priv->active_config) {
 				r = LIBUSB_COMPLETED;
 			} else {
+				usbi_warn(ctx, "cannot set configuration other than the default one");
 				r = LIBUSB_ERROR_INVALID_PARAM;
 			}
 			break;
@@ -3811,16 +3813,18 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 			}
 			break;
 		default:
+			usbi_warn(ctx, "unsupported HID control request");
 			r = LIBUSB_ERROR_INVALID_PARAM;
 			break;
 		}
 		break;
-    case LIBUSB_REQUEST_TYPE_CLASS:
-      r =_hid_class_request(priv->hid, wfd.handle, setup->request_type, setup->request, setup->value,
-		  setup->index, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, transfer_priv,
-		  &size, wfd.overlapped);
-      break;
+	case LIBUSB_REQUEST_TYPE_CLASS:
+		r =_hid_class_request(priv->hid, wfd.handle, setup->request_type, setup->request, setup->value,
+			setup->index, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, transfer_priv,
+			&size, wfd.overlapped);
+		break;
 	default:
+		usbi_warn(ctx, "unsupported HID control request");
 		r = LIBUSB_ERROR_INVALID_PARAM;
 		break;
 	}
