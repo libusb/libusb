@@ -112,24 +112,62 @@ enum usbi_log_level {
 	LOG_LEVEL_ERROR,
 };
 
-void usbi_log(struct libusb_context *ctx, enum usbi_log_level,
+void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 	const char *function, const char *format, ...);
 
+#if !defined(_MSC_VER) || _MSC_VER > 1200
+
 #ifdef ENABLE_LOGGING
-#define _usbi_log(ctx, level, fmt...) usbi_log(ctx, level, __FUNCTION__, fmt)
+#define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __FUNCTION__, __VA_ARGS__)
 #else
-#define _usbi_log(ctx, level, fmt...)
+#define _usbi_log(ctx, level, ...)
 #endif
 
 #ifdef ENABLE_DEBUG_LOGGING
-#define usbi_dbg(fmt...) _usbi_log(NULL, LOG_LEVEL_DEBUG, fmt)
+#define usbi_dbg(...) _usbi_log(NULL, LOG_LEVEL_DEBUG, __VA_ARGS__)
 #else
-#define usbi_dbg(fmt...)
+#define usbi_dbg(...)
 #endif
 
-#define usbi_info(ctx, fmt...) _usbi_log(ctx, LOG_LEVEL_INFO, fmt)
-#define usbi_warn(ctx, fmt...) _usbi_log(ctx, LOG_LEVEL_WARNING, fmt)
-#define usbi_err(ctx, fmt...) _usbi_log(ctx, LOG_LEVEL_ERROR, fmt)
+#define usbi_info(ctx, ...) _usbi_log(ctx, LOG_LEVEL_INFO, __VA_ARGS__)
+#define usbi_warn(ctx, ...) _usbi_log(ctx, LOG_LEVEL_WARNING, __VA_ARGS__)
+#define usbi_err(ctx, ...) _usbi_log(ctx, LOG_LEVEL_ERROR, __VA_ARGS__)
+
+#else /* !defined(_MSC_VER) || _MSC_VER > 1200 */
+
+void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
+	const char *function, const char *format, va_list args);
+
+#ifdef ENABLE_LOGGING
+#define LOG_BODY(ctxt, level) \
+{                             \
+	va_list args;             \
+	va_start (args, format);  \
+	usbi_log_v(ctxt, level, "", format, args); \
+	va_end(args);             \
+}
+#else
+#define LOG_BODY(ctxt, level) { }
+#endif
+
+static inline void usbi_info(struct libusb_context *ctx, const char *format,
+	...)
+	LOG_BODY(ctx,LOG_LEVEL_INFO)
+static inline void usbi_warn(struct libusb_context *ctx, const char *format,
+	...)
+	LOG_BODY(ctx,LOG_LEVEL_WARNING)
+static inline void usbi_err( struct libusb_context *ctx, const char *format,
+	...)
+	LOG_BODY(ctx,LOG_LEVEL_ERROR)
+
+static inline void usbi_dbg(const char *format, ...)
+#ifdef ENABLE_DEBUG_LOGGING
+	LOG_BODY(NULL,LOG_LEVEL_DEBUG)
+#else
+{ }
+#endif
+
+#endif /* !defined(_MSC_VER) || _MSC_VER > 1200 */
 
 #define USBI_GET_CONTEXT(ctx) if (!(ctx)) (ctx) = usbi_default_context
 #define DEVICE_CTX(dev) ((dev)->ctx)
