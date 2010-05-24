@@ -292,6 +292,9 @@ struct interface_handle_t {
 struct windows_device_handle_priv {
 	int active_interface;
 	struct interface_handle_t interface_handle[USB_MAXINTERFACES];
+#if defined(AUTO_CLAIM)
+	int autoclaim_count[USB_MAXINTERFACES]; // For auto-release
+#endif
 };
 
 static inline struct windows_device_handle_priv *__device_handle_priv(
@@ -307,9 +310,6 @@ struct windows_transfer_priv {
 	uint8_t *hid_buffer; // 1 byte extended data buffer, required for HID
 	uint8_t *hid_dest;   // transfer buffer destination, required for HID
 	size_t hid_expected_size;
-#if defined(AUTO_CLAIM)
-	bool autoclaimed;    // For auto-release
-#endif
 };
 
 
