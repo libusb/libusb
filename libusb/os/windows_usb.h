@@ -307,6 +307,9 @@ struct windows_transfer_priv {
 	uint8_t *hid_buffer; // 1 byte extended data buffer, required for HID
 	uint8_t *hid_dest;   // transfer buffer destination, required for HID
 	size_t hid_expected_size;
+#if defined(AUTO_CLAIM)
+	bool autoclaimed;    // For auto-release
+#endif
 };
 
 

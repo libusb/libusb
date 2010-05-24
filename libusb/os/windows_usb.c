@@ -28,7 +28,7 @@
 //   => Don't blame libusb if you can't read or write HID reports when the
 //   option below is enabled.
 #define USE_HIDD_FOR_REPORTS
-// - Should libusb automatically claim the interfaces it requires?
+// - Should libusb automatically claim (and release) the interfaces it requires?
 #define AUTO_CLAIM
 // - Forces instant overlapped completion on timeouts: can prevents extensive
 //   wait in poll, after a timeout, but might affect subsequent API calls.
@@ -1737,8 +1737,17 @@ static void windows_destroy_device(struct libusb_device *dev)
 static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
+
 	usbi_free_fd(transfer_priv->pollable_fd.fd);
 	safe_free(transfer_priv->hid_buffer);
+#if defined(AUTO_CLAIM)
+	if (transfer_priv->autoclaimed) {
+		libusb_release_interface(__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)->dev_handle,
+			transfer_priv->interface_number);
+		usbi_dbg("auto-released interface %d", transfer_priv->interface_number);
+
+	}
+#endif
 }
 
 static int submit_bulk_transfer(struct usbi_transfer *itransfer)
@@ -2395,6 +2404,7 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 				return LIBUSB_ERROR_ACCESS;
 			}
 #else
+			usbi_warn(ctx, "you must claim interface 0 before you can claim %d with WinUSB", iface);
 			return LIBUSB_ERROR_ACCESS;
 #endif
 		}
@@ -2557,6 +2567,9 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 	CHECK_WINUSB_AVAILABLE;
 
 	transfer_priv->pollable_fd = INVALID_WINFD;
+#if defined(AUTO_CLAIM)
+	transfer_priv->autoclaimed = false;
+#endif
 	size = transfer->length - LIBUSB_CONTROL_SETUP_SIZE;
 
 	if (size > MAX_CTRL_BUFFER_LENGTH)
@@ -2570,7 +2583,8 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 			// Must claim an interface of the same API type
 			if ( (priv->usb_interface[current_interface].apib == &usb_api_backend[USB_API_WINUSB])
 			  && (libusb_claim_interface(transfer->dev_handle, current_interface) == LIBUSB_SUCCESS) ) {
-				usbi_warn(ctx, "auto-claimed interface %d for control request", current_interface);
+				usbi_dbg("auto-claimed interface %d for control request", current_interface);
+				transfer_priv->autoclaimed = true;
 				break;
 			}
 		}
@@ -3670,6 +3684,9 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 	safe_free(transfer_priv->hid_buffer);
 	transfer_priv->hid_dest = NULL;
 	size = transfer->length - LIBUSB_CONTROL_SETUP_SIZE;
+#if defined(AUTO_CLAIM)
+	transfer_priv->autoclaimed = false;
+#endif
 
 	if (size > MAX_CTRL_BUFFER_LENGTH) {
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -3683,7 +3700,8 @@ static int hid_submit_control_transfer(struct usbi_transfer *itransfer)
 			// Must claim an interface of the same API type
 			if ( (priv->usb_interface[current_interface].apib == &usb_api_backend[USB_API_HID])
 			  && (libusb_claim_interface(transfer->dev_handle, current_interface) == LIBUSB_SUCCESS) ) {
-				usbi_warn(ctx, "auto-claimed interface %d for control request", current_interface);
+				usbi_dbg("auto-claimed interface %d for control request", current_interface);
+				transfer_priv->autoclaimed = true;
 				break;
 			}
 		}
