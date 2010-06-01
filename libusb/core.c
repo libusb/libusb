@@ -41,6 +41,7 @@ const struct usbi_os_backend * const usbi_backend = &darwin_backend;
 #endif
 
 struct libusb_context *usbi_default_context = NULL;
+static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 
 /**
@@ -309,6 +310,14 @@ if (cfg != desired)
  * When you pass NULL, the default context will be used. The default context
  * is created the first time a process calls libusb_init() when no other
  * context is alive. Contexts are destroyed during libusb_exit().
+ *
+ * The default context is reference-counted and can be shared. That means that
+ * if libusb_init(NULL) is called twice within the same process, the two
+ * users end up sharing the same context. The deinitialization and freeing of
+ * the default context will only happen when the last user calls libusb_exit().
+ * In other words, the default context is created and initialized when its
+ * reference count goes from 0 to 1, and is deinitialized and destroyed when
+ * its reference count goes from 1 to 0.
  *
  * You may be wondering why only a subset of libusb functions require a
  * context pointer in their function definition. Internally, libusb stores
@@ -1455,18 +1464,36 @@ API_EXPORTED void libusb_set_debug(libusb_context *ctx, int level)
 /** \ingroup lib
  * Initialize libusb. This function must be called before calling any other
  * libusb function.
+ *
+ * If you do not provide an output location for a context pointer, a default
+ * context will be created. If there was already a default context, it will
+ * be reused (and nothing will be initialized/reinitialized).
+ *
  * \param context Optional output location for context pointer.
  * Only valid on return code 0.
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ * \see contexts
  */
 API_EXPORTED int libusb_init(libusb_context **context)
 {
 	char *dbg = getenv("LIBUSB_DEBUG");
-	struct libusb_context *ctx = malloc(sizeof(*ctx));
+	struct libusb_context *ctx;
 	int r;
 
-	if (!ctx)
-		return LIBUSB_ERROR_NO_MEM;
+	usbi_mutex_static_lock(&default_context_lock);
+	if (!context && usbi_default_context) {
+		r = 0;
+		usbi_dbg("reusing default context");
+		default_context_refcnt++;
+		usbi_mutex_static_unlock(&default_context_lock);
+		return 0;
+	}
+
+	ctx = malloc(sizeof(*ctx));
+	if (!ctx) {
+		r = LIBUSB_ERROR_NO_MEM;
+		goto err_unlock;
+	}
 	memset(ctx, 0, sizeof(*ctx));
 
 	if (dbg) {
@@ -1495,10 +1522,10 @@ API_EXPORTED int libusb_init(libusb_context **context)
 		goto err_destroy_mutex;
 	}
 
-	usbi_mutex_static_lock(&default_context_lock);
 	if (!usbi_default_context) {
 		usbi_dbg("created default context");
 		usbi_default_context = ctx;
+		default_context_refcnt++;
 	}
 	usbi_mutex_static_unlock(&default_context_lock);
 
@@ -1511,6 +1538,8 @@ err_destroy_mutex:
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
 err_free_ctx:
 	free(ctx);
+err_unlock:
+	usbi_mutex_static_unlock(&default_context_lock);
 	return r;
 }
 
@@ -1521,8 +1550,22 @@ err_free_ctx:
  */
 API_EXPORTED void libusb_exit(struct libusb_context *ctx)
 {
-	USBI_GET_CONTEXT(ctx);
 	usbi_dbg("");
+	USBI_GET_CONTEXT(ctx);
+
+	/* if working with default context, only actually do the deinitialization
+	 * if we're the last user */
+	if (ctx == usbi_default_context) {
+		usbi_mutex_static_lock(&default_context_lock);
+		if (--default_context_refcnt > 0) {
+			usbi_dbg("not destroying default context");
+			usbi_mutex_static_unlock(&default_context_lock);
+			return;
+		}
+		usbi_dbg("destroying default context");
+		usbi_default_context = NULL;
+		usbi_mutex_static_unlock(&default_context_lock);
+	}
 
 	/* a little sanity check. doesn't bother with open_devs locking because
 	 * unless there is an application bug, nobody will be accessing this. */
@@ -1532,13 +1575,6 @@ API_EXPORTED void libusb_exit(struct libusb_context *ctx)
 	usbi_io_exit(ctx);
 	if (usbi_backend->exit)
 		usbi_backend->exit();
-
-	usbi_mutex_static_lock(&default_context_lock);
-	if (ctx == usbi_default_context) {
-		usbi_dbg("freeing default context");
-		usbi_default_context = NULL;
-	}
-	usbi_mutex_static_unlock(&default_context_lock);
 
 	usbi_mutex_destroy(&ctx->open_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
