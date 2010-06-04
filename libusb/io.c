@@ -2020,7 +2020,7 @@ retry:
 		return r;
 	}
 
-	/* another thread is doing event handling. wait for pthread events that
+	/* another thread is doing event handling. wait for thread events that
 	 * notify event completion. */
 	libusb_lock_event_waiters(ctx);
 
