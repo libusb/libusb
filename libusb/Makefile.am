@@ -15,7 +15,7 @@ AM_CFLAGS_EXT = -no-cpp-precomp
 endif
 
 libusb_1_0_la_CFLAGS = $(VISIBILITY_CFLAGS) $(AM_CFLAGS) $(THREAD_CFLAGS)
-libusb_1_0_la_SOURCES = libusbi.h core.c descriptor.c io.c sync.c os/threads_posix.h $(OS_SRC)
+libusb_1_0_la_SOURCES = libusbi.h core.c descriptor.c io.c sync.c os/threads_posix.h os/poll_posix.h $(OS_SRC)
 
 hdrdir = $(includedir)/libusb-1.0
 hdr_HEADERS = libusb.h
