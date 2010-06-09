@@ -1,4 +1,4 @@
-@echo off
+@echo off 
 if NOT x%DDK_TARGET_OS%==xWinXP goto usage
 
 rmdir /S /Q E:\dailies\%DATE%
