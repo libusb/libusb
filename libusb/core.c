@@ -254,7 +254,7 @@ if (cfg != desired)
  * libusb v1.0.2, this information was lost (and for device-to-host transfers,
  * the corresponding data was discarded). As of libusb v1.0.3, this information
  * is kept (the data length of the transfer is updated) and, for device-to-host
- * transfesr, any surplus data was added to the buffer. Still, this is not
+ * transfers, any surplus data was added to the buffer. Still, this is not
  * a nice solution because it loses the information about the end of the short
  * packet, and the user probably wanted that surplus data to arrive in the next
  * logical transfer.
@@ -271,7 +271,7 @@ if (cfg != desired)
  * The subtransfers are submitted all at once so that the kernel can queue
  * them at the hardware level, therefore maximizing bus throughput.
  *
- * On legacy platforms, this caused problems when transfers completed early
+ * On legacy platforms, this caused problems when transfers completed early.
  * Upon this event, the kernel would terminate all further packets in that
  * subtransfer (but not any following ones). libusb would note this event and
  * immediately cancel any following subtransfers that had been queued,
