@@ -601,7 +601,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
-	int iface, nb_ifaces, nb_strings;
+	int iface, nb_ifaces;
 #ifdef OS_LINUX
 	// Attaching/detaching the kernel driver is only relevant for Linux
 	int iface_detached = -1;
@@ -609,6 +609,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	bool test_scsi = false;
 	struct libusb_device_descriptor dev_desc;
 	char string[128];
+	uint8_t string_index[3];	// indexes of the string descriptors
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
 
 	printf("Opening device...\n");
@@ -630,6 +631,10 @@ int test_device(uint16_t vid, uint16_t pid)
 	printf("         bcdDevice: %04X\n", dev_desc.bcdDevice);
 	printf("   iMan:iProd:iSer: %d:%d:%d\n", dev_desc.iManufacturer, dev_desc.iProduct, dev_desc.iSerialNumber);
 	printf("          nb confs: %d\n", dev_desc.bNumConfigurations);
+	// Copy the string descriptors for easier parsing
+	string_index[0] = dev_desc.iManufacturer;
+	string_index[1] = dev_desc.iProduct;
+	string_index[2] = dev_desc.iSerialNumber;
 
 	printf("\nReading configuration descriptors:\n");
 	CALL_CHECK(libusb_get_config_descriptor(dev, 0, &conf_desc));
@@ -686,13 +691,12 @@ int test_device(uint16_t vid, uint16_t pid)
 	}
 
 	printf("\nReading string descriptors:\n");
-	r = libusb_get_string_descriptor(handle, 0, 0, string, 128);
-	if (r > 0) {
-		nb_strings = string[0];
-		for (i=1; i<nb_strings; i++) {
-			if (libusb_get_string_descriptor_ascii(handle, (uint8_t)i, string, 128) >= 0) {
-				printf("   String (%d/%d): \"%s\"\n", i, nb_strings-1, string);
-			}
+	for (i=0; i<3; i++) {
+		if (string_index[i] == 0) {
+			continue;
+		}
+		if (libusb_get_string_descriptor_ascii(handle, string_index[i], string, 128) >= 0) {
+			printf("   String (0x%02X): \"%s\"\n", string_index[i], string);
 		}
 	}
 
