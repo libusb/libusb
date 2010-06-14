@@ -2935,9 +2935,9 @@ static int _hid_get_device_descriptor(struct hid_device_priv* dev, void *data, s
 	d.idVendor = (uint16_t)dev->vid;
 	d.idProduct = (uint16_t)dev->pid;
 	d.bcdDevice = 0x0100;
-	d.iManufacturer = _hid_wcslen(dev->man_string) ? 1 : 0;
-	d.iProduct = _hid_wcslen(dev->prod_string) ? 2 : 0;
-	d.iSerialNumber  = _hid_wcslen(dev->ser_string) ? 3 : 0;
+	d.iManufacturer = dev->string_index[0];
+	d.iProduct = dev->string_index[1];
+	d.iSerialNumber = dev->string_index[2];
 	d.bNumConfigurations = 1;
 
 	if (*size > LIBUSB_DT_DEVICE_SIZE)
@@ -3027,6 +3027,7 @@ static int _hid_get_string_descriptor(struct hid_device_priv* dev, int index,
 {
 	void *tmp = NULL;
 	size_t tmp_size = 0;
+	int i;
 
 	/* language ID, EN-US */
 	char string_langid[] = {
@@ -3038,25 +3039,20 @@ static int _hid_get_string_descriptor(struct hid_device_priv* dev, int index,
 		return LIBUSB_ERROR_OVERFLOW;
 	}
 
-	switch(index) {
-	case 0:
+	if (index == 0) {
 		tmp = string_langid;
 		tmp_size = sizeof(string_langid)+2;
-		break;
-	case 1:
-		tmp = dev->man_string;
-		tmp_size = (_hid_wcslen(dev->man_string)+1) * sizeof(WCHAR);
-		break;
-	case 2:
-		tmp = dev->prod_string;
-		tmp_size = (_hid_wcslen(dev->prod_string)+1) * sizeof(WCHAR);
-		break;
-	case 3:
-		tmp = dev->ser_string;
-		tmp_size = (_hid_wcslen(dev->ser_string)+1) * sizeof(WCHAR);
-		break;
-	default:
-		return LIBUSB_ERROR_INVALID_PARAM;
+	} else {
+		for (i=0; i<3; i++) {
+			if (index == (dev->string_index[i])) {
+				tmp = dev->string[i];
+				tmp_size = (_hid_wcslen(dev->string[i])+1) * sizeof(WCHAR);
+				break;
+			}
+		}
+		if (i == 3) {	// not found
+			return LIBUSB_ERROR_INVALID_PARAM;
+		}
 	}
 
 	if(!tmp_size) {
@@ -3635,12 +3631,27 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 		priv->hid->feature_report_size = capabilities.FeatureReportByteLength;
 
 		// Fetch string descriptors
-		HidD_GetManufacturerString(hid_handle, priv->hid->man_string,
-			sizeof(priv->hid->man_string));
-		HidD_GetProductString(hid_handle, priv->hid->prod_string,
-			sizeof(priv->hid->prod_string));
-		HidD_GetSerialNumberString(hid_handle, priv->hid->ser_string,
-			sizeof(priv->hid->ser_string));
+		priv->hid->string_index[0] = priv->dev_descriptor.iManufacturer;
+		if (priv->hid->string_index[0] != 0) {
+			HidD_GetManufacturerString(hid_handle, priv->hid->string[0],
+				sizeof(priv->hid->string[0]));
+		} else {
+			priv->hid->string[0][0] = 0;
+		}
+		priv->hid->string_index[1] = priv->dev_descriptor.iProduct;
+		if (priv->hid->string_index[1] != 0) {
+			HidD_GetProductString(hid_handle, priv->hid->string[1],
+				sizeof(priv->hid->string[1]));
+		} else {
+			priv->hid->string[1][0] = 0;
+		}
+		priv->hid->string_index[2] = priv->dev_descriptor.iSerialNumber;
+		if (priv->hid->string_index[2] != 0) {
+			HidD_GetSerialNumberString(hid_handle, priv->hid->string[2],
+				sizeof(priv->hid->string[2]));
+		} else {
+			priv->hid->string[2][0] = 0;
+		}
 	} while(0);
 
 	if (preparsed_data) {

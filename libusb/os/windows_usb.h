@@ -219,9 +219,8 @@ struct hid_device_priv {
 	uint16_t input_report_size;
 	uint16_t output_report_size;
 	uint16_t feature_report_size;
-	WCHAR man_string[MAX_USB_STRING_LENGTH];
-	WCHAR prod_string[MAX_USB_STRING_LENGTH];
-	WCHAR ser_string[MAX_USB_STRING_LENGTH];
+	WCHAR string[3][MAX_USB_STRING_LENGTH];
+	uint8_t string_index[3];	// man, prod, ser
 };
 
 typedef struct libusb_device_descriptor USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESCRIPTOR;
