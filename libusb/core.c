@@ -1532,15 +1532,15 @@ API_EXPORTED int libusb_init(libusb_context **context)
 		goto err_destroy_mutex;
 	}
 
-	if (!usbi_default_context) {
+	if (context) {
+		*context = ctx;
+	} else if (!usbi_default_context) {
 		usbi_dbg("created default context");
 		usbi_default_context = ctx;
 		default_context_refcnt++;
 	}
 	usbi_mutex_static_unlock(&default_context_lock);
 
-	if (context)
-		*context = ctx;
 	return 0;
 
 err_destroy_mutex:
