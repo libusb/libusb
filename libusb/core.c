@@ -1533,10 +1533,15 @@ API_EXPORTED int LIBUSB_API libusb_init(libusb_context **context)
 		goto err;
 	}
 
+	if (context) {
+		*context = ctx;
+	} else if (!usbi_default_context) {
+		usbi_dbg("created default context");
+		usbi_default_context = ctx;
+		default_context_refcnt++;
+	}
 	usbi_mutex_static_unlock(&default_context_lock);
 
-	if (context)
-		*context = ctx;
 	return 0;
 
 err:
