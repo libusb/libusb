@@ -1055,9 +1055,10 @@ static int op_open(struct libusb_device_handle *handle)
 	hpriv->fd = open(filename, O_RDWR);
 	if (hpriv->fd < 0) {
 		if (errno == EACCES) {
-			usbi_err("libusb couldn't open USB device %s: "
+			usbi_err(HANDLE_CTX(handle), "libusb couldn't open USB device %s: "
 				"Permission denied.", filename);
-			usbi_err("libusb requires write access to USB device nodes.");
+			usbi_err(HANDLE_CTX(handle),
+				"libusb requires write access to USB device nodes.");
 			return LIBUSB_ERROR_ACCESS;
 		} else if (errno == ENOENT) {
 			return LIBUSB_ERROR_NO_DEVICE;
