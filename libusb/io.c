@@ -859,7 +859,7 @@ if (libusb_try_lock_events(ctx) == 0) {
 			goto retry;
 		}
 
-		libusb_wait_for_event(ctx);
+		libusb_wait_for_event(ctx, NULL);
 	}
 	libusb_unlock_event_waiters(ctx);
 }
