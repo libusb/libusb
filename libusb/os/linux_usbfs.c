@@ -1415,7 +1415,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 			}
 
 			/* if it's not the first URB that failed, the situation is a bit
-			 * tricky. we must discard all previous URBs. there are
+			 * tricky. we may need to discard all previous URBs. there are
 			 * complications:
 			 *  - discarding is asynchronous - discarded urbs will be reaped
 			 *    later. the user must not have freed the transfer when the
@@ -1423,15 +1423,23 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 			 *    freed memory.
 			 *  - the earlier URBs may have completed successfully and we do
 			 *    not want to throw away any data.
-			 * so, in this case we discard all the previous URBs BUT we report
-			 * that the transfer was submitted successfully. then later when
-			 * the final discard completes we can report error to the user.
+			 *  - this URB failing may be no error; EREMOTEIO means that
+			 *    this transfer simply didn't need all the URBs we submitted
+			 * so, we report that the transfer was submitted successfully and
+			 * in case of error we discard all previous URBs. later when
+			 * the final reap completes we can report error to the user,
+			 * or success if an earlier URB was completed successfully.
 			 */
-			tpriv->reap_action = SUBMIT_FAILED;
+			tpriv->reap_action = EREMOTEIO == errno ? COMPLETED_EARLY : SUBMIT_FAILED;
 
 			/* The URBs we haven't submitted yet we count as already
 			 * retired. */
 			tpriv->num_retired += num_urbs - i;
+
+			/* If we completed short then don't try to discard. */
+			if (COMPLETED_EARLY == tpriv->reap_action)
+				return 0;
+
 			for (j = 0; j < i; j++) {
 				int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &urbs[j]);
 				if (tmp && errno != EINVAL)
