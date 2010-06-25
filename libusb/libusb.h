@@ -22,10 +22,13 @@
 #define __LIBUSB_H__
 
 #include <stdint.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 #include <limits.h>
+
+#if defined(__linux) || defined(__APPLE__)
+#include <sys/time.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
