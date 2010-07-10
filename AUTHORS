@@ -1,6 +1,8 @@
 Copyright (C) 2007-2009 Daniel Drake <dsd@gentoo.org>
 Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
 Copyright (C) 2008-2010 Nathan Hjelm <hjelmn@users.sourceforge.net>
+Copyright (C) 2009-2010 Pete Batard <pbatard@gmail.com>
+Copyright (C) 2010 Michael Plante <michael.plante@gmail.com>
 
 Other contributors:
 Alex Vatchenko
@@ -14,9 +16,7 @@ Francesco Montorsi
 Hans Ulrich Niedermann
 Ludovic Rousseau
 Martin Koegler
-Michael Plante
 Mikhail Gusarov
-Pete Batard
 Peter Stuge
 Rob Walker
 Toby Peterson

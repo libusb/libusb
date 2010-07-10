@@ -30,8 +30,6 @@
 #include <sys/time.h>
 #endif
 
-#include "os/poll_posix.h"
-
 #ifdef USBI_TIMERFD_AVAILABLE
 #include <sys/timerfd.h>
 #endif

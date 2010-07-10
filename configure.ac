@@ -1,4 +1,13 @@
-AC_INIT([libusb], [1.0.8])
+m4_define(LIBUSB_MAJOR, [1])
+m4_define(LIBUSB_MINOR, [0])
+m4_define(LIBUSB_MICRO, [8])
+
+AC_INIT([libusb], LIBUSB_MAJOR.LIBUSB_MINOR.LIBUSB_MICRO, [libusb-devel@lists.sourceforge.net], [libusb], [http://www.libusb.org/])
+
+AC_SUBST([LIBUSB_VERSION_MAJOR], [LIBUSB_MAJOR])
+AC_SUBST([LIBUSB_VERSION_MINOR], [LIBUSB_MINOR])
+AC_SUBST([LIBUSB_VERSION_MICRO], [LIBUSB_MICRO])
+
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([libusb/core.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -19,6 +28,7 @@ case $host in
 *-linux*)
 	AC_DEFINE(OS_LINUX, [], [Linux backend])
 	AC_SUBST(OS_LINUX)
+	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])	
 	AC_MSG_RESULT([Linux])
 	backend="linux"
 	AC_CHECK_LIB(rt, clock_gettime)
@@ -29,6 +39,7 @@ case $host in
 *-darwin*)
 	AC_DEFINE(OS_DARWIN, [], [Darwin backend])
 	AC_SUBST(OS_DARWIN)
+	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
 	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
 	AC_MSG_RESULT([Darwin/MacOS X])
 	backend="darwin"
@@ -36,12 +47,35 @@ case $host in
 	THREAD_CFLAGS="-pthread"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
+*-mingw*)
+	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
+	AC_SUBST(OS_WINDOWS)
+	AC_MSG_RESULT([Windows])
+	backend="windows"
+	threads="windows"
+	LIBS="-lsetupapi -lole32 -ladvapi32"
+	# -avoid-version to avoid a naming scheme such as libusb-0.dll
+	AM_LDFLAGS="-no-undefined -avoid-version"
+	AC_CHECK_TOOL(RC, windres, no)
+	;;
+*-cygwin*)
+	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
+	AC_SUBST(OS_WINDOWS)
+	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
+	AC_MSG_RESULT([Windows])
+	backend="windows"
+	threads="posix"
+	LIBS="-lsetupapi -lole32 -ladvapi32"
+	AM_LDFLAGS="-no-undefined -avoid-version"
+	AC_CHECK_TOOL(RC, windres, no)
+	;;
 *)
 	AC_MSG_ERROR([unsupported operating system])
 esac
 
 AM_CONDITIONAL([OS_LINUX], [test "x$backend" = "xlinux"])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = "xdarwin"])
+AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" = "xwindows"])
 AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" = "xposix"])
 
 # Library versioning
@@ -80,6 +114,8 @@ else
 	fi
 fi
 
+AC_CHECK_TYPES(struct timespec)
+
 # Message logging
 AC_ARG_ENABLE([log], [AS_HELP_STRING([--disable-log], [disable all logging])],
 	[log_enabled=$enableval],
@@ -111,7 +147,8 @@ CFLAGS="$saved_cflags"
 
 # check for -fvisibility=hidden compiler support (GCC >= 3.4)
 saved_cflags="$CFLAGS"
-CFLAGS="$CFLAGS -fvisibility=hidden"
+# -Werror required for cygwin
+CFLAGS="$CFLAGS -Werror -fvisibility=hidden"
 AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
 	[VISIBILITY_CFLAGS="-fvisibility=hidden"
 	 AC_DEFINE([API_EXPORTED], [__attribute__((visibility("default")))], [Default visibility]) ],
@@ -142,6 +179,6 @@ AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)
 AC_SUBST(AM_LDFLAGS)
 
-AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [examples/Makefile] [doc/Makefile] [doc/doxygen.cfg])
+AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [libusb/libusb-1.0.rc] [examples/Makefile] [doc/Makefile] [doc/doxygen.cfg])
 AC_OUTPUT
 

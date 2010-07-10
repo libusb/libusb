@@ -23,7 +23,6 @@
 
 #include <config.h>
 
-#include <poll.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
@@ -177,9 +176,17 @@ static inline void usbi_dbg(const char *format, ...)
 #define ITRANSFER_CTX(transfer) \
 	(TRANSFER_CTX(__USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)))
 
-/* Internal abstraction for thread synchronization */
-#if defined(OS_LINUX) || defined(OS_DARWIN)
+/* Internal abstractions for thread synchronization and poll */
+#if defined(THREADS_POSIX)
 #include <os/threads_posix.h>
+#elif defined(OS_WINDOWS)
+#include <os/threads_windows.h>
+#endif
+
+#if defined(OS_LINUX) || defined(OS_DARWIN)
+#include <os/poll_posix.h>
+#elif defined(OS_WINDOWS)
+#include <os/poll_windows.h>
 #endif
 
 extern struct libusb_context *usbi_default_context;
@@ -850,6 +857,7 @@ extern const struct usbi_os_backend * const usbi_backend;
 
 extern const struct usbi_os_backend linux_usbfs_backend;
 extern const struct usbi_os_backend darwin_backend;
+extern const struct usbi_os_backend windows_backend;
 
 #endif
 

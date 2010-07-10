@@ -27,14 +27,14 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include "os/poll_posix.h"
-
 #include "libusbi.h"
 
 #if defined(OS_LINUX)
 const struct usbi_os_backend * const usbi_backend = &linux_usbfs_backend;
 #elif defined(OS_DARWIN)
 const struct usbi_os_backend * const usbi_backend = &darwin_backend;
+#elif defined(OS_WINDOWS)
+const struct usbi_os_backend * const usbi_backend = &windows_backend;
 #else
 #error "Unsupported OS"
 #endif

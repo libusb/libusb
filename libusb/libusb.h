@@ -21,13 +21,30 @@
 #ifndef __LIBUSB_H__
 #define __LIBUSB_H__
 
+/* MSVC doesn't like inline, but does accept __inline ?? */
+#ifdef _MSC_VER
+#define inline __inline
+#endif
+
 #include <stdint.h>
 #include <sys/types.h>
 #include <time.h>
 #include <limits.h>
 
-#if defined(__linux) || defined(__APPLE__)
+#if defined(__linux) || defined(__APPLE__) || defined(__CYGWIN__)
 #include <sys/time.h>
+#endif
+
+/* 'interface' might be defined as a macro on Windows, so we need to
+ * undefine it so as not to break the current libusb API, because
+ * libusb_config_descriptor has an 'interface' member
+ * As this can be problematic if you include windows.h after libusb.h
+ * in your sources, we force windows.h to be included first. */
+#if defined(_WIN32) || defined(__CYGWIN__)
+#include <windows.h>
+#if defined(interface)
+#undef interface
+#endif
 #endif
 
 #ifdef __cplusplus
