@@ -127,6 +127,10 @@ AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
 	nopointersign_cflags="-Wno-pointer-sign", nopointersign_cflags="")
 CFLAGS="$saved_cflags"
 
+# sigaction not available on MinGW
+AC_CHECK_FUNC([sigaction], [have_sigaction=yes], [have_sigaction=no])
+AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
+
 # headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 
