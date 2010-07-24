@@ -748,8 +748,11 @@ static int darwin_get_interface (usb_device_t **darwin_device, uint8_t ifc, io_s
   if (kresult)
     return kresult;
 
-  for ( current_interface = 0 ; current_interface <= ifc ; current_interface++ )
+  for ( current_interface = 0 ; current_interface <= ifc ; current_interface++ ) {
     *usbInterfacep = IOIteratorNext(interface_iterator);
+    if (current_interface != ifc)
+      (void) IOObjectRelease (*usbInterfacep);
+  }
 
   /* done with the interface iterator */
   IOObjectRelease(interface_iterator);
