@@ -1376,7 +1376,7 @@ static void darwin_handle_callback (struct usbi_transfer *itransfer, kern_return
       /* copy isochronous results back */
 
       for (i = 0; i < transfer->num_iso_packets ; i++) {
-	struct libusb_iso_packet_descriptor *lib_desc = transfer->iso_packet_desc;
+	struct libusb_iso_packet_descriptor *lib_desc = &transfer->iso_packet_desc[i];
 	lib_desc->status = darwin_to_libusb (tpriv->isoc_framelist[i].frStatus);
 	lib_desc->actual_length = tpriv->isoc_framelist[i].frActCount;
       }
