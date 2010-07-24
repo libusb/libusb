@@ -294,12 +294,12 @@ static void *event_thread_main (void *arg0) {
   /* let the main thread know about the async runloop */
   libusb_darwin_acfl = CFRunLoopGetCurrent ();
 
-  usbi_info (ctx, "libopenusb/darwin.c event_thread_main: thread ready to receive events");
+  usbi_info (ctx, "thread ready to receive events");
 
   /* run the runloop */
   CFRunLoopRun();
 
-  usbi_info (ctx, "libopenusb/darwin.c event_thread_main: thread exiting");
+  usbi_info (ctx, "thread exiting");
 
   /* delete notification port */
   CFRunLoopSourceInvalidate (libusb_notification_cfsource);
@@ -1340,7 +1340,7 @@ static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_
     usbi_warn (ITRANSFER_CTX (itransfer), "transfer error: pipe is stalled");
     return LIBUSB_TRANSFER_STALL;
   case kIOReturnOverrun:
-    usbi_err (ITRANSFER_CTX (itransfer), "transfer error: data overrun", darwin_error_str (result));
+    usbi_err (ITRANSFER_CTX (itransfer), "transfer error: data overrun");
     return LIBUSB_TRANSFER_OVERFLOW;
   case kIOUSBTransactionTimeout:
     usbi_err (ITRANSFER_CTX (itransfer), "transfer error: timed out");
