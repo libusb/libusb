@@ -179,7 +179,9 @@ static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 
   (*plugInInterface)->Stop(plugInInterface);
   IODestroyPlugInInterface (plugInInterface);
 
-  (*(device))->GetLocationID(device, locationp);
+  /* get the location from the device */
+  if (locationp)
+    (*(device))->GetLocationID(device, locationp);
 
   return device;
 }
@@ -475,9 +477,8 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     (*(device))->GetDeviceSubClass (device, &bDeviceSubClass);
 
     /**** retrieve device descriptors ****/
-    /* device must be open for DeviceRequest */
-    (*device)->USBDeviceOpen(device);
-
+    /* according to Apple's documentation the device must be open for DeviceRequest but we may not be able to open some
+     * devices and Apple's USB Prober doesn't bother to open the device before issuing a descriptor request */
     ret = (*(device))->DeviceRequest (device, &req);
     if (ret != kIOReturnSuccess) {
       int try_unsuspend = 1;
@@ -491,6 +492,9 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
       try_unsuspend = info & (1 << kUSBInformationDeviceIsSuspendedBit);
 #endif
 
+      /* the device should be open before to device is unsuspended */
+      (void) (*device)->USBDeviceOpenSeize(device);
+
       if (try_unsuspend) {
 	/* resume the device */
 	(void)(*device)->USBDeviceSuspend (device, 0);
@@ -500,9 +504,9 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
 	/* resuspend the device */
 	(void)(*device)->USBDeviceSuspend (device, 1);
       }
-    }
 
-    (*device)->USBDeviceClose (device);
+      (*device)->USBDeviceClose (device);
+    }
 
     if (ret != kIOReturnSuccess) {
       usbi_warn (ctx, "could not retrieve device descriptor: %s. skipping device", darwin_error_str (ret));
