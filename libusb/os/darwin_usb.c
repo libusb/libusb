@@ -90,6 +90,7 @@ static const char *darwin_error_str (int result) {
 
 static int darwin_to_libusb (int result) {
   switch (result) {
+  case kIOReturnUnderrun:
   case kIOReturnSuccess:
     return LIBUSB_SUCCESS;
   case kIOReturnNotOpen:
@@ -1335,6 +1336,7 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 
 static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_t result) {
   switch (result) {
+  case kIOReturnUnderrun:
   case kIOReturnSuccess:
     return LIBUSB_TRANSFER_COMPLETED;
   case kIOReturnAborted:
@@ -1371,7 +1373,7 @@ static void darwin_handle_callback (struct usbi_transfer *itransfer, kern_return
   usbi_info (ITRANSFER_CTX (itransfer), "handling %s completion with kernel status %d",
 	     isControl ? "control" : isBulk ? "bulk" : isIsoc ? "isoc" : "interrupt", result);
 
-  if (kIOReturnSuccess == result) {
+  if (kIOReturnSuccess == result || kIOReturnUnderrun == result) {
     if (isIsoc && tpriv->isoc_framelist) {
       /* copy isochronous results back */
 
