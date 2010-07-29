@@ -312,7 +312,7 @@ if (cfg != desired)
  * The default context is reference-counted and can be shared. That means that
  * if libusb_init(NULL) is called twice within the same process, the two
  * users end up sharing the same context. The deinitialization and freeing of
- * the default context will only happen when the last user calls libusb_exit()
+ * the default context will only happen when the last user calls libusb_exit().
  * In other words, the default context is created and initialized when its
  * reference count goes from 0 to 1, and is deinitialized and destroyed when
  * its reference count goes from 1 to 0.
@@ -1560,7 +1560,6 @@ API_EXPORTED int LIBUSB_API libusb_init(libusb_context **context)
 		usbi_default_context = ctx;
 		default_context_refcnt++;
 	}
-	usbi_mutex_static_unlock(&default_context_lock);
 
 	return 0;
 
