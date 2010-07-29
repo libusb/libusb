@@ -34,6 +34,7 @@ case $host in
 	AC_CHECK_LIB(rt, clock_gettime)
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
+	AM_CFLAGS="-std=gnu99"
 	AM_LDFLAGS=""
 	;;
 *-darwin*)
@@ -45,6 +46,7 @@ case $host in
 	backend="darwin"
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
+	AM_CFLAGS="-std=gnu99"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
 *-mingw*)
@@ -56,6 +58,7 @@ case $host in
 	LIBS="-lsetupapi -lole32 -ladvapi32"
 	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version"
+	AM_CFLAGS="-std=c99"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
 *-cygwin*)
@@ -66,6 +69,7 @@ case $host in
 	backend="windows"
 	threads="posix"
 	LIBS="-lsetupapi -lole32 -ladvapi32"
+	AM_CFLAGS="-std=c99"
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
@@ -183,7 +187,7 @@ AC_CHECK_HEADERS([sys/time.h])
 
 AC_SUBST([THREAD_CFLAGS])
 
-AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
+AM_CFLAGS="$AM_CFLAGS $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
 
 AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)
