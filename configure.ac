@@ -28,7 +28,7 @@ case $host in
 *-linux*)
 	AC_DEFINE(OS_LINUX, [], [Linux backend])
 	AC_SUBST(OS_LINUX)
-	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])	
+	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
 	AC_MSG_RESULT([Linux])
 	backend="linux"
 	AC_CHECK_LIB(rt, clock_gettime)

@@ -198,7 +198,7 @@ static int set_mode_async(unsigned char data)
 
 	if (!buf)
 		return -ENOMEM;
-	
+
 	transfer = libusb_alloc_transfer(0);
 	if (!transfer) {
 		free(buf);
@@ -237,7 +237,7 @@ static int do_sync_intr(unsigned char *data)
 }
 
 static int sync_intr(unsigned char type)
-{	
+{
 	int r;
 	unsigned char data[INTR_LENGTH];
 
@@ -423,7 +423,7 @@ static int alloc_transfers(void)
 	img_transfer = libusb_alloc_transfer(0);
 	if (!img_transfer)
 		return -ENOMEM;
-	
+
 	irq_transfer = libusb_alloc_transfer(0);
 	if (!irq_transfer)
 		return -ENOMEM;
