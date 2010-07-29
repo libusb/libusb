@@ -34,7 +34,6 @@ case $host in
 	AC_CHECK_LIB(rt, clock_gettime)
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
-	AM_CFLAGS="-Wshadow"
 	AM_LDFLAGS=""
 	;;
 *-darwin*)
@@ -46,7 +45,6 @@ case $host in
 	backend="darwin"
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
-	AM_CFLAGS="-Wshadow"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
 *-mingw*)
@@ -56,7 +54,6 @@ case $host in
 	backend="windows"
 	threads="windows"
 	LIBS="-lsetupapi -lole32 -ladvapi32"
-	AM_CFLAGS="-Wshadow"
 	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
@@ -69,7 +66,6 @@ case $host in
 	backend="windows"
 	threads="posix"
 	LIBS="-lsetupapi -lole32 -ladvapi32"
-	AM_CFLAGS=""
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
@@ -81,6 +77,14 @@ AM_CONDITIONAL([OS_LINUX], [test "x$backend" = "xlinux"])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = "xdarwin"])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" = "xwindows"])
 AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" = "xposix"])
+
+# Library versioning
+lt_major="0"
+lt_revision="0"
+lt_age="0"
+AC_SUBST(lt_major)
+AC_SUBST(lt_revision)
+AC_SUBST(lt_age)
 
 # timerfd
 AC_CHECK_HEADER([sys/timerfd.h], [timerfd_h=1], [timerfd_h=0])
@@ -121,7 +125,7 @@ if test "x$log_enabled" != "xno"; then
 fi
 
 AC_ARG_ENABLE([debug-log], [AS_HELP_STRING([--enable-debug-log],
-	[force all logging, including debug (default n)])],
+	[enable debug logging (default n)])],
 	[debug_log_enabled=$enableval],
 	[debug_log_enabled='no'])
 
@@ -131,7 +135,7 @@ AC_ARG_ENABLE([toggable-debug], [AS_HELP_STRING([--enable-toggable-debug],
 	[toggable_debug='no'])
 
 if test "x$debug_log_enabled" != "xno"; then
-	AC_DEFINE([ENABLE_DEBUG_LOGGING], 1, [Debug message logging (forced)])
+	AC_DEFINE([ENABLE_DEBUG_LOGGING], 1, [Debug message logging])
 else
 	if test "x$toggable_debug" != "xno"; then
 		AC_DEFINE([INCLUDE_DEBUG_LOGGING], 1, [Debug message logging (toggable)])
@@ -177,18 +181,9 @@ AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
 # headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 
-# check if -pthread is supported (some environments like cygwin don't support it)
-AC_MSG_CHECKING([whether compiler supports the -pthread option])
-if $CC -pthread 2>&1 | grep -q 'unrecognized option.*pthread'; then
-	AC_MSG_RESULT([no])
-	THREAD_CFLAGS=""
-else
-	AC_MSG_RESULT([yes])
-	THREAD_CFLAGS="-pthread"
-fi
 AC_SUBST([THREAD_CFLAGS])
 
-AM_CFLAGS="$AM_CFLAGS -std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags"
+AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
 
 AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)
@@ -196,3 +191,4 @@ AC_SUBST(AM_LDFLAGS)
 
 AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [libusb/libusb-1.0.rc] [examples/Makefile] [doc/Makefile] [doc/doxygen.cfg])
 AC_OUTPUT
+
