@@ -1157,8 +1157,8 @@ static inline unsigned char *libusb_get_iso_packet_buffer_simple(
 /* sync I/O */
 
 LIBUSB_EXP int LIBUSB_API libusb_control_transfer(libusb_device_handle *dev_handle,
-	uint8_t request_type, uint8_t request, uint16_t value, uint16_t index,
-	unsigned char *data, uint16_t length, unsigned int timeout);
+	uint8_t request_type, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
+	unsigned char *data, uint16_t wLength, unsigned int timeout);
 
 LIBUSB_EXP int LIBUSB_API libusb_bulk_transfer(libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *data, int length,
@@ -1211,7 +1211,7 @@ static inline int libusb_get_string_descriptor(libusb_device_handle *dev,
 }
 
 LIBUSB_EXP int LIBUSB_API libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
-	uint8_t index, unsigned char *data, int length);
+	uint8_t desc_index, unsigned char *data, int length);
 
 /* polling and timeouts */
 
