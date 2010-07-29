@@ -28,22 +28,24 @@ case $host in
 *-linux*)
 	AC_DEFINE(OS_LINUX, [], [Linux backend])
 	AC_SUBST(OS_LINUX)
+	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
 	AC_MSG_RESULT([Linux])
 	backend="linux"
-	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
-	threads="posix"
 	AC_CHECK_LIB(rt, clock_gettime)
+	threads="posix"
+	THREAD_CFLAGS="-pthread"
 	AM_CFLAGS="-Wshadow"
 	AM_LDFLAGS=""
 	;;
 *-darwin*)
 	AC_DEFINE(OS_DARWIN, [], [Darwin backend])
 	AC_SUBST(OS_DARWIN)
+	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
 	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
 	AC_MSG_RESULT([Darwin/MacOS X])
 	backend="darwin"
-	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 	threads="posix"
+	THREAD_CFLAGS="-pthread"
 	AM_CFLAGS="-Wshadow"
 	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
 	;;
@@ -55,15 +57,16 @@ case $host in
 	threads="windows"
 	LIBS="-lsetupapi -lole32 -ladvapi32"
 	AM_CFLAGS="-Wshadow"
+	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
 *-cygwin*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
 	AC_SUBST(OS_WINDOWS)
+	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
 	AC_MSG_RESULT([Windows])
 	backend="windows"
-	AC_DEFINE([POSIX_THREADS], [], [Posix Threads])
 	threads="posix"
 	LIBS="-lsetupapi -lole32 -ladvapi32"
 	AM_CFLAGS=""
@@ -77,7 +80,7 @@ esac
 AM_CONDITIONAL([OS_LINUX], [test "x$backend" == "xlinux"])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" == "xdarwin"])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" == "xwindows"])
-AM_CONDITIONAL([POSIX_THREADS], [test "x$threads" == "xposix"])
+AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" == "xposix"])
 
 # timerfd
 AC_CHECK_HEADER([sys/timerfd.h], [timerfd_h=1], [timerfd_h=0])
@@ -167,6 +170,13 @@ AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
 	nopointersign_cflags="-Wno-pointer-sign", nopointersign_cflags="")
 CFLAGS="$saved_cflags"
 
+# sigaction not available on MinGW
+AC_CHECK_FUNC([sigaction], [have_sigaction=yes], [have_sigaction=no])
+AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
+
+# headers not available on all platforms but required on others
+AC_CHECK_HEADERS([sys/time.h])
+
 # check if -pthread is supported (some environments like cygwin don't support it)
 AC_MSG_CHECKING([whether compiler supports the -pthread option])
 if $CC -pthread 2>&1 | grep -q 'unrecognized option.*pthread'; then
@@ -186,4 +196,3 @@ AC_SUBST(AM_LDFLAGS)
 
 AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [libusb/libusb-1.0.rc] [examples/Makefile] [doc/Makefile] [doc/doxygen.cfg])
 AC_OUTPUT
-
