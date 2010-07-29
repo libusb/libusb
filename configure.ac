@@ -77,10 +77,10 @@ case $host in
 	AC_MSG_ERROR([unsupported operating system])
 esac
 
-AM_CONDITIONAL([OS_LINUX], [test "x$backend" == "xlinux"])
-AM_CONDITIONAL([OS_DARWIN], [test "x$backend" == "xdarwin"])
-AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" == "xwindows"])
-AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" == "xposix"])
+AM_CONDITIONAL([OS_LINUX], [test "x$backend" = "xlinux"])
+AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = "xdarwin"])
+AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" = "xwindows"])
+AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" = "xposix"])
 
 # timerfd
 AC_CHECK_HEADER([sys/timerfd.h], [timerfd_h=1], [timerfd_h=0])
