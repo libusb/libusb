@@ -1,12 +1,11 @@
 @echo off 
 if NOT x%DDK_TARGET_OS%==xWinXP goto usage
 
-rmdir /S /Q E:\dailies\%DATE%
 mkdir E:\dailies\%DATE%
-for %%A in (MS32 MS64 MinGW32) do mkdir E:\dailies\%DATE%\%%A
-for %%A in (MS32 MS64 MinGW32) do mkdir E:\dailies\%DATE%\%%A\lib
-for %%A in (MS32 MS64 MinGW32) do mkdir E:\dailies\%DATE%\%%A\dll
-for %%A in (MS32 MS64 MinGW32) do mkdir E:\dailies\%DATE%\%%A\examples
+for %%A in (MS32 MS64) do mkdir E:\dailies\%DATE%\%%A
+for %%A in (MS32 MS64) do mkdir E:\dailies\%DATE%\%%A\lib
+for %%A in (MS32 MS64) do mkdir E:\dailies\%DATE%\%%A\dll
+for %%A in (MS32 MS64) do mkdir E:\dailies\%DATE%\%%A\examples
 copy libusb\libusb.h E:\dailies\%DATE%\
 
 set ORG_BUILD_ALT_DIR=%BUILD_ALT_DIR%
