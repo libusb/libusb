@@ -21,6 +21,7 @@
 #include <config.h>
 #include <errno.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -1962,7 +1963,7 @@ retry:
 		return r;
 	}
 
-	/* another thread is doing event handling. wait for thread events that
+	/* another thread is doing event handling. wait for pthread events that
 	 * notify event completion. */
 	libusb_lock_event_waiters(ctx);
 

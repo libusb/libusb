@@ -19,6 +19,7 @@
  */
 
 #include <config.h>
+
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -1471,9 +1472,6 @@ API_EXPORTED int LIBUSB_API libusb_attach_kernel_driver(libusb_device_handle *de
 API_EXPORTED void LIBUSB_API libusb_set_debug(libusb_context *ctx, int level)
 {
 	USBI_GET_CONTEXT(ctx);
-	// ctx can be NULL if called before libusb_init
-	if (ctx == NULL)
-		return;
 	if (!ctx->debug_fixed)
 		ctx->debug = level;
 }
@@ -1512,9 +1510,6 @@ API_EXPORTED int LIBUSB_API libusb_init(libusb_context **context)
 		goto err_unlock;
 	}
 	memset(ctx, 0, sizeof(*ctx));
-#ifdef USBI_TIMERFD_AVAILABLE
-	ctx->timerfd = -1;
-#endif
 
 	if (dbg) {
 		ctx->debug = atoi(dbg);
@@ -1529,11 +1524,6 @@ API_EXPORTED int LIBUSB_API libusb_init(libusb_context **context)
 	}
 
 	usbi_dbg("");
-
-	usbi_mutex_init(&ctx->usb_devs_lock, NULL);
-	usbi_mutex_init(&ctx->open_devs_lock, NULL);
-	list_init(&ctx->usb_devs);
-	list_init(&ctx->open_devs);
 
 	if (usbi_backend->init) {
 		r = usbi_backend->init(ctx);
@@ -1560,13 +1550,13 @@ API_EXPORTED int LIBUSB_API libusb_init(libusb_context **context)
 		usbi_default_context = ctx;
 		default_context_refcnt++;
 	}
+	usbi_mutex_static_unlock(&default_context_lock);
 
 	return 0;
 
 err_destroy_mutex:
 	if (usbi_default_context == ctx)
 		usbi_default_context = NULL;
-	usbi_mutex_static_unlock(&default_context_lock);
 	usbi_mutex_destroy(&ctx->open_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
 err_free_ctx:
