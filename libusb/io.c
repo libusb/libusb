@@ -1002,7 +1002,7 @@ printf("completed!\n");
 
 int usbi_io_init(struct libusb_context *ctx)
 {
-	int p, r;
+	int r;
 
 	usbi_mutex_init(&ctx->flying_transfers_lock, NULL);
 	usbi_mutex_init(&ctx->pollfds_lock, NULL);
@@ -1014,15 +1014,15 @@ int usbi_io_init(struct libusb_context *ctx)
 	list_init(&ctx->pollfds);
 
 	/* FIXME should use an eventfd on kernels that support it */
-	p = usbi_pipe(ctx->ctrl_pipe);
-	if (p < 0) {
+	r = usbi_pipe(ctx->ctrl_pipe);
+	if (r < 0) {
 		r = LIBUSB_ERROR_OTHER;
 		goto err;
 	}
 
 	r = usbi_add_pollfd(ctx, ctx->ctrl_pipe[0], POLLIN);
 	if (r < 0)
-		goto err;
+		goto err_close_pipe;
 
 #ifdef USBI_TIMERFD_AVAILABLE
 	ctx->timerfd = timerfd_create(usbi_backend->get_timerfd_clockid(),
@@ -1030,8 +1030,11 @@ int usbi_io_init(struct libusb_context *ctx)
 	if (ctx->timerfd >= 0) {
 		usbi_dbg("using timerfd for timeouts");
 		r = usbi_add_pollfd(ctx, ctx->timerfd, POLLIN);
-		if (r < 0)
-			goto err;
+		if (r < 0) {
+			usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
+			close(ctx->timerfd);
+			goto err_close_pipe;
+		}
 	} else {
 		usbi_dbg("timerfd not available (code %d error %d)", ctx->timerfd, errno);
 		ctx->timerfd = -1;
@@ -1040,16 +1043,10 @@ int usbi_io_init(struct libusb_context *ctx)
 
 	return 0;
 
+err_close_pipe:
+	usbi_close(ctx->ctrl_pipe[0]);
+	usbi_close(ctx->ctrl_pipe[1]);
 err:
-#ifdef USBI_TIMERFD_AVAILABLE
-	if (ctx->timerfd != -1)
-		close(ctx->timerfd);
-#endif
-	if (0 == p) {
-		usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
-		usbi_close(ctx->ctrl_pipe[0]);
-		usbi_close(ctx->ctrl_pipe[1]);
-	}
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
 	usbi_mutex_destroy(&ctx->pollfds_lock);
 	usbi_mutex_destroy(&ctx->pollfd_modify_lock);

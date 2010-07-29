@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include "libusbi.h"
 
@@ -1539,6 +1540,11 @@ API_EXPORTED int LIBUSB_API libusb_init(libusb_context **context)
 		if (r)
 			goto err_free_ctx;
 	}
+
+	usbi_mutex_init(&ctx->usb_devs_lock, NULL);
+	usbi_mutex_init(&ctx->open_devs_lock, NULL);
+	list_init(&ctx->usb_devs);
+	list_init(&ctx->open_devs);
 
 	r = usbi_io_init(ctx);
 	if (r < 0) {
