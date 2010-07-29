@@ -47,12 +47,6 @@
 
 #include <libusbi.h>
 
-// The following prevents "The function 'InitializeCriticalSection' must be called from within
-// a try/except block" errors when using the MS's WDK OACR/Prefast
-#if defined(_PREFAST_)
-#pragma warning(disable:28125)
-#endif
-
 // Uncomment to debug the polling layer
 //#define DEBUG_POLL_WINDOWS
 #if defined(DEBUG_POLL_WINDOWS)
@@ -75,27 +69,27 @@
 // cygwin produces a warning unless these prototypes are defined
 extern int _close(int fd);
 extern int _snprintf(char *buffer, size_t count, const char *format, ...);
-extern int cygwin_attach_handle_to_fd(char *name, int fd, HANDLE handle, int bin, int access);
+extern int cygwin_attach_handle_to_fd(char *name, int fd, HANDLE handle, int bin, int access_mode);
 // _open_osfhandle() is not available on cygwin, but we can emulate
 // it for our needs with cygwin_attach_handle_to_fd()
 static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 {
-	int access;
+	int access_mode;
 	switch (flags) {
 	case _O_RDONLY:
-		access = GENERIC_READ;
+		access_mode = GENERIC_READ;
 		break;
 	case _O_WRONLY:
-		access = GENERIC_WRITE;
+		access_mode = GENERIC_WRITE;
 		break;
 	case _O_RDWR:
-		access = GENERIC_READ|GENERIC_WRITE;
+		access_mode = GENERIC_READ|GENERIC_WRITE;
 		break;
 	default:
-		usbi_err(NULL, "unuspported access mode");
+		usbi_err(NULL, "unsupported access mode");
 		return -1;
 	}
-	return cygwin_attach_handle_to_fd("/dev/null", -1, (HANDLE)osfhandle, -1, access);
+	return cygwin_attach_handle_to_fd("/dev/null", -1, (HANDLE)osfhandle, -1, access_mode);
 }
 #endif
 

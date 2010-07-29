@@ -74,7 +74,6 @@ extern char *_strdup(const char *strSource);
 #define safe_strcmp(str1, str2) strcmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2))
 #define safe_strncmp(str1, str2, count) strncmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2), count)
 #define safe_strlen(str) ((str==NULL)?0:strlen(str))
-#define safe_strdup _strdup
 #define safe_sprintf _snprintf
 #define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
@@ -584,17 +583,14 @@ typedef struct _USB_NODE_CONNECTION_INFORMATION {
 //	USB_PIPE_INFO  PipeList[0];
 } USB_NODE_CONNECTION_INFORMATION, *PUSB_NODE_CONNECTION_INFORMATION;
 
-typedef union _USB_HUB_CAP_FLAGS {
-	ULONG ul;
-	struct {
-		ULONG HubIsHighSpeedCapable:1;
-		ULONG HubIsHighSpeed:1;
-		ULONG HubIsMultiTtCapable:1;
-		ULONG HubIsMultiTt:1;
-		ULONG HubIsRoot:1;
-		ULONG HubIsArmedWakeOnConnect:1;
-		ULONG ReservedMBZ:26;
-	};
+typedef struct _USB_HUB_CAP_FLAGS {
+	ULONG HubIsHighSpeedCapable:1;
+	ULONG HubIsHighSpeed:1;
+	ULONG HubIsMultiTtCapable:1;
+	ULONG HubIsMultiTt:1;
+	ULONG HubIsRoot:1;
+	ULONG HubIsArmedWakeOnConnect:1;
+	ULONG ReservedMBZ:26;
 } USB_HUB_CAP_FLAGS, *PUSB_HUB_CAP_FLAGS;
 
 typedef struct _USB_HUB_CAPABILITIES {
@@ -742,7 +738,7 @@ typedef struct _HIDP_VALUE_CAPS {
 		USHORT  DesignatorIndex, Reserved3;
 		USHORT  DataIndex, Reserved4;
 	  } NotRange;
-	};
+	} u;
 } HIDP_VALUE_CAPS, *PHIDP_VALUE_CAPS;
 
 DLL_DECLARE(WINAPI, BOOL, HidD_GetAttributes, (HANDLE, PHIDD_ATTRIBUTES));

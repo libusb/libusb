@@ -1513,7 +1513,10 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 							break;
 						default:
 							// For other devices, the first interface is the same as the device
-							priv->usb_interface[0].path = safe_strdup(priv->path);	// needs strdup
+							priv->usb_interface[0].path = malloc(safe_strlen(priv->path));
+							if (priv->usb_interface[0].path != NULL) {
+								safe_strcpy(priv->usb_interface[0].path, safe_strlen(priv->path), priv->path);
+							}
 							// The following is needed if we want to API calls to work for both simple
 							// and composite devices, as
 							for(k=0; k<USB_MAXINTERFACES; k++) {
