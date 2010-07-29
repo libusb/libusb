@@ -65,7 +65,7 @@ int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest,
 		}
 	}
 
-	return (int)(sp - source);
+	return (int) (sp - source);
 }
 
 static void clear_endpoint(struct libusb_endpoint_descriptor *endpoint)
@@ -639,7 +639,7 @@ API_EXPORTED int LIBUSB_API libusb_get_config_descriptor_by_value(libusb_device 
 	else if (idx == -1)
 		return LIBUSB_ERROR_NOT_FOUND;
 	else
-		return libusb_get_config_descriptor(dev, (uint8_t)idx, config);
+		return libusb_get_config_descriptor(dev, (uint8_t) idx, config);
 }
 
 /** \ingroup desc

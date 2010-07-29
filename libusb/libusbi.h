@@ -22,10 +22,8 @@
 #define __LIBUSBI_H__
 
 #include <config.h>
-#if !defined(OS_WINDOWS) || defined(__CYGWIN__)
-#include <poll.h>
-#endif
 #include <stddef.h>
+#include <stdint.h>
 
 #include <libusb.h>
 
@@ -150,14 +148,17 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 #define LOG_BODY(ctxt, level) { }
 #endif
 
-void inline usbi_info(struct libusb_context *ctx, const char *format, ...)
+static inline void usbi_info(struct libusb_context *ctx, const char *format,
+	...)
 	LOG_BODY(ctx,LOG_LEVEL_INFO)
-void inline usbi_warn(struct libusb_context *ctx, const char *format, ...)
+static inline void usbi_warn(struct libusb_context *ctx, const char *format,
+	...)
 	LOG_BODY(ctx,LOG_LEVEL_WARNING)
-void inline usbi_err( struct libusb_context *ctx, const char *format, ...)
+static inline void usbi_err( struct libusb_context *ctx, const char *format,
+	...)
 	LOG_BODY(ctx,LOG_LEVEL_ERROR)
 
-void inline usbi_dbg(const char *format, ...)
+static inline void usbi_dbg(const char *format, ...)
 #if defined(ENABLE_DEBUG_LOGGING) || defined(INCLUDE_DEBUG_LOGGING)
 	LOG_BODY(NULL,LOG_LEVEL_DEBUG)
 #else
@@ -173,14 +174,16 @@ void inline usbi_dbg(const char *format, ...)
 #define ITRANSFER_CTX(transfer) \
 	(TRANSFER_CTX(__USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)))
 
-/* Internal abstraction for thread synchronization */
-#if defined(OS_LINUX) || defined(OS_DARWIN)
+/* Internal abstractions for thread synchronization and poll */
+#if defined(THREADS_POSIX)
 #include <os/threads_posix.h>
-#elif defined(OS_WINDOWS) && (defined(__CYGWIN__) || defined(USE_PTHREAD))
-#include <os/threads_posix.h>
-#include <os/poll_windows.h>
 #elif defined(OS_WINDOWS)
 #include <os/threads_windows.h>
+#endif
+
+#if defined(OS_LINUX) || defined(OS_DARWIN)
+#include <os/poll_posix.h>
+#elif defined(OS_WINDOWS)
 #include <os/poll_windows.h>
 #endif
 
@@ -312,15 +315,15 @@ struct usbi_transfer {
 };
 
 #define __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
-	((struct libusb_transfer *)(((char *)(transfer)) \
+	((struct libusb_transfer *)(((unsigned char *)(transfer)) \
 		+ sizeof(struct usbi_transfer)))
 #define __LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer) \
-	((struct usbi_transfer *)(((char *)(transfer)) \
+	((struct usbi_transfer *)(((unsigned char *)(transfer)) \
 		- sizeof(struct usbi_transfer)))
 
 static inline void *usbi_transfer_get_os_priv(struct usbi_transfer *transfer)
 {
-	return ((char *)transfer) + sizeof(struct usbi_transfer)
+	return ((unsigned char *)transfer) + sizeof(struct usbi_transfer)
 		+ sizeof(struct libusb_transfer)
 		+ (transfer->num_iso_packets
 			* sizeof(struct libusb_iso_packet_descriptor));

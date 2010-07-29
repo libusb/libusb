@@ -23,9 +23,10 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-#ifndef OS_WINDOWS
-#include "os/poll_posix.h"
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
 #endif
 
 #ifdef USBI_TIMERFD_AVAILABLE

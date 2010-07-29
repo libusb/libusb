@@ -21,27 +21,30 @@
 #ifndef __LIBUSB_H__
 #define __LIBUSB_H__
 
-#include <stdint.h>
+/* MSVC doesn't like inline, but does accept __inline ?? */
 #ifdef _MSC_VER
 #define inline __inline
-#else
-#include <sys/time.h>
 #endif
+
+#include <stdint.h>
 #include <sys/types.h>
 #include <time.h>
 #include <limits.h>
+
+#if defined(__linux) || defined(__APPLE__) || defined(__CYGWIN__)
+#include <sys/time.h>
+#endif
 
 /* 'interface' might be defined as a macro on Windows, so we need to
  * undefine it so as not to break the current libusb API, because
  * libusb_config_descriptor has an 'interface' member
  * As this can be problematic if you include windows.h after libusb.h
  * in your sources, we force windows.h to be included first. */
-#if     (defined(_WIN32) || defined(__CYGWIN__))
+#if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
-#endif
-
 #if defined(interface)
 #undef interface
+#endif
 #endif
 
 #if     (defined(_WIN32) || defined(__CYGWIN__))&&defined(LIBUSB_DLL_BUILD)
@@ -68,14 +71,14 @@ extern "C" {
  * \param x the host-endian value to convert
  * \returns the value in little-endian byte order
  */
-static inline uint16_t libusb_cpu_to_le16(uint16_t x) {
+static inline uint16_t libusb_cpu_to_le16(const uint16_t x)
+{
 	union {
 		uint8_t  b8[2];
 		uint16_t b16;
 	} _tmp;
-	uint16_t _tmp2 = (uint16_t)(x);
-	_tmp.b8[1] = _tmp2 >> 8;
-	_tmp.b8[0] = _tmp2 & 0xff;
+	_tmp.b8[1] = x >> 8;
+	_tmp.b8[0] = x & 0xff;
 	return _tmp.b16;
 }
 
@@ -808,7 +811,7 @@ struct libusb_transfer {
 LIBUSB_EXP int LIBUSB_API libusb_init(libusb_context **ctx);
 LIBUSB_EXP void LIBUSB_API libusb_exit(libusb_context *ctx);
 LIBUSB_EXP void LIBUSB_API libusb_set_debug(libusb_context *ctx, int level);
-LIBUSB_EXP const char* LIBUSB_API libusb_strerror(enum libusb_error errcode);
+LIBUSB_EXP const char *LIBUSB_API libusb_strerror(enum libusb_error errcode);
 
 LIBUSB_EXP ssize_t LIBUSB_API libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);
@@ -1181,8 +1184,8 @@ static inline int libusb_get_descriptor(libusb_device_handle *dev,
 	uint8_t desc_type, uint8_t desc_index, unsigned char *data, int length)
 {
 	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
-		LIBUSB_REQUEST_GET_DESCRIPTOR, (desc_type << 8) | desc_index,
-		0, data, (uint16_t)length, 1000);
+		LIBUSB_REQUEST_GET_DESCRIPTOR, (desc_type << 8) | desc_index, 0, data,
+		(uint16_t) length, 1000);
 }
 
 /** \ingroup desc
@@ -1203,9 +1206,8 @@ static inline int libusb_get_string_descriptor(libusb_device_handle *dev,
 	uint8_t desc_index, uint16_t langid, unsigned char *data, int length)
 {
 	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
-		LIBUSB_REQUEST_GET_DESCRIPTOR,
-		(uint16_t)((LIBUSB_DT_STRING << 8) | desc_index),
-		langid, data, (uint16_t)length, 1000);
+		LIBUSB_REQUEST_GET_DESCRIPTOR, (uint16_t)((LIBUSB_DT_STRING << 8) | desc_index),
+		langid, data, (uint16_t) length, 1000);
 }
 
 LIBUSB_EXP int LIBUSB_API libusb_get_string_descriptor_ascii(libusb_device_handle *dev,

@@ -24,9 +24,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef OS_WINDOWS
-#include "os/poll_posix.h"
-#endif
 
 #include "libusbi.h"
 
@@ -914,7 +911,7 @@ API_EXPORTED int LIBUSB_API libusb_open(libusb_device *dev, libusb_device_handle
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device_handle *_handle;
 	size_t priv_size = usbi_backend->device_handle_priv_size;
-	ssize_t r;
+	int r;
 	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
 
 	_handle = malloc(sizeof(*_handle) + priv_size);
@@ -936,7 +933,7 @@ API_EXPORTED int LIBUSB_API libusb_open(libusb_device *dev, libusb_device_handle
 		libusb_unref_device(dev);
 		usbi_mutex_destroy(&_handle->lock);
 		free(_handle);
-		return (int)r;
+		return r;
 	}
 
 	usbi_mutex_lock(&ctx->open_devs_lock);
@@ -944,14 +941,12 @@ API_EXPORTED int LIBUSB_API libusb_open(libusb_device *dev, libusb_device_handle
 	usbi_mutex_unlock(&ctx->open_devs_lock);
 	*handle = _handle;
 
-
 	/* At this point, we want to interrupt any existing event handlers so
 	 * that they realise the addition of the new device's poll fd. One
 	 * example when this is desirable is if the user is running a separate
 	 * dedicated libusb events handling thread, which is running with a long
 	 * or infinite timeout. We want to interrupt that iteration of the loop,
 	 * so that it picks up the new fd, and then continues. */
-
 	usbi_fd_notification(ctx);
 
 	return 0;
@@ -1674,18 +1669,22 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 }
 
 /** \ingroup misc
- * Returns a constant string with an English short description of the given
- * error code. The caller should never free() the returned pointer since it
- * points to a constant string.
+ * Returns a constant NULL-terminated string with an English short description
+ * of the given error code. The caller should never free() the returned pointer
+ * since it points to a constant string.
  * The returned string is encoded in ASCII form and always starts with a
- * capital letter and ends without any dot.
+ * capital letter and ends without any punctuation.
+ * Future versions of libusb may return NULL if the library is compiled without
+ * these messages included (e.g. for embedded systems).
+ * This function is intended to be used for debugging purposes only.
+ *
  * \param errcode the error code whose description is desired
- * \returns a short description of the error code in English
+ * \returns a short description of the error code in English, or NULL if the
+ * error descriptions are unavailable
  */
-API_EXPORTED const char* LIBUSB_API libusb_strerror(enum libusb_error errcode)
+API_EXPORTED const char *LIBUSB_API libusb_strerror(enum libusb_error errcode)
 {
-	switch (errcode)
-	{
+	switch (errcode) {
 	case LIBUSB_SUCCESS:
 		return "Success";
 	case LIBUSB_ERROR_IO:

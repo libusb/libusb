@@ -1,6 +1,9 @@
 This file lists notable changes in each release. For the full history of all
 changes, see ChangeLog.
 
+2010-05-07: v1.0.8
+* Bug fixes
+
 2010-04-19: v1.0.7
 * Bug fixes and documentation tweaks
 * Add more interface class definitions
