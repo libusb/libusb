@@ -416,9 +416,7 @@ static void sighandler(int signum)
 
 int main(void)
 {
-#ifndef __MINGW32__
 	struct sigaction sigact;
-#endif
 	int r = 1;
 
 	r = libusb_init(NULL);
@@ -458,17 +456,12 @@ int main(void)
 	if (r < 0)
 		goto out_deinit;
 
-#ifndef __MINGW32__
 	sigact.sa_handler = sighandler;
 	sigemptyset(&sigact.sa_mask);
 	sigact.sa_flags = 0;
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
 	sigaction(SIGQUIT, &sigact, NULL);
-#else
-	signal(SIGINT, sighandler);
-	signal(SIGTERM, sighandler);
-#endif
 
 	while (!do_exit) {
 		r = libusb_handle_events(NULL);
