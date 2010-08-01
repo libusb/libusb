@@ -517,7 +517,7 @@ static int windows_init(struct libusb_context *ctx)
 		usbi_err(ctx, "failure to access semaphore: %s", windows_error_str(0));
 		CloseHandle(semaphore);
 		return LIBUSB_ERROR_NO_MEM;
-    }
+	}
 
 	// NB: concurrent usage supposes that init calls are equally balanced with
 	// exit calls. If init is called more than exit, we will not exit properly
@@ -2423,7 +2423,7 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 			file_handle = CreateFileA(priv->usb_interface[i].path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ,
 				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 			if (file_handle == INVALID_HANDLE_VALUE) {
-				usbi_err(ctx, "could not open device %s (interface %d): %s", priv->path, i, windows_error_str(0));
+				usbi_err(ctx, "could not open device %s (interface %d): %s", priv->usb_interface[i].path, i, windows_error_str(0));
 				switch(GetLastError()) {
 				case ERROR_FILE_NOT_FOUND:	// The device was disconnected
 					return LIBUSB_ERROR_NO_DEVICE;
@@ -2583,6 +2583,7 @@ static int winusb_release_interface(struct libusb_device_handle *dev_handle, int
 	}
 
 	WinUsb_Free(winusb_handle);
+	handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
 
 	return LIBUSB_SUCCESS;
 }
