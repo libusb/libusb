@@ -67,7 +67,7 @@ extern char *_strdup(const char *strSource);
 #endif
 #define safe_free(p) do {if (p != NULL) {free(p); p = NULL;}} while(0)
 #define safe_closehandle(h) do {if (h != INVALID_HANDLE_VALUE) {CloseHandle(h); h = INVALID_HANDLE_VALUE;}} while(0)
-#define safe_strncpy(dst, dst_max, src, count) strncpy(dst, src, min(count, dst_max - 1))
+#define safe_strncpy(dst, dst_max, src, count) do {strncpy(dst, src, dst_max); ((char*)dst)[dst_max-1] = 0;} while(0)
 #define safe_strcpy(dst, dst_max, src) safe_strncpy(dst, dst_max, src, strlen(src)+1)
 #define safe_strncat(dst, dst_max, src, count) strncat(dst, src, min(count, dst_max - strlen(dst) - 1))
 #define safe_strcat(dst, dst_max, src) safe_strncat(dst, dst_max, src, strlen(src)+1)
