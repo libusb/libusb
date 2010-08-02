@@ -198,7 +198,7 @@ static char err_string[ERR_BUFFER_SIZE];
 	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%d] ", errcode);
 
 	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errcode,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &err_string[strlen(err_string)],
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &err_string[safe_strlen(err_string)],
 		ERR_BUFFER_SIZE, NULL);
 	if (size == 0)
 	{
@@ -226,7 +226,7 @@ static char* sanitize_path(const char* path)
 	if (path == NULL)
 		return NULL;
 
-	size = strlen(path)+1;
+	size = safe_strlen(path)+1;
 	root_size = sizeof(root_prefix)-1;
 
 	// Microsoft indiscriminatly uses '\\?\', '\\.\', '##?#" or "##.#" for root prefixes.
@@ -239,7 +239,7 @@ static char* sanitize_path(const char* path)
 	if ((ret_path = (char*)calloc(size, 1)) == NULL)
 		return NULL;
 
-	safe_strncpy(&ret_path[add_root], size-add_root, path, strlen(path));
+	safe_strncpy(&ret_path[add_root], size-add_root, path, safe_strlen(path));
 
 	// Ensure consistancy with root prefix
 	for (j=0; j<root_size; j++)
@@ -1273,7 +1273,7 @@ enum libusb_hid_report_type {
 		}
 
 		for (j=0; j<nb_paths; j++) {
-			if ( (safe_strncmp(sanitized_path[j], sanitized_short, strlen(sanitized_short)) == 0)
+			if ( (safe_strncmp(sanitized_path[j], sanitized_short, safe_strlen(sanitized_short)) == 0)
 			  || (safe_strcmp(hid_path[j], sanitized_short) == 0 ) ) {
 				// HID devices can have multiple collections (COL##) for each MI_## interface
 				if (priv->usb_interface[interface_number].path != NULL) {
@@ -1369,7 +1369,7 @@ static int set_hid_device(struct libusb_context *ctx, struct windows_device_priv
 		}
 
 		// NB: we compare strings of different lengths below => strncmp
-		if (safe_strncmp(priv->path, sanitized_path, strlen(sanitized_path)) == 0) {
+		if (safe_strncmp(priv->path, sanitized_path, safe_strlen(sanitized_path)) == 0) {
 			priv->usb_interface[interface_number].path = sanitize_path(dev_interface_details->DevicePath);
 			priv->usb_interface[interface_number].apib = &usb_api_backend[USB_API_HID];
 			usbi_dbg("interface_path[%d]: %s", interface_number, priv->usb_interface[interface_number].path);
@@ -1471,7 +1471,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			parent_priv = __device_priv(priv->parent_dev);
 
 			// NB: we compare strings of different lengths below => strncmp
-			if ( (safe_strncmp(parent_priv->path, sanitized_path, strlen(sanitized_path)) == 0)
+			if ( (safe_strncmp(parent_priv->path, sanitized_path, safe_strlen(sanitized_path)) == 0)
 			  && (port_nr == priv->connection_index) ) {
 
 				priv->path = sanitize_path(dev_interface_details->DevicePath);

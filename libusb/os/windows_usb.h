@@ -65,22 +65,22 @@ extern char *_strdup(const char *strSource);
 // _beginthreadex is MSVCRT => unavailable for cygwin. Fallback to using CreateThread
 #define _beginthreadex(a, b, c, d, e, f) CreateThread(a, b, (LPTHREAD_START_ROUTINE)c, d, e, f)
 #endif
-#define safe_free(p) do {if (p != NULL) {free(p); p = NULL;}} while(0)
+#define safe_free(p) do {if (p != NULL) {free((void*)p); p = NULL;}} while(0)
 #define safe_closehandle(h) do {if (h != INVALID_HANDLE_VALUE) {CloseHandle(h); h = INVALID_HANDLE_VALUE;}} while(0)
 #define safe_strncpy(dst, dst_max, src, count) do {strncpy(dst, src, dst_max); ((char*)dst)[dst_max-1] = 0;} while(0)
-#define safe_strcpy(dst, dst_max, src) safe_strncpy(dst, dst_max, src, strlen(src)+1)
-#define safe_strncat(dst, dst_max, src, count) strncat(dst, src, min(count, dst_max - strlen(dst) - 1))
-#define safe_strcat(dst, dst_max, src) safe_strncat(dst, dst_max, src, strlen(src)+1)
+#define safe_strcpy(dst, dst_max, src) safe_strncpy(dst, dst_max, src, safe_strlen(src)+1)
+#define safe_strncat(dst, dst_max, src, count) strncat(dst, src, min((size_t)count, (size_t)(dst_max - safe_strlen(dst) - 1)))
+#define safe_strcat(dst, dst_max, src) safe_strncat(dst, dst_max, src, safe_strlen(src)+1)
 #define safe_strcmp(str1, str2) strcmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2))
 #define safe_strncmp(str1, str2, count) strncmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2), count)
 #define safe_strlen(str) ((str==NULL)?0:strlen(str))
 #define safe_sprintf _snprintf
 #define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
-#define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
+#define wchar_to_utf8_ms(wstr, str, len) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, len, NULL, NULL)
 inline void upperize(char* str) {
 	size_t i;
 	if (str == NULL) return;
-	for (i=0; i<strlen(str); i++)
+	for (i=0; i<safe_strlen(str); i++)
 		str[i] = (char)toupper((int)str[i]);
 }
 
@@ -315,7 +315,7 @@ struct windows_transfer_priv {
  * API macros - from libusb-win32 1.x
  */
 #define DLL_DECLARE(api, ret, name, args)                     \
-  typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name
+  typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name = NULL
 
 #define DLL_LOAD(dll, name, ret_on_failure)                   \
 	do {                                                      \
@@ -343,7 +343,7 @@ struct windows_transfer_priv {
 typedef DWORD DEVNODE, DEVINST;
 typedef DEVNODE *PDEVNODE, *PDEVINST;
 typedef DWORD RETURN_TYPE;
-typedef RETURN_TYPE	CONFIGRET;
+typedef RETURN_TYPE CONFIGRET;
 
 #define CR_SUCCESS                              0x00000000
 #define CR_NO_SUCH_DEVNODE                      0x0000000D
