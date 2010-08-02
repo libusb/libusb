@@ -44,7 +44,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;LIBUSB_DLL_BUILD"
+				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -67,6 +67,7 @@
 				AdditionalDependencies="setupapi.lib ole32.lib advapi32.lib"
 				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
 				LinkIncremental="2"
+				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				TargetMachine="1"
@@ -122,7 +123,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;LIBUSB_DLL_BUILD"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
@@ -143,6 +144,7 @@
 				AdditionalDependencies="setupapi.lib ole32.lib advapi32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="1"
+				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -201,7 +203,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;LIBUSB_DLL_BUILD"
+				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -224,6 +226,7 @@
 				AdditionalDependencies="setupapi.lib"
 				OutputFile="$(OutDir)\libusb-1.0_debug.dll"
 				LinkIncremental="2"
+				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				TargetMachine="17"
@@ -280,7 +283,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;LIBUSB_DLL_BUILD"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
@@ -301,6 +304,7 @@
 				AdditionalDependencies="setupapi.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="1"
+				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -351,6 +355,10 @@
 			</File>
 			<File
 				RelativePath=".\libusb\io.c"
+				>
+			</File>
+			<File
+				RelativePath=".\libusb\libusb-1.0.def"
 				>
 			</File>
 			<File

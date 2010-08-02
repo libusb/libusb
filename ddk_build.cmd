@@ -11,14 +11,11 @@ rem DLL or static lib selection (must use concatenation)
 if Test%1==TestDLL goto libusb_dll
 :libusb_static
 set TARGET=LIBRARY
-set LIBDEF=
 goto libusb_common
 :libusb_dll
 set TARGET=DYNLINK
-set LIBDEF=/DLIBUSB_DLL_BUILD
 :libusb_common
 echo TARGETTYPE=%TARGET% > target
-echo LIBUSB_DEFINES=%LIBDEF% >> target
 copy target+libusb_sources sources >NUL 2>&1
 del target
 @echo on

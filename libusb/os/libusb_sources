@@ -1,7 +1,6 @@
 #TARGETTYPE is not defined, to allow selection between static lib or DLL with ddk_build
 TARGETNAME=libusb-1.0
-#Must be set, else DLL build will look for libusb-1.0.def
-DLLDEF=
+DLLDEF=..\libusb-1.0.def
 
 !IFNDEF MSC_WARNING_LEVEL
 MSC_WARNING_LEVEL=/W3

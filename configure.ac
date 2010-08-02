@@ -57,7 +57,7 @@ case $host in
 	threads="windows"
 	LIBS="-lsetupapi -lole32 -ladvapi32"
 	# -avoid-version to avoid a naming scheme such as libusb-0.dll
-	AM_LDFLAGS="-no-undefined -avoid-version"
+	AM_LDFLAGS="-no-undefined -avoid-version -Wl,--add-stdcall-alias"
 	AM_CFLAGS="-std=c99"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
@@ -70,7 +70,7 @@ case $host in
 	threads="posix"
 	LIBS="-lsetupapi -lole32 -ladvapi32"
 	AM_CFLAGS="-std=c99"
-	AM_LDFLAGS="-no-undefined -avoid-version"
+	AM_LDFLAGS="-no-undefined -avoid-version -Wl,--add-stdcall-alias"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
 *)
