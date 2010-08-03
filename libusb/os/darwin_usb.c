@@ -374,7 +374,7 @@ static int get_configuration_index (struct libusb_device *dev, int config_value)
   for (i = 0 ; i < numConfig ; i++) {
     (*(priv->device))->GetConfigurationDescriptorPtr (priv->device, i, &desc);
 
-    if (libusb_le16_to_cpu (desc->bConfigurationValue) == config_value)
+    if (desc->bConfigurationValue == config_value)
       return i;
   }
 
@@ -384,15 +384,12 @@ static int get_configuration_index (struct libusb_device *dev, int config_value)
 
 static int darwin_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian) {
   struct darwin_device_priv *priv = (struct darwin_device_priv *)dev->os_priv;
-  UInt8 config_value;
   int config_index;
-  IOReturn kresult;
 
-  kresult = (*(priv->device))->GetConfiguration (priv->device, &config_value);
-  if (kresult != kIOReturnSuccess)
-    return darwin_to_libusb (kresult);
+  if (0 == priv->active_config)
+    return LIBUSB_ERROR_INVALID_PARAM;
 
-  config_index = get_configuration_index (dev, config_value);
+  config_index = get_configuration_index (dev, priv->active_config);
   if (config_index < 0)
     return config_index;
 
@@ -436,6 +433,64 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
     (*device)->Release (device);
 
   return darwin_to_libusb (kresult);
+}
+
+/* check whether the os has configured the device */
+static int darwin_check_configuration (struct libusb_context *ctx, struct libusb_device *dev, usb_device_t **darwin_device) {
+  struct darwin_device_priv *priv = (struct darwin_device_priv *)dev->os_priv;
+
+  IOUSBConfigurationDescriptorPtr configDesc;
+  IOUSBFindInterfaceRequest request;
+  kern_return_t             kresult;
+  io_iterator_t             interface_iterator;
+  io_service_t              firstInterface;
+
+  if (priv->dev_descriptor.bNumConfigurations < 1) {
+    usbi_err (ctx, "device has no configurations");
+    return LIBUSB_ERROR_OTHER; /* no configurations at this speed so we can't use it */
+  }
+
+  /* find the first configuration */
+  kresult = (*darwin_device)->GetConfigurationDescriptorPtr (darwin_device, 0, &configDesc);
+  priv->first_config = (kIOReturnSuccess == kresult) ? configDesc->bConfigurationValue : 1;
+
+  /* check if the device is already configured. there is probably a better way than iterating over the
+     to accomplish this (the trick is we need to avoid a call to GetConfigurations since buggy devices
+     might lock up on the device request) */
+
+  /* Setup the Interface Request */
+  request.bInterfaceClass    = kIOUSBFindInterfaceDontCare;
+  request.bInterfaceSubClass = kIOUSBFindInterfaceDontCare;
+  request.bInterfaceProtocol = kIOUSBFindInterfaceDontCare;
+  request.bAlternateSetting  = kIOUSBFindInterfaceDontCare;
+
+  kresult = (*(darwin_device))->CreateInterfaceIterator(darwin_device, &request, &interface_iterator);
+  if (kresult)
+    return darwin_to_libusb (kresult);
+
+  /* iterate once */
+  firstInterface = IOIteratorNext(interface_iterator);
+
+  /* done with the interface iterator */
+  IOObjectRelease(interface_iterator);
+
+  if (firstInterface) {
+    IOObjectRelease (firstInterface);
+
+    /* device is configured */
+    if (priv->dev_descriptor.bNumConfigurations == 1)
+      /* to avoid problems with some devices get the configurations value from the configuration descriptor */
+      priv->active_config = priv->first_config;
+    else
+      /* devices with more than one configuration should work with GetConfiguration */
+      (*darwin_device)->GetConfiguration (darwin_device, &priv->active_config);
+  } else
+    /* not configured */
+    priv->active_config = 0;
+  
+  usbi_info (ctx, "active config: %u, first config: %u", priv->active_config, priv->first_config);
+
+  return 0;
 }
 
 static int process_new_device (struct libusb_context *ctx, usb_device_t **device, UInt32 locationID, struct discovered_devs **_discdevs) {
@@ -528,6 +583,11 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
 
     dev->bus_number     = locationID >> 24;
     dev->device_address = address;
+
+    /* check current active configuration (and cache the first configuration value-- which may be used by claim_interface) */
+    ret = darwin_check_configuration (ctx, dev, device);
+    if (ret < 0)
+      break;
 
     /* save our location, we'll need this later */
     priv->location = locationID;
@@ -696,14 +756,8 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
 
 static int darwin_get_configuration(struct libusb_device_handle *dev_handle, int *config) {
   struct darwin_device_priv *dpriv = (struct darwin_device_priv *)dev_handle->dev->os_priv;
-  UInt8 configNum;
-  IOReturn kresult;
 
-  kresult = (*(dpriv->device))->GetConfiguration (dpriv->device, &configNum);
-  if (kresult != kIOReturnSuccess)
-    return darwin_to_libusb (kresult);
-
-  *config = (int) configNum;
+  *config = (int) dpriv->active_config;
 
   return 0;
 }
@@ -727,6 +781,8 @@ static int darwin_set_configuration(struct libusb_device_handle *dev_handle, int
   for (i = 0 ; i < USB_MAXINTERFACES ; i++)
     if (dev_handle->claimed_interfaces & (1 << i))
       darwin_claim_interface (dev_handle, i);
+
+  dpriv->active_config = config;
 
   return 0;
 }
@@ -811,7 +867,6 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
   IOReturn kresult;
   IOCFPlugInInterface **plugInInterface = NULL;
   SInt32                score;
-  uint8_t               new_config;
 
   /* current interface */
   struct __darwin_interface *cInterface = &priv->interfaces[iface];
@@ -821,43 +876,11 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
     return darwin_to_libusb (kresult);
 
   /* make sure we have an interface */
-  if (!usbInterface) {
-    u_int8_t nConfig;     /* Index of configuration to use */
-    IOUSBConfigurationDescriptorPtr configDesc; /* to describe which configuration to select */
-    /* Only a composite class device with no vendor-specific driver will
-       be configured. Otherwise, we need to do it ourselves, or there
-       will be no interfaces for the device. */
-
-    usbi_info (HANDLE_CTX (dev_handle), "no interface found; selecting configuration" );
-
-    kresult = (*(dpriv->device))->GetNumberOfConfigurations (dpriv->device, &nConfig);
-    if (kresult != kIOReturnSuccess) {
-      usbi_err (HANDLE_CTX (dev_handle), "GetNumberOfConfigurations: %s", darwin_error_str(kresult));
-      return darwin_to_libusb(kresult);
-    }
-
-    if (nConfig < 1) {
-      usbi_err (HANDLE_CTX (dev_handle), "GetNumberOfConfigurations: no configurations");
-      return LIBUSB_ERROR_OTHER;
-    }
-
-    usbi_info (HANDLE_CTX (dev_handle), "device has %d configuration%s. using the first",
-	      (int)nConfig, (nConfig > 1 ? "s" : "") );
-
-    /* Always use the first configuration */
-    kresult = (*(dpriv->device))->GetConfigurationDescriptorPtr (dpriv->device, 0, &configDesc);
-    if (kresult != kIOReturnSuccess) {
-      usbi_err (HANDLE_CTX (dev_handle), "GetConfigurationDescriptorPtr: %s",
-		darwin_error_str(kresult));
-
-      new_config = 1;
-    } else
-      new_config = configDesc->bConfigurationValue;
-
-    usbi_info (HANDLE_CTX (dev_handle), "new configuration value is %d", new_config);
+  if (!usbInterface && dpriv->first_config != 0) {
+    usbi_info (HANDLE_CTX (dev_handle), "no interface found; setting configuration: %d", dpriv->first_config);
 
     /* set the configuration */
-    kresult = darwin_set_configuration (dev_handle, new_config);
+    kresult = darwin_set_configuration (dev_handle, dpriv->first_config);
     if (kresult != LIBUSB_SUCCESS) {
       usbi_err (HANDLE_CTX (dev_handle), "could not set configuration");
       return kresult;
