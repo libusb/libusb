@@ -239,7 +239,7 @@ static char* sanitize_path(const char* path)
 	if ((ret_path = (char*)calloc(size, 1)) == NULL)
 		return NULL;
 
-	safe_strncpy(&ret_path[add_root], size-add_root, path, safe_strlen(path));
+	safe_strcpy(&ret_path[add_root], size-add_root, path);
 
 	// Ensure consistancy with root prefix
 	for (j=0; j<root_size; j++)
