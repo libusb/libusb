@@ -1,7 +1,8 @@
 libusb
 ======
 
-libusb is a library for USB device access from Linux userspace.
+libusb is a library for USB device access from Linux, Mac OS X and
+Windows userspace.
 It is written in C and licensed under the LGPL-2.1 (see COPYING).
 
 libusb is abstracted internally in such a way that it can hopefully
