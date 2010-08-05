@@ -2583,6 +2583,7 @@ static int winusb_release_interface(struct libusb_device_handle *dev_handle, int
 	}
 
 	WinUsb_Free(winusb_handle);
+	handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
 
 	return LIBUSB_SUCCESS;
 }
