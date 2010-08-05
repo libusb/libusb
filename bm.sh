@@ -8,7 +8,9 @@ target=e:/dailies/$date/MinGW32
 git clean -f -d -x
 # Not using debug (-g) in CFLAGS DRAMATICALLY reduces the size of the binaries
 export CFLAGS="-O2 -m32"
+export LDFLAGS="-m32"
 export RCFLAGS="--target=pe-i386"
+export DLLTOOLFLAGS="-m i386 -f --32"
 echo `pwd`
 (glibtoolize --version) < /dev/null > /dev/null 2>&1 && LIBTOOLIZE=glibtoolize || LIBTOOLIZE=libtoolize
 $LIBTOOLIZE --copy --force || exit 1
@@ -32,8 +34,10 @@ make clean
 # 64 bit binaries
 #
 target=e:/dailies/$date/MinGW64
-export CFLAGS="-O2 -m64"
+export CFLAGS="-O2"
+export LDFLAGS=""
 export RCFLAGS=""
+export DLLTOOLFLAGS=""
 ./configure --enable-examples-build --enable-toggable-debug
 make
 mkdir -p $target/examples
