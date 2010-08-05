@@ -1513,9 +1513,9 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 							break;
 						default:
 							// For other devices, the first interface is the same as the device
-							priv->usb_interface[0].path = malloc(safe_strlen(priv->path));
+							priv->usb_interface[0].path = malloc(safe_strlen(priv->path)+1);
 							if (priv->usb_interface[0].path != NULL) {
-								safe_strcpy(priv->usb_interface[0].path, safe_strlen(priv->path), priv->path);
+								safe_strcpy(priv->usb_interface[0].path, safe_strlen(priv->path)+1, priv->path);
 							}
 							// The following is needed if we want to API calls to work for both simple
 							// and composite devices, as
@@ -2423,7 +2423,7 @@ static int winusb_open(struct libusb_device_handle *dev_handle)
 			file_handle = CreateFileA(priv->usb_interface[i].path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ,
 				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 			if (file_handle == INVALID_HANDLE_VALUE) {
-				usbi_err(ctx, "could not open device %s (interface %d): %s", priv->path, i, windows_error_str(0));
+				usbi_err(ctx, "could not open device %s (interface %d): %s", priv->usb_interface[i].path, i, windows_error_str(0));
 				switch(GetLastError()) {
 				case ERROR_FILE_NOT_FOUND:	// The device was disconnected
 					return LIBUSB_ERROR_NO_DEVICE;
