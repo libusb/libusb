@@ -1,3 +1,9 @@
+all: libusb-1.0.la
+if CREATE_IMPORT_LIB
+# Rebuild the import lib from the .def so that MS and MinGW DLLs can be interchanged
+	$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def libusb-1.0.def --dllname libusb-1.0.dll --output-lib .libs/libusb-1.0.dll.a
+endif
+
 lib_LTLIBRARIES = libusb-1.0.la
 
 LINUX_USBFS_SRC = os/linux_usbfs.c

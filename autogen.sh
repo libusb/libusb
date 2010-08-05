@@ -7,6 +7,16 @@ create_def()
   echo "LIBRARY" > libusb/libusb-1.0.def
   echo "EXPORTS" >> libusb/libusb-1.0.def
   sed -n -e "s/.*API_EXPORTED.*\([[:blank:]]\)\(.*\)(.*/  \2/p" libusb/*.c >> libusb/libusb-1.0.def
+  # We need to manually define a whole set of DLL aliases if we want the MS
+  # DLLs to be usable with dynamically linked MinGW executables. This is
+  # because it is not possible to avoid the @ decoration from import WINAPI
+  # calls in MinGW generated objects, and .def based MS generated DLLs don't
+  # have such a decoration => linking to MS DLL will fail without aliases.
+  # Currently, the maximum size is 32 and all sizes are multiples of 4
+  for i in 4 8 12 16 20 24 28 32
+  do
+    sed -n -e "s/.*API_EXPORTED.*\([[:blank:]]\)\(.*\)(.*/  \2@$i = \2/p" libusb/*.c >> libusb/libusb-1.0.def
+  done
 }
 
 # use glibtoolize if it is available (darwin)

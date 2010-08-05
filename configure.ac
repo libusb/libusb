@@ -55,11 +55,13 @@ case $host in
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	threads="windows"
+	create_import_lib="yes"
 	LIBS="-lsetupapi -lole32 -ladvapi32"
 	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version -Wl,--add-stdcall-alias"
 	AM_CFLAGS="-std=c99"
 	AC_CHECK_TOOL(RC, windres, no)
+	AC_CHECK_TOOL(DLLTOOL, dlltool, false)
 	;;
 *-cygwin*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
@@ -70,7 +72,7 @@ case $host in
 	threads="posix"
 	LIBS="-lsetupapi -lole32 -ladvapi32"
 	AM_CFLAGS="-std=c99"
-	AM_LDFLAGS="-no-undefined -avoid-version -Wl,--add-stdcall-alias"
+	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
 *)
@@ -81,6 +83,7 @@ AM_CONDITIONAL([OS_LINUX], [test "x$backend" = "xlinux"])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = "xdarwin"])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" = "xwindows"])
 AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" = "xposix"])
+AM_CONDITIONAL([CREATE_IMPORT_LIB], [test "x$create_import_lib" = "xyes"]) 
 
 # Library versioning
 lt_major="0"
