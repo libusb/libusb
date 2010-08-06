@@ -47,12 +47,9 @@
 				Optimization="0"
 				AdditionalIncludeDirectories="..\msvc;..\"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
-				MinimalRebuild="true"
-				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
-				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				DebugInformationFormat="4"
+				DebugInformationFormat="3"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -66,7 +63,6 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
-				LinkIncremental="2"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
@@ -124,10 +120,7 @@
 				Optimization="0"
 				AdditionalIncludeDirectories="..\msvc;..\"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
-				MinimalRebuild="true"
-				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
-				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="3"
 			/>
@@ -143,7 +136,6 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
-				LinkIncremental="2"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
@@ -198,15 +190,10 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories="..\msvc;..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="0"
-				EnableFunctionLevelLinking="true"
-				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				DebugInformationFormat="3"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -220,13 +207,9 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
-				LinkIncremental="1"
 				AdditionalLibraryDirectories=""
-				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
-				OptimizeReferences="2"
-				EnableCOMDATFolding="2"
 				TargetMachine="1"
 			/>
 			<Tool
@@ -278,15 +261,10 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories="..\msvc;..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="0"
-				EnableFunctionLevelLinking="true"
-				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				DebugInformationFormat="3"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -300,13 +278,9 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
-				LinkIncremental="1"
 				AdditionalLibraryDirectories=""
-				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
-				OptimizeReferences="2"
-				EnableCOMDATFolding="2"
 				TargetMachine="17"
 			/>
 			<Tool

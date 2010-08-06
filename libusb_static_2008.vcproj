@@ -45,11 +45,9 @@
 				Optimization="0"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
 				PreprocessorDefinitions="_WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS"
-				MinimalRebuild="true"
-				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				WarningLevel="3"
-				DebugInformationFormat="4"
+				DebugInformationFormat="3"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -108,8 +106,6 @@
 				Optimization="0"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
 				PreprocessorDefinitions="_WIN32;_WIN64;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS"
-				MinimalRebuild="true"
-				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				WarningLevel="3"
 				DebugInformationFormat="3"
@@ -168,14 +164,10 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
 				PreprocessorDefinitions="_WIN32;_LIB;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="0"
-				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
-				DebugInformationFormat="3"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -232,14 +224,10 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories=".\msvc;.\libusb"
 				PreprocessorDefinitions="_WIN32;_WIN64;_LIB;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="0"
-				EnableFunctionLevelLinking="true"
 				WarningLevel="3"
-				DebugInformationFormat="3"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
