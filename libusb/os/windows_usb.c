@@ -2465,21 +2465,42 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = __device_handle_priv(dev_handle);
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
-	bool is_composite = (priv->apib->id == USB_API_COMPOSITE);
+	bool is_using_usbccgp = (priv->apib->id == USB_API_COMPOSITE);
 	HANDLE file_handle, winusb_handle;
-	USB_INTERFACE_DESCRIPTOR if_desc;
 	UCHAR policy;
 	uint8_t endpoint_address;
 	int i;
 
 	CHECK_WINUSB_AVAILABLE;
 
-	// interfaces for composite devices are always independent, therefore
-	// "alt" interfaces are only found on non-composite
-	if ((!is_composite) && (iface != 0)) {
+	// If the device is composite, but using the default Windows composite parent driver (usbccgp)
+	// or if it's the first WinUSB interface, we get a handle through WinUsb_Initialize().
+	if ((is_using_usbccgp) || (iface == 0)) {
+		// composite device (independent interfaces) or interface 0
+		winusb_handle = handle_priv->interface_handle[iface].api_handle;
+		file_handle = handle_priv->interface_handle[iface].dev_handle;
+		if ((file_handle == 0) || (file_handle == INVALID_HANDLE_VALUE)) {
+			return LIBUSB_ERROR_NOT_FOUND;
+		}
+
+		if (!WinUsb_Initialize(file_handle, &winusb_handle)) {
+			usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(0));
+			handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
+
+			switch(GetLastError()) {
+			case ERROR_BAD_COMMAND:	// The device was disconnected
+				return LIBUSB_ERROR_NO_DEVICE;
+			default:
+				usbi_err(ctx, "could not claim interface %d: %s", iface, windows_error_str(0));
+				return LIBUSB_ERROR_ACCESS;
+			}
+		}
+		handle_priv->interface_handle[iface].api_handle = winusb_handle;
+	} else {
+		// For all other interfaces, use WinUsb_GetAssociatedInterface()
 		winusb_handle = handle_priv->interface_handle[0].api_handle;
-		// It is a requirement on Windows that to claim an interface >= 1
-		// on a non-composite WinUSB device, you must first have claimed interface 0
+		// It is a requirement for multiple interface devices on Windows that, to you
+		// must first claim the first interface before you claim the others
 		if ((winusb_handle == 0) || (winusb_handle == INVALID_HANDLE_VALUE)) {
 #if defined(AUTO_CLAIM)
 			file_handle = handle_priv->interface_handle[0].dev_handle;
@@ -2510,35 +2531,7 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 				return LIBUSB_ERROR_ACCESS;
 			}
 		}
-	} else {
-		// composite device (independent interfaces) or interface 0
-		winusb_handle = handle_priv->interface_handle[iface].api_handle;
-		file_handle = handle_priv->interface_handle[iface].dev_handle;
-		if ((file_handle == 0) || (file_handle == INVALID_HANDLE_VALUE)) {
-			return LIBUSB_ERROR_NOT_FOUND;
-		}
-
-		if (!WinUsb_Initialize(file_handle, &winusb_handle)) {
-			usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(0));
-			handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
-
-			switch(GetLastError()) {
-			case ERROR_BAD_COMMAND:	// The device was disconnected
-				return LIBUSB_ERROR_NO_DEVICE;
-			default:
-				usbi_err(ctx, "could not claim interface %d: %s", iface, windows_error_str(0));
-				return LIBUSB_ERROR_ACCESS;
-			}
-		}
-		handle_priv->interface_handle[iface].api_handle = winusb_handle;
 	}
-	if (!WinUsb_QueryInterfaceSettings(winusb_handle, 0, &if_desc)) {
-		usbi_err(ctx, "could not query interface settings for interface %d: %s", iface, windows_error_str(0));
-	} else if (if_desc.bInterfaceNumber != iface) {
-		usbi_warn(ctx, "program assertion failed - WinUSB interface %d found at position %d",
-			if_desc.bInterfaceNumber, iface);
-	}
-
 	usbi_dbg("claimed interface %d", iface);
 	handle_priv->active_interface = iface;
 
