@@ -832,13 +832,8 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
-		usbi_dbg("cached config descriptor #%d (%d bytes)", i+1, cd_data->wTotalLength);
-
-		// Sanity check. Ensures that indexes for our list of config desc is in the right order
-		if (i != (cd_data->bConfigurationValue-1)) {
-			usbi_warn(ctx, "program assertion failed - config descriptors are being read out of order");
-			continue;
-		}
+		usbi_dbg("cached config descriptor %d (bConfigurationValue=%d, %d bytes)",
+			i, cd_data->bConfigurationValue, cd_data->wTotalLength);
 
 		// Cache the descriptor
 		priv->config_descriptor[i] = malloc(cd_data->wTotalLength);

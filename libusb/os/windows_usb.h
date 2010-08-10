@@ -468,7 +468,7 @@ typedef struct _USB_INTERFACE_DESCRIPTOR {
 typedef struct _USB_CONFIGURATION_DESCRIPTOR {
   UCHAR  bLength;
   UCHAR  bDescriptorType;
-  USHORT  wTotalLength;
+  USHORT wTotalLength;
   UCHAR  bNumInterfaces;
   UCHAR  bConfigurationValue;
   UCHAR  iConfiguration;
