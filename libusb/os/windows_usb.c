@@ -111,6 +111,19 @@ static int composite_abort_control(struct usbi_transfer *itransfer);
 static int composite_reset_device(struct libusb_device_handle *dev_handle);
 static int composite_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size);
 
+// Workaround for MinGW-w64 multilib bug
+static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
+#define INIT_INTERLOCKEDEXCHANGE if (pInterlockedExchange == NULL) {		\
+	pInterlockedExchange = (LONG (WINAPI *)(LONG volatile *, LONG))			\
+		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedExchange");	\
+	if (pInterlockedExchange == NULL) return 1;								\
+	}
+static LONG (WINAPI *pInterlockedIncrement)(LONG volatile *) = NULL;
+#define INIT_INTERLOCKEDINCREMENT if (pInterlockedIncrement == NULL) {		\
+	pInterlockedIncrement = (LONG (WINAPI *)(LONG volatile *))				\
+		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedIncrement");\
+	if (pInterlockedIncrement == NULL) return LIBUSB_ERROR_NOT_FOUND;		\
+	}
 
 // Global variables
 struct windows_hcd_priv* hcd_root = NULL;
@@ -2121,7 +2134,8 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 			}
 			ReleaseMutex(timer_mutex);
 
-			nb_responses = InterlockedExchange((LONG*)&request_count[0], 0);
+			INIT_INTERLOCKEDEXCHANGE;
+			nb_responses = pInterlockedExchange((LONG*)&request_count[0], 0);
 			if ( (nb_responses)
 			  && (ReleaseSemaphore(timer_response, nb_responses, NULL) == 0) ) {
 				usbi_dbg("unable to release timer semaphore %d: %s", windows_error_str(0));
@@ -2144,8 +2158,9 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 	switch(clk_id) {
 	case USBI_CLOCK_MONOTONIC:
 		if (hires_frequency != 0) {
+			INIT_INTERLOCKEDINCREMENT;
 			while (1) {
-				InterlockedIncrement((LONG*)&request_count[0]);
+				pInterlockedIncrement((LONG*)&request_count[0]);
 				SetEvent(timer_request[0]);
 				r = WaitForSingleObject(timer_response, TIMER_REQUEST_RETRY_MS);
 				switch(r) {

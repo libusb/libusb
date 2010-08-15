@@ -95,6 +95,14 @@ static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
 
+// Workaround for MinGW-w64 multilib bug
+static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
+#define INIT_INTERLOCKEDEXCHANGE if (pInterlockedExchange == NULL) {		\
+	pInterlockedExchange = (LONG (WINAPI *)(LONG volatile *, LONG))			\
+		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedExchange");	\
+	if (pInterlockedExchange == NULL) return;								\
+	}
+
 // public fd data
 const struct winfd INVALID_WINFD = {-1, INVALID_HANDLE_VALUE, NULL, RW_NONE};
 struct winfd poll_fd[MAX_FDS];
@@ -147,7 +155,8 @@ void init_polling(void)
 {
 	int i;
 
-	while (InterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
+	INIT_INTERLOCKEDEXCHANGE;
+	while (pInterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
 		SleepEx(0, TRUE);
 	}
 	if (!is_polling_set) {
@@ -242,7 +251,8 @@ void exit_polling(void)
 {
 	int i;
 
-	while (InterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
+	INIT_INTERLOCKEDEXCHANGE;
+	while (pInterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
 		SleepEx(0, TRUE);
 	}
 	if (is_polling_set) {
