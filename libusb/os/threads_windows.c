@@ -26,12 +26,17 @@
 #include "libusbi.h"
 
 // Workaround for MinGW-w64 multilib bug
+#if defined(_WIN64)
+#define INIT_INTERLOCKEDEXCHANGE
+#define pInterlockedExchange InterlockedExchange
+#else
 static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
 #define INIT_INTERLOCKEDEXCHANGE if (pInterlockedExchange == NULL) {		\
 	pInterlockedExchange = (LONG (WINAPI *)(LONG volatile *, LONG))			\
 		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedExchange");	\
 	if (pInterlockedExchange == NULL) return ((errno=ENOENT));				\
 	}
+#endif
 
 int usbi_mutex_init(usbi_mutex_t *mutex,
 					const usbi_mutexattr_t *attr) {

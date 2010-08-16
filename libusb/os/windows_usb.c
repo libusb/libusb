@@ -112,6 +112,12 @@ static int composite_reset_device(struct libusb_device_handle *dev_handle);
 static int composite_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size);
 
 // Workaround for MinGW-w64 multilib bug
+#if defined(_WIN64)
+#define INIT_INTERLOCKEDEXCHANGE
+#define INIT_INTERLOCKEDINCREMENT
+#define pInterlockedExchange InterlockedExchange
+#define pInterlockedIncrement InterlockedIncrement
+#else
 static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
 #define INIT_INTERLOCKEDEXCHANGE if (pInterlockedExchange == NULL) {		\
 	pInterlockedExchange = (LONG (WINAPI *)(LONG volatile *, LONG))			\
@@ -124,6 +130,7 @@ static LONG (WINAPI *pInterlockedIncrement)(LONG volatile *) = NULL;
 		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedIncrement");\
 	if (pInterlockedIncrement == NULL) return LIBUSB_ERROR_NOT_FOUND;		\
 	}
+#endif
 
 // Global variables
 struct windows_hcd_priv* hcd_root = NULL;
