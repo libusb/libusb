@@ -217,23 +217,23 @@ static char *windows_error_str(uint32_t retval)
 static char err_string[ERR_BUFFER_SIZE];
 
 	DWORD size;
-	uint32_t errcode, format_errcode;
+	uint32_t error_code, format_error;
 
-	errcode = retval?retval:GetLastError();
+	error_code = retval?retval:GetLastError();
 
-	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%d] ", errcode);
+	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%d] ", error_code);
 
-	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errcode,
+	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
 		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &err_string[safe_strlen(err_string)],
 		ERR_BUFFER_SIZE, NULL);
 	if (size == 0)
 	{
-		format_errcode = GetLastError();
-		if (format_errcode)
+		format_error = GetLastError();
+		if (format_error)
 			safe_sprintf(err_string, ERR_BUFFER_SIZE,
-				"Windows error code %u (FormatMessage error code %u)", errcode, format_errcode);
+				"Windows error code %u (FormatMessage error code %u)", error_code, format_error);
 		else
-			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", errcode);
+			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", error_code);
 	}
 	return err_string;
 }
