@@ -1677,9 +1677,9 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
  * \returns a short description of the error code in English, or NULL if the
  * error descriptions are unavailable
  */
-API_EXPORTED const char *LIBUSB_API libusb_strerror(enum libusb_error errcode)
+API_EXPORTED const char *LIBUSB_API libusb_strerror(enum libusb_error error_code)
 {
-	switch (errcode) {
+	switch (error_code) {
 	case LIBUSB_SUCCESS:
 		return "Success";
 	case LIBUSB_ERROR_IO:
