@@ -96,7 +96,7 @@ static inline int _open_osfhandle(intptr_t osfhandle, int flags)
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
 
 // Workaround for MinGW-w64 multilib bug
-#if defined(_WIN64)
+#if defined(_MSC_VER) || defined(_WIN64)
 #define INIT_INTERLOCKEDEXCHANGE
 #define pInterlockedExchange InterlockedExchange
 #else
@@ -104,8 +104,11 @@ static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
 #define INIT_INTERLOCKEDEXCHANGE if (pInterlockedExchange == NULL) {		\
 	pInterlockedExchange = (LONG (WINAPI *)(LONG volatile *, LONG))			\
 		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedExchange");	\
-	if (pInterlockedExchange == NULL) return;								\
-	}
+	if (pInterlockedExchange == NULL) {										\
+		usbi_err(NULL, "InterlockedExchange is unavailable");				\
+		return;																\
+	}																		\
+}
 #endif
 
 // public fd data

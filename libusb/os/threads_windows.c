@@ -26,7 +26,7 @@
 #include "libusbi.h"
 
 // Workaround for MinGW-w64 multilib bug
-#if defined(_WIN64)
+#if defined(_MSC_VER) || defined(_WIN64)
 #define INIT_INTERLOCKEDEXCHANGE
 #define pInterlockedExchange InterlockedExchange
 #else
