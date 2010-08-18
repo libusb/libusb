@@ -718,7 +718,7 @@ static int initialize_device(struct libusb_device *dev, libusb_bus_t busnum,
 		// NB: SetupDiGetDeviceRegistryProperty w/ SPDRP_INSTALL_STATE would tell us
 		// if the driver is properly installed, but driverless devices don't seem to
 		// be enumerable by SetupDi...
-		usbi_dbg("* DRIVERLESS DEVICE *");
+		usbi_dbg("* This device has no driver => libusb will not be able to access it *");
 	}
 
 	return LIBUSB_SUCCESS;
@@ -1410,7 +1410,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	struct windows_device_priv *priv;
 	struct windows_device_priv *parent_priv;
 	char path[MAX_PATH_LENGTH];
-	char reg_key[MAX_KEY_LENGTH];
+	char driver[MAX_KEY_LENGTH], filter_driver[MAX_KEY_LENGTH];
 	char *sanitized_path = NULL;
 	HDEVINFO dev_info;
 	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
@@ -1503,48 +1503,63 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				// Check the service name to know what kind of device we have.
 				// The service name is really the driver name without ".sys" ("WinUSB", "HidUsb", ...)
 				// It tells us if we can use WinUSB, if we have a composite device, and the API to use
-				if(!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_SERVICE,
-					&reg_type, (BYTE*)reg_key, MAX_KEY_LENGTH, &size)) {
-					usbi_err(ctx, "could not retrieve driver information for device %s, skipping: %s",
-						dev_interface_details->DevicePath, windows_error_str(0));
-					break;
+				if(SetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_SERVICE,
+					&reg_type, (BYTE*)driver, MAX_KEY_LENGTH, &size)) {
+					upperize(driver);
+					usbi_dbg("driver: %s", driver);
+					found = true;
+				} else {
+					driver[0] = 0;
 				}
 
-				usbi_dbg("driver: %s", reg_key);
-				found = true;
+				// The device might also have a filter driver we can use
+				if(SetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_LOWERFILTERS,
+					&reg_type, (BYTE*)filter_driver, MAX_KEY_LENGTH, &size)) {
+					upperize(filter_driver);
+					usbi_dbg("filter driver: %s", filter_driver);
+					found = true;
+				} else {
+					filter_driver[0] = 0;
+				}
 
 				for (api = 0; api<USB_API_MAX; api++) {
-					if (is_api_driver(reg_key, api)) {
-						priv->apib = &usb_api_backend[api];
-						switch(api) {
-						case USB_API_COMPOSITE:
-							set_composite_device(ctx, dev_info_data.DevInst, priv);
-							break;
-						case USB_API_HID:
-							safe_free(priv->hid);
-							priv->hid = calloc(1, sizeof(struct hid_device_priv));
-							if (priv->hid == NULL) {
-								usbi_err(ctx, "could not allocate HID data for %s, skipping",
-									dev_interface_details->DevicePath);
-								priv->apib = &usb_api_backend[USB_API_UNSUPPORTED];
-								safe_free(priv->path);
-							} else {
-								set_hid_device(ctx, priv);
-							}
-							break;
-						default:
-							// For other devices, the first interface is the same as the device
-							priv->usb_interface[0].path = malloc(safe_strlen(priv->path)+1);
-							if (priv->usb_interface[0].path != NULL) {
-								safe_strcpy(priv->usb_interface[0].path, safe_strlen(priv->path)+1, priv->path);
-							}
-							// The following is needed if we want to API calls to work for both simple
-							// and composite devices, as
-							for(k=0; k<USB_MAXINTERFACES; k++) {
-								priv->usb_interface[k].apib = &usb_api_backend[api];
-							}
-							break;
+					// For now, driver has precedence over filter driver
+					if ((driver[0] != 0) && (is_api_driver(driver, api))) {
+						usbi_dbg("matched device using driver");
+					} else if ((filter_driver[0] != 0) && (is_api_driver(filter_driver, api))) {
+						usbi_dbg("matched device using filter driver");
+					} else {
+						continue;
+					}
+					priv->apib = &usb_api_backend[api];
+					switch(api) {
+					case USB_API_COMPOSITE:
+						set_composite_device(ctx, dev_info_data.DevInst, priv);
+						break;
+					case USB_API_HID:
+						safe_free(priv->hid);
+						priv->hid = calloc(1, sizeof(struct hid_device_priv));
+						if (priv->hid == NULL) {
+							usbi_err(ctx, "could not allocate HID data for %s, skipping",
+								dev_interface_details->DevicePath);
+							priv->apib = &usb_api_backend[USB_API_UNSUPPORTED];
+							safe_free(priv->path);
+						} else {
+							set_hid_device(ctx, priv);
 						}
+						break;
+					default:
+						// For other devices, the first interface is the same as the device
+						priv->usb_interface[0].path = malloc(safe_strlen(priv->path)+1);
+						if (priv->usb_interface[0].path != NULL) {
+							safe_strcpy(priv->usb_interface[0].path, safe_strlen(priv->path)+1, priv->path);
+						}
+						// The following is needed if we want to API calls to work for both simple
+						// and composite devices, as
+						for(k=0; k<USB_MAXINTERFACES; k++) {
+							priv->usb_interface[k].apib = &usb_api_backend[api];
+						}
+						break;
 					}
 				}
 				break;
@@ -2305,9 +2320,10 @@ static int unsupported_copy_transfer_data(struct usbi_transfer *itransfer, uint3
 	PRINT_UNSUPPORTED_API(copy_transfer_data);
 }
 
-const char* composite_driver_names[] = {"usbccgp"};
-const char* winusb_driver_names[] = {"WinUSB"};
-const char* hid_driver_names[] = {"HidUsb", "mouhid", "kbdhid"};
+// These names must be uppercase
+const char* composite_driver_names[] = {"USBCCGP"};
+const char* winusb_driver_names[] = {"WINUSB"};
+const char* hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
 const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	{
 		USB_API_UNSUPPORTED,
@@ -2333,7 +2349,7 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		USB_API_COMPOSITE,
 		&CLASS_GUID_COMPOSITE,
 		composite_driver_names,
-		1,
+		sizeof(composite_driver_names)/sizeof(composite_driver_names[0]),
 		composite_init,
 		composite_exit,
 		composite_open,
@@ -2353,7 +2369,7 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		USB_API_WINUSB,
 		&CLASS_GUID_LIBUSB_WINUSB,
 		winusb_driver_names,
-		1,
+		sizeof(winusb_driver_names)/sizeof(winusb_driver_names[0]),
 		winusb_init,
 		winusb_exit,
 		winusb_open,
@@ -2373,7 +2389,7 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		USB_API_HID,
 		&CLASS_GUID_HID,
 		hid_driver_names,
-		3,
+		sizeof(hid_driver_names)/sizeof(hid_driver_names[0]),
 		hid_init,
 		hid_exit,
 		hid_open,
