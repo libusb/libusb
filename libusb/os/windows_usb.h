@@ -95,8 +95,9 @@ inline void upperize(char* str) {
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
 #define MAX_TIMER_SEMAPHORES        128
-#define TIMER_REQUEST_RETRY_MS		100
+#define TIMER_REQUEST_RETRY_MS      100
 #define ERR_BUFFER_SIZE             256
+#define LIST_SEPARATOR              ';'
 
 // Handle code for HID interface that have been claimed ("dibs")
 #define INTERFACE_CLAIMED           ((HANDLE)(intptr_t)0xD1B5)
@@ -129,6 +130,7 @@ const GUID CLASS_GUID_COMPOSITE     = { 0x36FC9E60, 0xC465, 0x11cF, {0x80, 0x56,
 
 struct windows_usb_api_backend {
 	const uint8_t id;
+	const char* designation;
 	const GUID *class_guid;  // The Class GUID (for fallback in case the driver name cannot be read)
 	const char **driver_name_list; // Driver name, without .sys, e.g. "usbccgp"
 	const uint8_t nb_driver_names;
@@ -312,6 +314,12 @@ struct windows_transfer_priv {
 	size_t hid_expected_size;
 };
 
+// used to match a device driver (including filter drivers) against a supported API
+struct driver_lookup {
+	char list[MAX_KEY_LENGTH+1];// REG_MULTI_SZ list of services (driver) names
+	const DWORD reg_prop;		// SPDRP registry key to use to retreive list
+	const char* designation;	// internal designation (for debug output)
+};
 
 /*
  * API macros - from libusb-win32 1.x

@@ -423,11 +423,20 @@ static int windows_assign_endpoints(struct libusb_device *dev, int iface, int al
 bool is_api_driver(char* driver, uint8_t api)
 {
 	uint8_t i;
-	for (i=0; i<usb_api_backend[api].nb_driver_names; i++) {
-		if (safe_strcmp(driver, usb_api_backend[api].driver_name_list[i]) == 0) {
-			return true;
+	const char sep_str[2] = {LIST_SEPARATOR, 0};
+	char *tok, *tmp_str = _strdup(driver);
+	if (tmp_str == NULL) return false;
+	tok = strtok(tmp_str, sep_str);
+	while (tok != NULL) {
+		for (i=0; i<usb_api_backend[api].nb_driver_names; i++) {
+			if (safe_strcmp(tok, usb_api_backend[api].driver_name_list[i]) == 0) {
+				free(tmp_str);
+				return true;
+			}
 		}
+		tok = strtok(NULL, sep_str);
 	}
+	free (tmp_str);
 	return false;
 }
 
@@ -1407,10 +1416,15 @@ static int set_hid_device(struct libusb_context *ctx, struct windows_device_priv
  */
 static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *discdevs)
 {
+	// Precedence for filter drivers vs driver is in the order of this array
+	struct driver_lookup lookup[3] = {
+		{"\0\0", SPDRP_SERVICE, "driver"},
+		{"\0\0", SPDRP_UPPERFILTERS, "upper filter driver"},
+		{"\0\0", SPDRP_LOWERFILTERS, "lower filter driver"}
+	};
 	struct windows_device_priv *priv;
 	struct windows_device_priv *parent_priv;
 	char path[MAX_PATH_LENGTH];
-	char driver[MAX_KEY_LENGTH], filter_driver[MAX_KEY_LENGTH];
 	char *sanitized_path = NULL;
 	HDEVINFO dev_info;
 	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
@@ -1418,8 +1432,8 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	DEVINST parent_devinst;
 	GUID guid;
 	DWORD size, reg_type, install_state, port_nr;
-	int	r = LIBUSB_SUCCESS;
-	unsigned i, j, k;
+	int r = LIBUSB_SUCCESS;
+	unsigned i, j, k, l;
 	uint8_t api;
 	bool found;
 
@@ -1500,37 +1514,42 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 				usbi_dbg("path (%d:%d): %s", discdevs->devices[j]->bus_number,
 					discdevs->devices[j]->device_address, priv->path);
 
-				// Check the service name to know what kind of device we have.
-				// The service name is really the driver name without ".sys" ("WinUSB", "HidUsb", ...)
-				// It tells us if we can use WinUSB, if we have a composite device, and the API to use
-				if(SetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_SERVICE,
-					&reg_type, (BYTE*)driver, MAX_KEY_LENGTH, &size)) {
-					upperize(driver);
-					usbi_dbg("driver: %s", driver);
-					found = true;
-				} else {
-					driver[0] = 0;
-				}
-
-				// The device might also have a filter driver we can use
-				if(SetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_LOWERFILTERS,
-					&reg_type, (BYTE*)filter_driver, MAX_KEY_LENGTH, &size)) {
-					upperize(filter_driver);
-					usbi_dbg("filter driver: %s", filter_driver);
-					found = true;
-				} else {
-					filter_driver[0] = 0;
-				}
-
-				for (api = 0; api<USB_API_MAX; api++) {
-					// For now, driver has precedence over filter driver
-					if ((driver[0] != 0) && (is_api_driver(driver, api))) {
-						usbi_dbg("matched device using driver");
-					} else if ((filter_driver[0] != 0) && (is_api_driver(filter_driver, api))) {
-						usbi_dbg("matched device using filter driver");
+				// Check the service & filter names to know the API we should use
+				for (k=0; k<3; k++) {
+					if (SetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, lookup[k].reg_prop,
+						&reg_type, (BYTE*)lookup[k].list, MAX_KEY_LENGTH, &size)) {
+						// Turn the REG_SZ SPDRP_SERVICE into REG_MULTI_SZ
+						if (lookup[k].reg_prop == SPDRP_SERVICE) {
+							// our buffers are MAX_KEY_LENGTH+1 so we can overflow if needed
+							lookup[k].list[safe_strlen(lookup[k].list)+1] = 0;
+						}
+						// MULTI_SZ is a pain to work with. Turn it into something much more manageable
+						// NB: none of the driver names we check against contain LIST_SEPARATOR,
+						// (currently ';'), so even if an unsuported one does, it's not an issue
+						for (l=0; (lookup[k].list[l] != 0) || (lookup[k].list[l+1] != 0); l++) {
+							if (lookup[k].list[l] == 0) {
+								lookup[k].list[l] = LIST_SEPARATOR;
+							}
+						}
+						upperize(lookup[k].list);
+						usbi_dbg("%s(s): %s", lookup[k].designation, lookup[k].list);
+						found = true;
 					} else {
-						continue;
+						if (GetLastError() != ERROR_INVALID_DATA) {
+							usbi_dbg("could not access %s: %s", lookup[k].designation, windows_error_str(0));
+						}
+						lookup[k].list[0] = 0;
 					}
+				}
+
+				for (api=0; api<USB_API_MAX; api++) {
+					for (k=0; k<3; k++) {
+						if (is_api_driver(lookup[k].list, api)) {
+							usbi_dbg("matched %s name against %s", lookup[k].designation, usb_api_backend[api].designation);
+							break;
+						}
+					}
+					if (k >= 3) continue;
 					priv->apib = &usb_api_backend[api];
 					switch(api) {
 					case USB_API_COMPOSITE:
@@ -2327,6 +2346,7 @@ const char* hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
 const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	{
 		USB_API_UNSUPPORTED,
+		"Unsupported API",
 		&CLASS_GUID_UNSUPPORTED,
 		NULL,
 		0,
@@ -2347,6 +2367,7 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		unsupported_copy_transfer_data,
 	}, {
 		USB_API_COMPOSITE,
+		"Composite API",
 		&CLASS_GUID_COMPOSITE,
 		composite_driver_names,
 		sizeof(composite_driver_names)/sizeof(composite_driver_names[0]),
@@ -2367,6 +2388,7 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		composite_copy_transfer_data,
 	}, {
 		USB_API_WINUSB,
+		"WinUSB API",
 		&CLASS_GUID_LIBUSB_WINUSB,
 		winusb_driver_names,
 		sizeof(winusb_driver_names)/sizeof(winusb_driver_names[0]),
@@ -2387,6 +2409,7 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		winusb_copy_transfer_data,
 	}, {
 		USB_API_HID,
+		"HID API",
 		&CLASS_GUID_HID,
 		hid_driver_names,
 		sizeof(hid_driver_names)/sizeof(hid_driver_names[0]),
