@@ -201,15 +201,16 @@ static clockid_t find_monotonic_clock(void)
 	struct timespec ts;
 	int r;
 
+#ifdef CLOCK_MONOTONIC
 	/* Linux 2.6.28 adds CLOCK_MONOTONIC_RAW but we don't use it
 	 * because it's not available through timerfd */
 	r = clock_gettime(CLOCK_MONOTONIC, &ts);
-	if (r == 0) {
+	if (r == 0)
 		return CLOCK_MONOTONIC;
-	} else {
-		usbi_dbg("monotonic clock doesn't work, errno %d", errno);
-		return CLOCK_REALTIME;
-	}
+	usbi_dbg("monotonic clock doesn't work, errno %d", errno);
+#endif
+
+	return CLOCK_REALTIME;
 }
 
 /* bulk continuation URB flag available from Linux 2.6.32 */
