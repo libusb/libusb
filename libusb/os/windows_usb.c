@@ -429,8 +429,13 @@ bool is_api_driver(char* driver, uint8_t api)
 {
 	uint8_t i;
 	const char sep_str[2] = {LIST_SEPARATOR, 0};
-	char *tok, *tmp_str = _strdup(driver);
+	char *tok, *tmp_str;
+	size_t len = safe_strlen(driver);
+
+	if (len == 0) return false;
+	tmp_str = calloc(len+1, 1);
 	if (tmp_str == NULL) return false;
+	memcpy(tmp_str, driver, len+1);
 	tok = strtok(tmp_str, sep_str);
 	while (tok != NULL) {
 		for (i=0; i<usb_api_backend[api].nb_driver_names; i++) {
