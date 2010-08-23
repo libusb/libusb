@@ -18,14 +18,11 @@ aclocal || exit 1
 autoheader || exit 1
 autoconf || exit 1
 automake -a -c || exit 1
-./configure --enable-examples-build --enable-toggable-debug
+./configure --enable-toggable-debug
 make
-mkdir -p $target/examples
-mkdir -p $target/lib
+mkdir -p $target/static
 mkdir -p $target/dll
-cp -v examples/.libs/lsusb.exe $target/examples
-cp -v examples/.libs/xusb.exe $target/examples
-cp -v libusb/.libs/libusb-1.0.a $target/lib
+cp -v libusb/.libs/libusb-1.0.a $target/static
 cp -v libusb/.libs/libusb-1.0.dll $target/dll
 cp -v libusb/.libs/libusb-1.0.dll.a $target/dll
 make clean
@@ -38,13 +35,10 @@ export CFLAGS="-O2"
 export LDFLAGS=""
 export RCFLAGS=""
 export DLLTOOLFLAGS=""
-./configure --enable-examples-build --enable-toggable-debug
+./configure --enable-toggable-debug
 make
-mkdir -p $target/examples
-mkdir -p $target/lib
+mkdir -p $target/static
 mkdir -p $target/dll
-cp -v examples/.libs/lsusb.exe $target/examples
-cp -v examples/.libs/xusb.exe $target/examples
-cp -v libusb/.libs/libusb-1.0.a $target/lib
+cp -v libusb/.libs/libusb-1.0.a $target/static
 cp -v libusb/.libs/libusb-1.0.dll $target/dll
 cp -v libusb/.libs/libusb-1.0.dll.a $target/dll
