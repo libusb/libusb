@@ -489,7 +489,7 @@ static int sysfs_get_active_config_descriptor(struct libusb_device *dev,
 		if (off < 0)
 			return LIBUSB_ERROR_IO;
 
-		r = seek_to_next_config(DEVICE_CTX(dev), fd, 1);
+		r = seek_to_next_config(DEVICE_CTX(dev), fd, 0);
 		if (r < 0)
 			return r;
 	}
@@ -544,7 +544,7 @@ static int get_config_descriptor(struct libusb_context *ctx, int fd,
 	/* might need to skip some configuration descriptors to reach the
 	 * requested configuration */
 	while (config_index > 0) {
-		r = seek_to_next_config(ctx, fd, 0);
+		r = seek_to_next_config(ctx, fd, 1);
 		if (r < 0)
 			return r;
 		config_index--;
