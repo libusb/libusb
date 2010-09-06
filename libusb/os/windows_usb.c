@@ -3,6 +3,7 @@
  * Copyright (c) 2009-2010 Pete Batard <pbatard@gmail.com>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
+ * HID Reports IOCTLs inspired from HIDAPI by Alan Ott, Signal 11 Software
  * Major code testing contribution by Xiaofan Chen
  *
  * This library is free software; you can redistribute it and/or
@@ -21,13 +22,6 @@
  */
 
 // COMPILATION OPTIONS:
-// - Use HidD_(G/S)et(In/Out)putReport instead of (Read/Write)File for HID
-//   Note that http://msdn.microsoft.com/en-us/library/ms789883.aspx:
-//   "In addition, some devices might not support HidD_GetInputReport,
-//    and will become unresponsive if this routine is used."
-//   => Don't blame libusb if you can't read or write HID reports when the
-//   option below is enabled.
-#define USE_HIDD_FOR_REPORTS
 // - Should libusb automatically claim (and release) the interfaces it requires?
 #define AUTO_CLAIM
 // - Forces instant overlapped completion on timeouts: can prevents extensive
@@ -3262,10 +3256,11 @@ static int _hid_get_descriptor(struct hid_device_priv* dev, HANDLE hid_handle, i
 }
 
 static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data,
-						   struct windows_transfer_priv *tp, size_t *size, OVERLAPPED* overlapped)
+						   struct windows_transfer_priv *tp, size_t *size, OVERLAPPED* overlapped,
+						   int report_type)
 {
 	uint8_t *buf;
-	DWORD read_size, expected_size = (DWORD)*size;
+	DWORD ioctl_code, read_size, expected_size = (DWORD)*size;
 	int r = LIBUSB_SUCCESS;
 
 	if (tp->hid_buffer != NULL) {
@@ -3275,6 +3270,18 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
 		usbi_dbg("invalid size (%d)", *size);
 		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	switch (report_type) {
+		case HID_REPORT_TYPE_INPUT:
+			ioctl_code = IOCTL_HID_GET_INPUT_REPORT;
+			break;
+		case HID_REPORT_TYPE_FEATURE:
+			ioctl_code = IOCTL_HID_GET_FEATURE;
+			break;
+		default:
+			usbi_dbg("unknown HID report type %d", report_type);
+			return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
 	// When report IDs are not in use, add an extra byte for the report ID
@@ -3290,16 +3297,12 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	buf[0] = (uint8_t)id;	// Must be set always
 	usbi_dbg("report ID: 0x%02X", buf[0]);
 
-	// NB: HidD_GetInputReport sends an request to the device for the Input Report
-	// (and blocks until response) whereas ReadFile waits for input to be generated
-	// asynchronously
-#if !defined(USE_HIDD_FOR_REPORTS)
-	// Use ReadFile instead of HidD_GetInputReport for async I/O
-	// TODO: send a request paquet?
 	tp->hid_expected_size = expected_size;
-	if (!ReadFile(hid_handle, buf, expected_size+1, &read_size, overlapped)) {
+
+	if (!DeviceIoControl(hid_handle, ioctl_code, buf, expected_size+1,
+		buf, expected_size+1, &read_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
-			usbi_dbg("Failed to Read HID Input Report: %s", windows_error_str(0));
+			usbi_dbg("Failed to Read HID Report: %s", windows_error_str(0));
 			safe_free(buf);
 			return LIBUSB_ERROR_IO;
 		}
@@ -3308,15 +3311,7 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 		tp->hid_dest = data; // copy dest, as not necessarily the start of the transfer buffer
 		return LIBUSB_SUCCESS;
 	}
-#else
-	// Synchronous request for the Input Report
-	if (!HidD_GetInputReport(hid_handle, buf, expected_size)) {
-		usbi_dbg("Failed to Read HID Input Report: %s", windows_error_str(0));
-		safe_free(buf);
-		return LIBUSB_ERROR_IO;
-	}
-	read_size = expected_size;	// Can't detect overflows with this API
-#endif
+
 	// Transfer completed synchronously => copy and discard extra buffer
 	if (read_size == 0) {
 		usbi_dbg("program assertion failed - read completed synchronously, but no data was read");
@@ -3346,10 +3341,11 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 }
 
 static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data,
-						   struct windows_transfer_priv *tp, size_t *size, OVERLAPPED* overlapped)
+						   struct windows_transfer_priv *tp, size_t *size, OVERLAPPED* overlapped,
+						   int report_type)
 {
 	uint8_t *buf = NULL;
-	DWORD write_size= (DWORD)*size;
+	DWORD ioctl_code, write_size= (DWORD)*size;
 
 	if (tp->hid_buffer != NULL) {
 		usbi_dbg("program assertion failed: hid_buffer is not NULL");
@@ -3358,6 +3354,18 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
 		usbi_dbg("invalid size (%d)", *size);
 		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	switch (report_type) {
+		case HID_REPORT_TYPE_OUTPUT:
+			ioctl_code = IOCTL_HID_SET_OUTPUT_REPORT;
+			break;
+		case HID_REPORT_TYPE_FEATURE:
+			ioctl_code = IOCTL_HID_SET_FEATURE;
+			break;
+		default:
+			usbi_dbg("unknown HID report type %d", report_type);
+			return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
 	usbi_dbg("report ID: 0x%02X", id);
@@ -3382,9 +3390,8 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 		}
 	}
 
-#if !defined(USE_HIDD_FOR_REPORTS)
-	// Une WriteFile instead of HidD_SetOutputReport for async I/O
-	if (!WriteFile(hid_handle, buf, write_size, &write_size, overlapped)) {
+	if (!DeviceIoControl(hid_handle, ioctl_code, buf, write_size,
+		buf, write_size, &write_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
 			usbi_dbg("Failed to Write HID Output Report: %s", windows_error_str(0));
 			safe_free(buf);
@@ -3394,15 +3401,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 		tp->hid_dest = NULL;
 		return LIBUSB_SUCCESS;
 	}
-#else
-	if (!HidD_SetOutputReport(hid_handle, buf, write_size)) {
-		usbi_dbg("Failed to Write HID Output Report: %s", windows_error_str(0));
-		if (id == 0) {
-			safe_free(buf);
-		}
-		return LIBUSB_ERROR_IO;
-	}
-#endif
+
 	// Transfer completed synchronously
 	if (write_size == 0) {
 		usbi_dbg("program assertion failed - write completed synchronously, but no data was written");
@@ -3412,100 +3411,6 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	}
 	safe_free(buf);
 	return LIBUSB_COMPLETED;
-}
-
-static int _hid_get_feature(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data, size_t *size)
-{
-	uint8_t *buf = (uint8_t*)data;	// default with report ID is to use data
-	ULONG read_size = (ULONG)*size;
-	int r = LIBUSB_ERROR_OTHER;
-	uint32_t err;
-
-	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
-		usbi_dbg("invalid size (%d)", *size);
-		return LIBUSB_ERROR_INVALID_PARAM;
-	}
-
-	// When report IDs are not in use, we must prefix an extra zero ID
-	if (id == 0) {
-		read_size++;
-		buf = (uint8_t*)calloc(1, read_size);
-		if (buf == NULL) {
-			return LIBUSB_ERROR_NO_MEM;
-		}
-	}
-	buf[0] = (uint8_t)id;
-	usbi_dbg("report ID: 0x%02X", buf[0]);
-
-	if (HidD_GetFeature(hid_handle, buf, read_size)) {
-		if (buf[0] != id) {
-			usbi_warn(NULL, "mismatched report ID (data is %02X, parameter is %02X)", buf[0], id);
-		}
-		if (id == 0) {
-			memcpy(data, buf+1, *size);
-		}
-		r = LIBUSB_COMPLETED;
-	} else {
-		err = GetLastError();
-		switch (err) {
-		case ERROR_INVALID_FUNCTION:
-			r = LIBUSB_ERROR_NOT_FOUND;
-			break;
-		default:
-			usbi_dbg("error %s", windows_error_str(err));
-			r = LIBUSB_ERROR_OTHER;
-			break;
-		}
-	}
-	if (id == 0) {
-		safe_free(buf);
-	}
-	return r;
-}
-
-static int _hid_set_feature(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data, size_t *size)
-{
-	uint8_t *buf = (uint8_t*)data;
-	uint32_t err;
-	int r = LIBUSB_ERROR_OTHER;
-	ULONG write_size = (ULONG)*size;
-
-	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
-		usbi_dbg("invalid size (%d)", *size);
-		return LIBUSB_ERROR_INVALID_PARAM;
-	}
-
-	if (id == 0) {
-		write_size++;
-		buf = (uint8_t*)calloc(write_size, 1);
-		if (buf == NULL) {
-			return LIBUSB_ERROR_NO_MEM;
-		}
-		memcpy(buf+1, data, *size);
-		buf[0] = (uint8_t)id;
-	} else if (buf[0] != id) {
-		usbi_warn(NULL, "mismatched report ID (data is %02X, parameter is %02X)", buf[0], id);
-		return LIBUSB_ERROR_INVALID_PARAM;
-	}
-
-	usbi_dbg("report ID: 0x%02X", buf[0]);
-
-	if (HidD_SetFeature(hid_handle, buf, write_size)) {
-		r = LIBUSB_COMPLETED;
-	} else {
-		err = GetLastError();
-		switch (err) {
-		case ERROR_INVALID_FUNCTION:
-			r = LIBUSB_ERROR_NOT_FOUND;
-		default:
-			usbi_dbg("error %s", windows_error_str(err));
-			r = LIBUSB_ERROR_OTHER;
-		}
-	}
-	if (id == 0) {
-		safe_free(buf);
-	}
-	return r;
 }
 
 static int _hid_class_request(struct hid_device_priv* dev, HANDLE hid_handle, int request_type,
@@ -3519,25 +3424,11 @@ static int _hid_class_request(struct hid_device_priv* dev, HANDLE hid_handle, in
 	  && (LIBUSB_REQ_RECIPIENT(request_type) != LIBUSB_RECIPIENT_DEVICE) )
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	if (LIBUSB_REQ_OUT(request_type)
-		&& request == HID_REQ_SET_REPORT
-		&& report_type == HID_REPORT_TYPE_OUTPUT)
-		return _hid_set_report(dev, hid_handle, report_id, data, tp, size, overlapped);
+	if (LIBUSB_REQ_OUT(request_type) && request == HID_REQ_SET_REPORT)
+		return _hid_set_report(dev, hid_handle, report_id, data, tp, size, overlapped, report_type);
 
-	if (LIBUSB_REQ_IN(request_type)
-		&& request == HID_REQ_GET_REPORT
-		&& report_type == HID_REPORT_TYPE_INPUT)
-		return _hid_get_report(dev, hid_handle, report_id, data, tp, size, overlapped);
-
-	if (LIBUSB_REQ_OUT(request_type)
-		&& request == HID_REQ_SET_REPORT
-		&& report_type == HID_REPORT_TYPE_FEATURE)
-		return _hid_set_feature(dev, hid_handle, report_id, data, size);
-
-	if (LIBUSB_REQ_IN(request_type)
-		&& request == HID_REQ_GET_REPORT
-		&& report_type == HID_REPORT_TYPE_FEATURE)
-		return _hid_get_feature(dev, hid_handle, report_id, data, size);
+	if (LIBUSB_REQ_IN(request_type) && request == HID_REQ_GET_REPORT)
+		return _hid_get_report(dev, hid_handle, report_id, data, tp, size, overlapped, report_type);
 
 	return LIBUSB_ERROR_INVALID_PARAM;
 }

@@ -199,6 +199,21 @@ struct libusb_hid_descriptor {
 #define LIBUSB_REQ_IN(request_type) ((request_type) & LIBUSB_ENDPOINT_IN)
 #define LIBUSB_REQ_OUT(request_type) (!LIBUSB_REQ_IN(request_type))
 
+// The following are used for HID reports IOCTLs
+#define HID_CTL_CODE(id) \
+  CTL_CODE (FILE_DEVICE_KEYBOARD, (id), METHOD_NEITHER, FILE_ANY_ACCESS)
+#define HID_BUFFER_CTL_CODE(id) \
+  CTL_CODE (FILE_DEVICE_KEYBOARD, (id), METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define HID_IN_CTL_CODE(id) \
+  CTL_CODE (FILE_DEVICE_KEYBOARD, (id), METHOD_IN_DIRECT, FILE_ANY_ACCESS)
+#define HID_OUT_CTL_CODE(id) \
+  CTL_CODE (FILE_DEVICE_KEYBOARD, (id), METHOD_OUT_DIRECT, FILE_ANY_ACCESS)
+
+#define IOCTL_HID_GET_FEATURE                 HID_OUT_CTL_CODE(100)
+#define IOCTL_HID_GET_INPUT_REPORT            HID_OUT_CTL_CODE(104)
+#define IOCTL_HID_SET_FEATURE                 HID_IN_CTL_CODE(100)
+#define IOCTL_HID_SET_OUTPUT_REPORT           HID_IN_CTL_CODE(101)
+
 enum libusb_hid_request_type {
 	HID_REQ_GET_REPORT = 0x01,
 	HID_REQ_GET_IDLE = 0x02,
