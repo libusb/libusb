@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <objbase.h>  // for string to GUID conv. requires libole32.a
+#include <winioctl.h>
 
 #include <libusbi.h>
 #include "poll_windows.h"
