@@ -582,6 +582,10 @@ while (user_has_not_requested_exit)
  *
  * \section pollmain The more advanced option
  *
+ * \note This functionality is currently only available on Unix-like platforms.
+ * On Windows, libusb_get_pollfds() simply returns NULL. Exposing event sources
+ * on Windows will require some further thought and design.
+ *
  * In more advanced applications, you will already have a main loop which
  * is monitoring other event sources: network sockets, X11 events, mouse
  * movements, etc. Through exposing a set of file descriptors, libusb is
@@ -2258,14 +2262,19 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
  * The returned list is NULL-terminated and should be freed with free() when
  * done. The actual list contents must not be touched.
  *
+ * As file descriptors are a Unix-specific concept, this function is not
+ * available on Windows and will always return NULL.
+ *
  * \param ctx the context to operate on, or NULL for the default context
- * \returns a NULL-terminated list of libusb_pollfd structures, or NULL on
- * error
+ * \returns a NULL-terminated list of libusb_pollfd structures
+ * \returns NULL on error
+ * \returns NULL on platforms where the functionality is not available
  */
 DEFAULT_VISIBILITY
 const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 	libusb_context *ctx)
 {
+#ifndef OS_WINDOWS
 	struct libusb_pollfd **ret = NULL;
 	struct usbi_pollfd *ipollfd;
 	size_t i = 0;
@@ -2287,6 +2296,9 @@ const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 out:
 	usbi_mutex_unlock(&ctx->pollfds_lock);
 	return (const struct libusb_pollfd **) ret;
+#else
+	return NULL;
+#endif
 }
 
 /* Backends call this from handle_events to report disconnection of a device.
@@ -2331,4 +2343,3 @@ void usbi_handle_disconnect(struct libusb_device_handle *handle)
 	}
 
 }
-
