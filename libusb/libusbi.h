@@ -29,6 +29,15 @@
 
 #include <libusb.h>
 
+/* Inside the libusb code, mark all public functions as follows:
+ *   return_type API_EXPORTED function_name(params) { ... }
+ * But if the function returns a pointer, mark it as follows:
+ *   DEFAULT_VISIBILITY return_type * LIBUSB_CALL function_name(params) { ... }
+ * In the libusb public header, mark all declarations as:
+ *   return_type LIBUSB_CALL function_name(params);
+ */
+#define API_EXPORTED LIBUSB_CALL DEFAULT_VISIBILITY
+
 #define DEVICE_DESC_LENGTH		18
 
 #define USB_MAXENDPOINTS	32

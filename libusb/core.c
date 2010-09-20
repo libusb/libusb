@@ -600,7 +600,7 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
  * \returns the number of devices in the outputted list, or LIBUSB_ERROR_NO_MEM
  * on memory allocation failure.
  */
-API_EXPORTED ssize_t LIBUSB_CALL libusb_get_device_list(libusb_context *ctx,
+ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list)
 {
 	struct discovered_devs *discdevs = discovered_devs_alloc();
@@ -646,7 +646,7 @@ out:
  * \param list the list to free
  * \param unref_devices whether to unref the devices in the list
  */
-API_EXPORTED void LIBUSB_CALL libusb_free_device_list(libusb_device **list,
+void API_EXPORTED libusb_free_device_list(libusb_device **list,
 	int unref_devices)
 {
 	if (!list)
@@ -667,7 +667,7 @@ API_EXPORTED void LIBUSB_CALL libusb_free_device_list(libusb_device **list,
  * \param dev a device
  * \returns the bus number
  */
-API_EXPORTED uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev)
+uint8_t API_EXPORTED libusb_get_bus_number(libusb_device *dev)
 {
 	return dev->bus_number;
 }
@@ -677,7 +677,7 @@ API_EXPORTED uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev)
  * \param dev a device
  * \returns the device address
  */
-API_EXPORTED uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *dev)
+uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 {
 	return dev->device_address;
 }
@@ -723,7 +723,7 @@ static const struct libusb_endpoint_descriptor *find_endpoint(
  * \returns LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
  * \returns LIBUSB_ERROR_OTHER on other failure
  */
-API_EXPORTED int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
+int API_EXPORTED libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint)
 {
 	struct libusb_config_descriptor *config;
@@ -772,7 +772,7 @@ API_EXPORTED int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
  * \returns LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
  * \returns LIBUSB_ERROR_OTHER on other failure
  */
-API_EXPORTED int LIBUSB_CALL libusb_get_max_iso_packet_size(libusb_device *dev,
+int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 	unsigned char endpoint)
 {
 	struct libusb_config_descriptor *config;
@@ -808,7 +808,8 @@ API_EXPORTED int LIBUSB_CALL libusb_get_max_iso_packet_size(libusb_device *dev,
  * \param dev the device to reference
  * \returns the same device
  */
-API_EXPORTED libusb_device* LIBUSB_CALL libusb_ref_device(libusb_device *dev)
+DEFAULT_VISIBILITY
+libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev)
 {
 	usbi_mutex_lock(&dev->lock);
 	dev->refcnt++;
@@ -821,7 +822,7 @@ API_EXPORTED libusb_device* LIBUSB_CALL libusb_ref_device(libusb_device *dev)
  * causes the reference count to reach zero, the device shall be destroyed.
  * \param dev the device to unreference
  */
-API_EXPORTED void LIBUSB_CALL libusb_unref_device(libusb_device *dev)
+void API_EXPORTED libusb_unref_device(libusb_device *dev)
 {
 	int refcnt;
 
@@ -910,7 +911,8 @@ void usbi_fd_notification(struct libusb_context *ctx)
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-API_EXPORTED int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle **handle)
+int API_EXPORTED libusb_open(libusb_device *dev,
+	libusb_device_handle **handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device_handle *_handle;
@@ -972,7 +974,8 @@ API_EXPORTED int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handl
  * \param product_id the idProduct value to search for
  * \returns a handle for the first found device, or NULL on error or if the
  * device could not be found. */
-API_EXPORTED libusb_device_handle* LIBUSB_CALL libusb_open_device_with_vid_pid(
+DEFAULT_VISIBILITY
+libusb_device_handle * LIBUSB_CALL libusb_open_device_with_vid_pid(
 	libusb_context *ctx, uint16_t vendor_id, uint16_t product_id)
 {
 	struct libusb_device **devs;
@@ -1031,7 +1034,7 @@ static void do_close(struct libusb_context *ctx,
  *
  * \param dev_handle the handle to close
  */
-API_EXPORTED void LIBUSB_CALL libusb_close(libusb_device_handle *dev_handle)
+void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 {
 	struct libusb_context *ctx;
 	unsigned char dummy = 1;
@@ -1092,7 +1095,8 @@ API_EXPORTED void LIBUSB_CALL libusb_close(libusb_device_handle *dev_handle)
  * \param dev_handle a device handle
  * \returns the underlying device
  */
-API_EXPORTED libusb_device* LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle)
+DEFAULT_VISIBILITY
+libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle)
 {
 	return dev_handle->dev;
 }
@@ -1117,7 +1121,7 @@ API_EXPORTED libusb_device* LIBUSB_CALL libusb_get_device(libusb_device_handle *
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-API_EXPORTED int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
+int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev,
 	int *config)
 {
 	int r = LIBUSB_ERROR_NOT_SUPPORTED;
@@ -1186,7 +1190,7 @@ API_EXPORTED int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-API_EXPORTED int LIBUSB_CALL libusb_set_configuration(libusb_device_handle *dev,
+int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev,
 	int configuration)
 {
 	usbi_dbg("configuration %d", configuration);
@@ -1217,7 +1221,7 @@ API_EXPORTED int LIBUSB_CALL libusb_set_configuration(libusb_device_handle *dev,
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns a LIBUSB_ERROR code on other failure
  */
-API_EXPORTED int LIBUSB_CALL libusb_claim_interface(libusb_device_handle *dev,
+int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev,
 	int interface_number)
 {
 	int r = 0;
@@ -1254,7 +1258,7 @@ out:
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-API_EXPORTED int LIBUSB_CALL libusb_release_interface(libusb_device_handle *dev,
+int API_EXPORTED libusb_release_interface(libusb_device_handle *dev,
 	int interface_number)
 {
 	int r;
@@ -1299,7 +1303,7 @@ out:
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-API_EXPORTED int LIBUSB_CALL libusb_set_interface_alt_setting(libusb_device_handle *dev,
+int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev,
 	int interface_number, int alternate_setting)
 {
 	usbi_dbg("interface %d altsetting %d",
@@ -1334,7 +1338,7 @@ API_EXPORTED int LIBUSB_CALL libusb_set_interface_alt_setting(libusb_device_hand
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-API_EXPORTED int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev,
+int API_EXPORTED libusb_clear_halt(libusb_device_handle *dev,
 	unsigned char endpoint)
 {
 	usbi_dbg("endpoint %x", endpoint);
@@ -1360,7 +1364,7 @@ API_EXPORTED int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev,
  * device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-API_EXPORTED int LIBUSB_CALL libusb_reset_device(libusb_device_handle *dev)
+int API_EXPORTED libusb_reset_device(libusb_device_handle *dev)
 {
 	usbi_dbg("");
 	return usbi_backend->reset_device(dev);
@@ -1371,16 +1375,19 @@ API_EXPORTED int LIBUSB_CALL libusb_reset_device(libusb_device_handle *dev)
  * is active, you cannot claim the interface, and libusb will be unable to
  * perform I/O.
  *
+ * This functionality is not available on Windows.
+ *
  * \param dev a device handle
  * \param interface_number the interface to check
  * \returns 0 if no kernel driver is active
  * \returns 1 if a kernel driver is active
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
- * \returns LIBUSB_ERROR_NOT_SUPPORTED on Windows
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED on platforms where the functionality
+ * is not available
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_detach_kernel_driver()
  */
-API_EXPORTED int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *dev,
+int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev,
 	int interface_number)
 {
 	usbi_dbg("interface %d", interface_number);
@@ -1392,8 +1399,9 @@ API_EXPORTED int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *d
 
 /** \ingroup dev
  * Detach a kernel driver from an interface. If successful, you will then be
- * able to claim the interface and perform I/O. This call is only effective
- * on Linux and returns LIBUSB_ERROR_NOT_SUPPORTED on all other platforms.
+ * able to claim the interface and perform I/O.
+ *
+ * This functionality is not available on Darwin or Windows.
  *
  * \param dev a device handle
  * \param interface_number the interface to detach the driver from
@@ -1401,11 +1409,12 @@ API_EXPORTED int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *d
  * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
  * \returns LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
- * \returns LIBUSB_ERROR_NOT_SUPPORTED on non Linux platforms
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED on platforms where the functionality
+ * is not available
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_kernel_driver_active()
  */
-API_EXPORTED int LIBUSB_CALL libusb_detach_kernel_driver(libusb_device_handle *dev,
+int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev,
 	int interface_number)
 {
 	usbi_dbg("interface %d", interface_number);
@@ -1420,19 +1429,22 @@ API_EXPORTED int LIBUSB_CALL libusb_detach_kernel_driver(libusb_device_handle *d
  * using libusb_detach_kernel_driver(). This call is only effective on
  * Linux and returns LIBUSB_ERROR_NOT_SUPPORTED on all other platforms.
  *
+ * This functionality is not available on Darwin or Windows.
+ *
  * \param dev a device handle
  * \param interface_number the interface to attach the driver from
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
  * \returns LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
- * \returns LIBUSB_ERROR_NOT_SUPPORTED on non Linux platforms
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED on platforms where the functionality
+ * is not available
  * \returns LIBUSB_ERROR_BUSY if the driver cannot be attached because the
  * interface is claimed by a program or driver
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_kernel_driver_active()
  */
-API_EXPORTED int LIBUSB_CALL libusb_attach_kernel_driver(libusb_device_handle *dev,
+int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
 	int interface_number)
 {
 	usbi_dbg("interface %d", interface_number);
@@ -1471,7 +1483,7 @@ API_EXPORTED int LIBUSB_CALL libusb_attach_kernel_driver(libusb_device_handle *d
  * \param ctx the context to operate on, or NULL for the default context
  * \param level debug level to set
  */
-API_EXPORTED void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level)
+void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 {
 	USBI_GET_CONTEXT(ctx);
 	if (!ctx->debug_fixed)
@@ -1491,7 +1503,7 @@ API_EXPORTED void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level)
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
  * \see contexts
  */
-API_EXPORTED int LIBUSB_CALL libusb_init(libusb_context **context)
+int API_EXPORTED libusb_init(libusb_context **context)
 {
 	char *dbg = getenv("LIBUSB_DEBUG");
 	struct libusb_context *ctx;
@@ -1573,7 +1585,7 @@ err_unlock:
  * before your application terminates.
  * \param ctx the context to deinitialize, or NULL for the default context
  */
-API_EXPORTED void LIBUSB_CALL libusb_exit(struct libusb_context *ctx)
+void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 {
 	USBI_GET_CONTEXT(ctx);
 	usbi_dbg("");
@@ -1679,7 +1691,8 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
  * \returns a short description of the error code in English, or NULL if the
  * error descriptions are unavailable
  */
-API_EXPORTED const char *LIBUSB_CALL libusb_strerror(enum libusb_error error_code)
+DEFAULT_VISIBILITY
+const char * LIBUSB_CALL libusb_strerror(enum libusb_error error_code)
 {
 	switch (error_code) {
 	case LIBUSB_SUCCESS:
@@ -1718,7 +1731,8 @@ API_EXPORTED const char *LIBUSB_CALL libusb_strerror(enum libusb_error error_cod
  * Fills a libusb_version struct with the full version (major, minor,
  * micro, nano) of this library
  */
-API_EXPORTED const struct libusb_version* LIBUSB_CALL libusb_getversion(void)
+DEFAULT_VISIBILITY
+const struct libusb_version * LIBUSB_CALL libusb_getversion(void)
 {
 	return &libusb_version_internal;
 }

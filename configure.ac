@@ -170,9 +170,9 @@ saved_cflags="$CFLAGS"
 CFLAGS="$CFLAGS -Werror -fvisibility=hidden"
 AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
 	[VISIBILITY_CFLAGS="-fvisibility=hidden"
-	 AC_DEFINE([API_EXPORTED], [__attribute__((visibility("default")))], [Default visibility]) ],
+	 AC_DEFINE([DEFAULT_VISIBILITY], [__attribute__((visibility("default")))], [Default visibility]) ],
 	[ VISIBILITY_CFLAGS=""
-	 AC_DEFINE([API_EXPORTED], [], [Default visibility]) ],
+	 AC_DEFINE([DEFAULT_VISIBILITY], [], [Default visibility]) ],
 	])
 CFLAGS="$saved_cflags"
 
