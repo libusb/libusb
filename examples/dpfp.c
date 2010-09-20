@@ -149,7 +149,7 @@ static int set_mode(unsigned char data)
 	return 0;
 }
 
-static void LIBUSB_API cb_mode_changed(struct libusb_transfer *transfer)
+static void LIBUSB_CALL cb_mode_changed(struct libusb_transfer *transfer)
 {
 	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
 		fprintf(stderr, "mode change transfer not completed!\n");
@@ -276,7 +276,7 @@ static int next_state(void)
 	return 0;
 }
 
-static void LIBUSB_API cb_irq(struct libusb_transfer *transfer)
+static void LIBUSB_CALL cb_irq(struct libusb_transfer *transfer)
 {
 	unsigned char irqtype = transfer->buffer[0];
 
@@ -315,7 +315,7 @@ static void LIBUSB_API cb_irq(struct libusb_transfer *transfer)
 		do_exit = 2;
 }
 
-static void LIBUSB_API cb_img(struct libusb_transfer *transfer)
+static void LIBUSB_CALL cb_img(struct libusb_transfer *transfer)
 {
 	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
 		fprintf(stderr, "img transfer status %d?\n", transfer->status);

@@ -430,7 +430,7 @@ err:
  * \param desc output location for the descriptor data
  * \returns 0 on success or a LIBUSB_ERROR code on failure
  */
-API_EXPORTED int LIBUSB_API libusb_get_device_descriptor(libusb_device *dev,
+API_EXPORTED int LIBUSB_CALL libusb_get_device_descriptor(libusb_device *dev,
 	struct libusb_device_descriptor *desc)
 {
 	unsigned char raw_desc[DEVICE_DESC_LENGTH];
@@ -466,7 +466,7 @@ API_EXPORTED int LIBUSB_API libusb_get_device_descriptor(libusb_device *dev,
  * \returns another LIBUSB_ERROR code on error
  * \see libusb_get_config_descriptor
  */
-API_EXPORTED int LIBUSB_API libusb_get_active_config_descriptor(libusb_device *dev,
+API_EXPORTED int LIBUSB_CALL libusb_get_active_config_descriptor(libusb_device *dev,
 	struct libusb_config_descriptor **config)
 {
 	struct libusb_config_descriptor *_config = malloc(sizeof(*_config));
@@ -531,7 +531,7 @@ err:
  * \see libusb_get_active_config_descriptor()
  * \see libusb_get_config_descriptor_by_value()
  */
-API_EXPORTED int LIBUSB_API libusb_get_config_descriptor(libusb_device *dev,
+API_EXPORTED int LIBUSB_CALL libusb_get_config_descriptor(libusb_device *dev,
 	uint8_t config_index, struct libusb_config_descriptor **config)
 {
 	struct libusb_config_descriptor *_config;
@@ -630,7 +630,7 @@ int usbi_get_config_index_by_value(struct libusb_device *dev,
  * \see libusb_get_active_config_descriptor()
  * \see libusb_get_config_descriptor()
  */
-API_EXPORTED int LIBUSB_API libusb_get_config_descriptor_by_value(libusb_device *dev,
+API_EXPORTED int LIBUSB_CALL libusb_get_config_descriptor_by_value(libusb_device *dev,
 	uint8_t bConfigurationValue, struct libusb_config_descriptor **config)
 {
 	int idx;
@@ -651,7 +651,7 @@ API_EXPORTED int LIBUSB_API libusb_get_config_descriptor_by_value(libusb_device 
  *
  * \param config the configuration descriptor to free
  */
-API_EXPORTED void LIBUSB_API libusb_free_config_descriptor(
+API_EXPORTED void LIBUSB_CALL libusb_free_config_descriptor(
 	struct libusb_config_descriptor *config)
 {
 	if (!config)
@@ -673,7 +673,7 @@ API_EXPORTED void LIBUSB_API libusb_free_config_descriptor(
  * \param length size of data buffer
  * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
  */
-API_EXPORTED int LIBUSB_API libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
+API_EXPORTED int LIBUSB_CALL libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
 	uint8_t desc_index, unsigned char *data, int length)
 {
 	unsigned char tbuf[255]; /* Some devices choke on size > 255 */
