@@ -742,6 +742,7 @@ int main(int argc, char** argv)
 	bool show_help = false;
 	bool got_vidpid = false;
 	bool debug_mode = false;
+	const struct libusb_version* version;
 	int j, r;
 	size_t i, arglen;
 	unsigned tmp_vid, tmp_pid;
@@ -856,6 +857,8 @@ int main(int argc, char** argv)
 		return 0;
 	}
 
+	version = libusb_getversion();
+	printf("Using libusb v%d.%d.%d.%d\n\n", version->major, version->minor, version->micro, version->nano);
 	r = libusb_init(NULL);
 	if (r < 0)
 		return r;
