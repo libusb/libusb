@@ -6,12 +6,9 @@ EXPORTS
   libusb_get_device_address
   libusb_get_max_packet_size
   libusb_get_max_iso_packet_size
-  libusb_ref_device
   libusb_unref_device
   libusb_open
-  libusb_open_device_with_vid_pid
   libusb_close
-  libusb_get_device
   libusb_get_configuration
   libusb_set_configuration
   libusb_claim_interface
@@ -25,15 +22,12 @@ EXPORTS
   libusb_set_debug
   libusb_init
   libusb_exit
-  libusb_strerror
-  libusb_getversion
   libusb_get_device_descriptor
   libusb_get_active_config_descriptor
   libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value
   libusb_free_config_descriptor
   libusb_get_string_descriptor_ascii
-  libusb_alloc_transfer
   libusb_free_transfer
   libusb_submit_transfer
   libusb_cancel_transfer
@@ -51,22 +45,25 @@ EXPORTS
   libusb_pollfds_handle_timeouts
   libusb_get_next_timeout
   libusb_set_pollfd_notifiers
-  libusb_get_pollfds
   libusb_control_transfer
   libusb_bulk_transfer
   libusb_interrupt_transfer
+  libusb_ref_device
+  libusb_open_device_with_vid_pid
+  libusb_get_device
+  libusb_strerror
+  libusb_getversion
+  libusb_alloc_transfer
+  libusb_get_pollfds
   libusb_get_device_list@4 = libusb_get_device_list
   libusb_free_device_list@4 = libusb_free_device_list
   libusb_get_bus_number@4 = libusb_get_bus_number
   libusb_get_device_address@4 = libusb_get_device_address
   libusb_get_max_packet_size@4 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@4 = libusb_get_max_iso_packet_size
-  libusb_ref_device@4 = libusb_ref_device
   libusb_unref_device@4 = libusb_unref_device
   libusb_open@4 = libusb_open
-  libusb_open_device_with_vid_pid@4 = libusb_open_device_with_vid_pid
   libusb_close@4 = libusb_close
-  libusb_get_device@4 = libusb_get_device
   libusb_get_configuration@4 = libusb_get_configuration
   libusb_set_configuration@4 = libusb_set_configuration
   libusb_claim_interface@4 = libusb_claim_interface
@@ -80,15 +77,12 @@ EXPORTS
   libusb_set_debug@4 = libusb_set_debug
   libusb_init@4 = libusb_init
   libusb_exit@4 = libusb_exit
-  libusb_strerror@4 = libusb_strerror
-  libusb_getversion@4 = libusb_getversion
   libusb_get_device_descriptor@4 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@4 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@4 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value@4 = libusb_get_config_descriptor_by_value
   libusb_free_config_descriptor@4 = libusb_free_config_descriptor
   libusb_get_string_descriptor_ascii@4 = libusb_get_string_descriptor_ascii
-  libusb_alloc_transfer@4 = libusb_alloc_transfer
   libusb_free_transfer@4 = libusb_free_transfer
   libusb_submit_transfer@4 = libusb_submit_transfer
   libusb_cancel_transfer@4 = libusb_cancel_transfer
@@ -106,22 +100,25 @@ EXPORTS
   libusb_pollfds_handle_timeouts@4 = libusb_pollfds_handle_timeouts
   libusb_get_next_timeout@4 = libusb_get_next_timeout
   libusb_set_pollfd_notifiers@4 = libusb_set_pollfd_notifiers
-  libusb_get_pollfds@4 = libusb_get_pollfds
   libusb_control_transfer@4 = libusb_control_transfer
   libusb_bulk_transfer@4 = libusb_bulk_transfer
   libusb_interrupt_transfer@4 = libusb_interrupt_transfer
+  libusb_ref_device@4 = libusb_ref_device
+  libusb_open_device_with_vid_pid@4 = libusb_open_device_with_vid_pid
+  libusb_get_device@4 = libusb_get_device
+  libusb_strerror@4 = libusb_strerror
+  libusb_getversion@4 = libusb_getversion
+  libusb_alloc_transfer@4 = libusb_alloc_transfer
+  libusb_get_pollfds@4 = libusb_get_pollfds
   libusb_get_device_list@8 = libusb_get_device_list
   libusb_free_device_list@8 = libusb_free_device_list
   libusb_get_bus_number@8 = libusb_get_bus_number
   libusb_get_device_address@8 = libusb_get_device_address
   libusb_get_max_packet_size@8 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@8 = libusb_get_max_iso_packet_size
-  libusb_ref_device@8 = libusb_ref_device
   libusb_unref_device@8 = libusb_unref_device
   libusb_open@8 = libusb_open
-  libusb_open_device_with_vid_pid@8 = libusb_open_device_with_vid_pid
   libusb_close@8 = libusb_close
-  libusb_get_device@8 = libusb_get_device
   libusb_get_configuration@8 = libusb_get_configuration
   libusb_set_configuration@8 = libusb_set_configuration
   libusb_claim_interface@8 = libusb_claim_interface
@@ -135,15 +132,12 @@ EXPORTS
   libusb_set_debug@8 = libusb_set_debug
   libusb_init@8 = libusb_init
   libusb_exit@8 = libusb_exit
-  libusb_strerror@8 = libusb_strerror
-  libusb_getversion@8 = libusb_getversion
   libusb_get_device_descriptor@8 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@8 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@8 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value@8 = libusb_get_config_descriptor_by_value
   libusb_free_config_descriptor@8 = libusb_free_config_descriptor
   libusb_get_string_descriptor_ascii@8 = libusb_get_string_descriptor_ascii
-  libusb_alloc_transfer@8 = libusb_alloc_transfer
   libusb_free_transfer@8 = libusb_free_transfer
   libusb_submit_transfer@8 = libusb_submit_transfer
   libusb_cancel_transfer@8 = libusb_cancel_transfer
@@ -161,22 +155,25 @@ EXPORTS
   libusb_pollfds_handle_timeouts@8 = libusb_pollfds_handle_timeouts
   libusb_get_next_timeout@8 = libusb_get_next_timeout
   libusb_set_pollfd_notifiers@8 = libusb_set_pollfd_notifiers
-  libusb_get_pollfds@8 = libusb_get_pollfds
   libusb_control_transfer@8 = libusb_control_transfer
   libusb_bulk_transfer@8 = libusb_bulk_transfer
   libusb_interrupt_transfer@8 = libusb_interrupt_transfer
+  libusb_ref_device@8 = libusb_ref_device
+  libusb_open_device_with_vid_pid@8 = libusb_open_device_with_vid_pid
+  libusb_get_device@8 = libusb_get_device
+  libusb_strerror@8 = libusb_strerror
+  libusb_getversion@8 = libusb_getversion
+  libusb_alloc_transfer@8 = libusb_alloc_transfer
+  libusb_get_pollfds@8 = libusb_get_pollfds
   libusb_get_device_list@12 = libusb_get_device_list
   libusb_free_device_list@12 = libusb_free_device_list
   libusb_get_bus_number@12 = libusb_get_bus_number
   libusb_get_device_address@12 = libusb_get_device_address
   libusb_get_max_packet_size@12 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@12 = libusb_get_max_iso_packet_size
-  libusb_ref_device@12 = libusb_ref_device
   libusb_unref_device@12 = libusb_unref_device
   libusb_open@12 = libusb_open
-  libusb_open_device_with_vid_pid@12 = libusb_open_device_with_vid_pid
   libusb_close@12 = libusb_close
-  libusb_get_device@12 = libusb_get_device
   libusb_get_configuration@12 = libusb_get_configuration
   libusb_set_configuration@12 = libusb_set_configuration
   libusb_claim_interface@12 = libusb_claim_interface
@@ -190,15 +187,12 @@ EXPORTS
   libusb_set_debug@12 = libusb_set_debug
   libusb_init@12 = libusb_init
   libusb_exit@12 = libusb_exit
-  libusb_strerror@12 = libusb_strerror
-  libusb_getversion@12 = libusb_getversion
   libusb_get_device_descriptor@12 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@12 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@12 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value@12 = libusb_get_config_descriptor_by_value
   libusb_free_config_descriptor@12 = libusb_free_config_descriptor
   libusb_get_string_descriptor_ascii@12 = libusb_get_string_descriptor_ascii
-  libusb_alloc_transfer@12 = libusb_alloc_transfer
   libusb_free_transfer@12 = libusb_free_transfer
   libusb_submit_transfer@12 = libusb_submit_transfer
   libusb_cancel_transfer@12 = libusb_cancel_transfer
@@ -216,22 +210,25 @@ EXPORTS
   libusb_pollfds_handle_timeouts@12 = libusb_pollfds_handle_timeouts
   libusb_get_next_timeout@12 = libusb_get_next_timeout
   libusb_set_pollfd_notifiers@12 = libusb_set_pollfd_notifiers
-  libusb_get_pollfds@12 = libusb_get_pollfds
   libusb_control_transfer@12 = libusb_control_transfer
   libusb_bulk_transfer@12 = libusb_bulk_transfer
   libusb_interrupt_transfer@12 = libusb_interrupt_transfer
+  libusb_ref_device@12 = libusb_ref_device
+  libusb_open_device_with_vid_pid@12 = libusb_open_device_with_vid_pid
+  libusb_get_device@12 = libusb_get_device
+  libusb_strerror@12 = libusb_strerror
+  libusb_getversion@12 = libusb_getversion
+  libusb_alloc_transfer@12 = libusb_alloc_transfer
+  libusb_get_pollfds@12 = libusb_get_pollfds
   libusb_get_device_list@16 = libusb_get_device_list
   libusb_free_device_list@16 = libusb_free_device_list
   libusb_get_bus_number@16 = libusb_get_bus_number
   libusb_get_device_address@16 = libusb_get_device_address
   libusb_get_max_packet_size@16 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@16 = libusb_get_max_iso_packet_size
-  libusb_ref_device@16 = libusb_ref_device
   libusb_unref_device@16 = libusb_unref_device
   libusb_open@16 = libusb_open
-  libusb_open_device_with_vid_pid@16 = libusb_open_device_with_vid_pid
   libusb_close@16 = libusb_close
-  libusb_get_device@16 = libusb_get_device
   libusb_get_configuration@16 = libusb_get_configuration
   libusb_set_configuration@16 = libusb_set_configuration
   libusb_claim_interface@16 = libusb_claim_interface
@@ -245,15 +242,12 @@ EXPORTS
   libusb_set_debug@16 = libusb_set_debug
   libusb_init@16 = libusb_init
   libusb_exit@16 = libusb_exit
-  libusb_strerror@16 = libusb_strerror
-  libusb_getversion@16 = libusb_getversion
   libusb_get_device_descriptor@16 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@16 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@16 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value@16 = libusb_get_config_descriptor_by_value
   libusb_free_config_descriptor@16 = libusb_free_config_descriptor
   libusb_get_string_descriptor_ascii@16 = libusb_get_string_descriptor_ascii
-  libusb_alloc_transfer@16 = libusb_alloc_transfer
   libusb_free_transfer@16 = libusb_free_transfer
   libusb_submit_transfer@16 = libusb_submit_transfer
   libusb_cancel_transfer@16 = libusb_cancel_transfer
@@ -271,22 +265,25 @@ EXPORTS
   libusb_pollfds_handle_timeouts@16 = libusb_pollfds_handle_timeouts
   libusb_get_next_timeout@16 = libusb_get_next_timeout
   libusb_set_pollfd_notifiers@16 = libusb_set_pollfd_notifiers
-  libusb_get_pollfds@16 = libusb_get_pollfds
   libusb_control_transfer@16 = libusb_control_transfer
   libusb_bulk_transfer@16 = libusb_bulk_transfer
   libusb_interrupt_transfer@16 = libusb_interrupt_transfer
+  libusb_ref_device@16 = libusb_ref_device
+  libusb_open_device_with_vid_pid@16 = libusb_open_device_with_vid_pid
+  libusb_get_device@16 = libusb_get_device
+  libusb_strerror@16 = libusb_strerror
+  libusb_getversion@16 = libusb_getversion
+  libusb_alloc_transfer@16 = libusb_alloc_transfer
+  libusb_get_pollfds@16 = libusb_get_pollfds
   libusb_get_device_list@20 = libusb_get_device_list
   libusb_free_device_list@20 = libusb_free_device_list
   libusb_get_bus_number@20 = libusb_get_bus_number
   libusb_get_device_address@20 = libusb_get_device_address
   libusb_get_max_packet_size@20 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@20 = libusb_get_max_iso_packet_size
-  libusb_ref_device@20 = libusb_ref_device
   libusb_unref_device@20 = libusb_unref_device
   libusb_open@20 = libusb_open
-  libusb_open_device_with_vid_pid@20 = libusb_open_device_with_vid_pid
   libusb_close@20 = libusb_close
-  libusb_get_device@20 = libusb_get_device
   libusb_get_configuration@20 = libusb_get_configuration
   libusb_set_configuration@20 = libusb_set_configuration
   libusb_claim_interface@20 = libusb_claim_interface
@@ -300,15 +297,12 @@ EXPORTS
   libusb_set_debug@20 = libusb_set_debug
   libusb_init@20 = libusb_init
   libusb_exit@20 = libusb_exit
-  libusb_strerror@20 = libusb_strerror
-  libusb_getversion@20 = libusb_getversion
   libusb_get_device_descriptor@20 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@20 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@20 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value@20 = libusb_get_config_descriptor_by_value
   libusb_free_config_descriptor@20 = libusb_free_config_descriptor
   libusb_get_string_descriptor_ascii@20 = libusb_get_string_descriptor_ascii
-  libusb_alloc_transfer@20 = libusb_alloc_transfer
   libusb_free_transfer@20 = libusb_free_transfer
   libusb_submit_transfer@20 = libusb_submit_transfer
   libusb_cancel_transfer@20 = libusb_cancel_transfer
@@ -326,22 +320,25 @@ EXPORTS
   libusb_pollfds_handle_timeouts@20 = libusb_pollfds_handle_timeouts
   libusb_get_next_timeout@20 = libusb_get_next_timeout
   libusb_set_pollfd_notifiers@20 = libusb_set_pollfd_notifiers
-  libusb_get_pollfds@20 = libusb_get_pollfds
   libusb_control_transfer@20 = libusb_control_transfer
   libusb_bulk_transfer@20 = libusb_bulk_transfer
   libusb_interrupt_transfer@20 = libusb_interrupt_transfer
+  libusb_ref_device@20 = libusb_ref_device
+  libusb_open_device_with_vid_pid@20 = libusb_open_device_with_vid_pid
+  libusb_get_device@20 = libusb_get_device
+  libusb_strerror@20 = libusb_strerror
+  libusb_getversion@20 = libusb_getversion
+  libusb_alloc_transfer@20 = libusb_alloc_transfer
+  libusb_get_pollfds@20 = libusb_get_pollfds
   libusb_get_device_list@24 = libusb_get_device_list
   libusb_free_device_list@24 = libusb_free_device_list
   libusb_get_bus_number@24 = libusb_get_bus_number
   libusb_get_device_address@24 = libusb_get_device_address
   libusb_get_max_packet_size@24 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@24 = libusb_get_max_iso_packet_size
-  libusb_ref_device@24 = libusb_ref_device
   libusb_unref_device@24 = libusb_unref_device
   libusb_open@24 = libusb_open
-  libusb_open_device_with_vid_pid@24 = libusb_open_device_with_vid_pid
   libusb_close@24 = libusb_close
-  libusb_get_device@24 = libusb_get_device
   libusb_get_configuration@24 = libusb_get_configuration
   libusb_set_configuration@24 = libusb_set_configuration
   libusb_claim_interface@24 = libusb_claim_interface
@@ -355,15 +352,12 @@ EXPORTS
   libusb_set_debug@24 = libusb_set_debug
   libusb_init@24 = libusb_init
   libusb_exit@24 = libusb_exit
-  libusb_strerror@24 = libusb_strerror
-  libusb_getversion@24 = libusb_getversion
   libusb_get_device_descriptor@24 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@24 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@24 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value@24 = libusb_get_config_descriptor_by_value
   libusb_free_config_descriptor@24 = libusb_free_config_descriptor
   libusb_get_string_descriptor_ascii@24 = libusb_get_string_descriptor_ascii
-  libusb_alloc_transfer@24 = libusb_alloc_transfer
   libusb_free_transfer@24 = libusb_free_transfer
   libusb_submit_transfer@24 = libusb_submit_transfer
   libusb_cancel_transfer@24 = libusb_cancel_transfer
@@ -381,22 +375,25 @@ EXPORTS
   libusb_pollfds_handle_timeouts@24 = libusb_pollfds_handle_timeouts
   libusb_get_next_timeout@24 = libusb_get_next_timeout
   libusb_set_pollfd_notifiers@24 = libusb_set_pollfd_notifiers
-  libusb_get_pollfds@24 = libusb_get_pollfds
   libusb_control_transfer@24 = libusb_control_transfer
   libusb_bulk_transfer@24 = libusb_bulk_transfer
   libusb_interrupt_transfer@24 = libusb_interrupt_transfer
+  libusb_ref_device@24 = libusb_ref_device
+  libusb_open_device_with_vid_pid@24 = libusb_open_device_with_vid_pid
+  libusb_get_device@24 = libusb_get_device
+  libusb_strerror@24 = libusb_strerror
+  libusb_getversion@24 = libusb_getversion
+  libusb_alloc_transfer@24 = libusb_alloc_transfer
+  libusb_get_pollfds@24 = libusb_get_pollfds
   libusb_get_device_list@28 = libusb_get_device_list
   libusb_free_device_list@28 = libusb_free_device_list
   libusb_get_bus_number@28 = libusb_get_bus_number
   libusb_get_device_address@28 = libusb_get_device_address
   libusb_get_max_packet_size@28 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@28 = libusb_get_max_iso_packet_size
-  libusb_ref_device@28 = libusb_ref_device
   libusb_unref_device@28 = libusb_unref_device
   libusb_open@28 = libusb_open
-  libusb_open_device_with_vid_pid@28 = libusb_open_device_with_vid_pid
   libusb_close@28 = libusb_close
-  libusb_get_device@28 = libusb_get_device
   libusb_get_configuration@28 = libusb_get_configuration
   libusb_set_configuration@28 = libusb_set_configuration
   libusb_claim_interface@28 = libusb_claim_interface
@@ -410,15 +407,12 @@ EXPORTS
   libusb_set_debug@28 = libusb_set_debug
   libusb_init@28 = libusb_init
   libusb_exit@28 = libusb_exit
-  libusb_strerror@28 = libusb_strerror
-  libusb_getversion@28 = libusb_getversion
   libusb_get_device_descriptor@28 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@28 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@28 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value@28 = libusb_get_config_descriptor_by_value
   libusb_free_config_descriptor@28 = libusb_free_config_descriptor
   libusb_get_string_descriptor_ascii@28 = libusb_get_string_descriptor_ascii
-  libusb_alloc_transfer@28 = libusb_alloc_transfer
   libusb_free_transfer@28 = libusb_free_transfer
   libusb_submit_transfer@28 = libusb_submit_transfer
   libusb_cancel_transfer@28 = libusb_cancel_transfer
@@ -436,22 +430,25 @@ EXPORTS
   libusb_pollfds_handle_timeouts@28 = libusb_pollfds_handle_timeouts
   libusb_get_next_timeout@28 = libusb_get_next_timeout
   libusb_set_pollfd_notifiers@28 = libusb_set_pollfd_notifiers
-  libusb_get_pollfds@28 = libusb_get_pollfds
   libusb_control_transfer@28 = libusb_control_transfer
   libusb_bulk_transfer@28 = libusb_bulk_transfer
   libusb_interrupt_transfer@28 = libusb_interrupt_transfer
+  libusb_ref_device@28 = libusb_ref_device
+  libusb_open_device_with_vid_pid@28 = libusb_open_device_with_vid_pid
+  libusb_get_device@28 = libusb_get_device
+  libusb_strerror@28 = libusb_strerror
+  libusb_getversion@28 = libusb_getversion
+  libusb_alloc_transfer@28 = libusb_alloc_transfer
+  libusb_get_pollfds@28 = libusb_get_pollfds
   libusb_get_device_list@32 = libusb_get_device_list
   libusb_free_device_list@32 = libusb_free_device_list
   libusb_get_bus_number@32 = libusb_get_bus_number
   libusb_get_device_address@32 = libusb_get_device_address
   libusb_get_max_packet_size@32 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@32 = libusb_get_max_iso_packet_size
-  libusb_ref_device@32 = libusb_ref_device
   libusb_unref_device@32 = libusb_unref_device
   libusb_open@32 = libusb_open
-  libusb_open_device_with_vid_pid@32 = libusb_open_device_with_vid_pid
   libusb_close@32 = libusb_close
-  libusb_get_device@32 = libusb_get_device
   libusb_get_configuration@32 = libusb_get_configuration
   libusb_set_configuration@32 = libusb_set_configuration
   libusb_claim_interface@32 = libusb_claim_interface
@@ -465,15 +462,12 @@ EXPORTS
   libusb_set_debug@32 = libusb_set_debug
   libusb_init@32 = libusb_init
   libusb_exit@32 = libusb_exit
-  libusb_strerror@32 = libusb_strerror
-  libusb_getversion@32 = libusb_getversion
   libusb_get_device_descriptor@32 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@32 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@32 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value@32 = libusb_get_config_descriptor_by_value
   libusb_free_config_descriptor@32 = libusb_free_config_descriptor
   libusb_get_string_descriptor_ascii@32 = libusb_get_string_descriptor_ascii
-  libusb_alloc_transfer@32 = libusb_alloc_transfer
   libusb_free_transfer@32 = libusb_free_transfer
   libusb_submit_transfer@32 = libusb_submit_transfer
   libusb_cancel_transfer@32 = libusb_cancel_transfer
@@ -491,7 +485,13 @@ EXPORTS
   libusb_pollfds_handle_timeouts@32 = libusb_pollfds_handle_timeouts
   libusb_get_next_timeout@32 = libusb_get_next_timeout
   libusb_set_pollfd_notifiers@32 = libusb_set_pollfd_notifiers
-  libusb_get_pollfds@32 = libusb_get_pollfds
   libusb_control_transfer@32 = libusb_control_transfer
   libusb_bulk_transfer@32 = libusb_bulk_transfer
   libusb_interrupt_transfer@32 = libusb_interrupt_transfer
+  libusb_ref_device@32 = libusb_ref_device
+  libusb_open_device_with_vid_pid@32 = libusb_open_device_with_vid_pid
+  libusb_get_device@32 = libusb_get_device
+  libusb_strerror@32 = libusb_strerror
+  libusb_getversion@32 = libusb_getversion
+  libusb_alloc_transfer@32 = libusb_alloc_transfer
+  libusb_get_pollfds@32 = libusb_get_pollfds
