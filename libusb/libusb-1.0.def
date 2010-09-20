@@ -26,6 +26,7 @@ EXPORTS
   libusb_init
   libusb_exit
   libusb_strerror
+  libusb_getversion
   libusb_get_device_descriptor
   libusb_get_active_config_descriptor
   libusb_get_config_descriptor
@@ -80,6 +81,7 @@ EXPORTS
   libusb_init@4 = libusb_init
   libusb_exit@4 = libusb_exit
   libusb_strerror@4 = libusb_strerror
+  libusb_getversion@4 = libusb_getversion
   libusb_get_device_descriptor@4 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@4 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@4 = libusb_get_config_descriptor
@@ -134,6 +136,7 @@ EXPORTS
   libusb_init@8 = libusb_init
   libusb_exit@8 = libusb_exit
   libusb_strerror@8 = libusb_strerror
+  libusb_getversion@8 = libusb_getversion
   libusb_get_device_descriptor@8 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@8 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@8 = libusb_get_config_descriptor
@@ -188,6 +191,7 @@ EXPORTS
   libusb_init@12 = libusb_init
   libusb_exit@12 = libusb_exit
   libusb_strerror@12 = libusb_strerror
+  libusb_getversion@12 = libusb_getversion
   libusb_get_device_descriptor@12 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@12 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@12 = libusb_get_config_descriptor
@@ -242,6 +246,7 @@ EXPORTS
   libusb_init@16 = libusb_init
   libusb_exit@16 = libusb_exit
   libusb_strerror@16 = libusb_strerror
+  libusb_getversion@16 = libusb_getversion
   libusb_get_device_descriptor@16 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@16 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@16 = libusb_get_config_descriptor
@@ -296,6 +301,7 @@ EXPORTS
   libusb_init@20 = libusb_init
   libusb_exit@20 = libusb_exit
   libusb_strerror@20 = libusb_strerror
+  libusb_getversion@20 = libusb_getversion
   libusb_get_device_descriptor@20 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@20 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@20 = libusb_get_config_descriptor
@@ -350,6 +356,7 @@ EXPORTS
   libusb_init@24 = libusb_init
   libusb_exit@24 = libusb_exit
   libusb_strerror@24 = libusb_strerror
+  libusb_getversion@24 = libusb_getversion
   libusb_get_device_descriptor@24 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@24 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@24 = libusb_get_config_descriptor
@@ -404,6 +411,7 @@ EXPORTS
   libusb_init@28 = libusb_init
   libusb_exit@28 = libusb_exit
   libusb_strerror@28 = libusb_strerror
+  libusb_getversion@28 = libusb_getversion
   libusb_get_device_descriptor@28 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@28 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@28 = libusb_get_config_descriptor
@@ -458,6 +466,7 @@ EXPORTS
   libusb_init@32 = libusb_init
   libusb_exit@32 = libusb_exit
   libusb_strerror@32 = libusb_strerror
+  libusb_getversion@32 = libusb_getversion
   libusb_get_device_descriptor@32 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@32 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@32 = libusb_get_config_descriptor
