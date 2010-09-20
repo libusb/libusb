@@ -570,6 +570,16 @@ struct libusb_device;
 struct libusb_device_handle;
 
 /** \ingroup lib
+ * Structure providing the version of libusb being used
+ */
+struct libusb_version {
+	uint16_t major;
+	uint16_t minor;
+	uint16_t micro;
+	uint16_t nano;
+};
+
+/** \ingroup lib
  * Structure representing a libusb session. The concept of individual libusb
  * sessions allows for your program to use two libraries (or dynamically
  * load two modules) which both independently use libusb. This will prevent
@@ -806,6 +816,7 @@ int LIBUSB_API libusb_init(libusb_context **ctx);
 void LIBUSB_API libusb_exit(libusb_context *ctx);
 void LIBUSB_API libusb_set_debug(libusb_context *ctx, int level);
 const char *LIBUSB_API libusb_strerror(enum libusb_error errcode);
+const struct libusb_version *LIBUSB_API libusb_getversion(void);
 
 ssize_t LIBUSB_API libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);

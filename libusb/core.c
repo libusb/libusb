@@ -40,6 +40,8 @@ const struct usbi_os_backend * const usbi_backend = &windows_backend;
 #endif
 
 struct libusb_context *usbi_default_context = NULL;
+const struct libusb_version libusb_version_internal = { LIBUSB_VERSION_MAJOR,
+LIBUSB_VERSION_MINOR, LIBUSB_VERSION_MICRO, LIBUSB_VERSION_NANO};
 static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 
@@ -1710,4 +1712,13 @@ API_EXPORTED const char *LIBUSB_API libusb_strerror(enum libusb_error error_code
 		return "Other error";
 	}
 	return "Unknown error";
+}
+
+/** \ingroup misc
+ * Fills a libusb_version struct with the full version (major, minor,
+ * micro, nano) of this library
+ */
+API_EXPORTED const struct libusb_version* LIBUSB_API libusb_getversion(void)
+{
+	return &libusb_version_internal;
 }
