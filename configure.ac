@@ -1,12 +1,14 @@
 m4_define(LIBUSB_MAJOR, [1])
 m4_define(LIBUSB_MINOR, [0])
 m4_define(LIBUSB_MICRO, [8])
+m4_define(LIBUSB_NANO, [0])
 
 AC_INIT([libusb], LIBUSB_MAJOR.LIBUSB_MINOR.LIBUSB_MICRO, [libusb-devel@lists.sourceforge.net], [libusb], [http://www.libusb.org/])
 
 AC_SUBST([LIBUSB_VERSION_MAJOR], [LIBUSB_MAJOR])
 AC_SUBST([LIBUSB_VERSION_MINOR], [LIBUSB_MINOR])
 AC_SUBST([LIBUSB_VERSION_MICRO], [LIBUSB_MICRO])
+AC_SUBST([LIBUSB_VERSION_NANO], [LIBUSB_NANO])
 
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([libusb/core.c])
@@ -196,6 +198,6 @@ AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)
 AC_SUBST(AM_LDFLAGS)
 
-AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [libusb/libusb-1.0.rc] [examples/Makefile] [doc/Makefile] [doc/doxygen.cfg])
+AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [libusb/libusb-1.0.rc] [libusb/libusbi.h] [examples/Makefile] [doc/Makefile] [doc/doxygen.cfg])
 AC_OUTPUT
 
