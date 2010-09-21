@@ -14,7 +14,7 @@ create_def()
   # calls in MinGW generated objects, and .def based MS generated DLLs don't
   # have such a decoration => linking to MS DLL will fail without aliases.
   # Currently, the maximum size is 32 and all sizes are multiples of 4
-  for i in 4 8 12 16 20 24 28 32
+  for i in 0 4 8 12 16 20 24 28 32
   do
     sed -n -e "s/.*API_EXPORTED.*\([[:blank:]]\)\(libusb.*\)(.*/  \2@$i = \2/p" libusb/*.c >> libusb/libusb-1.0.def
     sed -n -e "s/.*LIBUSB_CALL.*\([[:blank:]]\)\(libusb.*\)(.*/  \2@$i = \2/p" libusb/*.c >> libusb/libusb-1.0.def
