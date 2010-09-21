@@ -8,12 +8,6 @@
 #include "winresrc.h"
 #include "libusb_version.h"
 
-#ifdef _DEBUG
-#define VER_ORIGINALFILENAME_STR "libusb-1.0_debug.dll\0"
-#else
-#define VER_ORIGINALFILENAME_STR "libusb-1.0.dll\0"
-#endif
-
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION LIBUSB_VERSION_MAJOR,LIBUSB_VERSION_MINOR,LIBUSB_VERSION_MICRO,LIBUSB_VERSION_NANO
  PRODUCTVERSION LIBUSB_VERSION_MAJOR,LIBUSB_VERSION_MINOR,LIBUSB_VERSION_MICRO,LIBUSB_VERSION_NANO
@@ -31,17 +25,17 @@ BEGIN
 	BEGIN
 		BLOCK "040904b0"
 		BEGIN
-			VALUE "Comments", "\0"
+			VALUE "Comments", "http://libusb.org/\0"
 			VALUE "CompanyName", "libusb.org\0"
 			VALUE "FileDescription", "libusb-1\0"
-			VALUE "FileVersion", LIBUSB_PACKAGE_VERSION
+			VALUE "FileVersion", LIBUSB_PACKAGE_VERSION "\0"
 			VALUE "InternalName", "libusb\0"
 			VALUE "LegalCopyright", "See individual source files, GNU LGPL v2.1 or later.\0"
 			VALUE "LegalTrademarks", "http://www.gnu.org/licenses/lgpl-2.1.html\0"
-			VALUE "OriginalFilename", VER_ORIGINALFILENAME_STR
+			VALUE "OriginalFilename", "libusb-1.0.dll\0"
 			VALUE "PrivateBuild", "\0"
 			VALUE "ProductName", "libusb-1\0"
-			VALUE "ProductVersion", LIBUSB_PACKAGE_VERSION
+			VALUE "ProductVersion", LIBUSB_PACKAGE_VERSION "\0"
 			VALUE "SpecialBuild", "\0"
 		END
 	END
