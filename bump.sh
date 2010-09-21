@@ -27,9 +27,7 @@ echo "Bumping version to pbr$TAGVER (nano: $TAGVER_OFF)"
 sed -e "s/\(^m4_define(LIBUSB_NANO.*\)/m4_define(LIBUSB_NANO, [$TAGVER_OFF])/" configure.ac >> configure.ac~
 mv configure.ac~ configure.ac
 # we're duplicating libusb_version.h generation here, but that avoids having to run configure
-sed -e "s/\(^#define LIBUSB_VERSION_NANO.*\)/#define LIBUSB_VERSION_NANO    $TAGVER_OFF/" \
-    -e "s/^#define LIBUSB_PACKAGE_VERSION[[:blank:]]\"\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)\.[0-9]*\"/#define LIBUSB_PACKAGE_VERSION \"\1.\2.\3.$TAGVER_OFF\"/" \
-    libusb/libusb_version.h > libusb/libusb_version.h~
+sed -e "s/\(^#define LIBUSB_VERSION_NANO.*\)/#define LIBUSB_VERSION_NANO    $TAGVER_OFF/" libusb/libusb_version.h > libusb/libusb_version.h~
 mv libusb/libusb_version.h~ libusb/libusb_version.h
 git commit -a -m "bumped internal version"
 git tag "pbr$TAGVER"
