@@ -28,6 +28,7 @@
 #include <time.h>
 
 #include <libusb.h>
+#include "libusb_version.h"
 
 /* Inside the libusb code, mark all public functions as follows:
  *   return_type API_EXPORTED function_name(params) { ... }
@@ -43,11 +44,6 @@
 #define USB_MAXENDPOINTS	32
 #define USB_MAXINTERFACES	32
 #define USB_MAXCONFIG		8
-
-#define LIBUSB_VERSION_MAJOR 1
-#define LIBUSB_VERSION_MINOR 0
-#define LIBUSB_VERSION_MICRO 8
-#define LIBUSB_VERSION_NANO  0
 
 struct list_head {
 	struct list_head *prev, *next;

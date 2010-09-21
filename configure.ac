@@ -198,6 +198,6 @@ AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)
 AC_SUBST(AM_LDFLAGS)
 
-AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [libusb/libusb-1.0.rc] [libusb/libusbi.h] [examples/Makefile] [doc/Makefile] [doc/doxygen.cfg])
+AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [libusb/libusb_version.h] [examples/Makefile] [doc/Makefile] [doc/doxygen.cfg])
 AC_OUTPUT
 
