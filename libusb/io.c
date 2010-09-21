@@ -1948,8 +1948,8 @@ static int get_next_timeout(libusb_context *ctx, struct timeval *tv,
  * non-blocking mode
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
-int API_EXPORTED libusb_handle_events_timeout(libusb_context *ctx,
-	struct timeval *tv)
+int API_EXPORTED libusb_handle_events_timeout_check(libusb_context *ctx,
+	struct timeval *tv, int *completed)
 {
 	int r;
 	struct timeval poll_timeout;
@@ -1963,8 +1963,12 @@ int API_EXPORTED libusb_handle_events_timeout(libusb_context *ctx,
 
 retry:
 	if (libusb_try_lock_events(ctx) == 0) {
-		/* we obtained the event lock: do our own event handling */
-		r = handle_events(ctx, &poll_timeout);
+		r = 0;
+		if (completed == NULL || !*completed) {
+			/* we obtained the event lock: do our own event handling */
+			usbi_dbg("doing our own event handling");
+			r = handle_events(ctx, &poll_timeout);
+		}
 		libusb_unlock_events(ctx);
 		return r;
 	}
@@ -1973,16 +1977,18 @@ retry:
 	 * notify event completion. */
 	libusb_lock_event_waiters(ctx);
 
-	if (!libusb_event_handler_active(ctx)) {
-		/* we hit a race: whoever was event handling earlier finished in the
-		 * time it took us to reach this point. try the cycle again. */
-		libusb_unlock_event_waiters(ctx);
-		usbi_dbg("event handler was active but went away, retrying");
-		goto retry;
+	if (completed == NULL || !*completed) {
+		if (!libusb_event_handler_active(ctx)) {
+			/* we hit a race: whoever was event handling earlier finished in the
+			 * time it took us to reach this point. try the cycle again. */
+			libusb_unlock_event_waiters(ctx);
+			usbi_dbg("event handler was active but went away, retrying");
+			goto retry;
+		}
+	
+		usbi_dbg("another thread is doing event handling, wait for notification");
+		r = libusb_wait_for_event(ctx, &poll_timeout);
 	}
-
-	usbi_dbg("another thread is doing event handling");
-	r = libusb_wait_for_event(ctx, &poll_timeout);
 	libusb_unlock_event_waiters(ctx);
 
 	if (r < 0)
@@ -1991,6 +1997,21 @@ retry:
 		return handle_timeouts(ctx);
 	else
 		return 0;
+}
+
+API_EXPORTED int libusb_handle_events_timeout(libusb_context *ctx,
+	struct timeval *tv)
+{
+	return libusb_handle_events_timeout_check(ctx, tv, NULL); 
+}
+
+API_EXPORTED int libusb_handle_events_check(libusb_context *ctx,
+	int *completed)
+{
+	struct timeval tv;
+	tv.tv_sec = 60;
+	tv.tv_usec = 0;
+	return libusb_handle_events_timeout_check(ctx, &tv, completed);
 }
 
 /** \ingroup poll
@@ -2007,7 +2028,7 @@ int API_EXPORTED libusb_handle_events(libusb_context *ctx)
 	struct timeval tv;
 	tv.tv_sec = 60;
 	tv.tv_usec = 0;
-	return libusb_handle_events_timeout(ctx, &tv);
+	return libusb_handle_events_timeout_check(ctx, &tv, NULL);
 }
 
 /** \ingroup poll
