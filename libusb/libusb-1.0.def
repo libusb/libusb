@@ -39,7 +39,9 @@ EXPORTS
   libusb_lock_event_waiters
   libusb_unlock_event_waiters
   libusb_wait_for_event
+  libusb_handle_events_timeout_check
   libusb_handle_events_timeout
+  libusb_handle_events_check
   libusb_handle_events
   libusb_handle_events_locked
   libusb_pollfds_handle_timeouts
@@ -94,7 +96,9 @@ EXPORTS
   libusb_lock_event_waiters@4 = libusb_lock_event_waiters
   libusb_unlock_event_waiters@4 = libusb_unlock_event_waiters
   libusb_wait_for_event@4 = libusb_wait_for_event
+  libusb_handle_events_timeout_check@4 = libusb_handle_events_timeout_check
   libusb_handle_events_timeout@4 = libusb_handle_events_timeout
+  libusb_handle_events_check@4 = libusb_handle_events_check
   libusb_handle_events@4 = libusb_handle_events
   libusb_handle_events_locked@4 = libusb_handle_events_locked
   libusb_pollfds_handle_timeouts@4 = libusb_pollfds_handle_timeouts
@@ -149,7 +153,9 @@ EXPORTS
   libusb_lock_event_waiters@8 = libusb_lock_event_waiters
   libusb_unlock_event_waiters@8 = libusb_unlock_event_waiters
   libusb_wait_for_event@8 = libusb_wait_for_event
+  libusb_handle_events_timeout_check@8 = libusb_handle_events_timeout_check
   libusb_handle_events_timeout@8 = libusb_handle_events_timeout
+  libusb_handle_events_check@8 = libusb_handle_events_check
   libusb_handle_events@8 = libusb_handle_events
   libusb_handle_events_locked@8 = libusb_handle_events_locked
   libusb_pollfds_handle_timeouts@8 = libusb_pollfds_handle_timeouts
@@ -204,7 +210,9 @@ EXPORTS
   libusb_lock_event_waiters@12 = libusb_lock_event_waiters
   libusb_unlock_event_waiters@12 = libusb_unlock_event_waiters
   libusb_wait_for_event@12 = libusb_wait_for_event
+  libusb_handle_events_timeout_check@12 = libusb_handle_events_timeout_check
   libusb_handle_events_timeout@12 = libusb_handle_events_timeout
+  libusb_handle_events_check@12 = libusb_handle_events_check
   libusb_handle_events@12 = libusb_handle_events
   libusb_handle_events_locked@12 = libusb_handle_events_locked
   libusb_pollfds_handle_timeouts@12 = libusb_pollfds_handle_timeouts
@@ -259,7 +267,9 @@ EXPORTS
   libusb_lock_event_waiters@16 = libusb_lock_event_waiters
   libusb_unlock_event_waiters@16 = libusb_unlock_event_waiters
   libusb_wait_for_event@16 = libusb_wait_for_event
+  libusb_handle_events_timeout_check@16 = libusb_handle_events_timeout_check
   libusb_handle_events_timeout@16 = libusb_handle_events_timeout
+  libusb_handle_events_check@16 = libusb_handle_events_check
   libusb_handle_events@16 = libusb_handle_events
   libusb_handle_events_locked@16 = libusb_handle_events_locked
   libusb_pollfds_handle_timeouts@16 = libusb_pollfds_handle_timeouts
@@ -314,7 +324,9 @@ EXPORTS
   libusb_lock_event_waiters@20 = libusb_lock_event_waiters
   libusb_unlock_event_waiters@20 = libusb_unlock_event_waiters
   libusb_wait_for_event@20 = libusb_wait_for_event
+  libusb_handle_events_timeout_check@20 = libusb_handle_events_timeout_check
   libusb_handle_events_timeout@20 = libusb_handle_events_timeout
+  libusb_handle_events_check@20 = libusb_handle_events_check
   libusb_handle_events@20 = libusb_handle_events
   libusb_handle_events_locked@20 = libusb_handle_events_locked
   libusb_pollfds_handle_timeouts@20 = libusb_pollfds_handle_timeouts
@@ -369,7 +381,9 @@ EXPORTS
   libusb_lock_event_waiters@24 = libusb_lock_event_waiters
   libusb_unlock_event_waiters@24 = libusb_unlock_event_waiters
   libusb_wait_for_event@24 = libusb_wait_for_event
+  libusb_handle_events_timeout_check@24 = libusb_handle_events_timeout_check
   libusb_handle_events_timeout@24 = libusb_handle_events_timeout
+  libusb_handle_events_check@24 = libusb_handle_events_check
   libusb_handle_events@24 = libusb_handle_events
   libusb_handle_events_locked@24 = libusb_handle_events_locked
   libusb_pollfds_handle_timeouts@24 = libusb_pollfds_handle_timeouts
@@ -424,7 +438,9 @@ EXPORTS
   libusb_lock_event_waiters@28 = libusb_lock_event_waiters
   libusb_unlock_event_waiters@28 = libusb_unlock_event_waiters
   libusb_wait_for_event@28 = libusb_wait_for_event
+  libusb_handle_events_timeout_check@28 = libusb_handle_events_timeout_check
   libusb_handle_events_timeout@28 = libusb_handle_events_timeout
+  libusb_handle_events_check@28 = libusb_handle_events_check
   libusb_handle_events@28 = libusb_handle_events
   libusb_handle_events_locked@28 = libusb_handle_events_locked
   libusb_pollfds_handle_timeouts@28 = libusb_pollfds_handle_timeouts
@@ -479,7 +495,9 @@ EXPORTS
   libusb_lock_event_waiters@32 = libusb_lock_event_waiters
   libusb_unlock_event_waiters@32 = libusb_unlock_event_waiters
   libusb_wait_for_event@32 = libusb_wait_for_event
+  libusb_handle_events_timeout_check@32 = libusb_handle_events_timeout_check
   libusb_handle_events_timeout@32 = libusb_handle_events_timeout
+  libusb_handle_events_check@32 = libusb_handle_events_check
   libusb_handle_events@32 = libusb_handle_events
   libusb_handle_events_locked@32 = libusb_handle_events_locked
   libusb_pollfds_handle_timeouts@32 = libusb_pollfds_handle_timeouts

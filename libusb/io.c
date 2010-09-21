@@ -1985,7 +1985,7 @@ retry:
 			usbi_dbg("event handler was active but went away, retrying");
 			goto retry;
 		}
-	
+
 		usbi_dbg("another thread is doing event handling, wait for notification");
 		r = libusb_wait_for_event(ctx, &poll_timeout);
 	}
@@ -1999,13 +1999,13 @@ retry:
 		return 0;
 }
 
-API_EXPORTED int libusb_handle_events_timeout(libusb_context *ctx,
+int API_EXPORTED libusb_handle_events_timeout(libusb_context *ctx,
 	struct timeval *tv)
 {
-	return libusb_handle_events_timeout_check(ctx, tv, NULL); 
+	return libusb_handle_events_timeout_check(ctx, tv, NULL);
 }
 
-API_EXPORTED int libusb_handle_events_check(libusb_context *ctx,
+int API_EXPORTED libusb_handle_events_check(libusb_context *ctx,
 	int *completed)
 {
 	struct timeval tv;
