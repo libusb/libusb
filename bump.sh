@@ -14,12 +14,12 @@ if [ ! -n "$1" ]; then
 else
   TAG=$1
 fi
-if [ ! ${TAG:0:3} = 'pbr' ]; then
-  echo Tag "$TAG" does not start with 'pbr' - aborting
+if [ ! ${TAG:0:3} = 'pbh' ]; then
+  echo Tag "$TAG" does not start with 'pbh' - aborting
   exit 1
 fi
 TAGVER=${TAG:3}
-OFFSET=10000
+OFFSET=9000
 # increment - ideally, we'd check that tagver is really numeric here
 TAGVER=`expr $TAGVER + 1`
 TAGVER_OFF=`expr $TAGVER + $OFFSET`
@@ -30,4 +30,4 @@ mv configure.ac~ configure.ac
 sed -e "s/\(^#define LIBUSB_VERSION_NANO.*\)/#define LIBUSB_VERSION_NANO    $TAGVER_OFF/" libusb/libusb_version.h > libusb/libusb_version.h~
 mv libusb/libusb_version.h~ libusb/libusb_version.h
 git commit -a -m "bumped internal version"
-git tag "pbr$TAGVER"
+git tag "pbh$TAGVER"
