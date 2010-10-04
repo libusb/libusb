@@ -2,6 +2,12 @@ m4_define(LIBUSB_MAJOR, [1])
 m4_define(LIBUSB_MINOR, [0])
 m4_define(LIBUSB_MICRO, [8])
 
+AC_INIT([libusb], LIBUSB_MAJOR.LIBUSB_MINOR.LIBUSB_MICRO, [libusb-devel@lists.sourceforge.net], [libusb], [http://www.libusb.org/])
+
+AC_SUBST([LIBUSB_VERSION_MAJOR], [LIBUSB_MAJOR])
+AC_SUBST([LIBUSB_VERSION_MINOR], [LIBUSB_MINOR])
+AC_SUBST([LIBUSB_VERSION_MICRO], [LIBUSB_MICRO])
+
 # Library versioning
 # These numbers should be tweaked on every release. Read carefully:
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
@@ -9,12 +15,6 @@ m4_define(LIBUSB_MICRO, [8])
 lt_current="1"
 lt_revision="0"
 lt_age="1"
-
-AC_INIT([libusb], LIBUSB_MAJOR.LIBUSB_MINOR.LIBUSB_MICRO, [libusb-devel@lists.sourceforge.net], [libusb], [http://www.libusb.org/])
-
-AC_SUBST([LIBUSB_VERSION_MAJOR], [LIBUSB_MAJOR])
-AC_SUBST([LIBUSB_VERSION_MINOR], [LIBUSB_MINOR])
-AC_SUBST([LIBUSB_VERSION_MICRO], [LIBUSB_MICRO])
 AC_SUBST(lt_current)
 AC_SUBST(lt_revision)
 AC_SUBST(lt_age)
