@@ -264,7 +264,6 @@ static int Cfgmgr32_init(void)
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Child, TRUE);
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Sibling, TRUE);
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDA, TRUE);
-	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDW, TRUE);
 
 	return LIBUSB_SUCCESS;
 }
@@ -413,7 +412,7 @@ static unsigned long get_parent_session_id(DWORD devinst)
 	if (CM_Get_Parent(&parent_devinst, devinst, 0) != CR_SUCCESS) {
 		return 0;
 	}
-	if (CM_Get_Device_ID(parent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
+	if (CM_Get_Device_IDA(parent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
 		return 0;
 	}
 	sanitized_path = sanitize_path(path);
@@ -442,7 +441,7 @@ static unsigned long get_grandparent_session_id(DWORD devinst)
 	if (CM_Get_Parent(&grandparent_devinst, parent_devinst, 0) != CR_SUCCESS) {
 		return 0;
 	}
-	if (CM_Get_Device_ID(grandparent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
+	if (CM_Get_Device_IDA(grandparent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
 		return 0;
 	}
 	// TODO: try without sanitizing
@@ -1213,7 +1212,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 
 			// Read the Device ID path. This is what we'll use as UID
 			// Note that if the device is plugged in a different port or hub, the Device ID changes
-			if (CM_Get_Device_ID(dev_info_data.DevInst, path, sizeof(path), 0) != CR_SUCCESS) {
+			if (CM_Get_Device_IDA(dev_info_data.DevInst, path, sizeof(path), 0) != CR_SUCCESS) {
 				usbi_warn(ctx, "could not read the device id path for device '%s', skipping",
 					dev_interface_details->DevicePath);
 				continue;

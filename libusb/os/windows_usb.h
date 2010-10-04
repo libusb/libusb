@@ -159,21 +159,6 @@ extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
  * with inline pseudo constructors/destructors
  */
 
-// HCDs
-struct windows_hcd_priv {
-	char *path;
-	struct windows_hcd_priv *next;
-};
-
-static inline void windows_hcd_priv_init(struct windows_hcd_priv* p) {
-	p->path = NULL;
-	p->next = NULL;
-}
-
-static inline void windows_hcd_priv_release(struct windows_hcd_priv* p) {
-	safe_free(p->path);
-}
-
 // TODO (v2+): move hid desc to libusb.h?
 struct libusb_hid_descriptor {
 	uint8_t  bLength;
@@ -394,7 +379,6 @@ typedef RETURN_TYPE CONFIGRET;
 #define USB_REQUEST_SET_INTERFACE               LIBUSB_REQUEST_SET_INTERFACE
 #define USB_REQUEST_SYNC_FRAME                  LIBUSB_REQUEST_SYNCH_FRAME
 
-#define HCD_GET_ROOT_HUB_NAME                   258
 #define USB_GET_NODE_INFORMATION                258
 #define USB_GET_NODE_CONNECTION_INFORMATION     259
 #define USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION 260
@@ -444,13 +428,6 @@ DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Parent, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Child, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Sibling, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDA, (DEVINST, PCHAR, ULONG, ULONG));
-DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDW, (DEVINST, PWCHAR, ULONG, ULONG));
-
-#ifdef UNICODE
-#define CM_Get_Device_ID CM_Get_Device_IDW
-#else
-#define CM_Get_Device_ID CM_Get_Device_IDA
-#endif /* UNICODE */
 
 #define IOCTL_USB_GET_HUB_CAPABILITIES_EX \
   CTL_CODE( FILE_DEVICE_USB, USB_GET_HUB_CAPABILITIES_EX, METHOD_BUFFERED, FILE_ANY_ACCESS)
