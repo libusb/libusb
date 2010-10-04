@@ -35,6 +35,7 @@ AC_DEFINE([_GNU_SOURCE], [], [Use GNU extensions])
 AM_MAINTAINER_MODE
 
 AC_MSG_CHECKING([operating system])
+PC_LIBS_PRIVATE=
 case $host in
 *-linux*)
 	AC_DEFINE(OS_LINUX, [], [Linux backend])
@@ -42,9 +43,11 @@ case $host in
 	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
 	AC_MSG_RESULT([Linux])
 	backend="linux"
-	AC_CHECK_LIB(rt, clock_gettime)
+	AC_CHECK_LIB(rt, clock_gettime, PC_LIBS_PRIVATE="-lrt")
+	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
+	PC_LIBS_PRIVATE="${PC_LIBS_PRIVATE} -pthread"
 	AM_LDFLAGS=""
 	;;
 *-darwin*)
@@ -56,15 +59,17 @@ case $host in
 	backend="darwin"
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
-	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
-	;;
+	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-prebind -no-undefined -pthread"
+	AM_LDFLAGS=${PC_LIBS_PRIVATE}
+;;
 *-mingw*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
 	AC_SUBST(OS_WINDOWS)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	threads="windows"
-	LIBS="-lsetupapi -lole32 -ladvapi32"
+	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
+	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version --add-stdcall-alias"
 	AC_CHECK_TOOL(RC, windres, no)
@@ -76,13 +81,15 @@ case $host in
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	threads="posix"
-	LIBS="-lsetupapi -lole32 -ladvapi32"
+	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
+	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
 *)
 	AC_MSG_ERROR([unsupported operating system])
 esac
+AC_SUBST(PC_LIBS_PRIVATE)
 
 AM_CONDITIONAL([OS_LINUX], [test "x$backend" = "xlinux"])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = "xdarwin"])
