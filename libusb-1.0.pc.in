@@ -7,5 +7,6 @@ Name: libusb-1.0
 Description: C API for USB device access from Linux userspace
 Version: @VERSION@
 Libs: -L${libdir} -lusb-1.0
+Libs.private: @PC_LIBS_PRIVATE@
 Cflags: -I${includedir}/libusb-1.0
 
