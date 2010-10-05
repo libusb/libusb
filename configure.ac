@@ -10,6 +10,17 @@ AC_SUBST([LIBUSB_VERSION_MINOR], [LIBUSB_MINOR])
 AC_SUBST([LIBUSB_VERSION_MICRO], [LIBUSB_MICRO])
 AC_SUBST([LIBUSB_VERSION_NANO], [LIBUSB_NANO])
 
+# Library versioning
+# These numbers should be tweaked on every release. Read carefully:
+# http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+# http://sourceware.org/autobook/autobook/autobook_91.html
+lt_current="1"
+lt_revision="0"
+lt_age="1"
+AC_SUBST(lt_current)
+AC_SUBST(lt_revision)
+AC_SUBST(lt_age)
+
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([libusb/core.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -26,6 +37,7 @@ AC_DEFINE([_GNU_SOURCE], [], [Use GNU extensions])
 AM_MAINTAINER_MODE
 
 AC_MSG_CHECKING([operating system])
+PC_LIBS_PRIVATE=
 case $host in
 *-linux*)
 	AC_DEFINE(OS_LINUX, [], [Linux backend])
@@ -33,9 +45,11 @@ case $host in
 	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
 	AC_MSG_RESULT([Linux])
 	backend="linux"
-	AC_CHECK_LIB(rt, clock_gettime)
+	AC_CHECK_LIB(rt, clock_gettime, PC_LIBS_PRIVATE="-lrt")
+	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
+	PC_LIBS_PRIVATE="${PC_LIBS_PRIVATE} -pthread"
 	AM_CFLAGS="-std=gnu99"
 	AM_LDFLAGS=""
 	;;
@@ -49,7 +63,8 @@ case $host in
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
 	AM_CFLAGS="-std=gnu99"
-	AM_LDFLAGS="-Wl,-framework -Wl,IOKit -Wl,-framework -Wl,CoreFoundation -Wl,-prebind -no-undefined"
+	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-prebind -no-undefined -pthread"
+	AM_LDFLAGS=${PC_LIBS_PRIVATE}
 	;;
 *-mingw*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
@@ -58,7 +73,8 @@ case $host in
 	backend="windows"
 	threads="windows"
 	create_import_lib="yes"
-	LIBS="-lsetupapi -lole32 -ladvapi32"
+	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
+	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version -Wl,--add-stdcall-alias"
 	AM_CFLAGS="-std=c99"
@@ -72,7 +88,8 @@ case $host in
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	threads="posix"
-	LIBS="-lsetupapi -lole32 -ladvapi32"
+	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
+	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	AM_CFLAGS="-std=c99"
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
@@ -80,20 +97,13 @@ case $host in
 *)
 	AC_MSG_ERROR([unsupported operating system])
 esac
+AC_SUBST(PC_LIBS_PRIVATE)
 
 AM_CONDITIONAL([OS_LINUX], [test "x$backend" = "xlinux"])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = "xdarwin"])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" = "xwindows"])
 AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" = "xposix"])
 AM_CONDITIONAL([CREATE_IMPORT_LIB], [test "x$create_import_lib" = "xyes"]) 
-
-# Library versioning
-lt_major="0"
-lt_revision="0"
-lt_age="0"
-AC_SUBST(lt_major)
-AC_SUBST(lt_revision)
-AC_SUBST(lt_age)
 
 # timerfd
 AC_CHECK_HEADER([sys/timerfd.h], [timerfd_h=1], [timerfd_h=0])

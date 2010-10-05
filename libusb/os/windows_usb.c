@@ -282,9 +282,9 @@ static int Cfgmgr32_init(void)
  * incremented index starting at zero) until all interfaces have been returned.
  */
 bool get_devinfo_data(struct libusb_context *ctx,
-	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, unsigned index)
+	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, unsigned _index)
 {
-	if (index <= 0) {
+	if (_index <= 0) {
 		*dev_info = SetupDiGetClassDevs(NULL, "USB", NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
 		if (*dev_info == INVALID_HANDLE_VALUE) {
 			return false;
@@ -292,10 +292,10 @@ bool get_devinfo_data(struct libusb_context *ctx,
 	}
 
 	dev_info_data->cbSize = sizeof(SP_DEVINFO_DATA);
-	if (!SetupDiEnumDeviceInfo(*dev_info, index, dev_info_data)) {
+	if (!SetupDiEnumDeviceInfo(*dev_info, _index, dev_info_data)) {
 		if (GetLastError() != ERROR_NO_MORE_ITEMS) {
 			usbi_err(ctx, "Could not obtain device info data for index %u: %s",
-				index, windows_error_str(0));
+				_index, windows_error_str(0));
 		}
 		SetupDiDestroyDeviceInfoList(*dev_info);
 		*dev_info = INVALID_HANDLE_VALUE;
@@ -318,22 +318,22 @@ bool get_devinfo_data(struct libusb_context *ctx,
  * incremented index starting at zero) until all interfaces have been returned.
  */
 SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ctx,
-	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID* guid, unsigned index)
+	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID* guid, unsigned _index)
 {
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
 	DWORD size;
 
-	if (index <= 0) {
+	if (_index <= 0) {
 		*dev_info = SetupDiGetClassDevs(guid, NULL, NULL, DIGCF_PRESENT|DIGCF_DEVICEINTERFACE);
 	}
 
 	if (dev_info_data != NULL) {
 		dev_info_data->cbSize = sizeof(SP_DEVINFO_DATA);
-		if (!SetupDiEnumDeviceInfo(*dev_info, index, dev_info_data)) {
+		if (!SetupDiEnumDeviceInfo(*dev_info, _index, dev_info_data)) {
 			if (GetLastError() != ERROR_NO_MORE_ITEMS) {
 				usbi_err(ctx, "Could not obtain device info data for index %u: %s",
-					index, windows_error_str(0));
+					_index, windows_error_str(0));
 			}
 			SetupDiDestroyDeviceInfoList(*dev_info);
 			*dev_info = INVALID_HANDLE_VALUE;
@@ -342,10 +342,10 @@ SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ct
 	}
 
 	dev_interface_data.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
-	if (!SetupDiEnumDeviceInterfaces(*dev_info, NULL, guid, index, &dev_interface_data)) {
+	if (!SetupDiEnumDeviceInterfaces(*dev_info, NULL, guid, _index, &dev_interface_data)) {
 		if (GetLastError() != ERROR_NO_MORE_ITEMS) {
 			usbi_err(ctx, "Could not obtain interface data for index %u: %s",
-				index, windows_error_str(0));
+				_index, windows_error_str(0));
 		}
 		SetupDiDestroyDeviceInfoList(*dev_info);
 		*dev_info = INVALID_HANDLE_VALUE;
@@ -357,7 +357,7 @@ SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ct
 		// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
 		if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
 			usbi_err(ctx, "could not access interface data (dummy) for index %u: %s",
-				index, windows_error_str(0));
+				_index, windows_error_str(0));
 			goto err_exit;
 		}
 	} else {
@@ -366,7 +366,7 @@ SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ct
 	}
 
 	if ((dev_interface_details = malloc(size)) == NULL) {
-		usbi_err(ctx, "could not allocate interface data for index %u.", index);
+		usbi_err(ctx, "could not allocate interface data for index %u.", _index);
 		goto err_exit;
 	}
 
@@ -374,7 +374,7 @@ SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ct
 	if (!SetupDiGetDeviceInterfaceDetail(*dev_info, &dev_interface_data,
 		dev_interface_details, size, &size, NULL)) {
 		usbi_err(ctx, "could not access interface data (actual) for index %u: %s",
-			index, windows_error_str(0));
+			_index, windows_error_str(0));
 	}
 
 	return dev_interface_details;
@@ -2914,7 +2914,7 @@ static int _hid_get_config_descriptor(struct hid_device_priv* dev, void *data, s
 	return LIBUSB_COMPLETED;
 }
 
-static int _hid_get_string_descriptor(struct hid_device_priv* dev, int index,
+static int _hid_get_string_descriptor(struct hid_device_priv* dev, int _index,
 									  void *data, size_t *size)
 {
 	void *tmp = NULL;
@@ -2931,12 +2931,12 @@ static int _hid_get_string_descriptor(struct hid_device_priv* dev, int index,
 		return LIBUSB_ERROR_OVERFLOW;
 	}
 
-	if (index == 0) {
+	if (_index == 0) {
 		tmp = string_langid;
 		tmp_size = sizeof(string_langid)+2;
 	} else {
 		for (i=0; i<3; i++) {
-			if (index == (dev->string_index[i])) {
+			if (_index == (dev->string_index[i])) {
 				tmp = dev->string[i];
 				tmp_size = (_hid_wcslen(dev->string[i])+1) * sizeof(WCHAR);
 				break;
@@ -3050,7 +3050,7 @@ static int _hid_get_report_descriptor(struct hid_device_priv* dev, void *data, s
 }
 
 static int _hid_get_descriptor(struct hid_device_priv* dev, HANDLE hid_handle, int recipient,
-							   int type, int index, void *data, size_t *size)
+							   int type, int _index, void *data, size_t *size)
 {
 	switch(type) {
 	case LIBUSB_DT_DEVICE:
@@ -3058,20 +3058,20 @@ static int _hid_get_descriptor(struct hid_device_priv* dev, HANDLE hid_handle, i
 		return _hid_get_device_descriptor(dev, data, size);
 	case LIBUSB_DT_CONFIG:
 		usbi_dbg("LIBUSB_DT_CONFIG");
-		if (!index)
+		if (!_index)
 			return _hid_get_config_descriptor(dev, data, size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	case LIBUSB_DT_STRING:
 		usbi_dbg("LIBUSB_DT_STRING");
-		return _hid_get_string_descriptor(dev, index, data, size);
+		return _hid_get_string_descriptor(dev, _index, data, size);
 	case LIBUSB_DT_HID:
 		usbi_dbg("LIBUSB_DT_HID");
-		if (!index)
+		if (!_index)
 			return _hid_get_hid_descriptor(dev, data, size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	case LIBUSB_DT_REPORT:
 		usbi_dbg("LIBUSB_DT_REPORT");
-		if (!index)
+		if (!_index)
 			return _hid_get_report_descriptor(dev, data, size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	case LIBUSB_DT_PHYSICAL:
@@ -3243,7 +3243,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 }
 
 static int _hid_class_request(struct hid_device_priv* dev, HANDLE hid_handle, int request_type,
-							  int request, int value, int index, void *data, struct windows_transfer_priv *tp,
+							  int request, int value, int _index, void *data, struct windows_transfer_priv *tp,
 							  size_t *size, OVERLAPPED* overlapped)
 {
 	int report_type = (value >> 8) & 0xFF;
