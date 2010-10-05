@@ -1433,7 +1433,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 		// Check that the driver installation is OK
 		if ( (!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_INSTALL_STATE,
 			&reg_type, (BYTE*)&install_state, 4, &size))
-		  && (size != 4) ){
+		  || (size != 4) ){
 			usbi_warn(ctx, "could not detect installation state of driver for %s: %s",
 				dev_interface_details->DevicePath, windows_error_str(0));
 		} else if (install_state != 0) {
@@ -1445,7 +1445,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 		// The SPDRP_ADDRESS for USB devices should be the device port number on the hub
 		if ( (!SetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_ADDRESS,
 			&reg_type, (BYTE*)&port_nr, 4, &size))
-		  && (size != 4) ){
+		  || (size != 4) ){
 			usbi_warn(ctx, "could not retrieve port number for device %s, skipping: %s",
 				dev_interface_details->DevicePath, windows_error_str(0));
 			continue;
