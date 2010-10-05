@@ -10,6 +10,17 @@ AC_SUBST([LIBUSB_VERSION_MINOR], [LIBUSB_MINOR])
 AC_SUBST([LIBUSB_VERSION_MICRO], [LIBUSB_MICRO])
 AC_SUBST([LIBUSB_VERSION_NANO], [LIBUSB_NANO])
 
+# Library versioning
+# These numbers should be tweaked on every release. Read carefully:
+# http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+# http://sourceware.org/autobook/autobook/autobook_91.html
+lt_current="1"
+lt_revision="0"
+lt_age="1"
+AC_SUBST(lt_current)
+AC_SUBST(lt_revision)
+AC_SUBST(lt_age)
+
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([libusb/core.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -86,14 +97,6 @@ AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = "xdarwin"])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" = "xwindows"])
 AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" = "xposix"])
 AM_CONDITIONAL([CREATE_IMPORT_LIB], [test "x$create_import_lib" = "xyes"]) 
-
-# Library versioning
-lt_major="0"
-lt_revision="0"
-lt_age="0"
-AC_SUBST(lt_major)
-AC_SUBST(lt_revision)
-AC_SUBST(lt_age)
 
 # timerfd
 AC_CHECK_HEADER([sys/timerfd.h], [timerfd_h=1], [timerfd_h=0])
