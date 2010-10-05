@@ -631,7 +631,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		}
 
 		_index = _fd_to_index_and_lock(fds[i].fd);
-		poll_dbg("fd[%d]=%d: (overlapped=%p) got events %04X", i, poll_fd[index].fd, poll_fd[index].overlapped, fds[i].events);
+		poll_dbg("fd[%d]=%d: (overlapped=%p) got events %04X", i, poll_fd[_index].fd, poll_fd[_index].overlapped, fds[i].events);
 
 		if ( (_index < 0) || (poll_fd[_index].handle == INVALID_HANDLE_VALUE)
 		  || (poll_fd[_index].handle == 0) || (poll_fd[_index].overlapped == NULL)) {
@@ -823,7 +823,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 		return -1;
 	}
 
-	poll_dbg("set pipe event (fd = %d, thread = %08X)", index, GetCurrentThreadId());
+	poll_dbg("set pipe event (fd = %d, thread = %08X)", _index, GetCurrentThreadId());
 	SetEvent(poll_fd[_index].overlapped->hEvent);
 	poll_fd[_index].overlapped->Internal = STATUS_WAIT_0;
 	// If two threads write on the pipe at the same time, we need to
