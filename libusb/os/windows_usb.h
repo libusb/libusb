@@ -65,14 +65,14 @@ extern char *_strdup(const char *strSource);
 // _beginthreadex is MSVCRT => unavailable for cygwin. Fallback to using CreateThread
 #define _beginthreadex(a, b, c, d, e, f) CreateThread(a, b, (LPTHREAD_START_ROUTINE)c, d, e, f)
 #endif
-#define safe_free(p) do {if (p != NULL) {free(p); p = NULL;}} while(0)
+#define safe_free(p) do {if (p != NULL) {free((void*)p); p = NULL;}} while(0)
 #define safe_closehandle(h) do {if (h != INVALID_HANDLE_VALUE) {CloseHandle(h); h = INVALID_HANDLE_VALUE;}} while(0)
 #define safe_min(a, b) min((size_t)(a), (size_t)(b))
 #define safe_strcp(dst, dst_max, src, count) do {memcpy(dst, src, safe_min(count, dst_max)); \
 	((char*)dst)[safe_min(count, dst_max)-1] = 0;} while(0)
 #define safe_strcpy(dst, dst_max, src) safe_strcp(dst, dst_max, src, safe_strlen(src)+1)
-#define safe_strncat(dst, dst_max, src, count) strncat(dst, src, min(count, dst_max - strlen(dst) - 1))
-#define safe_strcat(dst, dst_max, src) safe_strncat(dst, dst_max, src, strlen(src)+1)
+#define safe_strncat(dst, dst_max, src, count) strncat(dst, src, safe_min(count, dst_max - safe_strlen(dst) - 1))
+#define safe_strcat(dst, dst_max, src) safe_strncat(dst, dst_max, src, safe_strlen(src)+1)
 #define safe_strcmp(str1, str2) strcmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2))
 #define safe_strncmp(str1, str2, count) strncmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2), count)
 #define safe_strlen(str) ((str==NULL)?0:strlen(str))
@@ -82,7 +82,7 @@ extern char *_strdup(const char *strSource);
 inline void upperize(char* str) {
 	size_t i;
 	if (str == NULL) return;
-	for (i=0; i<strlen(str); i++)
+	for (i=0; i<safe_strlen(str); i++)
 		str[i] = (char)toupper((int)str[i]);
 }
 
@@ -95,7 +95,7 @@ inline void upperize(char* str) {
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
 #define MAX_TIMER_SEMAPHORES        128
-#define TIMER_REQUEST_RETRY_MS		100
+#define TIMER_REQUEST_RETRY_MS      100
 #define ERR_BUFFER_SIZE             256
 
 // Handle code for HID interface that have been claimed ("dibs")
@@ -332,7 +332,7 @@ struct windows_transfer_priv {
  * API macros - from libusb-win32 1.x
  */
 #define DLL_DECLARE(api, ret, name, args)                     \
-  typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name
+  typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name = NULL
 
 #define DLL_LOAD(dll, name, ret_on_failure)                   \
 	do {                                                      \
