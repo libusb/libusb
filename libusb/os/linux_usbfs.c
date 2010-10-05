@@ -74,18 +74,18 @@ static const char *usbfs_path = NULL;
 
 /* Linux 2.6.32 adds support for a bulk continuation URB flag. this basically
  * allows us to mark URBs as being part of a specific logical transfer when
- * we submit them to the kernel. then, on any error error except a
- * cancellation, all URBs within that transfer will be cancelled with the
- * endpoint is disabled, meaning that no more data can creep in during the
- * time it takes to cancel the remaining URBs.
+ * we submit them to the kernel. then, on any error except a cancellation, all
+ * URBs within that transfer will be cancelled and no more URBs will be
+ * accepted for the transfer, meaning that no more data can creep in.
  *
  * The BULK_CONTINUATION flag must be set on all URBs within a bulk transfer
  * (in either direction) except the first.
- * For IN transfers, we must also set SHORT_NOT_OK on all the URBs.
- * For OUT transfers, SHORT_NOT_OK must not be set. The effective behaviour
- * (where an OUT transfer does not complete, the rest of the URBs in the
- * transfer get cancelled) is already in effect, and setting this flag is
- * disallowed (a kernel with USB debugging enabled will reject such URBs).
+ * For IN transfers, we must also set SHORT_NOT_OK on all URBs except the
+ * last; it means that the kernel should treat a short reply as an error.
+ * For OUT transfers, SHORT_NOT_OK must not be set. it isn't needed (OUT
+ * transfers can't be short unless there's already some sort of error), and
+ * setting this flag is disallowed (a kernel with USB debugging enabled will
+ * reject such URBs).
  */
 static int supports_flag_bulk_continuation = -1;
 
@@ -221,17 +221,25 @@ static clockid_t find_monotonic_clock(void)
 static int check_flag_bulk_continuation(void)
 {
 	struct utsname uts;
-	int sublevel;
+	int major, minor, sublevel;
 
 	if (uname(&uts) < 0)
 		return -1;
 	if (strlen(uts.release) < 4)
 		return 0;
-	if (strncmp(uts.release, "2.6.", 4) != 0)
+	if (sscanf(uts.release, "%d.%d.%d", &major, &minor, &sublevel) != 3)
 		return 0;
-
-	sublevel = atoi(uts.release + 4);
-	return sublevel >= 32;
+	if (major < 2)
+		return 0;
+	if (major == 2) {
+		if (minor < 6)
+			return 0;
+		if (minor == 6) {
+			if (sublevel < 32)
+				return 0;
+		}
+	}
+	return 1;
 }
 
 static int op_init(struct libusb_context *ctx)
@@ -1826,6 +1834,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		 * 2. we receive a short URB which marks the early completion condition,
 		 *    so we start cancelling the remaining URBs. however, we're too
 		 *    slow and another URB completes (or at least completes partially).
+		 *    (this can't happen since we always use BULK_CONTINUATION.)
 		 *
 		 * When this happens, our objectives are not to lose any "surplus" data,
 		 * and also to stick it at the end of the previously-received data
