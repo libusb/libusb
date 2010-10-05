@@ -114,10 +114,11 @@ const GUID GUID_NULL = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x
  * Multiple USB API backend support
  */
 #define USB_API_UNSUPPORTED 0
-#define USB_API_COMPOSITE   1
-#define USB_API_WINUSB      2
-#define USB_API_HID         3
-#define USB_API_MAX         4
+#define USB_API_HUB         1
+#define USB_API_COMPOSITE   2
+#define USB_API_WINUSB      3
+#define USB_API_HID         4
+#define USB_API_MAX         5
 
 #define CLASS_GUID_UNSUPPORTED      GUID_NULL
 const GUID CLASS_GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
@@ -225,14 +226,13 @@ struct hid_device_priv {
 
 typedef struct libusb_device_descriptor USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESCRIPTOR;
 struct windows_device_priv {
-	bool is_hub;						// NEW: is the device a hub?
-	uint8_t depth;						// NEW: distance to HCD
-	uint8_t port;						// NEW: port number on the hub
+	uint8_t depth;						// distance to HCD
+	uint8_t port;						// port number on the hub
 	struct libusb_device *parent_dev;	// access to parent is required for usermode ops
-	char *path;							// Device Interface Path
+	char *path;							// device interface path
 	struct windows_usb_api_backend const *apib;
 	struct {
-		char *path;						// Each interface needs a Device Interface Path,
+		char *path;						// each interface needs a device interface path,
 		struct windows_usb_api_backend const *apib; // an API backend (multiple drivers support),
 		int8_t nb_endpoints;			// and a set of endpoint addresses (USB_MAXENDPOINTS)
 		uint8_t *endpoint;
@@ -253,7 +253,6 @@ static inline struct windows_device_priv *__device_priv(struct libusb_device *de
 static inline void windows_device_priv_init(libusb_device* dev) {
 	struct windows_device_priv* p = __device_priv(dev);
 	int i;
-	p->is_hub = false;
 	p->depth = 0;
 	p->port = 0;
 	p->parent_dev = NULL;

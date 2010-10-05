@@ -912,7 +912,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	}
 	priv = __device_priv(dev);
 	parent_priv = __device_priv(parent_dev);
-	if (!parent_priv->is_hub) {
+	if (parent_priv->apib != &usb_api_backend[USB_API_HUB]) {
 		usbi_warn(ctx, "parent device is not a hub");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
@@ -1320,11 +1320,11 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					usbi_err(ctx, "program assertion failed: unlisted parent for '%s'", dev_id_path);
 					LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
 				}
+				parent_priv = __device_priv(parent_dev);
 				// virtual USB devices are also listed during GEN - don't process these yet
-				if ( (pass == GEN_PASS) && (!(__device_priv(parent_dev)->is_hub)) ) {
+				if ( (pass == GEN_PASS) && (parent_priv->apib != &usb_api_backend[USB_API_HUB]) ) {
 					continue;
 				}
-				parent_priv = __device_priv(parent_dev);
 				break;
 			}
 
@@ -1335,7 +1335,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				dev = usbi_get_device_by_session_id(ctx, session_id);
 				if (dev != NULL) {
 					// No need to re-process hubs
-					if (__device_priv(dev)->is_hub) {
+					if (__device_priv(dev)->apib == &usb_api_backend[USB_API_HUB]) {
 						continue;
 					}
 					usbi_dbg("found existing device for session [%lX]", session_id);
@@ -1381,7 +1381,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				dev->bus_number = (uint8_t)(i + 1);	// bus 0 is reserved for disconnected
 				dev->device_address = 0; //UINT8_MAX;
 				dev->num_configurations = 0;
-				priv->is_hub = true;
+				priv->apib = &usb_api_backend[USB_API_HUB];
 				priv->depth = UINT8_MAX;	// Overflow to 0 for HCD Hubs
 				priv->path = dev_interface_path; dev_interface_path = NULL;
 				break;
@@ -1415,7 +1415,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				}
 				break;
 			case HUB_PASS:
-				priv->is_hub = true;
+				priv->apib = &usb_api_backend[USB_API_HUB];
 				priv->path = dev_interface_path; dev_interface_path = NULL;
 				// fall through, as we must initialize hubs before generic devices
 			case GEN_PASS:
@@ -2159,6 +2159,27 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	{
 		USB_API_UNSUPPORTED,
 		"Unsupported API",
+		&CLASS_GUID_UNSUPPORTED,
+		NULL,
+		0,
+		unsupported_init,
+		unsupported_exit,
+		unsupported_open,
+		unsupported_close,
+		unsupported_claim_interface,
+		unsupported_set_interface_altsetting,
+		unsupported_release_interface,
+		unsupported_clear_halt,
+		unsupported_reset_device,
+		unsupported_submit_bulk_transfer,
+		unsupported_submit_iso_transfer,
+		unsupported_submit_control_transfer,
+		unsupported_abort_control,
+		unsupported_abort_transfers,
+		unsupported_copy_transfer_data,
+	}, {
+		USB_API_HUB,
+		"HUB API (Unsupported)",
 		&CLASS_GUID_UNSUPPORTED,
 		NULL,
 		0,
