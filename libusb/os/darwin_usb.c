@@ -672,10 +672,19 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
 	return darwin_to_libusb (kresult);
       }
     } else {
-      priv->is_open = 1;
-
       /* create async event source */
       kresult = (*(dpriv->device))->CreateDeviceAsyncEventSource (dpriv->device, &priv->cfSource);
+      if (kresult != kIOReturnSuccess) {
+	usbi_err (HANDLE_CTX (dev_handle), "CreateDeviceAsyncEventSource: %s", darwin_error_str(kresult));
+
+	(*(dpriv->device))->USBDeviceClose (dpriv->device);
+	(*(dpriv->device))->Release (dpriv->device);
+
+	dpriv->device = NULL;
+	return darwin_to_libusb (kresult);
+      }
+
+      priv->is_open = 1;
 
       CFRetain (libusb_darwin_acfl);
 
