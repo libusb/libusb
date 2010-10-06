@@ -288,8 +288,6 @@ struct libusb_device_handle {
 	unsigned char os_priv[0];
 };
 
-#define USBI_TRANSFER_TIMED_OUT	 			(1<<0)
-
 enum {
   USBI_CLOCK_MONOTONIC,
   USBI_CLOCK_REALTIME
@@ -323,6 +321,14 @@ struct usbi_transfer {
 	 * its completion (presumably there would be races within your OS backend
 	 * if this were possible). */
 	usbi_mutex_t lock;
+};
+
+enum usbi_transfer_flags {
+	/* The transfer has timed out */
+	USBI_TRANSFER_TIMED_OUT = 1 << 0,
+
+	/* Set by backend submit_transfer() if the OS handles timeout */
+	USBI_TRANSFER_OS_HANDLES_TIMEOUT = 1 << 1
 };
 
 #define __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \

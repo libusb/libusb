@@ -54,7 +54,6 @@ case $host in
 	AC_DEFINE(OS_DARWIN, [], [Darwin backend])
 	AC_SUBST(OS_DARWIN)
 	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
-	AC_DEFINE(USBI_OS_HANDLES_TIMEOUT, [], [Backend handles timeout])
 	AC_MSG_RESULT([Darwin/MacOS X])
 	backend="darwin"
 	threads="posix"

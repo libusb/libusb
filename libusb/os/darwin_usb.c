@@ -1137,6 +1137,8 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
       ret = (*(cInterface->interface))->WritePipeAsync(cInterface->interface, pipeRef, transfer->buffer,
 						       transfer->length, darwin_async_io_callback, itransfer);
   } else {
+    itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
     if (is_read)
       ret = (*(cInterface->interface))->ReadPipeAsyncTO(cInterface->interface, pipeRef, transfer->buffer,
 							transfer->length, transfer->timeout, transfer->timeout,
@@ -1243,6 +1245,8 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   tpriv->req.pData             = transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
   tpriv->req.completionTimeout = transfer->timeout;
   tpriv->req.noDataTimeout     = transfer->timeout;
+
+  itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
   /* all transfers in libusb-1.0 are async */
   kresult = (*(dpriv->device))->DeviceRequestAsyncTO(dpriv->device, &(tpriv->req), darwin_async_io_callback, itransfer);
@@ -1358,6 +1362,9 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 }
 
 static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_t result) {
+  if (itransfer->flags & USBI_TRANSFER_TIMED_OUT)
+    result = kIOUSBTransactionTimeout;
+
   switch (result) {
   case kIOReturnUnderrun:
   case kIOReturnSuccess:
@@ -1372,6 +1379,7 @@ static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_
     return LIBUSB_TRANSFER_OVERFLOW;
   case kIOUSBTransactionTimeout:
     usbi_err (ITRANSFER_CTX (itransfer), "transfer error: timed out");
+    itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
     return LIBUSB_TRANSFER_TIMED_OUT;
   default:
     usbi_err (ITRANSFER_CTX (itransfer), "transfer error: %s (value = 0x%08x)", darwin_error_str (result), result);

@@ -1710,16 +1710,6 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 			"async cancel failed %d errno=%d", r, errno);
 }
 
-#ifdef USBI_OS_HANDLES_TIMEOUT
-static int handle_timeouts_locked(struct libusb_context *ctx)
-{
-	return 0;
-}
-static int handle_timeouts(struct libusb_context *ctx)
-{
-	return 0;
-}
-#else
 static int handle_timeouts_locked(struct libusb_context *ctx)
 {
 	int r;
@@ -1747,7 +1737,7 @@ static int handle_timeouts_locked(struct libusb_context *ctx)
 			return 0;
 
 		/* ignore timeouts we've already handled */
-		if (transfer->flags & USBI_TRANSFER_TIMED_OUT)
+		if (transfer->flags & (USBI_TRANSFER_TIMED_OUT | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
 			continue;
 
 		/* if transfer has non-expired timeout, nothing more to do */
@@ -1771,7 +1761,6 @@ static int handle_timeouts(struct libusb_context *ctx)
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 	return r;
 }
-#endif
 
 #ifdef USBI_TIMERFD_AVAILABLE
 static int handle_timerfd_trigger(struct libusb_context *ctx)
@@ -2073,9 +2062,7 @@ int API_EXPORTED libusb_handle_events_locked(libusb_context *ctx,
  */
 int API_EXPORTED libusb_pollfds_handle_timeouts(libusb_context *ctx)
 {
-#if defined(USBI_OS_HANDLES_TIMEOUT)
-	return 1;
-#elif defined(USBI_TIMERFD_AVAILABLE)
+#if defined(USBI_TIMERFD_AVAILABLE)
 	USBI_GET_CONTEXT(ctx);
 	return usbi_using_timerfd(ctx);
 #else
@@ -2114,7 +2101,6 @@ int API_EXPORTED libusb_pollfds_handle_timeouts(libusb_context *ctx)
 int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	struct timeval *tv)
 {
-#ifndef USBI_OS_HANDLES_TIMEOUT
 	struct usbi_transfer *transfer;
 	struct timespec cur_ts;
 	struct timeval cur_tv;
@@ -2135,10 +2121,11 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 
 	/* find next transfer which hasn't already been processed as timed out */
 	list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
-		if (!(transfer->flags & USBI_TRANSFER_TIMED_OUT)) {
-			found = 1;
-			break;
-		}
+		if (transfer->flags & (USBI_TRANSFER_TIMED_OUT | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
+			continue;
+
+		found = 1;
+		break;
 	}
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
@@ -2171,9 +2158,6 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	}
 
 	return 1;
-#else
-	return 0;
-#endif
 }
 
 /** \ingroup poll
