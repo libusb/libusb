@@ -1237,6 +1237,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct libusb_control_setup *setup = (struct libusb_control_setup *) transfer->buffer;
   struct darwin_device_priv *dpriv = (struct darwin_device_priv *)transfer->dev_handle->dev->os_priv;
+  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
   struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 
   IOReturn               kresult;
@@ -1258,7 +1259,23 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
   /* all transfers in libusb-1.0 are async */
-  kresult = (*(dpriv->device))->DeviceRequestAsyncTO(dpriv->device, &(tpriv->req), darwin_async_io_callback, itransfer);
+
+  if (transfer->endpoint) {
+    struct __darwin_interface *cInterface;
+    uint8_t                 pipeRef, iface;
+
+    if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
+      usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
+
+      return LIBUSB_ERROR_NOT_FOUND;
+    }
+
+    cInterface = &priv->interfaces[iface];
+
+    kresult = (*(cInterface->interface))->ControlRequestAsyncTO (cInterface->interface, pipeRef, &(tpriv->req), darwin_async_io_callback, itransfer);
+  } else
+    /* control request on endpoint 0 */
+    kresult = (*(dpriv->device))->DeviceRequestAsyncTO(dpriv->device, &(tpriv->req), darwin_async_io_callback, itransfer);
 
   if (kresult != kIOReturnSuccess)
     usbi_err (TRANSFER_CTX (transfer), "control request failed: %s", darwin_error_str(kresult));
