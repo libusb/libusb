@@ -387,7 +387,7 @@ err_exit:
 
 /*
  * Hash a string (Nokia suggestion)
- * TODO: add collision detection!
+ * TODO: add collision detection (also flag 0x00000000 as reserved)
  */
 static inline unsigned long hash(const char* sz)
 {
@@ -400,7 +400,6 @@ static inline unsigned long hash(const char* sz)
 
 /*
  * Returns the Device ID path of a device's parent
- * The returned string needs to be freed by the caller
  */
 static unsigned long get_parent_session_id(DWORD devinst)
 {
@@ -426,15 +425,15 @@ static unsigned long get_parent_session_id(DWORD devinst)
 
 /*
  * Returns the Device ID path of a device's grandparent
- * The returned string needs to be freed by the caller
  */
-static unsigned long get_grandparent_session_id(DWORD devinst)
+static unsigned long get_grandparent_session_id(DWORD devinst, bool* non_usb_gp)
 {
 	DWORD parent_devinst, grandparent_devinst;
 	unsigned long session_id = 0;
 	char* sanitized_path = NULL;
 	char path[MAX_PATH_LENGTH];
 
+	*non_usb_gp = false;
 	if (CM_Get_Parent(&parent_devinst, devinst, 0) != CR_SUCCESS) {
 		return 0;
 	}
@@ -442,6 +441,12 @@ static unsigned long get_grandparent_session_id(DWORD devinst)
 		return 0;
 	}
 	if (CM_Get_Device_IDA(grandparent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
+		return 0;
+	}
+	// If the grandparent is not USB (as can be the case for HID), flag it
+	if ((path[0] != 'U') && (path[1] != 'S') && (path[2] != 'B')) {
+		usbi_dbg("detected non USB grandparent '%s'", path);
+		*non_usb_gp = true;
 		return 0;
 	}
 	// TODO: try without sanitizing
@@ -1124,6 +1129,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	GUID* if_guid;
 	LONG s;
 	uint8_t api;
+	bool non_usb_hid_parent;
 	// Keep a chained list of newly allocated devs to unref
 	// TODO: use a perf friendly realloc instead of a chained list
 	struct unref_dev {
@@ -1259,7 +1265,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					if (s == ERROR_SUCCESS) {
 						if (nb_guids >= MAX_ENUM_GUIDS) {
 							// If this assert is ever reported, grow a GUID table dynamically
-							usbi_err(ctx, "program assertion error: too many GUIDs");
+							usbi_err(ctx, "program assertion failed: too many GUIDs");
 							LOOP_BREAK(LIBUSB_ERROR_OVERFLOW);
 						}
 						if_guid = calloc(1, sizeof(GUID));
@@ -1302,8 +1308,12 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				parent_dev = usbi_get_device_by_session_id(ctx, session_id);
 				// Composite HID devices have double indirection => Check grandparent
 				if (pass == HID_PASS) {
-					session_id = get_grandparent_session_id(dev_info_data.DevInst);
+					session_id = get_grandparent_session_id(dev_info_data.DevInst, &non_usb_hid_parent);
 					if (session_id == 0) {
+						if (non_usb_hid_parent) {
+							usbi_dbg("skipping non USB HID interface '%s'", dev_id_path);
+							continue;
+						}
 						usbi_err(ctx, "program assertion failed: no grandparent for '%s'", dev_id_path);
 						LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
 					}
