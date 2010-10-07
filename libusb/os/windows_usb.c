@@ -1373,13 +1373,14 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					(*unref_cur)->dev = dev;
 					(*unref_cur)->next = NULL;
 					unref_cur = &((*unref_cur)->next);
-				}
-				if (pass != HCD_PASS) {
-					discdevs = discovered_devs_append(*_discdevs, dev);
-					if (!discdevs) {
-						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+					// Append newly created devices to the list of discovered devices
+					if (pass != HCD_PASS) {
+						discdevs = discovered_devs_append(*_discdevs, dev);
+						if (!discdevs) {
+							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+						}
+						*_discdevs = discdevs;
 					}
-					*_discdevs = discdevs;
 				}
 
 				priv = __device_priv(dev);
