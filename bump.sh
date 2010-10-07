@@ -23,7 +23,7 @@ OFFSET=9000
 # increment - ideally, we'd check that tagver is really numeric here
 TAGVER=`expr $TAGVER + 1`
 TAGVER_OFF=`expr $TAGVER + $OFFSET`
-echo "Bumping version to pbr$TAGVER (nano: $TAGVER_OFF)"
+echo "Bumping version to pbh$TAGVER (nano: $TAGVER_OFF)"
 sed -e "s/\(^m4_define(LIBUSB_NANO.*\)/m4_define(LIBUSB_NANO, [$TAGVER_OFF])/" configure.ac >> configure.ac~
 mv configure.ac~ configure.ac
 # we're duplicating libusb_version.h generation here, but that avoids having to run configure
