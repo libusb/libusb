@@ -1,4 +1,7 @@
 #!/bin/sh
+# produce the MinGW binary files for snapshots
+# !!!THIS SCRIPT IS FOR INTERNAL DEVELOPER USE ONLY!!!
+
 date=`date +%Y.%m.%d`
 
 #

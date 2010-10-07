@@ -1,4 +1,7 @@
 @echo off 
+rem produce the DDK binary files for snapshots
+rem !!!THIS SCRIPT IS FOR INTERNAL DEVELOPER USE ONLY!!!
+
 if NOT x%DDK_TARGET_OS%==xWinXP goto usage
 
 mkdir E:\dailies\%DATE%
