@@ -121,6 +121,15 @@ typedef IOCFPlugInInterface *io_cf_plugin_ref_t;
 typedef IONotificationPortRef io_notification_port_t;
 
 /* private structures */
+struct darwin_context_priv {
+  mach_port_t   libusb_darwin_mp;     /* master port */
+  CFRunLoopRef  libusb_darwin_acfl;   /* async cf loop */
+  int           initCount;
+  /* TODO: pthread_t -> usbi_t? */
+  pthread_t     libusb_darwin_at;     /* async event thread */
+  int           hotplug_pipe[2];
+};
+
 struct darwin_device_priv {
   IOUSBDeviceDescriptor dev_descriptor;
   UInt32                location;
@@ -128,6 +137,8 @@ struct darwin_device_priv {
   usb_device_t        **device;
   int                   open_count;
   UInt8                 first_config, active_config;
+  usbi_mutex_t          status_changed_lock;
+  int                   status_changed;
 };
 
 struct darwin_device_handle_priv {

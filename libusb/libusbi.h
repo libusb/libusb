@@ -179,6 +179,26 @@ static inline void usbi_dbg(const char *format, ...)
 
 #endif /* !defined(_MSC_VER) || _MSC_VER > 1200 */
 
+/*
+ * djb2
+ *
+ * This algorithm (k=33) was first reported by Dan Bernstein many years
+ * ago in comp.lang.c.
+ */
+// TODO: maintain a hash table and detect collisions
+static inline unsigned long usbi_hash(const char* sz)
+{
+	unsigned long r = 5381;
+	int c;
+	while ((c = *sz++)) {
+		r = ((r << 5) + r) + c; /* r * 33 + c */
+	}
+	if (r == 0) {
+		usbi_warn(NULL, "'%s''s hash is 0!", sz);
+	}
+	return r;
+}
+
 #define USBI_GET_CONTEXT(ctx) if (!(ctx)) (ctx) = usbi_default_context
 #define DEVICE_CTX(dev) ((dev)->ctx)
 #define HANDLE_CTX(handle) (DEVICE_CTX((handle)->dev))
@@ -254,6 +274,12 @@ struct libusb_context {
 	 * this timerfd is maintained to trigger on the next pending timeout */
 	int timerfd;
 #endif
+
+	libusb_hotplug_cb_fn hotplug_connected_listener;
+	libusb_hotplug_cb_fn hotplug_disconnected_listener;
+	void* hotplug_listener_user_data;
+	usbi_mutex_t hotplug_listener_lock;
+	unsigned char os_priv[0];
 };
 
 #ifdef USBI_TIMERFD_AVAILABLE
@@ -268,10 +294,13 @@ struct libusb_device {
 	usbi_mutex_t lock;
 	int refcnt;
 
+	int status_online;
+	usbi_mutex_t status_online_lock;
 	struct libusb_context *ctx;
 
 	uint8_t bus_number;
 	uint8_t device_address;
+	usbi_mutex_t devaddr_lock;
 	uint8_t num_configurations;
 
 	struct list_head list;
@@ -354,9 +383,12 @@ struct usb_descriptor_header {
 int usbi_io_init(struct libusb_context *ctx);
 void usbi_io_exit(struct libusb_context *ctx);
 
+int usbi_notify_device_state(struct libusb_device* dev, int new_state);
 struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	unsigned long session_id);
 struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
+	unsigned long session_id);
+struct libusb_device *usbi_get_device_by_session_id_ref(struct libusb_context *ctx,
 	unsigned long session_id);
 int usbi_sanitize_device(struct libusb_device *dev);
 void usbi_handle_disconnect(struct libusb_device_handle *handle);
@@ -423,7 +455,7 @@ struct usbi_os_backend {
 	 *
 	 * This function is called when the user deinitializes the library.
 	 */
-	void (*exit)(void);
+	void (*exit)(struct libusb_context *ctx);
 
 	/* Enumerate all the USB devices on the system, returning them in a list
 	 * of discovered devices.
@@ -839,6 +871,9 @@ struct usbi_os_backend {
 	/* clock ID of the clock that should be used for timerfd */
 	clockid_t (*get_timerfd_clockid)(void);
 #endif
+
+	/* TODO: doc */
+	size_t context_priv_size;
 
 	/* Number of bytes to reserve for per-device private backend data.
 	 * This private data area is accessible through the "os_priv" field of

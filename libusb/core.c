@@ -522,6 +522,15 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 		return NULL;
 	}
 
+	r = usbi_mutex_init(&dev->status_online_lock, NULL);
+	if (r)
+		return NULL;
+
+	r = usbi_mutex_init(&dev->devaddr_lock, NULL);
+	if (r)
+		return NULL;
+
+	dev->status_online = 1;
 	dev->ctx = ctx;
 	dev->refcnt = 1;
 	dev->session_data = session_id;
@@ -573,6 +582,24 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device)
 		if (dev->session_data == session_id) {
 			ret = dev;
+			break;
+		}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
+
+	return ret;
+}
+
+/* TODO: doc */
+struct libusb_device *usbi_get_device_by_session_id_ref(struct libusb_context *ctx,
+	unsigned long session_id)
+{
+	struct libusb_device *dev;
+	struct libusb_device *ret = NULL;
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device)
+		if (dev->session_data == session_id) {
+			ret = dev;
+			libusb_ref_device(dev);
 			break;
 		}
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
@@ -679,7 +706,18 @@ uint8_t API_EXPORTED libusb_get_bus_number(libusb_device *dev)
  */
 uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 {
-	return dev->device_address;
+	uint8_t devaddr;
+
+	usbi_mutex_lock(&dev->devaddr_lock);
+	devaddr = dev->device_address;
+	usbi_mutex_unlock(&dev->devaddr_lock);
+	return devaddr;
+}
+
+/* TODO: doc */
+unsigned long API_EXPORTED libusb_get_session_id(libusb_device *dev)
+{
+	return dev->session_data;
 }
 
 static const struct libusb_endpoint_descriptor *find_endpoint(
@@ -844,6 +882,8 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 		usbi_mutex_unlock(&dev->ctx->usb_devs_lock);
 
 		usbi_mutex_destroy(&dev->lock);
+		usbi_mutex_destroy(&dev->devaddr_lock);
+		usbi_mutex_destroy(&dev->status_online_lock);
 		free(dev);
 	}
 }
@@ -1506,7 +1546,8 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 int API_EXPORTED libusb_init(libusb_context **context)
 {
 	char *dbg = getenv("LIBUSB_DEBUG");
-	struct libusb_context *ctx;
+	size_t priv_size = usbi_backend->context_priv_size;
+	struct libusb_context *ctx = malloc(sizeof(*ctx) + priv_size);
 	int r;
 
 	usbi_mutex_static_lock(&default_context_lock);
@@ -1518,12 +1559,12 @@ int API_EXPORTED libusb_init(libusb_context **context)
 		return 0;
 	}
 
-	ctx = malloc(sizeof(*ctx));
+	ctx = malloc(sizeof(*ctx) + priv_size);
 	if (!ctx) {
 		r = LIBUSB_ERROR_NO_MEM;
 		goto err_unlock;
 	}
-	memset(ctx, 0, sizeof(*ctx));
+	memset(ctx, 0, sizeof(*ctx) + priv_size);
 
 	if (dbg) {
 		ctx->debug = atoi(dbg);
@@ -1547,13 +1588,17 @@ int API_EXPORTED libusb_init(libusb_context **context)
 
 	usbi_mutex_init(&ctx->usb_devs_lock, NULL);
 	usbi_mutex_init(&ctx->open_devs_lock, NULL);
+	usbi_mutex_init(&ctx->hotplug_listener_lock, NULL);
 	list_init(&ctx->usb_devs);
 	list_init(&ctx->open_devs);
 
+	ctx->hotplug_connected_listener = 0;
+	ctx->hotplug_disconnected_listener = 0;
+	ctx->hotplug_listener_user_data = 0;
 	r = usbi_io_init(ctx);
 	if (r < 0) {
 		if (usbi_backend->exit)
-			usbi_backend->exit();
+			usbi_backend->exit(ctx);
 		goto err_destroy_mutex;
 	}
 
@@ -1611,11 +1656,39 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 
 	usbi_io_exit(ctx);
 	if (usbi_backend->exit)
-		usbi_backend->exit();
+		usbi_backend->exit(ctx);
 
 	usbi_mutex_destroy(&ctx->open_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
 	free(ctx);
+}
+
+/* TODO: doc */
+void API_EXPORTED libusb_register_hotplug_listeners(
+	libusb_context *ctx, libusb_hotplug_cb_fn connected_cb,
+	libusb_hotplug_cb_fn disconnected_cb, void *user_data)
+{
+	usbi_mutex_lock(&ctx->hotplug_listener_lock);
+	ctx->hotplug_connected_listener = connected_cb;
+	ctx->hotplug_disconnected_listener = disconnected_cb;
+	ctx->hotplug_listener_user_data = user_data;
+	usbi_mutex_unlock(&ctx->hotplug_listener_lock);
+}
+
+/* TODO: doc */
+void API_EXPORTED libusb_unregister_hotplug_listeners(libusb_context *ctx)
+{
+	usbi_mutex_lock(&ctx->hotplug_listener_lock);
+	ctx->hotplug_connected_listener = 0;
+	ctx->hotplug_disconnected_listener = 0;
+	ctx->hotplug_listener_user_data = 0;
+	usbi_mutex_unlock(&ctx->hotplug_listener_lock);
+}
+
+/* TODO: doc */
+int API_EXPORTED libusb_get_status(libusb_device *dev)
+{
+	return dev->status_online;
 }
 
 void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
@@ -1736,3 +1809,30 @@ const struct libusb_version * LIBUSB_CALL libusb_getversion(void)
 {
 	return &libusb_version_internal;
 }
+
+/* TODO: doc */
+int usbi_notify_device_state(struct libusb_device *dev, int new_state)
+{
+	int status_online;
+	libusb_hotplug_cb_fn connected_cb;
+	libusb_hotplug_cb_fn disconnected_cb;
+	void* user_data;
+
+	usbi_mutex_lock(&dev->ctx->hotplug_listener_lock);
+	connected_cb = dev->ctx->hotplug_connected_listener;
+	disconnected_cb = dev->ctx->hotplug_disconnected_listener;
+	user_data = dev->ctx->hotplug_listener_user_data;
+	usbi_mutex_unlock(&dev->ctx->hotplug_listener_lock);
+	status_online = new_state == 0 ? 0 : 1;
+	if (connected_cb && status_online) {
+		usbi_dbg("calling registered callback for device attach");
+		connected_cb(dev, user_data);
+		return 1;
+	} else if (disconnected_cb) {
+		usbi_dbg("calling registered callback for device detach");
+		disconnected_cb(dev, user_data);
+		return 0;
+	}
+	return -1;
+}
+

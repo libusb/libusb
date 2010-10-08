@@ -844,11 +844,19 @@ struct libusb_transfer {
 	;
 };
 
+typedef void (*libusb_hotplug_cb_fn)(
+	struct libusb_device *device, void *user_data);
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
 const char * LIBUSB_CALL libusb_strerror(enum libusb_error errcode);
 const struct libusb_version * LIBUSB_CALL libusb_getversion(void);
+
+void LIBUSB_CALL libusb_register_hotplug_listeners(libusb_context *ctx,
+	libusb_hotplug_cb_fn connected_cb,
+	libusb_hotplug_cb_fn disconnected_cb, void *user_data);
+void LIBUSB_CALL libusb_unregister_hotplug_listeners(libusb_context *ctx);
+int LIBUSB_CALL libusb_get_status(libusb_device *dev);
 
 ssize_t LIBUSB_CALL libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);

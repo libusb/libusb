@@ -1009,10 +1009,26 @@ int usbi_io_init(struct libusb_context *ctx)
 {
 	int r;
 
+// mutexes on Windows are recursive by default
+// TODO: something more elegant
+#if !defined(OS_WINDOWS)
+	pthread_mutexattr_t attr;
+	pthread_mutexattr_init(&attr);
+	r = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+	if (r) {
+		pthread_mutexattr_destroy(&attr);
+		return r;;
+	}
+#endif
 	usbi_mutex_init(&ctx->flying_transfers_lock, NULL);
 	usbi_mutex_init(&ctx->pollfds_lock, NULL);
 	usbi_mutex_init(&ctx->pollfd_modify_lock, NULL);
+#if defined(OS_WINDOWS)
 	usbi_mutex_init(&ctx->events_lock, NULL);
+#else
+	pthread_mutex_init(&ctx->events_lock, &attr);
+	pthread_mutexattr_destroy(&attr);
+#endif
 	usbi_mutex_init(&ctx->event_waiters_lock, NULL);
 	usbi_cond_init(&ctx->event_waiters_cond, NULL);
 	list_init(&ctx->flying_transfers);

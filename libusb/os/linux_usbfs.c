@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <libudev.h>
 
 #include "libusb.h"
 #include "libusbi.h"
@@ -55,7 +56,7 @@
  * The busnum file is important as that is the only way we can relate sysfs
  * devices to usbfs nodes.
  *
- * If we also have descriptors, we can obtain the device descriptor and active 
+ * If we also have descriptors, we can obtain the device descriptor and active
  * configuration without touching usbfs at all.
  *
  * The descriptors file originally only contained the active configuration
@@ -100,6 +101,12 @@ static int sysfs_can_relate_devices = -1;
 /* do we have a descriptors file? */
 static int sysfs_has_descriptors = -1;
 
+struct linux_context_priv {
+	struct udev *udev_ctx;
+	struct udev_monitor *udev_monitor;
+	int udev_monitor_fd;
+};
+
 struct linux_device_priv {
 	char *sysfs_dir;
 	unsigned char *dev_descriptor;
@@ -141,6 +148,11 @@ static void __get_usbfs_path(struct libusb_device *dev, char *path)
 {
 	snprintf(path, PATH_MAX, "%s/%03d/%03d", usbfs_path, dev->bus_number,
 		dev->device_address);
+}
+
+inline static struct linux_context_priv *__ctx_priv(struct libusb_context *ctx)
+{
+	return (struct linux_context_priv*) ctx->os_priv;
 }
 
 static struct linux_device_priv *__device_priv(struct libusb_device *dev)
@@ -232,6 +244,8 @@ static int check_flag_bulk_continuation(void)
 
 static int op_init(struct libusb_context *ctx)
 {
+	struct linux_context_priv* ctx_priv = __ctx_priv(ctx);
+
 	struct stat statbuf;
 	int r;
 
@@ -264,7 +278,42 @@ static int op_init(struct libusb_context *ctx)
 		sysfs_can_relate_devices = 0;
 	}
 
+	ctx_priv->udev_ctx = udev_new();
+	ctx_priv->udev_monitor =
+		udev_monitor_new_from_netlink(ctx_priv->udev_ctx, "udev");
+	if (!ctx_priv->udev_monitor) {
+		usbi_err(ctx, "could not initialize udev monitor");
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	r = udev_monitor_filter_add_match_subsystem_devtype(
+		ctx_priv->udev_monitor, "usb", 0);
+	if (r) {
+		usbi_err(ctx, "could not initialize udev monitor filter for \"usb\" subsystem");
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	if (udev_monitor_enable_receiving(ctx_priv->udev_monitor)) {
+		usbi_err(ctx, "failed to enable the udev monitor");
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	ctx_priv->udev_monitor_fd = udev_monitor_get_fd(ctx_priv->udev_monitor);
+
+	r = usbi_add_pollfd(ctx, ctx_priv->udev_monitor_fd, POLLIN);
+	if (r < 0) {
+		return r;
+	}
+
 	return 0;
+}
+
+static void op_exit(struct libusb_context *ctx)
+{
+	struct linux_context_priv* ctx_priv = __ctx_priv(ctx);
+
+	udev_monitor_unref(ctx_priv->udev_monitor);
+	udev_unref(ctx_priv->udev_ctx);
 }
 
 static int usbfs_get_device_descriptor(struct libusb_device *dev,
@@ -360,7 +409,7 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 	r = read(fd, tmp, sizeof(tmp));
 	close(fd);
 	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev), 
+		usbi_err(DEVICE_CTX(dev),
 			"read bConfigurationValue failed ret=%d errno=%d", r, errno);
 		return LIBUSB_ERROR_IO;
 	} else if (r == 0) {
@@ -587,7 +636,7 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 }
 
 /* cache the active config descriptor in memory. a value of -1 means that
- * we aren't sure which one is active, so just assume the first one. 
+ * we aren't sure which one is active, so just assume the first one.
  * only for usbfs. */
 static int cache_active_config(struct libusb_device *dev, int fd,
 	int active_config)
@@ -784,51 +833,55 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	return 0;
 }
 
-static int enumerate_device(struct libusb_context *ctx,
-	struct discovered_devs **_discdevs, uint8_t busnum, uint8_t devaddr,
-	const char *sysfs_dir)
+static int get_device(struct libusb_context* ctx,
+	uint8_t busnum, uint8_t devaddr, struct libusb_device** dev, const char* sysfs_dir)
 {
-	struct discovered_devs *discdevs;
 	unsigned long session_id;
-	int need_unref = 0;
-	struct libusb_device *dev;
 	int r = 0;
 
-	/* FIXME: session ID is not guaranteed unique as addresses can wrap and
-	 * will be reused. instead we should add a simple sysfs attribute with
-	 * a session ID. */
-	session_id = busnum << 8 | devaddr;
+	session_id = usbi_hash(sysfs_dir);
 	usbi_dbg("busnum %d devaddr %d session_id %ld", busnum, devaddr,
 		session_id);
 
-	dev = usbi_get_device_by_session_id(ctx, session_id);
-	if (dev) {
+	*dev = usbi_get_device_by_session_id_ref(ctx, session_id);
+	if (*dev) {
 		usbi_dbg("using existing device for %d/%d (session %ld)",
 			busnum, devaddr, session_id);
 	} else {
 		usbi_dbg("allocating new device for %d/%d (session %ld)",
 			busnum, devaddr, session_id);
-		dev = usbi_alloc_device(ctx, session_id);
-		if (!dev)
+		*dev = usbi_alloc_device(ctx, session_id);
+		if (!*dev)
 			return LIBUSB_ERROR_NO_MEM;
-		need_unref = 1;
-		r = initialize_device(dev, busnum, devaddr, sysfs_dir);
+		r = initialize_device(*dev, busnum, devaddr, sysfs_dir);
 		if (r < 0)
-			goto out;
-		r = usbi_sanitize_device(dev);
+			return r;
+		r = usbi_sanitize_device(*dev);
 		if (r < 0)
-			goto out;
+			return r;
+	}
+	return r;
+}
+
+static int enumerate_device(struct libusb_context *ctx,
+	struct discovered_devs **_discdevs, uint8_t busnum, uint8_t devaddr,
+	const char *sysfs_dir)
+{
+	struct discovered_devs *discdevs;
+	struct libusb_device *dev;
+	int r = 0;
+
+	r = get_device(ctx, busnum, devaddr, &dev, sysfs_dir);
+	if (r >= 0) {
+		discdevs = discovered_devs_append(*_discdevs, dev);
+		if (!discdevs)
+			r = LIBUSB_ERROR_NO_MEM;
+		else
+			*_discdevs = discdevs;
 	}
 
-	discdevs = discovered_devs_append(*_discdevs, dev);
-	if (!discdevs)
-		r = LIBUSB_ERROR_NO_MEM;
-	else
-		*_discdevs = discdevs;
+	libusb_unref_device(dev);
 
-out:
-	if (need_unref)
-		libusb_unref_device(dev);
 	return r;
 }
 
@@ -1016,7 +1069,7 @@ static int sysfs_get_device_list(struct libusb_context *ctx,
 		if (r < 0)
 			goto out;
 		discdevs = discdevs_new;
-	}	
+	}
 
 out:
 	closedir(devices);
@@ -1405,7 +1458,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 					"submiturb failed error %d errno=%d", r, errno);
 				r = LIBUSB_ERROR_IO;
 			}
-	
+
 			/* if the first URB submission fails, we can simply free up and
 			 * return failure immediately. */
 			if (i == 0) {
@@ -2107,9 +2160,97 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 	}
 }
 
+static void handle_hotplug_event(struct libusb_context *ctx)
+{
+	struct linux_context_priv* ctx_priv = __ctx_priv(ctx);
+	struct libusb_device* dev;
+	struct udev_device* udev_dev;
+	const char* udev_action;
+	const char* dev_node;
+	const char* sys_name;
+	uint8_t busnum, devaddr;
+	char* delim = "/";
+	char* substr;
+	char* dev_node_dup;
+	char* save_ptr;
+	int status_online;
+
+	udev_dev = udev_monitor_receive_device(ctx_priv->udev_monitor);
+	if (!udev_dev) {
+		usbi_err(ctx, "failed to read data from udev monitor socket");
+		return;
+	}
+
+	dev_node = udev_device_get_devnode(udev_dev);
+	if (!dev_node) {
+		goto end;
+	}
+
+	sys_name = udev_device_get_sysname(udev_dev);
+	if (!sys_name) {
+		goto end;
+	}
+
+	udev_action = udev_device_get_action(udev_dev);
+	if (!udev_action) {
+		goto end;
+	}
+
+	dev_node_dup = strdup(dev_node);
+	substr = strtok_r(dev_node_dup, delim, &save_ptr);
+	while(substr) {
+		if (isdigit(substr[0])) {
+			if (!busnum) {
+				busnum = atoi(substr);
+			} else {
+				devaddr = atoi(substr);
+				break;
+			}
+		}
+		substr = strtok_r(0, delim, &save_ptr);
+	}
+	free(dev_node_dup);
+
+	if (strncmp(udev_action, "add", 3) == 0) {
+		if (!get_device(ctx, busnum, devaddr, &dev, sys_name)) {
+			pthread_mutex_lock(&dev->devaddr_lock);
+			dev->device_address = devaddr;
+			pthread_mutex_unlock(&dev->devaddr_lock);
+
+			pthread_mutex_lock(&dev->status_online_lock);
+			dev->status_online = 1;
+			pthread_mutex_unlock(&dev->status_online_lock);
+
+			status_online = 1;
+			usbi_notify_device_state(dev, status_online);
+			libusb_unref_device(dev);
+		}
+	}
+	else if (strncmp(udev_action, "remove", 6) == 0) {
+		dev = usbi_get_device_by_session_id_ref(ctx, usbi_hash(sys_name));
+		if (dev) {
+			pthread_mutex_lock(&dev->status_online_lock);
+			dev->status_online = 0;
+			pthread_mutex_unlock(&dev->status_online_lock);
+
+			status_online = 0;
+			usbi_notify_device_state(dev, status_online);
+			libusb_unref_device(dev);
+		}
+	} else {
+		usbi_err(ctx, "ignoring udev action %s", udev_action);
+	}
+
+end:
+	udev_device_unref(udev_dev);
+}
+
 static int op_handle_events(struct libusb_context *ctx,
 	struct pollfd *fds, nfds_t nfds, int num_ready)
 {
+	struct linux_context_priv* ctx_priv = __ctx_priv(ctx);
+	int hotplug_event = 0;
+
 	int r;
 	int i = 0;
 
@@ -2123,6 +2264,12 @@ static int op_handle_events(struct libusb_context *ctx,
 			continue;
 
 		num_ready--;
+
+		if (pollfd->fd == ctx_priv->udev_monitor_fd) {
+			hotplug_event = 1;
+			continue;
+		}
+
 		list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
 			hpriv =  __device_handle_priv(handle);
 			if (hpriv->fd == pollfd->fd)
@@ -2145,6 +2292,10 @@ static int op_handle_events(struct libusb_context *ctx,
 	r = 0;
 out:
 	usbi_mutex_unlock(&ctx->open_devs_lock);
+
+	if (hotplug_event) {
+		handle_hotplug_event(ctx);
+	}
 	return r;
 }
 
@@ -2171,7 +2322,7 @@ static clockid_t op_get_timerfd_clockid(void)
 const struct usbi_os_backend linux_usbfs_backend = {
 	.name = "Linux usbfs",
 	.init = op_init,
-	.exit = NULL,
+	.exit = op_exit,
 	.get_device_list = op_get_device_list,
 	.get_device_descriptor = op_get_device_descriptor,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
@@ -2206,6 +2357,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.get_timerfd_clockid = op_get_timerfd_clockid,
 #endif
 
+	.context_priv_size = sizeof(struct linux_context_priv),
 	.device_priv_size = sizeof(struct linux_device_priv),
 	.device_handle_priv_size = sizeof(struct linux_device_handle_priv),
 	.transfer_priv_size = sizeof(struct linux_transfer_priv),

@@ -51,7 +51,7 @@ case $host in
 	THREAD_CFLAGS="-pthread"
 	PC_LIBS_PRIVATE="${PC_LIBS_PRIVATE} -pthread"
 	AM_CFLAGS="-std=gnu99"
-	AM_LDFLAGS=""
+	AM_LDFLAGS="-ludev"
 	;;
 *-darwin*)
 	AC_DEFINE(OS_DARWIN, [], [Darwin backend])
@@ -77,7 +77,7 @@ case $host in
 	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version -Wl,--add-stdcall-alias"
-	AM_CFLAGS="-std=c99"
+	AM_CFLAGS="-std=c99 -DWINVER=0x500"
 	AC_CHECK_TOOL(RC, windres, no)
 	AC_CHECK_TOOL(DLLTOOL, dlltool, false)
 	;;
@@ -90,7 +90,7 @@ case $host in
 	threads="posix"
 	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
 	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
-	AM_CFLAGS="-std=c99"
+	AM_CFLAGS="-std=c99 -DWINVER=0x500"
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
