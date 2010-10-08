@@ -49,7 +49,7 @@
 #define SPDRP_INSTALL_STATE	34
 #endif
 
-#if defined(__CYGWIN__ )
+#if defined(__CYGWIN__)
 // cygwin produces a warning unless these prototypes are defined
 extern int _snprintf(char *buffer, size_t count, const char *format, ...);
 extern char *_strdup(const char *strSource);
@@ -107,6 +107,9 @@ const GUID GUID_DEVINTERFACE_USB_DEVICE = { 0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0
 #if !defined(GUID_DEVINTERFACE_USB_HUB)
 const GUID GUID_DEVINTERFACE_USB_HUB = { 0xF18A0E88, 0xC30C, 0x11D0, {0x88, 0x15, 0x00, 0xA0, 0xC9, 0x06, 0xBE, 0xD8} };
 #endif
+#if !defined(GUID_DEVCLASS_WCEUSBS)
+const GUID GUID_DEVCLASS_WCEUSBS = { 0x36FC9E60, 0xC465, 0x11CF, {0x80, 0x56, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00} };
+#endif
 const GUID GUID_NULL = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} };
 
 
@@ -123,7 +126,7 @@ const GUID GUID_NULL = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x
 #define CLASS_GUID_UNSUPPORTED      GUID_NULL
 const GUID CLASS_GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
 const GUID CLASS_GUID_LIBUSB_WINUSB = { 0x78A1C341, 0x4539, 0x11D3, {0xB8, 0x8D, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71} };
-const GUID CLASS_GUID_COMPOSITE     = { 0x36FC9E60, 0xC465, 0x11cF, {0x80, 0x56, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00} };
+#define CLASS_GUID_COMPOSITE        GUID_DEVCLASS_WCEUSBS
 
 struct windows_usb_api_backend {
 	const uint8_t id;
@@ -223,6 +226,14 @@ struct hid_device_priv {
 	WCHAR string[3][MAX_USB_STRING_LENGTH];
 	uint8_t string_index[3];	// man, prod, ser
 };
+
+struct windows_context_priv {
+	HWND hMessage;
+};
+
+static inline struct windows_context_priv *__context_priv(struct libusb_context *ctx) {
+	return (struct windows_context_priv *)ctx->os_priv;
+}
 
 typedef struct libusb_device_descriptor USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESCRIPTOR;
 struct windows_device_priv {

@@ -4,6 +4,7 @@ EXPORTS
   libusb_free_device_list
   libusb_get_bus_number
   libusb_get_device_address
+  libusb_get_session_id
   libusb_get_max_packet_size
   libusb_get_max_iso_packet_size
   libusb_unref_device
@@ -22,6 +23,9 @@ EXPORTS
   libusb_set_debug
   libusb_init
   libusb_exit
+  libusb_register_hotplug_listeners
+  libusb_unregister_hotplug_listeners
+  libusb_get_status
   libusb_get_device_descriptor
   libusb_get_active_config_descriptor
   libusb_get_config_descriptor
@@ -61,6 +65,7 @@ EXPORTS
   libusb_free_device_list@0 = libusb_free_device_list
   libusb_get_bus_number@0 = libusb_get_bus_number
   libusb_get_device_address@0 = libusb_get_device_address
+  libusb_get_session_id@0 = libusb_get_session_id
   libusb_get_max_packet_size@0 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@0 = libusb_get_max_iso_packet_size
   libusb_unref_device@0 = libusb_unref_device
@@ -79,6 +84,9 @@ EXPORTS
   libusb_set_debug@0 = libusb_set_debug
   libusb_init@0 = libusb_init
   libusb_exit@0 = libusb_exit
+  libusb_register_hotplug_listeners@0 = libusb_register_hotplug_listeners
+  libusb_unregister_hotplug_listeners@0 = libusb_unregister_hotplug_listeners
+  libusb_get_status@0 = libusb_get_status
   libusb_get_device_descriptor@0 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@0 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@0 = libusb_get_config_descriptor
@@ -118,6 +126,7 @@ EXPORTS
   libusb_free_device_list@4 = libusb_free_device_list
   libusb_get_bus_number@4 = libusb_get_bus_number
   libusb_get_device_address@4 = libusb_get_device_address
+  libusb_get_session_id@4 = libusb_get_session_id
   libusb_get_max_packet_size@4 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@4 = libusb_get_max_iso_packet_size
   libusb_unref_device@4 = libusb_unref_device
@@ -136,6 +145,9 @@ EXPORTS
   libusb_set_debug@4 = libusb_set_debug
   libusb_init@4 = libusb_init
   libusb_exit@4 = libusb_exit
+  libusb_register_hotplug_listeners@4 = libusb_register_hotplug_listeners
+  libusb_unregister_hotplug_listeners@4 = libusb_unregister_hotplug_listeners
+  libusb_get_status@4 = libusb_get_status
   libusb_get_device_descriptor@4 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@4 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@4 = libusb_get_config_descriptor
@@ -175,6 +187,7 @@ EXPORTS
   libusb_free_device_list@8 = libusb_free_device_list
   libusb_get_bus_number@8 = libusb_get_bus_number
   libusb_get_device_address@8 = libusb_get_device_address
+  libusb_get_session_id@8 = libusb_get_session_id
   libusb_get_max_packet_size@8 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@8 = libusb_get_max_iso_packet_size
   libusb_unref_device@8 = libusb_unref_device
@@ -193,6 +206,9 @@ EXPORTS
   libusb_set_debug@8 = libusb_set_debug
   libusb_init@8 = libusb_init
   libusb_exit@8 = libusb_exit
+  libusb_register_hotplug_listeners@8 = libusb_register_hotplug_listeners
+  libusb_unregister_hotplug_listeners@8 = libusb_unregister_hotplug_listeners
+  libusb_get_status@8 = libusb_get_status
   libusb_get_device_descriptor@8 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@8 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@8 = libusb_get_config_descriptor
@@ -232,6 +248,7 @@ EXPORTS
   libusb_free_device_list@12 = libusb_free_device_list
   libusb_get_bus_number@12 = libusb_get_bus_number
   libusb_get_device_address@12 = libusb_get_device_address
+  libusb_get_session_id@12 = libusb_get_session_id
   libusb_get_max_packet_size@12 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@12 = libusb_get_max_iso_packet_size
   libusb_unref_device@12 = libusb_unref_device
@@ -250,6 +267,9 @@ EXPORTS
   libusb_set_debug@12 = libusb_set_debug
   libusb_init@12 = libusb_init
   libusb_exit@12 = libusb_exit
+  libusb_register_hotplug_listeners@12 = libusb_register_hotplug_listeners
+  libusb_unregister_hotplug_listeners@12 = libusb_unregister_hotplug_listeners
+  libusb_get_status@12 = libusb_get_status
   libusb_get_device_descriptor@12 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@12 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@12 = libusb_get_config_descriptor
@@ -289,6 +309,7 @@ EXPORTS
   libusb_free_device_list@16 = libusb_free_device_list
   libusb_get_bus_number@16 = libusb_get_bus_number
   libusb_get_device_address@16 = libusb_get_device_address
+  libusb_get_session_id@16 = libusb_get_session_id
   libusb_get_max_packet_size@16 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@16 = libusb_get_max_iso_packet_size
   libusb_unref_device@16 = libusb_unref_device
@@ -307,6 +328,9 @@ EXPORTS
   libusb_set_debug@16 = libusb_set_debug
   libusb_init@16 = libusb_init
   libusb_exit@16 = libusb_exit
+  libusb_register_hotplug_listeners@16 = libusb_register_hotplug_listeners
+  libusb_unregister_hotplug_listeners@16 = libusb_unregister_hotplug_listeners
+  libusb_get_status@16 = libusb_get_status
   libusb_get_device_descriptor@16 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@16 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@16 = libusb_get_config_descriptor
@@ -346,6 +370,7 @@ EXPORTS
   libusb_free_device_list@20 = libusb_free_device_list
   libusb_get_bus_number@20 = libusb_get_bus_number
   libusb_get_device_address@20 = libusb_get_device_address
+  libusb_get_session_id@20 = libusb_get_session_id
   libusb_get_max_packet_size@20 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@20 = libusb_get_max_iso_packet_size
   libusb_unref_device@20 = libusb_unref_device
@@ -364,6 +389,9 @@ EXPORTS
   libusb_set_debug@20 = libusb_set_debug
   libusb_init@20 = libusb_init
   libusb_exit@20 = libusb_exit
+  libusb_register_hotplug_listeners@20 = libusb_register_hotplug_listeners
+  libusb_unregister_hotplug_listeners@20 = libusb_unregister_hotplug_listeners
+  libusb_get_status@20 = libusb_get_status
   libusb_get_device_descriptor@20 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@20 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@20 = libusb_get_config_descriptor
@@ -403,6 +431,7 @@ EXPORTS
   libusb_free_device_list@24 = libusb_free_device_list
   libusb_get_bus_number@24 = libusb_get_bus_number
   libusb_get_device_address@24 = libusb_get_device_address
+  libusb_get_session_id@24 = libusb_get_session_id
   libusb_get_max_packet_size@24 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@24 = libusb_get_max_iso_packet_size
   libusb_unref_device@24 = libusb_unref_device
@@ -421,6 +450,9 @@ EXPORTS
   libusb_set_debug@24 = libusb_set_debug
   libusb_init@24 = libusb_init
   libusb_exit@24 = libusb_exit
+  libusb_register_hotplug_listeners@24 = libusb_register_hotplug_listeners
+  libusb_unregister_hotplug_listeners@24 = libusb_unregister_hotplug_listeners
+  libusb_get_status@24 = libusb_get_status
   libusb_get_device_descriptor@24 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@24 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@24 = libusb_get_config_descriptor
@@ -460,6 +492,7 @@ EXPORTS
   libusb_free_device_list@28 = libusb_free_device_list
   libusb_get_bus_number@28 = libusb_get_bus_number
   libusb_get_device_address@28 = libusb_get_device_address
+  libusb_get_session_id@28 = libusb_get_session_id
   libusb_get_max_packet_size@28 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@28 = libusb_get_max_iso_packet_size
   libusb_unref_device@28 = libusb_unref_device
@@ -478,6 +511,9 @@ EXPORTS
   libusb_set_debug@28 = libusb_set_debug
   libusb_init@28 = libusb_init
   libusb_exit@28 = libusb_exit
+  libusb_register_hotplug_listeners@28 = libusb_register_hotplug_listeners
+  libusb_unregister_hotplug_listeners@28 = libusb_unregister_hotplug_listeners
+  libusb_get_status@28 = libusb_get_status
   libusb_get_device_descriptor@28 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@28 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@28 = libusb_get_config_descriptor
@@ -517,6 +553,7 @@ EXPORTS
   libusb_free_device_list@32 = libusb_free_device_list
   libusb_get_bus_number@32 = libusb_get_bus_number
   libusb_get_device_address@32 = libusb_get_device_address
+  libusb_get_session_id@32 = libusb_get_session_id
   libusb_get_max_packet_size@32 = libusb_get_max_packet_size
   libusb_get_max_iso_packet_size@32 = libusb_get_max_iso_packet_size
   libusb_unref_device@32 = libusb_unref_device
@@ -535,6 +572,9 @@ EXPORTS
   libusb_set_debug@32 = libusb_set_debug
   libusb_init@32 = libusb_init
   libusb_exit@32 = libusb_exit
+  libusb_register_hotplug_listeners@32 = libusb_register_hotplug_listeners
+  libusb_unregister_hotplug_listeners@32 = libusb_unregister_hotplug_listeners
+  libusb_get_status@32 = libusb_get_status
   libusb_get_device_descriptor@32 = libusb_get_device_descriptor
   libusb_get_active_config_descriptor@32 = libusb_get_active_config_descriptor
   libusb_get_config_descriptor@32 = libusb_get_config_descriptor

@@ -731,6 +731,10 @@ int test_device(uint16_t vid, uint16_t pid)
 	}
 #endif
 
+	printf("\nPress Enter to exit this program\n");
+	while(getchar() != 0x0A);
+
+
 	printf("Closing device...\n");
 	libusb_close(handle);
 
