@@ -449,7 +449,7 @@ static unsigned long get_grandparent_session_id(DWORD devinst, bool* non_usb_gp)
 		*non_usb_gp = true;
 		return 0;
 	}
-	// TODO: try without sanitizing
+	// TODO (post hotplug): try without sanitizing
 	sanitized_path = sanitize_path(path);
 	if (sanitized_path == NULL) {
 		return 0;
@@ -745,17 +745,14 @@ init_exit: // Holds semaphore here.
 /*
  * HCD (root) hubs need to have their device descriptor manually populated
  *
- * Note that we follow the Linux convention and use the "Linux Foundation root hub"
- * vendor ID as well as the product ID to indicate the hub speed
+ * Note that, like Microsoft does in the device manager, we populate the
+ * Vendor and Device ID for HCD hubs with the ones from the PCI HCD device.
  */
 static int force_hcd_device_descriptor(struct libusb_device *dev)
 {
-	DWORD size;
-	HANDLE handle;
-	USB_HUB_CAPABILITIES hub_caps;
-	USB_HUB_CAPABILITIES_EX hub_caps_ex;
-	struct windows_device_priv *priv = __device_priv(dev);
+	struct windows_device_priv *parent_priv, *priv = __device_priv(dev);
 	struct libusb_context *ctx = DEVICE_CTX(dev);
+	int vid, pid;
 
 	dev->num_configurations = 1;
 	priv->dev_descriptor.bLength = sizeof(USB_DEVICE_DESCRIPTOR);
@@ -763,39 +760,19 @@ static int force_hcd_device_descriptor(struct libusb_device *dev)
 	priv->dev_descriptor.bNumConfigurations = 1;
 	priv->active_config = 1;
 
-	handle = CreateFileA(priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
-		FILE_FLAG_OVERLAPPED, NULL);
-	if (handle == INVALID_HANDLE_VALUE) {
-		usbi_warn(ctx, "could not open hub %s: %s", priv->path, windows_error_str(0));
-		return LIBUSB_ERROR_IO;
+	if (priv->parent_dev == NULL) {
+		usbi_err(ctx, "program assertion failed - HCD hub has no parent");
+		return LIBUSB_ERROR_NO_DEVICE;
 	}
-
-	// The following is used to set the VID:PID of root HUBs similarly to what
-	// Linux does: 1d6b:0001 is for 1x root hubs, 1d6b:0002 for 2x
-	// TODO: pick up PCI VID/PID from parent
-	priv->dev_descriptor.idVendor = 0x1d6b;		// Linux Foundation root hub
-	if (windows_version >= WINDOWS_VISTA_AND_LATER) {
-		size = sizeof(USB_HUB_CAPABILITIES_EX);
-		if (DeviceIoControl(handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps_ex,
-			size, &hub_caps_ex, size, &size, NULL)) {
-			// Sanity check. HCD hub should always be root
-			if (!hub_caps_ex.CapabilityFlags.HubIsRoot) {
-				usbi_warn(ctx, "program assertion failed - HCD hub is not reported as root hub.");
-			}
-			priv->dev_descriptor.idProduct = hub_caps_ex.CapabilityFlags.HubIsHighSpeedCapable?2:1;
-		}
+	parent_priv = __device_priv(priv->parent_dev);
+	if (sscanf(parent_priv->path, "\\\\.\\PCI#VEN_%04x&DEV_%04x%*s", &vid, &pid) == 2) {
+		priv->dev_descriptor.idVendor = (uint16_t)vid;
+		priv->dev_descriptor.idProduct = (uint16_t)pid;
 	} else {
-		size = sizeof(USB_HUB_CAPABILITIES);
-		if (!DeviceIoControl(handle, IOCTL_USB_GET_HUB_CAPABILITIES, &hub_caps,
-			size, &hub_caps, size, &size, NULL)) {
-			usbi_warn(ctx, "could not read hub capabilities (std) for hub %s: %s",
-				priv->path, windows_error_str(0));
-			priv->dev_descriptor.idProduct = 1;	// Indicate 1x speed
-		} else {
-			priv->dev_descriptor.idProduct = hub_caps.HubIs2xCapable?2:1;
-		}
+		usbi_warn(ctx, "could not infer VID/PID of HCD hub from '%s'", parent_priv->path);
+		priv->dev_descriptor.idVendor = 0x1d6b;		// Linux Foundation root hub
+		priv->dev_descriptor.idProduct = 1;
 	}
-
 	return LIBUSB_SUCCESS;
 }
 
@@ -1099,7 +1076,6 @@ static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* d
 /*
  * get_device_list: libusb backend device enumeration function
  */
-// TODO: alert users on HID KBD/Mouse (kbhid, mouhid)
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs)
 {
 	struct discovered_devs *discdevs = *_discdevs;
@@ -1130,15 +1106,10 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	LONG s;
 	uint8_t api;
 	bool non_usb_hid_parent;
-	// Keep a chained list of newly allocated devs to unref
-	// TODO: use a perf friendly realloc instead of a chained list
-	struct unref_dev {
-		libusb_device* dev;
-		struct unref_dev* next;
-	};
-	struct unref_dev* unref_root = NULL;
-	struct unref_dev* unref_tmp;
-	struct unref_dev** unref_cur = &unref_root;
+	// Keep a list of newly allocated devs to unref
+	libusb_device** unref_list;
+	unsigned int unref_size = 64;
+	unsigned int unref_cur = 0;
 
 	// PASS 1 : (re)enumerate HCDs (allows for HCD hotplug)
 	// PASS 2 : (re)enumerate HUBS
@@ -1157,29 +1128,12 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	guid[HID_PASS] = &hid_guid;
 	nb_guids = HID_PASS+1;
 
+	unref_list = malloc(unref_size*sizeof(libusb_device*));
+	if (unref_list == NULL) {
+		return LIBUSB_ERROR_NO_MEM;
+	}
+
 	for (pass = 0; ((pass < nb_guids) && (r == LIBUSB_SUCCESS)); pass++) {
-/*
-		switch(pass) {
-		case HCD_PASS:
-			usbi_dbg("PROCESSING HCDs %s", guid_to_string(guid[pass]));
-			break;
-		case HUB_PASS:
-			usbi_dbg("PROCESSING HUBs %s", guid_to_string(guid[pass]));
-			break;
-		case DEV_PASS:
-			usbi_dbg("PROCESSING DEVs %s", guid_to_string(guid[pass]));
-			break;
-		case GEN_PASS:
-			usbi_dbg("PROCESSING GENs");
-			break;
-		case HID_PASS:
-			usbi_dbg("PROCESSING HIDs %s", guid_to_string(guid[pass]));
-			break;
-		default:
-			usbi_dbg("PROCESSING EXTs %s", guid_to_string(guid[pass]));
-			break;
-		}
-*/
 		for (i = 0; ; i++) {
 			// safe loop: free up any (unprotected) dynamic resource
 			// NB: this is always executed before breaking the loop
@@ -1223,12 +1177,10 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					dev_interface_details->DevicePath);
 				continue;
 			}
-			// TODO: speed things further by not sanitizing it?
 			dev_id_path = sanitize_path(path);
 			if (dev_id_path == NULL) {
 				usbi_warn(ctx, "could not sanitize device id path for '%s'", dev_interface_details->DevicePath);
 			}
-//			usbi_dbg("PRO: %s", dev_id_path);
 
 			// The SPDRP_ADDRESS for USB devices is the device port number on the hub
 			port_nr = 0;
@@ -1253,7 +1205,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				size = sizeof(strbuf);
 				if (!SetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_DRIVER,
 					&reg_type, (BYTE*)strbuf, size, &size)) {
-						usbi_dbg("DRIVERLESS: '%s'", dev_id_path);
+						usbi_info(ctx, "The following device has no driver: '%s'", dev_id_path);
+						usbi_info(ctx, "libusb will not be able to access it.");
 				}
 				// ...and to add the additional device interface GUIDs
 				key = SetupDiOpenDevRegKey(dev_info, &dev_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
@@ -1349,7 +1302,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						continue;
 					}
 					usbi_dbg("found existing device for session [%lX]", session_id);
-					// TODO: reuse priv data that can be reused - for now, just recreate
+					// TODO (post hotplug): reuse priv data that can be reused - for now, just recreate
 					if (pass == GEN_PASS) {
 						windows_device_priv_release(dev);
 					}
@@ -1366,13 +1319,16 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					usbi_dbg("allocating new device for session [%lX]", session_id);
 
 					// Keep track of devices that need unref
-					if ((*unref_cur = malloc(sizeof(struct unref_dev))) == NULL) {
-						usbi_err(ctx, "could not allocate struct for unref. aborting.");
-						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+					unref_list[unref_cur++] = dev;
+					if (unref_cur > unref_size) {
+						unref_size += 64;
+						unref_list = realloc(unref_list, unref_size*sizeof(libusb_device*));
+						if (unref_list == NULL) {
+							usbi_err(ctx, "could not realloc list for unref - aborting.");
+							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+						}
 					}
-					(*unref_cur)->dev = dev;
-					(*unref_cur)->next = NULL;
-					unref_cur = &((*unref_cur)->next);
+
 					// Append newly created devices to the list of discovered devices
 					if (pass != HCD_PASS) {
 						discdevs = discovered_devs_append(*_discdevs, dev);
@@ -1382,7 +1338,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						*_discdevs = discdevs;
 					}
 				}
-
 				priv = __device_priv(dev);
 			}
 
@@ -1455,12 +1410,10 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	}
 
 	// Unref newly allocated devs
-	while (unref_root != NULL) {
-		unref_tmp = unref_root;
-		unref_root = unref_root->next;
-		safe_unref_device(unref_tmp->dev);
-		safe_free(unref_tmp);
+	for (i=0; i<unref_cur; i++) {
+		safe_unref_device(unref_list[i]);
 	}
+	safe_free(unref_list);
 
 	return r;
 }
@@ -2754,7 +2707,7 @@ static int winusb_abort_transfers(struct usbi_transfer *itransfer)
  * IOCTL_USB_HUB_CYCLE_PORT ioctl was removed from Vista => the best we can do is
  * cycle the pipes (and even then, the control pipe can not be reset using WinUSB)
  */
-// TODO (2nd official release): see if we can force eject the device and redetect it (reuse hotplug?)
+// TODO (post hotplug): see if we can force eject the device and redetect it (reuse hotplug?)
 static int winusb_reset_device(struct libusb_device_handle *dev_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
