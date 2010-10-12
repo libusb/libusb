@@ -462,7 +462,6 @@ void htab_destroy(void)
 }
 
 /* This is the search function. It uses double hashing with open addressing.
-
    We use an trick to speed up the lookup. The table is created with one
    more element available. This enables us to use the index zero special.
    This index will never be used because we store the first hash index in
@@ -470,10 +469,6 @@ void htab_destroy(void)
    The used field can be used as a first fast comparison for equality of
    the stored and the parameter value. This helps to prevent unnecessary
    expensive calls of strcmp.  */
-
-/* NB: the only way we would ever need a mutex here is if 2 colliding
-   hashes were to be stored concurrently from 2 different threads. */
-
 unsigned long htab_hash(char* str)
 {
 	unsigned long hval, hval2;
@@ -546,6 +541,11 @@ unsigned long htab_hash(char* str)
 	safe_free(htab_table[idx].str);
 	htab_table[idx].used = hval;
 	htab_table[idx].str = malloc(safe_strlen(str)+1);
+	if (htab_table[idx].str == NULL) {
+		usbi_err(NULL, "could not duplicate string for hash table");
+		usbi_mutex_unlock(&htab_write_mutex);
+		return 0;
+	}
 	memcpy(htab_table[idx].str, str, safe_strlen(str)+1);
 	++htab_filled;
 	usbi_mutex_unlock(&htab_write_mutex);
