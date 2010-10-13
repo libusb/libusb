@@ -3237,11 +3237,6 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 			return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
-	// When report IDs are not in use, add an extra byte for the report ID
-	if (id==0) {
-		expected_size++;
-	}
-
 	// Add a trailing byte to detect overflows
 	buf = (uint8_t*)calloc(expected_size+1, 1);
 	if (buf == NULL) {
@@ -3251,7 +3246,9 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	usbi_dbg("report ID: 0x%02X", buf[0]);
 
 	tp->hid_expected_size = expected_size;
+	read_size = expected_size;
 
+	// NB: The size returned by DeviceIoControl doesn't include report IDs when not in use (0)
 	if (!DeviceIoControl(hid_handle, ioctl_code, buf, expected_size+1,
 		buf, expected_size+1, &read_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
@@ -3267,7 +3264,7 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 
 	// Transfer completed synchronously => copy and discard extra buffer
 	if (read_size == 0) {
-		usbi_dbg("program assertion failed - read completed synchronously, but no data was read");
+		usbi_warn(NULL, "program assertion failed - read completed synchronously, but no data was read");
 		*size = 0;
 	} else {
 		if (buf[0] != id) {
@@ -3280,12 +3277,11 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 			r = LIBUSB_COMPLETED;
 		}
 
+		*size = MIN((size_t)read_size, *size);
 		if (id == 0) {
 			// Discard report ID
-			*size = MIN((size_t)read_size-1, *size);
 			memcpy(data, buf+1, *size);
 		} else {
-			*size = MIN((size_t)read_size, *size);
 			memcpy(data, buf, *size);
 		}
 	}
@@ -3343,6 +3339,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 		}
 	}
 
+	// NB: The size returned by DeviceIoControl doesn't include report IDs when not in use (0)
 	if (!DeviceIoControl(hid_handle, ioctl_code, buf, write_size,
 		buf, write_size, &write_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
@@ -3356,11 +3353,9 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	}
 
 	// Transfer completed synchronously
+	*size = write_size;
 	if (write_size == 0) {
 		usbi_dbg("program assertion failed - write completed synchronously, but no data was written");
-		*size = 0;
-	} else {
-		*size = write_size - ((id == 0)?1:0);
 	}
 	safe_free(buf);
 	return LIBUSB_COMPLETED;
