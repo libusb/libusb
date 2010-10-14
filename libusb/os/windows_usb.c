@@ -431,7 +431,7 @@ int htab_create(struct libusb_context *ctx, unsigned long nel)
 		nel += 2;
 
 	htab_size = nel;
-	usbi_dbg("using %d elements hash table", nel);
+	usbi_dbg("using %d entries hash table", nel);
 	htab_filled = 0;
 
 	// allocate memory and zero out.
@@ -495,7 +495,7 @@ unsigned long htab_hash(char* str)
 		if ( (htab_table[idx].used == hval)
 		  && (safe_strcmp(str, htab_table[idx].str) == 0) ) {
 			// existing hash
-			return r;
+			return idx;
 		}
 		usbi_dbg("hash collision ('%s' vs '%s')", str, htab_table[idx].str);
 
@@ -518,7 +518,7 @@ unsigned long htab_hash(char* str)
 			// If entry is found use it.
 			if ( (htab_table[idx].used == hval)
 			  && (safe_strcmp(str, htab_table[idx].str) == 0) ) {
-				return r;
+				return idx;
 			}
 		}
 		while (htab_table[idx].used);
@@ -550,7 +550,7 @@ unsigned long htab_hash(char* str)
 	++htab_filled;
 	usbi_mutex_unlock(&htab_write_mutex);
 
-	return r;
+	return idx;
 }
 
 /*
@@ -858,8 +858,8 @@ static int windows_init(struct libusb_context *ctx)
 		}
 		SetThreadAffinityMask(timer_thread, 0);
 
-		// Create a hash table to store session ids (769 is prime)
-		htab_create(ctx, 769);
+		// Create a hash table to store session ids. Second parameter is better if prime
+		htab_create(ctx, HTAB_SIZE);
 
 		r = LIBUSB_SUCCESS;
 	}
