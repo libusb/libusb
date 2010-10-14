@@ -89,6 +89,7 @@ inline void upperize(char* str) {
 #define TIMER_REQUEST_RETRY_MS      100
 #define ERR_BUFFER_SIZE             256
 #define LIST_SEPARATOR              ';'
+#define HTAB_SIZE                   1021
 
 // Handle code for HID interface that have been claimed ("dibs")
 #define INTERFACE_CLAIMED           ((HANDLE)(intptr_t)0xD1B5)

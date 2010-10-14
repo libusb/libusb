@@ -1,6 +1,6 @@
 #!/bin/sh
-
-# This script bumps the version and updates the git tree accordingly, with tag
+# bump the version and update the git tree accordingly
+# !!!THIS SCRIPT IS FOR INTERNAL DEVELOPER USE ONLY!!!
 
 type -P sed &>/dev/null || { echo "sed command not found. Aborting." >&2; exit 1; }
 type -P git &>/dev/null || { echo "git command not found. Aborting." >&2; exit 1; }
@@ -19,8 +19,11 @@ if [ ! ${TAG:0:3} = 'pbh' ]; then
   exit 1
 fi
 TAGVER=${TAG:3}
+case $TAGVER in *[!0-9]*) 
+  echo "$TAGVER is not a number"
+  exit 1
+esac
 OFFSET=9000
-# increment - ideally, we'd check that tagver is really numeric here
 TAGVER=`expr $TAGVER + 1`
 TAGVER_OFF=`expr $TAGVER + $OFFSET`
 echo "Bumping version to pbh$TAGVER (nano: $TAGVER_OFF)"
@@ -29,5 +32,5 @@ mv configure.ac~ configure.ac
 # we're duplicating libusb_version.h generation here, but that avoids having to run configure
 sed -e "s/\(^#define LIBUSB_VERSION_NANO.*\)/#define LIBUSB_VERSION_NANO    $TAGVER_OFF/" libusb/libusb_version.h > libusb/libusb_version.h~
 mv libusb/libusb_version.h~ libusb/libusb_version.h
-git commit -a -m "bumped internal version"
+git commit -a -m "bumped internal version" -e
 git tag "pbh$TAGVER"

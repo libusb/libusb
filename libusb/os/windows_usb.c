@@ -4,6 +4,7 @@
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
  * HID Reports IOCTLs inspired from HIDAPI by Alan Ott, Signal 11 Software
+ * Hash table functions adapted from glibc, by Ulrich Drepper et al.
  * Major code testing contribution by Xiaofan Chen
  *
  * This library is free software; you can redistribute it and/or
@@ -390,6 +391,173 @@ err_exit:
 	return NULL;
 }
 
+/* Hash table functions - modified From glibc 2.3.2:
+   [Aho,Sethi,Ullman] Compilers: Principles, Techniques and Tools, 1986
+   [Knuth]            The Art of Computer Programming, part 3 (6.4)  */
+typedef struct htab_entry {
+	unsigned long used;
+	char* str;
+} htab_entry;
+htab_entry* htab_table = NULL;
+usbi_mutex_t htab_write_mutex = NULL;
+unsigned long htab_size, htab_filled;
+
+/* For the used double hash method the table size has to be a prime. To
+   correct the user given table size we need a prime test.  This trivial
+   algorithm is adequate because the code is called only during init and
+   the number is likely to be small  */
+static int isprime(unsigned long number)
+{
+	// no even number will be passed
+	unsigned int divider = 3;
+
+	while((divider * divider < number) && (number % divider != 0))
+		divider += 2;
+
+	return (number % divider != 0);
+}
+
+/* Before using the hash table we must allocate memory for it.
+   We allocate one element more as the found prime number says.
+   This is done for more effective indexing as explained in the
+   comment for the hash function.  */
+int htab_create(struct libusb_context *ctx, unsigned long nel)
+{
+	if (htab_table != NULL) {
+		usbi_err(ctx, "hash table already allocated");
+	}
+
+	// Create a mutex
+	usbi_mutex_init(&htab_write_mutex, NULL);
+
+	// Change nel to the first prime number not smaller as nel.
+	nel |= 1;
+	while(!isprime(nel))
+		nel += 2;
+
+	htab_size = nel;
+	usbi_dbg("using %d entries hash table", nel);
+	htab_filled = 0;
+
+	// allocate memory and zero out.
+	htab_table = (htab_entry*)calloc(htab_size + 1, sizeof(htab_entry));
+	if (htab_table == NULL) {
+		usbi_err(ctx, "could not allocate space for hash table");
+		return 0;
+	}
+
+	return 1;
+}
+
+/* After using the hash table it has to be destroyed.  */
+void htab_destroy(void)
+{
+	size_t i;
+	if (htab_table == NULL) {
+		return;
+	}
+
+	for (i=0; i<htab_size; i++) {
+		if (htab_table[i].used) {
+			safe_free(htab_table[i].str);
+		}
+	}
+	usbi_mutex_destroy(&htab_write_mutex);
+	safe_free(htab_table);
+}
+
+/* This is the search function. It uses double hashing with open addressing.
+   We use an trick to speed up the lookup. The table is created with one
+   more element available. This enables us to use the index zero special.
+   This index will never be used because we store the first hash index in
+   the field used where zero means not used. Every other value means used.
+   The used field can be used as a first fast comparison for equality of
+   the stored and the parameter value. This helps to prevent unnecessary
+   expensive calls of strcmp.  */
+unsigned long htab_hash(char* str)
+{
+	unsigned long hval, hval2;
+	unsigned long idx;
+	unsigned long r = 5381;
+	int c;
+	char* sz = str;
+
+	// Compute main hash value (algorithm suggested by Nokia)
+	while ((c = *sz++))
+		r = ((r << 5) + r) + c;
+	if (r == 0)
+		++r;
+
+	// compute table hash: simply take the modulus
+	hval = r % htab_size;
+	if (hval == 0)
+		++hval;
+
+	// Try the first index
+	idx = hval;
+
+	if (htab_table[idx].used) {
+		if ( (htab_table[idx].used == hval)
+		  && (safe_strcmp(str, htab_table[idx].str) == 0) ) {
+			// existing hash
+			return idx;
+		}
+		usbi_dbg("hash collision ('%s' vs '%s')", str, htab_table[idx].str);
+
+		// Second hash function, as suggested in [Knuth]
+		hval2 = 1 + hval % (htab_size - 2);
+
+		do {
+			// Because size is prime this guarantees to step through all available indexes
+			if (idx <= hval2) {
+				idx = htab_size + idx - hval2;
+			} else {
+				idx -= hval2;
+			}
+
+			// If we visited all entries leave the loop unsuccessfully
+			if (idx == hval) {
+				break;
+			}
+
+			// If entry is found use it.
+			if ( (htab_table[idx].used == hval)
+			  && (safe_strcmp(str, htab_table[idx].str) == 0) ) {
+				return idx;
+			}
+		}
+		while (htab_table[idx].used);
+	}
+
+	// Not found => New entry
+
+	// If the table is full return an error
+	if (htab_filled >= htab_size) {
+		usbi_err(NULL, "hash table is full (%d entries)", htab_size);
+		return 0;
+	}
+
+	// Concurrent threads might be storing the same entry at the same time
+	// (eg. "simultaneous" enums from different threads) => use a mutex
+	usbi_mutex_lock(&htab_write_mutex);
+	// Just free any previously allocated string (which should be the same as
+	// new one). The possibility of concurrent threads storing a collision
+	// string (same hash, different string) at the same time is extremely low
+	safe_free(htab_table[idx].str);
+	htab_table[idx].used = hval;
+	htab_table[idx].str = malloc(safe_strlen(str)+1);
+	if (htab_table[idx].str == NULL) {
+		usbi_err(NULL, "could not duplicate string for hash table");
+		usbi_mutex_unlock(&htab_write_mutex);
+		return 0;
+	}
+	memcpy(htab_table[idx].str, str, safe_strlen(str)+1);
+	++htab_filled;
+	usbi_mutex_unlock(&htab_write_mutex);
+
+	return idx;
+}
+
 /*
  * Returns the Device ID path of a device's parent
  */
@@ -410,7 +578,7 @@ static unsigned long get_parent_session_id(DWORD devinst)
 	if (sanitized_path == NULL) {
 		return 0;
 	}
-	session_id = usbi_hash(sanitized_path);
+	session_id = htab_hash(sanitized_path);
 	safe_free(sanitized_path);
 	return session_id;
 }
@@ -441,12 +609,12 @@ static unsigned long get_grandparent_session_id(DWORD devinst, bool* non_usb_gp)
 		*non_usb_gp = true;
 		return 0;
 	}
-	// TODO: try without sanitizing
+	// TODO (post hotplug): try without sanitizing
 	sanitized_path = sanitize_path(path);
 	if (sanitized_path == NULL) {
 		return 0;
 	}
-	session_id = usbi_hash(sanitized_path);
+	session_id = htab_hash(sanitized_path);
 	safe_free(sanitized_path);
 	return session_id;
 }
@@ -835,6 +1003,9 @@ static int windows_init(struct libusb_context *ctx)
 			goto init_exit;
 		}
 
+		// Create a hash table to store session ids Second parameter is better if prime
+		htab_create(ctx, HTAB_SIZE);
+
 		r = LIBUSB_SUCCESS;
 	}
 
@@ -864,6 +1035,7 @@ init_exit: // Holds semaphore here.
 			CloseHandle(timer_mutex);
 			timer_mutex = NULL;
 		}
+		htab_destroy();
 	}
 
 	if (r != LIBUSB_SUCCESS)
@@ -877,17 +1049,14 @@ init_exit: // Holds semaphore here.
 /*
  * HCD (root) hubs need to have their device descriptor manually populated
  *
- * Note that we follow the Linux convention and use the "Linux Foundation root hub"
- * vendor ID as well as the product ID to indicate the hub speed
+ * Note that, like Microsoft does in the device manager, we populate the
+ * Vendor and Device ID for HCD hubs with the ones from the PCI HCD device.
  */
 static int force_hcd_device_descriptor(struct libusb_device *dev)
 {
-	DWORD size;
-	HANDLE handle;
-	USB_HUB_CAPABILITIES hub_caps;
-	USB_HUB_CAPABILITIES_EX hub_caps_ex;
-	struct windows_device_priv *priv = __device_priv(dev);
+	struct windows_device_priv *parent_priv, *priv = __device_priv(dev);
 	struct libusb_context *ctx = DEVICE_CTX(dev);
+	int vid, pid;
 
 	dev->num_configurations = 1;
 	priv->dev_descriptor.bLength = sizeof(USB_DEVICE_DESCRIPTOR);
@@ -895,39 +1064,19 @@ static int force_hcd_device_descriptor(struct libusb_device *dev)
 	priv->dev_descriptor.bNumConfigurations = 1;
 	priv->active_config = 1;
 
-	handle = CreateFileA(priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
-		FILE_FLAG_OVERLAPPED, NULL);
-	if (handle == INVALID_HANDLE_VALUE) {
-		usbi_warn(ctx, "could not open hub %s: %s", priv->path, windows_error_str(0));
-		return LIBUSB_ERROR_IO;
+	if (priv->parent_dev == NULL) {
+		usbi_err(ctx, "program assertion failed - HCD hub has no parent");
+		return LIBUSB_ERROR_NO_DEVICE;
 	}
-
-	// The following is used to set the VID:PID of root HUBs similarly to what
-	// Linux does: 1d6b:0001 is for 1x root hubs, 1d6b:0002 for 2x
-	// TODO: pick up PCI VID/PID from parent
-	priv->dev_descriptor.idVendor = 0x1d6b;		// Linux Foundation root hub
-	if (windows_version >= WINDOWS_VISTA_AND_LATER) {
-		size = sizeof(USB_HUB_CAPABILITIES_EX);
-		if (DeviceIoControl(handle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hub_caps_ex,
-			size, &hub_caps_ex, size, &size, NULL)) {
-			// Sanity check. HCD hub should always be root
-			if (!hub_caps_ex.CapabilityFlags.HubIsRoot) {
-				usbi_warn(ctx, "program assertion failed - HCD hub is not reported as root hub.");
-			}
-			priv->dev_descriptor.idProduct = hub_caps_ex.CapabilityFlags.HubIsHighSpeedCapable?2:1;
-		}
+	parent_priv = __device_priv(priv->parent_dev);
+	if (sscanf(parent_priv->path, "\\\\.\\PCI#VEN_%04x&DEV_%04x%*s", &vid, &pid) == 2) {
+		priv->dev_descriptor.idVendor = (uint16_t)vid;
+		priv->dev_descriptor.idProduct = (uint16_t)pid;
 	} else {
-		size = sizeof(USB_HUB_CAPABILITIES);
-		if (!DeviceIoControl(handle, IOCTL_USB_GET_HUB_CAPABILITIES, &hub_caps,
-			size, &hub_caps, size, &size, NULL)) {
-			usbi_warn(ctx, "could not read hub capabilities (std) for hub %s: %s",
-				priv->path, windows_error_str(0));
-			priv->dev_descriptor.idProduct = 1;	// Indicate 1x speed
-		} else {
-			priv->dev_descriptor.idProduct = hub_caps.HubIs2xCapable?2:1;
-		}
+		usbi_warn(ctx, "could not infer VID/PID of HCD hub from '%s'", parent_priv->path);
+		priv->dev_descriptor.idVendor = 0x1d6b;		// Linux Foundation root hub
+		priv->dev_descriptor.idProduct = 1;
 	}
-
 	return LIBUSB_SUCCESS;
 }
 
@@ -1231,7 +1380,6 @@ static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* d
 /*
  * get_device_list: libusb backend device enumeration function
  */
-// TODO: alert users on HID KBD/Mouse (kbhid, mouhid)
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs)
 {
 	struct discovered_devs *discdevs = *_discdevs;
@@ -1262,15 +1410,10 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	LONG s;
 	uint8_t api;
 	bool non_usb_hid_parent;
-	// Keep a chained list of newly allocated devs to unref
-	// TODO: use a perf friendly realloc instead of a chained list
-	struct unref_dev {
-		libusb_device* dev;
-		struct unref_dev* next;
-	};
-	struct unref_dev* unref_root = NULL;
-	struct unref_dev* unref_tmp;
-	struct unref_dev** unref_cur = &unref_root;
+	// Keep a list of newly allocated devs to unref
+	libusb_device** unref_list;
+	unsigned int unref_size = 64;
+	unsigned int unref_cur = 0;
 
 	// PASS 1 : (re)enumerate HCDs (allows for HCD hotplug)
 	// PASS 2 : (re)enumerate HUBS
@@ -1289,29 +1432,12 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	guid[HID_PASS] = &hid_guid;
 	nb_guids = HID_PASS+1;
 
+	unref_list = malloc(unref_size*sizeof(libusb_device*));
+	if (unref_list == NULL) {
+		return LIBUSB_ERROR_NO_MEM;
+	}
+
 	for (pass = 0; ((pass < nb_guids) && (r == LIBUSB_SUCCESS)); pass++) {
-/*
-		switch(pass) {
-		case HCD_PASS:
-			usbi_dbg("PROCESSING HCDs %s", guid_to_string(guid[pass]));
-			break;
-		case HUB_PASS:
-			usbi_dbg("PROCESSING HUBs %s", guid_to_string(guid[pass]));
-			break;
-		case DEV_PASS:
-			usbi_dbg("PROCESSING DEVs %s", guid_to_string(guid[pass]));
-			break;
-		case GEN_PASS:
-			usbi_dbg("PROCESSING GENs");
-			break;
-		case HID_PASS:
-			usbi_dbg("PROCESSING HIDs %s", guid_to_string(guid[pass]));
-			break;
-		default:
-			usbi_dbg("PROCESSING EXTs %s", guid_to_string(guid[pass]));
-			break;
-		}
-*/
 		for (i = 0; ; i++) {
 			// safe loop: free up any (unprotected) dynamic resource
 			// NB: this is always executed before breaking the loop
@@ -1355,12 +1481,10 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					dev_interface_details->DevicePath);
 				continue;
 			}
-			// TODO: speed things further by not sanitizing it?
 			dev_id_path = sanitize_path(path);
 			if (dev_id_path == NULL) {
 				usbi_warn(ctx, "could not sanitize device id path for '%s'", dev_interface_details->DevicePath);
 			}
-//			usbi_dbg("PRO: %s", dev_id_path);
 
 			// The SPDRP_ADDRESS for USB devices is the device port number on the hub
 			port_nr = 0;
@@ -1385,7 +1509,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				size = sizeof(strbuf);
 				if (!SetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_DRIVER,
 					&reg_type, (BYTE*)strbuf, size, &size)) {
-						usbi_dbg("DRIVERLESS: '%s'", dev_id_path);
+						usbi_info(ctx, "The following device has no driver: '%s'", dev_id_path);
+						usbi_info(ctx, "libusb will not be able to access it.");
 				}
 				// ...and to add the additional device interface GUIDs
 				key = SetupDiOpenDevRegKey(dev_info, &dev_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
@@ -1481,7 +1606,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						continue;
 					}
 					usbi_dbg("found existing device for session [%lX]", session_id);
-					// TODO: reuse priv data that can be reused - for now, just recreate
+					// TODO (post hotplug): reuse priv data that can be reused - for now, just recreate
 					if (pass == GEN_PASS) {
 						windows_device_priv_release(dev);
 					}
@@ -1498,13 +1623,16 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					usbi_dbg("allocating new device for session [%lX]", session_id);
 
 					// Keep track of devices that need unref
-					if ((*unref_cur = malloc(sizeof(struct unref_dev))) == NULL) {
-						usbi_err(ctx, "could not allocate struct for unref. aborting.");
-						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+					unref_list[unref_cur++] = dev;
+					if (unref_cur > unref_size) {
+						unref_size += 64;
+						unref_list = realloc(unref_list, unref_size*sizeof(libusb_device*));
+						if (unref_list == NULL) {
+							usbi_err(ctx, "could not realloc list for unref - aborting.");
+							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+						}
 					}
-					(*unref_cur)->dev = dev;
-					(*unref_cur)->next = NULL;
-					unref_cur = &((*unref_cur)->next);
+
 					// Append newly created devices to the list of discovered devices
 					if (pass != HCD_PASS) {
 						discdevs = discovered_devs_append(*_discdevs, dev);
@@ -1514,7 +1642,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						*_discdevs = discdevs;
 					}
 				}
-
 				priv = __device_priv(dev);
 			}
 
@@ -1587,12 +1714,10 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	}
 
 	// Unref newly allocated devs
-	while (unref_root != NULL) {
-		unref_tmp = unref_root;
-		unref_root = unref_root->next;
-		safe_unref_device(unref_tmp->dev);
-		safe_free(unref_tmp);
+	for (i=0; i<unref_cur; i++) {
+		safe_unref_device(unref_list[i]);
 	}
+	safe_free(unref_list);
 
 	return r;
 }
@@ -1658,6 +1783,8 @@ static void windows_exit(struct libusb_context *ctx)
 				TerminateThread(hotplug_thread, 1);
 			}
 		}
+
+		htab_destroy();
 	}
 
 	ReleaseSemaphore(semaphore, 1, NULL);	// increase count back to 1
@@ -2896,7 +3023,7 @@ static int winusb_abort_transfers(struct usbi_transfer *itransfer)
  * IOCTL_USB_HUB_CYCLE_PORT ioctl was removed from Vista => the best we can do is
  * cycle the pipes (and even then, the control pipe can not be reset using WinUSB)
  */
-// TODO (2nd official release): see if we can force eject the device and redetect it (reuse hotplug?)
+// TODO (post hotplug): see if we can force eject the device and redetect it (reuse hotplug?)
 static int winusb_reset_device(struct libusb_device_handle *dev_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
@@ -3266,11 +3393,6 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 			return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
-	// When report IDs are not in use, add an extra byte for the report ID
-	if (id==0) {
-		expected_size++;
-	}
-
 	// Add a trailing byte to detect overflows
 	buf = (uint8_t*)calloc(expected_size+1, 1);
 	if (buf == NULL) {
@@ -3280,7 +3402,9 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	usbi_dbg("report ID: 0x%02X", buf[0]);
 
 	tp->hid_expected_size = expected_size;
+	read_size = expected_size;
 
+	// NB: The size returned by DeviceIoControl doesn't include report IDs when not in use (0)
 	if (!DeviceIoControl(hid_handle, ioctl_code, buf, expected_size+1,
 		buf, expected_size+1, &read_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
@@ -3296,7 +3420,7 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 
 	// Transfer completed synchronously => copy and discard extra buffer
 	if (read_size == 0) {
-		usbi_dbg("program assertion failed - read completed synchronously, but no data was read");
+		usbi_warn(NULL, "program assertion failed - read completed synchronously, but no data was read");
 		*size = 0;
 	} else {
 		if (buf[0] != id) {
@@ -3309,12 +3433,11 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 			r = LIBUSB_COMPLETED;
 		}
 
+		*size = MIN((size_t)read_size, *size);
 		if (id == 0) {
 			// Discard report ID
-			*size = MIN((size_t)read_size-1, *size);
 			memcpy(data, buf+1, *size);
 		} else {
-			*size = MIN((size_t)read_size, *size);
 			memcpy(data, buf, *size);
 		}
 	}
@@ -3372,6 +3495,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 		}
 	}
 
+	// NB: The size returned by DeviceIoControl doesn't include report IDs when not in use (0)
 	if (!DeviceIoControl(hid_handle, ioctl_code, buf, write_size,
 		buf, write_size, &write_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
@@ -3385,11 +3509,9 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	}
 
 	// Transfer completed synchronously
+	*size = write_size;
 	if (write_size == 0) {
 		usbi_dbg("program assertion failed - write completed synchronously, but no data was written");
-		*size = 0;
-	} else {
-		*size = write_size - ((id == 0)?1:0);
 	}
 	safe_free(buf);
 	return LIBUSB_COMPLETED;
