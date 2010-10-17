@@ -1454,7 +1454,9 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 			if (COMPLETED_EARLY == tpriv->reap_action)
 				return 0;
 
-			for (j = 0; j < i; j++) {
+			/* The URBs are discarded in reverse order of
+			 * submission, to avoid races. */
+			for (j = i - 1; j >= 0; j--) {
 				int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &urbs[j]);
 				if (tmp && errno != EINVAL)
 					usbi_warn(TRANSFER_CTX(transfer),
@@ -1611,7 +1613,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 			/* The URBs we haven't submitted yet we count as already
 			 * retired. */
 			tpriv->num_retired = num_urbs - i;
-			for (j = 0; j < i; j++) {
+			for (j = i - 1; j >= 0; j--) {
 				int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, urbs[j]);
 				if (tmp && errno != EINVAL)
 					usbi_warn(TRANSFER_CTX(transfer),
@@ -1734,7 +1736,7 @@ static int cancel_bulk_transfer(struct usbi_transfer *itransfer)
 	if (tpriv->reap_action != ERROR)
 		tpriv->reap_action = CANCELLED;
 
-	for (i = 0; i < tpriv->num_urbs; i++) {
+	for (i = tpriv->num_urbs - 1; i >= 0; i--) {
 		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
 		if (tmp && errno != EINVAL)
 			usbi_warn(TRANSFER_CTX(transfer),
@@ -1756,7 +1758,7 @@ static int cancel_iso_transfer(struct usbi_transfer *itransfer)
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	tpriv->reap_action = CANCELLED;
-	for (i = 0; i < tpriv->num_urbs; i++) {
+	for (i = tpriv->num_urbs - 1; i >= 0; i--) {
 		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, tpriv->iso_urbs[i]);
 		if (tmp && errno != EINVAL)
 			usbi_warn(TRANSFER_CTX(transfer),
@@ -1926,12 +1928,12 @@ cancel_remaining:
 
 	/* cancel remaining urbs and wait for their completion before
 	 * reporting results */
-	while (++urb_idx < tpriv->num_urbs) {
+	for (int i = tpriv->num_urbs - 1; i > urb_idx; i--) {
 		/* remaining URBs with continuation flag are
 		 * automatically cancelled by the kernel */
-		if (tpriv->urbs[urb_idx].flags & USBFS_URB_BULK_CONTINUATION)
+		if (tpriv->urbs[i].flags & USBFS_URB_BULK_CONTINUATION)
 			continue;
-		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[urb_idx]);
+		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
 		if (tmp && errno != EINVAL)
 			usbi_warn(TRANSFER_CTX(transfer),
 				"unrecognised discard errno %d", errno);
