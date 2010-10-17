@@ -1331,6 +1331,39 @@ static void op_destroy_device(struct libusb_device *dev)
 		free(priv->sysfs_dir);
 }
 
+/* URBs are discarded in reverse order of submission to avoid races. */
+static int discard_urbs(struct usbi_transfer *itransfer, int first, int last_plus_one)
+{
+	struct libusb_transfer *transfer =
+		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct linux_transfer_priv *tpriv =
+		usbi_transfer_get_os_priv(itransfer);
+	struct linux_device_handle_priv *dpriv =
+		__device_handle_priv(transfer->dev_handle);
+	int i, ret = 0;
+	struct usbfs_urb *urb;
+
+	for (i = last_plus_one - 1; i >= first; i--) {
+		if (LIBUSB_TRANSFER_TYPE_ISOCHRONOUS == transfer->type)
+			urb = tpriv->iso_urbs[i];
+		else
+			urb = &tpriv->urbs[i];
+
+		if (0 == ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, urb))
+			continue;
+
+		if (EINVAL == errno) {
+			usbi_dbg("URB not found --> assuming ready to be reaped");
+			ret = LIBUSB_ERROR_NOT_FOUND;
+		} else {
+			usbi_warn(TRANSFER_CTX(transfer),
+				"unrecognised discard errno %d", errno);
+			ret = LIBUSB_ERROR_OTHER;
+		}
+	}
+	return ret;
+}
+
 static void free_iso_urbs(struct linux_transfer_priv *tpriv)
 {
 	int i;
@@ -1409,8 +1442,6 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 
 		r = ioctl(dpriv->fd, IOCTL_USBFS_SUBMITURB, urb);
 		if (r < 0) {
-			int j;
-
 			if (errno == ENODEV) {
 				r = LIBUSB_ERROR_NO_DEVICE;
 			} else {
@@ -1454,14 +1485,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 			if (COMPLETED_EARLY == tpriv->reap_action)
 				return 0;
 
-			/* The URBs are discarded in reverse order of
-			 * submission, to avoid races. */
-			for (j = i - 1; j >= 0; j--) {
-				int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &urbs[j]);
-				if (tmp && errno != EINVAL)
-					usbi_warn(TRANSFER_CTX(transfer),
-						"unrecognised discard errno %d", errno);
-			}
+			discard_urbs(itransfer, 0, i);
 
 			usbi_dbg("reporting successful submission but waiting for %d "
 				"discards before reporting error", i);
@@ -1577,8 +1601,6 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	for (i = 0; i < num_urbs; i++) {
 		int r = ioctl(dpriv->fd, IOCTL_USBFS_SUBMITURB, urbs[i]);
 		if (r < 0) {
-			int j;
-
 			if (errno == ENODEV) {
 				r = LIBUSB_ERROR_NO_DEVICE;
 			} else {
@@ -1613,12 +1635,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 			/* The URBs we haven't submitted yet we count as already
 			 * retired. */
 			tpriv->num_retired = num_urbs - i;
-			for (j = i - 1; j >= 0; j--) {
-				int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, urbs[j]);
-				if (tmp && errno != EINVAL)
-					usbi_warn(TRANSFER_CTX(transfer),
-						"unrecognised discard errno %d", errno);
-			}
+			discard_urbs(itransfer, 0, i);
 
 			usbi_dbg("reporting successful submission but waiting for %d "
 				"discards before reporting error", i);
@@ -1697,39 +1714,17 @@ static int op_submit_transfer(struct usbi_transfer *itransfer)
 static int cancel_control_transfer(struct usbi_transfer *itransfer)
 {
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
-	struct libusb_transfer *transfer =
-		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct linux_device_handle_priv *dpriv =
-		__device_handle_priv(transfer->dev_handle);
-	int r;
 
 	if (!tpriv->urbs)
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	tpriv->reap_action = CANCELLED;
-	r = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, tpriv->urbs);
-	if(r) {
-		if (errno == EINVAL) {
-			usbi_dbg("URB not found --> assuming ready to be reaped");
-			return 0;
-		} else {
-			usbi_err(TRANSFER_CTX(transfer),
-				"unrecognised DISCARD code %d", errno);
-			return LIBUSB_ERROR_OTHER;
-		}
-	}
-
-	return 0;
+	return discard_urbs(itransfer, 0, tpriv->num_urbs);
 }
 
 static int cancel_bulk_transfer(struct usbi_transfer *itransfer)
 {
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
-	struct libusb_transfer *transfer =
-		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct linux_device_handle_priv *dpriv =
-		__device_handle_priv(transfer->dev_handle);
-	int i;
 
 	if (!tpriv->urbs)
 		return LIBUSB_ERROR_NOT_FOUND;
@@ -1737,35 +1732,18 @@ static int cancel_bulk_transfer(struct usbi_transfer *itransfer)
 	if (tpriv->reap_action != ERROR)
 		tpriv->reap_action = CANCELLED;
 
-	for (i = tpriv->num_urbs - 1; i >= 0; i--) {
-		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
-		if (tmp && errno != EINVAL)
-			usbi_warn(TRANSFER_CTX(transfer),
-				"unrecognised discard errno %d", errno);
-	}
-	return 0;
+	return discard_urbs(itransfer, 0, tpriv->num_urbs);
 }
 
 static int cancel_iso_transfer(struct usbi_transfer *itransfer)
 {
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
-	struct libusb_transfer *transfer =
-		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct linux_device_handle_priv *dpriv =
-		__device_handle_priv(transfer->dev_handle);
-	int i;
 
 	if (!tpriv->iso_urbs)
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	tpriv->reap_action = CANCELLED;
-	for (i = tpriv->num_urbs - 1; i >= 0; i--) {
-		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, tpriv->iso_urbs[i]);
-		if (tmp && errno != EINVAL)
-			usbi_warn(TRANSFER_CTX(transfer),
-				"unrecognised discard errno %d", errno);
-	}
-	return 0;
+	return discard_urbs(itransfer, 0, tpriv->num_urbs);
 }
 
 static int op_cancel_transfer(struct usbi_transfer *itransfer)
@@ -1815,7 +1793,6 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 {
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct linux_device_handle_priv *dpriv = __device_handle_priv(transfer->dev_handle);
 	int urb_idx = urb - tpriv->urbs;
 
 	usbi_mutex_lock(&itransfer->lock);
@@ -1929,16 +1906,7 @@ cancel_remaining:
 
 	/* cancel remaining urbs and wait for their completion before
 	 * reporting results */
-	for (int i = tpriv->num_urbs - 1; i > urb_idx; i--) {
-		/* remaining URBs with continuation flag are
-		 * automatically cancelled by the kernel */
-		if (tpriv->urbs[i].flags & USBFS_URB_BULK_CONTINUATION)
-			continue;
-		int tmp = ioctl(dpriv->fd, IOCTL_USBFS_DISCARDURB, &tpriv->urbs[i]);
-		if (tmp && errno != EINVAL)
-			usbi_warn(TRANSFER_CTX(transfer),
-				"unrecognised discard errno %d", errno);
-	}
+	discard_urbs(itransfer, urb_idx + 1, tpriv->num_urbs);
 
 out_unlock:
 	usbi_mutex_unlock(&itransfer->lock);
