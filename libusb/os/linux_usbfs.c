@@ -1863,9 +1863,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		goto out_unlock;
 	}
 
-	if (urb->status == 0 || urb->status == -EREMOTEIO ||
-			(urb->status == -EOVERFLOW && urb->actual_length > 0))
-		itransfer->transferred += urb->actual_length;
+	itransfer->transferred += urb->actual_length;
 
 	/* Many of these errors can occur on *any* urb of a multi-urb
 	 * transfer.  When they do, we tear down the rest of the transfer.
@@ -1979,16 +1977,14 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	usbi_dbg("handling completion status %d of iso urb %d/%d", urb->status,
 		urb_idx, num_urbs);
 
-	if (urb->status == 0) {
-		/* copy isochronous results back in */
+	/* copy isochronous results back in */
 
-		for (i = 0; i < urb->number_of_packets; i++) {
-			struct usbfs_iso_packet_desc *urb_desc = &urb->iso_frame_desc[i];
-			struct libusb_iso_packet_descriptor *lib_desc =
-				&transfer->iso_packet_desc[tpriv->iso_packet_offset++];
-			lib_desc->status = urb_desc->status;
-			lib_desc->actual_length = urb_desc->actual_length;
-		}
+	for (i = 0; i < urb->number_of_packets; i++) {
+		struct usbfs_iso_packet_desc *urb_desc = &urb->iso_frame_desc[i];
+		struct libusb_iso_packet_descriptor *lib_desc =
+			&transfer->iso_packet_desc[tpriv->iso_packet_offset++];
+		lib_desc->status = urb_desc->status;
+		lib_desc->actual_length = urb_desc->actual_length;
 	}
 
 	tpriv->num_retired++;
@@ -2057,8 +2053,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	usbi_mutex_lock(&itransfer->lock);
 	usbi_dbg("handling completion status %d", urb->status);
 
-	if (urb->status == 0)
-		itransfer->transferred += urb->actual_length;
+	itransfer->transferred += urb->actual_length;
 
 	if (tpriv->reap_action == CANCELLED) {
 		if (urb->status != 0 && urb->status != -ENOENT)
@@ -2072,7 +2067,6 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 
 	switch (urb->status) {
 	case 0:
-		itransfer->transferred = urb->actual_length;
 		status = LIBUSB_TRANSFER_COMPLETED;
 		break;
 	case -ENOENT: /* cancelled */
