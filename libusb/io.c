@@ -1021,8 +1021,6 @@ int usbi_io_init(struct libusb_context *ctx)
 	}
 #endif
 	usbi_mutex_init(&ctx->flying_transfers_lock, NULL);
-	usbi_mutex_init(&ctx->pollfds_lock, NULL);
-	usbi_mutex_init(&ctx->pollfd_modify_lock, NULL);
 #if defined(OS_WINDOWS)
 	usbi_mutex_init(&ctx->events_lock, NULL);
 #else
@@ -1032,7 +1030,6 @@ int usbi_io_init(struct libusb_context *ctx)
 	usbi_mutex_init(&ctx->event_waiters_lock, NULL);
 	usbi_cond_init(&ctx->event_waiters_cond, NULL);
 	list_init(&ctx->flying_transfers);
-	list_init(&ctx->pollfds);
 
 	/* FIXME should use an eventfd on kernels that support it */
 	r = usbi_pipe(ctx->ctrl_pipe);

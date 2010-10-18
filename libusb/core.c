@@ -1558,12 +1558,12 @@ static int usbi_htab_create(struct libusb_context *ctx, unsigned long nel)
 {
 	if (ctx == NULL) {
 		usbi_err(ctx, "null context");
-		return 0;
+		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
 	if (ctx->htab_table != NULL) {
 		usbi_err(ctx, "hash table already allocated");
-		return 0;
+		return LIBUSB_ERROR_ACCESS;
 	}
 
 	// Create a mutex
@@ -1582,10 +1582,10 @@ static int usbi_htab_create(struct libusb_context *ctx, unsigned long nel)
 	ctx->htab_table = (struct htab_entry*)calloc(ctx->htab_size + 1, sizeof(struct htab_entry));
 	if (ctx->htab_table == NULL) {
 		usbi_err(ctx, "could not allocate space for hash table");
-		return 0;
+		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	return 1;
+	return LIBUSB_SUCCESS;
 }
 
 /* After using the hash table it has to be destroyed.  */
@@ -1758,6 +1758,12 @@ int API_EXPORTED libusb_init(libusb_context **context)
 
 	usbi_dbg("");
 
+	// Some of the backends (Linux) require the following to be setup
+	// before calling backend init
+	usbi_mutex_init(&ctx->pollfds_lock, NULL);
+	usbi_mutex_init(&ctx->pollfd_modify_lock, NULL);
+	list_init(&ctx->pollfds);
+
 	if (usbi_backend->init) {
 		r = usbi_backend->init(ctx);
 		if (r)
@@ -1780,6 +1786,13 @@ int API_EXPORTED libusb_init(libusb_context **context)
 		goto err_destroy_mutex;
 	}
 
+	r = usbi_htab_create(ctx, DEFAULT_HTAB_SIZE);
+	if (r < 0) {
+		usbi_backend->exit(ctx);
+		usbi_io_exit(ctx);
+		goto err_destroy_mutex;
+	}
+
 	if (context) {
 		*context = ctx;
 	} else if (!usbi_default_context) {
@@ -1787,9 +1800,6 @@ int API_EXPORTED libusb_init(libusb_context **context)
 		usbi_default_context = ctx;
 		default_context_refcnt++;
 	}
-
-	// TODO: check return
-	usbi_htab_create(ctx, DEFAULT_HTAB_SIZE);
 
 	usbi_mutex_static_unlock(&default_context_lock);
 
