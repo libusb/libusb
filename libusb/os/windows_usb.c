@@ -391,177 +391,10 @@ err_exit:
 	return NULL;
 }
 
-/* Hash table functions - modified From glibc 2.3.2:
-   [Aho,Sethi,Ullman] Compilers: Principles, Techniques and Tools, 1986
-   [Knuth]            The Art of Computer Programming, part 3 (6.4)  */
-typedef struct htab_entry {
-	unsigned long used;
-	char* str;
-} htab_entry;
-htab_entry* htab_table = NULL;
-usbi_mutex_t htab_write_mutex = NULL;
-unsigned long htab_size, htab_filled;
-
-/* For the used double hash method the table size has to be a prime. To
-   correct the user given table size we need a prime test.  This trivial
-   algorithm is adequate because the code is called only during init and
-   the number is likely to be small  */
-static int isprime(unsigned long number)
-{
-	// no even number will be passed
-	unsigned int divider = 3;
-
-	while((divider * divider < number) && (number % divider != 0))
-		divider += 2;
-
-	return (number % divider != 0);
-}
-
-/* Before using the hash table we must allocate memory for it.
-   We allocate one element more as the found prime number says.
-   This is done for more effective indexing as explained in the
-   comment for the hash function.  */
-int htab_create(struct libusb_context *ctx, unsigned long nel)
-{
-	if (htab_table != NULL) {
-		usbi_err(ctx, "hash table already allocated");
-	}
-
-	// Create a mutex
-	usbi_mutex_init(&htab_write_mutex, NULL);
-
-	// Change nel to the first prime number not smaller as nel.
-	nel |= 1;
-	while(!isprime(nel))
-		nel += 2;
-
-	htab_size = nel;
-	usbi_dbg("using %d entries hash table", nel);
-	htab_filled = 0;
-
-	// allocate memory and zero out.
-	htab_table = (htab_entry*)calloc(htab_size + 1, sizeof(htab_entry));
-	if (htab_table == NULL) {
-		usbi_err(ctx, "could not allocate space for hash table");
-		return 0;
-	}
-
-	return 1;
-}
-
-/* After using the hash table it has to be destroyed.  */
-void htab_destroy(void)
-{
-	size_t i;
-	if (htab_table == NULL) {
-		return;
-	}
-
-	for (i=0; i<htab_size; i++) {
-		if (htab_table[i].used) {
-			safe_free(htab_table[i].str);
-		}
-	}
-	usbi_mutex_destroy(&htab_write_mutex);
-	safe_free(htab_table);
-}
-
-/* This is the search function. It uses double hashing with open addressing.
-   We use an trick to speed up the lookup. The table is created with one
-   more element available. This enables us to use the index zero special.
-   This index will never be used because we store the first hash index in
-   the field used where zero means not used. Every other value means used.
-   The used field can be used as a first fast comparison for equality of
-   the stored and the parameter value. This helps to prevent unnecessary
-   expensive calls of strcmp.  */
-unsigned long htab_hash(char* str)
-{
-	unsigned long hval, hval2;
-	unsigned long idx;
-	unsigned long r = 5381;
-	int c;
-	char* sz = str;
-
-	// Compute main hash value (algorithm suggested by Nokia)
-	while ((c = *sz++))
-		r = ((r << 5) + r) + c;
-	if (r == 0)
-		++r;
-
-	// compute table hash: simply take the modulus
-	hval = r % htab_size;
-	if (hval == 0)
-		++hval;
-
-	// Try the first index
-	idx = hval;
-
-	if (htab_table[idx].used) {
-		if ( (htab_table[idx].used == hval)
-		  && (safe_strcmp(str, htab_table[idx].str) == 0) ) {
-			// existing hash
-			return idx;
-		}
-		usbi_dbg("hash collision ('%s' vs '%s')", str, htab_table[idx].str);
-
-		// Second hash function, as suggested in [Knuth]
-		hval2 = 1 + hval % (htab_size - 2);
-
-		do {
-			// Because size is prime this guarantees to step through all available indexes
-			if (idx <= hval2) {
-				idx = htab_size + idx - hval2;
-			} else {
-				idx -= hval2;
-			}
-
-			// If we visited all entries leave the loop unsuccessfully
-			if (idx == hval) {
-				break;
-			}
-
-			// If entry is found use it.
-			if ( (htab_table[idx].used == hval)
-			  && (safe_strcmp(str, htab_table[idx].str) == 0) ) {
-				return idx;
-			}
-		}
-		while (htab_table[idx].used);
-	}
-
-	// Not found => New entry
-
-	// If the table is full return an error
-	if (htab_filled >= htab_size) {
-		usbi_err(NULL, "hash table is full (%d entries)", htab_size);
-		return 0;
-	}
-
-	// Concurrent threads might be storing the same entry at the same time
-	// (eg. "simultaneous" enums from different threads) => use a mutex
-	usbi_mutex_lock(&htab_write_mutex);
-	// Just free any previously allocated string (which should be the same as
-	// new one). The possibility of concurrent threads storing a collision
-	// string (same hash, different string) at the same time is extremely low
-	safe_free(htab_table[idx].str);
-	htab_table[idx].used = hval;
-	htab_table[idx].str = malloc(safe_strlen(str)+1);
-	if (htab_table[idx].str == NULL) {
-		usbi_err(NULL, "could not duplicate string for hash table");
-		usbi_mutex_unlock(&htab_write_mutex);
-		return 0;
-	}
-	memcpy(htab_table[idx].str, str, safe_strlen(str)+1);
-	++htab_filled;
-	usbi_mutex_unlock(&htab_write_mutex);
-
-	return idx;
-}
-
 /*
  * Returns the Device ID path of a device's parent
  */
-static unsigned long get_parent_session_id(DWORD devinst)
+static unsigned long get_parent_session_id(struct libusb_context *ctx, DWORD devinst)
 {
 	DWORD parent_devinst;
 	unsigned long session_id = 0;
@@ -578,7 +411,7 @@ static unsigned long get_parent_session_id(DWORD devinst)
 	if (sanitized_path == NULL) {
 		return 0;
 	}
-	session_id = htab_hash(sanitized_path);
+	session_id = usbi_htab_hash(ctx, sanitized_path);
 	safe_free(sanitized_path);
 	return session_id;
 }
@@ -586,7 +419,7 @@ static unsigned long get_parent_session_id(DWORD devinst)
 /*
  * Returns the Device ID path of a device's grandparent
  */
-static unsigned long get_grandparent_session_id(DWORD devinst, bool* non_usb_gp)
+static unsigned long get_grandparent_session_id(struct libusb_context *ctx, DWORD devinst, bool* non_usb_gp)
 {
 	DWORD parent_devinst, grandparent_devinst;
 	unsigned long session_id = 0;
@@ -614,7 +447,7 @@ static unsigned long get_grandparent_session_id(DWORD devinst, bool* non_usb_gp)
 	if (sanitized_path == NULL) {
 		return 0;
 	}
-	session_id = htab_hash(sanitized_path);
+	session_id = usbi_htab_hash(ctx, sanitized_path);
 	safe_free(sanitized_path);
 	return session_id;
 }
@@ -813,7 +646,7 @@ LRESULT CALLBACK messaging_callback(HWND hWnd, UINT message, WPARAM wParam, LPAR
 					// If it's an insertion, update the list
 					libusb_get_device_list(ctx, &devs);
 				}
-				dev = usbi_get_device_by_session_id(ctx, usbi_hash(hotplug_path));
+				dev = usbi_get_device_by_session_id(ctx, usbi_htab_hash(ctx, hotplug_path));
 				if (dev == NULL) {
 					usbi_warn(ctx, "%s: '%s' (not active)", (online)?"INSERTION":"REMOVAL",
 						hotplug_path);
@@ -1003,9 +836,6 @@ static int windows_init(struct libusb_context *ctx)
 			goto init_exit;
 		}
 
-		// Create a hash table to store session ids Second parameter is better if prime
-		htab_create(ctx, HTAB_SIZE);
-
 		r = LIBUSB_SUCCESS;
 	}
 
@@ -1035,7 +865,6 @@ init_exit: // Holds semaphore here.
 			CloseHandle(timer_mutex);
 			timer_mutex = NULL;
 		}
-		htab_destroy();
 	}
 
 	if (r != LIBUSB_SUCCESS)
@@ -1557,7 +1386,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			case DEV_PASS:
 				break;
 			default:
-				session_id = get_parent_session_id(dev_info_data.DevInst);
+				session_id = get_parent_session_id(ctx, dev_info_data.DevInst);
 				if (session_id == 0) {
 					usbi_err(ctx, "program assertion failed: orphan device '%s'", dev_id_path);
 					LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
@@ -1565,7 +1394,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				parent_dev = usbi_get_device_by_session_id(ctx, session_id);
 				// Composite HID devices have double indirection => Check grandparent
 				if (pass == HID_PASS) {
-					session_id = get_grandparent_session_id(dev_info_data.DevInst, &non_usb_hid_parent);
+					session_id = get_grandparent_session_id(ctx, dev_info_data.DevInst, &non_usb_hid_parent);
 					if (session_id == 0) {
 						if (non_usb_hid_parent) {
 							usbi_dbg("skipping non USB HID interface '%s'", dev_id_path);
@@ -1598,7 +1427,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			// Create new or match existing device, using the (hashed) device_id as session id
 			if (pass <= DEV_PASS) {	// For subsequent passes, we'll lookup the parent
 				// These are the passes that create "new" devices
-				session_id = usbi_hash(dev_id_path);
+				session_id = usbi_htab_hash(ctx, dev_id_path);
 				dev = usbi_get_device_by_session_id(ctx, session_id);
 				if (dev != NULL) {
 					// No need to re-process hubs
@@ -1783,8 +1612,6 @@ static void windows_exit(struct libusb_context *ctx)
 				TerminateThread(hotplug_thread, 1);
 			}
 		}
-
-		htab_destroy();
 	}
 
 	ReleaseSemaphore(semaphore, 1, NULL);	// increase count back to 1

@@ -839,7 +839,7 @@ static int get_device(struct libusb_context* ctx,
 	unsigned long session_id;
 	int r = 0;
 
-	session_id = usbi_hash(sysfs_dir);
+	session_id = usbi_htab_hash(ctx, sysfs_dir);
 	usbi_dbg("busnum %d devaddr %d session_id %ld", busnum, devaddr,
 		session_id);
 
@@ -2227,7 +2227,7 @@ static void handle_hotplug_event(struct libusb_context *ctx)
 		}
 	}
 	else if (strncmp(udev_action, "remove", 6) == 0) {
-		dev = usbi_get_device_by_session_id_ref(ctx, usbi_hash(sys_name));
+		dev = usbi_get_device_by_session_id_ref(ctx, usbi_htab_hash(ctx, sys_name));
 		if (dev) {
 			pthread_mutex_lock(&dev->status_online_lock);
 			dev->status_online = 0;

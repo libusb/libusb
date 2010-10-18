@@ -1530,6 +1530,184 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 		ctx->debug = level;
 }
 
+/* Hash table functions - modified From glibc 2.3.2:
+   [Aho,Sethi,Ullman] Compilers: Principles, Techniques and Tools, 1986
+   [Knuth]            The Art of Computer Programming, part 3 (6.4)  */
+#define DEFAULT_HTAB_SIZE 1021
+
+/* For the used double hash method the table size has to be a prime. To
+   correct the user given table size we need a prime test.  This trivial
+   algorithm is adequate because the code is called only during init and
+   the number is likely to be small  */
+static int isprime(unsigned long number)
+{
+	// no even number will be passed
+	unsigned int divider = 3;
+
+	while((divider * divider < number) && (number % divider != 0))
+		divider += 2;
+
+	return (number % divider != 0);
+}
+
+/* Before using the hash table we must allocate memory for it.
+   We allocate one element more as the found prime number says.
+   This is done for more effective indexing as explained in the
+   comment for the hash function.  */
+static int usbi_htab_create(struct libusb_context *ctx, unsigned long nel)
+{
+	if (ctx == NULL) {
+		usbi_err(ctx, "null context");
+		return 0;
+	}
+
+	if (ctx->htab_table != NULL) {
+		usbi_err(ctx, "hash table already allocated");
+		return 0;
+	}
+
+	// Create a mutex
+	usbi_mutex_init(&ctx->htab_write_mutex, NULL);
+
+	// Change nel to the first prime number not smaller as nel.
+	nel |= 1;
+	while(!isprime(nel))
+		nel += 2;
+
+	ctx->htab_size = nel;
+	usbi_dbg("using %d entries hash table", nel);
+	ctx->htab_filled = 0;
+
+	// allocate memory and zero out.
+	ctx->htab_table = (struct htab_entry*)calloc(ctx->htab_size + 1, sizeof(struct htab_entry));
+	if (ctx->htab_table == NULL) {
+		usbi_err(ctx, "could not allocate space for hash table");
+		return 0;
+	}
+
+	return 1;
+}
+
+/* After using the hash table it has to be destroyed.  */
+static void usbi_htab_destroy(struct libusb_context *ctx)
+{
+	size_t i;
+	if ((ctx == NULL) || (ctx->htab_table == NULL)) {
+		return;
+	}
+
+	for (i=0; i<ctx->htab_size; i++) {
+		if (ctx->htab_table[i].used) {
+			free(ctx->htab_table[i].str);
+		}
+	}
+	usbi_mutex_destroy(&ctx->htab_write_mutex);
+	free(ctx->htab_table);
+}
+
+/* This is the search function. It uses double hashing with open addressing.
+   We use an trick to speed up the lookup. The table is created with one
+   more element available. This enables us to use the index zero special.
+   This index will never be used because we store the first hash index in
+   the field used where zero means not used. Every other value means used.
+   The used field can be used as a first fast comparison for equality of
+   the stored and the parameter value. This helps to prevent unnecessary
+   expensive calls of strcmp.  */
+unsigned long usbi_htab_hash(struct libusb_context *ctx, const char* str)
+{
+	unsigned long hval, hval2;
+	unsigned long idx;
+	unsigned long r = 5381;
+	int c;
+	char* sz = (char*) str;
+
+	if (ctx == NULL) {
+		usbi_err(ctx, "no context");
+		return 0;
+	}
+	if ((str == NULL) || (str[0] == 0)) {
+		usbi_err(ctx, "empty string");
+		return 0;
+	}
+
+	// Compute main hash value (djb2 algorithm)
+	while ((c = *sz++))
+		r = ((r << 5) + r) + c;
+	if (r == 0)
+		++r;
+
+	// compute table hash: simply take the modulus
+	hval = r % ctx->htab_size;
+	if (hval == 0)
+		++hval;
+
+	// Try the first index
+	idx = hval;
+
+	if (ctx->htab_table[idx].used) {
+		if ( (ctx->htab_table[idx].used == hval)
+		  && (strcmp(str, ctx->htab_table[idx].str) == 0) ) {
+			// existing hash
+			return idx;
+		}
+		usbi_dbg("hash collision ('%s' vs '%s')", str, ctx->htab_table[idx].str);
+
+		// Second hash function, as suggested in [Knuth]
+		hval2 = 1 + hval % (ctx->htab_size - 2);
+
+		do {
+			// Because size is prime this guarantees to step through all available indexes
+			if (idx <= hval2) {
+				idx = ctx->htab_size + idx - hval2;
+			} else {
+				idx -= hval2;
+			}
+
+			// If we visited all entries leave the loop unsuccessfully
+			if (idx == hval) {
+				break;
+			}
+
+			// If entry is found use it.
+			if ( (ctx->htab_table[idx].used == hval)
+			  && (strcmp(str, ctx->htab_table[idx].str) == 0) ) {
+				return idx;
+			}
+		}
+		while (ctx->htab_table[idx].used);
+	}
+
+	// Not found => New entry
+
+	// If the table is full return an error
+	if (ctx->htab_filled >= ctx->htab_size) {
+		usbi_err(ctx, "hash table is full (%d entries)", ctx->htab_size);
+		return 0;
+	}
+
+	// Concurrent threads might be storing the same entry at the same time
+	// (eg. "simultaneous" enums from different threads) => use a mutex
+	usbi_mutex_lock(&ctx->htab_write_mutex);
+	// Just free any previously allocated string (which should be the same as
+	// new one). The possibility of concurrent threads storing a collision
+	// string (same hash, different string) at the same time is extremely low
+	if (ctx->htab_table[idx].str != NULL) {
+		free(ctx->htab_table[idx].str);
+	}
+	ctx->htab_table[idx].used = hval;
+	ctx->htab_table[idx].str = malloc(strlen(str)+1);
+	if (ctx->htab_table[idx].str == NULL) {
+		usbi_err(ctx, "could not duplicate string for hash table");
+		usbi_mutex_unlock(&ctx->htab_write_mutex);
+		return 0;
+	}
+	memcpy(ctx->htab_table[idx].str, str, strlen(str)+1);
+	++ctx->htab_filled;
+	usbi_mutex_unlock(&ctx->htab_write_mutex);
+
+	return idx;
+}
+
 /** \ingroup lib
  * Initialize libusb. This function must be called before calling any other
  * libusb function.
@@ -1609,6 +1787,10 @@ int API_EXPORTED libusb_init(libusb_context **context)
 		usbi_default_context = ctx;
 		default_context_refcnt++;
 	}
+
+	// TODO: check return
+	usbi_htab_create(ctx, DEFAULT_HTAB_SIZE);
+
 	usbi_mutex_static_unlock(&default_context_lock);
 
 	return 0;
@@ -1648,6 +1830,8 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 		usbi_default_context = NULL;
 		usbi_mutex_static_unlock(&default_context_lock);
 	}
+
+	usbi_htab_destroy(ctx);
 
 	/* a little sanity check. doesn't bother with open_devs locking because
 	 * unless there is an application bug, nobody will be accessing this. */
