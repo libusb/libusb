@@ -1867,12 +1867,21 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 			(urb->status == -EOVERFLOW && urb->actual_length > 0))
 		itransfer->transferred += urb->actual_length;
 
-
+	/* Many of these errors can occur on *any* urb of a multi-urb
+	 * transfer.  When they do, we tear down the rest of the transfer.
+	 */
 	switch (urb->status) {
 	case 0:
 		break;
 	case -EREMOTEIO: /* short transfer */
 		break;
+	case -ENOENT: /* cancelled */
+	case -ECONNRESET:
+		break;
+	case -ESHUTDOWN:
+		usbi_dbg("device removed");
+		tpriv->reap_status = LIBUSB_TRANSFER_NO_DEVICE;
+		goto cancel_remaining;
 	case -EPIPE:
 		usbi_dbg("detected endpoint stall");
 		if (tpriv->reap_status == LIBUSB_TRANSFER_COMPLETED)
@@ -1887,18 +1896,13 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	case -ETIME:
 	case -EPROTO:
 	case -EILSEQ:
-		/* These can happen on *any* urb of a multi-urb transfer, so
-		 * save a status and tear down rest of the transfer */
 		usbi_dbg("low level error %d", urb->status);
 		tpriv->reap_action = ERROR;
-		if (tpriv->reap_status == LIBUSB_TRANSFER_COMPLETED)
-			tpriv->reap_status = LIBUSB_TRANSFER_ERROR;
 		goto cancel_remaining;
 	default:
 		usbi_warn(ITRANSFER_CTX(itransfer),
 			"unrecognised urb status %d", urb->status);
-		if (tpriv->reap_status == LIBUSB_TRANSFER_COMPLETED)
-			tpriv->reap_status = LIBUSB_TRANSFER_ERROR;
+		tpriv->reap_action = ERROR;
 		goto cancel_remaining;
 	}
 
@@ -1916,6 +1920,9 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		goto out_unlock;
 
 cancel_remaining:
+	if (ERROR == tpriv->reap_action && LIBUSB_TRANSFER_COMPLETED == tpriv->reap_status)
+		tpriv->reap_status = LIBUSB_TRANSFER_ERROR;
+
 	if (tpriv->num_retired == tpriv->num_urbs) /* nothing to cancel */
 		goto completed;
 
@@ -1954,6 +1961,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	int num_urbs = tpriv->num_urbs;
 	int urb_idx = 0;
 	int i;
+	enum libusb_transfer_status status = LIBUSB_TRANSFER_COMPLETED;
 
 	usbi_mutex_lock(&itransfer->lock);
 	for (i = 0; i < num_urbs; i++) {
@@ -1988,6 +1996,9 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	if (tpriv->reap_action != NORMAL) { /* cancelled or submit_fail */
 		usbi_dbg("CANCEL: urb status %d", urb->status);
 
+		if (status == LIBUSB_TRANSFER_COMPLETED)
+			status = LIBUSB_TRANSFER_ERROR;
+
 		if (tpriv->num_retired == num_urbs) {
 			usbi_dbg("CANCEL: last URB handled, reporting");
 			free_iso_urbs(tpriv);
@@ -2006,6 +2017,12 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	switch (urb->status) {
 	case 0:
 		break;
+	case -ENOENT: /* cancelled */
+		break;
+	case -ESHUTDOWN:
+		usbi_dbg("device removed");
+		status = LIBUSB_TRANSFER_NO_DEVICE;
+		break;
 	case -ETIME:
 	case -EPROTO:
 	case -EILSEQ:
@@ -2023,7 +2040,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		usbi_dbg("last URB in transfer --> complete!");
 		free_iso_urbs(tpriv);
 		usbi_mutex_unlock(&itransfer->lock);
-		return usbi_handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
+		return usbi_handle_transfer_completion(itransfer, status);
 	}
 
 out:
@@ -2057,6 +2074,12 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	case 0:
 		itransfer->transferred = urb->actual_length;
 		status = LIBUSB_TRANSFER_COMPLETED;
+		break;
+	case -ENOENT: /* cancelled */
+		break;
+	case -ESHUTDOWN:
+		usbi_dbg("device removed");
+		status = LIBUSB_TRANSFER_NO_DEVICE;
 		break;
 	case -EPIPE:
 		usbi_dbg("unsupported control request");
