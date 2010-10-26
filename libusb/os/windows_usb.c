@@ -1418,6 +1418,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			switch (pass) {
 			case HCD_PASS:
 			case DEV_PASS:
+			case HUB_PASS:
 				break;
 			default:
 				session_id = get_parent_session_id(dev_info_data.DevInst);
@@ -1464,15 +1465,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				session_id = htab_hash(dev_id_path);
 				dev = usbi_get_device_by_session_id(ctx, session_id);
 				if (dev != NULL) {
-					// No need to re-process hubs
-					if (__device_priv(dev)->apib == &usb_api_backend[USB_API_HUB]) {
-						continue;
-					}
 					usbi_dbg("found existing device for session [%lX]", session_id);
-					// TODO (post hotplug): reuse priv data that can be reused - for now, just recreate
-					if (pass == GEN_PASS) {
-						windows_device_priv_release(dev);
-					}
 				} else {
 					if (pass == DEV_PASS) {
 						usbi_err(ctx, "program assertion failed: device '%s' was not listed in generic pass", dev_id_path);
@@ -1550,6 +1543,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			case HUB_PASS:
 				priv->apib = &usb_api_backend[USB_API_HUB];
 				priv->path = dev_interface_path; dev_interface_path = NULL;
+				break;
 				// fall through, as we must initialize hubs before generic devices
 			case GEN_PASS:
 				init_device(dev, parent_dev, (uint8_t)port_nr, dev_id_path);
