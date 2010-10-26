@@ -40,8 +40,8 @@ RSC=rc.exe
 # PROP Output_Dir "../Win32/Release/lib"
 # PROP Intermediate_Dir "../Win32/Release/lib"
 # PROP Target_Dir ""
-# ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_MBCS" /D "_LIB" /YX /FD /c
-# ADD CPP /nologo /MD /W3 /GX /O2 /I "." /I "../libusb" /D "WIN32" /D "NDEBUG" /D "_MBCS" /D "_LIB" /FR /FD /EHsc /c
+# ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_LIB" /YX /FD /c
+# ADD CPP /nologo /MD /W3 /GX /O2 /I "." /I "../libusb" /D "WIN32" /D "NDEBUG" /D "_UNICODE" /D "UNICODE" /U "_MBCS" /D "_LIB" /FR /FD /EHsc /c
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
 # ADD RSC /l 0x409 /d "NDEBUG"
 BSC32=bscmake.exe
@@ -63,8 +63,8 @@ LIB32=link.exe -lib
 # PROP Output_Dir "../Win32/Debug/lib"
 # PROP Intermediate_Dir "../Win32/Debug/lib"
 # PROP Target_Dir ""
-# ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ /c
-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "." /I "../libusb" /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FR /FD /GZ /EHsc /c
+# ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_LIB" /YX /FD /GZ /c
+# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "." /I "../libusb" /D "WIN32" /D "_DEBUG" /D "_UNICODE" /D "UNICODE" /U "_MBCS" /D "_LIB" /FR /FD /GZ /EHsc /c
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
 BSC32=bscmake.exe
