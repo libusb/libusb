@@ -195,7 +195,7 @@ static char err_string[ERR_BUFFER_SIZE];
 	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%d] ", error_code);
 
 	size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &err_string[safe_strlen(err_string)],
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &err_string[safe_strlen(err_string)],
 		ERR_BUFFER_SIZE - (DWORD)safe_strlen(err_string), NULL);
 	if (size == 0) {
 		format_error = GetLastError();
@@ -286,7 +286,7 @@ bool get_devinfo_data(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, unsigned _index)
 {
 	if (_index <= 0) {
-		*dev_info = SetupDiGetClassDevs(NULL, "USB", NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
+		*dev_info = SetupDiGetClassDevsA(NULL, "USB", NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
 		if (*dev_info == INVALID_HANDLE_VALUE) {
 			return false;
 		}
@@ -318,11 +318,11 @@ bool get_devinfo_data(struct libusb_context *ctx,
  * structure returned and call this function repeatedly using the same guid (with an
  * incremented index starting at zero) until all interfaces have been returned.
  */
-SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ctx,
+SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID* guid, unsigned _index)
 {
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
-	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
+	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	DWORD size;
 
 	if (_index <= 0) {
@@ -372,7 +372,7 @@ SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ct
 	}
 
 	dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
-	if (!SetupDiGetDeviceInterfaceDetail(*dev_info, &dev_interface_data,
+	if (!SetupDiGetDeviceInterfaceDetailA(*dev_info, &dev_interface_data,
 		dev_interface_details, size, &size, NULL)) {
 		usbi_err(ctx, "could not access interface data (actual) for index %u: %s",
 			_index, windows_error_str(0));
@@ -772,10 +772,10 @@ static int windows_init(struct libusb_context *ctx)
 	int i, r = LIBUSB_ERROR_OTHER;
 	OSVERSIONINFO os_version;
 	HANDLE semaphore;
-	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
+	char sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
 	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
-	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
+	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		usbi_err(ctx, "could not create semaphore: %s", windows_error_str(0));
 		return LIBUSB_ERROR_NO_MEM;
@@ -1240,7 +1240,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	struct discovered_devs *discdevs = *_discdevs;
 	HDEVINFO dev_info;
 	SP_DEVINFO_DATA dev_info_data;
-	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
+	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	GUID hid_guid;
 #define MAX_ENUM_GUIDS 64
 	const GUID* guid[MAX_ENUM_GUIDS];
@@ -1584,10 +1584,10 @@ static void windows_exit(void)
 {
 	int i;
 	HANDLE semaphore;
-	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
+	char sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
 	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
-	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
+	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		return;
 	}

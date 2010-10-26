@@ -332,9 +332,9 @@ struct driver_lookup {
 
 #define DLL_LOAD(dll, name, ret_on_failure)                   \
 	do {                                                      \
-		HMODULE h = GetModuleHandle(#dll);                    \
+		HMODULE h = GetModuleHandleA(#dll);                   \
 	if (!h)                                                   \
-		h = LoadLibrary(#dll);                                \
+		h = LoadLibraryA(#dll);                               \
 	if (!h) {                                                 \
 		if (ret_on_failure) { return LIBUSB_ERROR_NOT_FOUND; }\
 		else { break; }                                       \
