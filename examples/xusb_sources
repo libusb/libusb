@@ -5,24 +5,11 @@ TARGETTYPE=PROGRAM
 _NT_TARGET_VERSION= $(_NT_TARGET_VERSION_WINXP)
 
 !IFNDEF MSC_WARNING_LEVEL
-
 MSC_WARNING_LEVEL=/W3
-
 !ENDIF
 
-
-
 USE_MSVCRT=1
-
 UMTYPE=console
-
 INCLUDES=..\..\msvc;..\..;$(DDK_INC_PATH)
-
 UMLIBS=..\..\libusb\os\obj$(BUILD_ALT_DIR)\*\libusb-1.0.lib
-
-TARGETLIBS=$(SDK_LIB_PATH)\setupapi.lib \
-		   $(SDK_LIB_PATH)\ole32.lib \
-		   $(SDK_LIB_PATH)\advapi32.lib
-
 SOURCES=..\xusb.c
-

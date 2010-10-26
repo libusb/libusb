@@ -63,7 +63,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				SubSystem="1"
@@ -136,7 +135,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				SubSystem="1"
@@ -206,7 +204,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				SubSystem="1"
 				TargetMachine="1"
@@ -276,7 +273,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				SubSystem="1"
 				TargetMachine="17"

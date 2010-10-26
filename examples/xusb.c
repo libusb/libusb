@@ -31,19 +31,11 @@
 
 #include <libusb/libusb.h>
 
-#if defined(_MSC_VER)
-// On Windows, the libusb library has a dependency on the libraries below.
-// for MinGW/cygwin, make sure you link with -lsetupapi -lole32 -ladvapi32
-#pragma comment( lib, "setupapi.lib" )
-#pragma comment( lib, "ole32.lib" )
-#pragma comment( lib, "advapi32.lib" )
-#endif
-
 #ifdef OS_WINDOWS
 #define msleep(msecs) Sleep(msecs)
 #else
 #include <unistd.h>
-#define	msleep(msecs) usleep(1000*msecs)
+#define msleep(msecs) usleep(1000*msecs)
 #endif
 
 #if !defined(_MSC_VER) || _MSC_VER<=1200

@@ -64,7 +64,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib ole32.lib advapi32.lib"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="..\msvc"
 				GenerateDebugInformation="true"
@@ -140,7 +139,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib ole32.lib advapi32.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="..\msvc"
 				GenerateDebugInformation="true"
@@ -221,7 +219,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="..\msvc"
 				GenerateDebugInformation="true"
@@ -298,7 +295,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="..\msvc"
 				GenerateDebugInformation="true"

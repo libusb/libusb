@@ -62,7 +62,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
@@ -135,7 +134,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
@@ -206,7 +204,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
@@ -277,7 +274,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				ProgramDatabaseFile="$(TargetDir)$(ProjectName).pdb"
 				SubSystem="1"
