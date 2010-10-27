@@ -6,7 +6,11 @@ DLLDEF=..\libusb-1.0.def
 MSC_WARNING_LEVEL=/W3
 !ENDIF
 
+!IFDEF STATIC_LIBC
+USE_LIBCMT=1
+!ELSE
 USE_MSVCRT=1
+!ENDIF
 
 INCLUDES=..;..\..\msvc;$(DDK_INC_PATH)
 C_DEFINES= $(C_DEFINES) $(LIBUSB_DEFINES) /DDDKBUILD
@@ -19,8 +23,6 @@ C_DEFINES= $(C_DEFINES) $(LIBUSB_DEFINES) /DDDKBUILD
 # "fatal error C1047: The object or library file 'libusb-1.0.lib' was created with
 #  an older compiler than other objects; rebuild old objects and libraries"
 USER_C_FLAGS=/GL-
-
-TARGETLIBS=$(SDK_LIB_PATH)\kernel32.lib
 
 SOURCES=..\core.c \
 	..\descriptor.c \
