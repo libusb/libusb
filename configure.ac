@@ -1,7 +1,7 @@
 m4_define(LIBUSB_MAJOR, [1])
 m4_define(LIBUSB_MINOR, [0])
 m4_define(LIBUSB_MICRO, [8])
-m4_define(LIBUSB_NANO, [10317])
+m4_define(LIBUSB_NANO, [10318])
 
 AC_INIT([libusb], LIBUSB_MAJOR.LIBUSB_MINOR.LIBUSB_MICRO, [libusb-devel@lists.sourceforge.net], [libusb], [http://www.libusb.org/])
 

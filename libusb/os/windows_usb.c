@@ -1342,13 +1342,15 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			// Read the Device ID path. This is what we'll use as UID
 			// Note that if the device is plugged in a different port or hub, the Device ID changes
 			if (CM_Get_Device_IDA(dev_info_data.DevInst, path, sizeof(path), 0) != CR_SUCCESS) {
-				usbi_warn(ctx, "could not read the device id path for device '%s', skipping",
-					dev_interface_details->DevicePath);
+				usbi_warn(ctx, "could not read the device id path for devinst %X, skipping",
+					dev_info_data.DevInst);
 				continue;
 			}
 			dev_id_path = sanitize_path(path);
 			if (dev_id_path == NULL) {
-				usbi_warn(ctx, "could not sanitize device id path for '%s'", dev_interface_details->DevicePath);
+				usbi_warn(ctx, "could not sanitize device id path for devinst %X, skipping",
+					dev_info_data.DevInst);
+				continue;
 			}
 
 			// The SPDRP_ADDRESS for USB devices is the device port number on the hub
@@ -1357,8 +1359,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				if ( (!pSetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_ADDRESS,
 					&reg_type, (BYTE*)&port_nr, 4, &size))
 				  || (size != 4) ) {
-					usbi_warn(ctx, "could not retrieve port number for device %s, skipping: %s",
-						dev_interface_details->DevicePath, windows_error_str(0));
+					usbi_warn(ctx, "could not retrieve port number for device '%s', skipping: %s",
+						dev_id_path, windows_error_str(0));
 					continue;
 				}
 			}
@@ -1548,7 +1550,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				break;
 				// fall through, as we must initialize hubs before generic devices
 			case GEN_PASS:
-				init_device(dev, parent_dev, (uint8_t)port_nr, dev_id_path);
+				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_id_path);
 				break;
 			default:	// HID_PASS and later
 				if (parent_priv->apib == &usb_api_backend[USB_API_HID]) {
