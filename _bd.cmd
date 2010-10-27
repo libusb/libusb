@@ -10,9 +10,11 @@ for %%A in (MS32 MS64) do mkdir E:\dailies\%DATE%\%%A\static
 for %%A in (MS32 MS64) do mkdir E:\dailies\%DATE%\%%A\dll
 for %%A in (source bin32 bin64) do mkdir E:\dailies\%DATE%\examples\%%A
 copy libusb\libusb.h E:\dailies\%DATE%\
-copy libusb\msvc\stdint.h E:\dailies\%DATE%\
+copy msvc\stdint.h E:\dailies\%DATE%\
 copy libusb\libusb-1.0.def E:\dailies\%DATE%\
-copy examples\*.c E:\dailies\%DATE%\examples\source
+copy examples\lsusb.c E:\dailies\%DATE%\examples\source
+copy examples\xusb.c E:\dailies\%DATE%\examples\source
+copy _README.txt E:\dailies\%DATE%\README.txt
 
 set ORG_BUILD_ALT_DIR=%BUILD_ALT_DIR%
 set ORG_BUILDARCH=%_BUILDARCH%
