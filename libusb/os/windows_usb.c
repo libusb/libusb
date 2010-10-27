@@ -274,6 +274,8 @@ static int init_dlls(void)
 	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiDestroyDeviceInfoList, TRUE);
 	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiOpenDevRegKey, TRUE);
 	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetDeviceRegistryPropertyA, TRUE);
+	DLL_LOAD_PREFIXED(AdvAPI32.dll, p, RegQueryValueExW, TRUE);
+	DLL_LOAD_PREFIXED(AdvAPI32.dll, p, RegCloseKey, TRUE);
 	return LIBUSB_SUCCESS;
 }
 
@@ -1379,9 +1381,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				key = pSetupDiOpenDevRegKey(dev_info, &dev_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
 				if (key != INVALID_HANDLE_VALUE) {
 					size = sizeof(guid_string_w);
-					s = RegQueryValueExW(key, L"DeviceInterfaceGUIDs", NULL, &reg_type,
+					s = pRegQueryValueExW(key, L"DeviceInterfaceGUIDs", NULL, &reg_type,
 						(BYTE*)guid_string_w, &size);
-					RegCloseKey(key);
+					pRegCloseKey(key);
 					if (s == ERROR_SUCCESS) {
 						if (nb_guids >= MAX_ENUM_GUIDS) {
 							// If this assert is ever reported, grow a GUID table dynamically
