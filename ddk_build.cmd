@@ -1,20 +1,23 @@
+@rem default builds static library. 
+@rem you can pass the following arguments (case insensitive):
+@rem - "DLL" to build a DLL instead of a static library
+@rem - "/MT" to build a static library compatible with MSVC's /MT option (LIBCMT vs MSVCRT)
 @echo off
-
-rem default builds static library. Pass argument 'DLL' to build a DLL
 
 if Test%BUILD_ALT_DIR%==Test goto usage
 
+rem process commandline parameters
+set TARGET=LIBRARY
+set STATIC_LIBC=
 set version=1.0
 
+if "%1" == "" goto no_more_args
+rem /I for case insensitive
+if /I Test%1==TestDLL set TARGET=DYNLINK
+if /I Test%1==Test/MT set STATIC_LIBC=1
+:no_more_args
+
 cd libusb\os
-rem DLL or static lib selection (must use concatenation)
-if Test%1==TestDLL goto libusb_dll
-:libusb_static
-set TARGET=LIBRARY
-goto libusb_common
-:libusb_dll
-set TARGET=DYNLINK
-:libusb_common
 echo TARGETTYPE=%TARGET% > target
 copy target+libusb_sources sources >NUL 2>&1
 del target
