@@ -17,4 +17,5 @@ USE_MSVCRT=1
 UMTYPE=console
 INCLUDES=..\..\msvc;..\..;$(DDK_INC_PATH)
 UMLIBS=..\..\libusb\os\obj$(BUILD_ALT_DIR)\*\libusb-1.0.lib
+TARGETLIBS=$(SDK_LIB_PATH)\user32.lib
 SOURCES=..\xusb.c
