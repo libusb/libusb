@@ -24,7 +24,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples\$(ProjectName)"
 			ConfigurationType="1"
-			CharacterSet="2"
+			CharacterSet="1"
 			BuildLogFile="$(IntDir)\$(ProjectName).htm"
 			>
 			<Tool
@@ -63,7 +63,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				SubSystem="1"
@@ -96,7 +95,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples\$(ProjectName)"
 			ConfigurationType="1"
-			CharacterSet="2"
+			CharacterSet="1"
 			BuildLogFile="$(IntDir)\$(ProjectName).htm"
 			>
 			<Tool
@@ -136,7 +135,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				SubSystem="1"
@@ -169,7 +167,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples\$(ProjectName)"
 			ConfigurationType="1"
-			CharacterSet="2"
+			CharacterSet="1"
 			WholeProgramOptimization="1"
 			BuildLogFile="$(IntDir)\$(ProjectName).htm"
 			>
@@ -206,7 +204,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				SubSystem="1"
 				TargetMachine="1"
@@ -238,7 +235,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\examples\$(ProjectName)"
 			ConfigurationType="1"
-			CharacterSet="2"
+			CharacterSet="1"
 			WholeProgramOptimization="1"
 			BuildLogFile="$(IntDir)\$(ProjectName).htm"
 			>
@@ -276,7 +273,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				AdditionalLibraryDirectories=""
 				SubSystem="1"
 				TargetMachine="17"

@@ -73,7 +73,6 @@ case $host in
 	backend="windows"
 	threads="windows"
 	create_import_lib="yes"
-	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
 	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version -Wl,--add-stdcall-alias"
@@ -88,7 +87,6 @@ case $host in
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	threads="posix"
-	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
 	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	AM_CFLAGS="-std=c99 -DWINVER=0x500"
 	AM_LDFLAGS="-no-undefined -avoid-version"

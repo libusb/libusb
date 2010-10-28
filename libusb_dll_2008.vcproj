@@ -23,7 +23,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
 			ConfigurationType="2"
-			CharacterSet="2"
+			CharacterSet="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -60,7 +60,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
@@ -93,7 +92,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
 			ConfigurationType="2"
-			CharacterSet="2"
+			CharacterSet="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -131,7 +130,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
@@ -164,7 +162,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
 			ConfigurationType="2"
-			CharacterSet="2"
+			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -200,7 +198,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"
@@ -232,7 +229,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
 			ConfigurationType="2"
-			CharacterSet="2"
+			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -269,7 +266,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib advapi32.lib ole32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
 				EmbedManagedResourceFile="libusb-1.0.rc"

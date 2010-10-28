@@ -337,27 +337,46 @@ struct driver_lookup {
 /*
  * API macros - from libusb-win32 1.x
  */
-#define DLL_DECLARE(api, ret, name, args)                     \
-  typedef ret (api * __dll_##name##_t)args; __dll_##name##_t name = NULL
+#define DLL_DECLARE_PREFIXED(api, ret, prefix, name, args)    \
+	typedef ret (api * __dll_##name##_t)args;                 \
+	static __dll_##name##_t prefix##name = NULL
 
-#define DLL_LOAD(dll, name, ret_on_failure)                   \
+#define DLL_LOAD_PREFIXED(dll, prefix, name, ret_on_failure)  \
 	do {                                                      \
-		HMODULE h = GetModuleHandle(#dll);                    \
+		HMODULE h = GetModuleHandleA(#dll);                   \
 	if (!h)                                                   \
-		h = LoadLibrary(#dll);                                \
+		h = LoadLibraryA(#dll);                               \
 	if (!h) {                                                 \
 		if (ret_on_failure) { return LIBUSB_ERROR_NOT_FOUND; }\
 		else { break; }                                       \
 	}                                                         \
-	name = (__dll_##name##_t)GetProcAddress(h, #name);        \
-	if (name) break;                                          \
-	name = (__dll_##name##_t)GetProcAddress(h, #name "A");    \
-	if (name) break;                                          \
-	name = (__dll_##name##_t)GetProcAddress(h, #name "W");    \
-	if (name) break;                                          \
+	prefix##name = (__dll_##name##_t)GetProcAddress(h, #name);\
+	if (prefix##name) break;                                  \
+	prefix##name = (__dll_##name##_t)GetProcAddress(h, #name "A");\
+	if (prefix##name) break;                                  \
+	prefix##name = (__dll_##name##_t)GetProcAddress(h, #name "W");\
+	if (prefix##name) break;                                  \
 	if(ret_on_failure)                                        \
 		return LIBUSB_ERROR_NOT_FOUND;                        \
 	} while(0)
+
+#define DLL_DECLARE(api, ret, name, args)   DLL_DECLARE_PREFIXED(api, ret, , name, args)
+#define DLL_LOAD(dll, name, ret_on_failure) DLL_LOAD_PREFIXED(dll, , name, ret_on_failure)
+
+/* OLE32 dependency */
+DLL_DECLARE_PREFIXED(WINAPI, HRESULT, p, CLSIDFromString, (LPCOLESTR, LPCLSID));
+
+/* SetupAPI dependencies */
+DLL_DECLARE_PREFIXED(WINAPI, HDEVINFO, p, SetupDiGetClassDevsA, (const GUID*, PCSTR, HWND, DWORD));
+DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiEnumDeviceInfo, (HDEVINFO, DWORD, PSP_DEVINFO_DATA));
+DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiEnumDeviceInterfaces, (HDEVINFO, PSP_DEVINFO_DATA,
+			const GUID*, DWORD, PSP_DEVICE_INTERFACE_DATA));
+DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceInterfaceDetailA, (HDEVINFO, PSP_DEVICE_INTERFACE_DATA,
+			PSP_DEVICE_INTERFACE_DETAIL_DATA_A, DWORD, PDWORD, PSP_DEVINFO_DATA));
+DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiDestroyDeviceInfoList, (HDEVINFO));
+DLL_DECLARE_PREFIXED(WINAPI, HKEY, p, SetupDiOpenDevRegKey, (HDEVINFO, PSP_DEVINFO_DATA, DWORD, DWORD, DWORD, REGSAM));
+DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceRegistryPropertyA, (HDEVINFO,
+			PSP_DEVINFO_DATA, DWORD, PDWORD, PBYTE, DWORD, PDWORD));
 
 
 /*

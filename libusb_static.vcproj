@@ -23,7 +23,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\libusb-1.0"
 			ConfigurationType="4"
-			CharacterSet="2"
+			CharacterSet="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -87,7 +87,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\lib\libusb-1.0"
 			ConfigurationType="4"
-			CharacterSet="2"
+			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -149,7 +149,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
 			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="4"
-			CharacterSet="2"
+			CharacterSet="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -214,7 +214,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
 			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="4"
-			CharacterSet="2"
+			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
 			<Tool

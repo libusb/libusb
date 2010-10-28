@@ -23,7 +23,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
 			ConfigurationType="2"
-			CharacterSet="2"
+			CharacterSet="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -64,7 +64,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib ole32.lib advapi32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="2"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
@@ -102,7 +101,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
 			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
 			ConfigurationType="2"
-			CharacterSet="2"
+			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -141,7 +140,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib ole32.lib advapi32.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="1"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
@@ -181,7 +179,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
 			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="2"
-			CharacterSet="2"
+			CharacterSet="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -223,7 +221,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="2"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
@@ -261,7 +258,7 @@
 			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
 			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="2"
-			CharacterSet="2"
+			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -301,7 +298,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="setupapi.lib"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="1"
 				ModuleDefinitionFile="libusb\libusb-1.0.def"
