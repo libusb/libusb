@@ -618,7 +618,7 @@ LRESULT CALLBACK messaging_callback(HWND hWnd, UINT message, WPARAM wParam, LPAR
 	static struct libusb_context* ctx;
 	LRESULT ret = TRUE;
 	DEV_BROADCAST_HDR* dev_bhd;
-	DEV_BROADCAST_DEVICEINTERFACE* dev_bdi;
+	DEV_BROADCAST_DEVICEINTERFACE_A* dev_bdi;
 	libusb_device **devs;
 	struct libusb_device *dev;
 	struct windows_device_priv *priv;
@@ -634,7 +634,7 @@ LRESULT CALLBACK messaging_callback(HWND hWnd, UINT message, WPARAM wParam, LPAR
 		if ((wParam == DBT_DEVICEARRIVAL) || (wParam == DBT_DEVICEREMOVECOMPLETE)) {
 			dev_bhd = (DEV_BROADCAST_HDR*)lParam;
 			if ( (dev_bhd->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) ) {
-				dev_bdi = (DEV_BROADCAST_DEVICEINTERFACE*)dev_bhd;
+				dev_bdi = (DEV_BROADCAST_DEVICEINTERFACE_A*)dev_bhd;
 				// We assert that a device interface path is just a device id plus a GUID
 				for (i = safe_strlen(dev_bdi->dbcc_name)-38; i >= 0; ) {	// GUID is 38 chars
 					if ((dev_bdi->dbcc_name[i--] == '{') && (dev_bdi->dbcc_name[i--] == '#')) {
@@ -686,8 +686,8 @@ LRESULT CALLBACK messaging_callback(HWND hWnd, UINT message, WPARAM wParam, LPAR
 unsigned __stdcall windows_hotplug_threaded(void* param)
 {
 	MSG msg;
-	WNDCLASSEX wc;
-	DEV_BROADCAST_DEVICEINTERFACE dev_bdi;
+	WNDCLASSEXA wc;
+	DEV_BROADCAST_DEVICEINTERFACE_A dev_bdi;
 	struct libusb_context* ctx = (struct libusb_context *)param;
 	struct windows_context_priv* ctx_priv = __context_priv(ctx);
 	BOOL r;
@@ -717,7 +717,7 @@ unsigned __stdcall windows_hotplug_threaded(void* param)
 	}
 
 	memset(&dev_bdi, 0, sizeof(dev_bdi));
-	dev_bdi.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
+	dev_bdi.dbcc_size = sizeof(dev_bdi);
 	dev_bdi.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
 	dev_bdi.dbcc_classguid = GUID_DEVINTERFACE_USB_DEVICE; //GUID_DEVCLASS_WCEUSBS;
 
