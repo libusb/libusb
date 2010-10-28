@@ -63,6 +63,9 @@ extern void usbi_fd_notification(struct libusb_context *ctx);
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
 static int windows_clock_gettime(int clk_id, struct timespec *tp);
 unsigned __stdcall windows_clock_gettime_threaded(void* param);
+// HUB (limited) API prototypes
+static int hub_open(struct libusb_device_handle *dev_handle);
+static void hub_close(struct libusb_device_handle *dev_handle);
 // WinUSB API prototypes
 static int winusb_init(struct libusb_context *ctx);
 static int winusb_exit(void);
@@ -1303,6 +1306,29 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	}
 
 	for (pass = 0; ((pass < nb_guids) && (r == LIBUSB_SUCCESS)); pass++) {
+//#define ENUM_DEBUG
+#ifdef ENUM_DEBUG
+		switch(pass) {
+		case HCD_PASS:
+			usbi_dbg("PROCESSING HCDs %s", guid_to_string(guid[pass]));
+			break;
+		case HUB_PASS:
+			usbi_dbg("PROCESSING HUBs %s", guid_to_string(guid[pass]));
+			break;
+		case DEV_PASS:
+			usbi_dbg("PROCESSING DEVs %s", guid_to_string(guid[pass]));
+			break;
+		case GEN_PASS:
+			usbi_dbg("PROCESSING GENs");
+			break;
+		case HID_PASS:
+			usbi_dbg("PROCESSING HIDs %s", guid_to_string(guid[pass]));
+			break;
+		default:
+			usbi_dbg("PROCESSING EXTs %s", guid_to_string(guid[pass]));
+			break;
+		}
+#endif
 		for (i = 0; ; i++) {
 			// safe loop: free up any (unprotected) dynamic resource
 			// NB: this is always executed before breaking the loop
@@ -1352,6 +1378,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					dev_info_data.DevInst);
 				continue;
 			}
+#ifdef ENUM_DEBUG
+			usbi_dbg("PRO: %s", dev_id_path);
+#endif
 
 			// The SPDRP_ADDRESS for USB devices is the device port number on the hub
 			port_nr = 0;
@@ -1369,7 +1398,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			api = USB_API_UNSUPPORTED;
 			switch (pass) {
 			case HCD_PASS:
-			case HUB_PASS:
 				break;
 			case GEN_PASS:
 				// We use the GEN pass to detect driverless devices...
@@ -1402,7 +1430,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			case HID_PASS:
 				api = USB_API_HID;
 				break;
-			default:	// DEV_PASS or EXT_PASS
+			default:
 				// Get the API type (after checking that the driver installation is OK)
 				if ( (!pSetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_INSTALL_STATE,
 					&reg_type, (BYTE*)&install_state, 4, &size))
@@ -1498,7 +1526,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			switch (pass) {
 			case HCD_PASS:
 				dev->bus_number = (uint8_t)(i + 1);	// bus 0 is reserved for disconnected
-				dev->device_address = 0; //UINT8_MAX;
+				dev->device_address = 0;
 				dev->num_configurations = 0;
 				priv->apib = &usb_api_backend[USB_API_HUB];
 				priv->depth = UINT8_MAX;	// Overflow to 0 for HCD Hubs
@@ -1534,10 +1562,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				}
 				break;
 			case HUB_PASS:
-				priv->apib = &usb_api_backend[USB_API_HUB];
+				priv->apib = &usb_api_backend[api];
 				priv->path = dev_interface_path; dev_interface_path = NULL;
 				break;
-				// fall through, as we must initialize hubs before generic devices
 			case GEN_PASS:
 				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_id_path);
 				if (r == LIBUSB_SUCCESS) {
@@ -2283,6 +2310,7 @@ static int unsupported_copy_transfer_data(struct usbi_transfer *itransfer, uint3
 }
 
 // These names must be uppercase
+const char* hub_driver_names[] = {"USBHUB"};
 const char* composite_driver_names[] = {"USBCCGP"};
 const char* winusb_driver_names[] = {"WINUSB"};
 const char* hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
@@ -2310,14 +2338,14 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		unsupported_copy_transfer_data,
 	}, {
 		USB_API_HUB,
-		"HUB API (Unsupported)",
+		"HUB API",
 		&CLASS_GUID_UNSUPPORTED,
-		NULL,
-		0,
+		hub_driver_names,
+		sizeof(hub_driver_names)/sizeof(hub_driver_names[0]),
 		unsupported_init,
 		unsupported_exit,
-		unsupported_open,
-		unsupported_close,
+		hub_open,
+		hub_close,
 		unsupported_claim_interface,
 		unsupported_set_interface_altsetting,
 		unsupported_release_interface,
@@ -2395,6 +2423,19 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	},
 };
 
+
+/*
+ * HUB API functions - only cached descriptors readout for now
+ * might be expanded if
+ */
+static int hub_open(struct libusb_device_handle *dev_handle)
+{
+	return LIBUSB_SUCCESS;
+}
+
+static void hub_close(struct libusb_device_handle *dev_handle)
+{
+}
 
 /*
  * WinUSB API functions
