@@ -948,7 +948,7 @@ static int force_hcd_device_descriptor(struct libusb_device *dev)
 /*
  * fetch and cache all the config descriptors through I/O
  */
-static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle)
+static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle, char* device_id)
 {
 	DWORD size, ret_size;
 	struct libusb_context *ctx = DEVICE_CTX(dev);
@@ -991,18 +991,18 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		// Dummy call to get the required data size
 		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
 			&cd_buf_short, size, &ret_size, NULL)) {
-			usbi_err(ctx, "could not access configuration descriptor (dummy): %s", windows_error_str(0));
+			usbi_err(ctx, "could not access configuration descriptor (dummy) for '%s': %s", device_id, windows_error_str(0));
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
 		if ((ret_size != size) || (cd_buf_short.data.wTotalLength < sizeof(USB_CONFIGURATION_DESCRIPTOR))) {
-			usbi_err(ctx, "unexpected configuration descriptor size (dummy).");
+			usbi_err(ctx, "unexpected configuration descriptor size (dummy) for '%s'.", device_id);
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
 		size = sizeof(USB_DESCRIPTOR_REQUEST) + cd_buf_short.data.wTotalLength;
 		if ((cd_buf_actual = (PUSB_DESCRIPTOR_REQUEST)malloc(size)) == NULL) {
-			usbi_err(ctx, "could not allocate configuration descriptor buffer. aborting.");
+			usbi_err(ctx, "could not allocate configuration descriptor buffer for '%s'.", device_id);
 			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 		}
 		memset(cd_buf_actual, 0, size);
@@ -1017,19 +1017,19 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 
 		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
 			cd_buf_actual, size, &ret_size, NULL)) {
-			usbi_err(ctx, "could not access configuration descriptor (actual): %s", windows_error_str(0));
+			usbi_err(ctx, "could not access configuration descriptor (actual) for '%s': %s", device_id, windows_error_str(0));
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
 		cd_data = (PUSB_CONFIGURATION_DESCRIPTOR)((UCHAR*)cd_buf_actual+sizeof(USB_DESCRIPTOR_REQUEST));
 
 		if ((size != ret_size) || (cd_data->wTotalLength != cd_buf_short.data.wTotalLength)) {
-			usbi_err(ctx, "unexpected configuration descriptor size (actual).");
+			usbi_err(ctx, "unexpected configuration descriptor size (actual) for '%s'.", device_id);
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
 		if (cd_data->bDescriptorType != USB_CONFIGURATION_DESCRIPTOR_TYPE) {
-			usbi_err(ctx, "not a configuration descriptor");
+			usbi_err(ctx, "not a configuration descriptor for '%s'", device_id);
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
@@ -1090,7 +1090,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			return LIBUSB_ERROR_IO;
 		}
 		if (conn_info.ConnectionStatus == NoDeviceConnected) {
-			usbi_err(ctx, "program assertion failed - no device connected");
+			usbi_err(ctx, "device '%s' is no longer connected!", device_id);
 			safe_closehandle(handle);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
@@ -1100,7 +1100,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		priv->active_config = conn_info.CurrentConfigurationValue;
 		usbi_dbg("found %d configurations (active conf: %d)", dev->num_configurations, priv->active_config);
 		// If we can't read the config descriptors, just set the number of confs to zero
-		if (cache_config_descriptors(dev, handle) != LIBUSB_SUCCESS) {
+		if (cache_config_descriptors(dev, handle, device_id) != LIBUSB_SUCCESS) {
 			dev->num_configurations = 0;
 			priv->dev_descriptor.bNumConfigurations = 0;
 		}
@@ -1468,9 +1468,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				// These are the passes that create "new" devices
 				session_id = htab_hash(dev_id_path);
 				dev = usbi_get_device_by_session_id(ctx, session_id);
-				if (dev != NULL) {
-					usbi_dbg("found existing device for session [%lX]", session_id);
-				} else {
+				if (dev == NULL) {
+					usbi_dbg("allocating new device for session [%lX]", session_id);
 					if (pass == DEV_PASS) {
 						usbi_err(ctx, "program assertion failed: device '%s' was not listed in generic pass", dev_id_path);
 						LOOP_BREAK(LIBUSB_ERROR_NOT_FOUND);
@@ -1479,9 +1478,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 					}
 					windows_device_priv_init(dev);
-
-					usbi_dbg("allocating new device for session [%lX]", session_id);
-
 					// Keep track of devices that need unref
 					unref_list[unref_cur++] = dev;
 					if (unref_cur > unref_size) {
@@ -1492,15 +1488,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 						}
 					}
-
-					// Append newly created devices to the list of discovered devices
-					if (pass != HCD_PASS) {
-						discdevs = discovered_devs_append(*_discdevs, dev);
-						if (!discdevs) {
-							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-						}
-						*_discdevs = discdevs;
-					}
+				} else {
+					usbi_dbg("found existing device for session [%lX]", session_id);
 				}
 				priv = __device_priv(dev);
 			}
@@ -1551,6 +1540,18 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				// fall through, as we must initialize hubs before generic devices
 			case GEN_PASS:
 				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_id_path);
+				if (r == LIBUSB_SUCCESS) {
+					// Append device to the list of discovered devices
+					discdevs = discovered_devs_append(*_discdevs, dev);
+					if (!discdevs) {
+						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+					}
+					*_discdevs = discdevs;
+				} else if (r == LIBUSB_ERROR_NO_DEVICE) {
+					// This can occur if the device was disconnected but Windows hasn't
+					// refreshed its enumeration yet - in that case, we ignore the device
+					r = LIBUSB_SUCCESS;
+				}
 				break;
 			default:	// HID_PASS and later
 				if (parent_priv->apib == &usb_api_backend[USB_API_HID]) {
