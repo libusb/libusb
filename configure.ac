@@ -59,8 +59,7 @@ case $host in
 	AC_MSG_RESULT([Darwin/MacOS X])
 	backend="darwin"
 	threads="posix"
-	THREAD_CFLAGS="-pthread"
-	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-prebind -no-undefined -pthread"
+	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-prebind -no-undefined"
 	AM_LDFLAGS=${PC_LIBS_PRIVATE}
 	AC_CHECK_HEADERS([poll.h])
 	AC_CHECK_TYPE([nfds_t],
