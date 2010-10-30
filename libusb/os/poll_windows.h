@@ -61,8 +61,6 @@ struct pollfd {
     short revents;    /* returned events */
 };
 
-typedef unsigned int nfds_t;
-
 // access modes
 enum rw_type {
 	RW_NONE,

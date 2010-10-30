@@ -49,6 +49,8 @@ case $host in
 	THREAD_CFLAGS="-pthread"
 	PC_LIBS_PRIVATE="${PC_LIBS_PRIVATE} -pthread"
 	AM_LDFLAGS=""
+	AC_CHECK_HEADERS([poll.h])
+	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
 *-darwin*)
 	AC_DEFINE(OS_DARWIN, [], [Darwin backend])
@@ -60,6 +62,11 @@ case $host in
 	THREAD_CFLAGS="-pthread"
 	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-prebind -no-undefined -pthread"
 	AM_LDFLAGS=${PC_LIBS_PRIVATE}
+	AC_CHECK_HEADERS([poll.h])
+	AC_CHECK_TYPE([nfds_t],
+		[AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])],
+		[AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])],
+		[#include <poll.h>])
 ;;
 *-mingw*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
@@ -72,6 +79,7 @@ case $host in
 	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version --add-stdcall-alias"
 	AC_CHECK_TOOL(RC, windres, no)
+	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	;;
 *-cygwin*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
@@ -84,6 +92,7 @@ case $host in
 	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
+	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	;;
 *)
 	AC_MSG_ERROR([unsupported operating system])

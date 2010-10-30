@@ -2084,7 +2084,7 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 }
 
 static int op_handle_events(struct libusb_context *ctx,
-	struct pollfd *fds, nfds_t nfds, int num_ready)
+	struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready)
 {
 	int r;
 	int i = 0;

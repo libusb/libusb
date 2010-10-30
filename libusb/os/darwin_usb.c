@@ -1447,7 +1447,7 @@ static void darwin_handle_callback (struct usbi_transfer *itransfer, kern_return
   usbi_handle_transfer_completion (itransfer, darwin_transfer_status (itransfer, result));
 }
 
-static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds, int num_ready) {
+static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready) {
   struct usbi_transfer *itransfer;
   UInt32 io_size;
   IOReturn kresult;

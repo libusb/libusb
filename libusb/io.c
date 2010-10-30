@@ -1793,7 +1793,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 {
 	int r;
 	struct usbi_pollfd *ipollfd;
-	nfds_t nfds = 0;
+	POLL_NFDS_TYPE nfds = 0;
 	struct pollfd *fds;
 	int i = -1;
 	int timeout_ms;

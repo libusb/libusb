@@ -26,6 +26,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
 
 #include <libusb.h>
 
@@ -193,6 +196,7 @@ static inline void usbi_dbg(const char *format, ...)
 #endif
 
 #if defined(OS_LINUX) || defined(OS_DARWIN)
+#include <unistd.h>
 #include <os/poll_posix.h>
 #elif defined(OS_WINDOWS)
 #include <os/poll_windows.h>
@@ -828,7 +832,7 @@ struct usbi_os_backend {
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */
 	int (*handle_events)(struct libusb_context *ctx,
-		struct pollfd *fds, nfds_t nfds, int num_ready);
+		struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready);
 
 	/* Get time from specified clock. At least two clocks must be implemented
 	   by the backend: USBI_CLOCK_REALTIME, and USBI_CLOCK_MONOTONIC.
