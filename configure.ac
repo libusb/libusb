@@ -40,27 +40,22 @@ case $host in
 *-linux*)
 	AC_DEFINE(OS_LINUX, [], [Linux backend])
 	AC_SUBST(OS_LINUX)
-	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
 	AC_MSG_RESULT([Linux])
 	backend="linux"
 	AC_CHECK_LIB(rt, clock_gettime, PC_LIBS_PRIVATE="-lrt")
-	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
 	PC_LIBS_PRIVATE="${PC_LIBS_PRIVATE} -pthread"
-	AM_LDFLAGS=""
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
 *-darwin*)
 	AC_DEFINE(OS_DARWIN, [], [Darwin backend])
 	AC_SUBST(OS_DARWIN)
-	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
 	AC_MSG_RESULT([Darwin/Mac OS X])
 	backend="darwin"
 	threads="posix"
 	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-prebind -no-undefined"
-	AM_LDFLAGS=${PC_LIBS_PRIVATE}
 	AC_CHECK_HEADERS([poll.h])
 	AC_CHECK_TYPE([nfds_t],
 		[AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])],
@@ -72,10 +67,7 @@ case $host in
 	AC_SUBST(OS_WINDOWS)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
-	threads="windows"
 	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
-	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
-	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version --add-stdcall-alias"
 	AC_CHECK_TOOL(RC, windres, no)
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
@@ -83,12 +75,10 @@ case $host in
 *-cygwin*)
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
 	AC_SUBST(OS_WINDOWS)
-	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
 	AC_MSG_RESULT([Cygwin (using Windows backend)])
 	backend="windows"
 	threads="posix"
 	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
-	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
@@ -97,11 +87,15 @@ case $host in
 	AC_MSG_ERROR([unsupported operating system])
 esac
 AC_SUBST(PC_LIBS_PRIVATE)
+LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 
-AM_CONDITIONAL([OS_LINUX], [test "x$backend" = "xlinux"])
-AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = "xdarwin"])
-AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" = "xwindows"])
-AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" = "xposix"])
+AM_CONDITIONAL(OS_LINUX, test "x$backend" = xlinux)
+AM_CONDITIONAL(OS_DARWIN, test "x$backend" = xdarwin)
+AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
+AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
+if test "$threads" = posix; then
+	AC_DEFINE(THREADS_POSIX, 1, [Use POSIX Threads])
+fi
 
 # timerfd
 AC_CHECK_HEADER([sys/timerfd.h], [timerfd_h=1], [timerfd_h=0])
