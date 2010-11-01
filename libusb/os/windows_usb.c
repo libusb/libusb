@@ -1050,7 +1050,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 }
 
 /*
- * Populate a device
+ * Populate a libusb device structure
  */
 static int init_device(struct libusb_device* dev, struct libusb_device* parent_dev,
 					   uint8_t port_number, char* device_id)
@@ -1067,7 +1067,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	priv = __device_priv(dev);
 	parent_priv = __device_priv(parent_dev);
 	if (parent_priv->apib != &usb_api_backend[USB_API_HUB]) {
-		usbi_warn(ctx, "parent device is not a hub");
+		usbi_warn(ctx, "parent for device '%s' is not a hub", device_id);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
@@ -1088,9 +1088,10 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		conn_info.ConnectionIndex = (ULONG)port_number;
 		if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION, &conn_info, size,
 			&conn_info, size, &size, NULL)) {
-			usbi_warn(ctx, "could not get node connection information: %s", windows_error_str(0));
+			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
+				device_id, windows_error_str(0));
 			safe_closehandle(handle);
-			return LIBUSB_ERROR_IO;
+			return LIBUSB_ERROR_NO_DEVICE;
 		}
 		if (conn_info.ConnectionStatus == NoDeviceConnected) {
 			usbi_err(ctx, "device '%s' is no longer connected!", device_id);
@@ -1480,8 +1481,10 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					}
 				}
 				if (parent_dev == NULL) {
-					usbi_err(ctx, "program assertion failed: unlisted parent for '%s'", dev_id_path);
-					LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
+					// This can occur if the OS only reports a newly plugged device after we started enum,
+					// eg. HID parent not listed on GEN pass, but children listed on HID pass
+					usbi_warn(ctx, "unlisted parent for '%s' (newly connected device?) - ignoring", dev_id_path);
+					continue;
 				}
 				parent_priv = __device_priv(parent_dev);
 				// virtual USB devices are also listed during GEN - don't process these yet
@@ -1497,11 +1500,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				session_id = htab_hash(dev_id_path);
 				dev = usbi_get_device_by_session_id(ctx, session_id);
 				if (dev == NULL) {
-					usbi_dbg("allocating new device for session [%lX]", session_id);
 					if (pass == DEV_PASS) {
-						usbi_err(ctx, "program assertion failed: device '%s' was not listed in generic pass", dev_id_path);
-						LOOP_BREAK(LIBUSB_ERROR_NOT_FOUND);
+						// This can occur if the OS only reports a newly plugged device after we started enum
+						usbi_warn(ctx, "'%s' was only detected in late pass (newly connected device?)"
+							" - ignoring", dev_id_path);
+						continue;
 					}
+					usbi_dbg("allocating new device for session [%X]", session_id);
 					if ((dev = usbi_alloc_device(ctx, session_id)) == NULL) {
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 					}
@@ -1517,7 +1522,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						}
 					}
 				} else {
-					usbi_dbg("found existing device for session [%lX]", session_id);
+					usbi_dbg("found existing device for session [%X]", session_id);
 				}
 				priv = __device_priv(dev);
 			}
