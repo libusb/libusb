@@ -567,55 +567,30 @@ unsigned long htab_hash(char* str)
 }
 
 /*
- * Returns the Device ID path of a device's parent
+ * Returns the session ID of a device's nth level ancestor
  */
-static unsigned long get_parent_session_id(DWORD devinst)
+static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 {
 	DWORD parent_devinst;
 	unsigned long session_id = 0;
 	char* sanitized_path = NULL;
 	char path[MAX_PATH_LENGTH];
+	unsigned i;
 
-	if (CM_Get_Parent(&parent_devinst, devinst, 0) != CR_SUCCESS) {
+	if (level < 1) return 0;
+	for (i = 0; i<level; i++) {
+		if (CM_Get_Parent(&parent_devinst, devinst, 0) != CR_SUCCESS) {
+			return 0;
+		}
+		devinst = parent_devinst;
+	}
+	if (CM_Get_Device_IDA(devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
 		return 0;
 	}
-	if (CM_Get_Device_IDA(parent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
-		return 0;
-	}
-	sanitized_path = sanitize_path(path);
-	if (sanitized_path == NULL) {
-		return 0;
-	}
-	session_id = htab_hash(sanitized_path);
-	safe_free(sanitized_path);
-	return session_id;
-}
-
-/*
- * Returns the Device ID path of a device's grandparent
- */
-static unsigned long get_grandparent_session_id(DWORD devinst, bool* non_usb_gp)
-{
-	DWORD parent_devinst, grandparent_devinst;
-	unsigned long session_id = 0;
-	char* sanitized_path = NULL;
-	char path[MAX_PATH_LENGTH];
-
-	*non_usb_gp = false;
-	if (CM_Get_Parent(&parent_devinst, devinst, 0) != CR_SUCCESS) {
-		return 0;
-	}
-	if (CM_Get_Parent(&grandparent_devinst, parent_devinst, 0) != CR_SUCCESS) {
-		return 0;
-	}
-	if (CM_Get_Device_IDA(grandparent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
-		return 0;
-	}
-	// If the grandparent is not USB (as can be the case for HID), flag it
-	if ((path[0] != 'U') && (path[1] != 'S') && (path[2] != 'B')) {
-		usbi_dbg("detected non USB grandparent '%s'", path);
-		*non_usb_gp = true;
-		return 0;
+	// Return a special invalid session ID if the GP is not USB (as can be the case for HID)
+	if ((level == 2) && (path[0] != 'U') && (path[1] != 'S') && (path[2] != 'B')) {
+		usbi_dbg("detected non USB parent '%s'", path);
+		return ~0;
 	}
 	// TODO (post hotplug): try without sanitizing
 	sanitized_path = sanitize_path(path);
@@ -1053,13 +1028,15 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
  * Populate a libusb device structure
  */
 static int init_device(struct libusb_device* dev, struct libusb_device* parent_dev,
-					   uint8_t port_number, char* device_id)
+					   uint8_t port_number, char* device_id, DWORD devinst)
 {
 	HANDLE handle;
 	DWORD size;
 	USB_NODE_CONNECTION_INFORMATION conn_info;
 	struct windows_device_priv *priv, *parent_priv;
 	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_device* tmp_dev;
+	unsigned i;
 
 	if ((dev == NULL) || (parent_dev == NULL)) {
 		return LIBUSB_ERROR_NOT_FOUND;
@@ -1071,6 +1048,23 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
+	// It is possible for the parent hub not to have been initialized yet
+	// If that's the case, lookup the ancestors to set the bus number
+	if (parent_dev->bus_number == 0) {
+		for (i=2; ; i++) {
+			tmp_dev = usbi_get_device_by_session_id(ctx, get_ancestor_session_id(devinst, i));
+			if (tmp_dev == NULL) break;
+			if (tmp_dev->bus_number != 0) {
+				usbi_dbg("got bus number from ancestor #%d", i);
+				parent_dev->bus_number = tmp_dev->bus_number;
+				break;
+			}
+		}
+	}
+	if (parent_dev->bus_number == 0) {
+		usbi_err(ctx, "program assertion failed: unable to find ancestor bus number for '%s'", device_id);
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
 	dev->bus_number = parent_dev->bus_number;
 	priv->port = port_number;
 	priv->depth = parent_priv->depth + 1;
@@ -1278,7 +1272,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	GUID* if_guid;
 	LONG s;
 	uint8_t api;
-	bool non_usb_hid_parent;
 	// Keep a list of newly allocated devs to unref
 	libusb_device** unref_list;
 	unsigned int unref_size = 64;
@@ -1454,7 +1447,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			case HUB_PASS:
 				break;
 			default:
-				session_id = get_parent_session_id(dev_info_data.DevInst);
+				session_id = get_ancestor_session_id(dev_info_data.DevInst, 1);
 				if (session_id == 0) {
 					usbi_err(ctx, "program assertion failed: orphan device '%s'", dev_id_path);
 					LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
@@ -1462,14 +1455,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				parent_dev = usbi_get_device_by_session_id(ctx, session_id);
 				// Composite HID devices have double indirection => Check grandparent
 				if (pass == HID_PASS) {
-					session_id = get_grandparent_session_id(dev_info_data.DevInst, &non_usb_hid_parent);
+					session_id = get_ancestor_session_id(dev_info_data.DevInst, 2);
 					if (session_id == 0) {
-						if (non_usb_hid_parent) {
-							usbi_dbg("skipping non USB HID interface '%s'", dev_id_path);
-							continue;
-						}
 						usbi_err(ctx, "program assertion failed: no grandparent for '%s'", dev_id_path);
 						LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
+					} else if (session_id == ~0) {
+						usbi_dbg("skipping non USB HID interface '%s'", dev_id_path);
+						continue;
 					}
 					dev = usbi_get_device_by_session_id(ctx, session_id);
 					if (dev == NULL) {
@@ -1571,7 +1563,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				priv->path = dev_interface_path; dev_interface_path = NULL;
 				break;
 			case GEN_PASS:
-				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_id_path);
+				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_id_path, dev_info_data.DevInst);
 				if (r == LIBUSB_SUCCESS) {
 					// Append device to the list of discovered devices
 					discdevs = discovered_devs_append(*_discdevs, dev);
