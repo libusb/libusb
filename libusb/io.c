@@ -2124,23 +2124,21 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 		if (transfer->flags & (USBI_TRANSFER_TIMED_OUT | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
 			continue;
 
+		/* no timeout for this transfer? */
+		if (!timerisset(&transfer->timeout))
+			continue;
+
 		found = 1;
 		break;
 	}
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
 	if (!found) {
-		usbi_dbg("all URBs have already been processed for timeouts");
+		usbi_dbg("no URB with timeout or all handled by OS; no timeout!");
 		return 0;
 	}
 
 	next_timeout = &transfer->timeout;
-
-	/* no timeout for next transfer */
-	if (!timerisset(next_timeout)) {
-		usbi_dbg("no URBs with timeouts, no timeout!");
-		return 0;
-	}
 
 	r = usbi_backend->clock_gettime(USBI_CLOCK_MONOTONIC, &cur_ts);
 	if (r < 0) {
