@@ -38,6 +38,8 @@
 #define STATUS_COMPLETED_SYNCHRONOUSLY	STATUS_REPARSE
 #define HasOverlappedIoCompletedSync(lpOverlapped)	(((DWORD)(lpOverlapped)->Internal) == STATUS_COMPLETED_SYNCHRONOUSLY)
 
+#define DUMMY_HANDLE ((HANDLE)(LONG_PTR)-2)
+
 enum windows_version {
 	WINDOWS_UNSUPPORTED,
 	WINDOWS_XP,
