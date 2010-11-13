@@ -401,7 +401,8 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 		wfd.rw = RW_WRITE;
 	}
 
-	// Ensure that we get a non system conflicting unique fd
+	// Ensure that we get a non system conflicting unique fd, using
+	// the same fd attribution system as the pipe ends
 	fd = _open_osfhandle((intptr_t)CreateFileA("NUL", 0, 0,
 		NULL, OPEN_EXISTING, 0, NULL), _O_RDWR);
 	if (fd < 0) {
@@ -788,10 +789,9 @@ int usbi_close(int fd)
 			CloseHandle(poll_fd[_index].overlapped->hEvent);
 			free(poll_fd[_index].overlapped);
 		}
-		if (CloseHandle(poll_fd[_index].handle) == 0) {
+		r = _close(poll_fd[_index].fd);
+		if (r != 0) {
 			errno = EIO;
-		} else {
-			r = 0;
 		}
 		poll_fd[_index] = INVALID_WINFD;
 		LeaveCriticalSection(&_poll_fd[_index].mutex);
