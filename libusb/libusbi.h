@@ -129,13 +129,13 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 #ifdef ENABLE_LOGGING
 #define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __FUNCTION__, __VA_ARGS__)
 #else
-#define _usbi_log(ctx, level, ...)
+#define _usbi_log(ctx, level, ...) do {} while(0)
 #endif
 
 #ifdef ENABLE_DEBUG_LOGGING
 #define usbi_dbg(...) _usbi_log(NULL, LOG_LEVEL_DEBUG, __VA_ARGS__)
 #else
-#define usbi_dbg(...)
+#define usbi_dbg(...) do {} while(0)
 #endif
 
 #define usbi_info(ctx, ...) _usbi_log(ctx, LOG_LEVEL_INFO, __VA_ARGS__)
