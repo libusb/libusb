@@ -363,7 +363,7 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 	char tmp[4] = {0, 0, 0, 0};
 	long num;
 	int fd;
-	size_t r;
+	ssize_t r;
 
 	fd = __open_sysfs_attr(dev, "bConfigurationValue");
 	if (fd < 0)
@@ -407,7 +407,7 @@ static int seek_to_next_config(struct libusb_context *ctx, int fd,
 	struct libusb_config_descriptor config;
 	unsigned char tmp[6];
 	off_t off;
-	int r;
+	ssize_t r;
 
 	/* read first 6 bytes of descriptor */
 	r = read(fd, tmp, sizeof(tmp));
