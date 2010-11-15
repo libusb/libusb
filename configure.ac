@@ -15,9 +15,7 @@ AC_SUBST([LIBUSB_VERSION_MICRO], [LIBUSB_MICRO])
 lt_current="1"
 lt_revision="0"
 lt_age="1"
-AC_SUBST(lt_current)
-AC_SUBST(lt_revision)
-AC_SUBST(lt_age)
+LTLDFLAGS="-version-info ${lt_current}:${lt_revision}:${lt_age}"
 
 AM_INIT_AUTOMAKE
 AM_MAINTAINER_MODE
@@ -34,6 +32,8 @@ AC_C_INLINE
 AM_PROG_CC_C_O
 AC_DEFINE([_GNU_SOURCE], 1, [Use GNU extensions])
 
+LTLDFLAGS="${LTLDFLAGS} -no-undefined"
+
 AC_MSG_CHECKING([operating system])
 case $host in
 *-linux*)
@@ -45,7 +45,6 @@ case $host in
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
 	PC_LIBS_PRIVATE="${PC_LIBS_PRIVATE} -pthread"
-	AM_LDFLAGS="-Wl,--no-undefined"
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
@@ -56,7 +55,7 @@ case $host in
 	backend="darwin"
 	threads="posix"
 	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation"
-	AM_LDFLAGS="-Wl,-prebind -Wl,--no-undefined"
+	LTLDFLAGS="${LTLDFLAGS} -Wl,-prebind"
 	AC_CHECK_HEADERS([poll.h])
 	AC_CHECK_TYPE([nfds_t],
 		[AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])],
@@ -69,7 +68,7 @@ case $host in
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
-	AM_LDFLAGS="-no-undefined -avoid-version --add-stdcall-alias"
+	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
 	AC_CHECK_TOOL(RC, windres, no)
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	;;
@@ -80,7 +79,7 @@ case $host in
 	backend="windows"
 	threads="posix"
 	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
-	AM_LDFLAGS="-no-undefined -avoid-version --add-stdcall-alias"
+	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
 	AC_CHECK_TOOL(RC, windres, no)
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	;;
@@ -188,7 +187,7 @@ AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes 
 
 AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)
-AC_SUBST(AM_LDFLAGS)
+AC_SUBST(LTLDFLAGS)
 
 AC_CONFIG_FILES([libusb-1.0.pc])
 AC_CONFIG_FILES([Makefile])
