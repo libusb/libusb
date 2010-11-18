@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir)
+INCLUDES = -I$(top_srcdir)/libusb
 noinst_PROGRAMS = xusb lsusb
 
 lsusb_SOURCES = lsusb.c

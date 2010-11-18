@@ -29,7 +29,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include <libusb/libusb.h>
+#include "libusb.h"
 
 #ifdef OS_WINDOWS
 #define msleep(msecs) Sleep(msecs)

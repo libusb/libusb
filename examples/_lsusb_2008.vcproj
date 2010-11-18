@@ -45,7 +45,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\"
+				AdditionalIncludeDirectories="..\libusb"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				RuntimeLibrary="1"
 				WarningLevel="3"
@@ -117,7 +117,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\"
+				AdditionalIncludeDirectories="..\libusb"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				RuntimeLibrary="1"
 				WarningLevel="3"
@@ -188,7 +188,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="..\"
+				AdditionalIncludeDirectories="..\libusb"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="0"
 				WarningLevel="3"
@@ -258,7 +258,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="..\"
+				AdditionalIncludeDirectories="..\libusb"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="0"
 				WarningLevel="3"
