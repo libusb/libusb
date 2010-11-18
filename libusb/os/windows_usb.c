@@ -1205,21 +1205,22 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 
 	// HID devices can have multiple collections (COL##) for each MI_## interface
 	if (priv->usb_interface[interface_number].path != NULL) {
-		usbi_dbg("interface_path[%d] already set - ignoring HID collection: %s",
-			interface_number, device_id);
 		if (api != USB_API_HID) {
-			usbi_warn(ctx, "program assertion failed - not an HID collection");
+			usbi_warn(ctx, "program assertion failed %s is not an USB HID collection", device_id);
+			return LIBUSB_ERROR_OTHER;
 		}
-	} else {
-		priv->usb_interface[interface_number].path = dev_interface_path;
-		priv->usb_interface[interface_number].apib = &usb_api_backend[api];
-		if ((api == USB_API_HID) && (priv->hid == NULL)) {
-			priv->hid = calloc(1, sizeof(struct hid_device_priv));
-		}
-		priv->composite_api_flags |= 1<<api;
+		usbi_dbg("interface[%d] already set - ignoring HID collection: %s",
+			interface_number, device_id);
+		return LIBUSB_ERROR_ACCESS;
 	}
 
 	usbi_dbg("interface[%d] = %s", interface_number, dev_interface_path);
+	priv->usb_interface[interface_number].path = dev_interface_path;
+	priv->usb_interface[interface_number].apib = &usb_api_backend[api];
+	if ((api == USB_API_HID) && (priv->hid == NULL)) {
+		priv->hid = calloc(1, sizeof(struct hid_device_priv));
+	}
+	priv->composite_api_flags |= 1<<api;
 
 	return LIBUSB_SUCCESS;
 }
@@ -1585,9 +1586,17 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					dev_interface_path = NULL;
 				} else if (parent_priv->apib == &usb_api_backend[USB_API_COMPOSITE]) {
 					usbi_dbg("setting composite interface for [%lX]:", parent_dev->session_data);
-					r = set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api);
-					if (r != LIBUSB_SUCCESS) LOOP_BREAK(r);
-					dev_interface_path = NULL;
+					switch (set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api)) {
+					case LIBUSB_SUCCESS:
+						dev_interface_path = NULL;
+						break;
+					case LIBUSB_ERROR_ACCESS:
+						// interface has already been set => make sure dev_interface_path is freed then
+						break;
+					default:
+						LOOP_BREAK(r);
+						break;
+					}
 				}
 				break;
 			}
