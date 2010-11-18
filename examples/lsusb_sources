@@ -14,6 +14,6 @@ USE_MSVCRT=1
 !ENDIF
 
 UMTYPE=console
-INCLUDES=..\..\msvc;..\..;$(DDK_INC_PATH)
+INCLUDES=..\..;$(DDK_INC_PATH)
 UMLIBS=..\..\libusb\os\obj$(BUILD_ALT_DIR)\*\libusb-1.0.lib
 SOURCES=..\lsusb.c
