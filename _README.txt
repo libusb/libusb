@@ -7,11 +7,9 @@
 
 o Visual Studio:
   - Open existing or create a new project for your application
-  - Copy the libusb.h and (if not using Visual Studio 2010) stdint.h into your
-    project and make sure that the location where the file(s) reside appears in
-    the 'Additional Include Directories' section (Configuration Properties ->
-    C/C++ -> General).
-    The stdint.h file is located in the additional_includes\ directory.
+  - Copy the libusb.h into your project and make sure that the location where
+    the file reside appears in the 'Additional Include Directories' section
+    (Configuration Properties -> C/C++ -> General).
   - Copy the relevant .lib file from MS32\ or MS64\ and add 'libusb-1.0.lib' to
     your 'Additional Dependencies' (Configuration Properties -> Linker -> Input)
     Also make sure that the directory where libusb-1.0.lib resides is added to
@@ -29,8 +27,8 @@ o Visual Studio:
 o WDK/DDK:
   - The following is an example of a sources files that you can use to compile
     a libusb 1.0 based console application. In this sample ..\libusb\ is the
-    directory where you would have copied libusb.h, stdint.h as well as the
-    relevant libusb-1.0.lib
+    directory where you would have copied libusb.h as well as the relevant 
+    libusb-1.0.lib
 
 	TARGETNAME=your_app
 	TARGETTYPE=PROGRAM
@@ -39,8 +37,6 @@ o WDK/DDK:
 	INCLUDES=..\libusb;$(DDK_INC_PATH)
 	TARGETLIBS=..\libusb\libusb-1.0.lib
 	SOURCES=your_app.c
-	
-    The stdint.h file is located in the additional_includes\ directory.	
 
   - Note that if you plan to use libCMT instead of MSVCRT (USE_LIBCMT=1 instead
     of USE_MSVCRT=1), you will need to recompile libusb to use libCMT. This can
