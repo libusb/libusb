@@ -1182,10 +1182,18 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   /* are we reading or writing? */
   is_read = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-  /* construct an array of IOUSBIsocFrames */
-  tpriv->isoc_framelist = (IOUSBIsocFrame*) calloc (transfer->num_iso_packets, sizeof(IOUSBIsocFrame));
-  if (!tpriv->isoc_framelist)
-    return LIBUSB_ERROR_NO_MEM;
+  /* construct an array of IOUSBIsocFrames, reuse the old one if possible */
+  if (tpriv->isoc_framelist && tpriv->num_iso_packets != transfer->num_iso_packets) {
+    free(tpriv->isoc_framelist);
+    tpriv->isoc_framelist = NULL;
+  }
+
+  if (!tpriv->isoc_framelist) {
+    tpriv->num_iso_packets = transfer->num_iso_packets;
+    tpriv->isoc_framelist = (IOUSBIsocFrame*) calloc (transfer->num_iso_packets, sizeof(IOUSBIsocFrame));
+    if (!tpriv->isoc_framelist)
+      return LIBUSB_ERROR_NO_MEM;
+  }
 
   /* copy the frame list from the libusb descriptor (the structures differ only is member order) */
   for (i = 0 ; i < transfer->num_iso_packets ; i++)

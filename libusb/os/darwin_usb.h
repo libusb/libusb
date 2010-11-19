@@ -146,6 +146,7 @@ struct darwin_device_handle_priv {
 struct darwin_transfer_priv {
   /* Isoc */
   IOUSBIsocFrame *isoc_framelist;
+  size_t num_iso_packets;
 
   /* Control */
 #if !defined (LIBUSB_NO_TIMEOUT_DEVICE)
