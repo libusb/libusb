@@ -1219,7 +1219,10 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   }
 
   /* schedule for a frame a little in the future */
-  frame += 2;
+  frame += 4;
+
+  if (cInterface->frames[transfer->endpoint] && frame < cInterface->frames[transfer->endpoint])
+    frame = cInterface->frames[transfer->endpoint];
 
   /* submit the request */
   if (is_read)
@@ -1230,6 +1233,8 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
     kresult = (*(cInterface->interface))->WriteIsochPipeAsync(cInterface->interface, pipeRef, transfer->buffer, frame,
 							      transfer->num_iso_packets, tpriv->isoc_framelist, darwin_async_io_callback,
 							      itransfer);
+
+  cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets / 8;
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (TRANSFER_CTX (transfer), "isochronous transfer failed (dir: %s): %s", is_read ? "In" : "Out",
