@@ -45,6 +45,7 @@ case $host in
 	threads="posix"
 	THREAD_CFLAGS="-pthread"
 	PC_LIBS_PRIVATE="${PC_LIBS_PRIVATE} -pthread"
+	AM_LDFLAGS="-Wl,--no-undefined"
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
@@ -54,7 +55,8 @@ case $host in
 	AC_MSG_RESULT([Darwin/Mac OS X])
 	backend="darwin"
 	threads="posix"
-	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-prebind -no-undefined"
+	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation"
+	AM_LDFLAGS="-Wl,-prebind -Wl,--no-undefined"
 	AC_CHECK_HEADERS([poll.h])
 	AC_CHECK_TYPE([nfds_t],
 		[AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])],
@@ -78,7 +80,7 @@ case $host in
 	backend="windows"
 	threads="posix"
 	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
-	AM_LDFLAGS="-no-undefined -avoid-version"
+	AM_LDFLAGS="-no-undefined -avoid-version --add-stdcall-alias"
 	AC_CHECK_TOOL(RC, windres, no)
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	;;
