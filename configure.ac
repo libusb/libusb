@@ -30,7 +30,7 @@ AC_PROG_CC
 AC_PROG_LIBTOOL
 AC_C_INLINE
 AM_PROG_CC_C_O
-AC_DEFINE([_GNU_SOURCE], [], [Use GNU extensions])
+AC_DEFINE([_GNU_SOURCE], 1, [Use GNU extensions])
 
 AM_MAINTAINER_MODE
 
@@ -38,7 +38,7 @@ AC_MSG_CHECKING([operating system])
 PC_LIBS_PRIVATE=
 case $host in
 *-linux*)
-	AC_DEFINE(OS_LINUX, [], [Linux backend])
+	AC_DEFINE(OS_LINUX, 1, [Linux backend])
 	AC_SUBST(OS_LINUX)
 	AC_MSG_RESULT([Linux])
 	backend="linux"
@@ -50,7 +50,7 @@ case $host in
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
 *-darwin*)
-	AC_DEFINE(OS_DARWIN, [], [Darwin backend])
+	AC_DEFINE(OS_DARWIN, 1, [Darwin backend])
 	AC_SUBST(OS_DARWIN)
 	AC_MSG_RESULT([Darwin/Mac OS X])
 	backend="darwin"
@@ -63,7 +63,7 @@ case $host in
 		[#include <poll.h>])
 ;;
 *-mingw*)
-	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
+	AC_DEFINE(OS_WINDOWS, 1, [Windows backend])
 	AC_SUBST(OS_WINDOWS)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
@@ -73,7 +73,7 @@ case $host in
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	;;
 *-cygwin*)
-	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
+	AC_DEFINE(OS_WINDOWS, 1, [Windows backend])
 	AC_SUBST(OS_WINDOWS)
 	AC_MSG_RESULT([Cygwin (using Windows backend)])
 	backend="windows"
@@ -119,7 +119,7 @@ if test "x$use_timerfd" = "xno"; then
 else
 	if test "x$timerfd_h" = "x1" -a "x$tfd_hdr_ok" = "xyes"; then
 		AC_MSG_RESULT([yes])
-		AC_DEFINE(USBI_TIMERFD_AVAILABLE, [], [timerfd headers available])
+		AC_DEFINE(USBI_TIMERFD_AVAILABLE, 1, [timerfd headers available])
 	else
 		AC_MSG_RESULT([no (header not available)])
 	fi
