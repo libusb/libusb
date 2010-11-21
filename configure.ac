@@ -20,6 +20,8 @@ AC_SUBST(lt_revision)
 AC_SUBST(lt_age)
 
 AM_INIT_AUTOMAKE
+AM_MAINTAINER_MODE
+
 AC_CONFIG_SRCDIR([libusb/core.c])
 AC_CONFIG_MACRO_DIR([m4])
 AM_CONFIG_HEADER([config.h])
@@ -32,10 +34,7 @@ AC_C_INLINE
 AM_PROG_CC_C_O
 AC_DEFINE([_GNU_SOURCE], 1, [Use GNU extensions])
 
-AM_MAINTAINER_MODE
-
 AC_MSG_CHECKING([operating system])
-PC_LIBS_PRIVATE=
 case $host in
 *-linux*)
 	AC_DEFINE(OS_LINUX, 1, [Linux backend])
@@ -61,7 +60,7 @@ case $host in
 		[AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])],
 		[AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])],
 		[#include <poll.h>])
-;;
+	;;
 *-mingw*)
 	AC_DEFINE(OS_WINDOWS, 1, [Windows backend])
 	AC_SUBST(OS_WINDOWS)
@@ -86,6 +85,7 @@ case $host in
 *)
 	AC_MSG_ERROR([unsupported operating system])
 esac
+AC_SUBST(THREAD_CFLAGS)
 AC_SUBST(PC_LIBS_PRIVATE)
 LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 
@@ -182,8 +182,6 @@ AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
 # headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 
-AC_SUBST([THREAD_CFLAGS])
-
 AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
 
 AC_SUBST(VISIBILITY_CFLAGS)
@@ -192,4 +190,3 @@ AC_SUBST(AM_LDFLAGS)
 
 AC_CONFIG_FILES([libusb-1.0.pc] [Makefile] [libusb/Makefile] [libusb/libusb-1.0.rc] [examples/Makefile] [doc/Makefile] [doc/doxygen.cfg])
 AC_OUTPUT
-
