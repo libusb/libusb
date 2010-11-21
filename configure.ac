@@ -153,14 +153,14 @@ AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != "xno"])
 # Restore gnu89 inline semantics on gcc 4.3 and newer
 saved_cflags="$CFLAGS"
 CFLAGS="$CFLAGS -fgnu89-inline"
-AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]), inline_cflags="-fgnu89-inline", inline_cflags="")
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])], inline_cflags="-fgnu89-inline", inline_cflags="")
 CFLAGS="$saved_cflags"
 
 # check for -fvisibility=hidden compiler support (GCC >= 3.4)
 saved_cflags="$CFLAGS"
 # -Werror required for cygwin
 CFLAGS="$CFLAGS -Werror -fvisibility=hidden"
-AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
 	[VISIBILITY_CFLAGS="-fvisibility=hidden"
 	 AC_DEFINE([DEFAULT_VISIBILITY], [__attribute__((visibility("default")))], [Default visibility]) ],
 	[ VISIBILITY_CFLAGS=""
@@ -171,7 +171,7 @@ CFLAGS="$saved_cflags"
 # check for -Wno-pointer-sign compiler support (GCC >= 4)
 saved_cflags="$CFLAGS"
 CFLAGS="$CFLAGS -Wno-pointer-sign"
-AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
 	nopointersign_cflags="-Wno-pointer-sign", nopointersign_cflags="")
 CFLAGS="$saved_cflags"
 
