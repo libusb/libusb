@@ -10,7 +10,7 @@ be ported to other operating systems. See the PORTING file for some
 information, if you fancy a challenge :)
 
 libusb homepage:
-http://libusb.sourceforge.net
+http://libusb.org/
 
 Developers will wish to consult the API documentation:
 http://libusb.sourceforge.net/api-1.0/
@@ -19,4 +19,5 @@ Use the mailing list for questions, comments, etc:
 https://sourceforge.net/mailarchive/forum.php?forum_name=libusb-devel
 
 - Daniel Drake <dsd@gentoo.org>
+- Peter Stuge <peter@stuge.se>
 (use the mailing list rather than mailing developers directly)
