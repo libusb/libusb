@@ -20,8 +20,8 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
-			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
+			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)\dll"
+			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
 			ConfigurationType="2"
 			CharacterSet="1"
 			>
@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories=".\msvc;.\libusb"
+				AdditionalIncludeDirectories=".;..\libusb"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -66,7 +66,7 @@
 				Name="VCLinkerTool"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="2"
-				ModuleDefinitionFile="libusb\libusb-1.0.def"
+				ModuleDefinitionFile="..\libusb\libusb-1.0.def"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				TargetMachine="1"
@@ -98,8 +98,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll"
-			IntermediateDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
+			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)\dll"
+			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)\dll\libusb-1.0"
 			ConfigurationType="2"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
@@ -121,7 +121,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories=".\msvc;.\libusb"
+				AdditionalIncludeDirectories=".;..\libusb"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
@@ -142,7 +142,7 @@
 				Name="VCLinkerTool"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="1"
-				ModuleDefinitionFile="libusb\libusb-1.0.def"
+				ModuleDefinitionFile="..\libusb\libusb-1.0.def"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -176,8 +176,8 @@
 		</Configuration>
 		<Configuration
 			Name="Debug|x64"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
-			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)"
+			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="2"
 			CharacterSet="1"
 			>
@@ -200,7 +200,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories=".\msvc;.\libusb"
+				AdditionalIncludeDirectories=".;..\libusb"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -223,7 +223,7 @@
 				Name="VCLinkerTool"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="2"
-				ModuleDefinitionFile="libusb\libusb-1.0.def"
+				ModuleDefinitionFile="..\libusb\libusb-1.0.def"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				TargetMachine="17"
@@ -255,8 +255,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release|x64"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
-			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)"
+			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)"
 			ConfigurationType="2"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
@@ -279,7 +279,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories=".\msvc;.\libusb"
+				AdditionalIncludeDirectories=".;..\libusb"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
@@ -300,7 +300,7 @@
 				Name="VCLinkerTool"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
 				LinkIncremental="1"
-				ModuleDefinitionFile="libusb\libusb-1.0.def"
+				ModuleDefinitionFile="..\libusb\libusb-1.0.def"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -342,36 +342,36 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\libusb\core.c"
+				RelativePath="..\libusb\core.c"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\descriptor.c"
+				RelativePath="..\libusb\descriptor.c"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\io.c"
+				RelativePath="..\libusb\io.c"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\libusb-1.0.def"
+				RelativePath="..\libusb\libusb-1.0.def"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\sync.c"
+				RelativePath="..\libusb\sync.c"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\os\threads_windows.c"
+				RelativePath="..\libusb\os\threads_windows.c"
 				>
 			</File>
 
 			<File
-				RelativePath=".\libusb\os\poll_windows.c"
+				RelativePath="..\libusb\os\poll_windows.c"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\os\windows_usb.c"
+				RelativePath="..\libusb\os\windows_usb.c"
 				>
 			</File>
 		</Filter>
@@ -381,27 +381,27 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\msvc\config.h"
+				RelativePath=".\config.h"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\libusb.h"
+				RelativePath="..\libusb\libusb.h"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\libusbi.h"
+				RelativePath="..\libusb\libusbi.h"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\os\threads_windows.h"
+				RelativePath="..\libusb\os\threads_windows.h"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\os\poll_windows.h"
+				RelativePath="..\libusb\os\poll_windows.h"
 				>
 			</File>
 			<File
-				RelativePath=".\libusb\os\windows_usb.h"
+				RelativePath="..\libusb\os\windows_usb.h"
 				>
 			</File>
 		</Filter>
@@ -411,7 +411,7 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
 			<File
-				RelativePath=".\libusb\libusb-1.0.rc"
+				RelativePath="..\libusb\libusb-1.0.rc"
 				>
 			</File>
 		</Filter>

@@ -37,11 +37,11 @@ RSC=rc.exe
 # PROP BASE Target_Dir ""
 # PROP Use_MFC 0
 # PROP Use_Debug_Libraries 0
-# PROP Output_Dir "Win32/Release/lib"
-# PROP Intermediate_Dir "Win32/Release/lib"
+# PROP Output_Dir "../Win32/Release/lib"
+# PROP Intermediate_Dir "../Win32/Release/lib"
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_MBCS" /D "_LIB" /YX /FD /c
-# ADD CPP /nologo /MD /W3 /GX /O2 /I "msvc" /I "libusb" /D "WIN32" /D "NDEBUG" /D "_MBCS" /D "_LIB" /FR /FD /EHsc /c
+# ADD CPP /nologo /MD /W3 /GX /O2 /I "." /I "../libusb" /D "WIN32" /D "NDEBUG" /D "_MBCS" /D "_LIB" /FR /FD /EHsc /c
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
 # ADD RSC /l 0x409 /d "NDEBUG"
 BSC32=bscmake.exe
@@ -49,7 +49,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LIB32=link.exe -lib
 # ADD BASE LIB32 /nologo
-# ADD LIB32 /nologo /out:"Win32/Release/lib/libusb-1.0.lib"
+# ADD LIB32 /nologo /out:"../Win32/Release/lib/libusb-1.0.lib"
 
 !ELSEIF  "$(CFG)" == "libusb_static - Win32 Debug"
 
@@ -60,11 +60,11 @@ LIB32=link.exe -lib
 # PROP BASE Target_Dir ""
 # PROP Use_MFC 0
 # PROP Use_Debug_Libraries 1
-# PROP Output_Dir "Win32/Debug/lib"
-# PROP Intermediate_Dir "Win32/Debug/lib"
+# PROP Output_Dir "../Win32/Debug/lib"
+# PROP Intermediate_Dir "../Win32/Debug/lib"
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ /c
-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "msvc" /I "libusb" /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FR /FD /GZ /EHsc /c
+# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "." /I "../libusb" /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FR /FD /GZ /EHsc /c
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
 BSC32=bscmake.exe
@@ -72,7 +72,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo /n
 LIB32=link.exe -lib
 # ADD BASE LIB32 /nologo
-# ADD LIB32 /nologo /out:"Win32/Debug/lib/libusb-1.0.lib"
+# ADD LIB32 /nologo /out:"../Win32/Debug/lib/libusb-1.0.lib"
 
 !ENDIF 
 
@@ -85,41 +85,41 @@ LIB32=link.exe -lib
 # PROP Default_Filter "cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
 # Begin Source File
 
-SOURCE=.\libusb\core.c
+SOURCE=..\libusb\core.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\darwin_usb.c
+SOURCE=..\libusb\os\darwin_usb.c
 # PROP Exclude_From_Build 1
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\descriptor.c
+SOURCE=..\libusb\descriptor.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\io.c
+SOURCE=..\libusb\io.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\linux_usbfs.c
+SOURCE=..\libusb\os\linux_usbfs.c
 # PROP Exclude_From_Build 1
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\poll_windows.c
+SOURCE=..\libusb\os\poll_windows.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\sync.c
+SOURCE=..\libusb\sync.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\threads_windows.c
+SOURCE=..\libusb\os\threads_windows.c
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\windows_usb.c
+SOURCE=..\libusb\os\windows_usb.c
 # End Source File
 # End Group
 # Begin Group "Header Files"
@@ -127,43 +127,43 @@ SOURCE=.\libusb\os\windows_usb.c
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
 # Begin Source File
 
-SOURCE=.\msvc\config.h
+SOURCE=.\config.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\darwin_usb.h
+SOURCE=..\libusb\os\darwin_usb.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\libusb.h
+SOURCE=..\libusb\libusb.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\libusbi.h
+SOURCE=..\libusb\libusbi.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\linux_usbfs.h
+SOURCE=..\libusb\os\linux_usbfs.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\poll_posix.h
+SOURCE=..\libusb\os\poll_posix.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\poll_windows.h
+SOURCE=..\libusb\os\poll_windows.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\threads_posix.h
+SOURCE=..\libusb\os\threads_posix.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\threads_windows.h
+SOURCE=..\libusb\os\threads_windows.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\libusb\os\windows_usb.h
+SOURCE=..\libusb\os\windows_usb.h
 # End Source File
 # End Group
 # End Target
