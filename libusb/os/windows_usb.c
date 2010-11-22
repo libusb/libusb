@@ -702,7 +702,7 @@ static int auto_claim(struct libusb_transfer *transfer, int *interface_number, i
 	{
 		for (current_interface=0; current_interface<USB_MAXINTERFACES; current_interface++) {
 			// Must claim an interface of the same API type
-			if ( (priv->usb_interface[current_interface].apib == &usb_api_backend[api_type])
+			if ( (priv->usb_interface[current_interface].apib->id == api_type)
 			  && (libusb_claim_interface(transfer->dev_handle, current_interface) == LIBUSB_SUCCESS) ) {
 				usbi_dbg("auto-claimed interface %d for control request", current_interface);
 				if (handle_priv->autoclaim_count[current_interface] != 0) {
@@ -1051,7 +1051,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	}
 	priv = __device_priv(dev);
 	parent_priv = __device_priv(parent_dev);
-	if (parent_priv->apib != &usb_api_backend[USB_API_HUB]) {
+	if (parent_priv->apib->id != USB_API_HUB) {
 		usbi_warn(ctx, "parent for device '%s' is not a hub", device_id);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
@@ -1188,7 +1188,7 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 	struct windows_device_priv *priv = __device_priv(dev);
 	int interface_number;
 
-	if (priv->apib != &usb_api_backend[USB_API_COMPOSITE]) {
+	if (priv->apib->id != USB_API_COMPOSITE) {
 		usbi_err(ctx, "program assertion failed: '%s' is not composite", device_id);
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
@@ -1477,7 +1477,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						usbi_err(ctx, "program assertion failed: unlisted grandparent for '%s'", dev_id_path);
 						LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
 					}
-					if (__device_priv(dev)->apib == &usb_api_backend[USB_API_COMPOSITE]) {
+					if (__device_priv(dev)->apib->id == USB_API_COMPOSITE) {
 						parent_dev = dev;
 					}
 				}
@@ -1489,7 +1489,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				}
 				parent_priv = __device_priv(parent_dev);
 				// virtual USB devices are also listed during GEN - don't process these yet
-				if ( (pass == GEN_PASS) && (parent_priv->apib != &usb_api_backend[USB_API_HUB]) ) {
+				if ( (pass == GEN_PASS) && (parent_priv->apib->id != USB_API_HUB) ) {
 					continue;
 				}
 				break;
@@ -1587,12 +1587,12 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				}
 				break;
 			default:	// HID_PASS and later
-				if (parent_priv->apib == &usb_api_backend[USB_API_HID]) {
+				if (parent_priv->apib->id == USB_API_HID) {
 					usbi_dbg("setting HID interface for [%lX]:", parent_dev->session_data);
 					r = set_hid_interface(ctx, parent_dev, dev_interface_path);
 					if (r != LIBUSB_SUCCESS) LOOP_BREAK(r);
 					dev_interface_path = NULL;
-				} else if (parent_priv->apib == &usb_api_backend[USB_API_COMPOSITE]) {
+				} else if (parent_priv->apib->id == USB_API_COMPOSITE) {
 					usbi_dbg("setting composite interface for [%lX]:", parent_dev->session_data);
 					switch (set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api)) {
 					case LIBUSB_SUCCESS:
@@ -2697,7 +2697,7 @@ static int get_valid_interface(struct libusb_device_handle *dev_handle, int api_
 		  && (handle_priv->interface_handle[i].dev_handle != INVALID_HANDLE_VALUE)
 		  && (handle_priv->interface_handle[i].api_handle != 0)
 		  && (handle_priv->interface_handle[i].api_handle != INVALID_HANDLE_VALUE)
-		  && (priv->usb_interface[i].apib == &usb_api_backend[api_id]) ) {
+		  && (priv->usb_interface[i].apib->id == api_id) ) {
 			return i;
 		}
 	}
