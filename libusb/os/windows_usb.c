@@ -71,6 +71,7 @@ static int winusb_init(struct libusb_context *ctx);
 static int winusb_exit(void);
 static int winusb_open(struct libusb_device_handle *dev_handle);
 static void winusb_close(struct libusb_device_handle *dev_handle);
+static int winusb_configure_endpoints(struct libusb_device_handle *dev_handle, int iface);
 static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int iface);
 static int winusb_release_interface(struct libusb_device_handle *dev_handle, int iface);
 static int winusb_submit_control_transfer(struct usbi_transfer *itransfer);
@@ -607,15 +608,15 @@ static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 /*
  * Populate the endpoints addresses of the device_priv interface helper structs
  */
-static int windows_assign_endpoints(struct libusb_device *dev, int iface, int altsetting)
+static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int iface, int altsetting)
 {
 	int i, r;
-	struct windows_device_priv *priv = __device_priv(dev);
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_interface_descriptor *if_desc;
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 
-	r = libusb_get_config_descriptor(dev, 0, &conf_desc);
+	r = libusb_get_config_descriptor(dev_handle->dev, 0, &conf_desc);
 	if (r != LIBUSB_SUCCESS) {
 		usbi_warn(ctx, "could not read config descriptor: error %d", r);
 		return r;
@@ -640,6 +641,11 @@ static int windows_assign_endpoints(struct libusb_device *dev, int iface, int al
 		usbi_dbg("(re)assigned endpoint %02X to interface %d", priv->usb_interface[iface].endpoint[i], iface);
 	}
 	libusb_free_config_descriptor(conf_desc);
+
+	// Extra init is required for WinUSB endpoints
+	if (priv->apib->id == USB_API_WINUSB) {
+		return winusb_configure_endpoints(dev_handle, iface);
+	}
 
 	return LIBUSB_SUCCESS;
 }
@@ -1794,7 +1800,7 @@ static int windows_claim_interface(struct libusb_device_handle *dev_handle, int 
 	r = priv->apib->claim_interface(dev_handle, iface);
 
 	if (r == LIBUSB_SUCCESS) {
-		r = windows_assign_endpoints(dev_handle->dev, iface, 0);
+		r = windows_assign_endpoints(dev_handle, iface, 0);
 	}
 
 	return r;
@@ -1811,7 +1817,7 @@ static int windows_set_interface_altsetting(struct libusb_device_handle *dev_han
 	r = priv->apib->set_interface_altsetting(dev_handle, iface, altsetting);
 
 	if (r == LIBUSB_SUCCESS) {
-		r = windows_assign_endpoints(dev_handle->dev, iface, altsetting);
+		r = windows_assign_endpoints(dev_handle, iface, altsetting);
 	}
 
 	return r;
@@ -2535,6 +2541,50 @@ static void winusb_close(struct libusb_device_handle *dev_handle)
 	}
 }
 
+static int winusb_configure_endpoints(struct libusb_device_handle *dev_handle, int iface)
+{
+	struct windows_device_handle_priv *handle_priv = __device_handle_priv(dev_handle);
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+	HANDLE winusb_handle = handle_priv->interface_handle[iface].api_handle;
+	UCHAR policy;
+	ULONG timeout = 0;
+	uint8_t endpoint_address;
+	int i;
+
+	CHECK_WINUSB_AVAILABLE;
+
+	// With handle and enpoints set (in parent), we can setup the default pipe properties
+	// see http://download.microsoft.com/download/D/1/D/D1DD7745-426B-4CC3-A269-ABBBE427C0EF/DVC-T705_DDC08.pptx
+	for (i=-1; i<priv->usb_interface[iface].nb_endpoints; i++) {
+		endpoint_address =(i==-1)?0:priv->usb_interface[iface].endpoint[i];
+		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
+			PIPE_TRANSFER_TIMEOUT, sizeof(ULONG), &timeout)) {
+			usbi_dbg("failed to set PIPE_TRANSFER_TIMEOUT for control endpoint %02X", endpoint_address);
+		}
+		if (i == -1) continue;	// Other policies don't apply to control endpoint
+		policy = false;
+		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
+			SHORT_PACKET_TERMINATE, sizeof(UCHAR), &policy)) {
+			usbi_dbg("failed to disable SHORT_PACKET_TERMINATE for endpoint %02X", endpoint_address);
+		}
+		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
+			IGNORE_SHORT_PACKETS, sizeof(UCHAR), &policy)) {
+			usbi_dbg("failed to disable IGNORE_SHORT_PACKETS for endpoint %02X", endpoint_address);
+		}
+		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
+			ALLOW_PARTIAL_READS, sizeof(UCHAR), &policy)) {
+			usbi_dbg("failed to disable ALLOW_PARTIAL_READS for endpoint %02X", endpoint_address);
+		}
+		policy = true;
+		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
+			AUTO_CLEAR_STALL, sizeof(UCHAR), &policy)) {
+			usbi_dbg("failed to enable AUTO_CLEAR_STALL for endpoint %02X", endpoint_address);
+		}
+	}
+
+	return LIBUSB_SUCCESS;
+}
+
 static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int iface)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
@@ -2542,9 +2592,6 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	bool is_using_usbccgp = (priv->apib->id == USB_API_COMPOSITE);
 	HANDLE file_handle, winusb_handle;
-	UCHAR policy;
-	uint8_t endpoint_address;
-	int i;
 
 	CHECK_WINUSB_AVAILABLE;
 
@@ -2609,31 +2656,6 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	}
 	usbi_dbg("claimed interface %d", iface);
 	handle_priv->active_interface = iface;
-
-	// With handle and enpoints set (in parent), we can setup the default
-	// pipe properties (copied from libusb-win32-v1)
-	// see http://download.microsoft.com/download/D/1/D/D1DD7745-426B-4CC3-A269-ABBBE427C0EF/DVC-T705_DDC08.pptx
-	for (i=0; i<priv->usb_interface[iface].nb_endpoints; i++) {
-		endpoint_address = priv->usb_interface[iface].endpoint[i];
-		policy = false;
-		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
-			SHORT_PACKET_TERMINATE, sizeof(UCHAR), &policy)) {
-			usbi_dbg("failed to disable SHORT_PACKET_TERMINATE for endpoint %02X", endpoint_address);
-		}
-		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
-			IGNORE_SHORT_PACKETS, sizeof(UCHAR), &policy)) {
-			usbi_dbg("failed to disable IGNORE_SHORT_PACKETS for endpoint %02X", endpoint_address);
-		}
-		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
-			ALLOW_PARTIAL_READS, sizeof(UCHAR), &policy)) {
-			usbi_dbg("failed to disable ALLOW_PARTIAL_READS for endpoint %02X", endpoint_address);
-		}
-		policy = true;
-		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
-			AUTO_CLEAR_STALL, sizeof(UCHAR), &policy)) {
-			usbi_dbg("failed to enable AUTO_CLEAR_STALL for endpoint %02X", endpoint_address);
-		}
-	}
 
 	return LIBUSB_SUCCESS;
 }
