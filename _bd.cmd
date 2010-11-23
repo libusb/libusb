@@ -28,14 +28,18 @@ set _AMD64bit=
 set _BUILDARCH=x86
 set PATH=%BASEDIR%\bin\x86;%BASEDIR%\bin\x86\x86
 
+cd msvc
 call ddk_build
+cd ..
 
 @echo off
 copy Win32\Release\lib\libusb-1.0.lib E:\dailies\%DATE%\MS32\static
 copy Win32\Release\examples\lsusb.exe E:\dailies\%DATE%\examples\bin32
 copy Win32\Release\examples\xusb.exe E:\dailies\%DATE%\examples\bin32
 
+cd msvc
 call ddk_build DLL
+cd ..
 
 @echo off
 copy Win32\Release\lib\libusb-1.0.lib E:\dailies\%DATE%\MS32\dll
@@ -48,14 +52,18 @@ set _AMD64bit=true
 set _BUILDARCH=AMD64
 set PATH=%BASEDIR%\bin\x86\amd64;%BASEDIR%\bin\x86
 
+cd msvc
 call ddk_build
+cd ..
 
 @echo off
 copy x64\Release\lib\libusb-1.0.lib E:\dailies\%DATE%\MS64\static
 copy x64\Release\examples\lsusb.exe E:\dailies\%DATE%\examples\bin64
 copy x64\Release\examples\xusb.exe E:\dailies\%DATE%\examples\bin64
 
+cd msvc
 call ddk_build DLL
+cd ..
 
 @echo off
 copy x64\Release\lib\libusb-1.0.lib E:\dailies\%DATE%\MS64\dll
