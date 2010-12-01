@@ -571,6 +571,7 @@ unsigned long htab_hash(char* str)
 
 /*
  * Returns the session ID of a device's nth level ancestor
+ * If there's no device at the nth level, return 0
  */
 static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 {
@@ -589,11 +590,6 @@ static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 	}
 	if (CM_Get_Device_IDA(devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
 		return 0;
-	}
-	// Return a special invalid session ID if the GP is not USB (as can be the case for HID)
-	if ((level == 2) && (path[0] != 'U') && (path[1] != 'S') && (path[2] != 'B')) {
-		usbi_dbg("detected non USB parent '%s'", path);
-		return ~0;
 	}
 	// TODO (post hotplug): try without sanitizing
 	sanitized_path = sanitize_path(path);
@@ -1267,7 +1263,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 #define DEV_PASS 3
 #define HID_PASS 4
 	int r = LIBUSB_SUCCESS;
-	unsigned int nb_guids, pass, i, j;
+	unsigned int nb_guids, pass, i, j, ancestor;
 	char path[MAX_PATH_LENGTH];
 	char strbuf[MAX_PATH_LENGTH];
 	struct libusb_device *dev, *parent_dev;
@@ -1456,35 +1452,21 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			case HUB_PASS:
 				break;
 			default:
-				session_id = get_ancestor_session_id(dev_info_data.DevInst, 1);
-				if (session_id == 0) {
-					usbi_err(ctx, "program assertion failed: orphan device '%s'", dev_id_path);
-					LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
-				}
-				parent_dev = usbi_get_device_by_session_id(ctx, session_id);
-				// Composite HID devices have double indirection => Check grandparent
-				if (pass == HID_PASS) {
-					session_id = get_ancestor_session_id(dev_info_data.DevInst, 2);
+				// Go through the ancestors until we see a face we recognize
+				parent_dev = NULL;
+				for (ancestor = 1; parent_dev == NULL; ancestor++) {
+					session_id = get_ancestor_session_id(dev_info_data.DevInst, ancestor);
 					if (session_id == 0) {
-						usbi_err(ctx, "program assertion failed: no grandparent for '%s'", dev_id_path);
-						LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
-					} else if (session_id == ~0) {
-						usbi_dbg("skipping non USB HID interface '%s'", dev_id_path);
-						continue;
+						usbi_err(ctx, "program assertion failed: orphan device '%s'", dev_id_path);
+						r = LIBUSB_ERROR_NO_DEVICE;
+						break;
 					}
-					dev = usbi_get_device_by_session_id(ctx, session_id);
-					if (dev == NULL) {
-						usbi_err(ctx, "program assertion failed: unlisted grandparent for '%s'", dev_id_path);
-						LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
-					}
-					if (__device_priv(dev)->apib->id == USB_API_COMPOSITE) {
-						parent_dev = dev;
-					}
+					parent_dev = usbi_get_device_by_session_id(ctx, session_id);
 				}
 				if (parent_dev == NULL) {
-					// This can occur if the OS only reports a newly plugged device after we started enum,
-					// eg. HID parent not listed on GEN pass, but children listed on HID pass
-					usbi_warn(ctx, "unlisted parent for '%s' (newly connected device?) - ignoring", dev_id_path);
+					if (session_id != 0) {
+						usbi_dbg("unlisted ancestor for '%s' (newly connected device, non USB HID, etc.) - ignoring", dev_id_path);
+					}
 					continue;
 				}
 				parent_priv = __device_priv(parent_dev);
