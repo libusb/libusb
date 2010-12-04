@@ -1457,16 +1457,12 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				for (ancestor = 1; parent_dev == NULL; ancestor++) {
 					session_id = get_ancestor_session_id(dev_info_data.DevInst, ancestor);
 					if (session_id == 0) {
-						usbi_err(ctx, "program assertion failed: orphan device '%s'", dev_id_path);
-						r = LIBUSB_ERROR_NO_DEVICE;
 						break;
 					}
 					parent_dev = usbi_get_device_by_session_id(ctx, session_id);
 				}
 				if (parent_dev == NULL) {
-					if (session_id != 0) {
-						usbi_dbg("unlisted ancestor for '%s' (newly connected device, non USB HID, etc.) - ignoring", dev_id_path);
-					}
+					usbi_dbg("unlisted ancestor for '%s' (non USB HID, newly connected, etc.) - ignoring", dev_id_path);
 					continue;
 				}
 				parent_priv = __device_priv(parent_dev);
