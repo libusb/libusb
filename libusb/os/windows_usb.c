@@ -411,7 +411,7 @@ err_exit:
  * Returns the session ID of a device's nth level ancestor
  * If there's no device at the nth level, return 0
  */
-static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
+static unsigned long get_ancestor_session_id(struct libusb_context *ctx, DWORD devinst, unsigned level)
 {
 	DWORD parent_devinst;
 	unsigned long session_id = 0;
@@ -1030,7 +1030,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	// If that's the case, lookup the ancestors to set the bus number
 	if (parent_dev->bus_number == 0) {
 		for (i=2; ; i++) {
-			tmp_dev = usbi_get_device_by_session_id(ctx, get_ancestor_session_id(devinst, i));
+			tmp_dev = usbi_get_device_by_session_id(ctx, get_ancestor_session_id(ctx, devinst, i));
 			if (tmp_dev == NULL) break;
 			if (tmp_dev->bus_number != 0) {
 				usbi_dbg("got bus number from ancestor #%d", i);
@@ -1429,7 +1429,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				// Go through the ancestors until we see a face we recognize
 				parent_dev = NULL;
 				for (ancestor = 1; parent_dev == NULL; ancestor++) {
-					session_id = get_ancestor_session_id(dev_info_data.DevInst, ancestor);
+					session_id = get_ancestor_session_id(ctx, dev_info_data.DevInst, ancestor);
 					if (session_id == 0) {
 						break;
 					}
