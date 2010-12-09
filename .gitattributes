@@ -1,5 +1,8 @@
 *.sh     -crlf
+*.ac     -crlf
+*.am     -crlf
 *.dsw    -crlf
 *.dsp    -crlf
 *.sln    -crlf
 *.vcproj -crlf
+*.test   -crlf

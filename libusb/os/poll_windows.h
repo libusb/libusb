@@ -38,6 +38,8 @@
 #define STATUS_COMPLETED_SYNCHRONOUSLY	STATUS_REPARSE
 #define HasOverlappedIoCompletedSync(lpOverlapped)	(((DWORD)(lpOverlapped)->Internal) == STATUS_COMPLETED_SYNCHRONOUSLY)
 
+#define DUMMY_HANDLE ((HANDLE)(LONG_PTR)-2)
+
 enum windows_version {
 	WINDOWS_UNSUPPORTED,
 	WINDOWS_XP,
@@ -72,10 +74,10 @@ enum rw_type {
 
 // fd struct that can be used for polling on Windows
 struct winfd {
-	int fd;				            // what's exposed to libusb core
-	HANDLE handle;                  // what we need to attach overlapped to the I/O op, so we can poll it
-	OVERLAPPED* overlapped;         // what will report our I/O status
-	enum rw_type rw;                // I/O transfer direction: read *XOR* write (NOT BOTH)
+	int fd;							// what's exposed to libusb core
+	HANDLE handle;					// what we need to attach overlapped to the I/O op, so we can poll it
+	OVERLAPPED* overlapped;			// what will report our I/O status
+	enum rw_type rw;				// I/O transfer direction: read *XOR* write (NOT BOTH)
 };
 extern const struct winfd INVALID_WINFD;
 

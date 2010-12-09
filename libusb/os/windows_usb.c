@@ -72,6 +72,7 @@ static int winusb_init(struct libusb_context *ctx);
 static int winusb_exit(void);
 static int winusb_open(struct libusb_device_handle *dev_handle);
 static void winusb_close(struct libusb_device_handle *dev_handle);
+static int winusb_configure_endpoints(struct libusb_device_handle *dev_handle, int iface);
 static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int iface);
 static int winusb_release_interface(struct libusb_device_handle *dev_handle, int iface);
 static int winusb_submit_control_transfer(struct usbi_transfer *itransfer);
@@ -171,6 +172,7 @@ static inline BOOLEAN guid_eq(const GUID *guid1, const GUID *guid2) {
 	return false;
 }
 
+#if defined(ENABLE_DEBUG_LOGGING) || defined(INCLUDE_DEBUG_LOGGING)
 static char* guid_to_string(const GUID* guid)
 {
 	static char guid_string[MAX_GUID_STRING_LENGTH];
@@ -182,6 +184,7 @@ static char* guid_to_string(const GUID* guid)
 		guid->Data4[4], guid->Data4[5], guid->Data4[6], guid->Data4[7]);
 	return guid_string;
 }
+#endif
 
 /*
  * Converts a windows error to human readable string
@@ -406,6 +409,7 @@ err_exit:
 
 /*
  * Returns the session ID of a device's nth level ancestor
+ * If there's no device at the nth level, return 0
  */
 static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 {
@@ -425,11 +429,6 @@ static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 	if (CM_Get_Device_IDA(devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
 		return 0;
 	}
-	// Return a special invalid session ID if the GP is not USB (as can be the case for HID)
-	if ((level == 2) && (path[0] != 'U') && (path[1] != 'S') && (path[2] != 'B')) {
-		usbi_dbg("detected non USB parent '%s'", path);
-		return ~0;
-	}
 	// TODO (post hotplug): try without sanitizing
 	sanitized_path = sanitize_path(path);
 	if (sanitized_path == NULL) {
@@ -443,15 +442,15 @@ static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 /*
  * Populate the endpoints addresses of the device_priv interface helper structs
  */
-static int windows_assign_endpoints(struct libusb_device *dev, int iface, int altsetting)
+static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int iface, int altsetting)
 {
 	int i, r;
-	struct windows_device_priv *priv = __device_priv(dev);
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_interface_descriptor *if_desc;
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 
-	r = libusb_get_config_descriptor(dev, 0, &conf_desc);
+	r = libusb_get_config_descriptor(dev_handle->dev, 0, &conf_desc);
 	if (r != LIBUSB_SUCCESS) {
 		usbi_warn(ctx, "could not read config descriptor: error %d", r);
 		return r;
@@ -476,6 +475,11 @@ static int windows_assign_endpoints(struct libusb_device *dev, int iface, int al
 		usbi_dbg("(re)assigned endpoint %02X to interface %d", priv->usb_interface[iface].endpoint[i], iface);
 	}
 	libusb_free_config_descriptor(conf_desc);
+
+	// Extra init is required for WinUSB endpoints
+	if (priv->apib->id == USB_API_WINUSB) {
+		return winusb_configure_endpoints(dev_handle, iface);
+	}
 
 	return LIBUSB_SUCCESS;
 }
@@ -532,7 +536,7 @@ static int auto_claim(struct libusb_transfer *transfer, int *interface_number, i
 	{
 		for (current_interface=0; current_interface<USB_MAXINTERFACES; current_interface++) {
 			// Must claim an interface of the same API type
-			if ( (priv->usb_interface[current_interface].apib == &usb_api_backend[api_type])
+			if ( (priv->usb_interface[current_interface].apib->id == api_type)
 			  && (libusb_claim_interface(transfer->dev_handle, current_interface) == LIBUSB_SUCCESS) ) {
 				usbi_dbg("auto-claimed interface %d for control request", current_interface);
 				if (handle_priv->autoclaim_count[current_interface] != 0) {
@@ -1017,7 +1021,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	}
 	priv = __device_priv(dev);
 	parent_priv = __device_priv(parent_dev);
-	if (parent_priv->apib != &usb_api_backend[USB_API_HUB]) {
+	if (parent_priv->apib->id != USB_API_HUB) {
 		usbi_warn(ctx, "parent for device '%s' is not a hub", device_id);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
@@ -1154,7 +1158,7 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 	struct windows_device_priv *priv = __device_priv(dev);
 	int interface_number;
 
-	if (priv->apib != &usb_api_backend[USB_API_COMPOSITE]) {
+	if (priv->apib->id != USB_API_COMPOSITE) {
 		usbi_err(ctx, "program assertion failed: '%s' is not composite", device_id);
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
@@ -1179,21 +1183,22 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 
 	// HID devices can have multiple collections (COL##) for each MI_## interface
 	if (priv->usb_interface[interface_number].path != NULL) {
-		usbi_dbg("interface_path[%d] already set - ignoring HID collection: %s",
-			interface_number, device_id);
 		if (api != USB_API_HID) {
-			usbi_warn(ctx, "program assertion failed - not an HID collection");
+			usbi_warn(ctx, "program assertion failed %s is not an USB HID collection", device_id);
+			return LIBUSB_ERROR_OTHER;
 		}
-	} else {
-		priv->usb_interface[interface_number].path = dev_interface_path;
-		priv->usb_interface[interface_number].apib = &usb_api_backend[api];
-		if ((api == USB_API_HID) && (priv->hid == NULL)) {
-			priv->hid = calloc(1, sizeof(struct hid_device_priv));
-		}
-		priv->composite_api_flags |= 1<<api;
+		usbi_dbg("interface[%d] already set - ignoring HID collection: %s",
+			interface_number, device_id);
+		return LIBUSB_ERROR_ACCESS;
 	}
 
 	usbi_dbg("interface[%d] = %s", interface_number, dev_interface_path);
+	priv->usb_interface[interface_number].path = dev_interface_path;
+	priv->usb_interface[interface_number].apib = &usb_api_backend[api];
+	if ((api == USB_API_HID) && (priv->hid == NULL)) {
+		priv->hid = calloc(1, sizeof(struct hid_device_priv));
+	}
+	priv->composite_api_flags |= 1<<api;
 
 	return LIBUSB_SUCCESS;
 }
@@ -1232,7 +1237,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 #define DEV_PASS 3
 #define HID_PASS 4
 	int r = LIBUSB_SUCCESS;
-	unsigned int nb_guids, pass, i, j;
+	unsigned int nb_guids, pass, i, j, ancestor;
 	char path[MAX_PATH_LENGTH];
 	char strbuf[MAX_PATH_LENGTH];
 	struct libusb_device *dev, *parent_dev;
@@ -1421,40 +1426,22 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			case HUB_PASS:
 				break;
 			default:
-				session_id = get_ancestor_session_id(dev_info_data.DevInst, 1);
-				if (session_id == 0) {
-					usbi_err(ctx, "program assertion failed: orphan device '%s'", dev_id_path);
-					LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
-				}
-				parent_dev = usbi_get_device_by_session_id(ctx, session_id);
-				// Composite HID devices have double indirection => Check grandparent
-				if (pass == HID_PASS) {
-					session_id = get_ancestor_session_id(dev_info_data.DevInst, 2);
+				// Go through the ancestors until we see a face we recognize
+				parent_dev = NULL;
+				for (ancestor = 1; parent_dev == NULL; ancestor++) {
+					session_id = get_ancestor_session_id(dev_info_data.DevInst, ancestor);
 					if (session_id == 0) {
-						usbi_err(ctx, "program assertion failed: no grandparent for '%s'", dev_id_path);
-						LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
-					} else if (session_id == ~0) {
-						usbi_dbg("skipping non USB HID interface '%s'", dev_id_path);
-						continue;
+						break;
 					}
-					dev = usbi_get_device_by_session_id(ctx, session_id);
-					if (dev == NULL) {
-						usbi_err(ctx, "program assertion failed: unlisted grandparent for '%s'", dev_id_path);
-						LOOP_BREAK(LIBUSB_ERROR_NO_DEVICE);
-					}
-					if (__device_priv(dev)->apib == &usb_api_backend[USB_API_COMPOSITE]) {
-						parent_dev = dev;
-					}
+					parent_dev = usbi_get_device_by_session_id(ctx, session_id);
 				}
 				if (parent_dev == NULL) {
-					// This can occur if the OS only reports a newly plugged device after we started enum,
-					// eg. HID parent not listed on GEN pass, but children listed on HID pass
-					usbi_warn(ctx, "unlisted parent for '%s' (newly connected device?) - ignoring", dev_id_path);
+					usbi_dbg("unlisted ancestor for '%s' (non USB HID, newly connected, etc.) - ignoring", dev_id_path);
 					continue;
 				}
 				parent_priv = __device_priv(parent_dev);
 				// virtual USB devices are also listed during GEN - don't process these yet
-				if ( (pass == GEN_PASS) && (parent_priv->apib != &usb_api_backend[USB_API_HUB]) ) {
+				if ( (pass == GEN_PASS) && (parent_priv->apib->id != USB_API_HUB) ) {
 					continue;
 				}
 				break;
@@ -1552,16 +1539,24 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				}
 				break;
 			default:	// HID_PASS and later
-				if (parent_priv->apib == &usb_api_backend[USB_API_HID]) {
+				if (parent_priv->apib->id == USB_API_HID) {
 					usbi_dbg("setting HID interface for [%lX]:", parent_dev->session_data);
 					r = set_hid_interface(ctx, parent_dev, dev_interface_path);
 					if (r != LIBUSB_SUCCESS) LOOP_BREAK(r);
 					dev_interface_path = NULL;
-				} else if (parent_priv->apib == &usb_api_backend[USB_API_COMPOSITE]) {
+				} else if (parent_priv->apib->id == USB_API_COMPOSITE) {
 					usbi_dbg("setting composite interface for [%lX]:", parent_dev->session_data);
-					r = set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api);
-					if (r != LIBUSB_SUCCESS) LOOP_BREAK(r);
-					dev_interface_path = NULL;
+					switch (set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api)) {
+					case LIBUSB_SUCCESS:
+						dev_interface_path = NULL;
+						break;
+					case LIBUSB_ERROR_ACCESS:
+						// interface has already been set => make sure dev_interface_path is freed then
+						break;
+					default:
+						LOOP_BREAK(r);
+						break;
+					}
 				}
 				break;
 			}
@@ -1765,7 +1760,7 @@ static int windows_claim_interface(struct libusb_device_handle *dev_handle, int 
 	r = priv->apib->claim_interface(dev_handle, iface);
 
 	if (r == LIBUSB_SUCCESS) {
-		r = windows_assign_endpoints(dev_handle->dev, iface, 0);
+		r = windows_assign_endpoints(dev_handle, iface, 0);
 	}
 
 	return r;
@@ -1782,7 +1777,7 @@ static int windows_set_interface_altsetting(struct libusb_device_handle *dev_han
 	r = priv->apib->set_interface_altsetting(dev_handle, iface, altsetting);
 
 	if (r == LIBUSB_SUCCESS) {
-		r = windows_assign_endpoints(dev_handle->dev, iface, altsetting);
+		r = windows_assign_endpoints(dev_handle, iface, altsetting);
 	}
 
 	return r;
@@ -2507,6 +2502,50 @@ static void winusb_close(struct libusb_device_handle *dev_handle)
 	}
 }
 
+static int winusb_configure_endpoints(struct libusb_device_handle *dev_handle, int iface)
+{
+	struct windows_device_handle_priv *handle_priv = __device_handle_priv(dev_handle);
+	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
+	HANDLE winusb_handle = handle_priv->interface_handle[iface].api_handle;
+	UCHAR policy;
+	ULONG timeout = 0;
+	uint8_t endpoint_address;
+	int i;
+
+	CHECK_WINUSB_AVAILABLE;
+
+	// With handle and enpoints set (in parent), we can setup the default pipe properties
+	// see http://download.microsoft.com/download/D/1/D/D1DD7745-426B-4CC3-A269-ABBBE427C0EF/DVC-T705_DDC08.pptx
+	for (i=-1; i<priv->usb_interface[iface].nb_endpoints; i++) {
+		endpoint_address =(i==-1)?0:priv->usb_interface[iface].endpoint[i];
+		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
+			PIPE_TRANSFER_TIMEOUT, sizeof(ULONG), &timeout)) {
+			usbi_dbg("failed to set PIPE_TRANSFER_TIMEOUT for control endpoint %02X", endpoint_address);
+		}
+		if (i == -1) continue;	// Other policies don't apply to control endpoint
+		policy = false;
+		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
+			SHORT_PACKET_TERMINATE, sizeof(UCHAR), &policy)) {
+			usbi_dbg("failed to disable SHORT_PACKET_TERMINATE for endpoint %02X", endpoint_address);
+		}
+		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
+			IGNORE_SHORT_PACKETS, sizeof(UCHAR), &policy)) {
+			usbi_dbg("failed to disable IGNORE_SHORT_PACKETS for endpoint %02X", endpoint_address);
+		}
+		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
+			ALLOW_PARTIAL_READS, sizeof(UCHAR), &policy)) {
+			usbi_dbg("failed to disable ALLOW_PARTIAL_READS for endpoint %02X", endpoint_address);
+		}
+		policy = true;
+		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
+			AUTO_CLEAR_STALL, sizeof(UCHAR), &policy)) {
+			usbi_dbg("failed to enable AUTO_CLEAR_STALL for endpoint %02X", endpoint_address);
+		}
+	}
+
+	return LIBUSB_SUCCESS;
+}
+
 static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int iface)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
@@ -2514,9 +2553,6 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	bool is_using_usbccgp = (priv->apib->id == USB_API_COMPOSITE);
 	HANDLE file_handle, winusb_handle;
-	UCHAR policy;
-	uint8_t endpoint_address;
-	int i;
 
 	CHECK_WINUSB_AVAILABLE;
 
@@ -2582,31 +2618,6 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	usbi_dbg("claimed interface %d", iface);
 	handle_priv->active_interface = iface;
 
-	// With handle and enpoints set (in parent), we can setup the default
-	// pipe properties (copied from libusb-win32-v1)
-	// see http://download.microsoft.com/download/D/1/D/D1DD7745-426B-4CC3-A269-ABBBE427C0EF/DVC-T705_DDC08.pptx
-	for (i=0; i<priv->usb_interface[iface].nb_endpoints; i++) {
-		endpoint_address = priv->usb_interface[iface].endpoint[i];
-		policy = false;
-		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
-			SHORT_PACKET_TERMINATE, sizeof(UCHAR), &policy)) {
-			usbi_dbg("failed to disable SHORT_PACKET_TERMINATE for endpoint %02X", endpoint_address);
-		}
-		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
-			IGNORE_SHORT_PACKETS, sizeof(UCHAR), &policy)) {
-			usbi_dbg("failed to disable IGNORE_SHORT_PACKETS for endpoint %02X", endpoint_address);
-		}
-		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
-			ALLOW_PARTIAL_READS, sizeof(UCHAR), &policy)) {
-			usbi_dbg("failed to disable ALLOW_PARTIAL_READS for endpoint %02X", endpoint_address);
-		}
-		policy = true;
-		if (!WinUsb_SetPipePolicy(winusb_handle, endpoint_address,
-			AUTO_CLEAR_STALL, sizeof(UCHAR), &policy)) {
-			usbi_dbg("failed to enable AUTO_CLEAR_STALL for endpoint %02X", endpoint_address);
-		}
-	}
-
 	return LIBUSB_SUCCESS;
 }
 
@@ -2647,7 +2658,7 @@ static int get_valid_interface(struct libusb_device_handle *dev_handle, int api_
 		  && (handle_priv->interface_handle[i].dev_handle != INVALID_HANDLE_VALUE)
 		  && (handle_priv->interface_handle[i].api_handle != 0)
 		  && (handle_priv->interface_handle[i].api_handle != INVALID_HANDLE_VALUE)
-		  && (priv->usb_interface[i].apib == &usb_api_backend[api_id]) ) {
+		  && (priv->usb_interface[i].apib->id == api_id) ) {
 			return i;
 		}
 	}

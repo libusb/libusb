@@ -29,17 +29,6 @@
 #ifndef _STDINT_H
 #define _STDINT_H
 
-/* from stddef.h and _mingw.h */
-#ifndef _SSIZE_T_DEFINED
-#define _SSIZE_T_DEFINED
-#undef ssize_t
-#ifdef _WIN64
-  typedef __int64 ssize_t;
-#else
-  typedef int ssize_t;
-#endif /* _WIN64 */
-#endif /* _SSIZE_T_DEFINED */
-
 #ifndef _INTPTR_T_DEFINED
 #define _INTPTR_T_DEFINED
 #ifndef __intptr_t_defined

@@ -27,7 +27,7 @@ Package=<4>
 
 ###############################################################################
 
-Project: "lsusb"=".\EXAMPLES\lsusb.dsp" - Package Owner=<4>
+Project: "lsusb"=".\lsusb.dsp" - Package Owner=<4>
 
 Package=<5>
 {{{
@@ -42,7 +42,7 @@ Package=<4>
 
 ###############################################################################
 
-Project: "xusb"=".\examples\xusb.dsp" - Package Owner=<4>
+Project: "xusb"=".\xusb.dsp" - Package Owner=<4>
 
 Package=<5>
 {{{

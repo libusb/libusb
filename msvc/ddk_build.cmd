@@ -17,9 +17,9 @@ if /I Test%1==TestDLL set TARGET=DYNLINK
 if /I Test%1==Test/MT set STATIC_LIBC=1
 :no_more_args
 
-cd libusb\os
+cd ..\libusb\os
 echo TARGETTYPE=%TARGET% > target
-copy target+libusb_sources sources >NUL 2>&1
+copy target+..\..\msvc\libusb_sources sources >NUL 2>&1
 del target
 @echo on
 build -cwgZ
@@ -71,7 +71,7 @@ md examples\lsusb_ddkbuild
 :md7
 
 cd examples\lsusb_ddkbuild
-copy ..\lsusb_sources sources >NUL 2>&1
+copy ..\..\msvc\lsusb_sources sources >NUL 2>&1
 @echo on
 build -cwgZ
 @echo off
@@ -91,7 +91,7 @@ md examples\xusb_ddkbuild
 :md8
 
 cd examples\xusb_ddkbuild
-copy ..\xusb_sources sources >NUL 2>&1
+copy ..\..\msvc\xusb_sources sources >NUL 2>&1
 @echo on
 build -cwgZ
 @echo off
@@ -106,22 +106,22 @@ copy %srcPath%\xusb.pdb %dstPath%\examples
 
 @echo off
 
-
+cd msvc
 goto done
 
 
 :builderror
-cd ..\..
+cd ..\..\msvc
 echo Build failed
 goto done
 
 :buildlsusberror
-cd ..\..
+cd ..\..\msvc
 echo lsusb build failed
 goto done
 
 :buildxusberror
-cd ..\..
+cd ..\..\msvc
 echo xusb build failed
 goto done
 

@@ -7,9 +7,9 @@
 
 o Visual Studio:
   - Open existing or create a new project for your application
-  - Copy the libusb.h and stdint.h files into your project and make sure that
-    the location where these files reside appears in the 'Additional Include
-    Directories' section (Configuration Properties -> C/C++ -> General)
+  - Copy the libusb.h into your project and make sure that the location where
+    the file reside appears in the 'Additional Include Directories' section
+    (Configuration Properties -> C/C++ -> General).
   - Copy the relevant .lib file from MS32\ or MS64\ and add 'libusb-1.0.lib' to
     your 'Additional Dependencies' (Configuration Properties -> Linker -> Input)
     Also make sure that the directory where libusb-1.0.lib resides is added to
@@ -27,8 +27,8 @@ o Visual Studio:
 o WDK/DDK:
   - The following is an example of a sources files that you can use to compile
     a libusb 1.0 based console application. In this sample ..\libusb\ is the
-    directory where you would have copied libusb.h, stdint.h as well as the
-    relevant libusb-1.0.lib
+    directory where you would have copied libusb.h as well as the relevant 
+    libusb-1.0.lib
 
 	TARGETNAME=your_app
 	TARGETTYPE=PROGRAM

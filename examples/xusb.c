@@ -24,12 +24,12 @@
 
 #include <config.h>
 #include <stdio.h>
-#include <inttypes.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 
-#include <libusb/libusb.h>
+#include "libusb.h"
 
 #ifdef OS_WINDOWS
 #define msleep(msecs) Sleep(msecs)

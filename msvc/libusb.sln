@@ -13,7 +13,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-1.0 (dll)", "libusb_
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lsusb", "examples\lsusb.vcproj", "{98CFD8FA-EE20-40D5-AF13-F8C4856D6CA5}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lsusb", "lsusb.vcproj", "{98CFD8FA-EE20-40D5-AF13-F8C4856D6CA5}"
 	ProjectSection(WebsiteProperties) = preProject
 		Debug.AspNetCompiler.Debug = "True"
 		Release.AspNetCompiler.Debug = "False"
@@ -22,7 +22,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lsusb", "examples\lsusb.vcp
 		{5AB6B770-1925-48D5-ABC2-930F3259C020} = {5AB6B770-1925-48D5-ABC2-930F3259C020}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xusb", "examples\xusb.vcproj", "{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xusb", "xusb.vcproj", "{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}"
 	ProjectSection(WebsiteProperties) = preProject
 		Debug.AspNetCompiler.Debug = "True"
 		Release.AspNetCompiler.Debug = "False"

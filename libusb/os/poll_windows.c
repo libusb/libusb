@@ -67,30 +67,12 @@
 
 #if defined(__CYGWIN__)
 // cygwin produces a warning unless these prototypes are defined
+extern int _open(char* name, int flags);
 extern int _close(int fd);
 extern int _snprintf(char *buffer, size_t count, const char *format, ...);
-extern int cygwin_attach_handle_to_fd(char *name, int fd, HANDLE handle, int bin, int access_mode);
-// _open_osfhandle() is not available on cygwin, but we can emulate
-// it for our needs with cygwin_attach_handle_to_fd()
-static inline int _open_osfhandle(intptr_t osfhandle, int flags)
-{
-	int access_mode;
-	switch (flags) {
-	case _O_RDONLY:
-		access_mode = GENERIC_READ;
-		break;
-	case _O_WRONLY:
-		access_mode = GENERIC_WRITE;
-		break;
-	case _O_RDWR:
-		access_mode = GENERIC_READ|GENERIC_WRITE;
-		break;
-	default:
-		usbi_err(NULL, "unsupported access mode");
-		return -1;
-	}
-	return cygwin_attach_handle_to_fd("/dev/null", -1, (HANDLE)osfhandle, -1, access_mode);
-}
+#define NUL_DEVICE "/dev/null"
+#else
+#define NUL_DEVICE "NUL"
 #endif
 
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
@@ -306,7 +288,6 @@ void exit_polling(void)
 int usbi_pipe(int filedes[2])
 {
 	int i;
-	HANDLE handle;
 	OVERLAPPED* overlapped;
 
 	CHECK_INIT_POLLING;
@@ -320,12 +301,11 @@ int usbi_pipe(int filedes[2])
 	overlapped->InternalHigh = 0;
 
 	// Read end of the "pipe"
-	handle = CreateFileA("NUL", 0, 0, NULL, OPEN_EXISTING, 0, NULL);
-	if (handle == INVALID_HANDLE_VALUE) {
-		usbi_err(NULL, "could not create pipe: errcode %d", (int)GetLastError());
+	filedes[0] = _open(NUL_DEVICE, _O_WRONLY);
+	if (filedes[0] < 0) {
+		usbi_err(NULL, "could not create pipe: errno %d", errno);
 		goto out1;
 	}
-	filedes[0] = _open_osfhandle((intptr_t)handle, _O_RDONLY);
 	// We can use the same handle for both ends
 	filedes[1] = filedes[0];
 	poll_dbg("pipe filedes = %d", filedes[0]);
@@ -346,7 +326,7 @@ int usbi_pipe(int filedes[2])
 			}
 
 			poll_fd[i].fd = filedes[0];
-			poll_fd[i].handle = handle;
+			poll_fd[i].handle = DUMMY_HANDLE;
 			poll_fd[i].overlapped = overlapped;
 			// There's no polling on the write end, so we just use READ for our needs
 			poll_fd[i].rw = RW_READ;
@@ -358,7 +338,7 @@ int usbi_pipe(int filedes[2])
 
 	CloseHandle(overlapped->hEvent);
 out2:
-	CloseHandle(handle);
+	_close(filedes[0]);
 out1:
 	free(overlapped);
 	return -1;
@@ -401,9 +381,9 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 		wfd.rw = RW_WRITE;
 	}
 
-	// Ensure that we get a non system conflicting unique fd
-	fd = _open_osfhandle((intptr_t)CreateFileA("NUL", 0, 0,
-		NULL, OPEN_EXISTING, 0, NULL), _O_RDWR);
+	// Ensure that we get a non system conflicting unique fd, using
+	// the same fd attribution system as the pipe ends
+	fd = _open(NUL_DEVICE, _O_WRONLY);
 	if (fd < 0) {
 		return INVALID_WINFD;
 	}
@@ -788,10 +768,9 @@ int usbi_close(int fd)
 			CloseHandle(poll_fd[_index].overlapped->hEvent);
 			free(poll_fd[_index].overlapped);
 		}
-		if (CloseHandle(poll_fd[_index].handle) == 0) {
+		r = _close(poll_fd[_index].fd);
+		if (r != 0) {
 			errno = EIO;
-		} else {
-			r = 0;
 		}
 		poll_fd[_index] = INVALID_WINFD;
 		LeaveCriticalSection(&_poll_fd[_index].mutex);

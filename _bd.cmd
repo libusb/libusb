@@ -7,10 +7,10 @@ for %%A in (MS32 MS64) do mkdir E:\dailies\%DATE%\%%A\static
 for %%A in (MS32 MS64) do mkdir E:\dailies\%DATE%\%%A\dll
 for %%A in (source bin32 bin64) do mkdir E:\dailies\%DATE%\examples\%%A
 copy libusb\libusb.h E:\dailies\%DATE%\
-copy msvc\stdint.h E:\dailies\%DATE%\
 copy libusb\libusb-1.0.def E:\dailies\%DATE%\
 copy examples\lsusb.c E:\dailies\%DATE%\examples\source
 copy examples\xusb.c E:\dailies\%DATE%\examples\source
+copy msvc\stdint.h E:\dailies\%DATE%\examples\source
 copy _README.txt E:\dailies\%DATE%\README.txt
 
 set ORG_BUILD_ALT_DIR=%BUILD_ALT_DIR%
@@ -25,14 +25,18 @@ set _AMD64bit=
 set _BUILDARCH=x86
 set PATH=%BASEDIR%\bin\x86;%BASEDIR%\bin\x86\x86
 
+cd msvc
 call ddk_build
+cd ..
 
 @echo off
 copy Win32\Release\lib\libusb-1.0.lib E:\dailies\%DATE%\MS32\static
 copy Win32\Release\examples\lsusb.exe E:\dailies\%DATE%\examples\bin32
 copy Win32\Release\examples\xusb.exe E:\dailies\%DATE%\examples\bin32
 
+cd msvc
 call ddk_build DLL
+cd ..
 
 @echo off
 copy Win32\Release\lib\libusb-1.0.lib E:\dailies\%DATE%\MS32\dll
@@ -45,14 +49,18 @@ set _AMD64bit=true
 set _BUILDARCH=AMD64
 set PATH=%BASEDIR%\bin\x86\amd64;%BASEDIR%\bin\x86
 
+cd msvc
 call ddk_build
+cd ..
 
 @echo off
 copy x64\Release\lib\libusb-1.0.lib E:\dailies\%DATE%\MS64\static
 copy x64\Release\examples\lsusb.exe E:\dailies\%DATE%\examples\bin64
 copy x64\Release\examples\xusb.exe E:\dailies\%DATE%\examples\bin64
 
+cd msvc
 call ddk_build DLL
+cd ..
 
 @echo off
 copy x64\Release\lib\libusb-1.0.lib E:\dailies\%DATE%\MS64\dll
