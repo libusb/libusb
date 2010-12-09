@@ -5,3 +5,4 @@
 *.dsp    -crlf
 *.sln    -crlf
 *.vcproj -crlf
+*.test   -crlf
