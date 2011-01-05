@@ -94,10 +94,10 @@ static clockid_t monotonic_clkid = -1;
 
 /* do we have a busnum to relate devices? this also implies that we can read
  * the active configuration through bConfigurationValue */
-static int sysfs_can_relate_devices = -1;
+static int sysfs_can_relate_devices = 0;
 
 /* do we have a descriptors file? */
-static int sysfs_has_descriptors = -1;
+static int sysfs_has_descriptors = 0;
 
 struct linux_device_priv {
 	char *sysfs_dir;
@@ -241,6 +241,22 @@ static int check_flag_bulk_continuation(void)
 	return 1;
 }
 
+/* Return 1 if filename exists inside dirname in sysfs.
+   SYSFS_DEVICE_PATH is assumed to be the beginning of the path. */
+static int sysfs_has_file(const char *dirname, const char *filename)
+{
+	struct stat statbuf;
+	char path[PATH_MAX];
+	int r;
+
+	snprintf(path, PATH_MAX, "%s/%s/%s", SYSFS_DEVICE_PATH, dirname, filename);
+	r = stat(path, &statbuf);
+	if (r == 0 && S_ISREG(statbuf.st_mode))
+		return 1;
+
+	return 0;
+}
+
 static int op_init(struct libusb_context *ctx)
 {
 	struct stat statbuf;
@@ -268,7 +284,60 @@ static int op_init(struct libusb_context *ctx)
 
 	r = stat(SYSFS_DEVICE_PATH, &statbuf);
 	if (r == 0 && S_ISDIR(statbuf.st_mode)) {
+		DIR *devices = opendir(SYSFS_DEVICE_PATH);
+		struct dirent *entry;
+
 		usbi_dbg("found usb devices in sysfs");
+
+		if (!devices) {
+			usbi_err(ctx, "opendir devices failed errno=%d", errno);
+			return LIBUSB_ERROR_IO;
+		}
+
+		/* Make sure sysfs supports all the required files. If it
+		 * does not, then usbfs will be used instead.  Determine
+		 * this by looping through the directories in
+		 * SYSFS_DEVICE_PATH.  With the assumption that there will
+		 * always be subdirectories of the name usbN (usb1, usb2,
+		 * etc) representing the root hubs, check the usbN
+		 * subdirectories to see if they have all the needed files.
+		 * This algorithm uses the usbN subdirectories (root hubs)
+		 * because a device disconnection will cause a race
+		 * condition regarding which files are available, sometimes
+		 * causing an incorrect result.  The root hubs are used
+		 * because it is assumed that they will always be present.
+		 * See the "sysfs vs usbfs" comment at the top of this file
+		 * for more details.  */
+		while ((entry = readdir(devices))) {
+			int has_busnum=0, has_devnum=0, has_descriptors=0;
+			int has_configuration_value=0;
+
+			/* Only check the usbN directories. */
+			if (strncmp(entry->d_name, "usb", 3) != 0)
+				continue;
+
+			/* Check for the files libusb needs from sysfs. */
+			has_busnum = sysfs_has_file(entry->d_name, "busnum");
+			has_devnum = sysfs_has_file(entry->d_name, "devnum");
+			has_descriptors = sysfs_has_file(entry->d_name, "descriptors");
+			has_configuration_value = sysfs_has_file(entry->d_name, "bConfigurationValue");
+
+			if (has_busnum && has_devnum && has_configuration_value)
+				sysfs_can_relate_devices = 1;
+			if (has_descriptors)
+				sysfs_has_descriptors = 1;
+
+			/* Only need to check until we've found ONE device which
+			   has all the attributes. */
+			if (sysfs_has_descriptors && sysfs_can_relate_devices)
+				break;
+		}
+		closedir(devices);
+
+		/* Only use sysfs descriptors if the rest of
+		   sysfs will work for libusb. */
+		if (!sysfs_can_relate_devices)
+			sysfs_has_descriptors = 0;
 	} else {
 		usbi_dbg("sysfs usb info not available");
 		sysfs_has_descriptors = 0;
@@ -929,8 +998,7 @@ out:
 }
 
 static int sysfs_scan_device(struct libusb_context *ctx,
-	struct discovered_devs **_discdevs, const char *devname,
-	int *usbfs_fallback)
+	struct discovered_devs **_discdevs, const char *devname)
 {
 	int r;
 	FILE *fd;
@@ -961,28 +1029,29 @@ static int sysfs_scan_device(struct libusb_context *ctx,
 	fd = fopen(filename, "r");
 	if (!fd) {
 		if (errno == ENOENT) {
-			usbi_dbg("busnum not found, cannot relate sysfs to usbfs, "
-				"falling back on pure usbfs");
-			sysfs_can_relate_devices = 0;
-			*usbfs_fallback = 1;
-			return LIBUSB_ERROR_OTHER;
+			/* busnum doesn't exist. Assume the device has been
+			   disconnected (unplugged). */
+			return LIBUSB_ERROR_NO_DEVICE;
 		}
 		usbi_err(ctx, "open busnum failed, errno=%d", errno);
 		return LIBUSB_ERROR_IO;
 	}
 
-	sysfs_can_relate_devices = 1;
-
 	r = fscanf(fd, "%d", &busnum);
 	fclose(fd);
 	if (r != 1) {
 		usbi_err(ctx, "fscanf busnum returned %d, errno=%d", r, errno);
-		return LIBUSB_ERROR_IO;
+		return LIBUSB_ERROR_NO_DEVICE;
 	}
 
 	snprintf(filename, PATH_MAX, "%s/%s/devnum", SYSFS_DEVICE_PATH, devname);
 	fd = fopen(filename, "r");
 	if (!fd) {
+		if (errno == ENOENT) {
+			/* devnum doesn't exist. Assume the device has been
+			   disconnected (unplugged). */
+			return LIBUSB_ERROR_NO_DEVICE;
+		}
 		usbi_err(ctx, "open devnum failed, errno=%d", errno);
 		return LIBUSB_ERROR_IO;
 	}
@@ -991,7 +1060,7 @@ static int sysfs_scan_device(struct libusb_context *ctx,
 	fclose(fd);
 	if (r != 1) {
 		usbi_err(ctx, "fscanf devnum returned %d, errno=%d", r, errno);
-		return LIBUSB_ERROR_IO;
+		return LIBUSB_ERROR_NO_DEVICE;
 	}
 
 	usbi_dbg("bus=%d dev=%d", busnum, devaddr);
@@ -1003,7 +1072,7 @@ static int sysfs_scan_device(struct libusb_context *ctx,
 }
 
 static int sysfs_get_device_list(struct libusb_context *ctx,
-	struct discovered_devs **_discdevs, int *usbfs_fallback)
+	struct discovered_devs **_discdevs)
 {
 	struct discovered_devs *discdevs = *_discdevs;
 	DIR *devices = opendir(SYSFS_DEVICE_PATH);
@@ -1022,13 +1091,12 @@ static int sysfs_get_device_list(struct libusb_context *ctx,
 				|| strchr(entry->d_name, ':'))
 			continue;
 
-		r = sysfs_scan_device(ctx, &discdevs_new, entry->d_name,
-			usbfs_fallback);
-		if (r < 0)
+		r = sysfs_scan_device(ctx, &discdevs_new, entry->d_name);
+		if (r < 0 && r != LIBUSB_ERROR_NO_DEVICE)
 			goto out;
 		discdevs = discdevs_new;
-	}	
-
+	}
+	r = 0;
 out:
 	closedir(devices);
 	*_discdevs = discdevs;
@@ -1043,19 +1111,15 @@ static int op_get_device_list(struct libusb_context *ctx,
 	 * any autosuspended USB devices. however, sysfs is not available
 	 * everywhere, so we need a usbfs fallback too.
 	 *
-	 * as described in the "sysfs vs usbfs" comment, sometimes we have
-	 * sysfs but not enough information to relate sysfs devices to usbfs
-	 * nodes. the usbfs_fallback variable is used to indicate that we should
-	 * fall back on usbfs.
+	 * as described in the "sysfs vs usbfs" comment at the top of this
+	 * file, sometimes we have sysfs but not enough information to
+	 * relate sysfs devices to usbfs nodes.  op_init() determines the
+	 * adequacy of sysfs and sets sysfs_can_relate_devices.
 	 */
-	if (sysfs_can_relate_devices != 0) {
-		int usbfs_fallback = 0;
-		int r = sysfs_get_device_list(ctx, _discdevs, &usbfs_fallback);
-		if (!usbfs_fallback)
-			return r;
-	}
-
-	return usbfs_get_device_list(ctx, _discdevs);
+	if (sysfs_can_relate_devices != 0)
+		return sysfs_get_device_list(ctx, _discdevs);
+	else
+		return usbfs_get_device_list(ctx, _discdevs);
 }
 
 static int op_open(struct libusb_device_handle *handle)
