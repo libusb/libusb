@@ -147,14 +147,30 @@ uint16_t VID, PID;
 
 void display_buffer_hex(unsigned char *buffer, unsigned size)
 {
-	unsigned i;
+	unsigned i, j, k;
 
-	for (i=0; i<size; i++) {
-		if (!(i%0x10))
-			printf("\n  ");
-		printf(" %02X", buffer[i]);
+	for (i=0; i<size; i+=16) {
+		printf("\n  %08x  ", i);
+		for(j=0,k=0; k<16; j++,k++) {
+			if (i+j < size) {
+				printf("%02x", buffer[i+j]);
+			} else {
+				printf("  ");
+			}
+			printf(" ");
+		}
+		printf(" ");
+		for(j=0,k=0; k<16; j++,k++) {
+			if (i+j < size) {
+				if ((buffer[i+j] < 32) || (buffer[i+j] > 126)) {
+					printf(".");
+				} else {
+					printf("%c", buffer[i+j]);
+				}
+			}
+		}
 	}
-	printf("\n");
+	printf("\n" );
 }
 
 
