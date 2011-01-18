@@ -88,7 +88,7 @@ case $host in
 	backend="windows"
 	threads="posix"
 	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
-	AM_CFLAGS="-std=c99"
+	AM_CFLAGS="-std=gnu99"
 	AM_LDFLAGS="-no-undefined -avoid-version"
 	AC_CHECK_TOOL(RC, windres, no)
 	;;
