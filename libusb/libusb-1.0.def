@@ -19,6 +19,7 @@ EXPORTS
   libusb_kernel_driver_active
   libusb_detach_kernel_driver
   libusb_attach_kernel_driver
+  libusb_get_device_topology
   libusb_set_debug
   libusb_init
   libusb_exit
@@ -76,6 +77,7 @@ EXPORTS
   libusb_kernel_driver_active@0 = libusb_kernel_driver_active
   libusb_detach_kernel_driver@0 = libusb_detach_kernel_driver
   libusb_attach_kernel_driver@0 = libusb_attach_kernel_driver
+  libusb_get_device_topology@0 = libusb_get_device_topology
   libusb_set_debug@0 = libusb_set_debug
   libusb_init@0 = libusb_init
   libusb_exit@0 = libusb_exit
@@ -133,6 +135,7 @@ EXPORTS
   libusb_kernel_driver_active@4 = libusb_kernel_driver_active
   libusb_detach_kernel_driver@4 = libusb_detach_kernel_driver
   libusb_attach_kernel_driver@4 = libusb_attach_kernel_driver
+  libusb_get_device_topology@4 = libusb_get_device_topology
   libusb_set_debug@4 = libusb_set_debug
   libusb_init@4 = libusb_init
   libusb_exit@4 = libusb_exit
@@ -190,6 +193,7 @@ EXPORTS
   libusb_kernel_driver_active@8 = libusb_kernel_driver_active
   libusb_detach_kernel_driver@8 = libusb_detach_kernel_driver
   libusb_attach_kernel_driver@8 = libusb_attach_kernel_driver
+  libusb_get_device_topology@8 = libusb_get_device_topology
   libusb_set_debug@8 = libusb_set_debug
   libusb_init@8 = libusb_init
   libusb_exit@8 = libusb_exit
@@ -247,6 +251,7 @@ EXPORTS
   libusb_kernel_driver_active@12 = libusb_kernel_driver_active
   libusb_detach_kernel_driver@12 = libusb_detach_kernel_driver
   libusb_attach_kernel_driver@12 = libusb_attach_kernel_driver
+  libusb_get_device_topology@12 = libusb_get_device_topology
   libusb_set_debug@12 = libusb_set_debug
   libusb_init@12 = libusb_init
   libusb_exit@12 = libusb_exit
@@ -304,6 +309,7 @@ EXPORTS
   libusb_kernel_driver_active@16 = libusb_kernel_driver_active
   libusb_detach_kernel_driver@16 = libusb_detach_kernel_driver
   libusb_attach_kernel_driver@16 = libusb_attach_kernel_driver
+  libusb_get_device_topology@16 = libusb_get_device_topology
   libusb_set_debug@16 = libusb_set_debug
   libusb_init@16 = libusb_init
   libusb_exit@16 = libusb_exit
@@ -361,6 +367,7 @@ EXPORTS
   libusb_kernel_driver_active@20 = libusb_kernel_driver_active
   libusb_detach_kernel_driver@20 = libusb_detach_kernel_driver
   libusb_attach_kernel_driver@20 = libusb_attach_kernel_driver
+  libusb_get_device_topology@20 = libusb_get_device_topology
   libusb_set_debug@20 = libusb_set_debug
   libusb_init@20 = libusb_init
   libusb_exit@20 = libusb_exit
@@ -418,6 +425,7 @@ EXPORTS
   libusb_kernel_driver_active@24 = libusb_kernel_driver_active
   libusb_detach_kernel_driver@24 = libusb_detach_kernel_driver
   libusb_attach_kernel_driver@24 = libusb_attach_kernel_driver
+  libusb_get_device_topology@24 = libusb_get_device_topology
   libusb_set_debug@24 = libusb_set_debug
   libusb_init@24 = libusb_init
   libusb_exit@24 = libusb_exit
@@ -475,6 +483,7 @@ EXPORTS
   libusb_kernel_driver_active@28 = libusb_kernel_driver_active
   libusb_detach_kernel_driver@28 = libusb_detach_kernel_driver
   libusb_attach_kernel_driver@28 = libusb_attach_kernel_driver
+  libusb_get_device_topology@28 = libusb_get_device_topology
   libusb_set_debug@28 = libusb_set_debug
   libusb_init@28 = libusb_init
   libusb_exit@28 = libusb_exit
@@ -532,6 +541,7 @@ EXPORTS
   libusb_kernel_driver_active@32 = libusb_kernel_driver_active
   libusb_detach_kernel_driver@32 = libusb_detach_kernel_driver
   libusb_attach_kernel_driver@32 = libusb_attach_kernel_driver
+  libusb_get_device_topology@32 = libusb_get_device_topology
   libusb_set_debug@32 = libusb_set_debug
   libusb_init@32 = libusb_init
   libusb_exit@32 = libusb_exit
