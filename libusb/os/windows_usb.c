@@ -855,12 +855,12 @@ static int windows_init(struct libusb_context *ctx)
 
 		// Create a hash table to store session ids. Second parameter is better if prime
 		htab_create(ctx, HTAB_SIZE);
-
-		r = LIBUSB_SUCCESS;
 	}
+	// At this stage, either we went through full init successfully, or didn't need to
+	r = LIBUSB_SUCCESS;
 
 init_exit: // Holds semaphore here.
-	if(!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
+	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
 		if (timer_thread) {
 			SetEvent(timer_request[1]); // actually the signal to quit the thread.
 			if (WAIT_OBJECT_0 != WaitForSingleObject(timer_thread, INFINITE)) {
