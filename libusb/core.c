@@ -1454,6 +1454,28 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+/** \ingroup dev
+ * Returns topology information for a device
+ *
+ * \param dev the device to get topology properties from
+ * \param topology the libusb_device_topology structure to be populated.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_INVALID_PARAM if dev or topology are invalid
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED on platforms where the functionality
+ * is not available
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+
+int API_EXPORTED libusb_get_device_topology(libusb_device *dev,
+	struct libusb_device_topology* topology)
+{
+	usbi_dbg("");
+	if (dev == NULL || topology == NULL) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	return usbi_backend->get_device_topology(dev, topology);
+}
+
 /** \ingroup lib
  * Set message verbosity.
  *  - Level 0: no messages ever printed by the library (default)

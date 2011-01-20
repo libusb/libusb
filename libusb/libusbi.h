@@ -755,6 +755,14 @@ struct usbi_os_backend {
 	int (*attach_kernel_driver)(struct libusb_device_handle *handle,
 		int interface_number);
 
+	/* Return device topology. Optional.
+	 *
+	 * This function is called to populate a libusb_device_topology structure,
+	 * that allows to uniquely identify the location of a device on the system.
+	 */
+	int (*get_device_topology)(struct libusb_device *dev,
+		struct libusb_device_topology* topology);
+
 	/* Destroy a device. Optional.
 	 *
 	 * This function is called when the last reference to a device is

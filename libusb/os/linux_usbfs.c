@@ -1310,6 +1310,12 @@ static int op_attach_kernel_driver(struct libusb_device_handle *handle,
 	return 0;
 }
 
+static int op_get_device_topology(struct libusb_device *dev,
+	struct libusb_device_topology* topology)
+{
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 static void op_destroy_device(struct libusb_device *dev)
 {
 	struct linux_device_priv *priv = __device_priv(dev);
@@ -2198,6 +2204,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.detach_kernel_driver = op_detach_kernel_driver,
 	.attach_kernel_driver = op_attach_kernel_driver,
 
+	.get_device_topology = op_get_device_topology,
 	.destroy_device = op_destroy_device,
 
 	.submit_transfer = op_submit_transfer,

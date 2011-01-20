@@ -1845,6 +1845,17 @@ static void windows_destroy_device(struct libusb_device *dev)
 	windows_device_priv_release(dev);
 }
 
+static int windows_get_device_topology(struct libusb_device *dev, struct libusb_device_topology* topology)
+{
+	struct windows_device_priv *priv = __device_priv(dev);
+
+	topology->bus = dev->bus_number;
+	topology->depth = priv->depth;
+	topology->parent_dev = priv->parent_dev;
+	topology->port = priv->port;
+	return LIBUSB_SUCCESS;
+}
+
 static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
@@ -2236,6 +2247,7 @@ const struct usbi_os_backend windows_backend = {
 	windows_detach_kernel_driver,
 	windows_attach_kernel_driver,
 
+	windows_get_device_topology,
 	windows_destroy_device,
 
 	windows_submit_transfer,
