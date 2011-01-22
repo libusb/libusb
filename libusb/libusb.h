@@ -96,7 +96,7 @@ typedef unsigned __int16  uint16_t;
  * return type, before the function name. See internal documentation for
  * API_EXPORTED.
  */
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32)
 #define LIBUSB_CALL WINAPI
 #else
 #define LIBUSB_CALL
