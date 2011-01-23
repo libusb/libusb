@@ -1650,6 +1650,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 		return LIBUSB_ERROR_NO_MEM;
 	memset(urb, 0, sizeof(struct usbfs_urb));
 	tpriv->urbs = urb;
+	tpriv->num_urbs = 1;
 	tpriv->reap_action = NORMAL;
 
 	urb->usercontext = itransfer;
