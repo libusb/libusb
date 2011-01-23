@@ -1711,59 +1711,32 @@ static int op_submit_transfer(struct usbi_transfer *itransfer)
 	}
 }
 
-static int cancel_control_transfer(struct usbi_transfer *itransfer)
-{
-	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
-
-	if (!tpriv->urbs)
-		return LIBUSB_ERROR_NOT_FOUND;
-
-	tpriv->reap_action = CANCELLED;
-	return discard_urbs(itransfer, 0, tpriv->num_urbs);
-}
-
-static int cancel_bulk_transfer(struct usbi_transfer *itransfer)
-{
-	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
-
-	if (!tpriv->urbs)
-		return LIBUSB_ERROR_NOT_FOUND;
-
-	if (tpriv->reap_action != ERROR)
-		tpriv->reap_action = CANCELLED;
-
-	return discard_urbs(itransfer, 0, tpriv->num_urbs);
-}
-
-static int cancel_iso_transfer(struct usbi_transfer *itransfer)
-{
-	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
-
-	if (!tpriv->iso_urbs)
-		return LIBUSB_ERROR_NOT_FOUND;
-
-	tpriv->reap_action = CANCELLED;
-	return discard_urbs(itransfer, 0, tpriv->num_urbs);
-}
-
 static int op_cancel_transfer(struct usbi_transfer *itransfer)
 {
+	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 	struct libusb_transfer *transfer =
 		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
 	switch (transfer->type) {
-	case LIBUSB_TRANSFER_TYPE_CONTROL:
-		return cancel_control_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_BULK:
+		if (tpriv->reap_action == ERROR)
+			break;
+		/* else, fall through */
+	case LIBUSB_TRANSFER_TYPE_CONTROL:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-		return cancel_bulk_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		return cancel_iso_transfer(itransfer);
+		tpriv->reap_action = CANCELLED;
+		break;
 	default:
 		usbi_err(TRANSFER_CTX(transfer),
 			"unknown endpoint type %d", transfer->type);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
+
+	if (!tpriv->urbs)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	return discard_urbs(itransfer, 0, tpriv->num_urbs);
 }
 
 static void op_clear_transfer_priv(struct usbi_transfer *itransfer)
