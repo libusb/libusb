@@ -1884,6 +1884,7 @@ void API_EXPORTED libusb_register_hotplug_listeners(
 	libusb_context *ctx, libusb_hotplug_cb_fn connected_cb,
 	libusb_hotplug_cb_fn disconnected_cb, void *user_data)
 {
+	USBI_GET_CONTEXT(ctx);
 	usbi_mutex_lock(&ctx->hotplug_listener_lock);
 	ctx->hotplug_connected_listener = connected_cb;
 	ctx->hotplug_disconnected_listener = disconnected_cb;
@@ -1894,6 +1895,7 @@ void API_EXPORTED libusb_register_hotplug_listeners(
 /* TODO: doc */
 void API_EXPORTED libusb_unregister_hotplug_listeners(libusb_context *ctx)
 {
+	USBI_GET_CONTEXT(ctx);
 	usbi_mutex_lock(&ctx->hotplug_listener_lock);
 	ctx->hotplug_connected_listener = 0;
 	ctx->hotplug_disconnected_listener = 0;
@@ -1904,6 +1906,8 @@ void API_EXPORTED libusb_unregister_hotplug_listeners(libusb_context *ctx)
 /* TODO: doc */
 int API_EXPORTED libusb_get_status(libusb_device *dev)
 {
+	if (dev == NULL)
+		return LIBUSB_ERROR_INVALID_PARAM;
 	return dev->status_online;
 }
 
@@ -2034,6 +2038,8 @@ int usbi_notify_device_state(struct libusb_device *dev, int new_state)
 	libusb_hotplug_cb_fn disconnected_cb;
 	void* user_data;
 
+	if (dev == NULL)
+		return LIBUSB_ERROR_INVALID_PARAM;
 	usbi_mutex_lock(&dev->ctx->hotplug_listener_lock);
 	connected_cb = dev->ctx->hotplug_connected_listener;
 	disconnected_cb = dev->ctx->hotplug_disconnected_listener;
