@@ -647,10 +647,12 @@ LRESULT CALLBACK messaging_callback(HWND hWnd, UINT message, WPARAM wParam, LPAR
 						hotplug_path);
 				} else {
 					priv = __device_priv(dev);
+/*
 					usbi_warn(ctx, "(bus: %d, addr: %d, depth: %d, port: %d)",
 						dev->bus_number, dev->device_address, priv->depth, priv->port);
 					usbi_warn(ctx, "%s: '%s'", (online)?"INSERTION":"REMOVAL",
 						hotplug_path);
+*/
 					usbi_mutex_lock(&dev->status_online_lock);
 					dev->status_online = online;
 					usbi_mutex_unlock(&dev->status_online_lock);
