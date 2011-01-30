@@ -130,13 +130,13 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 #ifdef ENABLE_LOGGING
 #define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __FUNCTION__, __VA_ARGS__)
 #else
-#define _usbi_log(ctx, level, ...)
+#define _usbi_log(ctx, level, ...) do {} while(0)
 #endif
 
 #if defined(ENABLE_DEBUG_LOGGING) || defined(INCLUDE_DEBUG_LOGGING)
 #define usbi_dbg(...) _usbi_log(NULL, LOG_LEVEL_DEBUG, __VA_ARGS__)
 #else
-#define usbi_dbg(...)
+#define usbi_dbg(...) do {} while(0)
 #endif
 
 #define usbi_info(ctx, ...) _usbi_log(ctx, LOG_LEVEL_INFO, __VA_ARGS__)
@@ -289,8 +289,6 @@ struct libusb_device_handle {
 	unsigned char os_priv[0];
 };
 
-#define USBI_TRANSFER_TIMED_OUT	 			(1<<0)
-
 enum {
   USBI_CLOCK_MONOTONIC,
   USBI_CLOCK_REALTIME
@@ -324,6 +322,14 @@ struct usbi_transfer {
 	 * its completion (presumably there would be races within your OS backend
 	 * if this were possible). */
 	usbi_mutex_t lock;
+};
+
+enum usbi_transfer_flags {
+	/* The transfer has timed out */
+	USBI_TRANSFER_TIMED_OUT = 1 << 0,
+
+	/* Set by backend submit_transfer() if the OS handles timeout */
+	USBI_TRANSFER_OS_HANDLES_TIMEOUT = 1 << 1
 };
 
 #define __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
@@ -365,8 +371,8 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
 int usbi_handle_transfer_cancellation(struct usbi_transfer *transfer);
 
-int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest,
-	int host_endian);
+int usbi_parse_descriptor(unsigned char *source, const char *descriptor,
+	void *dest, int host_endian);
 int usbi_get_config_index_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, int *idx);
 
