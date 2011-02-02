@@ -1747,7 +1747,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 {
 	char *dbg = getenv("LIBUSB_DEBUG");
 	size_t priv_size = usbi_backend->context_priv_size;
-	struct libusb_context *ctx = malloc(sizeof(*ctx) + priv_size);
+	struct libusb_context *ctx;
 	int r;
 
 	usbi_mutex_static_lock(&default_context_lock);
