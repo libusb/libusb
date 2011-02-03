@@ -520,15 +520,14 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	if (descriptor_size < 0) {
 		printf("failed\n");
 		return -1;
-	} else {
-		display_buffer_hex(hid_report_descriptor, descriptor_size);
-		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-			junk = fwrite(hid_report_descriptor, 1, descriptor_size, fd);
-			fclose(fd);
-		}
-		size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_FEATURE);
+	}
+	display_buffer_hex(hid_report_descriptor, descriptor_size);
+	if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
+		junk = fwrite(hid_report_descriptor, 1, descriptor_size, fd);
+		fclose(fd);
 	}
 
+	size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_FEATURE);
 	if (size <= 0) {
 		printf("\nSkipping Feature Report readout (None detected)\n");
 	} else {
