@@ -1271,17 +1271,47 @@ static int op_clear_halt(struct libusb_device_handle *handle,
 static int op_reset_device(struct libusb_device_handle *handle)
 {
 	int fd = __device_handle_priv(handle)->fd;
-	int r = ioctl(fd, IOCTL_USBFS_RESET, NULL);
+	int i, r, ret = 0;
+
+	/* Doing a device reset will cause the usbfs driver to get unbound
+	   from any interfaces it is bound to. By voluntarily unbinding
+	   the usbfs driver ourself, we stop the kernel from rebinding
+	   the interface after reset (which would end up with the interface
+	   getting bound to the in kernel driver if any). */
+	for (i = 0; i < USB_MAXINTERFACES; i++) {
+		if (handle->claimed_interfaces & (1L << i)) {
+			op_release_interface(handle, i);
+		}
+	}
+
+	usbi_mutex_lock(&handle->lock);
+	r = ioctl(fd, IOCTL_USBFS_RESET, NULL);
 	if (r) {
-		if (errno == ENODEV)
-			return LIBUSB_ERROR_NOT_FOUND;
+		if (errno == ENODEV) {
+			ret = LIBUSB_ERROR_NOT_FOUND;
+			goto out;
+		}
 
 		usbi_err(HANDLE_CTX(handle),
 			"reset failed error %d errno %d", r, errno);
-		return LIBUSB_ERROR_OTHER;
+		ret = LIBUSB_ERROR_OTHER;
+		goto out;
 	}
 
-	return 0;
+	/* And re-claim any interfaces which were claimed before the reset */
+	for (i = 0; i < USB_MAXINTERFACES; i++) {
+		if (handle->claimed_interfaces & (1L << i)) {
+			r = op_claim_interface(handle, i);
+			if (r) {
+				usbi_warn(HANDLE_CTX(handle),
+					"failed to re-claim interface %d after reset", i);
+				handle->claimed_interfaces &= ~(1L << i);
+			}
+		}
+	}
+out:
+	usbi_mutex_unlock(&handle->lock);
+	return ret;
 }
 
 static int op_kernel_driver_active(struct libusb_device_handle *handle,
