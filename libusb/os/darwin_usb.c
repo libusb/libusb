@@ -132,7 +132,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
   for (iface = 0 ; iface < USB_MAXINTERFACES ; iface++) {
     cInterface = &priv->interfaces[iface];
 
-    if (dev_handle->claimed_interfaces & (1 << iface)) {
+    if (dev_handle->claimed_interfaces & (1L << iface)) {
       for (i = 0 ; i < cInterface->num_endpoints ; i++) {
 	if (cInterface->endpoint_addrs[i] == ep) {
 	  *pipep = i + 1;
@@ -749,7 +749,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
 
   /* make sure all interfaces are released */
   for (i = 0 ; i < USB_MAXINTERFACES ; i++)
-    if (dev_handle->claimed_interfaces & (1 << i))
+    if (dev_handle->claimed_interfaces & (1L << i))
       libusb_release_interface (dev_handle, i);
 
   if (0 == dpriv->open_count) {
@@ -803,7 +803,7 @@ static int darwin_set_configuration(struct libusb_device_handle *dev_handle, int
   /* Setting configuration will invalidate the interface, so we need
      to reclaim it. First, dispose of existing interfaces, if any. */
   for (i = 0 ; i < USB_MAXINTERFACES ; i++)
-    if (dev_handle->claimed_interfaces & (1 << i))
+    if (dev_handle->claimed_interfaces & (1L << i))
       darwin_release_interface (dev_handle, i);
 
   kresult = (*(dpriv->device))->SetConfiguration (dpriv->device, config);
@@ -812,7 +812,7 @@ static int darwin_set_configuration(struct libusb_device_handle *dev_handle, int
 
   /* Reclaim any interfaces. */
   for (i = 0 ; i < USB_MAXINTERFACES ; i++)
-    if (dev_handle->claimed_interfaces & (1 << i))
+    if (dev_handle->claimed_interfaces & (1L << i))
       darwin_claim_interface (dev_handle, i);
 
   dpriv->active_config = config;
