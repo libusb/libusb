@@ -1146,6 +1146,9 @@ static int op_get_configuration(struct libusb_device_handle *handle,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 
 	r = sysfs_get_active_config(handle->dev, config);
+	if (r < 0)
+		return r;
+
 	if (*config == -1)
 		*config = 0;
 
@@ -2063,6 +2066,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 		status = LIBUSB_TRANSFER_COMPLETED;
 		break;
 	case -ENOENT: /* cancelled */
+		status = LIBUSB_TRANSFER_CANCELLED;
 		break;
 	case -ESHUTDOWN:
 		usbi_dbg("device removed");
