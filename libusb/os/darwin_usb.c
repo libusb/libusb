@@ -301,7 +301,7 @@ static void *event_thread_main (void *arg0) {
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "could not add hotplug event source: %s", darwin_error_str (kresult));
 
-    pthread_exit ((void *)kresult);
+    pthread_exit (NULL);
   }
 
   /* arm notifiers */
@@ -325,7 +325,7 @@ static void *event_thread_main (void *arg0) {
 
   libusb_darwin_acfl = NULL;
 
-  pthread_exit (0);
+  pthread_exit (NULL);
 }
 
 static int darwin_init(struct libusb_context *ctx) {
@@ -351,11 +351,10 @@ static int darwin_init(struct libusb_context *ctx) {
 
 static void darwin_exit (void) {
   if (!(--initCount)) {
-    void *ret;
 
     /* stop the async runloop */
     CFRunLoopStop (libusb_darwin_acfl);
-    pthread_join (libusb_darwin_at, &ret);
+    pthread_join (libusb_darwin_at, NULL);
 
     if (libusb_darwin_mp)
       mach_port_deallocate(mach_task_self(), libusb_darwin_mp);
