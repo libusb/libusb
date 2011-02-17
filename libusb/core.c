@@ -523,6 +523,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	dev->ctx = ctx;
 	dev->refcnt = 1;
 	dev->session_data = session_id;
+	dev->speed = LIBUSB_SPEED_UNKNOWN;
 	memset(&dev->os_priv, 0, priv_size);
 
 	usbi_mutex_lock(&ctx->usb_devs_lock);
@@ -678,6 +679,17 @@ uint8_t API_EXPORTED libusb_get_bus_number(libusb_device *dev)
 uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 {
 	return dev->device_address;
+}
+
+/** \ingroup dev
+ * Get the negotiated speed of the device.
+ * \param dev a device
+ * \returns the device speed or LIBUSB_SPEED_UNKNOWN if the OS doesn't know or
+ * support returning the negotiated speed.
+ */
+enum libusb_speed API_EXPORTED libusb_get_device_speed(libusb_device *dev)
+{
+	return dev->speed;
 }
 
 static const struct libusb_endpoint_descriptor *find_endpoint(
