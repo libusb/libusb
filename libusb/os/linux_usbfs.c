@@ -1036,7 +1036,6 @@ static int sysfs_scan_device(struct libusb_context *ctx,
 	struct discovered_devs **_discdevs, const char *devname)
 {
 	int r;
-	FILE *fd;
 	char filename[PATH_MAX];
 	int busnum;
 	int devaddr;
@@ -1060,43 +1059,13 @@ static int sysfs_scan_device(struct libusb_context *ctx,
 		}
 	}
 
-	snprintf(filename, PATH_MAX, "%s/%s/busnum", SYSFS_DEVICE_PATH, devname);
-	fd = fopen(filename, "r");
-	if (!fd) {
-		if (errno == ENOENT) {
-			/* busnum doesn't exist. Assume the device has been
-			   disconnected (unplugged). */
-			return LIBUSB_ERROR_NO_DEVICE;
-		}
-		usbi_err(ctx, "open busnum failed, errno=%d", errno);
-		return LIBUSB_ERROR_IO;
-	}
+	busnum = __read_sysfs_attr(ctx, devname, "busnum");
+	if (busnum < 0)
+		return busnum;
 
-	r = fscanf(fd, "%d", &busnum);
-	fclose(fd);
-	if (r != 1) {
-		usbi_err(ctx, "fscanf busnum returned %d, errno=%d", r, errno);
-		return LIBUSB_ERROR_NO_DEVICE;
-	}
-
-	snprintf(filename, PATH_MAX, "%s/%s/devnum", SYSFS_DEVICE_PATH, devname);
-	fd = fopen(filename, "r");
-	if (!fd) {
-		if (errno == ENOENT) {
-			/* devnum doesn't exist. Assume the device has been
-			   disconnected (unplugged). */
-			return LIBUSB_ERROR_NO_DEVICE;
-		}
-		usbi_err(ctx, "open devnum failed, errno=%d", errno);
-		return LIBUSB_ERROR_IO;
-	}
-
-	r = fscanf(fd, "%d", &devaddr);
-	fclose(fd);
-	if (r != 1) {
-		usbi_err(ctx, "fscanf devnum returned %d, errno=%d", r, errno);
-		return LIBUSB_ERROR_NO_DEVICE;
-	}
+	devaddr = __read_sysfs_attr(ctx, devname, "devnum");
+	if (devaddr < 0)
+		return devaddr;
 
 	usbi_dbg("bus=%d dev=%d", busnum, devaddr);
 	if (busnum > 255 || devaddr > 255)
