@@ -784,7 +784,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	struct linux_device_priv *priv = __device_priv(dev);
 	unsigned char *dev_buf;
 	char path[PATH_MAX];
-	int fd;
+	int fd, speed;
 	int active_config = 0;
 	int device_configured = 1;
 	ssize_t r;
@@ -797,6 +797,20 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		if (!priv->sysfs_dir)
 			return LIBUSB_ERROR_NO_MEM;
 		strcpy(priv->sysfs_dir, sysfs_dir);
+
+		/* Note speed can contain 1.5, in this case __read_sysfs_attr
+		   will stop parsing at the '.' and return 1 */
+		speed = __read_sysfs_attr(DEVICE_CTX(dev), sysfs_dir, "speed");
+		if (speed >= 0) {
+			switch (speed) {
+			case     1: dev->speed = LIBUSB_SPEED_LOW; break;
+			case    12: dev->speed = LIBUSB_SPEED_FULL; break;
+			case   480: dev->speed = LIBUSB_SPEED_HIGH; break;
+			case  5000: dev->speed = LIBUSB_SPEED_SUPER; break;
+			default:
+				usbi_warn(DEVICE_CTX(dev), "Unknown device speed: %d Mbps", speed);
+			}
+		}
 	}
 
 	if (sysfs_has_descriptors)
