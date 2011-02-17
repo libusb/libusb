@@ -1270,7 +1270,7 @@ int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev,
 	int r = 0;
 
 	usbi_dbg("interface %d", interface_number);
-	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
+	if (interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	usbi_mutex_lock(&dev->lock);
@@ -1307,7 +1307,7 @@ int API_EXPORTED libusb_release_interface(libusb_device_handle *dev,
 	int r;
 
 	usbi_dbg("interface %d", interface_number);
-	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
+	if (interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	usbi_mutex_lock(&dev->lock);
@@ -1351,7 +1351,7 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev,
 {
 	usbi_dbg("interface %d altsetting %d",
 		interface_number, alternate_setting);
-	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
+	if (interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	usbi_mutex_lock(&dev->lock);
