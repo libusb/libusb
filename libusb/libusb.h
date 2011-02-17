@@ -684,6 +684,26 @@ typedef struct libusb_device libusb_device;
  */
 typedef struct libusb_device_handle libusb_device_handle;
 
+/** \ingroup dev
+ * Speed codes. Indicates the speed at which the device is operating.
+ */
+enum libusb_speed {
+    /** The OS doesn't report or know the device speed. */
+    LIBUSB_SPEED_UNKNOWN = 0,
+
+    /** The device is operating at low speed (1.5MBit/s). */
+    LIBUSB_SPEED_LOW = 1,
+
+    /** The device is operating at full speed (12MBit/s). */
+    LIBUSB_SPEED_FULL = 2,
+
+    /** The device is operating at high speed (480MBit/s). */
+    LIBUSB_SPEED_HIGH = 3,
+
+    /** The device is operating at super speed (5000MBit/s). */
+    LIBUSB_SPEED_SUPER = 4,
+};
+
 /** \ingroup misc
  * Error codes. Most libusb functions return 0 on success or one of these
  * codes on failure.
@@ -890,6 +910,7 @@ void LIBUSB_CALL libusb_free_config_descriptor(
 	struct libusb_config_descriptor *config);
 uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *dev);
+int LIBUSB_CALL libusb_get_device_speed(libusb_device *dev);
 int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint);
 int LIBUSB_CALL libusb_get_max_iso_packet_size(libusb_device *dev,

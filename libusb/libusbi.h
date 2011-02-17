@@ -276,6 +276,7 @@ struct libusb_device {
 	uint8_t bus_number;
 	uint8_t device_address;
 	uint8_t num_configurations;
+	enum libusb_speed speed;
 
 	struct list_head list;
 	unsigned long session_data;
