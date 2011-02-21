@@ -1097,10 +1097,6 @@ static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle,
   return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int darwin_get_device_topology(struct libusb_device *dev, struct libusb_device_topology* topology) {
-  return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
 static void darwin_destroy_device(struct libusb_device *dev) {
 }
 
@@ -1539,7 +1535,6 @@ const struct usbi_os_backend darwin_backend = {
 	.detach_kernel_driver = darwin_detach_kernel_driver,
 	.attach_kernel_driver = darwin_attach_kernel_driver,
 
-	.get_device_topology = darwin_get_device_topology,
 	.destroy_device = darwin_destroy_device,
 
 	.submit_transfer = darwin_submit_transfer,

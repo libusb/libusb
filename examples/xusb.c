@@ -605,7 +605,7 @@ int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
 	libusb_device *dev;
-	struct libusb_device_topology topology;
+	uint8_t bus, port_path[8];
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
@@ -629,8 +629,14 @@ int test_device(uint16_t vid, uint16_t pid)
 	}
 
 	dev = libusb_get_device(handle);
-	if (libusb_get_device_topology(dev, &topology) == LIBUSB_SUCCESS) {
-		printf("bus: %d, port: %d, depth: %d\n", topology.bus, topology.port, topology.depth);
+	bus = libusb_get_bus_number(dev);
+	r = libusb_get_port_path(dev, port_path, sizeof(port_path));
+	if (r > 0) {
+		printf("bus: %d, port path from HCD: %d", bus, port_path[0]);
+		for (i=1; i<r; i++) {
+			printf("->%d", port_path[i]);
+		}
+		printf("\n");
 	}
 
 	printf("\nReading device descriptor:\n");

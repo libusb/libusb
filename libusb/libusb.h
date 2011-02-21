@@ -675,19 +675,6 @@ typedef struct libusb_device libusb_device;
  */
 typedef struct libusb_device_handle libusb_device_handle;
 
-/** \ingroup dev
- * Structure representing the topology of an USB device.
- */
-struct libusb_device_topology {
-	/** Opaque device handle to the USB parent (a Hub or a HCD) */
-	libusb_device* parent_dev;
-	/** Bus number to which the device is connected, as seen by the OS */
-	uint8_t bus;
-	/** Depth to HCD for this bus (0 depth means the HCD device) */
-	uint8_t depth;
-	/** Hub port onto which the device is plugged in, as seen by the OS */
-	uint8_t port;
-};
 
 /** \ingroup misc
  * Error codes. Most libusb functions return 0 on success or one of these
@@ -901,6 +888,9 @@ int LIBUSB_CALL libusb_get_config_descriptor_by_value(libusb_device *dev,
 void LIBUSB_CALL libusb_free_config_descriptor(
 	struct libusb_config_descriptor *config);
 uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev);
+uint8_t LIBUSB_CALL libusb_get_port_number(libusb_device *dev);
+libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev);
+int LIBUSB_CALL libusb_get_port_path(libusb_device *dev, uint8_t* path, uint8_t path_length);
 uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *dev);
 int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint);
@@ -933,9 +923,6 @@ int LIBUSB_CALL libusb_detach_kernel_driver(libusb_device_handle *dev,
 	int interface_number);
 int LIBUSB_CALL libusb_attach_kernel_driver(libusb_device_handle *dev,
 	int interface_number);
-
-int LIBUSB_CALL libusb_get_device_topology(struct libusb_device *dev,
-	struct libusb_device_topology *topology);
 
 /* async I/O */
 

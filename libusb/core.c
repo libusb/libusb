@@ -510,7 +510,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	unsigned long session_id)
 {
 	size_t priv_size = usbi_backend->device_priv_size;
-	struct libusb_device *dev = malloc(sizeof(*dev) + priv_size);
+	struct libusb_device *dev = calloc(1, sizeof(*dev) + priv_size);
 	int r;
 
 	if (!dev)
@@ -670,6 +670,55 @@ void API_EXPORTED libusb_free_device_list(libusb_device **list,
 uint8_t API_EXPORTED libusb_get_bus_number(libusb_device *dev)
 {
 	return dev->bus_number;
+}
+
+/** \ingroup dev
+ * Get the number of the port that a device is connected to
+ * \param dev a device
+ * \returns the port number (0 if not available)
+ */
+uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
+{
+	return dev->port_number;
+}
+
+/** \ingroup dev
+ * Get the list of all port numbers from root for the specified device
+ * \param dev a device
+ * \param path the array that should contain the port numbers
+ * \param path_len the maximum length of the array
+ * \returns the number of elements filled
+ * \returns LIBUSB_ERROR_OVERFLOW if the array is too small
+ */
+int API_EXPORTED libusb_get_port_path(libusb_device *dev, uint8_t* path, uint8_t path_len)
+{
+	int i = path_len;
+
+	while(dev) {
+		// HCDs can be listed as devices and would have port #0
+		// TODO: see how the other backends want to implement HCDs as parents
+		if (dev->port_number == 0)
+			break;
+		usbi_dbg("another one (addy: %d)", dev->device_address);
+		if (--i<0) {
+			return LIBUSB_ERROR_OVERFLOW;
+		}
+		path[i] = dev->port_number;
+		dev = dev->parent_dev;
+	}
+	memmove(path, &path[i], path_len-i);
+	return path_len-i;
+}
+
+/** \ingroup dev
+ * Get the the parent from the specified device
+ * \param dev a device
+ * \returns the device parent or NULL if not available
+ */
+DEFAULT_VISIBILITY
+libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev)
+{
+	return dev->parent_dev;
 }
 
 /** \ingroup dev
@@ -1452,28 +1501,6 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
 		return usbi_backend->attach_kernel_driver(dev, interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
-/** \ingroup dev
- * Returns topology information for a device
- *
- * \param dev the device to get topology properties from
- * \param topology the libusb_device_topology structure to be populated.
- * \returns 0 on success
- * \returns LIBUSB_ERROR_INVALID_PARAM if dev or topology are invalid
- * \returns LIBUSB_ERROR_NOT_SUPPORTED on platforms where the functionality
- * is not available
- * \returns another LIBUSB_ERROR code on other failure
- */
-
-int API_EXPORTED libusb_get_device_topology(libusb_device *dev,
-	struct libusb_device_topology* topology)
-{
-	usbi_dbg("");
-	if (dev == NULL || topology == NULL) {
-		return LIBUSB_ERROR_INVALID_PARAM;
-	}
-	return usbi_backend->get_device_topology(dev, topology);
 }
 
 /** \ingroup lib

@@ -240,16 +240,6 @@ EXPORTS
   libusb_get_device_list@24 = libusb_get_device_list
   libusb_get_device_list@28 = libusb_get_device_list
   libusb_get_device_list@32 = libusb_get_device_list
-  libusb_get_device_topology
-  libusb_get_device_topology@00 = libusb_get_device_topology
-  libusb_get_device_topology@04 = libusb_get_device_topology
-  libusb_get_device_topology@08 = libusb_get_device_topology
-  libusb_get_device_topology@12 = libusb_get_device_topology
-  libusb_get_device_topology@16 = libusb_get_device_topology
-  libusb_get_device_topology@20 = libusb_get_device_topology
-  libusb_get_device_topology@24 = libusb_get_device_topology
-  libusb_get_device_topology@28 = libusb_get_device_topology
-  libusb_get_device_topology@32 = libusb_get_device_topology
   libusb_get_max_iso_packet_size
   libusb_get_max_iso_packet_size@00 = libusb_get_max_iso_packet_size
   libusb_get_max_iso_packet_size@04 = libusb_get_max_iso_packet_size
@@ -280,6 +270,16 @@ EXPORTS
   libusb_get_next_timeout@24 = libusb_get_next_timeout
   libusb_get_next_timeout@28 = libusb_get_next_timeout
   libusb_get_next_timeout@32 = libusb_get_next_timeout
+  libusb_get_parent
+  libusb_get_parent@00 = libusb_get_parent
+  libusb_get_parent@04 = libusb_get_parent
+  libusb_get_parent@08 = libusb_get_parent
+  libusb_get_parent@12 = libusb_get_parent
+  libusb_get_parent@16 = libusb_get_parent
+  libusb_get_parent@20 = libusb_get_parent
+  libusb_get_parent@24 = libusb_get_parent
+  libusb_get_parent@28 = libusb_get_parent
+  libusb_get_parent@32 = libusb_get_parent
   libusb_get_pollfds
   libusb_get_pollfds@00 = libusb_get_pollfds
   libusb_get_pollfds@04 = libusb_get_pollfds
@@ -290,6 +290,26 @@ EXPORTS
   libusb_get_pollfds@24 = libusb_get_pollfds
   libusb_get_pollfds@28 = libusb_get_pollfds
   libusb_get_pollfds@32 = libusb_get_pollfds
+  libusb_get_port_number
+  libusb_get_port_number@00 = libusb_get_port_number
+  libusb_get_port_number@04 = libusb_get_port_number
+  libusb_get_port_number@08 = libusb_get_port_number
+  libusb_get_port_number@12 = libusb_get_port_number
+  libusb_get_port_number@16 = libusb_get_port_number
+  libusb_get_port_number@20 = libusb_get_port_number
+  libusb_get_port_number@24 = libusb_get_port_number
+  libusb_get_port_number@28 = libusb_get_port_number
+  libusb_get_port_number@32 = libusb_get_port_number
+  libusb_get_port_path
+  libusb_get_port_path@00 = libusb_get_port_path
+  libusb_get_port_path@04 = libusb_get_port_path
+  libusb_get_port_path@08 = libusb_get_port_path
+  libusb_get_port_path@12 = libusb_get_port_path
+  libusb_get_port_path@16 = libusb_get_port_path
+  libusb_get_port_path@20 = libusb_get_port_path
+  libusb_get_port_path@24 = libusb_get_port_path
+  libusb_get_port_path@28 = libusb_get_port_path
+  libusb_get_port_path@32 = libusb_get_port_path
   libusb_get_string_descriptor_ascii
   libusb_get_string_descriptor_ascii@00 = libusb_get_string_descriptor_ascii
   libusb_get_string_descriptor_ascii@04 = libusb_get_string_descriptor_ascii
