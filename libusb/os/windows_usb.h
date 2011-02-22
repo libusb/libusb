@@ -118,12 +118,14 @@ const GUID GUID_NULL = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x
 #define USB_API_HUB         1
 #define USB_API_COMPOSITE   2
 #define USB_API_WINUSB      3
-#define USB_API_HID         4
-#define USB_API_MAX         5
+#define USB_API_LIBUSBK     4
+#define USB_API_HID         5
+#define USB_API_MAX         6
 
 #define CLASS_GUID_UNSUPPORTED      GUID_NULL
 const GUID CLASS_GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
 const GUID CLASS_GUID_LIBUSB_WINUSB = { 0x78A1C341, 0x4539, 0x11D3, {0xB8, 0x8D, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71} };
+const GUID CLASS_GUID_LIBUSBK       = { 0xECFB0CFD, 0x74C4, 0x4F52, {0xBB, 0xF7, 0x34, 0x34, 0x61, 0xCD, 0x72, 0xAC} };
 const GUID CLASS_GUID_COMPOSITE     = { 0x36FC9E60, 0xC465, 0x11cF, {0x80, 0x56, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00} };
 
 struct windows_usb_api_backend {
@@ -136,6 +138,7 @@ struct windows_usb_api_backend {
 	int (*exit)(void);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
+	int (*configure_endpoints)(struct libusb_device_handle *dev_handle, int iface);
 	int (*claim_interface)(struct libusb_device_handle *dev_handle, int iface);
 	int (*set_interface_altsetting)(struct libusb_device_handle *dev_handle, int iface, int altsetting);
 	int (*release_interface)(struct libusb_device_handle *dev_handle, int iface);
@@ -671,6 +674,7 @@ typedef struct {
 
 typedef void *WINUSB_INTERFACE_HANDLE, *PWINUSB_INTERFACE_HANDLE;
 
+/* WinUSB.dll */
 DLL_DECLARE(WINAPI, BOOL, WinUsb_Initialize, (HANDLE, PWINUSB_INTERFACE_HANDLE));
 DLL_DECLARE(WINAPI, BOOL, WinUsb_Free, (WINUSB_INTERFACE_HANDLE));
 DLL_DECLARE(WINAPI, BOOL, WinUsb_GetAssociatedInterface, (WINUSB_INTERFACE_HANDLE, UCHAR, PWINUSB_INTERFACE_HANDLE));
@@ -688,6 +692,25 @@ DLL_DECLARE(WINAPI, BOOL, WinUsb_ControlTransfer, (WINUSB_INTERFACE_HANDLE, WINU
 DLL_DECLARE(WINAPI, BOOL, WinUsb_ResetPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
 DLL_DECLARE(WINAPI, BOOL, WinUsb_AbortPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
 DLL_DECLARE(WINAPI, BOOL, WinUsb_FlushPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
+
+/* libusbwK.dll */
+DLL_DECLARE(WINAPI, BOOL, LUsbW_Initialize, (HANDLE, PWINUSB_INTERFACE_HANDLE));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_Free, (WINUSB_INTERFACE_HANDLE));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_GetAssociatedInterface, (WINUSB_INTERFACE_HANDLE, UCHAR, PWINUSB_INTERFACE_HANDLE));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_GetDescriptor, (WINUSB_INTERFACE_HANDLE, UCHAR, UCHAR, USHORT, PUCHAR, ULONG, PULONG));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_QueryInterfaceSettings, (WINUSB_INTERFACE_HANDLE, UCHAR, PUSB_INTERFACE_DESCRIPTOR));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_QueryDeviceInformation, (WINUSB_INTERFACE_HANDLE, ULONG, PULONG, PVOID));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_SetCurrentAlternateSetting, (WINUSB_INTERFACE_HANDLE, UCHAR));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_GetCurrentAlternateSetting, (WINUSB_INTERFACE_HANDLE, PUCHAR));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_QueryPipe, (WINUSB_INTERFACE_HANDLE, UCHAR, UCHAR, PWINUSB_PIPE_INFORMATION));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_SetPipePolicy, (WINUSB_INTERFACE_HANDLE, UCHAR, ULONG, ULONG, PVOID));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_GetPipePolicy, (WINUSB_INTERFACE_HANDLE, UCHAR, ULONG, PULONG, PVOID));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_ReadPipe, (WINUSB_INTERFACE_HANDLE, UCHAR, PUCHAR, ULONG, PULONG, LPOVERLAPPED));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_WritePipe, (WINUSB_INTERFACE_HANDLE, UCHAR, PUCHAR, ULONG, PULONG, LPOVERLAPPED));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_ControlTransfer, (WINUSB_INTERFACE_HANDLE, WINUSB_SETUP_PACKET, PUCHAR, ULONG, PULONG, LPOVERLAPPED));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_ResetPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_AbortPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
+DLL_DECLARE(WINAPI, BOOL, LUsbW_FlushPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
 
 /* hid.dll interface */
 
