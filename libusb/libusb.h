@@ -890,7 +890,7 @@ void LIBUSB_CALL libusb_free_config_descriptor(
 uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_port_number(libusb_device *dev);
 libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev);
-int LIBUSB_CALL libusb_get_port_path(libusb_device *dev, uint8_t* path, uint8_t path_length);
+int LIBUSB_CALL libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t* path, uint8_t path_length);
 uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *dev);
 int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint);

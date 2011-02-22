@@ -630,7 +630,7 @@ int test_device(uint16_t vid, uint16_t pid)
 
 	dev = libusb_get_device(handle);
 	bus = libusb_get_bus_number(dev);
-	r = libusb_get_port_path(dev, port_path, sizeof(port_path));
+	r = libusb_get_port_path(NULL, dev, port_path, sizeof(port_path));
 	if (r > 0) {
 		printf("bus: %d, port path from HCD: %d", bus, port_path[0]);
 		for (i=1; i<r; i++) {

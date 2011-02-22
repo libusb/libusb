@@ -690,9 +690,16 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
  * \returns the number of elements filled
  * \returns LIBUSB_ERROR_OVERFLOW if the array is too small
  */
-int API_EXPORTED libusb_get_port_path(libusb_device *dev, uint8_t* path, uint8_t path_len)
+int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t* path, uint8_t path_len)
 {
 	int i = path_len;
+	ssize_t r;
+	struct libusb_device **devs;
+
+	/* The device needs to be open, else the parents may have been destroyed */
+	r = libusb_get_device_list(ctx, &devs);
+	if (r < 0)
+		return (int)r;
 
 	while(dev) {
 		// HCDs can be listed as devices and would have port #0
@@ -706,6 +713,7 @@ int API_EXPORTED libusb_get_port_path(libusb_device *dev, uint8_t* path, uint8_t
 		path[i] = dev->port_number;
 		dev = dev->parent_dev;
 	}
+	libusb_free_device_list(devs, 1);
 	memmove(path, &path[i], path_len-i);
 	return path_len-i;
 }
