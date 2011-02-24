@@ -2335,7 +2335,7 @@ static int common_configure_endpoints(struct libusb_device_handle *dev_handle, i
 const char* hub_driver_names[] = {"USBHUB"};
 const char* composite_driver_names[] = {"USBCCGP"};
 const char* winusb_driver_names[] = {"WINUSB"};
-const char* libusbK_driver_names[] = {"LIBUSBWK"};
+const char* libusbK_driver_names[] = {"LIBUSBWK", "LIBUSBK"};
 const char* hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
 const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	{
