@@ -1,7 +1,7 @@
 *.sh     eol=lf
 *.ac     eol=lf
 *.am     eol=lf
-*.dsw    eol=crlf
+*.dsw    -crlf
 *.dsp    eol=crlf
 *.sln    eol=crlf
 *.vcproj eol=crlf
