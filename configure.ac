@@ -63,29 +63,25 @@ case $host in
 		[#include <poll.h>])
 	;;
 *-mingw*)
-	AC_DEFINE(OS_WINDOWS, 1, [Windows backend])
-	AC_SUBST(OS_WINDOWS)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
-	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
-	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
-	AC_CHECK_TOOL(RC, windres, no)
-	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	;;
 *-cygwin*)
-	AC_DEFINE(OS_WINDOWS, 1, [Windows backend])
-	AC_SUBST(OS_WINDOWS)
 	AC_MSG_RESULT([Cygwin (using Windows backend)])
 	backend="windows"
 	threads="posix"
-	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
-	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
-	AC_CHECK_TOOL(RC, windres, no)
-	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	;;
 *)
 	AC_MSG_ERROR([unsupported operating system])
 esac
+if test "$backend" = windows; then
+	AC_DEFINE(OS_WINDOWS, 1, [Windows backend])
+	AC_SUBST(OS_WINDOWS)
+	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
+	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
+	AC_CHECK_TOOL(RC, windres, no)
+	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
+fi
 AC_SUBST(THREAD_CFLAGS)
 AC_SUBST(PC_LIBS_PRIVATE)
 LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
