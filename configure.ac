@@ -56,7 +56,7 @@ case $host in
 	AC_DEFINE(OS_DARWIN, [], [Darwin backend])
 	AC_SUBST(OS_DARWIN)
 	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
-	AC_MSG_RESULT([Darwin/MacOS X])
+	AC_MSG_RESULT([Darwin/Mac OS X])
 	backend="darwin"
 	threads="posix"
 	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-prebind -no-undefined"
@@ -84,7 +84,7 @@ case $host in
 	AC_DEFINE(OS_WINDOWS, [], [Windows backend])
 	AC_SUBST(OS_WINDOWS)
 	AC_DEFINE([THREADS_POSIX], [], [Use Posix Threads])
-	AC_MSG_RESULT([Windows])
+	AC_MSG_RESULT([Cygwin (using Windows backend)])
 	backend="windows"
 	threads="posix"
 	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
