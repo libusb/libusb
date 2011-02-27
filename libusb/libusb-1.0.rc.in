@@ -32,14 +32,14 @@ BEGIN
 		BEGIN
 			VALUE "Comments", "\0"
 			VALUE "CompanyName", "libusb.org\0"
-			VALUE "FileDescription", "libusb-1\0"
+			VALUE "FileDescription", "C library for writing portable USB drivers in userspace\0"
 			VALUE "FileVersion", "@PACKAGE_VERSION@"
 			VALUE "InternalName", "libusb\0"
 			VALUE "LegalCopyright", "See individual source files, GNU LGPL v2.1 or later.\0"
 			VALUE "LegalTrademarks", "http://www.gnu.org/licenses/lgpl-2.1.html\0"
 			VALUE "OriginalFilename", VER_ORIGINALFILENAME_STR
 			VALUE "PrivateBuild", "\0"
-			VALUE "ProductName", "libusb-1\0"
+			VALUE "ProductName", "libusb-1.0\0"
 			VALUE "ProductVersion", "@PACKAGE_VERSION@"
 			VALUE "SpecialBuild", "\0"
 		END
