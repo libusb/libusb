@@ -489,8 +489,8 @@ static void auto_release(struct usbi_transfer *itransfer)
 			if (r == LIBUSB_SUCCESS) {
 				usbi_dbg("auto-released interface %d", transfer_priv->interface_number);
 			} else {
-				usbi_dbg("failed to auto-release interface %d (%s)",
-					transfer_priv->interface_number, libusb_strerror(r));
+				usbi_dbg("failed to auto-release interface %d (error=%d)",
+					transfer_priv->interface_number, r);
 			}
 		}
 	}
