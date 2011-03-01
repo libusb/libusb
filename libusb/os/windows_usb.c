@@ -2542,6 +2542,7 @@ static int libusbk_init(struct libusb_context *ctx)
 	DLL_LOAD(libusbK.dll, LUsbK_ResetPipe, TRUE);
 	DLL_LOAD(libusbK.dll, LUsbK_AbortPipe, TRUE);
 	DLL_LOAD(libusbK.dll, LUsbK_FlushPipe, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_ResetDevice, TRUE);
 
 	api_libusbk_available = true;
 	return LIBUSB_SUCCESS;
@@ -3186,6 +3187,14 @@ static int _winusb_reset_device(struct libusb_device_handle *dev_handle, bool k)
 						priv->usb_interface[i].endpoint[j], windows_error_str(0));
 				}
 			}
+		}
+	}
+
+	// LibusbK has the ability to issue an actual device reset
+	if (k) {
+		winusb_handle = handle_priv->interface_handle[0].api_handle;
+		if ( (winusb_handle != 0) && (winusb_handle != INVALID_HANDLE_VALUE)) {
+			LUsbK_ResetDevice(winusb_handle);
 		}
 	}
 
