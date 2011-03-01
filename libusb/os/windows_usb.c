@@ -71,7 +71,7 @@ static int common_configure_endpoints(struct libusb_device_handle *dev_handle, i
 // HUB (limited) API prototypes
 static int hub_open(struct libusb_device_handle *dev_handle);
 static void hub_close(struct libusb_device_handle *dev_handle);
-// WinUSB, libusbwK API prototypes
+// WinUSB, libusbK API prototypes
 static int winusb_init(struct libusb_context *ctx);
 static int winusb_exit(void);
 static int winusb_open(struct libusb_device_handle *dev_handle);
@@ -2335,7 +2335,7 @@ static int common_configure_endpoints(struct libusb_device_handle *dev_handle, i
 const char* hub_driver_names[] = {"USBHUB"};
 const char* composite_driver_names[] = {"USBCCGP"};
 const char* winusb_driver_names[] = {"WINUSB"};
-const char* libusbK_driver_names[] = {"LIBUSBWK", "LIBUSBK"};
+const char* libusbK_driver_names[] = {"LIBUSBK"};
 const char* hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
 const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	{
@@ -2492,7 +2492,7 @@ static void hub_close(struct libusb_device_handle *dev_handle)
  */
 
 // TODO: This will break on MSVC6 because of the use of VA_ARGS...
-#define _WinUsb(name, ...) (((k) && (LUsbW_##name(__VA_ARGS__))) || ((!k) && (WinUsb_##name(__VA_ARGS__))))
+#define _WinUsb(name, ...) (((k) && (LUsbK_##name(__VA_ARGS__))) || ((!k) && (WinUsb_##name(__VA_ARGS__))))
 
 static int winusb_init(struct libusb_context *ctx)
 {
@@ -2525,23 +2525,23 @@ static int winusb_exit(void)
 
 static int libusbk_init(struct libusb_context *ctx)
 {
-	DLL_LOAD(libusbwK.dll, LUsbW_Initialize, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_Free, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_GetAssociatedInterface, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_GetDescriptor, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_QueryInterfaceSettings, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_QueryDeviceInformation, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_SetCurrentAlternateSetting, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_GetCurrentAlternateSetting, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_QueryPipe, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_SetPipePolicy, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_GetPipePolicy, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_ReadPipe, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_WritePipe, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_ControlTransfer, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_ResetPipe, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_AbortPipe, TRUE);
-	DLL_LOAD(libusbwK.dll, LUsbW_FlushPipe, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_Initialize, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_Free, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_GetAssociatedInterface, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_GetDescriptor, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_QueryInterfaceSettings, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_QueryDeviceInformation, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_SetCurrentAlternateSetting, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_GetCurrentAlternateSetting, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_QueryPipe, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_SetPipePolicy, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_GetPipePolicy, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_ReadPipe, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_WritePipe, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_ControlTransfer, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_ResetPipe, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_AbortPipe, TRUE);
+	DLL_LOAD(libusbK.dll, LUsbK_FlushPipe, TRUE);
 
 	api_libusbk_available = true;
 	return LIBUSB_SUCCESS;
@@ -3009,13 +3009,13 @@ static int _winusb_submit_bulk_transfer(struct usbi_transfer *itransfer, bool k)
 		if (!k)
 			ret = WinUsb_ReadPipe(wfd.handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
 		else
-			ret = LUsbW_ReadPipe(wfd.handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
+			ret = LUsbK_ReadPipe(wfd.handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
 	} else {
 		usbi_dbg("writing %d bytes", transfer->length);
 		if (!k)
 			ret = WinUsb_WritePipe(wfd.handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
 		else
-			ret = LUsbW_WritePipe(wfd.handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
+			ret = LUsbK_WritePipe(wfd.handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
 	}
 	if (!ret) {
 		if(GetLastError() != ERROR_IO_PENDING) {
