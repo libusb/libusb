@@ -2578,7 +2578,6 @@ static int winusb_release_interface(struct libusb_device_handle *dev_handle, int
 static int winusb_get_valid_interface(struct libusb_device_handle *dev_handle)
 {
 	struct windows_device_handle_priv *handle_priv = __device_handle_priv(dev_handle);
-	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 	int i;
 
 	for (i=0; i<USB_MAXINTERFACES; i++) {
