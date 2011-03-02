@@ -1,11 +1,8 @@
 /*
- * xusb: libusb-winusb specific test program
- * Copyright (c) 2009-2010 Pete Batard <pbatard@gmail.com>
+ * xusb: Generic USB test program
+ * Copyright (c) 2009-2011 Pete Batard <pbatard@gmail.com>
  * Based on lsusb, copyright (c) 2007 Daniel Drake <dsd@gentoo.org>
  * With contributions to Mass Storage test by Alan Stern.
- *
- * This test program tries to access an USB device through WinUSB.
- * To access your device, modify this source and add your VID/PID.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -138,9 +135,9 @@ static uint8_t cdb_length[256] = {
 };
 
 enum test_type {
+	USE_GENERIC,
 	USE_XBOX,
-	USE_KEY,
-	USE_JTAG,
+	USE_SCSI,
 	USE_HID,
 } test_mode;
 uint16_t VID, PID;
@@ -516,7 +513,7 @@ int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 
 	printf("\nReading HID Report Descriptors:\n");
 	descriptor_size = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_RECIPIENT_INTERFACE,
-		LIBUSB_REQUEST_GET_DESCRIPTOR, LIBUSB_DT_REPORT<<8, 0, hid_report_descriptor, 256, 1000);
+		LIBUSB_REQUEST_GET_DESCRIPTOR, LIBUSB_DT_REPORT<<8, 0, hid_report_descriptor, sizeof(hid_report_descriptor), 1000);
 	if (descriptor_size < 0) {
 		printf("failed\n");
 		return -1;
@@ -614,7 +611,6 @@ int test_device(uint16_t vid, uint16_t pid)
 	// Attaching/detaching the kernel driver is only relevant for Linux
 	int iface_detached = -1;
 #endif
-	bool test_scsi = false;
 	struct libusb_device_descriptor dev_desc;
 	char string[128];
 	uint8_t string_index[3];	// indexes of the string descriptors
@@ -670,7 +666,7 @@ int test_device(uint16_t vid, uint16_t pid)
 			  || (conf_desc->usb_interface[i].altsetting[j].bInterfaceSubClass == 0x06) )
 			  && (conf_desc->usb_interface[i].altsetting[j].bInterfaceProtocol == 0x50) ) {
 				// Mass storage devices that can use basic SCSI commands
-				test_scsi = true;
+				test_mode = USE_SCSI;
 			}
 			for (k=0; k<conf_desc->usb_interface[i].altsetting[j].bNumEndpoints; k++) {
 				endpoint = &conf_desc->usb_interface[i].altsetting[j].endpoint[k];
@@ -727,12 +723,10 @@ int test_device(uint16_t vid, uint16_t pid)
 	case USE_HID:
 		test_hid(handle, endpoint_in);
 		break;
+	case USE_SCSI:
+		CALL_CHECK(test_mass_storage(handle, endpoint_in, endpoint_out));
 	default:
 		break;
-	}
-
-	if (test_scsi) {
-		CALL_CHECK(test_mass_storage(handle, endpoint_in, endpoint_out));
 	}
 
 	printf("\n");
@@ -765,10 +759,10 @@ int main(int argc, char** argv)
 	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
 
-	// Default to HID, expecting VID:PID
+	// Default to generic, expecting VID:PID
 	VID = 0;
 	PID = 0;
-	test_mode = USE_HID;
+	test_mode = USE_GENERIC;
 
 	if (((uint8_t*)&endian_test)[0] == 0xBE) {
 		printf("Despite their natural superiority for end users, big endian\n"
@@ -793,13 +787,7 @@ int main(int argc, char** argv)
 					}
 					binary_dump = true;
 					break;
-				case 'i':
-					// IBM HID Optical mouse - 1 interface
-					if (!VID && !PID) {
-						VID = 0x04B3;
-						PID = 0x3108;
-					}
-					test_mode = USE_HID;
+				case 'g':
 					break;
 				case 'j':
 					// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
@@ -807,7 +795,6 @@ int main(int argc, char** argv)
 						VID = 0x15BA;
 						PID = 0x0004;
 					}
-					test_mode = USE_JTAG;
 					break;
 				case 'k':
 					// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
@@ -815,7 +802,6 @@ int main(int argc, char** argv)
 						VID = 0x0204;
 						PID = 0x6025;
 					}
-					test_mode = USE_KEY;
 					break;
 				// The following tests will force VID:PID if already provided
 				case 'l':
@@ -861,11 +847,11 @@ int main(int argc, char** argv)
 	}
 
 	if ((show_help) || (argc == 1) || (argc > 7)) {
-		printf("usage: %s [-d] [-b [file]] [-h] [-i] [-j] [-k] [-l] [-s] [-x] [vid:pid]\n", argv[0]);
+		printf("usage: %s [-d] [-b [file]] [-h] [-i] [-j] [-k] [-x] [vid:pid]\n", argv[0]);
 		printf("   -h: display usage\n");
 		printf("   -d: enable debug output (if library was compiled with debug enabled)\n");
-		printf("   -b: dump raw HID report descriptor or Mass Storage first block to binary file\n");
-		printf("   -i: test generic HID device (default)\n");
+		printf("   -b: dump Mass Storage first block to binary file\n");
+		printf("   -g: short generic test (default)\n");
 		printf("   -k: test generic Mass Storage USB device (using WinUSB)\n");
 		printf("   -j: test FTDI based JTAG device (using WinUSB)\n");
 		printf("   -l: test Plantronics Headset (using HID)\n");
@@ -889,4 +875,3 @@ int main(int argc, char** argv)
 
 	return 0;
 }
-
