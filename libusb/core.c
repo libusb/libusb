@@ -706,7 +706,6 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev, u
 		// TODO: see how the other backends want to implement HCDs as parents
 		if (dev->port_number == 0)
 			break;
-		usbi_dbg("another one (addy: %d)", dev->device_address);
 		if (--i<0) {
 			return LIBUSB_ERROR_OVERFLOW;
 		}
