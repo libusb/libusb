@@ -1048,6 +1048,10 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	if ((dev == NULL) || (parent_dev == NULL)) {
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
+	if (dev->bus_number != 0) {
+		// Device has already been initialized
+		return LIBUSB_SUCCESS;
+	}
 	priv = __device_priv(dev);
 	parent_priv = __device_priv(parent_dev);
 	if (parent_priv->apib->id != USB_API_HUB) {
@@ -1506,7 +1510,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						}
 					}
 				} else {
-					usbi_dbg("found existing device for session [%X]", session_id);
+					usbi_dbg("found existing device for session [%X] (%d.%d)",
+						session_id, dev->bus_number, dev->device_address);
 				}
 				priv = __device_priv(dev);
 			}
@@ -1522,6 +1527,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				priv->path = dev_interface_path; dev_interface_path = NULL;
 				break;
 			case DEV_PASS:
+				// If the device has already been setup, don't do it again
+				if (priv->path != NULL)
+					break;
 				// Take care of API initialization
 				priv->path = dev_interface_path; dev_interface_path = NULL;
 				priv->apib = &usb_api_backend[api];
@@ -1529,7 +1537,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				case USB_API_COMPOSITE:
 					break;
 				case USB_API_HID:
-					safe_free(priv->hid);
 					priv->hid = calloc(1, sizeof(struct hid_device_priv));
 					if (priv->hid == NULL) {
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
