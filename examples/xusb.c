@@ -82,14 +82,9 @@ inline static int perr(char const *format, ...)
 
 // HID Class-Specific Requests values. See section 7.2 of the HID specifications
 #define HID_GET_REPORT                0x01
-#define HID_GET_IDLE                  0x02
-#define HID_GET_PROTOCOL              0x03
 #define HID_SET_REPORT                0x09
-#define HID_SET_IDLE                  0x0A
-#define HID_SET_PROTOCOL              0x0B
 #define HID_REPORT_TYPE_INPUT         0x01
 #define HID_REPORT_TYPE_OUTPUT        0x02
-#define HID_REPORT_TYPE_FEATURE       0x03
 
 // Mass Storage Requests values. See section 3 of the Bulk-Only Mass Storage Class specifications
 #define BOMS_RESET                    0xFF
@@ -138,7 +133,6 @@ enum test_type {
 	USE_GENERIC,
 	USE_XBOX,
 	USE_SCSI,
-	USE_HID,
 } test_mode;
 uint16_t VID, PID;
 
@@ -442,162 +436,6 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	return 0;
 }
 
-// HID
-int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int type)
-{
-	uint8_t i, j = 0;
-	uint8_t offset;
-	int record_size[3] = {0, 0, 0};
-	int nb_bits = 0, nb_items = 0;
-	bool found_bits, found_items, found_record_marker;
-
-	found_bits = false;
-	found_items = false;
-	found_record_marker = false;
-	for (i = hid_report_descriptor[0]+1; i < size; i += offset) {
-		offset = (hid_report_descriptor[i]&0x03) + 1;
-		if (offset == 4)
-			offset = 5;
-		switch (hid_report_descriptor[i] & 0xFC) {
-		case 0x74:	// bitsize
-			nb_bits = hid_report_descriptor[i+1];
-			found_bits = true;
-			break;
-		case 0x94:	// count
-			nb_items = 0;
-			for (j=1; j<offset; j++) {
-				nb_items = ((uint32_t)hid_report_descriptor[i+j]) << (8*(j-1));
-			}
-			found_items = true;
-			break;
-		case 0x80:	// input
-			found_record_marker = true;
-			j = 0;
-			break;
-		case 0x90:	// output
-			found_record_marker = true;
-			j = 1;
-			break;
-		case 0xb0:	// feature
-			found_record_marker = true;
-			j = 2;
-			break;
-		case 0xC0:	// end of collection
-			nb_items = 0;
-			nb_bits = 0;
-			break;
-		default:
-			continue;
-		}
-		if (found_record_marker) {
-			found_bits = false;
-			found_items = false;
-			found_record_marker = false;
-			record_size[j] += nb_items*nb_bits;
-		}
-	}
-	if ((type < HID_REPORT_TYPE_INPUT) || (type > HID_REPORT_TYPE_FEATURE)) {
-		return 0;
-	} else {
-		return (record_size[type - HID_REPORT_TYPE_INPUT]+7)/8;
-	}
-}
-
-int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
-{
-	int r, size, descriptor_size;
-	uint8_t hid_report_descriptor[256];
-	uint8_t *report_buffer;
-	FILE *fd;
-	size_t junk;
-
-	printf("\nReading HID Report Descriptors:\n");
-	descriptor_size = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_RECIPIENT_INTERFACE,
-		LIBUSB_REQUEST_GET_DESCRIPTOR, LIBUSB_DT_REPORT<<8, 0, hid_report_descriptor, sizeof(hid_report_descriptor), 1000);
-	if (descriptor_size < 0) {
-		printf("failed\n");
-		return -1;
-	}
-	display_buffer_hex(hid_report_descriptor, descriptor_size);
-	if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-		junk = fwrite(hid_report_descriptor, 1, descriptor_size, fd);
-		fclose(fd);
-	}
-
-	size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_FEATURE);
-	if (size <= 0) {
-		printf("\nSkipping Feature Report readout (None detected)\n");
-	} else {
-		report_buffer = calloc(size, 1);
-		if (report_buffer == NULL) {
-			return -1;
-		}
-
-		printf("\nReading Feature Report (length %d)...\n", size);
-		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
-			HID_GET_REPORT, (HID_REPORT_TYPE_FEATURE<<8)|0, 0, report_buffer, (uint16_t)size, 5000);
-		if (r >= 0) {
-			display_buffer_hex(report_buffer, size);
-		} else {
-			switch(r) {
-			case LIBUSB_ERROR_NOT_FOUND:
-				printf("   No Feature Report available for this device\n");
-				break;
-			case LIBUSB_ERROR_PIPE:
-				printf("   Detected stall - resetting pipe...\n");
-				libusb_clear_halt(handle, 0);
-				break;
-			default:
-				printf("   Error: %s\n", libusb_strerror(r));
-				break;
-			}
-		}
-		free(report_buffer);
-	}
-
-	size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_INPUT);
-	if (size <= 0) {
-		printf("\nSkipping Input Report readout (None detected)\n");
-	} else {
-		report_buffer = calloc(size, 1);
-		if (report_buffer == NULL) {
-			return -1;
-		}
-
-		printf("\nReading Input Report (length %d)...\n", size);
-		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
-			HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, report_buffer, (uint16_t)size, 5000);
-		if (r >= 0) {
-			display_buffer_hex(report_buffer, size);
-		} else {
-			switch(r) {
-			case LIBUSB_ERROR_TIMEOUT:
-				printf("   Timeout! Please make sure you act on the device within the 5 seconds allocated...\n");
-				break;
-			case LIBUSB_ERROR_PIPE:
-				printf("   Detected stall - resetting pipe...\n");
-				libusb_clear_halt(handle, 0);
-				break;
-			default:
-				printf("   Error: %s\n", libusb_strerror(r));
-				break;
-			}
-		}
-
-		// Attempt a bulk read from endpoint 0 (this should just return a raw input report)
-		printf("\nTesting interrupt read using endpoint %02X...\n", endpoint_in);
-		r = libusb_interrupt_transfer(handle, endpoint_in, report_buffer, size, &size, 5000);
-		if (r >= 0) {
-			display_buffer_hex(report_buffer, size);
-		} else {
-			printf("   %s\n", libusb_strerror(r));
-		}
-
-		free(report_buffer);
-	}
-	return 0;
-}
-
 int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
@@ -720,9 +558,6 @@ int test_device(uint16_t vid, uint16_t pid)
 		msleep(2000);
 		CALL_CHECK(set_xbox_actuators(handle, 0, 0));
 		break;
-	case USE_HID:
-		test_hid(handle, endpoint_in);
-		break;
 	case USE_SCSI:
 		CALL_CHECK(test_mass_storage(handle, endpoint_in, endpoint_out));
 	default:
@@ -804,18 +639,6 @@ int main(int argc, char** argv)
 					}
 					break;
 				// The following tests will force VID:PID if already provided
-				case 'l':
-					// Plantronics DSP 400, 2 channel HID composite device - 1 HID interface
-					VID = 0x047F;
-					PID = 0x0CA1;
-					test_mode = USE_HID;
-					break;
-				case 's':
-					// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
-					VID = 0x045E;
-					PID = 0x0008;
-					test_mode = USE_HID;
-					break;
 				case 'x':
 					// Microsoft XBox Controller Type S - 1 interface
 					VID = 0x045E;
@@ -854,8 +677,6 @@ int main(int argc, char** argv)
 		printf("   -g: short generic test (default)\n");
 		printf("   -k: test generic Mass Storage USB device (using WinUSB)\n");
 		printf("   -j: test FTDI based JTAG device (using WinUSB)\n");
-		printf("   -l: test Plantronics Headset (using HID)\n");
-		printf("   -s: test Microsoft Sidewinder Precision Pro (using HID)\n");
 		printf("   -x: test Microsoft XBox Controller Type S (using WinUSB)\n");
 		return 0;
 	}
