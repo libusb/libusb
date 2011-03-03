@@ -75,7 +75,7 @@ case $host in
 	LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 	# -avoid-version to avoid a naming scheme such as libusb-0.dll
 	AM_LDFLAGS="-no-undefined -avoid-version -Wl,--add-stdcall-alias"
-	AM_CFLAGS="-std=c99"
+	AM_CFLAGS="-std=gnu99"
 	AC_CHECK_TOOL(RC, windres, no)
 	AC_CHECK_TOOL(DLLTOOL, dlltool, false)
 	;;
