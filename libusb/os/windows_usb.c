@@ -980,7 +980,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 {
 	HANDLE handle;
 	DWORD size;
-	USB_NODE_CONNECTION_INFORMATION conn_info;
+	USB_NODE_CONNECTION_INFORMATION_EX conn_info;
 	struct windows_device_priv *priv, *parent_priv;
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device* tmp_dev;
@@ -1030,9 +1030,9 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			usbi_warn(ctx, "could not open hub %s: %s", parent_priv->path, windows_error_str(0));
 			return LIBUSB_ERROR_ACCESS;
 		}
-		size = sizeof(USB_NODE_CONNECTION_INFORMATION);
+		size = sizeof(conn_info);
 		conn_info.ConnectionIndex = (ULONG)port_number;
-		if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION, &conn_info, size,
+		if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, size,
 			&conn_info, size, &size, NULL)) {
 			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
 				device_id, windows_error_str(0));
@@ -1060,6 +1060,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			usbi_err(ctx, "program assertion failed: device address overflow");
 		}
 		dev->device_address = (uint8_t)conn_info.DeviceAddress;
+		dev->speed = conn_info.Speed + 1;	// expected future-proof
 	} else {
 		dev->device_address = UINT8_MAX;	// Hubs from HCD have a devaddr of 255
 		force_hcd_device_descriptor(dev);
