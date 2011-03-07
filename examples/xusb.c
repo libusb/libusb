@@ -19,7 +19,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -28,7 +27,7 @@
 
 #include "libusb.h"
 
-#ifdef OS_WINDOWS
+#if defined(_MSC_VER)
 #define msleep(msecs) Sleep(msecs)
 #else
 #include <unistd.h>
@@ -131,6 +130,7 @@ static uint8_t cdb_length[256] = {
 
 enum test_type {
 	USE_GENERIC,
+	USE_PS3,
 	USE_XBOX,
 	USE_SCSI,
 } test_mode;
@@ -164,7 +164,96 @@ void display_buffer_hex(unsigned char *buffer, unsigned size)
 	printf("\n" );
 }
 
+int initalize_ps3(libusb_device_handle *handle)
+{
+	int r;
+	uint8_t input_report[49];
+	CALL_CHECK(libusb_control_transfer(handle, 0x80, 0x06, 0x0001, 0x0, input_report, 0x12, 1000));
+	CALL_CHECK(libusb_control_transfer(handle, 0x80, 0x06, 0x0002, 0x0, input_report, 0x09, 1000));
+	CALL_CHECK(libusb_control_transfer(handle, 0x80, 0x06, 0x0002, 0x0, input_report, 0x29, 1000));
+	CALL_CHECK(libusb_control_transfer(handle, 0xa1, 0x01, 0x03f2, 0x0, input_report, 0x11, 1000));
+	CALL_CHECK(libusb_control_transfer(handle, 0xa1, 0x01, 0x03f5, 0x0, input_report, 0x08, 1000));
+	return 0;
+}
 
+// The PS3 Controller is really a HID device that got its HID Report Descriptors
+// removed by Sony
+int display_ps3_status(libusb_device_handle *handle)
+{
+	int r;
+	uint8_t input_report[49];
+
+	//Ensure the controller is initialized and ready to send its state
+	initalize_ps3(handle);
+
+	printf("\nReading PS3 Input Report...\n");
+	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x01, 0, input_report, 49, 1000));
+	switch(input_report[2]){	/** Direction pad plus start, select, and joystick buttons */
+		case 0x01:
+			printf("\tSELECT pressed\n");
+			break;
+		case 0x02:
+			printf("\tLEFT 3 pressed\n");
+			break;
+		case 0x04:
+			printf("\tRIGHT 3 pressed\n");
+			break;
+		case 0x08:
+			printf("\tSTART presed\n");
+			break;
+		case 0x10:
+			printf("\tUP pressed\n");
+			break;
+		case 0x20:
+			printf("\tRIGHT pressed\n");
+			break;
+		case 0x40:
+			printf("\tDOWN pressed\n");
+			break;
+		case 0x80:
+			printf("\tLEFT pressed\n");
+			break;
+	}
+	switch(input_report[3]){	/** Shapes plus top right and left buttons */
+		case 0x01:
+			printf("\tLEFT 2 pressed\n");
+			break;
+		case 0x02:
+			printf("\tRIGHT 2 pressed\n");
+			break;
+		case 0x04:
+			printf("\tLEFT 1 pressed\n");
+			break;
+		case 0x08:
+			printf("\tRIGHT 1 presed\n");
+			break;
+		case 0x10:
+			printf("\tTRIANGLE pressed\n");
+			break;
+		case 0x20:
+			printf("\tCIRCLE pressed\n");
+			break;
+		case 0x40:
+			printf("\tCROSS pressed\n");
+			break;
+		case 0x80:
+			printf("\tSQUARE pressed\n");
+			break;
+	}
+	printf("\tPS button: %d\n", input_report[4]);
+	printf("\tLeft Analog (X,Y): (%d,%d)\n", input_report[6], input_report[7]);
+	printf("\tRight Analog (X,Y): (%d,%d)\n", input_report[8], input_report[9]);
+	printf("\tL2 Value: %d\tR2 Value: %d\n", input_report[18], input_report[19]);
+	printf("\tL1 Value: %d\tR1 Value: %d\n", input_report[20], input_report[21]);
+	printf("\tRoll (x axis): %d Yaw (y axis): %d Pitch (z axis) %d\n",
+			//(((input_report[42] + 128) % 256) - 128),
+			(int8_t)(input_report[42]),
+			(int8_t)(input_report[44]),
+			(int8_t)(input_report[46]));
+	printf("\tAcceleration: %d\n\n", (int8_t)(input_report[48]));
+	return 0;
+}
 // The XBOX Controller is really a HID device that got its HID Report Descriptors
 // removed by Microsoft.
 // Input/Output reports described at http://euc.jp/periphs/xbox-controller.ja.html
@@ -552,6 +641,9 @@ int test_device(uint16_t vid, uint16_t pid)
 	}
 
 	switch(test_mode) {
+	case USE_PS3:
+		CALL_CHECK(display_ps3_status(handle));
+		break;
 	case USE_XBOX:
 		CALL_CHECK(display_xbox_status(handle));
 		CALL_CHECK(set_xbox_actuators(handle, 128, 222));
@@ -639,6 +731,12 @@ int main(int argc, char** argv)
 					}
 					break;
 				// The following tests will force VID:PID if already provided
+				case 'p':
+					// Sony PS3 Controller - 1 interface
+					VID = 0x054C;
+					PID = 0x0268;
+					test_mode = USE_PS3;
+					break;
 				case 'x':
 					// Microsoft XBox Controller Type S - 1 interface
 					VID = 0x045E;
@@ -677,6 +775,7 @@ int main(int argc, char** argv)
 		printf("   -g: short generic test (default)\n");
 		printf("   -k: test generic Mass Storage USB device (using WinUSB)\n");
 		printf("   -j: test FTDI based JTAG device (using WinUSB)\n");
+		printf("   -p: test Sony PS3 SixAxis controller (using WinUSB)\n");
 		printf("   -x: test Microsoft XBox Controller Type S (using WinUSB)\n");
 		return 0;
 	}
