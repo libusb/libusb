@@ -32,5 +32,5 @@ mv configure.ac~ configure.ac
 # we're duplicating libusb_version.h generation here, but that avoids having to run configure
 sed -e "s/\(^#define LIBUSB_VERSION_NANO.*\)/#define LIBUSB_VERSION_NANO    $TAGVER_OFF/" libusb/libusb_version.h > libusb/libusb_version.h~
 mv libusb/libusb_version.h~ libusb/libusb_version.h
-git commit -a -m "bumped internal version" -e
+git commit -a -m "[internal] bumped internal version" -e
 git tag "pbr$TAGVER"
