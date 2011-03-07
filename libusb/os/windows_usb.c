@@ -1970,10 +1970,10 @@ static void windows_handle_callback (struct usbi_transfer *itransfer, uint32_t i
 	}
 }
 
-static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds, int num_ready)
+static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready)
 {
 	struct windows_transfer_priv* transfer_priv = NULL;
-	nfds_t i = 0;
+	POLL_NFDS_TYPE i = 0;
 	bool found = false;
 	struct usbi_transfer *transfer;
 	DWORD io_size, io_result;

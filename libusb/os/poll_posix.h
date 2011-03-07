@@ -1,8 +1,6 @@
 #ifndef __LIBUSB_POLL_POSIX_H__
 #define __LIBUSB_POLL_POSIX_H__
 
-#include <unistd.h>
-#include <poll.h>
 #define usbi_write write
 #define usbi_read read
 #define usbi_close close

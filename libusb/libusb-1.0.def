@@ -340,16 +340,6 @@ EXPORTS
   libusb_handle_events@32 = libusb_handle_events
   libusb_handle_events@4 = libusb_handle_events
   libusb_handle_events@8 = libusb_handle_events
-  libusb_handle_events_check
-  libusb_handle_events_check@0 = libusb_handle_events_check
-  libusb_handle_events_check@12 = libusb_handle_events_check
-  libusb_handle_events_check@16 = libusb_handle_events_check
-  libusb_handle_events_check@20 = libusb_handle_events_check
-  libusb_handle_events_check@24 = libusb_handle_events_check
-  libusb_handle_events_check@28 = libusb_handle_events_check
-  libusb_handle_events_check@32 = libusb_handle_events_check
-  libusb_handle_events_check@4 = libusb_handle_events_check
-  libusb_handle_events_check@8 = libusb_handle_events_check
   libusb_handle_events_locked
   libusb_handle_events_locked@0 = libusb_handle_events_locked
   libusb_handle_events_locked@12 = libusb_handle_events_locked
@@ -370,16 +360,6 @@ EXPORTS
   libusb_handle_events_timeout@32 = libusb_handle_events_timeout
   libusb_handle_events_timeout@4 = libusb_handle_events_timeout
   libusb_handle_events_timeout@8 = libusb_handle_events_timeout
-  libusb_handle_events_timeout_check
-  libusb_handle_events_timeout_check@0 = libusb_handle_events_timeout_check
-  libusb_handle_events_timeout_check@12 = libusb_handle_events_timeout_check
-  libusb_handle_events_timeout_check@16 = libusb_handle_events_timeout_check
-  libusb_handle_events_timeout_check@20 = libusb_handle_events_timeout_check
-  libusb_handle_events_timeout_check@24 = libusb_handle_events_timeout_check
-  libusb_handle_events_timeout_check@28 = libusb_handle_events_timeout_check
-  libusb_handle_events_timeout_check@32 = libusb_handle_events_timeout_check
-  libusb_handle_events_timeout_check@4 = libusb_handle_events_timeout_check
-  libusb_handle_events_timeout_check@8 = libusb_handle_events_timeout_check
   libusb_init
   libusb_init@0 = libusb_init
   libusb_init@12 = libusb_init

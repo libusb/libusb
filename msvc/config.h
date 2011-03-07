@@ -20,11 +20,5 @@
 /* Windows backend */
 #define OS_WINDOWS /**/
 
-/* Define to 1 if you have the ANSI C header files. */
-#define STDC_HEADERS 1
-
-/* Backend handles timeout */
-/* #undef USBI_OS_HANDLES_TIMEOUT */
-
-/* timerfd headers available */
-/* #undef USBI_TIMERFD_AVAILABLE */
+/* type of second poll() argument */
+#define POLL_NFDS_TYPE unsigned int
