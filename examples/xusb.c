@@ -521,6 +521,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 			fclose(fd);
 		}
 	}
+	free(data);
 
 	return 0;
 }
