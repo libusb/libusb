@@ -177,7 +177,7 @@ static char err_string[ERR_BUFFER_SIZE];
 	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%d] ", error_code);
 
 	size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &err_string[safe_strlen(err_string)],
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &err_string[safe_strlen(err_string)],
 		ERR_BUFFER_SIZE - (DWORD)safe_strlen(err_string), NULL);
 	if (size == 0) {
 		format_error = GetLastError();
@@ -247,17 +247,16 @@ static int init_dlls(void)
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Child, TRUE);
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Sibling, TRUE);
 	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDA, TRUE);
-	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDW, TRUE);
 
 	// Prefixed to avoid conflict with header files
 	DLL_LOAD_PREFIXED(OLE32.dll, p, CLSIDFromString, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetClassDevs, TRUE);
+	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetClassDevsA, TRUE);
 	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiEnumDeviceInfo, TRUE);
 	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiEnumDeviceInterfaces, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetDeviceInterfaceDetail, TRUE);
+	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetDeviceInterfaceDetailA, TRUE);
 	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiDestroyDeviceInfoList, TRUE);
 	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiOpenDevRegKey, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetDeviceRegistryProperty, TRUE);
+	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetDeviceRegistryPropertyA, TRUE);
 	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetDeviceRegistryPropertyW, TRUE);
 	return LIBUSB_SUCCESS;
 }
@@ -275,15 +274,15 @@ static int init_dlls(void)
  * structure returned and call this function repeatedly using the same guid (with an
  * incremented index starting at zero) until all interfaces have been returned.
  */
-SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ctx,
+SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, GUID guid, unsigned _index)
 {
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
-	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
+	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	DWORD size;
 
 	if (_index <= 0) {
-		*dev_info = pSetupDiGetClassDevs(&guid, NULL, NULL, DIGCF_PRESENT|DIGCF_DEVICEINTERFACE);
+		*dev_info = pSetupDiGetClassDevsA(&guid, NULL, NULL, DIGCF_PRESENT|DIGCF_DEVICEINTERFACE);
 	}
 	if (*dev_info == INVALID_HANDLE_VALUE) {
 		return NULL;
@@ -314,7 +313,7 @@ SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ct
 	}
 
 	// Read interface data (dummy + actual) to access the device path
-	if (!pSetupDiGetDeviceInterfaceDetail(*dev_info, &dev_interface_data, NULL, 0, &size, NULL)) {
+	if (!pSetupDiGetDeviceInterfaceDetailA(*dev_info, &dev_interface_data, NULL, 0, &size, NULL)) {
 		// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
 		if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
 			usbi_err(ctx, "could not access interface data (dummy) for index %u: %s",
@@ -332,8 +331,8 @@ SP_DEVICE_INTERFACE_DETAIL_DATA *get_interface_details(struct libusb_context *ct
 		goto err_exit;
 	}
 
-	dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
-	if (!pSetupDiGetDeviceInterfaceDetail(*dev_info, &dev_interface_data,
+	dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_A);
+	if (!pSetupDiGetDeviceInterfaceDetailA(*dev_info, &dev_interface_data,
 		dev_interface_details, size, &size, NULL)) {
 		usbi_err(ctx, "could not access interface data (actual) for index %u: %s",
 			_index, windows_error_str(0));
@@ -494,17 +493,17 @@ static void auto_release(struct usbi_transfer *itransfer)
 static int windows_init(struct libusb_context *ctx)
 {
 	HDEVINFO dev_info;
-	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
+	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	GUID guid;
 	libusb_bus_t bus;
 	int i, r = LIBUSB_ERROR_OTHER;
 	OSVERSIONINFO os_version;
 	HANDLE semaphore;
 	struct windows_hcd_priv** _hcd_cur;
-	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
+	char sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
 	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
-	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
+	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		usbi_err(ctx, "could not create semaphore: %s", windows_error_str(0));
 		return LIBUSB_ERROR_NO_MEM;
@@ -1079,7 +1078,7 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 	CONFIGRET r;
 	HDEVINFO dev_info;
 	SP_DEVINFO_DATA dev_info_data;
-	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
+	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	HKEY key;
 	WCHAR guid_string_w[MAX_GUID_STRING_LENGTH];
 	GUID guid, class_guid;
@@ -1090,7 +1089,7 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 	char path[MAX_PATH_LENGTH];
 	char driver[MAX_KEY_LENGTH];
 
-	dev_info = pSetupDiGetClassDevs(NULL, "USB", NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
+	dev_info = pSetupDiGetClassDevsA(NULL, "USB", NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
 	if (dev_info == INVALID_HANDLE_VALUE) {
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
@@ -1163,7 +1162,7 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 			pCLSIDFromString(guid_string_w, &class_guid);
 
 			// Attempt to read the driver string
-			if(!pSetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_SERVICE,
+			if(!pSetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_SERVICE,
 				NULL, (BYTE*)driver, MAX_KEY_LENGTH, &size)) {
 				driver[0] = 0;
 			}
@@ -1202,7 +1201,7 @@ static int set_composite_device(struct libusb_context *ctx, DEVINST devinst, str
 			break;
 		}
 
-		r = CM_Get_Device_ID(child_devinst, path, MAX_PATH_LENGTH, 0);
+		r = CM_Get_Device_IDA(child_devinst, path, MAX_PATH_LENGTH, 0);
 		if (r != CR_SUCCESS) {
 			usbi_err(ctx, "could not retrieve simple path for interface %d: CR error %d",
 				i, r);
@@ -1278,7 +1277,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 	char path[MAX_PATH_LENGTH];
 	char *sanitized_path = NULL;
 	HDEVINFO dev_info;
-	SP_DEVICE_INTERFACE_DETAIL_DATA *dev_interface_details = NULL;
+	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	SP_DEVINFO_DATA dev_info_data;
 	DEVINST parent_devinst;
 	GUID guid;
@@ -1303,7 +1302,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			break;
 
 		// Check that the driver installation is OK
-		if ( (!pSetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_INSTALL_STATE,
+		if ( (!pSetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_INSTALL_STATE,
 			&reg_type, (BYTE*)&install_state, 4, &size))
 		  || (size != 4) ){
 			usbi_warn(ctx, "could not detect installation state of driver for %s: %s",
@@ -1315,7 +1314,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 		}
 
 		// The SPDRP_ADDRESS for USB devices should be the device port number on the hub
-		if ( (!pSetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, SPDRP_ADDRESS,
+		if ( (!pSetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_ADDRESS,
 			&reg_type, (BYTE*)&port_nr, 4, &size))
 		  || (size != 4) ){
 			usbi_warn(ctx, "could not retrieve port number for device %s, skipping: %s",
@@ -1330,7 +1329,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 			continue;
 		}
 
-		if (CM_Get_Device_ID(parent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
+		if (CM_Get_Device_IDA(parent_devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
 			usbi_warn(ctx, "could not retrieve parent's path for device %s, skipping: %s",
 				dev_interface_details->DevicePath, windows_error_str(0));
 			continue;
@@ -1367,7 +1366,7 @@ static int set_device_paths(struct libusb_context *ctx, struct discovered_devs *
 
 				// Check the service & filter names to know the API we should use
 				for (k=0; k<3; k++) {
-					if (pSetupDiGetDeviceRegistryProperty(dev_info, &dev_info_data, lookup[k].reg_prop,
+					if (pSetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, lookup[k].reg_prop,
 						&reg_type, (BYTE*)lookup[k].list, MAX_KEY_LENGTH, &size)) {
 						// Turn the REG_SZ SPDRP_SERVICE into REG_MULTI_SZ
 						if (lookup[k].reg_prop == SPDRP_SERVICE) {
@@ -1479,10 +1478,10 @@ static void windows_exit(void)
 	struct windows_hcd_priv* hcd_tmp;
 	int i;
 	HANDLE semaphore;
-	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
+	char sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
 	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
-	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
+	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		return;
 	}

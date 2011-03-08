@@ -263,9 +263,9 @@ struct driver_lookup {
 
 #define DLL_LOAD_PREFIXED(dll, prefix, name, ret_on_failure)  \
 	do {                                                      \
-		HMODULE h = GetModuleHandle(#dll);                    \
+		HMODULE h = GetModuleHandleA(#dll);                   \
 	if (!h)                                                   \
-		h = LoadLibrary(#dll);                                \
+		h = LoadLibraryA(#dll);                               \
 	if (!h) {                                                 \
 		if (ret_on_failure) { return LIBUSB_ERROR_NOT_FOUND; }\
 		else { break; }                                       \
@@ -287,15 +287,15 @@ struct driver_lookup {
 DLL_DECLARE_PREFIXED(WINAPI, HRESULT, p, CLSIDFromString, (LPCOLESTR, LPCLSID));
 
 /* SetupAPI dependencies */
-DLL_DECLARE_PREFIXED(WINAPI, HDEVINFO, p, SetupDiGetClassDevs, (const GUID*, PCSTR, HWND, DWORD));
+DLL_DECLARE_PREFIXED(WINAPI, HDEVINFO, p, SetupDiGetClassDevsA, (const GUID*, PCSTR, HWND, DWORD));
 DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiEnumDeviceInfo, (HDEVINFO, DWORD, PSP_DEVINFO_DATA));
 DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiEnumDeviceInterfaces, (HDEVINFO, PSP_DEVINFO_DATA,
                        const GUID*, DWORD, PSP_DEVICE_INTERFACE_DATA));
-DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceInterfaceDetail, (HDEVINFO, PSP_DEVICE_INTERFACE_DATA,
-                       PSP_DEVICE_INTERFACE_DETAIL_DATA, DWORD, PDWORD, PSP_DEVINFO_DATA));
+DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceInterfaceDetailA, (HDEVINFO, PSP_DEVICE_INTERFACE_DATA,
+                       PSP_DEVICE_INTERFACE_DETAIL_DATA_A, DWORD, PDWORD, PSP_DEVINFO_DATA));
 DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiDestroyDeviceInfoList, (HDEVINFO));
 DLL_DECLARE_PREFIXED(WINAPI, HKEY, p, SetupDiOpenDevRegKey, (HDEVINFO, PSP_DEVINFO_DATA, DWORD, DWORD, DWORD, REGSAM));
-DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceRegistryProperty, (HDEVINFO,
+DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceRegistryPropertyA, (HDEVINFO,
                        PSP_DEVINFO_DATA, DWORD, PDWORD, PBYTE, DWORD, PDWORD));
 DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceRegistryPropertyW, (HDEVINFO,
                        PSP_DEVINFO_DATA, DWORD, PDWORD, PBYTE, DWORD, PDWORD));
@@ -380,13 +380,6 @@ DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Parent, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Child, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Sibling, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDA, (DEVINST, PCHAR, ULONG, ULONG));
-DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDW, (DEVINST, PWCHAR, ULONG, ULONG));
-
-#ifdef UNICODE
-#define CM_Get_Device_ID CM_Get_Device_IDW
-#else
-#define CM_Get_Device_ID CM_Get_Device_IDA
-#endif /* UNICODE */
 
 #define IOCTL_USB_GET_HUB_CAPABILITIES_EX \
   CTL_CODE( FILE_DEVICE_USB, USB_GET_HUB_CAPABILITIES_EX, METHOD_BUFFERED, FILE_ANY_ACCESS)
