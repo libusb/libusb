@@ -80,8 +80,6 @@ inline void upperize(char* str) {
 #define MAX_CTRL_BUFFER_LENGTH      4096
 #define MAX_USB_DEVICES             256
 #define MAX_USB_STRING_LENGTH       128
-#define MAX_HID_REPORT_SIZE         1024
-#define MAX_HID_DESCRIPTOR_SIZE     256
 #define MAX_GUID_STRING_LENGTH      40
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
@@ -90,11 +88,6 @@ inline void upperize(char* str) {
 #define ERR_BUFFER_SIZE             256
 #define LIST_SEPARATOR              ';'
 #define HTAB_SIZE                   1021
-
-// Handle code for HID interface that have been claimed ("dibs")
-#define INTERFACE_CLAIMED           ((HANDLE)(intptr_t)0xD1B5)
-// Additional return code for HID operations that completed synchronously
-#define LIBUSB_COMPLETED            (LIBUSB_SUCCESS + 1)
 
 // http://msdn.microsoft.com/en-us/library/ff545978.aspx
 // http://msdn.microsoft.com/en-us/library/ff545972.aspx
