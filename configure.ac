@@ -77,7 +77,7 @@ esac
 if test "$backend" = windows; then
 	AC_DEFINE(OS_WINDOWS, 1, [Windows backend])
 	AC_SUBST(OS_WINDOWS)
-	PC_LIBS_PRIVATE="-lsetupapi -lole32 -ladvapi32"
+	PC_LIBS_PRIVATE=""
 	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
 	AC_CHECK_TOOL(RC, windres, no)
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
