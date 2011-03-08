@@ -2567,7 +2567,8 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
-	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
+	struct windows_device_priv *priv = __device_priv(transfer->dev_handle->dev);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
 	struct windows_device_handle_priv *handle_priv = __device_handle_priv(
 		transfer->dev_handle);
 	WINUSB_SETUP_PACKET *setup = (WINUSB_SETUP_PACKET *) transfer->buffer;
@@ -2605,15 +2606,27 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	if (!WinUsb_ControlTransfer(wfd.handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, wfd.overlapped)) {
-		if(GetLastError() != ERROR_IO_PENDING) {
-			usbi_err(ctx, "WinUsb_ControlTransfer failed: %s", windows_error_str(0));
+	// Sending of set configuration control requests from WinUSB creates issues
+	if ( ((setup->request_type & (0x03 << 5)) == LIBUSB_REQUEST_TYPE_STANDARD)
+	  && (setup->request == LIBUSB_REQUEST_SET_CONFIGURATION) ) {
+		if (setup->value != priv->active_config) {
+			usbi_warn(ctx, "cannot set configuration other than the default one");
 			usbi_free_fd(wfd.fd);
-			return LIBUSB_ERROR_IO;
+			return LIBUSB_ERROR_INVALID_PARAM;
 		}
-	} else {
 		wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
-		wfd.overlapped->InternalHigh = (DWORD)size;
+		wfd.overlapped->InternalHigh = 0;
+	} else {
+		if (!WinUsb_ControlTransfer(wfd.handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, wfd.overlapped)) {
+			if(GetLastError() != ERROR_IO_PENDING) {
+				usbi_err(ctx, "WinUsb_ControlTransfer failed: %s", windows_error_str(0));
+				usbi_free_fd(wfd.fd);
+				return LIBUSB_ERROR_IO;
+			}
+		} else {
+			wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
+			wfd.overlapped->InternalHigh = (DWORD)size;
+		}
 	}
 
 	// Use priv_transfer to store data needed for async polling
