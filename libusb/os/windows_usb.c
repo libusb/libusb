@@ -65,9 +65,6 @@ extern void usbi_fd_notification(struct libusb_context *ctx);
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
 static int windows_clock_gettime(int clk_id, struct timespec *tp);
 unsigned __stdcall windows_clock_gettime_threaded(void* param);
-// HUB (limited) API prototypes
-static int hub_open(struct libusb_device_handle *dev_handle);
-static void hub_close(struct libusb_device_handle *dev_handle);
 // WinUSB API prototypes
 static int winusb_init(struct libusb_context *ctx);
 static int winusb_exit(void);
@@ -2273,8 +2270,8 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		sizeof(hub_driver_names)/sizeof(hub_driver_names[0]),
 		unsupported_init,
 		unsupported_exit,
-		hub_open,
-		hub_close,
+		unsupported_open,
+		unsupported_close,
 		unsupported_claim_interface,
 		unsupported_set_interface_altsetting,
 		unsupported_release_interface,
@@ -2331,19 +2328,6 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	},
 };
 
-
-/*
- * HUB API functions - only cached descriptors readout for now
- * might be expanded if
- */
-static int hub_open(struct libusb_device_handle *dev_handle)
-{
-	return LIBUSB_SUCCESS;
-}
-
-static void hub_close(struct libusb_device_handle *dev_handle)
-{
-}
 
 /*
  * WinUSB API functions
