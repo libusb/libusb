@@ -1020,10 +1020,6 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	if ((dev == NULL) || (parent_dev == NULL)) {
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
-	if (dev->bus_number != 0) {
-		// Device has already been initialized
-		return LIBUSB_SUCCESS;
-	}
 	priv = __device_priv(dev);
 	parent_priv = __device_priv(parent_dev);
 	if (parent_priv->apib->id != USB_API_HUB) {
@@ -1054,8 +1050,12 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	priv->depth = parent_priv->depth + 1;
 	priv->parent_dev = parent_dev;
 	dev->parent_dev = parent_dev;
-	memset(&conn_info, 0, sizeof(conn_info));
 
+	// If the device address is already set, we can stop here
+	if (dev->device_address != 0) {
+		return LIBUSB_SUCCESS;
+	}
+	memset(&conn_info, 0, sizeof(conn_info));
 	if (priv->depth != 0) {	// Not a HCD hub
 		handle = CreateFileA(parent_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
 			FILE_FLAG_OVERLAPPED, NULL);
