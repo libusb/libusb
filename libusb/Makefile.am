@@ -1,7 +1,7 @@
 all: libusb-1.0.la
 if CREATE_IMPORT_LIB
 # Rebuild the import lib from the .def so that MS and MinGW DLLs can be interchanged
-	$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def libusb-1.0.def --dllname libusb-1.0.dll --output-lib .libs/libusb-1.0.dll.a
+	$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $(srcdir)/libusb-1.0.def --dllname libusb-1.0.dll --output-lib .libs/libusb-1.0.dll.a
 endif
 
 lib_LTLIBRARIES = libusb-1.0.la
@@ -30,11 +30,11 @@ OS_SRC += os/threads_windows.c
 endif
 
 .rc.lo:
-	$(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
+	$(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(RC) $(RCFLAGS) -I. -i $< -o $@
 endif
 
 libusb_1_0_la_CFLAGS = $(VISIBILITY_CFLAGS) $(AM_CFLAGS) $(THREAD_CFLAGS)
-libusb_1_0_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(lt_current):$(lt_revision):$(lt_age)
+libusb_1_0_la_LDFLAGS = $(LTLDFLAGS)
 libusb_1_0_la_SOURCES = libusbi.h core.c descriptor.c io.c sync.c $(OS_SRC) \
 	os/linux_usbfs.h os/darwin_usb.h os/windows_usb.h \
 	os/threads_posix.h os/threads_windows.h \

@@ -7,9 +7,9 @@
 
 o Visual Studio:
   - Open existing or create a new project for your application
-  - Copy the libusb.h into your project and make sure that the location where
-    the file reside appears in the 'Additional Include Directories' section
-    (Configuration Properties -> C/C++ -> General).
+  - Copy libusb.h, from the include\libusb-1.0\ directory, into your project and
+    make sure that the location where the file reside appears in the 'Additional
+    Include Directories' section (Configuration Properties -> C/C++ -> General).
   - Copy the relevant .lib file from MS32\ or MS64\ and add 'libusb-1.0.lib' to
     your 'Additional Dependencies' (Configuration Properties -> Linker -> Input)
     Also make sure that the directory where libusb-1.0.lib resides is added to
@@ -43,10 +43,10 @@ o WDK/DDK:
     easily be achieved, in the DDK environment, by running 'ddk_build /MT'
 
 o MinGW/cygwin
-  - Copy libusb.h to your default include directory and the relevant MinGW32\ or
-    MinGW64\ .a file to your default library directory. Or, if you don't want to
-    use the default locations, make sure that you feed the relevant -I and -L
-    options to the compiler.
+  - Copy libusb.h, from include/libusb-1.0/ to your default include directory,
+    and copy the MinGW32/ or MinGW64/ .a files to your default library directory.
+    Or, if you don't want to use the default locations, make sure that you feed
+    the relevant -I and -L options to the compiler.
   - Add the '-lusb-1.0' linker option when compiling.
 
 o Additional information:
