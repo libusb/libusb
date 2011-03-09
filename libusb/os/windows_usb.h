@@ -80,8 +80,6 @@ inline void upperize(char* str) {
 #define MAX_CTRL_BUFFER_LENGTH      4096
 #define MAX_USB_DEVICES             256
 #define MAX_USB_STRING_LENGTH       128
-#define MAX_HID_REPORT_SIZE         1024
-#define MAX_HID_DESCRIPTOR_SIZE     256
 #define MAX_GUID_STRING_LENGTH      40
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
@@ -89,11 +87,6 @@ inline void upperize(char* str) {
 #define TIMER_REQUEST_RETRY_MS      100
 #define ERR_BUFFER_SIZE             256
 #define LIST_SEPARATOR              ';'
-
-// Handle code for HID interface that have been claimed ("dibs")
-#define INTERFACE_CLAIMED           ((HANDLE)(intptr_t)0xD1B5)
-// Additional return code for HID operations that completed synchronously
-#define LIBUSB_COMPLETED            (LIBUSB_SUCCESS + 1)
 
 // http://msdn.microsoft.com/en-us/library/ff545978.aspx
 // http://msdn.microsoft.com/en-us/library/ff545972.aspx
@@ -120,11 +113,9 @@ const GUID GUID_NULL = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x
 #define USB_API_HUB         1
 #define USB_API_COMPOSITE   2
 #define USB_API_WINUSB      3
-#define USB_API_HID         4
-#define USB_API_MAX         5
+#define USB_API_MAX         4
 
 #define CLASS_GUID_UNSUPPORTED      GUID_NULL
-const GUID CLASS_GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
 const GUID CLASS_GUID_LIBUSB_WINUSB = { 0x78A1C341, 0x4539, 0x11D3, {0xB8, 0x8D, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71} };
 #define CLASS_GUID_COMPOSITE        GUID_DEVCLASS_WCEUSBS
 
@@ -162,71 +153,6 @@ extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
  * private structures definition
  * with inline pseudo constructors/destructors
  */
-
-// TODO (v2+): move hid desc to libusb.h?
-struct libusb_hid_descriptor {
-	uint8_t  bLength;
-	uint8_t  bDescriptorType;
-	uint16_t bcdHID;
-	uint8_t  bCountryCode;
-	uint8_t  bNumDescriptors;
-	uint8_t  bClassDescriptorType;
-	uint16_t wClassDescriptorLength;
-};
-#define LIBUSB_DT_HID_SIZE              9
-#define HID_MAX_CONFIG_DESC_SIZE (LIBUSB_DT_CONFIG_SIZE + LIBUSB_DT_INTERFACE_SIZE \
-	+ LIBUSB_DT_HID_SIZE + 2 * LIBUSB_DT_ENDPOINT_SIZE)
-#define HID_MAX_REPORT_SIZE             1024
-#define HID_IN_EP                       0x81
-#define HID_OUT_EP                      0x02
-#define LIBUSB_REQ_RECIPIENT(request_type) ((request_type) & 0x1F)
-#define LIBUSB_REQ_TYPE(request_type) ((request_type) & (0x03 << 5))
-#define LIBUSB_REQ_IN(request_type) ((request_type) & LIBUSB_ENDPOINT_IN)
-#define LIBUSB_REQ_OUT(request_type) (!LIBUSB_REQ_IN(request_type))
-
-// The following are used for HID reports IOCTLs
-#define HID_CTL_CODE(id) \
-  CTL_CODE (FILE_DEVICE_KEYBOARD, (id), METHOD_NEITHER, FILE_ANY_ACCESS)
-#define HID_BUFFER_CTL_CODE(id) \
-  CTL_CODE (FILE_DEVICE_KEYBOARD, (id), METHOD_BUFFERED, FILE_ANY_ACCESS)
-#define HID_IN_CTL_CODE(id) \
-  CTL_CODE (FILE_DEVICE_KEYBOARD, (id), METHOD_IN_DIRECT, FILE_ANY_ACCESS)
-#define HID_OUT_CTL_CODE(id) \
-  CTL_CODE (FILE_DEVICE_KEYBOARD, (id), METHOD_OUT_DIRECT, FILE_ANY_ACCESS)
-
-#define IOCTL_HID_GET_FEATURE                 HID_OUT_CTL_CODE(100)
-#define IOCTL_HID_GET_INPUT_REPORT            HID_OUT_CTL_CODE(104)
-#define IOCTL_HID_SET_FEATURE                 HID_IN_CTL_CODE(100)
-#define IOCTL_HID_SET_OUTPUT_REPORT           HID_IN_CTL_CODE(101)
-
-enum libusb_hid_request_type {
-	HID_REQ_GET_REPORT = 0x01,
-	HID_REQ_GET_IDLE = 0x02,
-	HID_REQ_GET_PROTOCOL = 0x03,
-	HID_REQ_SET_REPORT = 0x09,
-	HID_REQ_SET_IDLE = 0x0A,
-	HID_REQ_SET_PROTOCOL = 0x0B
-};
-
-enum libusb_hid_report_type {
-	HID_REPORT_TYPE_INPUT = 0x01,
-	HID_REPORT_TYPE_OUTPUT = 0x02,
-	HID_REPORT_TYPE_FEATURE = 0x03
-};
-
-struct hid_device_priv {
-	uint16_t vid;
-	uint16_t pid;
-	uint8_t config;
-	uint8_t nb_interfaces;
-	bool uses_report_ids[3];	// input, ouptput, feature
-	uint16_t input_report_size;
-	uint16_t output_report_size;
-	uint16_t feature_report_size;
-	WCHAR string[3][MAX_USB_STRING_LENGTH];
-	uint8_t string_index[3];	// man, prod, ser
-};
-
 struct windows_context_priv {
 	HWND hMessage;
 };
@@ -247,11 +173,8 @@ struct windows_device_priv {
 		struct windows_usb_api_backend const *apib; // an API backend (multiple drivers support),
 		int8_t nb_endpoints;			// and a set of endpoint addresses (USB_MAXENDPOINTS)
 		uint8_t *endpoint;
-		bool restricted_functionality;	// indicates if the interface functionality is restricted
-										// by Windows (eg. HID keyboards or mice cannot do R/W)
 	} usb_interface[USB_MAXINTERFACES];
-	uint8_t composite_api_flags;		// HID and composite devices require additional data
-	struct hid_device_priv *hid;
+	uint8_t composite_api_flags;		// composite devices require additional data
 	uint8_t active_config;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
 	unsigned char **config_descriptor;	// list of pointers to the cached config descriptors
@@ -270,7 +193,6 @@ static inline void windows_device_priv_init(libusb_device* dev) {
 	p->path = NULL;
 	p->apib = &usb_api_backend[USB_API_UNSUPPORTED];
 	p->composite_api_flags = 0;
-	p->hid = NULL;
 	p->active_config = 0;
 	p->config_descriptor = NULL;
 	memset(&(p->dev_descriptor), 0, sizeof(USB_DEVICE_DESCRIPTOR));
@@ -279,7 +201,6 @@ static inline void windows_device_priv_init(libusb_device* dev) {
 		p->usb_interface[i].apib = &usb_api_backend[USB_API_UNSUPPORTED];
 		p->usb_interface[i].nb_endpoints = 0;
 		p->usb_interface[i].endpoint = NULL;
-		p->usb_interface[i].restricted_functionality = false;
 	}
 }
 
@@ -292,7 +213,6 @@ static inline void windows_device_priv_release(libusb_device* dev) {
 			safe_free(p->config_descriptor[i]);
 	}
 	safe_free(p->config_descriptor);
-	safe_free(p->hid);
 	for (i=0; i<USB_MAXINTERFACES; i++) {
 		safe_free(p->usb_interface[i].path);
 		safe_free(p->usb_interface[i].endpoint);
@@ -322,9 +242,6 @@ static inline struct windows_device_handle_priv *__device_handle_priv(
 struct windows_transfer_priv {
 	struct winfd pollable_fd;
 	uint8_t interface_number;
-	uint8_t *hid_buffer; // 1 byte extended data buffer, required for HID
-	uint8_t *hid_dest;   // transfer buffer destination, required for HID
-	size_t hid_expected_size;
 };
 
 // used to match a device driver (including filter drivers) against a supported API
@@ -583,7 +500,6 @@ typedef struct _USB_HUB_NAME_FIXED {
 	} u;
 } USB_HUB_NAME_FIXED;
 
-
 typedef struct _USB_HUB_INFORMATION {
 	USB_HUB_DESCRIPTOR  HubDescriptor;
 	BOOLEAN  HubIsBusPowered;
@@ -698,97 +614,3 @@ DLL_DECLARE(WINAPI, BOOL, WinUsb_ControlTransfer, (WINUSB_INTERFACE_HANDLE, WINU
 DLL_DECLARE(WINAPI, BOOL, WinUsb_ResetPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
 DLL_DECLARE(WINAPI, BOOL, WinUsb_AbortPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
 DLL_DECLARE(WINAPI, BOOL, WinUsb_FlushPipe, (WINUSB_INTERFACE_HANDLE, UCHAR));
-
-/* hid.dll interface */
-
-#define HIDP_STATUS_SUCCESS  0x110000
-typedef void* PHIDP_PREPARSED_DATA;
-
-#pragma pack(1)
-typedef struct {
-	ULONG Size;
-	USHORT VendorID;
-	USHORT ProductID;
-	USHORT VersionNumber;
-} HIDD_ATTRIBUTES, *PHIDD_ATTRIBUTES;
-#pragma pack()
-
-typedef USHORT USAGE;
-typedef struct {
-  USAGE Usage;
-  USAGE UsagePage;
-  USHORT InputReportByteLength;
-  USHORT OutputReportByteLength;
-  USHORT FeatureReportByteLength;
-  USHORT Reserved[17];
-  USHORT NumberLinkCollectionNodes;
-  USHORT NumberInputButtonCaps;
-  USHORT NumberInputValueCaps;
-  USHORT NumberInputDataIndices;
-  USHORT NumberOutputButtonCaps;
-  USHORT NumberOutputValueCaps;
-  USHORT NumberOutputDataIndices;
-  USHORT NumberFeatureButtonCaps;
-  USHORT NumberFeatureValueCaps;
-  USHORT NumberFeatureDataIndices;
-} HIDP_CAPS, *PHIDP_CAPS;
-
-typedef enum _HIDP_REPORT_TYPE {
-  HidP_Input,
-  HidP_Output,
-  HidP_Feature
-} HIDP_REPORT_TYPE;
-
-typedef struct _HIDP_VALUE_CAPS {
-  USAGE  UsagePage;
-  UCHAR  ReportID;
-  BOOLEAN  IsAlias;
-  USHORT  BitField;
-  USHORT  LinkCollection;
-  USAGE  LinkUsage;
-  USAGE  LinkUsagePage;
-  BOOLEAN  IsRange;
-  BOOLEAN  IsStringRange;
-  BOOLEAN  IsDesignatorRange;
-  BOOLEAN  IsAbsolute;
-  BOOLEAN  HasNull;
-  UCHAR  Reserved;
-  USHORT  BitSize;
-  USHORT  ReportCount;
-  USHORT  Reserved2[5];
-  ULONG  UnitsExp;
-  ULONG  Units;
-  LONG  LogicalMin, LogicalMax;
-  LONG  PhysicalMin, PhysicalMax;
-	union {
-	  struct {
-		USAGE  UsageMin, UsageMax;
-		USHORT  StringMin, StringMax;
-		USHORT  DesignatorMin, DesignatorMax;
-		USHORT  DataIndexMin, DataIndexMax;
-	  } Range;
-	  struct {
-		USAGE  Usage, Reserved1;
-		USHORT  StringIndex, Reserved2;
-		USHORT  DesignatorIndex, Reserved3;
-		USHORT  DataIndex, Reserved4;
-	  } NotRange;
-	} u;
-} HIDP_VALUE_CAPS, *PHIDP_VALUE_CAPS;
-
-DLL_DECLARE(WINAPI, BOOL, HidD_GetAttributes, (HANDLE, PHIDD_ATTRIBUTES));
-DLL_DECLARE(WINAPI, VOID, HidD_GetHidGuid, (LPGUID));
-DLL_DECLARE(WINAPI, BOOL, HidD_GetPreparsedData, (HANDLE, PHIDP_PREPARSED_DATA *));
-DLL_DECLARE(WINAPI, BOOL, HidD_FreePreparsedData, (PHIDP_PREPARSED_DATA));
-DLL_DECLARE(WINAPI, BOOL, HidD_GetManufacturerString, (HANDLE, PVOID, ULONG));
-DLL_DECLARE(WINAPI, BOOL, HidD_GetProductString, (HANDLE, PVOID, ULONG));
-DLL_DECLARE(WINAPI, BOOL, HidD_GetSerialNumberString, (HANDLE, PVOID, ULONG));
-DLL_DECLARE(WINAPI, LONG, HidP_GetCaps, (PHIDP_PREPARSED_DATA, PHIDP_CAPS));
-DLL_DECLARE(WINAPI, BOOL, HidD_SetNumInputBuffers, (HANDLE, ULONG));
-DLL_DECLARE(WINAPI, BOOL, HidD_SetFeature, (HANDLE, PVOID, ULONG));
-DLL_DECLARE(WINAPI, BOOL, HidD_GetFeature, (HANDLE, PVOID, ULONG));
-DLL_DECLARE(WINAPI, BOOL, HidD_GetPhysicalDescriptor, (HANDLE, PVOID, ULONG));
-DLL_DECLARE(WINAPI, BOOL, HidD_GetInputReport, (HANDLE, PVOID, ULONG));
-DLL_DECLARE(WINAPI, BOOL, HidD_SetOutputReport, (HANDLE, PVOID, ULONG));
-DLL_DECLARE(WINAPI, BOOL, HidD_FlushQueue, (HANDLE));
-DLL_DECLARE(WINAPI, BOOL, HidP_GetValueCaps, (HIDP_REPORT_TYPE, PHIDP_VALUE_CAPS, PULONG, PHIDP_PREPARSED_DATA));

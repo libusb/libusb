@@ -1,11 +1,15 @@
 #!/bin/sh
 date=`date +%Y.%m.%d`
+target=e:/dailies/$date
+mkdir -p $target/include/libusb-1.0
+cp -v libusb/libusb-1.0.def $target
+cp -v libusb/libusb.h $target/include/libusb-1.0
 
 #
 # 32 bit binaries
 #
 target=e:/dailies/$date/MinGW32
-git clean -f -d -x
+git clean -fdx
 # Not using debug (-g) in CFLAGS DRAMATICALLY reduces the size of the binaries
 export CFLAGS="-O2 -m32"
 export LDFLAGS="-m32"

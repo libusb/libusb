@@ -26,6 +26,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
 
 #include <libusb.h>
 #include "libusb_version.h"
@@ -130,13 +133,13 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 #ifdef ENABLE_LOGGING
 #define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __FUNCTION__, __VA_ARGS__)
 #else
-#define _usbi_log(ctx, level, ...)
+#define _usbi_log(ctx, level, ...) do {} while(0)
 #endif
 
 #if defined(ENABLE_DEBUG_LOGGING) || defined(INCLUDE_DEBUG_LOGGING)
 #define usbi_dbg(...) _usbi_log(NULL, LOG_LEVEL_DEBUG, __VA_ARGS__)
 #else
-#define usbi_dbg(...)
+#define usbi_dbg(...) do {} while(0)
 #endif
 
 #define usbi_info(ctx, ...) _usbi_log(ctx, LOG_LEVEL_INFO, __VA_ARGS__)
@@ -194,6 +197,7 @@ static inline void usbi_dbg(const char *format, ...)
 #endif
 
 #if defined(OS_LINUX) || defined(OS_DARWIN)
+#include <unistd.h>
 #include <os/poll_posix.h>
 #elif defined(OS_WINDOWS)
 #include <os/poll_windows.h>
@@ -288,6 +292,8 @@ struct libusb_device {
 	struct libusb_context *ctx;
 
 	uint8_t bus_number;
+	uint8_t port_number;
+	struct libusb_device* parent_dev;
 	uint8_t device_address;
 	usbi_mutex_t devaddr_lock;
 	uint8_t num_configurations;
@@ -306,8 +312,6 @@ struct libusb_device_handle {
 	struct libusb_device *dev;
 	unsigned char os_priv[0];
 };
-
-#define USBI_TRANSFER_TIMED_OUT	 			(1<<0)
 
 enum {
   USBI_CLOCK_MONOTONIC,
@@ -342,6 +346,14 @@ struct usbi_transfer {
 	 * its completion (presumably there would be races within your OS backend
 	 * if this were possible). */
 	usbi_mutex_t lock;
+};
+
+enum usbi_transfer_flags {
+	/* The transfer has timed out */
+	USBI_TRANSFER_TIMED_OUT = 1 << 0,
+
+	/* Set by backend submit_transfer() if the OS handles timeout */
+	USBI_TRANSFER_OS_HANDLES_TIMEOUT = 1 << 1
 };
 
 #define __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
@@ -387,8 +399,8 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
 int usbi_handle_transfer_cancellation(struct usbi_transfer *transfer);
 
-int usbi_parse_descriptor(unsigned char *source, char *descriptor, void *dest,
-	int host_endian);
+int usbi_parse_descriptor(unsigned char *source, const char *descriptor,
+	void *dest, int host_endian);
 int usbi_get_config_index_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, int *idx);
 
@@ -777,14 +789,6 @@ struct usbi_os_backend {
 	int (*attach_kernel_driver)(struct libusb_device_handle *handle,
 		int interface_number);
 
-	/* Return device topology. Optional.
-	 *
-	 * This function is called to populate a libusb_device_topology structure,
-	 * that allows to uniquely identify the location of a device on the system.
-	 */
-	int (*get_device_topology)(struct libusb_device *dev,
-		struct libusb_device_topology* topology);
-
 	/* Destroy a device. Optional.
 	 *
 	 * This function is called when the last reference to a device is
@@ -853,7 +857,7 @@ struct usbi_os_backend {
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */
 	int (*handle_events)(struct libusb_context *ctx,
-		struct pollfd *fds, nfds_t nfds, int num_ready);
+		struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready);
 
 	/* Get time from specified clock. At least two clocks must be implemented
 	   by the backend: USBI_CLOCK_REALTIME, and USBI_CLOCK_MONOTONIC.

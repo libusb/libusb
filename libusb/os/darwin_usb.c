@@ -730,10 +730,19 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
 	return darwin_to_libusb (kresult);
       }
     } else {
-      priv->is_open = 1;
-
       /* create async event source */
       kresult = (*(dpriv->device))->CreateDeviceAsyncEventSource (dpriv->device, &priv->cfSource);
+      if (kresult != kIOReturnSuccess) {
+	usbi_err (HANDLE_CTX (dev_handle), "CreateDeviceAsyncEventSource: %s", darwin_error_str(kresult));
+
+	(*(dpriv->device))->USBDeviceClose (dpriv->device);
+	(*(dpriv->device))->Release (dpriv->device);
+
+	dpriv->device = NULL;
+	return darwin_to_libusb (kresult);
+      }
+
+      priv->is_open = 1;
 
       CFRetain (ctx_priv->libusb_darwin_acfl);
 
@@ -1205,10 +1214,6 @@ static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle,
   return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int darwin_get_device_topology(struct libusb_device *dev, struct libusb_device_topology* topology) {
-  return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
 static void darwin_destroy_device(struct libusb_device *dev) {
 }
 
@@ -1249,6 +1254,8 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
       ret = (*(cInterface->interface))->WritePipeAsync(cInterface->interface, pipeRef, transfer->buffer,
 						       transfer->length, darwin_async_io_callback, itransfer);
   } else {
+    itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
     if (is_read)
       ret = (*(cInterface->interface))->ReadPipeAsyncTO(cInterface->interface, pipeRef, transfer->buffer,
 							transfer->length, transfer->timeout, transfer->timeout,
@@ -1283,10 +1290,18 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   /* are we reading or writing? */
   is_read = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-  /* construct an array of IOUSBIsocFrames */
-  tpriv->isoc_framelist = (IOUSBIsocFrame*) calloc (transfer->num_iso_packets, sizeof(IOUSBIsocFrame));
-  if (!tpriv->isoc_framelist)
-    return LIBUSB_ERROR_NO_MEM;
+  /* construct an array of IOUSBIsocFrames, reuse the old one if possible */
+  if (tpriv->isoc_framelist && tpriv->num_iso_packets != transfer->num_iso_packets) {
+    free(tpriv->isoc_framelist);
+    tpriv->isoc_framelist = NULL;
+  }
+
+  if (!tpriv->isoc_framelist) {
+    tpriv->num_iso_packets = transfer->num_iso_packets;
+    tpriv->isoc_framelist = (IOUSBIsocFrame*) calloc (transfer->num_iso_packets, sizeof(IOUSBIsocFrame));
+    if (!tpriv->isoc_framelist)
+      return LIBUSB_ERROR_NO_MEM;
+  }
 
   /* copy the frame list from the libusb descriptor (the structures differ only is member order) */
   for (i = 0 ; i < transfer->num_iso_packets ; i++)
@@ -1312,7 +1327,10 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   }
 
   /* schedule for a frame a little in the future */
-  frame += 2;
+  frame += 4;
+
+  if (cInterface->frames[transfer->endpoint] && frame < cInterface->frames[transfer->endpoint])
+    frame = cInterface->frames[transfer->endpoint];
 
   /* submit the request */
   if (is_read)
@@ -1323,6 +1341,8 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
     kresult = (*(cInterface->interface))->WriteIsochPipeAsync(cInterface->interface, pipeRef, transfer->buffer, frame,
 							      transfer->num_iso_packets, tpriv->isoc_framelist, darwin_async_io_callback,
 							      itransfer);
+
+  cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets / 8;
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (TRANSFER_CTX (transfer), "isochronous transfer failed (dir: %s): %s", is_read ? "In" : "Out",
@@ -1338,6 +1358,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct libusb_control_setup *setup = (struct libusb_control_setup *) transfer->buffer;
   struct darwin_device_priv *dpriv = (struct darwin_device_priv *)transfer->dev_handle->dev->os_priv;
+  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
   struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 
   IOReturn               kresult;
@@ -1356,8 +1377,26 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   tpriv->req.completionTimeout = transfer->timeout;
   tpriv->req.noDataTimeout     = transfer->timeout;
 
+  itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
   /* all transfers in libusb-1.0 are async */
-  kresult = (*(dpriv->device))->DeviceRequestAsyncTO(dpriv->device, &(tpriv->req), darwin_async_io_callback, itransfer);
+
+  if (transfer->endpoint) {
+    struct __darwin_interface *cInterface;
+    uint8_t                 pipeRef, iface;
+
+    if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
+      usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
+
+      return LIBUSB_ERROR_NOT_FOUND;
+    }
+
+    cInterface = &priv->interfaces[iface];
+
+    kresult = (*(cInterface->interface))->ControlRequestAsyncTO (cInterface->interface, pipeRef, &(tpriv->req), darwin_async_io_callback, itransfer);
+  } else
+    /* control request on endpoint 0 */
+    kresult = (*(dpriv->device))->DeviceRequestAsyncTO(dpriv->device, &(tpriv->req), darwin_async_io_callback, itransfer);
 
   if (kresult != kIOReturnSuccess)
     usbi_err (TRANSFER_CTX (transfer), "control request failed: %s", darwin_error_str(kresult));
@@ -1470,6 +1509,9 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 }
 
 static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_t result) {
+  if (itransfer->flags & USBI_TRANSFER_TIMED_OUT)
+    result = kIOUSBTransactionTimeout;
+
   switch (result) {
   case kIOReturnUnderrun:
   case kIOReturnSuccess:
@@ -1484,6 +1526,7 @@ static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_
     return LIBUSB_TRANSFER_OVERFLOW;
   case kIOUSBTransactionTimeout:
     usbi_err (ITRANSFER_CTX (itransfer), "transfer error: timed out");
+    itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
     return LIBUSB_TRANSFER_TIMED_OUT;
   default:
     usbi_err (ITRANSFER_CTX (itransfer), "transfer error: %s (value = 0x%08x)", darwin_error_str (result), result);
@@ -1549,7 +1592,7 @@ static void handle_hotplug_event(struct libusb_context* ctx, UInt32 location)
     }
   }
 }
-static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds, int num_ready) {
+static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready) {
   struct darwin_context_priv *ctx_priv = __ctx_priv(ctx);
   struct usbi_transfer *itransfer;
   UInt32 io_size;
@@ -1676,7 +1719,6 @@ const struct usbi_os_backend darwin_backend = {
 	.detach_kernel_driver = darwin_detach_kernel_driver,
 	.attach_kernel_driver = darwin_attach_kernel_driver,
 
-	.get_device_topology = darwin_get_device_topology,
 	.destroy_device = darwin_destroy_device,
 
 	.submit_transfer = darwin_submit_transfer,
