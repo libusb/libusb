@@ -58,6 +58,8 @@ struct timespec {
 #define usbi_mutexattr_t void
 #define usbi_condattr_t  void
 
+// all Windows mutexes are recursive
+#define usbi_mutex_init_recursive(mutex, attr) usbi_mutex_init((mutex), (attr))
 
 int usbi_mutex_static_lock(usbi_mutex_static_t *mutex);
 int usbi_mutex_static_unlock(usbi_mutex_static_t *mutex);

@@ -5,7 +5,7 @@ DARWIN_USB_SRC = os/darwin_usb.c
 WINDOWS_USB_SRC = os/poll_windows.c os/windows_usb.c libusb-1.0.rc
 
 EXTRA_DIST = $(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) $(WINDOWS_USB_SRC) \
-	os/threads_windows.c
+	os/threads_posix.c os/threads_windows.c
 
 if OS_LINUX
 OS_SRC = $(LINUX_USBFS_SRC)
@@ -24,7 +24,7 @@ OS_SRC = $(WINDOWS_USB_SRC)
 endif
 
 if THREADS_POSIX
-THREADS_SRC = os/threads_posix.h
+THREADS_SRC = os/threads_posix.h os/threads_posix.c
 else
 THREADS_SRC = os/threads_windows.h os/threads_windows.c
 endif
