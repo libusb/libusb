@@ -1401,6 +1401,9 @@ static int discard_urbs(struct usbi_transfer *itransfer, int first, int last_plu
 		if (EINVAL == errno) {
 			usbi_dbg("URB not found --> assuming ready to be reaped");
 			ret = LIBUSB_ERROR_NOT_FOUND;
+		} else if (ENODEV == errno) {
+			usbi_dbg("Device not found for URB --> assuming ready to be reaped");
+			ret = LIBUSB_ERROR_NO_DEVICE;
 		} else {
 			usbi_warn(TRANSFER_CTX(transfer),
 				"unrecognised discard errno %d", errno);
