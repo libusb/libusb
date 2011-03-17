@@ -333,6 +333,12 @@ enum usbi_transfer_flags {
 
 	/* Set by backend submit_transfer() if the OS handles timeout */
 	USBI_TRANSFER_OS_HANDLES_TIMEOUT = 1 << 1,
+
+	/* Cancellation was requested via libusb_cancel_transfer() */
+	USBI_TRANSFER_CANCELLING = 1 << 2,
+
+	/* Operation on the transfer failed because the device disappeared */
+	USBI_TRANSFER_DEVICE_DISAPPEARED = 1 << 3,
 };
 
 #define __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
