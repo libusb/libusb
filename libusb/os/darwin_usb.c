@@ -1,6 +1,6 @@
 /*
  * darwin backend for libusb 1.0
- * Copyright (C) 2008-2010 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright (C) 2008-2011 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -511,8 +511,140 @@ static int darwin_check_configuration (struct libusb_context *ctx, struct libusb
   } else
     /* not configured */
     priv->active_config = 0;
-  
+
   usbi_info (ctx, "active config: %u, first config: %u", priv->active_config, priv->first_config);
+
+  return 0;
+}
+
+static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct libusb_device *dev, usb_device_t **device) {
+  struct darwin_device_priv *priv;
+  int retries = 5, delay = 30000;
+  int unsuspended = 0, try_unsuspend = 1, try_reconfigure = 1;
+  int is_open = 0;
+  int ret = 0, ret2;
+  IOUSBDevRequest req;
+  UInt8 bDeviceClass;
+  UInt16 idProduct, idVendor;
+
+  (*device)->GetDeviceClass (device, &bDeviceClass);
+  (*(device))->GetDeviceProduct (device, &idProduct);
+  (*(device))->GetDeviceVendor (device, &idVendor);
+
+  priv = (struct darwin_device_priv *)dev->os_priv;
+
+  /* try to open the device (we can usually continue even if this fails) */
+  is_open = ((*device)->USBDeviceOpenSeize(device) == kIOReturnSuccess);
+
+  /**** retrieve device descriptor ****/
+  do {
+    /* Set up request for device descriptor */
+    memset (&(priv->dev_descriptor), 0, sizeof(IOUSBDeviceDescriptor));
+    req.bmRequestType = USBmakebmRequestType(kUSBIn, kUSBStandard, kUSBDevice);
+    req.bRequest      = kUSBRqGetDescriptor;
+    req.wValue        = kUSBDeviceDesc << 8;
+    req.wIndex        = 0;
+    req.wLength       = sizeof(priv->dev_descriptor);
+    req.pData         = &(priv->dev_descriptor);
+
+    /* according to Apple's documentation the device must be open for DeviceRequest but we may not be able to open some
+     * devices and Apple's USB Prober doesn't bother to open the device before issuing a descriptor request.  Still,
+     * to follow the spec as closely as possible, try opening the device */
+
+    ret = (*(device))->DeviceRequest (device, &req);
+
+    if (kIOReturnOverrun == ret && kUSBDeviceDesc == priv->dev_descriptor.bDescriptorType)
+      /* received an overrun error but we still received a device descriptor */
+      ret = kIOReturnSuccess;
+
+    if (kIOReturnSuccess == ret && (0 == priv->dev_descriptor.idProduct ||
+				    0 == priv->dev_descriptor.bNumConfigurations ||
+				    0 == priv->dev_descriptor.bcdUSB)) {
+      /* work around for incorrectly configured devices */
+      if (try_reconfigure && is_open) {
+	usbi_dbg("descriptor appears to be invalid. resetting configuration before trying again...");
+
+	/* set the first configuration */
+	(*(device))->SetConfiguration(device, 1);
+
+	/* don't try to reconfigure again */
+	try_reconfigure = 0;
+      }
+
+      ret = kIOUSBPipeStalled;
+    }
+
+    if (kIOReturnSuccess != ret && is_open && try_unsuspend) {
+      /* device may be suspended. unsuspend it and try again */
+#if DeviceVersion >= 320
+      UInt32 info;
+
+      /* IOUSBFamily 320+ provides a way to detect device suspension but earlier versions do not */
+      (void)(*device)->GetUSBDeviceInformation (device, &info);
+
+      try_unsuspend = info & (1 << kUSBInformationDeviceIsSuspendedBit);
+#endif
+
+      if (try_unsuspend) {
+	/* resume the device */
+	ret2 = (*device)->USBDeviceSuspend (device, 0);
+	if (kIOReturnSuccess != ret2) {
+	  /* prevent log spew from poorly behaving devices.  this indicates the
+	     os actually had trouble communicating with the device */
+	  usbi_dbg("could not retrieve device descriptor. failed to unsuspend: %s",darwin_error_str(ret2));
+	} else
+	  unsuspended = 1;
+
+	try_unsuspend = 0;
+      }
+    }
+
+    if (kIOReturnSuccess != ret) {
+      usbi_dbg("kernel responded with code: 0x%08x. sleeping for 30ms before trying again", ret);
+      /* sleep for a little while before trying again */
+      usleep (delay);
+    }
+  } while (kIOReturnSuccess != ret && retries--);
+
+  if (unsuspended)
+    /* resuspend the device */
+    (void)(*device)->USBDeviceSuspend (device, 1);
+
+  if (is_open)
+    (void) (*device)->USBDeviceClose (device);
+
+  if (ret != kIOReturnSuccess) {
+    /* a debug message was already printed out for this error */
+    if (LIBUSB_CLASS_HUB == bDeviceClass)
+      usbi_dbg ("could not retrieve device descriptor %.4x:%.4x: %s. skipping device", idVendor, idProduct, darwin_error_str (ret));
+    else
+      usbi_warn (ctx, "could not retrieve device descriptor %.4x:%.4x: %s. skipping device", idVendor, idProduct, darwin_error_str (ret));
+
+    return -1;
+  }
+
+  usbi_dbg ("device descriptor:");
+  usbi_dbg (" bDescriptorType:    0x%02x", priv->dev_descriptor.bDescriptorType);
+  usbi_dbg (" bcdUSB:             0x%04x", priv->dev_descriptor.bcdUSB);
+  usbi_dbg (" bDeviceClass:       0x%02x", priv->dev_descriptor.bDeviceClass);
+  usbi_dbg (" bDeviceSubClass:    0x%02x", priv->dev_descriptor.bDeviceSubClass);
+  usbi_dbg (" bDeviceProtocol:    0x%02x", priv->dev_descriptor.bDeviceProtocol);
+  usbi_dbg (" bMaxPacketSize0:    0x%02x", priv->dev_descriptor.bMaxPacketSize0);
+  usbi_dbg (" idVendor:           0x%04x", priv->dev_descriptor.idVendor);
+  usbi_dbg (" idProduct:          0x%04x", priv->dev_descriptor.idProduct);
+  usbi_dbg (" bcdDevice:          0x%04x", priv->dev_descriptor.bcdDevice);
+  usbi_dbg (" iManufacturer:      0x%02x", priv->dev_descriptor.iManufacturer);
+  usbi_dbg (" iProduct:           0x%02x", priv->dev_descriptor.iProduct);
+  usbi_dbg (" iSerialNumber:      0x%02x", priv->dev_descriptor.iSerialNumber);
+  usbi_dbg (" bNumConfigurations: 0x%02x", priv->dev_descriptor.bNumConfigurations);
+
+  /* catch buggy hubs (which appear to be virtual). Apple's own USB prober has problems with these devices. */
+  if (libusb_le16_to_cpu (priv->dev_descriptor.idProduct) != idProduct) {
+    /* not a valid device */
+    usbi_warn (ctx, "idProduct from iokit (%04x) does not match idProduct in descriptor (%04x). skipping device",
+	       idProduct, libusb_le16_to_cpu (priv->dev_descriptor.idProduct));
+    return -1;
+  }
 
   return 0;
 }
@@ -521,9 +653,8 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
   struct darwin_device_priv *priv;
   struct libusb_device *dev;
   struct discovered_devs *discdevs;
-  UInt16                address, idVendor, idProduct;
-  UInt8                 bDeviceClass, bDeviceSubClass;
-  IOUSBDevRequest      req;
+  UInt16                address;
+  UInt8                 devSpeed;
   int ret = 0, need_unref = 0;
 
   do {
@@ -542,80 +673,31 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
 
     priv = (struct darwin_device_priv *)dev->os_priv;
 
-    /* Set up request for device descriptor */
-    req.bmRequestType = USBmakebmRequestType(kUSBIn, kUSBStandard, kUSBDevice);
-    req.bRequest      = kUSBRqGetDescriptor;
-    req.wValue        = kUSBDeviceDesc << 8;
-    req.wIndex        = 0;
-    req.wLength       = sizeof(IOUSBDeviceDescriptor);
-    req.pData         = &(priv->dev_descriptor);
-
     (*(device))->GetDeviceAddress (device, (USBDeviceAddress *)&address);
-    (*(device))->GetDeviceProduct (device, &idProduct);
-    (*(device))->GetDeviceVendor (device, &idVendor);
-    (*(device))->GetDeviceClass (device, &bDeviceClass);
-    (*(device))->GetDeviceSubClass (device, &bDeviceSubClass);
 
-    /**** retrieve device descriptors ****/
-    /* according to Apple's documentation the device must be open for DeviceRequest but we may not be able to open some
-     * devices and Apple's USB Prober doesn't bother to open the device before issuing a descriptor request */
-    ret = (*(device))->DeviceRequest (device, &req);
-    if (ret != kIOReturnSuccess) {
-      int try_unsuspend = 1;
-#if DeviceVersion >= 320
-      UInt32 info;
-
-      /* device may be suspended. unsuspend it and try again */
-      /* IOUSBFamily 320+ provides a way to detect device suspension but earlier versions do not */
-      (void)(*device)->GetUSBDeviceInformation (device, &info);
-
-      try_unsuspend = info & (1 << kUSBInformationDeviceIsSuspendedBit);
-#endif
-
-      /* the device should be open before to device is unsuspended */
-      (void) (*device)->USBDeviceOpenSeize(device);
-
-      if (try_unsuspend) {
-	/* resume the device */
-	(void)(*device)->USBDeviceSuspend (device, 0);
-
-	ret = (*(device))->DeviceRequest (device, &req);
-
-	/* resuspend the device */
-	(void)(*device)->USBDeviceSuspend (device, 1);
-      }
-
-      (*device)->USBDeviceClose (device);
-    }
-
-    if (ret != kIOReturnSuccess) {
-      usbi_warn (ctx, "could not retrieve device descriptor: %s. skipping device", darwin_error_str (ret));
-      ret = -1;
+    ret = darwin_cache_device_descriptor (ctx, dev, device);
+    if (ret < 0)
       break;
-    }
-
-    /**** end: retrieve device descriptors ****/
-
-    /* catch buggy hubs (which appear to be virtual). Apple's own USB prober has problems with these devices. */
-    if (libusb_le16_to_cpu (priv->dev_descriptor.idProduct) != idProduct) {
-      /* not a valid device */
-      usbi_warn (ctx, "idProduct from iokit (%04x) does not match idProduct in descriptor (%04x). skipping device",
-		 idProduct, libusb_le16_to_cpu (priv->dev_descriptor.idProduct));
-      ret = -1;
-      break;
-    }
-
-    dev->bus_number     = locationID >> 24;
-    dev->device_address = address;
 
     /* check current active configuration (and cache the first configuration value-- which may be used by claim_interface) */
     ret = darwin_check_configuration (ctx, dev, device);
     if (ret < 0)
       break;
 
+    dev->bus_number     = locationID >> 24;
+    dev->device_address = address;
+
+    (*(device))->GetDeviceSpeed (device, &devSpeed);
+
+    /* the OS's speeds are in the same order as libusb but enumerated from 0 (instead of 1) */
+    dev->speed = devSpeed + LIBUSB_SPEED_LOW;
+    if (dev->speed > LIBUSB_SPEED_SUPER)
+      dev->speed = LIBUSB_SPEED_UNKNOWN;
+
     /* save our location, we'll need this later */
     priv->location = locationID;
-    snprintf(priv->sys_path, 20, "%03i-%04x-%04x-%02x-%02x", address, idVendor, idProduct, bDeviceClass, bDeviceSubClass);
+    snprintf(priv->sys_path, 20, "%03i-%04x-%04x-%02x-%02x", address, priv->dev_descriptor.idVendor, priv->dev_descriptor.idProduct,
+	     priv->dev_descriptor.bDeviceClass, priv->dev_descriptor.bDeviceSubClass);
 
     ret = usbi_sanitize_device (dev);
     if (ret < 0)
@@ -1184,7 +1266,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
 
   if (ret)
     usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", is_read ? "In" : "Out",
-	       darwin_error_str(ret), ret);
+	      darwin_error_str(ret), ret);
 
   return darwin_to_libusb (ret);
 }
@@ -1262,7 +1344,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (TRANSFER_CTX (transfer), "isochronous transfer failed (dir: %s): %s", is_read ? "In" : "Out",
-	       darwin_error_str(kresult));
+	      darwin_error_str(kresult));
     free (tpriv->isoc_framelist);
     tpriv->isoc_framelist = NULL;
   }
@@ -1575,42 +1657,41 @@ static int darwin_clock_gettime(int clk_id, struct timespec *tp) {
 }
 
 const struct usbi_os_backend darwin_backend = {
-	.name = "Darwin",
-	.init = darwin_init,
-	.exit = darwin_exit,
-	.get_device_list = darwin_get_device_list,
-	.get_device_descriptor = darwin_get_device_descriptor,
-	.get_active_config_descriptor = darwin_get_active_config_descriptor,
-	.get_config_descriptor = darwin_get_config_descriptor,
+  .name = "Darwin",
+  .init = darwin_init,
+  .exit = darwin_exit,
+  .get_device_list = darwin_get_device_list,
+  .get_device_descriptor = darwin_get_device_descriptor,
+  .get_active_config_descriptor = darwin_get_active_config_descriptor,
+  .get_config_descriptor = darwin_get_config_descriptor,
 
-	.open = darwin_open,
-	.close = darwin_close,
-	.get_configuration = darwin_get_configuration,
-	.set_configuration = darwin_set_configuration,
-	.claim_interface = darwin_claim_interface,
-	.release_interface = darwin_release_interface,
+  .open = darwin_open,
+  .close = darwin_close,
+  .get_configuration = darwin_get_configuration,
+  .set_configuration = darwin_set_configuration,
+  .claim_interface = darwin_claim_interface,
+  .release_interface = darwin_release_interface,
 
-	.set_interface_altsetting = darwin_set_interface_altsetting,
-	.clear_halt = darwin_clear_halt,
-	.reset_device = darwin_reset_device,
+  .set_interface_altsetting = darwin_set_interface_altsetting,
+  .clear_halt = darwin_clear_halt,
+  .reset_device = darwin_reset_device,
 
-	.kernel_driver_active = darwin_kernel_driver_active,
-	.detach_kernel_driver = darwin_detach_kernel_driver,
-	.attach_kernel_driver = darwin_attach_kernel_driver,
+  .kernel_driver_active = darwin_kernel_driver_active,
+  .detach_kernel_driver = darwin_detach_kernel_driver,
+  .attach_kernel_driver = darwin_attach_kernel_driver,
 
-	.destroy_device = darwin_destroy_device,
+  .destroy_device = darwin_destroy_device,
 
-	.submit_transfer = darwin_submit_transfer,
-	.cancel_transfer = darwin_cancel_transfer,
-	.clear_transfer_priv = darwin_clear_transfer_priv,
+  .submit_transfer = darwin_submit_transfer,
+  .cancel_transfer = darwin_cancel_transfer,
+  .clear_transfer_priv = darwin_clear_transfer_priv,
 
-	.handle_events = op_handle_events,
+  .handle_events = op_handle_events,
 
-	.clock_gettime = darwin_clock_gettime,
+  .clock_gettime = darwin_clock_gettime,
 
-	.device_priv_size = sizeof(struct darwin_device_priv),
-	.device_handle_priv_size = sizeof(struct darwin_device_handle_priv),
-	.transfer_priv_size = sizeof(struct darwin_transfer_priv),
-	.add_iso_packet_size = 0,
+  .device_priv_size = sizeof(struct darwin_device_priv),
+  .device_handle_priv_size = sizeof(struct darwin_device_handle_priv),
+  .transfer_priv_size = sizeof(struct darwin_transfer_priv),
+  .add_iso_packet_size = 0,
 };
-
