@@ -33,7 +33,7 @@
 static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
 #define INIT_INTERLOCKEDEXCHANGE if (pInterlockedExchange == NULL) {		\
 	pInterlockedExchange = (LONG (WINAPI *)(LONG volatile *, LONG))			\
-		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedExchange");	\
+		GetProcAddress(GetModuleHandleA("KERNEL32"), "InterlockedExchange");\
 	if (pInterlockedExchange == NULL) return ((errno=ENOENT));				\
 	}
 #endif

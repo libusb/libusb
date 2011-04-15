@@ -108,7 +108,7 @@ static int composite_copy_transfer_data(struct usbi_transfer *itransfer, uint32_
 static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
 #define INIT_INTERLOCKEDEXCHANGE if (pInterlockedExchange == NULL) {		\
 	pInterlockedExchange = (LONG (WINAPI *)(LONG volatile *, LONG))			\
-		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedExchange");	\
+		GetProcAddress(GetModuleHandleA("KERNEL32"), "InterlockedExchange");\
 	if (pInterlockedExchange == NULL) {										\
 		usbi_err(NULL, "InterlockedExchange is unavailable");				\
 		return 1;															\
@@ -117,7 +117,7 @@ static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
 static LONG (WINAPI *pInterlockedIncrement)(LONG volatile *) = NULL;
 #define INIT_INTERLOCKEDINCREMENT if (pInterlockedIncrement == NULL) {		\
 	pInterlockedIncrement = (LONG (WINAPI *)(LONG volatile *))				\
-		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedIncrement");\
+		GetProcAddress(GetModuleHandleA("KERNEL32"), "InterlockedIncrement");\
 	if (pInterlockedIncrement == NULL) {									\
 		usbi_err(NULL, "IInterlockedIncrement is unavailable");				\
 		return LIBUSB_ERROR_NOT_FOUND;										\
