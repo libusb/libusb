@@ -6,15 +6,19 @@
  * viewed with utilities such as Windows Explorer.
  */
 #include "winresrc.h"
-#include "libusb_version.h"
 
-#define __DEFTOSTR(x) #x
-#define  _DEFTOSTR(x) __DEFTOSTR(x)
-#define LIBUSB_PACKAGE_VERSION _DEFTOSTR(LIBUSB_VERSION_MAJOR.LIBUSB_VERSION_MINOR.LIBUSB_VERSION_MICRO.LIBUSB_VERSION_NANO)
+#include "version.h"
+#ifndef LIBUSB_VERSIONSTRING
+#define LU_STR(s) #s
+#define LU_XSTR(s) LU_STR(s)
+#define LIBUSB_VERSIONSTRING \
+	LU_XSTR(LIBUSB_MAJOR) "." LU_XSTR(LIBUSB_MINOR) "." \
+	LU_XSTR(LIBUSB_MICRO) "." LU_XSTR(LIBUSB_NANO)
+#endif
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION LIBUSB_VERSION_MAJOR,LIBUSB_VERSION_MINOR,LIBUSB_VERSION_MICRO,LIBUSB_VERSION_NANO
- PRODUCTVERSION LIBUSB_VERSION_MAJOR,LIBUSB_VERSION_MINOR,LIBUSB_VERSION_MICRO,LIBUSB_VERSION_NANO
+ FILEVERSION LIBUSB_MAJOR,LIBUSB_MINOR,LIBUSB_MICRO,LIBUSB_NANO
+ PRODUCTVERSION LIBUSB_MAJOR,LIBUSB_MINOR,LIBUSB_MICRO,LIBUSB_NANO
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -31,15 +35,15 @@ BEGIN
 		BEGIN
 			VALUE "Comments", "http://libusb.org/\0"
 			VALUE "CompanyName", "libusb.org\0"
-			VALUE "FileDescription", "libusb-1\0"
-			VALUE "FileVersion", LIBUSB_PACKAGE_VERSION "\0"
+			VALUE "FileDescription", "C library for writing portable USB drivers in userspace\0"
+			VALUE "FileVersion", LIBUSB_VERSIONSTRING
 			VALUE "InternalName", "libusb\0"
 			VALUE "LegalCopyright", "See individual source files, GNU LGPL v2.1 or later.\0"
 			VALUE "LegalTrademarks", "http://www.gnu.org/licenses/lgpl-2.1.html\0"
 			VALUE "OriginalFilename", "libusb-1.0.dll\0"
 			VALUE "PrivateBuild", "\0"
-			VALUE "ProductName", "libusb-1\0"
-			VALUE "ProductVersion", LIBUSB_PACKAGE_VERSION "\0"
+			VALUE "ProductName", "libusb-1.0\0"
+			VALUE "ProductVersion", LIBUSB_VERSIONSTRING
 			VALUE "SpecialBuild", "\0"
 		END
 	END
