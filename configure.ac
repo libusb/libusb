@@ -1,12 +1,17 @@
-m4_define(LIBUSB_MAJOR, [1])
-m4_define(LIBUSB_MINOR, [0])
-m4_define(LIBUSB_MICRO, [8])
+dnl These m4 macros are whitespace sensitive and break if moved around much.
+m4_define([LU_VERSION_H], m4_include([libusb/version.h]))
+m4_define([LU_DEFINE_VERSION_ATOM],
+	[m4_define([$1], m4_bregexp(LU_VERSION_H,
+	[^#define\s*$1\s*\([0-9]*\).*], [\1]))])
+dnl The m4_bregexp() returns (only) the numbers following the #define named
+dnl in the first macro parameter. m4_define() then defines the name for use
+dnl in AC_INIT().
 
-AC_INIT([libusb], LIBUSB_MAJOR.LIBUSB_MINOR.LIBUSB_MICRO, [libusb-devel@lists.sourceforge.net], [libusb], [http://www.libusb.org/])
+LU_DEFINE_VERSION_ATOM([LIBUSB_MAJOR])
+LU_DEFINE_VERSION_ATOM([LIBUSB_MINOR])
+LU_DEFINE_VERSION_ATOM([LIBUSB_MICRO])
 
-AC_SUBST([LIBUSB_VERSION_MAJOR], [LIBUSB_MAJOR])
-AC_SUBST([LIBUSB_VERSION_MINOR], [LIBUSB_MINOR])
-AC_SUBST([LIBUSB_VERSION_MICRO], [LIBUSB_MICRO])
+AC_INIT([libusb], LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO, [libusb-devel@lists.sourceforge.net], [libusb], [http://www.libusb.org/])
 
 # Library versioning
 # These numbers should be tweaked on every release. Read carefully:
@@ -188,7 +193,6 @@ AC_SUBST(LTLDFLAGS)
 AC_CONFIG_FILES([libusb-1.0.pc])
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([libusb/Makefile])
-AC_CONFIG_FILES([libusb/libusb-1.0.rc])
 AC_CONFIG_FILES([examples/Makefile])
 AC_CONFIG_FILES([doc/Makefile])
 AC_CONFIG_FILES([doc/doxygen.cfg])
