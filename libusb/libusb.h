@@ -21,12 +21,29 @@
 #ifndef __LIBUSB_H__
 #define __LIBUSB_H__
 
-/* MSVC doesn't like inline, but does accept __inline ?? */
 #ifdef _MSC_VER
+/* on MS environments, the inline keyword is available in C++ only */
 #define inline __inline
+/* ssize_t is also not available (copy/paste from MinGW) */
+#ifndef _SSIZE_T_DEFINED
+#define _SSIZE_T_DEFINED
+#undef ssize_t
+#ifdef _WIN64
+  typedef __int64 ssize_t;
+#else
+  typedef int ssize_t;
+#endif /* _WIN64 */
+#endif /* _SSIZE_T_DEFINED */
+#endif /* _MSC_VER */
+
+/* stdint.h is also not usually available on MS */
+#if defined(_MSC_VER) && (_MSC_VER < 1600) && (!defined(_STDINT)) && (!defined(_STDINT_H))
+typedef unsigned __int8   uint8_t;
+typedef unsigned __int16  uint16_t;
+#else
+#include <stdint.h>
 #endif
 
-#include <stdint.h>
 #include <sys/types.h>
 #include <time.h>
 #include <limits.h>

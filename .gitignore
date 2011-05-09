@@ -17,6 +17,7 @@ aclocal.m4
 compile
 config.guess
 config.h*
+!msvc/config.h
 config.log
 config.status
 config.sub

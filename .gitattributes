@@ -1,3 +1,7 @@
 *.sh eol=lf
 *.ac eol=lf
 *.am eol=lf
+*.dsw eol=crlf
+*.dsp eol=crlf whitespace=space-before-tab
+*.sln eol=crlf
+*.vcxproj* eol=crlf
