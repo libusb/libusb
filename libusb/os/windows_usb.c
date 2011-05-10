@@ -281,7 +281,7 @@ static int init_dlls(void)
  * structure returned and call this function repeatedly using the same guid (with an
  * incremented index starting at zero) until all interfaces have been returned.
  */
-bool get_devinfo_data(struct libusb_context *ctx,
+static bool get_devinfo_data(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, unsigned _index)
 {
 	if (_index <= 0) {
@@ -317,7 +317,7 @@ bool get_devinfo_data(struct libusb_context *ctx,
  * structure returned and call this function repeatedly using the same guid (with an
  * incremented index starting at zero) until all interfaces have been returned.
  */
-SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_context *ctx,
+static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID* guid, unsigned _index)
 {
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
@@ -415,7 +415,7 @@ static int isprime(unsigned long number)
    We allocate one element more as the found prime number says.
    This is done for more effective indexing as explained in the
    comment for the hash function.  */
-int htab_create(struct libusb_context *ctx, unsigned long nel)
+static int htab_create(struct libusb_context *ctx, unsigned long nel)
 {
 	if (htab_table != NULL) {
 		usbi_err(ctx, "hash table already allocated");
@@ -444,7 +444,7 @@ int htab_create(struct libusb_context *ctx, unsigned long nel)
 }
 
 /* After using the hash table it has to be destroyed.  */
-void htab_destroy(void)
+static void htab_destroy(void)
 {
 	size_t i;
 	if (htab_table == NULL) {
@@ -468,7 +468,7 @@ void htab_destroy(void)
    The used field can be used as a first fast comparison for equality of
    the stored and the parameter value. This helps to prevent unnecessary
    expensive calls of strcmp.  */
-unsigned long htab_hash(char* str)
+static unsigned long htab_hash(char* str)
 {
 	unsigned long hval, hval2;
 	unsigned long idx;
@@ -630,7 +630,7 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int
 }
 
 // Lookup for a match in the list of API driver names
-bool is_api_driver(char* driver, uint8_t api)
+static bool is_api_driver(char* driver, uint8_t api)
 {
 	uint8_t i;
 	const char sep_str[2] = {LIST_SEPARATOR, 0};
