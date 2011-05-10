@@ -7,12 +7,6 @@
  */
 #include "winresrc.h"
 
-#ifdef _DEBUG
-#define VER_ORIGINALFILENAME_STR "libusb-1.0_debug.dll\0"
-#else
-#define VER_ORIGINALFILENAME_STR "libusb-1.0.dll\0"
-#endif
-
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION @LIBUSB_VERSION_MAJOR@,@LIBUSB_VERSION_MINOR@,@LIBUSB_VERSION_MICRO@,0
  PRODUCTVERSION @LIBUSB_VERSION_MAJOR@,@LIBUSB_VERSION_MINOR@,@LIBUSB_VERSION_MICRO@,0
@@ -37,7 +31,7 @@ BEGIN
 			VALUE "InternalName", "libusb\0"
 			VALUE "LegalCopyright", "See individual source files, GNU LGPL v2.1 or later.\0"
 			VALUE "LegalTrademarks", "http://www.gnu.org/licenses/lgpl-2.1.html\0"
-			VALUE "OriginalFilename", VER_ORIGINALFILENAME_STR
+			VALUE "OriginalFilename", "libusb-1.0.dll\0"
 			VALUE "PrivateBuild", "\0"
 			VALUE "ProductName", "libusb-1.0\0"
 			VALUE "ProductVersion", "@PACKAGE_VERSION@"
