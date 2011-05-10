@@ -1739,7 +1739,6 @@ static int windows_release_interface(struct libusb_device_handle *dev_handle, in
 {
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 
-	windows_set_interface_altsetting(dev_handle, iface, 0);
 	return priv->apib->release_interface(dev_handle, iface);
 }
 
