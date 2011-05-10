@@ -1207,7 +1207,7 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs)
 {
 	struct discovered_devs *discdevs = *_discdevs;
-	HDEVINFO dev_info;
+	HDEVINFO dev_info = { 0 };
 	SP_DEVINFO_DATA dev_info_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 #define MAX_ENUM_GUIDS 64
