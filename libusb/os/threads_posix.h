@@ -41,6 +41,6 @@
 #define usbi_cond_timedwait		pthread_cond_timedwait
 #define usbi_cond_broadcast		pthread_cond_broadcast
 #define usbi_cond_destroy		pthread_cond_destroy
-#define usbi_cond_signal	pthread_cond_signal
+#define usbi_cond_signal		pthread_cond_signal
 
 #endif /* __LIBUSB_THREADS_POSIX_H__ */
