@@ -155,6 +155,9 @@ enum libusb_class_code {
 	/** Human Interface Device class */
 	LIBUSB_CLASS_HID = 3,
 
+	/** Physical */
+	LIBUSB_CLASS_PHYSICAL = 5,
+
 	/** Printer class */
 	LIBUSB_CLASS_PRINTER = 7,
 
@@ -170,6 +173,21 @@ enum libusb_class_code {
 
 	/** Data class */
 	LIBUSB_CLASS_DATA = 10,
+
+	/** Smart Card */
+	LIBUSB_CLASS_SMART_CARD = 0x0b,
+
+	/** Content Security */
+	LIBUSB_CLASS_CONTENT_SECURITY = 0x0d,
+
+	/** Video */
+	LIBUSB_CLASS_VIDEO = 0x0e,
+
+	/** Personal Healthcare */
+	LIBUSB_CLASS_PERSONAL_HEALTHCARE = 0x0f,
+
+	/** Diagnostic Device */
+	LIBUSB_CLASS_DIAGNOSTIC_DEVICE = 0xdc,
 
 	/** Wireless class */
 	LIBUSB_CLASS_WIRELESS = 0xe0,
