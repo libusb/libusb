@@ -158,8 +158,9 @@ enum libusb_class_code {
 	/** Printer class */
 	LIBUSB_CLASS_PRINTER = 7,
 
-	/** Picture transfer protocol class */
-	LIBUSB_CLASS_PTP = 6,
+	/** Image class */
+	LIBUSB_CLASS_PTP = 6, /* legacy name from libusb-0.1 usb.h */
+	LIBUSB_CLASS_IMAGE = 6,
 
 	/** Mass storage class */
 	LIBUSB_CLASS_MASS_STORAGE = 8,
