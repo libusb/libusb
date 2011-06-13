@@ -155,7 +155,7 @@ enum libusb_class_code {
 	/** Human Interface Device class */
 	LIBUSB_CLASS_HID = 3,
 
-	/** Printer dclass */
+	/** Printer class */
 	LIBUSB_CLASS_PRINTER = 7,
 
 	/** Picture transfer protocol class */
