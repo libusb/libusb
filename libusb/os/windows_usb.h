@@ -70,7 +70,7 @@ extern char *_strdup(const char *strSource);
 #define safe_sprintf _snprintf
 #define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
-inline void upperize(char* str) {
+static inline void upperize(char* str) {
 	size_t i;
 	if (str == NULL) return;
 	for (i=0; i<safe_strlen(str); i++)
