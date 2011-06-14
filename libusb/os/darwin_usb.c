@@ -227,6 +227,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
 
   io_service_t device;
   long location;
+  bool locationValid;
   CFTypeRef locationCF;
   UInt32 message;
 
@@ -236,9 +237,18 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
     /* get the location from the i/o registry */
     locationCF = IORegistryEntryCreateCFProperty (device, CFSTR(kUSBDevicePropertyLocationID), kCFAllocatorDefault, 0);
 
-    CFNumberGetValue(locationCF, kCFNumberLongType, &location);
-    CFRelease (locationCF);
     IOObjectRelease (device);
+
+    if (!locationCF)
+      continue;
+
+    locationValid = CFGetTypeID(locationCF) == CFNumberGetTypeID() &&
+	    CFNumberGetValue(locationCF, kCFNumberLongType, &location);
+
+    CFRelease (locationCF);
+
+    if (!locationValid)
+      continue;
 
     usbi_mutex_lock(&ctx->open_devs_lock);
     list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
