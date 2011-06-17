@@ -1049,29 +1049,10 @@ out:
 static int sysfs_scan_device(struct libusb_context *ctx,
 	struct discovered_devs **_discdevs, const char *devname)
 {
-	int r;
-	char filename[PATH_MAX];
 	int busnum;
 	int devaddr;
 
 	usbi_dbg("scan %s", devname);
-
-	/* determine descriptors presence ahead of time, we need to know this
-	 * when we reach initialize_device */
-	if (sysfs_has_descriptors == -1) {
-		struct stat statbuf;
-
-		snprintf(filename, PATH_MAX, "%s/%s/descriptors", SYSFS_DEVICE_PATH,
-			devname);
-		r = stat(filename, &statbuf);
-		if (r == 0 && S_ISREG(statbuf.st_mode)) {
-			usbi_dbg("sysfs descriptors available");
-			sysfs_has_descriptors = 1;
-		} else {
-			usbi_dbg("sysfs descriptors not available");
-			sysfs_has_descriptors = 0;
-		}
-	}
 
 	busnum = __read_sysfs_attr(ctx, devname, "busnum");
 	if (busnum < 0)
