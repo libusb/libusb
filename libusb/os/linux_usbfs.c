@@ -226,18 +226,26 @@ static int check_flag_bulk_continuation(void)
 		return -1;
 	if (strlen(uts.release) < 4)
 		return 0;
-	if (sscanf(uts.release, "%d.%d.%d", &major, &minor, &sublevel) != 3)
+	if (sscanf(uts.release, "%d.%d", &major, &minor) != 2)
 		return 0;
 	if (major < 2)
 		return 0;
-	if (major == 2) {
-		if (minor < 6)
-			return 0;
-		if (minor == 6) {
-			if (sublevel < 32)
-				return 0;
-		}
-	}
+	if (major > 2)
+		return 1;
+
+	/* major == 2 */
+	if (minor < 6)
+		return 0;
+	if (minor > 6) /* Does not exist, just here for correctness */
+		return 1;
+
+	/* 2.6.x */
+	if (sscanf(uts.release, "%d.%d.%d", &major, &minor, &sublevel) != 3)
+		return 0;
+
+	if (sublevel < 32)
+		return 0;
+
 	return 1;
 }
 
