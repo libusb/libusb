@@ -1092,7 +1092,6 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		if (conn_info.DeviceAddress > UINT8_MAX) {
 			usbi_err(ctx, "program assertion failed: device address overflow");
 		}
-		dev->device_address = (uint8_t)conn_info.DeviceAddress;
 	} else {
 		dev->device_address = UINT8_MAX;	// Hubs from HCD have a devaddr of 255
 		force_hcd_device_descriptor(dev);
