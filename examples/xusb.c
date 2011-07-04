@@ -787,8 +787,8 @@ int main(int argc, char** argv)
 	if (r < 0)
 		return r;
 
-	// Warnings = 2, Debug = 4
-	libusb_set_debug(NULL, debug_mode?4:2);
+	// Info = 3, Debug = 4
+	libusb_set_debug(NULL, debug_mode?4:3);
 
 	test_device(VID, PID);
 
