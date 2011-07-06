@@ -1003,6 +1003,74 @@ static int sysfs_scan_device(struct libusb_context *ctx,
 		devname);
 }
 
+static void sysfs_analyze_topology(struct discovered_devs *discdevs)
+{
+	struct linux_device_priv *priv;
+	int i, j;
+	struct libusb_device *dev1, *dev2;
+	const char *sysfs_dir1, *sysfs_dir2;
+	const char *p;
+	int n, boundary_char;
+
+	/* Fill in the port_number and parent_dev fields for each device */
+
+	for (i = 0; i < discdevs->len; ++i) {
+		dev1 = discdevs->devices[i];
+		priv = __device_priv(dev1);
+		if (!priv)
+			continue;
+		sysfs_dir1 = priv->sysfs_dir;
+
+		/* Root hubs have sysfs_dir names of the form "usbB",
+		 * where B is the bus number.  All other devices have
+		 * sysfs_dir names of the form "B-P[.P ...]", where the
+		 * P values are port numbers leading from the root hub
+		 * to the device.
+		 */
+
+		/* Root hubs don't have parents or port numbers */
+		if (sysfs_dir1[0] == 'u')
+			continue;
+
+		/* The rightmost component is the device's port number */
+		p = strrchr(sysfs_dir1, '.');
+		if (!p) {
+			p = strchr(sysfs_dir1, '-');
+			if (!p)
+				continue;	/* Should never happen */
+		}
+		dev1->port_number = atoi(p + 1);
+
+		/* Search for the parent device */
+		boundary_char = *p;
+		n = p - sysfs_dir1;
+		for (j = 0; j < discdevs->len; ++j) {
+			dev2 = discdevs->devices[j];
+			priv = __device_priv(dev2);
+			if (!priv)
+				continue;
+			sysfs_dir2 = priv->sysfs_dir;
+
+			if (boundary_char == '-') {
+				/* The parent's name must begin with 'usb';
+				 * skip past that part of sysfs_dir2.
+				 */
+				if (sysfs_dir2[0] != 'u')
+					continue;
+				sysfs_dir2 += 3;
+			}
+
+			/* The remainder of the parent's name must be equal to
+			 * the first n bytes of sysfs_dir1.
+			 */
+			if (memcmp(sysfs_dir1, sysfs_dir2, n) == 0 && !sysfs_dir2[n]) {
+				dev1->parent_dev = dev2;
+				break;
+			}
+		}
+	}
+}
+
 static int sysfs_get_device_list(struct libusb_context *ctx,
 	struct discovered_devs **_discdevs, int *usbfs_fallback)
 {
@@ -1033,6 +1101,7 @@ static int sysfs_get_device_list(struct libusb_context *ctx,
 out:
 	closedir(devices);
 	*_discdevs = discdevs;
+	sysfs_analyze_topology(discdevs);
 	return r;
 }
 
