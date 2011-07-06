@@ -274,7 +274,7 @@ static int init_dlls(void)
  * Parameters:
  * dev_info: a pointer to a dev_info list
  * dev_info_data: a pointer to an SP_DEVINFO_DATA to be filled (or NULL if not needed)
- * guid: the GUID for which to retrieve interface details
+ * usb_class: the generic USB class for which to retrieve interface details
  * index: zero based index of the interface in the device info list
  *
  * Note: it is the responsibility of the caller to free the DEVICE_INTERFACE_DETAIL_DATA
@@ -282,10 +282,10 @@ static int init_dlls(void)
  * incremented index starting at zero) until all interfaces have been returned.
  */
 static bool get_devinfo_data(struct libusb_context *ctx,
-	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, unsigned _index)
+	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, char* usb_class, unsigned _index)
 {
 	if (_index <= 0) {
-		*dev_info = pSetupDiGetClassDevsA(NULL, "USB", NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
+		*dev_info = pSetupDiGetClassDevsA(NULL, usb_class, NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
 		if (*dev_info == INVALID_HANDLE_VALUE) {
 			return false;
 		}
@@ -1207,6 +1207,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 {
 	struct discovered_devs *discdevs = *_discdevs;
 	HDEVINFO dev_info = { 0 };
+	char* usb_class[2] = {"USB", "NUSB3"}; 
 	SP_DEVINFO_DATA dev_info_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 #define MAX_ENUM_GUIDS 64
@@ -1216,6 +1217,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 #define GEN_PASS 2
 #define DEV_PASS 3
 	int r = LIBUSB_SUCCESS;
+	int class_index = 0;
 	unsigned int nb_guids, pass, i, j, ancestor;
 	char path[MAX_PATH_LENGTH];
 	char strbuf[MAX_PATH_LENGTH];
@@ -1225,6 +1227,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	char* dev_id_path = NULL;
 	unsigned long session_id;
 	DWORD size, reg_type, port_nr, install_state;
+	BOOL b;
 	HKEY key;
 	WCHAR guid_string_w[MAX_GUID_STRING_LENGTH];
 	GUID* if_guid;
@@ -1306,9 +1309,14 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					}
 				}
 			} else {
-				if (!get_devinfo_data(ctx, &dev_info, &dev_info_data, i)) {
-					break;
+				// Workaround for a Nec/Renesas USB 3.0 driver bug where root hubs are
+				// being listed under the "NUSB3" PnP Symbolic Name rather than "USB"
+				while ( (!(b = get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i)))
+					 && (class_index < 2) ) {
+						class_index++;
+						i = 0;
 				}
+				if (!b) break;
 			}
 
 			// Read the Device ID path. This is what we'll use as UID
