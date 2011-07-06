@@ -599,11 +599,15 @@ int test_device(uint16_t vid, uint16_t pid)
 			for (k=0; k<conf_desc->usb_interface[i].altsetting[j].bNumEndpoints; k++) {
 				endpoint = &conf_desc->usb_interface[i].altsetting[j].endpoint[k];
 				printf("       endpoint[%d].address: %02X\n", k, endpoint->bEndpointAddress);
-				// Use the last IN/OUT endpoints found as default for testing
-				if (endpoint->bEndpointAddress & LIBUSB_ENDPOINT_IN) {
-					endpoint_in = endpoint->bEndpointAddress;
-				} else {
-					endpoint_out = endpoint->bEndpointAddress;
+				// Use the first bulk IN/OUT endpoints found as default for testing
+				if ((endpoint->bmAttributes & LIBUSB_TRANSFER_TYPE_MASK) == LIBUSB_TRANSFER_TYPE_BULK) {
+					if (endpoint->bEndpointAddress & LIBUSB_ENDPOINT_IN) {
+						if (!endpoint_in)
+							endpoint_in = endpoint->bEndpointAddress;
+					} else {
+						if (!endpoint_out)
+							endpoint_out = endpoint->bEndpointAddress;
+					}
 				}
 				printf("           max packet size: %04X\n", endpoint->wMaxPacketSize);
 				printf("          polling interval: %02X\n", endpoint->bInterval);
