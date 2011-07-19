@@ -678,6 +678,7 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
   struct libusb_device *dev;
   struct discovered_devs *discdevs;
   UInt16                address;
+  UInt8                 devSpeed;
   int ret = 0, need_unref = 0;
 
   do {
@@ -709,6 +710,16 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
 
     dev->bus_number     = locationID >> 24;
     dev->device_address = address;
+
+    (*device)->GetDeviceSpeed (device, &devSpeed);
+
+    switch (devSpeed) {
+    case kUSBDeviceSpeedLow: dev->speed = LIBUSB_SPEED_LOW; break;
+    case kUSBDeviceSpeedFull: dev->speed = LIBUSB_SPEED_FULL; break;
+    case kUSBDeviceSpeedHigh: dev->speed = LIBUSB_SPEED_HIGH; break;
+    default:
+      usbi_warn (ctx, "Got unknown device speed %d", devSpeed);
+    }
 
     /* save our location, we'll need this later */
     priv->location = locationID;
