@@ -1227,7 +1227,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	char* dev_id_path = NULL;
 	unsigned long session_id;
 	DWORD size, reg_type, port_nr, install_state;
-	BOOL b;
+	BOOL b = FALSE;
 	HKEY key;
 	WCHAR guid_string_w[MAX_GUID_STRING_LENGTH];
 	GUID* if_guid;
@@ -1311,8 +1311,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			} else {
 				// Workaround for a Nec/Renesas USB 3.0 driver bug where root hubs are
 				// being listed under the "NUSB3" PnP Symbolic Name rather than "USB"
-				while ( (!(b = get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i)))
-					 && (class_index < 2) ) {
+				while ( (class_index < 2) && 
+					    (!(b = get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i))) ) {
 						class_index++;
 						i = 0;
 				}
