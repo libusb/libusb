@@ -192,6 +192,9 @@ static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 
     result = IOCreatePlugInInterfaceForService(usbDevice, kIOUSBDeviceUserClientTypeID,
 					       kIOCFPlugInInterfaceID, &plugInInterface,
 					       &score);
+
+    /* we are done with the usb_device_t */
+    (void)IOObjectRelease(usbDevice);
     if (kIOReturnSuccess == result && plugInInterface)
       break;
 
@@ -201,7 +204,6 @@ static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 
   if (!usbDevice)
     return NULL;
 
-  (void)IOObjectRelease(usbDevice);
   (void)(*plugInInterface)->QueryInterface(plugInInterface, CFUUIDGetUUIDBytes(DeviceInterfaceID),
 					   (LPVOID)&device);
 
@@ -1043,13 +1045,12 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
   kresult = (*plugInInterface)->QueryInterface(plugInInterface,
 					       CFUUIDGetUUIDBytes(kIOUSBInterfaceInterfaceID),
 					       (LPVOID)&cInterface->interface);
+  /* We no longer need the intermediate plug-in */
+  IODestroyPlugInInterface (plugInInterface);
   if (kresult || !cInterface->interface) {
     usbi_err (HANDLE_CTX (dev_handle), "QueryInterface: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
   }
-
-  /* We no longer need the intermediate plug-in */
-  (*plugInInterface)->Release(plugInInterface);
 
   /* claim the interface */
   kresult = (*(cInterface->interface))->USBInterfaceOpen(cInterface->interface);
