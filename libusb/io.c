@@ -1085,7 +1085,7 @@ static int calculate_timeout(struct usbi_transfer *transfer)
 	int r;
 	struct timespec current_time;
 	unsigned int timeout =
-		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)->timeout;
+		USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)->timeout;
 
 	if (!timeout)
 		return 0;
@@ -1198,7 +1198,7 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	memset(itransfer, 0, alloc_size);
 	itransfer->num_iso_packets = iso_packets;
 	usbi_mutex_init(&itransfer->lock, NULL);
-	return __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	return USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 }
 
 /** \ingroup asyncio
@@ -1227,7 +1227,7 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER && transfer->buffer)
 		free(transfer->buffer);
 
-	itransfer = __LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+	itransfer = LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	usbi_mutex_destroy(&itransfer->lock);
 	free(itransfer);
 }
@@ -1246,7 +1246,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 {
 	struct libusb_context *ctx = TRANSFER_CTX(transfer);
 	struct usbi_transfer *itransfer =
-		__LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
 	int first;
 
@@ -1303,7 +1303,7 @@ out:
 int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 {
 	struct usbi_transfer *itransfer =
-		__LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
 
 	usbi_dbg("");
@@ -1360,7 +1360,7 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 			int r;
 			const struct itimerspec it = { {0, 0},
 				{ cur_tv->tv_sec, cur_tv->tv_usec * 1000 } };
-			usbi_dbg("next timeout originally %dms", __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)->timeout);
+			usbi_dbg("next timeout originally %dms", USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)->timeout);
 			r = timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &it, NULL);
 			if (r < 0)
 				return LIBUSB_ERROR_OTHER;
@@ -1393,7 +1393,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status)
 {
 	struct libusb_transfer *transfer =
-		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = TRANSFER_CTX(transfer);
 	uint8_t flags;
 	int r;
@@ -1709,7 +1709,7 @@ int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 static void handle_timeout(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer =
-		__USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	int r;
 
 	itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
@@ -2320,7 +2320,7 @@ void usbi_handle_disconnect(struct libusb_device_handle *handle)
 		usbi_mutex_lock(&HANDLE_CTX(handle)->flying_transfers_lock);
 		to_cancel = NULL;
 		list_for_each_entry(cur, &HANDLE_CTX(handle)->flying_transfers, list, struct usbi_transfer)
-			if (__USBI_TRANSFER_TO_LIBUSB_TRANSFER(cur)->dev_handle == handle) {
+			if (USBI_TRANSFER_TO_LIBUSB_TRANSFER(cur)->dev_handle == handle) {
 				to_cancel = cur;
 				break;
 			}

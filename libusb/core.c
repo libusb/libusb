@@ -1032,7 +1032,7 @@ static void do_close(struct libusb_context *ctx,
 	/* safe iteration because transfers may be being deleted */
 	list_for_each_entry_safe(itransfer, tmp, &ctx->flying_transfers, list, struct usbi_transfer) {
 		struct libusb_transfer *transfer =
-		        __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		        USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
 		if (transfer->dev_handle != dev_handle)
 			continue;

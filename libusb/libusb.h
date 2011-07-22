@@ -18,8 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef __LIBUSB_H__
-#define __LIBUSB_H__
+#ifndef LIBUSB_H
+#define LIBUSB_H
 
 #ifdef _MSC_VER
 /* on MS environments, the inline keyword is available in C++ only */

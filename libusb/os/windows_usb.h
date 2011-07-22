@@ -170,12 +170,12 @@ struct windows_device_priv {
 	unsigned char **config_descriptor;	// list of pointers to the cached config descriptors
 };
 
-static inline struct windows_device_priv *__device_priv(struct libusb_device *dev) {
+static inline struct windows_device_priv *_device_priv(struct libusb_device *dev) {
 	return (struct windows_device_priv *)dev->os_priv;
 }
 
 static inline void windows_device_priv_init(libusb_device* dev) {
-	struct windows_device_priv* p = __device_priv(dev);
+	struct windows_device_priv* p = _device_priv(dev);
 	int i;
 	p->depth = 0;
 	p->port = 0;
@@ -195,7 +195,7 @@ static inline void windows_device_priv_init(libusb_device* dev) {
 }
 
 static inline void windows_device_priv_release(libusb_device* dev) {
-	struct windows_device_priv* p = __device_priv(dev);
+	struct windows_device_priv* p = _device_priv(dev);
 	int i;
 	safe_free(p->path);
 	if ((dev->num_configurations > 0) && (p->config_descriptor != NULL)) {
@@ -222,7 +222,7 @@ struct windows_device_handle_priv {
 #endif
 };
 
-static inline struct windows_device_handle_priv *__device_handle_priv(
+static inline struct windows_device_handle_priv *_device_handle_priv(
 	struct libusb_device_handle *handle)
 {
 	return (struct windows_device_handle_priv *) handle->os_priv;
@@ -345,7 +345,7 @@ typedef RETURN_TYPE CONFIGRET;
   ((DeviceType) << 16) | ((Access) << 14) | ((Function) << 2) | (Method))
 #endif
 
-typedef enum _USB_CONNECTION_STATUS {
+typedef enum USB_CONNECTION_STATUS {
 	NoDeviceConnected,
 	DeviceConnected,
 	DeviceFailedEnumeration,
@@ -357,7 +357,7 @@ typedef enum _USB_CONNECTION_STATUS {
 	DeviceInLegacyHub
 } USB_CONNECTION_STATUS, *PUSB_CONNECTION_STATUS;
 
-typedef enum _USB_HUB_NODE {
+typedef enum USB_HUB_NODE {
 	UsbHub,
 	UsbMIParent
 } USB_HUB_NODE;
@@ -395,7 +395,7 @@ DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDA, (DEVINST, PCHAR, ULONG, ULONG)
 // Most of the structures below need to be packed
 #pragma pack(push, 1)
 
-typedef struct _USB_INTERFACE_DESCRIPTOR {
+typedef struct USB_INTERFACE_DESCRIPTOR {
   UCHAR  bLength;
   UCHAR  bDescriptorType;
   UCHAR  bInterfaceNumber;
@@ -407,7 +407,7 @@ typedef struct _USB_INTERFACE_DESCRIPTOR {
   UCHAR  iInterface;
 } USB_INTERFACE_DESCRIPTOR, *PUSB_INTERFACE_DESCRIPTOR;
 
-typedef struct _USB_CONFIGURATION_DESCRIPTOR {
+typedef struct USB_CONFIGURATION_DESCRIPTOR {
   UCHAR  bLength;
   UCHAR  bDescriptorType;
   USHORT wTotalLength;
@@ -418,7 +418,7 @@ typedef struct _USB_CONFIGURATION_DESCRIPTOR {
   UCHAR  MaxPower;
 } USB_CONFIGURATION_DESCRIPTOR, *PUSB_CONFIGURATION_DESCRIPTOR;
 
-typedef struct _USB_CONFIGURATION_DESCRIPTOR_SHORT {
+typedef struct USB_CONFIGURATION_DESCRIPTOR_SHORT {
 	struct {
 		ULONG ConnectionIndex;
 		struct {
@@ -432,7 +432,7 @@ typedef struct _USB_CONFIGURATION_DESCRIPTOR_SHORT {
 	USB_CONFIGURATION_DESCRIPTOR data;
 } USB_CONFIGURATION_DESCRIPTOR_SHORT;
 
-typedef struct _USB_ENDPOINT_DESCRIPTOR {
+typedef struct USB_ENDPOINT_DESCRIPTOR {
   UCHAR  bLength;
   UCHAR  bDescriptorType;
   UCHAR  bEndpointAddress;
@@ -441,7 +441,7 @@ typedef struct _USB_ENDPOINT_DESCRIPTOR {
   UCHAR  bInterval;
 } USB_ENDPOINT_DESCRIPTOR, *PUSB_ENDPOINT_DESCRIPTOR;
 
-typedef struct _USB_DESCRIPTOR_REQUEST {
+typedef struct USB_DESCRIPTOR_REQUEST {
 	ULONG  ConnectionIndex;
 	struct {
 		UCHAR  bmRequest;
@@ -453,7 +453,7 @@ typedef struct _USB_DESCRIPTOR_REQUEST {
 //	UCHAR  Data[0];
 } USB_DESCRIPTOR_REQUEST, *PUSB_DESCRIPTOR_REQUEST;
 
-typedef struct _USB_HUB_DESCRIPTOR {
+typedef struct USB_HUB_DESCRIPTOR {
 	UCHAR  bDescriptorLength;
 	UCHAR  bDescriptorType;
 	UCHAR  bNumberOfPorts;
@@ -463,45 +463,45 @@ typedef struct _USB_HUB_DESCRIPTOR {
 	UCHAR  bRemoveAndPowerMask[64];
 } USB_HUB_DESCRIPTOR, *PUSB_HUB_DESCRIPTOR;
 
-typedef struct _USB_ROOT_HUB_NAME {
+typedef struct USB_ROOT_HUB_NAME {
 	ULONG  ActualLength;
 	WCHAR  RootHubName[1];
 } USB_ROOT_HUB_NAME, *PUSB_ROOT_HUB_NAME;
 
-typedef struct _USB_ROOT_HUB_NAME_FIXED {
+typedef struct USB_ROOT_HUB_NAME_FIXED {
 	ULONG ActualLength;
 	WCHAR RootHubName[MAX_PATH_LENGTH];
 } USB_ROOT_HUB_NAME_FIXED;
 
-typedef struct _USB_NODE_CONNECTION_NAME {
+typedef struct USB_NODE_CONNECTION_NAME {
 	ULONG  ConnectionIndex;
 	ULONG  ActualLength;
 	WCHAR  NodeName[1];
 } USB_NODE_CONNECTION_NAME, *PUSB_NODE_CONNECTION_NAME;
 
-typedef struct _USB_NODE_CONNECTION_NAME_FIXED {
+typedef struct USB_NODE_CONNECTION_NAME_FIXED {
 	ULONG ConnectionIndex;
 	ULONG ActualLength;
 	WCHAR NodeName[MAX_PATH_LENGTH];
 } USB_NODE_CONNECTION_NAME_FIXED;
 
-typedef struct _USB_HUB_NAME_FIXED {
+typedef struct USB_HUB_NAME_FIXED {
 	union {
 		USB_ROOT_HUB_NAME_FIXED root;
 		USB_NODE_CONNECTION_NAME_FIXED node;
 	} u;
 } USB_HUB_NAME_FIXED;
 
-typedef struct _USB_HUB_INFORMATION {
+typedef struct USB_HUB_INFORMATION {
 	USB_HUB_DESCRIPTOR  HubDescriptor;
 	BOOLEAN  HubIsBusPowered;
 } USB_HUB_INFORMATION, *PUSB_HUB_INFORMATION;
 
-typedef struct _USB_MI_PARENT_INFORMATION {
+typedef struct USB_MI_PARENT_INFORMATION {
   ULONG  NumberOfInterfaces;
 } USB_MI_PARENT_INFORMATION, *PUSB_MI_PARENT_INFORMATION;
 
-typedef struct _USB_NODE_INFORMATION {
+typedef struct USB_NODE_INFORMATION {
 	USB_HUB_NODE  NodeType;
 	union {
 		USB_HUB_INFORMATION  HubInformation;
@@ -509,12 +509,12 @@ typedef struct _USB_NODE_INFORMATION {
 	} u;
 } USB_NODE_INFORMATION, *PUSB_NODE_INFORMATION;
 
-typedef struct _USB_PIPE_INFO {
+typedef struct USB_PIPE_INFO {
 	USB_ENDPOINT_DESCRIPTOR  EndpointDescriptor;
 	ULONG  ScheduleOffset;
 } USB_PIPE_INFO, *PUSB_PIPE_INFO;
 
-typedef struct _USB_NODE_CONNECTION_INFORMATION_EX {
+typedef struct USB_NODE_CONNECTION_INFORMATION_EX {
 	ULONG  ConnectionIndex;
 	USB_DEVICE_DESCRIPTOR  DeviceDescriptor;
 	UCHAR  CurrentConfigurationValue;
@@ -526,7 +526,7 @@ typedef struct _USB_NODE_CONNECTION_INFORMATION_EX {
 //	USB_PIPE_INFO  PipeList[0];
 } USB_NODE_CONNECTION_INFORMATION_EX, *PUSB_NODE_CONNECTION_INFORMATION_EX;
 
-typedef struct _USB_HUB_CAP_FLAGS {
+typedef struct USB_HUB_CAP_FLAGS {
 	ULONG HubIsHighSpeedCapable:1;
 	ULONG HubIsHighSpeed:1;
 	ULONG HubIsMultiTtCapable:1;
@@ -536,11 +536,11 @@ typedef struct _USB_HUB_CAP_FLAGS {
 	ULONG ReservedMBZ:26;
 } USB_HUB_CAP_FLAGS, *PUSB_HUB_CAP_FLAGS;
 
-typedef struct _USB_HUB_CAPABILITIES {
+typedef struct USB_HUB_CAPABILITIES {
   ULONG  HubIs2xCapable : 1;
 } USB_HUB_CAPABILITIES, *PUSB_HUB_CAPABILITIES;
 
-typedef struct _USB_HUB_CAPABILITIES_EX {
+typedef struct USB_HUB_CAPABILITIES_EX {
 	USB_HUB_CAP_FLAGS CapabilityFlags;
 } USB_HUB_CAPABILITIES_EX, *PUSB_HUB_CAPABILITIES_EX;
 
@@ -563,7 +563,7 @@ typedef struct _USB_HUB_CAPABILITIES_EX {
 #define FullSpeed               0x02
 #define HighSpeed               0x03
 
-typedef enum _USBD_PIPE_TYPE {
+typedef enum USBD_PIPE_TYPE {
 	UsbdPipeTypeControl,
 	UsbdPipeTypeIsochronous,
 	UsbdPipeTypeBulk,
