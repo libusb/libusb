@@ -980,7 +980,7 @@ static int usbfs_scan_busdir(struct libusb_context *ctx,
 	char dirpath[PATH_MAX];
 	struct dirent *entry;
 	struct discovered_devs *discdevs = *_discdevs;
-	int r = 0;
+	int r = LIBUSB_ERROR_IO;
 
 	snprintf(dirpath, PATH_MAX, "%s/%03d", usbfs_path, busnum);
 	usbi_dbg("%s", dirpath);
@@ -989,7 +989,7 @@ static int usbfs_scan_busdir(struct libusb_context *ctx,
 		usbi_err(ctx, "opendir '%s' failed, errno=%d", dirpath, errno);
 		/* FIXME: should handle valid race conditions like hub unplugged
 		 * during directory iteration - this is not an error */
-		return LIBUSB_ERROR_IO;
+		return r;
 	}
 
 	while ((entry = readdir(dir))) {
@@ -1004,13 +1004,16 @@ static int usbfs_scan_busdir(struct libusb_context *ctx,
 			continue;
 		}
 
-		r = enumerate_device(ctx, &discdevs, busnum, (uint8_t) devaddr, NULL);
-		if (r < 0)
-			goto out;
+		if (enumerate_device(ctx, &discdevs, busnum, (uint8_t) devaddr, NULL)) {
+			usbi_dbg("failed to enumerate dir entry %s", entry->d_name);
+			continue;
+		}
+
+		r = 0;
 	}
 
-	*_discdevs = discdevs;
-out:
+	if (!r)
+		*_discdevs = discdevs;
 	closedir(dir);
 	return r;
 }
@@ -1084,11 +1087,11 @@ static int sysfs_get_device_list(struct libusb_context *ctx,
 	struct discovered_devs *discdevs = *_discdevs;
 	DIR *devices = opendir(SYSFS_DEVICE_PATH);
 	struct dirent *entry;
-	int r = 0;
+	int r = LIBUSB_ERROR_IO;
 
 	if (!devices) {
 		usbi_err(ctx, "opendir devices failed errno=%d", errno);
-		return LIBUSB_ERROR_IO;
+		return r;
 	}
 
 	while ((entry = readdir(devices))) {
@@ -1098,15 +1101,18 @@ static int sysfs_get_device_list(struct libusb_context *ctx,
 				|| strchr(entry->d_name, ':'))
 			continue;
 
-		r = sysfs_scan_device(ctx, &discdevs_new, entry->d_name);
-		if (r < 0 && r != LIBUSB_ERROR_NO_DEVICE)
-			goto out;
+		if (sysfs_scan_device(ctx, &discdevs_new, entry->d_name)) {
+			usbi_dbg("failed to enumerate dir entry %s", entry->d_name);
+			continue;
+		}
+
+		r = 0;
 		discdevs = discdevs_new;
 	}
-	r = 0;
-out:
+
+	if (!r)
+		*_discdevs = discdevs;
 	closedir(devices);
-	*_discdevs = discdevs;
 	return r;
 }
 
