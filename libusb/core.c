@@ -550,10 +550,8 @@ int usbi_sanitize_device(struct libusb_device *dev)
 	if (num_configurations > USB_MAXCONFIG) {
 		usbi_err(DEVICE_CTX(dev), "too many configurations");
 		return LIBUSB_ERROR_IO;
-	} else if (num_configurations < 1) {
-		usbi_dbg("no configurations?");
-		return LIBUSB_ERROR_IO;
-	}
+	} else if (0 == num_configurations)
+		usbi_dbg("zero configurations, maybe an unauthorized device");
 
 	dev->num_configurations = num_configurations;
 	return 0;
