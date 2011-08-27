@@ -47,6 +47,10 @@
 
 #include "darwin_usb.h"
 
+/* async event thread */
+static pthread_mutex_t libusb_darwin_at_mutex;
+static pthread_cond_t  libusb_darwin_at_cond;
+
 static CFRunLoopRef libusb_darwin_acfl = NULL; /* async cf loop */
 static int initCount = 0;
 
@@ -342,10 +346,15 @@ static void *event_thread_main (void *arg0) {
   /* arm notifiers */
   darwin_clear_iterator (libusb_rem_device_iterator);
 
+  usbi_info (ctx, "thread ready to receive events");
+
   /* let the main thread know about the async runloop */
   libusb_darwin_acfl = CFRunLoopGetCurrent ();
 
-  usbi_info (ctx, "thread ready to receive events");
+  /* signal the main thread */
+  pthread_mutex_lock (&libusb_darwin_at_mutex);
+  pthread_cond_signal (&libusb_darwin_at_cond);
+  pthread_mutex_unlock (&libusb_darwin_at_mutex);
 
   /* run the runloop */
   CFRunLoopRun();
@@ -364,13 +373,16 @@ static void *event_thread_main (void *arg0) {
 }
 
 static int darwin_init(struct libusb_context *ctx) {
-  IOReturn kresult;
-
   if (!(initCount++)) {
+    pthread_mutex_init (&libusb_darwin_at_mutex, NULL);
+    pthread_cond_init (&libusb_darwin_at_cond, NULL);
+
     pthread_create (&libusb_darwin_at, NULL, event_thread_main, (void *)ctx);
 
+    pthread_mutex_lock (&libusb_darwin_at_mutex);
     while (!libusb_darwin_acfl)
-      usleep (10);
+      pthread_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
+    pthread_mutex_unlock (&libusb_darwin_at_mutex);
   }
 
   return 0;
