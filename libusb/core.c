@@ -1068,6 +1068,51 @@ out:
 static void do_close(struct libusb_context *ctx,
 	struct libusb_device_handle *dev_handle)
 {
+	struct usbi_transfer *itransfer;
+	struct usbi_transfer *tmp;
+
+	libusb_lock_events(ctx);
+
+	/* remove any transfers in flight that are for this device */
+	usbi_mutex_lock(&ctx->flying_transfers_lock);
+
+	/* safe iteration because transfers may be being deleted */
+	list_for_each_entry_safe(itransfer, tmp, &ctx->flying_transfers, list, struct usbi_transfer) {
+		struct libusb_transfer *transfer =
+		        __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+
+		if (transfer->dev_handle != dev_handle)
+			continue;
+
+		if (!(itransfer->flags & USBI_TRANSFER_DEVICE_DISAPPEARED)) {
+			usbi_err(ctx, "Device handle closed while transfer was still being processed, but the device is still connected as far as we know");
+
+			if (itransfer->flags & USBI_TRANSFER_CANCELLING)
+				usbi_warn(ctx, "A cancellation for an in-flight transfer hasn't completed but closing the device handle");
+			else
+				usbi_err(ctx, "A cancellation hasn't even been scheduled on the transfer for which the device is closing");
+		}
+
+		/* remove from the list of in-flight transfers and make sure
+		 * we don't accidentally use the device handle in the future
+		 * (or that such accesses will be easily caught and identified as a crash)
+		 */
+		usbi_mutex_lock(&itransfer->lock);
+		list_del(&itransfer->list);
+		transfer->dev_handle = NULL;
+		usbi_mutex_unlock(&itransfer->lock);
+
+		/* it is up to the user to free up the actual transfer struct.  this is
+		 * just making sure that we don't attempt to process the transfer after
+		 * the device handle is invalid
+		 */
+		usbi_dbg("Removed transfer %p from the in-flight list because device handle %p closed",
+			 transfer, dev_handle);
+	}
+	usbi_mutex_unlock(&ctx->flying_transfers_lock);
+
+	libusb_unlock_events(ctx);
+
 	usbi_mutex_lock(&ctx->open_devs_lock);
 	list_del(&dev_handle->list);
 	usbi_mutex_unlock(&ctx->open_devs_lock);
