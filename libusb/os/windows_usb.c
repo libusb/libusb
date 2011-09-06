@@ -1079,11 +1079,12 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		}
 		dev->device_address = (uint8_t)conn_info.DeviceAddress;
 		switch (conn_info.Speed) {
-		case 0: dev->speed = LIBUSB_SPEED_LOW;
-		case 1: dev->speed = LIBUSB_SPEED_FULL;
-		case 2: dev->speed = LIBUSB_SPEED_HIGH;
+		case 0: dev->speed = LIBUSB_SPEED_LOW; break;
+		case 1: dev->speed = LIBUSB_SPEED_FULL; break;
+		case 2: dev->speed = LIBUSB_SPEED_HIGH; break;
 		default:
 			usbi_warn(ctx, "Got unknown device speed %d", conn_info.Speed);
+			break;
 		}		
 		memcpy(&priv->dev_descriptor, &(conn_info.DeviceDescriptor), sizeof(USB_DEVICE_DESCRIPTOR));
 		dev->num_configurations = priv->dev_descriptor.bNumConfigurations;

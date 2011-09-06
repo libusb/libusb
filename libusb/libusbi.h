@@ -336,7 +336,7 @@ enum usbi_transfer_flags {
 	USBI_TRANSFER_TIMED_OUT = 1 << 0,
 
 	/* Set by backend submit_transfer() if the OS handles timeout */
-	USBI_TRANSFER_OS_HANDLES_TIMEOUT = 1 << 1
+	USBI_TRANSFER_OS_HANDLES_TIMEOUT = 1 << 1,
 
 	/* Cancellation was requested via libusb_cancel_transfer() */
 	USBI_TRANSFER_CANCELLING = 1 << 2,
