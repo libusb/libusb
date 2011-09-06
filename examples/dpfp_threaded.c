@@ -91,7 +91,7 @@ static void *poll_thread_main(void *arg)
 	}
 
 	printf("poll thread shutting down\n");
-	pthread_exit(NULL);
+	return NULL;
 }
 
 static int find_dpfp_device(void)
