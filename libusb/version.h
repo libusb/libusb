@@ -9,5 +9,5 @@
 #define LIBUSB_MICRO 8
 #endif
 #ifndef LIBUSB_NANO
-#define LIBUSB_NANO 10341
+#define LIBUSB_NANO 10342
 #endif
