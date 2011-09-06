@@ -375,6 +375,41 @@ static int __open_sysfs_attr(struct libusb_device *dev, const char *attr)
 	return fd;
 }
 
+/* Note only suitable for attributes which always read >= 0, < 0 is error */
+static int __read_sysfs_attr(struct libusb_context *ctx,
+	const char *devname, const char *attr)
+{
+	char filename[PATH_MAX];
+	FILE *f;
+	int r, value;
+
+	snprintf(filename, PATH_MAX, "%s/%s/%s", SYSFS_DEVICE_PATH,
+		 devname, attr);
+	f = fopen(filename, "r");
+	if (f == NULL) {
+		if (errno == ENOENT) {
+			/* File doesn't exist. Assume the device has been
+			   disconnected (see trac ticket #70). */
+			return LIBUSB_ERROR_NO_DEVICE;
+		}
+		usbi_err(ctx, "open %s failed errno=%d", filename, errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	r = fscanf(f, "%d", &value);
+	fclose(f);
+	if (r != 1) {
+		usbi_err(ctx, "fscanf %s returned %d, errno=%d", attr, r, errno);
+		return LIBUSB_ERROR_NO_DEVICE; /* For unplug race (trac #70) */
+	}
+	if (value < 0) {
+		usbi_err(ctx, "%s contains a negative value", filename);
+		return LIBUSB_ERROR_IO;
+	}
+
+	return value;
+}
+
 static int sysfs_get_device_descriptor(struct libusb_device *dev,
 	unsigned char *buffer)
 {
