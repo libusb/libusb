@@ -150,8 +150,32 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
   return -1;
 }
 
-static int usb_setup_device_iterator (io_iterator_t *deviceIterator) {
-  return IOServiceGetMatchingServices(libusb_darwin_mp, IOServiceMatching(kIOUSBDeviceClassName), deviceIterator);
+static int usb_setup_device_iterator (io_iterator_t *deviceIterator, long location) {
+  CFMutableDictionaryRef matchingDict = IOServiceMatching(kIOUSBDeviceClassName);
+
+  if (!matchingDict)
+    return kIOReturnError;
+
+  if (location) {
+    CFMutableDictionaryRef propertyMatchDict = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
+                                                                         &kCFTypeDictionaryKeyCallBacks,
+                                                                         &kCFTypeDictionaryValueCallBacks);
+
+    if (propertyMatchDict) {
+      CFTypeRef locationCF = CFNumberCreate (NULL, kCFNumberLongType, &location);
+
+      CFDictionarySetValue (propertyMatchDict, CFSTR(kUSBDevicePropertyLocationID), locationCF);
+      /* release our reference to the CFNumber (CFDictionarySetValue retains it) */
+      CFRelease (locationCF);
+
+      CFDictionarySetValue (matchingDict, CFSTR(kIOPropertyMatchKey), propertyMatchDict);
+      /* release out reference to the CFMutableDictionaryRef (CFDictionarySetValue retains it) */
+      CFRelease (propertyMatchDict);
+    }
+    /* else we can still proceed as long as the caller accounts for the possibility of other devices in the iterator */
+  }
+
+  return IOServiceGetMatchingServices(libusb_darwin_mp, matchingDict, deviceIterator);
 }
 
 static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 *locationp) {
@@ -197,7 +221,7 @@ static kern_return_t darwin_get_device (uint32_t dev_location, usb_device_t ***d
   UInt32        location;
   io_iterator_t deviceIterator;
 
-  kresult = usb_setup_device_iterator (&deviceIterator);
+  kresult = usb_setup_device_iterator (&deviceIterator, dev_location);
   if (kresult)
     return kresult;
 
@@ -733,7 +757,7 @@ static int darwin_get_device_list(struct libusb_context *ctx, struct discovered_
   if (!libusb_darwin_mp)
     return LIBUSB_ERROR_INVALID_PARAM;
 
-  kresult = usb_setup_device_iterator (&deviceIterator);
+  kresult = usb_setup_device_iterator (&deviceIterator, 0);
   if (kresult != kIOReturnSuccess)
     return darwin_to_libusb (kresult);
 
