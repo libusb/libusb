@@ -34,8 +34,13 @@
 #include <mach/clock.h>
 #include <mach/clock_types.h>
 #include <mach/mach_host.h>
-
 #include <mach/mach_port.h>
+
+#include <AvailabilityMacros.h>
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
+  #include <objc/objc-auto.h>
+#endif
+
 #include <IOKit/IOCFBundle.h>
 #include <IOKit/usb/IOUSBLib.h>
 #include <IOKit/IOCFPlugIn.h>
@@ -273,6 +278,14 @@ static void *event_thread_main (void *arg0) {
   IOReturn kresult;
   struct libusb_context *ctx = (struct libusb_context *)arg0;
   CFRunLoopRef runloop;
+
+  /* Tell the Objective-C garbage collector about this thread.
+     This is required because, unlike NSThreads, pthreads are
+     not automatically registered. Although we don't use
+     Objective-C, we use CoreFoundation, which does. */
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
+  objc_registerThreadWithCollector();
+#endif
 
   /* hotplug (device removal) source */
   CFRunLoopSourceRef     libusb_notification_cfsource;

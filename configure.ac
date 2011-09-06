@@ -60,6 +60,7 @@ case $host in
 	AC_MSG_RESULT([Darwin/Mac OS X])
 	backend="darwin"
 	threads="posix"
+	LIBS="${LIBS} -lobjc"
 	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation"
 	LTLDFLAGS="${LTLDFLAGS} -Wl,-prebind"
 	AC_CHECK_HEADERS([poll.h])
