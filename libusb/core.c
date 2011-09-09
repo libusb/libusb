@@ -40,8 +40,7 @@ const struct usbi_os_backend * const usbi_backend = &windows_backend;
 #endif
 
 struct libusb_context *usbi_default_context = NULL;
-const struct libusb_version libusb_version_internal = { LIBUSB_VERSION_MAJOR,
-LIBUSB_VERSION_MINOR, LIBUSB_VERSION_MICRO, LIBUSB_VERSION_NANO};
+const struct libusb_version libusb_version_internal = { LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO};
 static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 

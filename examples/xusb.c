@@ -535,7 +535,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
 	int iface, nb_ifaces;
-#ifdef OS_LINUX
+#if defined(__linux)
 	// Attaching/detaching the kernel driver is only relevant for Linux
 	int iface_detached = -1;
 #endif
@@ -599,11 +599,15 @@ int test_device(uint16_t vid, uint16_t pid)
 			for (k=0; k<conf_desc->usb_interface[i].altsetting[j].bNumEndpoints; k++) {
 				endpoint = &conf_desc->usb_interface[i].altsetting[j].endpoint[k];
 				printf("       endpoint[%d].address: %02X\n", k, endpoint->bEndpointAddress);
-				// Use the last IN/OUT endpoints found as default for testing
-				if (endpoint->bEndpointAddress & LIBUSB_ENDPOINT_IN) {
-					endpoint_in = endpoint->bEndpointAddress;
-				} else {
-					endpoint_out = endpoint->bEndpointAddress;
+				// Use the first bulk IN/OUT endpoints found as default for testing
+				if ((endpoint->bmAttributes & LIBUSB_TRANSFER_TYPE_MASK) == LIBUSB_TRANSFER_TYPE_BULK) {
+					if (endpoint->bEndpointAddress & LIBUSB_ENDPOINT_IN) {
+						if (!endpoint_in)
+							endpoint_in = endpoint->bEndpointAddress;
+					} else {
+						if (!endpoint_out)
+							endpoint_out = endpoint->bEndpointAddress;
+					}
 				}
 				printf("           max packet size: %04X\n", endpoint->wMaxPacketSize);
 				printf("          polling interval: %02X\n", endpoint->bInterval);
@@ -616,7 +620,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	{
 		printf("\nClaiming interface %d...\n", iface);
 		r = libusb_claim_interface(handle, iface);
-#ifdef OS_LINUX
+#if defined(__linux)
 		if ((r != LIBUSB_SUCCESS) && (iface == 0)) {
 			// Maybe we need to detach the driver
 			perr("   Failed. Trying to detach driver...\n");
@@ -663,7 +667,7 @@ int test_device(uint16_t vid, uint16_t pid)
 		libusb_release_interface(handle, iface);
 	}
 
-#ifdef OS_LINUX
+#if defined(__linux)
 	if (iface_detached >= 0) {
 		printf("Re-attaching kernel driver...\n");
 		libusb_attach_kernel_driver(handle, iface_detached);
@@ -791,8 +795,8 @@ int main(int argc, char** argv)
 	if (r < 0)
 		return r;
 
-	// Warnings = 2, Debug = 4
-	libusb_set_debug(NULL, debug_mode?4:2);
+	// Info = 3, Debug = 4
+	libusb_set_debug(NULL, debug_mode?4:3);
 
 	test_device(VID, PID);
 

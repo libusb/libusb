@@ -33,4 +33,4 @@ SOURCES=..\core.c \
 	threads_windows.c \
 	poll_windows.c \
 	windows_usb.c \
-	libusb-1.0.rc
+	..\libusb-1.0.rc

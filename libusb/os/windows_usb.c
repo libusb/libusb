@@ -109,7 +109,7 @@ static int composite_copy_transfer_data(struct usbi_transfer *itransfer, uint32_
 static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
 #define INIT_INTERLOCKEDEXCHANGE if (pInterlockedExchange == NULL) {		\
 	pInterlockedExchange = (LONG (WINAPI *)(LONG volatile *, LONG))			\
-		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedExchange");	\
+		GetProcAddress(GetModuleHandleA("KERNEL32"), "InterlockedExchange");\
 	if (pInterlockedExchange == NULL) {										\
 		usbi_err(NULL, "InterlockedExchange is unavailable");				\
 		return 1;															\
@@ -118,7 +118,7 @@ static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
 static LONG (WINAPI *pInterlockedIncrement)(LONG volatile *) = NULL;
 #define INIT_INTERLOCKEDINCREMENT if (pInterlockedIncrement == NULL) {		\
 	pInterlockedIncrement = (LONG (WINAPI *)(LONG volatile *))				\
-		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedIncrement");\
+		GetProcAddress(GetModuleHandleA("KERNEL32"), "InterlockedIncrement");\
 	if (pInterlockedIncrement == NULL) {									\
 		usbi_err(NULL, "IInterlockedIncrement is unavailable");				\
 		return LIBUSB_ERROR_NOT_FOUND;										\
@@ -276,18 +276,18 @@ static int init_dlls(void)
  * Parameters:
  * dev_info: a pointer to a dev_info list
  * dev_info_data: a pointer to an SP_DEVINFO_DATA to be filled (or NULL if not needed)
- * guid: the GUID for which to retrieve interface details
+ * usb_class: the generic USB class for which to retrieve interface details
  * index: zero based index of the interface in the device info list
  *
  * Note: it is the responsibility of the caller to free the DEVICE_INTERFACE_DETAIL_DATA
  * structure returned and call this function repeatedly using the same guid (with an
  * incremented index starting at zero) until all interfaces have been returned.
  */
-bool get_devinfo_data(struct libusb_context *ctx,
-	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, unsigned _index)
+static bool get_devinfo_data(struct libusb_context *ctx,
+	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, char* usb_class, unsigned _index)
 {
 	if (_index <= 0) {
-		*dev_info = pSetupDiGetClassDevsA(NULL, "USB", NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
+		*dev_info = pSetupDiGetClassDevsA(NULL, usb_class, NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
 		if (*dev_info == INVALID_HANDLE_VALUE) {
 			return false;
 		}
@@ -319,7 +319,7 @@ bool get_devinfo_data(struct libusb_context *ctx,
  * structure returned and call this function repeatedly using the same guid (with an
  * incremented index starting at zero) until all interfaces have been returned.
  */
-SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_context *ctx,
+static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID* guid, unsigned _index)
 {
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
@@ -388,6 +388,173 @@ err_exit:
 	pSetupDiDestroyDeviceInfoList(*dev_info);
 	*dev_info = INVALID_HANDLE_VALUE;
 	return NULL;
+}
+
+/* Hash table functions - modified From glibc 2.3.2:
+   [Aho,Sethi,Ullman] Compilers: Principles, Techniques and Tools, 1986
+   [Knuth]            The Art of Computer Programming, part 3 (6.4)  */
+typedef struct htab_entry {
+	unsigned long used;
+	char* str;
+} htab_entry;
+htab_entry* htab_table = NULL;
+usbi_mutex_t htab_write_mutex = NULL;
+unsigned long htab_size, htab_filled;
+
+/* For the used double hash method the table size has to be a prime. To
+   correct the user given table size we need a prime test.  This trivial
+   algorithm is adequate because the code is called only during init and
+   the number is likely to be small  */
+static int isprime(unsigned long number)
+{
+	// no even number will be passed
+	unsigned int divider = 3;
+
+	while((divider * divider < number) && (number % divider != 0))
+		divider += 2;
+
+	return (number % divider != 0);
+}
+
+/* Before using the hash table we must allocate memory for it.
+   We allocate one element more as the found prime number says.
+   This is done for more effective indexing as explained in the
+   comment for the hash function.  */
+static int htab_create(struct libusb_context *ctx, unsigned long nel)
+{
+	if (htab_table != NULL) {
+		usbi_err(ctx, "hash table already allocated");
+	}
+
+	// Create a mutex
+	usbi_mutex_init(&htab_write_mutex, NULL);
+
+	// Change nel to the first prime number not smaller as nel.
+	nel |= 1;
+	while(!isprime(nel))
+		nel += 2;
+
+	htab_size = nel;
+	usbi_dbg("using %d entries hash table", nel);
+	htab_filled = 0;
+
+	// allocate memory and zero out.
+	htab_table = (htab_entry*)calloc(htab_size + 1, sizeof(htab_entry));
+	if (htab_table == NULL) {
+		usbi_err(ctx, "could not allocate space for hash table");
+		return 0;
+	}
+
+	return 1;
+}
+
+/* After using the hash table it has to be destroyed.  */
+static void htab_destroy(void)
+{
+	size_t i;
+	if (htab_table == NULL) {
+		return;
+	}
+
+	for (i=0; i<htab_size; i++) {
+		if (htab_table[i].used) {
+			safe_free(htab_table[i].str);
+		}
+	}
+	usbi_mutex_destroy(&htab_write_mutex);
+	safe_free(htab_table);
+}
+
+/* This is the search function. It uses double hashing with open addressing.
+   We use an trick to speed up the lookup. The table is created with one
+   more element available. This enables us to use the index zero special.
+   This index will never be used because we store the first hash index in
+   the field used where zero means not used. Every other value means used.
+   The used field can be used as a first fast comparison for equality of
+   the stored and the parameter value. This helps to prevent unnecessary
+   expensive calls of strcmp.  */
+static unsigned long htab_hash(char* str)
+{
+	unsigned long hval, hval2;
+	unsigned long idx;
+	unsigned long r = 5381;
+	int c;
+	char* sz = str;
+
+	// Compute main hash value (algorithm suggested by Nokia)
+	while ((c = *sz++))
+		r = ((r << 5) + r) + c;
+	if (r == 0)
+		++r;
+
+	// compute table hash: simply take the modulus
+	hval = r % htab_size;
+	if (hval == 0)
+		++hval;
+
+	// Try the first index
+	idx = hval;
+
+	if (htab_table[idx].used) {
+		if ( (htab_table[idx].used == hval)
+		  && (safe_strcmp(str, htab_table[idx].str) == 0) ) {
+			// existing hash
+			return idx;
+		}
+		usbi_dbg("hash collision ('%s' vs '%s')", str, htab_table[idx].str);
+
+		// Second hash function, as suggested in [Knuth]
+		hval2 = 1 + hval % (htab_size - 2);
+
+		do {
+			// Because size is prime this guarantees to step through all available indexes
+			if (idx <= hval2) {
+				idx = htab_size + idx - hval2;
+			} else {
+				idx -= hval2;
+			}
+
+			// If we visited all entries leave the loop unsuccessfully
+			if (idx == hval) {
+				break;
+			}
+
+			// If entry is found use it.
+			if ( (htab_table[idx].used == hval)
+			  && (safe_strcmp(str, htab_table[idx].str) == 0) ) {
+				return idx;
+			}
+		}
+		while (htab_table[idx].used);
+	}
+
+	// Not found => New entry
+
+	// If the table is full return an error
+	if (htab_filled >= htab_size) {
+		usbi_err(NULL, "hash table is full (%d entries)", htab_size);
+		return 0;
+	}
+
+	// Concurrent threads might be storing the same entry at the same time
+	// (eg. "simultaneous" enums from different threads) => use a mutex
+	usbi_mutex_lock(&htab_write_mutex);
+	// Just free any previously allocated string (which should be the same as
+	// new one). The possibility of concurrent threads storing a collision
+	// string (same hash, different string) at the same time is extremely low
+	safe_free(htab_table[idx].str);
+	htab_table[idx].used = hval;
+	htab_table[idx].str = malloc(safe_strlen(str)+1);
+	if (htab_table[idx].str == NULL) {
+		usbi_err(NULL, "could not duplicate string for hash table");
+		usbi_mutex_unlock(&htab_write_mutex);
+		return 0;
+	}
+	memcpy(htab_table[idx].str, str, safe_strlen(str)+1);
+	++htab_filled;
+	usbi_mutex_unlock(&htab_write_mutex);
+
+	return idx;
 }
 
 /*
@@ -468,7 +635,7 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int
 }
 
 // Lookup for a match in the list of API driver names
-bool is_api_driver(char* driver, uint8_t api)
+static bool is_api_driver(char* driver, uint8_t api)
 {
 	uint8_t i;
 	const char sep_str[2] = {LIST_SEPARATOR, 0};
@@ -1068,7 +1235,6 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		if (conn_info.DeviceAddress > UINT8_MAX) {
 			usbi_err(ctx, "program assertion failed: device address overflow");
 		}
-		dev->device_address = (uint8_t)conn_info.DeviceAddress;
 	} else {
 		dev->device_address = UINT8_MAX;	// Hubs from HCD have a devaddr of 255
 		force_hcd_device_descriptor(dev);
@@ -1183,7 +1349,8 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs)
 {
 	struct discovered_devs *discdevs = *_discdevs;
-	HDEVINFO dev_info;
+	HDEVINFO dev_info = { 0 };
+	char* usb_class[2] = {"USB", "NUSB3"}; 
 	SP_DEVINFO_DATA dev_info_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 #define MAX_ENUM_GUIDS 64
@@ -1193,6 +1360,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 #define GEN_PASS 2
 #define DEV_PASS 3
 	int r = LIBUSB_SUCCESS;
+	int class_index = 0;
 	unsigned int nb_guids, pass, i, j, ancestor;
 	char path[MAX_PATH_LENGTH];
 	char strbuf[MAX_PATH_LENGTH];
@@ -1202,6 +1370,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	char* dev_id_path = NULL;
 	unsigned long session_id;
 	DWORD size, reg_type, port_nr, install_state;
+	BOOL b = FALSE;
 	HKEY key;
 	WCHAR guid_string_w[MAX_GUID_STRING_LENGTH];
 	GUID* if_guid;
@@ -1283,9 +1452,14 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					}
 				}
 			} else {
-				if (!get_devinfo_data(ctx, &dev_info, &dev_info_data, i)) {
-					break;
+				// Workaround for a Nec/Renesas USB 3.0 driver bug where root hubs are
+				// being listed under the "NUSB3" PnP Symbolic Name rather than "USB"
+				while ( (class_index < 2) && 
+					    (!(b = get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i))) ) {
+						class_index++;
+						i = 0;
 				}
+				if (!b) break;
 			}
 
 			// Read the Device ID path. This is what we'll use as UID
@@ -1438,6 +1612,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				priv->depth = UINT8_MAX;	// Overflow to 0 for HCD Hubs
 				priv->path = dev_interface_path; dev_interface_path = NULL;
 				break;
+			case HUB_PASS:
 			case DEV_PASS:
 				// If the device has already been setup, don't do it again
 				if (priv->path != NULL)
@@ -1447,6 +1622,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				priv->apib = &usb_api_backend[api];
 				switch(api) {
 				case USB_API_COMPOSITE:
+				case USB_API_HUB:
 					break;
 				default:
 					// For other devices, the first interface is the same as the device
@@ -1461,10 +1637,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					}
 					break;
 				}
-				break;
-			case HUB_PASS:
-				priv->apib = &usb_api_backend[api];
-				priv->path = dev_interface_path; dev_interface_path = NULL;
 				break;
 			case GEN_PASS:
 				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_id_path, dev_info_data.DevInst);
@@ -1725,7 +1897,6 @@ static int windows_release_interface(struct libusb_device_handle *dev_handle, in
 {
 	struct windows_device_priv *priv = __device_priv(dev_handle->dev);
 
-	windows_set_interface_altsetting(dev_handle, iface, 0);
 	return priv->apib->release_interface(dev_handle, iface);
 }
 
@@ -2222,7 +2393,7 @@ static int unsupported_copy_transfer_data(struct usbi_transfer *itransfer, uint3
 }
 
 // These names must be uppercase
-const char* hub_driver_names[] = {"USBHUB"};
+const char* hub_driver_names[] = {"USBHUB", "NUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3"};
 const char* composite_driver_names[] = {"USBCCGP"};
 const char* winusb_driver_names[] = {"WINUSB"};
 const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
@@ -2462,7 +2633,6 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	// or if it's the first WinUSB interface, we get a handle through WinUsb_Initialize().
 	if ((is_using_usbccgp) || (iface == 0)) {
 		// composite device (independent interfaces) or interface 0
-		winusb_handle = handle_priv->interface_handle[iface].api_handle;
 		file_handle = handle_priv->interface_handle[iface].dev_handle;
 		if ((file_handle == 0) || (file_handle == INVALID_HANDLE_VALUE)) {
 			return LIBUSB_ERROR_NOT_FOUND;

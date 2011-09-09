@@ -85,7 +85,7 @@ extern int _snprintf(char *buffer, size_t count, const char *format, ...);
 static LONG (WINAPI *pInterlockedExchange)(LONG volatile *, LONG) = NULL;
 #define INIT_INTERLOCKEDEXCHANGE if (pInterlockedExchange == NULL) {		\
 	pInterlockedExchange = (LONG (WINAPI *)(LONG volatile *, LONG))			\
-		GetProcAddress(GetModuleHandle("KERNEL32"), "InterlockedExchange");	\
+		GetProcAddress(GetModuleHandleA("KERNEL32"), "InterlockedExchange");\
 	if (pInterlockedExchange == NULL) {										\
 		usbi_err(NULL, "InterlockedExchange is unavailable");				\
 		return;																\
