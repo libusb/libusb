@@ -155,11 +155,15 @@ enum libusb_class_code {
 	/** Human Interface Device class */
 	LIBUSB_CLASS_HID = 3,
 
-	/** Printer dclass */
+	/** Physical */
+	LIBUSB_CLASS_PHYSICAL = 5,
+
+	/** Printer class */
 	LIBUSB_CLASS_PRINTER = 7,
 
-	/** Picture transfer protocol class */
-	LIBUSB_CLASS_PTP = 6,
+	/** Image class */
+	LIBUSB_CLASS_PTP = 6, /* legacy name from libusb-0.1 usb.h */
+	LIBUSB_CLASS_IMAGE = 6,
 
 	/** Mass storage class */
 	LIBUSB_CLASS_MASS_STORAGE = 8,
@@ -169,6 +173,21 @@ enum libusb_class_code {
 
 	/** Data class */
 	LIBUSB_CLASS_DATA = 10,
+
+	/** Smart Card */
+	LIBUSB_CLASS_SMART_CARD = 0x0b,
+
+	/** Content Security */
+	LIBUSB_CLASS_CONTENT_SECURITY = 0x0d,
+
+	/** Video */
+	LIBUSB_CLASS_VIDEO = 0x0e,
+
+	/** Personal Healthcare */
+	LIBUSB_CLASS_PERSONAL_HEALTHCARE = 0x0f,
+
+	/** Diagnostic Device */
+	LIBUSB_CLASS_DIAGNOSTIC_DEVICE = 0xdc,
 
 	/** Wireless class */
 	LIBUSB_CLASS_WIRELESS = 0xe0,
@@ -675,6 +694,25 @@ typedef struct libusb_device libusb_device;
  */
 typedef struct libusb_device_handle libusb_device_handle;
 
+/** \ingroup dev
+ * Speed codes. Indicates the speed at which the device is operating.
+ */
+enum libusb_speed {
+	/** The OS doesn't report or know the device speed. */
+	LIBUSB_SPEED_UNKNOWN = 0,
+
+	/** The device is operating at low speed (1.5MBit/s). */
+	LIBUSB_SPEED_LOW = 1,
+
+	/** The device is operating at full speed (12MBit/s). */
+	LIBUSB_SPEED_FULL = 2,
+
+	/** The device is operating at high speed (480MBit/s). */
+	LIBUSB_SPEED_HIGH = 3,
+
+	/** The device is operating at super speed (5000MBit/s). */
+	LIBUSB_SPEED_SUPER = 4,
+};
 
 /** \ingroup misc
  * Error codes. Most libusb functions return 0 on success or one of these
@@ -900,6 +938,7 @@ uint8_t LIBUSB_CALL libusb_get_port_number(libusb_device *dev);
 libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev);
 int LIBUSB_CALL libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t* path, uint8_t path_length);
 uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *dev);
+enum libusb_speed LIBUSB_CALL libusb_get_device_speed(libusb_device *dev);
 int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint);
 int LIBUSB_CALL libusb_get_max_iso_packet_size(libusb_device *dev,

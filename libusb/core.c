@@ -533,6 +533,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	dev->ctx = ctx;
 	dev->refcnt = 1;
 	dev->session_data = session_id;
+	dev->speed = LIBUSB_SPEED_UNKNOWN;
 	memset(&dev->os_priv, 0, priv_size);
 
 	usbi_mutex_lock(&ctx->usb_devs_lock);
@@ -773,6 +774,17 @@ uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 unsigned long API_EXPORTED libusb_get_session_id(libusb_device *dev)
 {
 	return dev->session_data;
+}
+
+/** \ingroup dev
+ * Get the negotiated speed of the device.
+ * \param dev a device
+ * \returns the device speed or LIBUSB_SPEED_UNKNOWN if the OS doesn't know or
+ * support returning the negotiated speed.
+ */
+enum libusb_speed API_EXPORTED libusb_get_device_speed(libusb_device *dev)
+{
+	return dev->speed;
 }
 
 static const struct libusb_endpoint_descriptor *find_endpoint(
@@ -1108,6 +1120,51 @@ out:
 static void do_close(struct libusb_context *ctx,
 	struct libusb_device_handle *dev_handle)
 {
+	struct usbi_transfer *itransfer;
+	struct usbi_transfer *tmp;
+
+	libusb_lock_events(ctx);
+
+	/* remove any transfers in flight that are for this device */
+	usbi_mutex_lock(&ctx->flying_transfers_lock);
+
+	/* safe iteration because transfers may be being deleted */
+	list_for_each_entry_safe(itransfer, tmp, &ctx->flying_transfers, list, struct usbi_transfer) {
+		struct libusb_transfer *transfer =
+		        __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+
+		if (transfer->dev_handle != dev_handle)
+			continue;
+
+		if (!(itransfer->flags & USBI_TRANSFER_DEVICE_DISAPPEARED)) {
+			usbi_err(ctx, "Device handle closed while transfer was still being processed, but the device is still connected as far as we know");
+
+			if (itransfer->flags & USBI_TRANSFER_CANCELLING)
+				usbi_warn(ctx, "A cancellation for an in-flight transfer hasn't completed but closing the device handle");
+			else
+				usbi_err(ctx, "A cancellation hasn't even been scheduled on the transfer for which the device is closing");
+		}
+
+		/* remove from the list of in-flight transfers and make sure
+		 * we don't accidentally use the device handle in the future
+		 * (or that such accesses will be easily caught and identified as a crash)
+		 */
+		usbi_mutex_lock(&itransfer->lock);
+		list_del(&itransfer->list);
+		transfer->dev_handle = NULL;
+		usbi_mutex_unlock(&itransfer->lock);
+
+		/* it is up to the user to free up the actual transfer struct.  this is
+		 * just making sure that we don't attempt to process the transfer after
+		 * the device handle is invalid
+		 */
+		usbi_dbg("Removed transfer %p from the in-flight list because device handle %p closed",
+			 transfer, dev_handle);
+	}
+	usbi_mutex_unlock(&ctx->flying_transfers_lock);
+
+	libusb_unlock_events(ctx);
+
 	usbi_mutex_lock(&ctx->open_devs_lock);
 	list_del(&dev_handle->list);
 	usbi_mutex_unlock(&ctx->open_devs_lock);
@@ -1322,7 +1379,7 @@ int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev,
 	int r = 0;
 
 	usbi_dbg("interface %d", interface_number);
-	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
+	if (interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	usbi_mutex_lock(&dev->lock);
@@ -1359,7 +1416,7 @@ int API_EXPORTED libusb_release_interface(libusb_device_handle *dev,
 	int r;
 
 	usbi_dbg("interface %d", interface_number);
-	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
+	if (interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	usbi_mutex_lock(&dev->lock);
@@ -1403,7 +1460,7 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev,
 {
 	usbi_dbg("interface %d altsetting %d",
 		interface_number, alternate_setting);
-	if (interface_number >= sizeof(dev->claimed_interfaces) * 8)
+	if (interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	usbi_mutex_lock(&dev->lock);

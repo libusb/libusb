@@ -70,7 +70,7 @@ extern char *_strdup(const char *strSource);
 #define safe_sprintf _snprintf
 #define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
 #define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
-inline void upperize(char* str) {
+static inline void upperize(char* str) {
 	size_t i;
 	if (str == NULL) return;
 	for (i=0; i<safe_strlen(str); i++)
@@ -327,10 +327,12 @@ typedef RETURN_TYPE CONFIGRET;
 #define USB_REQUEST_SYNC_FRAME                  LIBUSB_REQUEST_SYNCH_FRAME
 
 #define USB_GET_NODE_INFORMATION                258
-#define USB_GET_NODE_CONNECTION_INFORMATION     259
 #define USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION 260
 #define USB_GET_NODE_CONNECTION_NAME            261
 #define USB_GET_HUB_CAPABILITIES                271
+#if !defined(USB_GET_NODE_CONNECTION_INFORMATION_EX)
+#define USB_GET_NODE_CONNECTION_INFORMATION_EX  274
+#endif
 #if !defined(USB_GET_HUB_CAPABILITIES_EX)
 #define USB_GET_HUB_CAPABILITIES_EX             276
 #endif
@@ -391,8 +393,8 @@ DLL_DECLARE(WINAPI, CONFIGRET, CM_Get_Device_IDA, (DEVINST, PCHAR, ULONG, ULONG)
 #define IOCTL_USB_GET_NODE_INFORMATION \
   CTL_CODE(FILE_DEVICE_USB, USB_GET_NODE_INFORMATION, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
-#define IOCTL_USB_GET_NODE_CONNECTION_INFORMATION \
-  CTL_CODE(FILE_DEVICE_USB, USB_GET_NODE_CONNECTION_INFORMATION, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX \
+  CTL_CODE(FILE_DEVICE_USB, USB_GET_NODE_CONNECTION_INFORMATION_EX, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 #define IOCTL_USB_GET_NODE_CONNECTION_ATTRIBUTES \
   CTL_CODE(FILE_DEVICE_USB, USB_GET_NODE_CONNECTION_ATTRIBUTES, METHOD_BUFFERED, FILE_ANY_ACCESS)
@@ -522,17 +524,17 @@ typedef struct _USB_PIPE_INFO {
 	ULONG  ScheduleOffset;
 } USB_PIPE_INFO, *PUSB_PIPE_INFO;
 
-typedef struct _USB_NODE_CONNECTION_INFORMATION {
+typedef struct _USB_NODE_CONNECTION_INFORMATION_EX {
 	ULONG  ConnectionIndex;
 	USB_DEVICE_DESCRIPTOR  DeviceDescriptor;
 	UCHAR  CurrentConfigurationValue;
-	BOOLEAN  LowSpeed;
+	UCHAR  Speed;
 	BOOLEAN  DeviceIsHub;
 	USHORT  DeviceAddress;
 	ULONG  NumberOfOpenPipes;
 	USB_CONNECTION_STATUS  ConnectionStatus;
 //	USB_PIPE_INFO  PipeList[0];
-} USB_NODE_CONNECTION_INFORMATION, *PUSB_NODE_CONNECTION_INFORMATION;
+} USB_NODE_CONNECTION_INFORMATION_EX, *PUSB_NODE_CONNECTION_INFORMATION_EX;
 
 typedef struct _USB_HUB_CAP_FLAGS {
 	ULONG HubIsHighSpeedCapable:1;

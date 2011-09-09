@@ -120,7 +120,7 @@ static volatile LONG compat_spinlock = 0;
 // platform headers, we hook into the Kernel32 system DLL directly to seek it.
 static BOOL (__stdcall *pCancelIoEx)(HANDLE, LPOVERLAPPED) = NULL;
 #define CancelIoEx_Available (pCancelIoEx != NULL)
-__inline BOOL cancel_io(int _index)
+static __inline BOOL cancel_io(int _index)
 {
 	if ((_index < 0) || (_index >= MAX_FDS)) {
 		return FALSE;

@@ -240,6 +240,16 @@ EXPORTS
   libusb_get_device_list@32 = libusb_get_device_list
   libusb_get_device_list@4 = libusb_get_device_list
   libusb_get_device_list@8 = libusb_get_device_list
+  libusb_get_device_speed
+  libusb_get_device_speed@0 = libusb_get_device_speed
+  libusb_get_device_speed@12 = libusb_get_device_speed
+  libusb_get_device_speed@16 = libusb_get_device_speed
+  libusb_get_device_speed@20 = libusb_get_device_speed
+  libusb_get_device_speed@24 = libusb_get_device_speed
+  libusb_get_device_speed@28 = libusb_get_device_speed
+  libusb_get_device_speed@32 = libusb_get_device_speed
+  libusb_get_device_speed@4 = libusb_get_device_speed
+  libusb_get_device_speed@8 = libusb_get_device_speed
   libusb_get_max_iso_packet_size
   libusb_get_max_iso_packet_size@0 = libusb_get_max_iso_packet_size
   libusb_get_max_iso_packet_size@12 = libusb_get_max_iso_packet_size

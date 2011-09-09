@@ -60,6 +60,7 @@ case $host in
 	AC_MSG_RESULT([Darwin/Mac OS X])
 	backend="darwin"
 	threads="posix"
+	LIBS="${LIBS} -lobjc"
 	PC_LIBS_PRIVATE="-Wl,-framework,IOKit -Wl,-framework,CoreFoundation"
 	LTLDFLAGS="${LTLDFLAGS} -Wl,-prebind"
 	AC_CHECK_HEADERS([poll.h])
@@ -165,12 +166,6 @@ AC_ARG_ENABLE([examples-build], [AS_HELP_STRING([--enable-examples-build],
 	[build_examples='no'])
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != "xno"])
 
-# Restore gnu89 inline semantics on gcc 4.3 and newer
-saved_cflags="$CFLAGS"
-CFLAGS="$CFLAGS -fgnu89-inline"
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])], inline_cflags="-fgnu89-inline", inline_cflags="")
-CFLAGS="$saved_cflags"
-
 # check for -fvisibility=hidden compiler support (GCC >= 3.4)
 saved_cflags="$CFLAGS"
 # -Werror required for cygwin
@@ -197,7 +192,7 @@ AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
 # headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 
-AM_CFLAGS="-std=gnu99 $inline_cflags -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
+AM_CFLAGS="-std=gnu99 -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
 
 AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)

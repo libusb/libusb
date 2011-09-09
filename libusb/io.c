@@ -1022,7 +1022,7 @@ int usbi_io_init(struct libusb_context *ctx)
 #endif
 	usbi_mutex_init(&ctx->flying_transfers_lock, NULL);
 #if defined(OS_WINDOWS)
-	usbi_mutex_init(&ctx->events_lock, NULL);
+	usbi_mutex_init_recursive(&ctx->events_lock, NULL);
 #else
 	pthread_mutex_init(&ctx->events_lock, &attr);
 	pthread_mutexattr_destroy(&attr);
@@ -1290,6 +1290,8 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		if (r < 0)
 			r = LIBUSB_ERROR_OTHER;
 	}
+#else
+	(void)first;
 #endif
 
 out:
@@ -1320,9 +1322,16 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 	usbi_dbg("");
 	usbi_mutex_lock(&itransfer->lock);
 	r = usbi_backend->cancel_transfer(itransfer);
-	if (r < 0)
+	if (r < 0) {
 		usbi_err(TRANSFER_CTX(transfer),
 			"cancel transfer failed error %d", r);
+
+		if (r == LIBUSB_ERROR_NO_DEVICE)
+			itransfer->flags |= USBI_TRANSFER_DEVICE_DISAPPEARED;
+	}
+
+	itransfer->flags |= USBI_TRANSFER_CANCELLING;
+
 	usbi_mutex_unlock(&itransfer->lock);
 	return r;
 }

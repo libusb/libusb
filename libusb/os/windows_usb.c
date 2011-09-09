@@ -1154,7 +1154,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 {
 	HANDLE handle;
 	DWORD size;
-	USB_NODE_CONNECTION_INFORMATION conn_info;
+	USB_NODE_CONNECTION_INFORMATION_EX conn_info;
 	struct windows_device_priv *priv, *parent_priv;
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device* tmp_dev;
@@ -1206,9 +1206,9 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			usbi_warn(ctx, "could not open hub %s: %s", parent_priv->path, windows_error_str(0));
 			return LIBUSB_ERROR_ACCESS;
 		}
-		size = sizeof(USB_NODE_CONNECTION_INFORMATION);
+		size = sizeof(conn_info);
 		conn_info.ConnectionIndex = (ULONG)port_number;
-		if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION, &conn_info, size,
+		if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, size,
 			&conn_info, size, &size, NULL)) {
 			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
 				device_id, windows_error_str(0));
@@ -1221,6 +1221,14 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
 		dev->device_address = (uint8_t)conn_info.DeviceAddress;
+		switch (conn_info.Speed) {
+		case 0: dev->speed = LIBUSB_SPEED_LOW; break;
+		case 1: dev->speed = LIBUSB_SPEED_FULL; break;
+		case 2: dev->speed = LIBUSB_SPEED_HIGH; break;
+		default:
+			usbi_warn(ctx, "Got unknown device speed %d", conn_info.Speed);
+			break;
+		}		
 		memcpy(&priv->dev_descriptor, &(conn_info.DeviceDescriptor), sizeof(USB_DEVICE_DESCRIPTOR));
 		dev->num_configurations = priv->dev_descriptor.bNumConfigurations;
 		priv->active_config = conn_info.CurrentConfigurationValue;
