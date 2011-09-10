@@ -1946,8 +1946,8 @@ static int get_next_timeout(libusb_context *ctx, struct timeval *tv,
  * non-blocking mode
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
-int API_EXPORTED libusb_handle_events_timeout(libusb_context *ctx,
-	struct timeval *tv)
+int API_EXPORTED libusb_handle_events_timeout_completed(libusb_context *ctx,
+	struct timeval *tv, int *completed)
 {
 	int r;
 	struct timeval poll_timeout;
@@ -1961,8 +1961,11 @@ int API_EXPORTED libusb_handle_events_timeout(libusb_context *ctx,
 
 retry:
 	if (libusb_try_lock_events(ctx) == 0) {
-		/* we obtained the event lock: do our own event handling */
-		r = handle_events(ctx, &poll_timeout);
+		if (completed == NULL || !*completed) {
+			/* we obtained the event lock: do our own event handling */
+			usbi_dbg("doing our own event handling");
+			r = handle_events(ctx, &poll_timeout);
+		}
 		libusb_unlock_events(ctx);
 		return r;
 	}
@@ -1970,6 +1973,9 @@ retry:
 	/* another thread is doing event handling. wait for pthread events that
 	 * notify event completion. */
 	libusb_lock_event_waiters(ctx);
+
+	if (completed && *completed)
+		goto already_done;
 
 	if (!libusb_event_handler_active(ctx)) {
 		/* we hit a race: whoever was event handling earlier finished in the
@@ -1981,6 +1987,8 @@ retry:
 
 	usbi_dbg("another thread is doing event handling");
 	r = libusb_wait_for_event(ctx, &poll_timeout);
+
+already_done:
 	libusb_unlock_event_waiters(ctx);
 
 	if (r < 0)
@@ -1989,6 +1997,12 @@ retry:
 		return handle_timeouts(ctx);
 	else
 		return 0;
+}
+
+int API_EXPORTED libusb_handle_events_timeout(libusb_context *ctx,
+	struct timeval *tv)
+{
+	return libusb_handle_events_timeout_completed(ctx, tv, NULL);
 }
 
 /** \ingroup poll
@@ -2005,7 +2019,16 @@ int API_EXPORTED libusb_handle_events(libusb_context *ctx)
 	struct timeval tv;
 	tv.tv_sec = 60;
 	tv.tv_usec = 0;
-	return libusb_handle_events_timeout(ctx, &tv);
+	return libusb_handle_events_timeout_completed(ctx, &tv, NULL);
+}
+
+int API_EXPORTED libusb_handle_events_completed(libusb_context *ctx,
+	int *completed)
+{
+	struct timeval tv;
+	tv.tv_sec = 60;
+	tv.tv_usec = 0;
+	return libusb_handle_events_timeout_completed(ctx, &tv, completed);
 }
 
 /** \ingroup poll

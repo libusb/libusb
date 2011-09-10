@@ -62,10 +62,14 @@ EXPORTS
   libusb_get_string_descriptor_ascii@16 = libusb_get_string_descriptor_ascii
   libusb_handle_events
   libusb_handle_events@4 = libusb_handle_events
+  libusb_handle_events_completed
+  libusb_handle_events_completed@8 = libusb_handle_events_completed
   libusb_handle_events_locked
   libusb_handle_events_locked@8 = libusb_handle_events_locked
   libusb_handle_events_timeout
   libusb_handle_events_timeout@8 = libusb_handle_events_timeout
+  libusb_handle_events_timeout_completed
+  libusb_handle_events_timeout_completed@12 = libusb_handle_events_timeout_completed
   libusb_init
   libusb_init@4 = libusb_init
   libusb_interrupt_transfer
