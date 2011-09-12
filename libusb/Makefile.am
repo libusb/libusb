@@ -26,7 +26,8 @@ if OS_WINDOWS
 OS_SRC = $(WINDOWS_USB_SRC)
 
 .rc.lo:
-	$(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(RC) $(RCFLAGS) -I. -i $< -o $@
+	@echo "  WINRES $<"
+	@$(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --silent --mode=compile $(RC) $(RCFLAGS) -I. -i $< -o $@
 endif
 
 if THREADS_POSIX
