@@ -86,6 +86,7 @@ if test "$backend" = windows; then
 	AC_DEFINE(OS_WINDOWS, 1, [Windows backend])
 	AC_SUBST(OS_WINDOWS)
 	PC_LIBS_PRIVATE=""
+	AM_CFLAGS="${AM_CFLAGS} -DWINVER=0x500"
 	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
 	AC_CHECK_TOOL(RC, windres, no)
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
@@ -192,7 +193,7 @@ AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
 # headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 
-AM_CFLAGS="-std=gnu99 -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
+AM_CFLAGS="${AM_CFLAGS} -std=gnu99 -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
 
 AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)
