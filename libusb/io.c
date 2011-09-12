@@ -770,17 +770,58 @@ void myfunc() {
  *
  * Before we go any further, it is worth mentioning that all libusb-wrapped
  * event handling procedures fully adhere to the scheme documented below.
- * This includes libusb_handle_events() and all the synchronous I/O functions -
- * libusb hides this headache from you. You do not need to worry about any
- * of these issues if you stick to that level.
+ * This includes libusb_handle_events() and its variants, and all the
+ * synchronous I/O functions - libusb hides this headache from you.
+ *
+ * \section Using libusb_handle_events() from multiple threads
+ *
+ * Even when only using libusb_handle_events() and synchronous I/O functions,
+ * you can still have a race condition. You might be tempted to solve the
+ * above with libusb_handle_events() like so:
+ *
+\code
+	libusb_submit_transfer(transfer);
+
+	while (!completed) {
+		libusb_handle_events(ctx);
+	}
+	printf("completed!");
+\endcode
+ *
+ * This however has a race between the checking of completed and
+ * libusb_handle_events() acquiring the events lock, so another thread
+ * could have completed the transfer, resulting in this thread hanging
+ * until either a timeout or another event occurs. See also commit
+ * 6696512aade99bb15d6792af90ae329af270eba6 which fixes this in the
+ * synchronous API implementation of libusb.
+ *
+ * Fixing this race requires checking the variable completed only after
+ * taking the event lock, which defeats the concept of just calling
+ * libusb_handle_events() without worrying about locking. This is why
+ * libusb-1.0.9 introduces the new libusb_handle_events_timeout_completed()
+ * and libusb_handle_events_completed() functions, which handles doing the
+ * completion check for you after they have acquired the lock:
+ *
+\code
+	libusb_submit_transfer(transfer);
+
+	while (!completed) {
+		libusb_handle_events_completed(ctx, &completed);
+	}
+	printf("completed!");
+\endcode
+ *
+ * This nicely fixes the race in our example. Note that if all you want to
+ * do is submit a single transfer and wait for its completion, then using
+ * one of the synchronous I/O functions is much easier.
+ *
+ * \section eventlock The events lock
  *
  * The problem is when we consider the fact that libusb exposes file
  * descriptors to allow for you to integrate asynchronous USB I/O into
  * existing main loops, effectively allowing you to do some work behind
  * libusb's back. If you do take libusb's file descriptors and pass them to
  * poll()/select() yourself, you need to be aware of the associated issues.
- *
- * \section eventlock The events lock
  *
  * The first concept to be introduced is the events lock. The events lock
  * is used to serialize threads that want to handle events, such that only
@@ -1941,10 +1982,17 @@ static int get_next_timeout(libusb_context *ctx, struct timeval *tv,
  * timeout. If an event arrives or a signal is raised, this function will
  * return early.
  *
+ * If the parameter completed is not NULL then <em>after obtaining the event
+ * handling lock</em> this function will return immediately if the integer
+ * pointed to is not 0. This allows for race free waiting for the completion
+ * of a specific transfer.
+ *
  * \param ctx the context to operate on, or NULL for the default context
  * \param tv the maximum time to block waiting for events, or zero for
  * non-blocking mode
+ * \param completed pointer to completion integer to check, or NULL
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ * \see \ref mtasync
  */
 int API_EXPORTED libusb_handle_events_timeout_completed(libusb_context *ctx,
 	struct timeval *tv, int *completed)
@@ -1999,6 +2047,22 @@ already_done:
 		return 0;
 }
 
+/** \ingroup poll
+ * Handle any pending events
+ *
+ * Like libusb_handle_events_timeout_completed(), but without the completed
+ * parameter, calling this function is equivalent to calling
+ * libusb_handle_events_timeout_completed() with a NULL completed parameter.
+ *
+ * This function is kept primarily for backwards compatibility.
+ * All new code should call libusb_handle_events_completed() or
+ * libusb_handle_events_timeout_completed() to avoid race conditions.
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param tv the maximum time to block waiting for events, or zero for
+ * non-blocking mode
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ */
 int API_EXPORTED libusb_handle_events_timeout(libusb_context *ctx,
 	struct timeval *tv)
 {
@@ -2009,7 +2073,12 @@ int API_EXPORTED libusb_handle_events_timeout(libusb_context *ctx,
  * Handle any pending events in blocking mode. There is currently a timeout
  * hardcoded at 60 seconds but we plan to make it unlimited in future. For
  * finer control over whether this function is blocking or non-blocking, or
- * for control over the timeout, use libusb_handle_events_timeout() instead.
+ * for control over the timeout, use libusb_handle_events_timeout_completed()
+ * instead.
+ *
+ * This function is kept primarily for backwards compatibility.
+ * All new code should call libusb_handle_events_completed() or
+ * libusb_handle_events_timeout_completed() to avoid race conditions.
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
@@ -2022,6 +2091,20 @@ int API_EXPORTED libusb_handle_events(libusb_context *ctx)
 	return libusb_handle_events_timeout_completed(ctx, &tv, NULL);
 }
 
+/** \ingroup poll
+ * Handle any pending events in blocking mode.
+ *
+ * Like libusb_handle_events(), with the addition of a completed parameter
+ * to allow for race free waiting for the completion of a specific transfer.
+ *
+ * See libusb_handle_events_timeout_completed() for details on the completed
+ * parameter.
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param completed pointer to completion integer to check, or NULL
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ * \see \ref mtasync
+ */
 int API_EXPORTED libusb_handle_events_completed(libusb_context *ctx,
 	int *completed)
 {
