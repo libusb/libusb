@@ -320,6 +320,26 @@ EXPORTS
   libusb_get_port_path@32 = libusb_get_port_path
   libusb_get_port_path@4 = libusb_get_port_path
   libusb_get_port_path@8 = libusb_get_port_path
+  libusb_get_session_id
+  libusb_get_session_id@0 = libusb_get_session_id
+  libusb_get_session_id@12 = libusb_get_session_id
+  libusb_get_session_id@16 = libusb_get_session_id
+  libusb_get_session_id@20 = libusb_get_session_id
+  libusb_get_session_id@24 = libusb_get_session_id
+  libusb_get_session_id@28 = libusb_get_session_id
+  libusb_get_session_id@32 = libusb_get_session_id
+  libusb_get_session_id@4 = libusb_get_session_id
+  libusb_get_session_id@8 = libusb_get_session_id
+  libusb_get_status
+  libusb_get_status@0 = libusb_get_status
+  libusb_get_status@12 = libusb_get_status
+  libusb_get_status@16 = libusb_get_status
+  libusb_get_status@20 = libusb_get_status
+  libusb_get_status@24 = libusb_get_status
+  libusb_get_status@28 = libusb_get_status
+  libusb_get_status@32 = libusb_get_status
+  libusb_get_status@4 = libusb_get_status
+  libusb_get_status@8 = libusb_get_status
   libusb_get_string_descriptor_ascii
   libusb_get_string_descriptor_ascii@0 = libusb_get_string_descriptor_ascii
   libusb_get_string_descriptor_ascii@12 = libusb_get_string_descriptor_ascii
@@ -460,6 +480,16 @@ EXPORTS
   libusb_ref_device@32 = libusb_ref_device
   libusb_ref_device@4 = libusb_ref_device
   libusb_ref_device@8 = libusb_ref_device
+  libusb_register_hotplug_listeners
+  libusb_register_hotplug_listeners@0 = libusb_register_hotplug_listeners
+  libusb_register_hotplug_listeners@12 = libusb_register_hotplug_listeners
+  libusb_register_hotplug_listeners@16 = libusb_register_hotplug_listeners
+  libusb_register_hotplug_listeners@20 = libusb_register_hotplug_listeners
+  libusb_register_hotplug_listeners@24 = libusb_register_hotplug_listeners
+  libusb_register_hotplug_listeners@28 = libusb_register_hotplug_listeners
+  libusb_register_hotplug_listeners@32 = libusb_register_hotplug_listeners
+  libusb_register_hotplug_listeners@4 = libusb_register_hotplug_listeners
+  libusb_register_hotplug_listeners@8 = libusb_register_hotplug_listeners
   libusb_release_interface
   libusb_release_interface@0 = libusb_release_interface
   libusb_release_interface@12 = libusb_release_interface
@@ -580,6 +610,16 @@ EXPORTS
   libusb_unref_device@32 = libusb_unref_device
   libusb_unref_device@4 = libusb_unref_device
   libusb_unref_device@8 = libusb_unref_device
+  libusb_unregister_hotplug_listeners
+  libusb_unregister_hotplug_listeners@0 = libusb_unregister_hotplug_listeners
+  libusb_unregister_hotplug_listeners@12 = libusb_unregister_hotplug_listeners
+  libusb_unregister_hotplug_listeners@16 = libusb_unregister_hotplug_listeners
+  libusb_unregister_hotplug_listeners@20 = libusb_unregister_hotplug_listeners
+  libusb_unregister_hotplug_listeners@24 = libusb_unregister_hotplug_listeners
+  libusb_unregister_hotplug_listeners@28 = libusb_unregister_hotplug_listeners
+  libusb_unregister_hotplug_listeners@32 = libusb_unregister_hotplug_listeners
+  libusb_unregister_hotplug_listeners@4 = libusb_unregister_hotplug_listeners
+  libusb_unregister_hotplug_listeners@8 = libusb_unregister_hotplug_listeners
   libusb_wait_for_event
   libusb_wait_for_event@0 = libusb_wait_for_event
   libusb_wait_for_event@12 = libusb_wait_for_event
