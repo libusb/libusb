@@ -36,6 +36,10 @@
 
 #include "libusbi.h"
 
+/* The timercmp from MinGW's _timeval.h produces a warning */
+#define	libusb_timercmp(a, b, CMP) (((a)->tv_sec == (b)->tv_sec) ? \
+	((a)->tv_usec CMP (b)->tv_usec):((a)->tv_sec CMP (b)->tv_sec))
+
 /**
  * \page io Synchronous and asynchronous device I/O
  *
@@ -1917,7 +1921,7 @@ static int get_next_timeout(libusb_context *ctx, struct timeval *tv,
 			return 1;
 
 		/* choose the smallest of next URB timeout or user specified timeout */
-		if (timercmp(&timeout, tv, <))
+		if (libusb_timercmp(&timeout, tv, <))
 			*out = timeout;
 		else
 			*out = *tv;
@@ -2156,7 +2160,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	}
 	TIMESPEC_TO_TIMEVAL(&cur_tv, &cur_ts);
 
-	if (!timercmp(&cur_tv, next_timeout, <)) {
+	if (!libusb_timercmp(&cur_tv, next_timeout, <)) {
 		usbi_dbg("first timeout already expired");
 		timerclear(tv);
 	} else {
