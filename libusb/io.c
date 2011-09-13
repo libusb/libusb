@@ -92,8 +92,8 @@
  * in the following style:
 \code
 unsigned char data[4];
-int actual_length,
-int r = libusb_bulk_transfer(handle, EP_IN, data, sizeof(data), &actual_length, 0);
+int actual_length;
+int r = libusb_bulk_transfer(handle, LIBUSB_ENDPOINT_IN, data, sizeof(data), &actual_length, 0);
 if (r == 0 && actual_length == sizeof(data)) {
 	// results of the transaction can now be found in the data buffer
 	// parse them here and report button press
