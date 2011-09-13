@@ -1141,6 +1141,7 @@ static int op_open(struct libusb_device_handle *handle)
 	char filename[PATH_MAX];
 
 	_get_usbfs_path(handle->dev, filename);
+	usbi_dbg("opening %s", filename);
 	hpriv->fd = open(filename, O_RDWR);
 	if (hpriv->fd < 0) {
 		if (errno == EACCES) {
@@ -1150,6 +1151,8 @@ static int op_open(struct libusb_device_handle *handle)
 				"libusb requires write access to USB device nodes.");
 			return LIBUSB_ERROR_ACCESS;
 		} else if (errno == ENOENT) {
+			usbi_err(HANDLE_CTX(handle), "libusb couldn't open USB device %s: "
+				"No such file or directory.", filename);
 			return LIBUSB_ERROR_NO_DEVICE;
 		} else {
 			usbi_err(HANDLE_CTX(handle),
