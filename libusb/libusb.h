@@ -707,6 +707,8 @@ enum libusb_speed {
 /** \ingroup misc
  * Error codes. Most libusb functions return 0 on success or one of these
  * codes on failure.
+ * You can call \ref libusb_error_name() to retrieve a string representation
+ * of an error code.
  */
 enum libusb_error {
 	/** Success (no error) */
@@ -747,6 +749,9 @@ enum libusb_error {
 
 	/** Operation not supported or unimplemented on this platform */
 	LIBUSB_ERROR_NOT_SUPPORTED = -12,
+
+	/* NB! Remember to update libusb_error_name()
+	   when adding new error codes here. */
 
 	/** Other error */
 	LIBUSB_ERROR_OTHER = -99
@@ -899,6 +904,7 @@ int LIBUSB_CALL libusb_init(libusb_context **ctx);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
 int LIBUSB_CALL libusb_has_capability(uint32_t capability);
+const char * LIBUSB_CALL libusb_error_name(int errcode);
 
 ssize_t LIBUSB_CALL libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);

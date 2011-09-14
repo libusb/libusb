@@ -18,6 +18,8 @@ EXPORTS
   libusb_control_transfer@32 = libusb_control_transfer
   libusb_detach_kernel_driver
   libusb_detach_kernel_driver@8 = libusb_detach_kernel_driver
+  libusb_error_name
+  libusb_error_name@4 = libusb_error_name
   libusb_event_handler_active
   libusb_event_handler_active@4 = libusb_event_handler_active
   libusb_event_handling_ok
