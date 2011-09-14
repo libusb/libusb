@@ -1734,3 +1734,47 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 	usbi_log_v(ctx, level, function, format, args);
 	va_end (args);
 }
+
+/** \ingroup misc
+ * Returns a constant NULL-terminated string with the ASCII name of a libusb
+ * error code. The caller must not free() the returned string.
+ *
+ * \param error_code The \ref libusb_error code to return the name of.
+ * \returns The error name, or the string **UNKNOWN** if the value of
+ * error_code is not a known error code.
+ */
+DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
+{
+	enum libusb_error error = error_code;
+	switch (error) {
+	case LIBUSB_SUCCESS:
+		return "LIBUSB_SUCCESS";
+	case LIBUSB_ERROR_IO:
+		return "LIBUSB_ERROR_IO";
+	case LIBUSB_ERROR_INVALID_PARAM:
+		return "LIBUSB_ERROR_INVALID_PARAM";
+	case LIBUSB_ERROR_ACCESS:
+		return "LIBUSB_ERROR_ACCESS";
+	case LIBUSB_ERROR_NO_DEVICE:
+		return "LIBUSB_ERROR_NO_DEVICE";
+	case LIBUSB_ERROR_NOT_FOUND:
+		return "LIBUSB_ERROR_NOT_FOUND";
+	case LIBUSB_ERROR_BUSY:
+		return "LIBUSB_ERROR_BUSY";
+	case LIBUSB_ERROR_TIMEOUT:
+		return "LIBUSB_ERROR_TIMEOUT";
+	case LIBUSB_ERROR_OVERFLOW:
+		return "LIBUSB_ERROR_OVERFLOW";
+	case LIBUSB_ERROR_PIPE:
+		return "LIBUSB_ERROR_PIPE";
+	case LIBUSB_ERROR_INTERRUPTED:
+		return "LIBUSB_ERROR_INTERRUPTED";
+	case LIBUSB_ERROR_NO_MEM:
+		return "LIBUSB_ERROR_NO_MEM";
+	case LIBUSB_ERROR_NOT_SUPPORTED:
+		return "LIBUSB_ERROR_NOT_SUPPORTED";
+	case LIBUSB_ERROR_OTHER:
+		return "LIBUSB_ERROR_OTHER";
+	}
+	return "**UNKNOWN**";
+}
