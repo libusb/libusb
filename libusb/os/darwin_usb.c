@@ -1449,6 +1449,9 @@ static int cancel_control_transfer(struct usbi_transfer *itransfer) {
 
   usbi_info (ITRANSFER_CTX (itransfer), "WARNING: aborting all transactions control pipe");
 
+  if (!dpriv->device)
+    return LIBUSB_ERROR_NO_DEVICE;
+
   kresult = (*(dpriv->device))->USBDeviceAbortPipeZero (dpriv->device);
 
   return darwin_to_libusb (kresult);
@@ -1456,6 +1459,7 @@ static int cancel_control_transfer(struct usbi_transfer *itransfer) {
 
 static int darwin_abort_transfers (struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+  struct darwin_device_priv *dpriv = (struct darwin_device_priv *)transfer->dev_handle->dev->os_priv;
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
   struct darwin_interface *cInterface;
   uint8_t pipeRef, iface;
@@ -1468,6 +1472,9 @@ static int darwin_abort_transfers (struct usbi_transfer *itransfer) {
   }
 
   cInterface = &priv->interfaces[iface];
+
+  if (!dpriv->device)
+    return LIBUSB_ERROR_NO_DEVICE;
 
   usbi_info (ITRANSFER_CTX (itransfer), "WARNING: aborting all transactions on interface %d pipe %d", iface, pipeRef);
 
