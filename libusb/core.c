@@ -1664,6 +1664,23 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	free(ctx);
 }
 
+/** \ingroup misc
+ * Check if the running library has a given capability.
+ *
+ * \param capability the \ref libusb_capability to check for
+ * \returns 1 if the running library has the capability, 0 otherwise
+ */
+int API_EXPORTED libusb_has_capability(uint32_t capability)
+{
+	switch (capability) {
+	case LIBUSB_CAN_GET_DEVICE_SPEED:
+		return 1;
+	default:
+		break;
+	}
+	return 0;
+}
+
 void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	const char *function, const char *format, va_list args)
 {
