@@ -621,9 +621,9 @@ while (user has not requested application exit) {
 	poll(on libusb file descriptors plus any other event sources of interest,
 		using a timeout no larger than the value libusb just suggested)
 	if (poll() indicated activity on libusb file descriptors)
-		libusb_handle_events_timeout(ctx, 0);
+		libusb_handle_events_timeout(ctx, &zero_tv);
 	if (time has elapsed to or beyond the libusb timeout)
-		libusb_handle_events_timeout(ctx, 0);
+		libusb_handle_events_timeout(ctx, &zero_tv);
 	// handle events from other sources here
 }
 
@@ -656,7 +656,7 @@ while (user has not requested application exit) {
 	poll(on libusb file descriptors plus any other event sources of interest,
 		using any timeout that you like)
 	if (poll() indicated activity on libusb file descriptors)
-		libusb_handle_events_timeout(ctx, 0);
+		libusb_handle_events_timeout(ctx, &zero_tv);
 	// handle events from other sources here
 }
 
@@ -741,7 +741,7 @@ void myfunc() {
 	while (!completed) {
 		poll(libusb file descriptors, 120*1000);
 		if (poll indicates activity)
-			libusb_handle_events_timeout(ctx, 0);
+			libusb_handle_events_timeout(ctx, &zero_tv);
 	}
 	printf("completed!");
 	// other code here
@@ -840,7 +840,7 @@ void myfunc() {
 	while (!completed) {
 		poll(libusb file descriptors, 120*1000);
 		if (poll indicates activity)
-			libusb_handle_events_timeout(ctx, 0);
+			libusb_handle_events_timeout(ctx, &zero_tv);
 	}
 	libusb_unlock_events(ctx);
 \endcode
@@ -1988,8 +1988,8 @@ static int get_next_timeout(libusb_context *ctx, struct timeval *tv,
  * of a specific transfer.
  *
  * \param ctx the context to operate on, or NULL for the default context
- * \param tv the maximum time to block waiting for events, or zero for
- * non-blocking mode
+ * \param tv the maximum time to block waiting for events, or an all zero
+ * timeval struct for non-blocking mode
  * \param completed pointer to completion integer to check, or NULL
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
  * \see \ref mtasync
@@ -2059,8 +2059,8 @@ already_done:
  * libusb_handle_events_timeout_completed() to avoid race conditions.
  *
  * \param ctx the context to operate on, or NULL for the default context
- * \param tv the maximum time to block waiting for events, or zero for
- * non-blocking mode
+ * \param tv the maximum time to block waiting for events, or an all zero
+ * timeval struct for non-blocking mode
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
  */
 int API_EXPORTED libusb_handle_events_timeout(libusb_context *ctx,
