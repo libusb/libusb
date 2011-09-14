@@ -70,6 +70,8 @@ EXPORTS
   libusb_handle_events_timeout@8 = libusb_handle_events_timeout
   libusb_handle_events_timeout_completed
   libusb_handle_events_timeout_completed@12 = libusb_handle_events_timeout_completed
+  libusb_has_capability
+  libusb_has_capability@4 = libusb_has_capability
   libusb_init
   libusb_init@4 = libusb_init
   libusb_interrupt_transfer
