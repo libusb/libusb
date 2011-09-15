@@ -23,6 +23,6 @@ dist-up: dist
 	rm -rf $(reldir)
 	mkdir -p $(reldir)
 	cp $(distdir).tar.bz2 $(reldir)
-	rsync -rv $(reldir) dsd_,libusb@frs.sourceforge.net:/home/frs/project/l/li/libusb/libusb-1.0/
+	rsync -rv $(reldir) frs.sourceforge.net:/home/frs/project/l/li/libusb/libusb-1.0/
 	rm -rf $(reldir)
 
