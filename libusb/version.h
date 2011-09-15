@@ -12,3 +12,7 @@
 #ifndef LIBUSB_NANO
 #define LIBUSB_NANO 0
 #endif
+/* LIBUSB_RC is the release candidate suffix. Should normally be empty. */
+#ifndef LIBUSB_RC
+#define LIBUSB_RC ""
+#endif

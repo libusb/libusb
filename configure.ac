@@ -3,6 +3,9 @@ m4_define([LU_VERSION_H], m4_include([libusb/version.h]))
 m4_define([LU_DEFINE_VERSION_ATOM],
 	[m4_define([$1], m4_bregexp(LU_VERSION_H,
 	[^#define\s*$1\s*\([0-9]*\).*], [\1]))])
+m4_define([LU_DEFINE_VERSION_RC_ATOM],
+	[m4_define([$1], m4_bregexp(LU_VERSION_H,
+	[^#define\s*$1\s*"\(-rc[0-9]*\)".*], [\1]))])
 dnl The m4_bregexp() returns (only) the numbers following the #define named
 dnl in the first macro parameter. m4_define() then defines the name for use
 dnl in AC_INIT().
@@ -10,8 +13,9 @@ dnl in AC_INIT().
 LU_DEFINE_VERSION_ATOM([LIBUSB_MAJOR])
 LU_DEFINE_VERSION_ATOM([LIBUSB_MINOR])
 LU_DEFINE_VERSION_ATOM([LIBUSB_MICRO])
+LU_DEFINE_VERSION_RC_ATOM([LIBUSB_RC])
 
-AC_INIT([libusb], LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO, [libusb-devel@lists.sourceforge.net], [libusb], [http://www.libusb.org/])
+AC_INIT([libusb], LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO[]LIBUSB_RC, [libusb-devel@lists.sourceforge.net], [libusb], [http://www.libusb.org/])
 
 # Library versioning
 # These numbers should be tweaked on every release. Read carefully:
