@@ -1040,6 +1040,10 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
   /* get an interface to the device's interface */
   kresult = IOCreatePlugInInterfaceForService (usbInterface, kIOUSBInterfaceUserClientTypeID,
 					       kIOCFPlugInInterfaceID, &plugInInterface, &score);
+
+  /* ignore release error */
+  (void)IOObjectRelease (usbInterface);
+
   if (kresult) {
     usbi_err (HANDLE_CTX (dev_handle), "IOCreatePlugInInterfaceForService: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
@@ -1049,9 +1053,6 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
     usbi_err (HANDLE_CTX (dev_handle), "plugin interface not found");
     return LIBUSB_ERROR_NOT_FOUND;
   }
-
-  /* ignore release error */
-  (void)IOObjectRelease (usbInterface);
 
   /* Do the actual claim */
   kresult = (*plugInInterface)->QueryInterface(plugInInterface,
