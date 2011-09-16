@@ -362,7 +362,6 @@ static void *event_thread_main (void *arg0) {
   usbi_info (ctx, "thread exiting");
 
   /* delete notification port */
-  CFRunLoopSourceInvalidate (libusb_notification_cfsource);
   IONotificationPortDestroy (libusb_notification_port);
   IOObjectRelease (libusb_rem_device_iterator);
 
