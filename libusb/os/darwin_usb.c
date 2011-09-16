@@ -1524,16 +1524,18 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
   struct usbi_transfer *itransfer = (struct usbi_transfer *)refcon;
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
-  UInt32 message;
+  UInt32 message, size;
 
   usbi_info (ITRANSFER_CTX (itransfer), "an async io operation has completed");
+
+  size = (UInt32) arg0;
 
   /* send a completion message to the device's file descriptor */
   message = MESSAGE_ASYNC_IO_COMPLETE;
   write (priv->fds[1], &message, sizeof (message));
   write (priv->fds[1], &itransfer, sizeof (itransfer));
   write (priv->fds[1], &result, sizeof (IOReturn));
-  write (priv->fds[1], &arg0, sizeof (UInt32));
+  write (priv->fds[1], &size, sizeof (size));
 }
 
 static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_t result) {
