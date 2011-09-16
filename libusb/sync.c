@@ -132,6 +132,9 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 	case LIBUSB_TRANSFER_NO_DEVICE:
 		r = LIBUSB_ERROR_NO_DEVICE;
 		break;
+	case LIBUSB_TRANSFER_OVERFLOW:
+		r = LIBUSB_ERROR_OVERFLOW;
+		break;
 	default:
 		usbi_warn(HANDLE_CTX(dev_handle),
 			"unrecognised status code %d", transfer->status);
