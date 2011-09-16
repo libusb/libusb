@@ -51,6 +51,9 @@
 static pthread_mutex_t libusb_darwin_at_mutex;
 static pthread_cond_t  libusb_darwin_at_cond;
 
+static clock_serv_t clock_realtime;
+static clock_serv_t clock_monotonic;
+
 static CFRunLoopRef libusb_darwin_acfl = NULL; /* async cf loop */
 static int initCount = 0;
 
@@ -373,7 +376,16 @@ static void *event_thread_main (void *arg0) {
 }
 
 static int darwin_init(struct libusb_context *ctx) {
+  host_name_port_t host_self;
+
   if (!(initCount++)) {
+    /* create the clocks that will be used */
+
+    host_self = mach_host_self();
+    host_get_clock_service(host_self, CALENDAR_CLOCK, &clock_realtime);
+    host_get_clock_service(host_self, SYSTEM_CLOCK, &clock_monotonic);
+    mach_port_deallocate(mach_task_self(), host_self);
+
     pthread_mutex_init (&libusb_darwin_at_mutex, NULL);
     pthread_cond_init (&libusb_darwin_at_cond, NULL);
 
@@ -390,6 +402,8 @@ static int darwin_init(struct libusb_context *ctx) {
 
 static void darwin_exit (void) {
   if (!(--initCount)) {
+    mach_port_deallocate(mach_task_self(), clock_realtime);
+    mach_port_deallocate(mach_task_self(), clock_monotonic);
 
     /* stop the async runloop */
     CFRunLoopStop (libusb_darwin_acfl);
@@ -1671,11 +1685,11 @@ static int darwin_clock_gettime(int clk_id, struct timespec *tp) {
   switch (clk_id) {
   case USBI_CLOCK_REALTIME:
     /* CLOCK_REALTIME represents time since the epoch */
-    host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &clock_ref);
+    clock_ref = clock_realtime;
     break;
   case USBI_CLOCK_MONOTONIC:
     /* use system boot time as reference for the monotonic clock */
-    host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &clock_ref);
+    clock_ref = clock_monotonic;
     break;
   default:
     return LIBUSB_ERROR_INVALID_PARAM;
