@@ -1243,14 +1243,19 @@ static int darwin_kernel_driver_active(struct libusb_device_handle *dev_handle, 
 
 /* attaching/detaching kernel drivers is not currently supported (maybe in the future?) */
 static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle, int interface) {
+  (void)dev_handle;
+  (void)interface;
   return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, int interface) {
+  (void)dev_handle;
+  (void)interface;
   return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static void darwin_destroy_device(struct libusb_device *dev) {
+  (void)dev;
 }
 
 static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
