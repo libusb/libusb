@@ -288,7 +288,7 @@ static bool get_devinfo_data(struct libusb_context *ctx,
  * structure returned and call this function repeatedly using the same guid (with an
  * incremented index starting at zero) until all interfaces have been returned.
  */
-SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_context *ctx,
+static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID* guid, unsigned _index)
 {
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
@@ -363,9 +363,9 @@ typedef struct htab_entry {
 	unsigned long used;
 	char* str;
 } htab_entry;
-static htab_entry* htab_table = NULL;
-static usbi_mutex_t htab_write_mutex = NULL;
-static unsigned long htab_size, htab_filled;
+htab_entry* htab_table = NULL;
+usbi_mutex_t htab_write_mutex = NULL;
+unsigned long htab_size, htab_filled;
 
 /* For the used double hash method the table size has to be a prime. To
    correct the user given table size we need a prime test.  This trivial
@@ -601,7 +601,7 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int
 }
 
 // Lookup for a match in the list of API driver names
-bool is_api_driver(char* driver, uint8_t api)
+static bool is_api_driver(char* driver, uint8_t api)
 {
 	uint8_t i;
 	const char sep_str[2] = {LIST_SEPARATOR, 0};
@@ -1046,7 +1046,6 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			safe_closehandle(handle);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
-		dev->device_address = (uint8_t)conn_info.DeviceAddress;
 		memcpy(&priv->dev_descriptor, &(conn_info.DeviceDescriptor), sizeof(USB_DEVICE_DESCRIPTOR));
 		dev->num_configurations = priv->dev_descriptor.bNumConfigurations;
 		priv->active_config = conn_info.CurrentConfigurationValue;
@@ -2452,7 +2451,6 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	// or if it's the first WinUSB interface, we get a handle through WinUsb_Initialize().
 	if ((is_using_usbccgp) || (iface == 0)) {
 		// composite device (independent interfaces) or interface 0
-		winusb_handle = handle_priv->interface_handle[iface].api_handle;
 		file_handle = handle_priv->interface_handle[iface].dev_handle;
 		if ((file_handle == 0) || (file_handle == INVALID_HANDLE_VALUE)) {
 			return LIBUSB_ERROR_NOT_FOUND;
