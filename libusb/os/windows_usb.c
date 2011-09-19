@@ -1087,15 +1087,6 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			safe_closehandle(handle);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
-		dev->device_address = (uint8_t)conn_info.DeviceAddress;
-		switch (conn_info.Speed) {
-		case 0: dev->speed = LIBUSB_SPEED_LOW; break;
-		case 1: dev->speed = LIBUSB_SPEED_FULL; break;
-		case 2: dev->speed = LIBUSB_SPEED_HIGH; break;
-		default:
-			usbi_warn(ctx, "Got unknown device speed %d", conn_info.Speed);
-			break;
-		}
 		memcpy(&priv->dev_descriptor, &(conn_info.DeviceDescriptor), sizeof(USB_DEVICE_DESCRIPTOR));
 		dev->num_configurations = priv->dev_descriptor.bNumConfigurations;
 		priv->active_config = conn_info.CurrentConfigurationValue;
@@ -1109,6 +1100,15 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 
 		if (conn_info.DeviceAddress > UINT8_MAX) {
 			usbi_err(ctx, "program assertion failed: device address overflow");
+		}
+		dev->device_address = (uint8_t)conn_info.DeviceAddress;
+		switch (conn_info.Speed) {
+		case 0: dev->speed = LIBUSB_SPEED_LOW; break;
+		case 1: dev->speed = LIBUSB_SPEED_FULL; break;
+		case 2: dev->speed = LIBUSB_SPEED_HIGH; break;
+		default:
+			usbi_warn(ctx, "Got unknown device speed %d", conn_info.Speed);
+			break;
 		}
 	} else {
 		dev->device_address = UINT8_MAX;	// Hubs from HCD have a devaddr of 255
@@ -2526,8 +2526,8 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 	} else {
 		// For all other interfaces, use WinUsb_GetAssociatedInterface()
 		winusb_handle = handle_priv->interface_handle[0].api_handle;
-		// It is a requirement for multiple interface devices on Windows that, to you
-		// must first claim the first interface before you claim the others
+		// It is a requirement for multiple interface devices using WinUSB that you
+		// must first claim the first interface before you claim any other
 		if ((winusb_handle == 0) || (winusb_handle == INVALID_HANDLE_VALUE)) {
 #if defined(AUTO_CLAIM)
 			file_handle = handle_priv->interface_handle[0].dev_handle;
