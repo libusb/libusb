@@ -1622,7 +1622,8 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL
   struct usbi_transfer *itransfer;
   UInt32 io_size;
   IOReturn kresult;
-  int i = 0, ret;
+  POLL_NFDS_TYPE i = 0;
+  ssize_t ret;
   UInt32 message;
 
   usbi_mutex_lock(&ctx->open_devs_lock);
@@ -1645,7 +1646,7 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL
 
     if (!(pollfd->revents & POLLERR)) {
       ret = read (hpriv->fds[0], &message, sizeof (message));
-      if (ret < sizeof (message))
+      if (ret < (ssize_t)sizeof (message))
 	continue;
     } else
       /* could not poll the device-- response is to delete the device (this seems a little heavy-handed) */
