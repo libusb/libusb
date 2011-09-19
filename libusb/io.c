@@ -1414,10 +1414,12 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 #else
 static int disarm_timerfd(struct libusb_context *ctx)
 {
+	(void)ctx;
 	return 0;
 }
 static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 {
+	(void)ctx;
 	return 0;
 }
 #endif
@@ -2181,6 +2183,7 @@ int API_EXPORTED libusb_pollfds_handle_timeouts(libusb_context *ctx)
 	USBI_GET_CONTEXT(ctx);
 	return usbi_using_timerfd(ctx);
 #else
+	(void)ctx;
 	return 0;
 #endif
 }
