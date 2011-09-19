@@ -58,7 +58,7 @@ md %dstPath%\examples
 :md6
 @echo on
 
-@if NOT Test%1==TestDLL goto copylib
+@if /I NOT Test%1==TestDLL goto copylib
 copy %srcPath%\libusb-%version%.dll %dstPath%\dll
 copy %srcPath%\libusb-%version%.pdb %dstPath%\dll
 :copylib
