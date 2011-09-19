@@ -1446,6 +1446,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				priv->depth = UINT8_MAX;	// Overflow to 0 for HCD Hubs
 				priv->path = dev_interface_path; dev_interface_path = NULL;
 				break;
+			case HUB_PASS:
 			case DEV_PASS:
 				// If the device has already been setup, don't do it again
 				if (priv->path != NULL)
@@ -1455,6 +1456,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				priv->apib = &usb_api_backend[api];
 				switch(api) {
 				case USB_API_COMPOSITE:
+				case USB_API_HUB:
 					break;
 				default:
 					// For other devices, the first interface is the same as the device
@@ -1469,10 +1471,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					}
 					break;
 				}
-				break;
-			case HUB_PASS:
-				priv->apib = &usb_api_backend[api];
-				priv->path = dev_interface_path; dev_interface_path = NULL;
 				break;
 			case GEN_PASS:
 				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_id_path, dev_info_data.DevInst);
