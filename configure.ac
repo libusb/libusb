@@ -37,6 +37,7 @@ m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 AC_PREREQ([2.50])
 AC_PROG_CC
 AC_PROG_LIBTOOL
+LT_LANG([Windows Resource])
 AC_C_INLINE
 AM_PROG_CC_C_O
 AC_DEFINE([_GNU_SOURCE], 1, [Use GNU extensions])
