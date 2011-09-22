@@ -526,6 +526,53 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	return 0;
 }
 
+// Read the MS WinUSB Feature Descriptors, that are used on Windows 8 for automated driver installation
+void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bRequest, int iface_number)
+{
+#define MAX_OS_FD_LENGTH 256
+	int i, r;
+	uint8_t os_desc[MAX_OS_FD_LENGTH];
+	uint32_t length;
+	void* le_type_punning_IS_fine;
+	struct {
+		char* desc;
+		uint16_t index;
+		uint16_t header_size;
+	} os_fd[2] = { 
+		{"Extended Compat ID", 0x0004, 0x10},
+		{"Extended Properties", 0x0005, 0x0A} 
+	};
+
+	if (iface_number < 0) return;
+
+	for (i=0; i<2; i++) {
+		printf("\nReading %s OS Feature Descriptor (wIndex = 0x%04d):\n", os_fd[i].desc, os_fd[i].index);
+
+		// Read the header part
+		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR,
+			bRequest, iface_number << 8 || 0x00, os_fd[i].index, os_desc, os_fd[i].header_size, 1000);
+		if (r < os_fd[i].header_size) {
+			perr("   Failed: %s", (r<0)?libusb_strerror(r):"header size is too small");
+			return;
+		}
+		le_type_punning_IS_fine = (void*)os_desc;
+		length = *((uint32_t*)le_type_punning_IS_fine);
+		if (length > MAX_OS_FD_LENGTH) {
+			length = MAX_OS_FD_LENGTH;
+		}
+
+		// Read the full feature descriptor
+		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR,
+			bRequest, iface_number << 8 || 0x00, os_fd[i].index, os_desc, (uint16_t)length, 1000);
+		if (r < 0) {
+			perr("   Failed: %s", libusb_strerror(r));
+			return;
+		} else {
+			display_buffer_hex(os_desc, r);
+		}
+	}
+}
+
 int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
@@ -534,7 +581,7 @@ int test_device(uint16_t vid, uint16_t pid)
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
-	int iface, nb_ifaces;
+	int iface, nb_ifaces, first_iface = -1;
 #if defined(__linux)
 	// Attaching/detaching the kernel driver is only relevant for Linux
 	int iface_detached = -1;
@@ -586,7 +633,11 @@ int test_device(uint16_t vid, uint16_t pid)
 	CALL_CHECK(libusb_get_config_descriptor(dev, 0, &conf_desc));
 	nb_ifaces = conf_desc->bNumInterfaces;
 	printf("             nb interfaces: %d\n", nb_ifaces);
-	for (i=0; i<conf_desc->bNumInterfaces; i++) {
+	if (nb_ifaces > 0) 
+		first_iface = conf_desc->usb_interface[0].altsetting[0].bInterfaceNumber;
+	for (i=0; i<nb_ifaces; i++) {
+		printf("              interface[%d]: id = %d\n", i, 
+			conf_desc->usb_interface[i].altsetting[0].bInterfaceNumber);
 		for (j=0; j<conf_desc->usb_interface[i].num_altsetting; j++) {
 			printf("interface[%d].altsetting[%d]: num endpoints = %d\n",
 				i, j, conf_desc->usb_interface[i].altsetting[j].bNumEndpoints);
@@ -648,6 +699,14 @@ int test_device(uint16_t vid, uint16_t pid)
 		if (libusb_get_string_descriptor_ascii(handle, string_index[i], string, 128) >= 0) {
 			printf("   String (0x%02X): \"%s\"\n", string_index[i], string);
 		}
+	}
+	// Read the OS String Descriptor 
+	if (libusb_get_string_descriptor_ascii(handle, 0xEE, string, 128) >= 0) {
+		printf("   String (0x%02X): \"%s\"\n", 0xEE, string);
+		// If this is a Microsoft OS String Descriptor, 
+		// attempt to read the WinUSB extended Feature Descriptors
+		if (strncmp(string, "MSFT100", 7) == 0)
+			read_ms_winsub_feature_descriptors(handle, string[7], first_iface);
 	}
 
 	switch(test_mode) {
