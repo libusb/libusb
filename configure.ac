@@ -29,11 +29,14 @@ AM_MAINTAINER_MODE
 AC_CONFIG_SRCDIR([libusb/core.c])
 AC_CONFIG_MACRO_DIR([m4])
 AM_CONFIG_HEADER([config.h])
-m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
-
+# Enable silent build rules by default (Automake v1.11 or later).
+# Disable by either passing --disable-silent-rules to configure or passing V=1 to make
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])],
+         [AC_SUBST([AM_DEFAULT_VERBOSITY], [1])])
 AC_PREREQ([2.50])
 AC_PROG_CC
 AC_PROG_LIBTOOL
+LT_LANG([Windows Resource])
 AC_C_INLINE
 AM_PROG_CC_C_O
 AC_DEFINE([_GNU_SOURCE], 1, [Use GNU extensions])
@@ -72,7 +75,6 @@ case $host in
 *-mingw*)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
-	AC_CHECK_TOOL(DLLTOOL, dlltool, false)
 	;;
 *-cygwin*)
 	AC_MSG_RESULT([Cygwin (using Windows backend)])
@@ -88,7 +90,6 @@ if test "$backend" = windows; then
 	PC_LIBS_PRIVATE=""
 	AM_CFLAGS="${AM_CFLAGS} -DWINVER=0x500"
 	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
-	AC_CHECK_TOOL(RC, windres, no)
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 fi
 AC_SUBST(THREAD_CFLAGS)

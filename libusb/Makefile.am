@@ -25,9 +25,12 @@ endif
 if OS_WINDOWS
 OS_SRC = $(WINDOWS_USB_SRC)
 
+pkg_v_rc = $(pkg_v_rc_$(V))
+pkg_v_rc_ = $(pkg_v_rc_$(AM_DEFAULT_VERBOSITY))
+pkg_v_rc_0 = @echo "  RC     $@";
+
 .rc.lo:
-	@echo "  WINRES $<"
-	@$(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --silent --mode=compile $(RC) $(RCFLAGS) -I. -i $< -o $@
+	$(pkg_v_rc)$(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=RC --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
 endif
 
 if THREADS_POSIX
