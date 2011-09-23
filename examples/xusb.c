@@ -550,7 +550,7 @@ void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bR
 
 		// Read the header part
 		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR,
-			bRequest, iface_number << 8 || 0x00, os_fd[i].index, os_desc, os_fd[i].header_size, 1000);
+			bRequest, ((iface_number)<< 8)|0x00, os_fd[i].index, os_desc, os_fd[i].header_size, 1000);
 		if (r < os_fd[i].header_size) {
 			perr("   Failed: %s", (r<0)?libusb_strerror(r):"header size is too small");
 			return;
@@ -563,7 +563,7 @@ void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bR
 
 		// Read the full feature descriptor
 		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR,
-			bRequest, iface_number << 8 || 0x00, os_fd[i].index, os_desc, (uint16_t)length, 1000);
+			bRequest, ((iface_number)<< 8)|0x00, os_fd[i].index, os_desc, (uint16_t)length, 1000);
 		if (r < 0) {
 			perr("   Failed: %s", libusb_strerror(r));
 			return;
