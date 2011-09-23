@@ -1421,7 +1421,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					windows_device_priv_init(dev);
 					// Keep track of devices that need unref
 					unref_list[unref_cur++] = dev;
-					if (unref_cur > unref_size) {
+					if (unref_cur >= unref_size) {
 						unref_size += 64;
 						unref_list = realloc(unref_list, unref_size*sizeof(libusb_device*));
 						if (unref_list == NULL) {
