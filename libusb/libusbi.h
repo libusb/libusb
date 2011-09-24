@@ -26,6 +26,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#include <stdarg.h>
 #ifdef HAVE_POLL_H
 #include <poll.h>
 #endif
@@ -127,6 +128,9 @@ enum usbi_log_level {
 void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 	const char *function, const char *format, ...);
 
+void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
+	const char *function, const char *format, va_list args);
+
 #if !defined(_MSC_VER) || _MSC_VER > 1200
 
 #ifdef ENABLE_LOGGING
@@ -146,9 +150,6 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 #define usbi_err(ctx, ...) _usbi_log(ctx, LOG_LEVEL_ERROR, __VA_ARGS__)
 
 #else /* !defined(_MSC_VER) || _MSC_VER > 1200 */
-
-void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
-	const char *function, const char *format, va_list args);
 
 #ifdef ENABLE_LOGGING
 #define LOG_BODY(ctxt, level) \
