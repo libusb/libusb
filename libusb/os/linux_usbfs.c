@@ -71,6 +71,9 @@
 
 static const char *usbfs_path = NULL;
 
+/* use usbdev*.* device names in /dev instead of the usbfs bus directories */
+static int usbdev_names = 0;
+
 /* Linux 2.6.32 adds support for a bulk continuation URB flag. this basically
  * allows us to mark URBs as being part of a specific logical transfer when
  * we submit them to the kernel. then, on any error except a cancellation, all
@@ -148,8 +151,12 @@ struct linux_transfer_priv {
 
 static void _get_usbfs_path(struct libusb_device *dev, char *path)
 {
-	snprintf(path, PATH_MAX, "%s/%03d/%03d", usbfs_path, dev->bus_number,
-		dev->device_address);
+	if (usbdev_names)
+		snprintf(path, PATH_MAX, "%s/usbdev%d.%d",
+			usbfs_path, dev->bus_number, dev->device_address);
+	else
+		snprintf(path, PATH_MAX, "%s/%03d/%03d",
+			usbfs_path, dev->bus_number, dev->device_address);
 }
 
 static struct linux_device_priv *_device_priv(struct libusb_device *dev)
@@ -161,6 +168,23 @@ static struct linux_device_handle_priv *_device_handle_priv(
 	struct libusb_device_handle *handle)
 {
 	return (struct linux_device_handle_priv *) handle->os_priv;
+}
+
+/* check dirent for a /dev/usbdev%d.%d name
+ * optionally return bus/device on success */
+static int _is_usbdev_entry(struct dirent *entry, int *bus_p, int *dev_p)
+{
+	int busnum, devnum;
+
+	if (sscanf(entry->d_name, "usbdev%d.%d", &busnum, &devnum) != 2)
+		return 0;
+
+	usbi_dbg("found: %s", entry->d_name);
+	if (bus_p != NULL)
+		*bus_p = busnum;
+	if (dev_p != NULL)
+		*dev_p = devnum;
+	return 1;
 }
 
 static int check_usb_vfs(const char *dirname)
@@ -199,7 +223,29 @@ static const char *find_usbfs_path(void)
 			ret = path;
 	}
 
-	usbi_dbg("found usbfs at %s", ret);
+	/* look for /dev/usbdev*.* if the normal places fail */
+	if (ret == NULL) {
+		struct dirent *entry;
+		DIR *dir;
+
+		path = "/dev";
+		dir = opendir(path);
+		if (dir != NULL) {
+			while ((entry = readdir(dir)) != NULL) {
+				if (_is_usbdev_entry(entry, NULL, NULL)) {
+					/* found one; that's enough */
+					ret = path;
+					usbdev_names = 1;
+					break;
+				}
+			}
+			closedir(dir);
+		}
+	}
+
+	if (ret != NULL)
+		usbi_dbg("found usbfs at %s", ret);
+
 	return ret;
 }
 
@@ -1055,15 +1101,28 @@ static int usbfs_get_device_list(struct libusb_context *ctx,
 		if (entry->d_name[0] == '.')
 			continue;
 
-		busnum = atoi(entry->d_name);
-		if (busnum == 0) {
-			usbi_dbg("unknown dir entry %s", entry->d_name);
-			continue;
-		}
+		if (usbdev_names) {
+			int devaddr;
+			if (!_is_usbdev_entry(entry, &busnum, &devaddr))
+				continue;
 
-		r = usbfs_scan_busdir(ctx, &discdevs_new, busnum);
-		if (r < 0)
-			goto out;
+			r = enumerate_device(ctx, &discdevs_new, busnum,
+				(uint8_t) devaddr, NULL);
+			if (r < 0) {
+				usbi_dbg("failed to enumerate dir entry %s", entry->d_name);
+				continue;
+			}
+		} else {
+			busnum = atoi(entry->d_name);
+			if (busnum == 0) {
+				usbi_dbg("unknown dir entry %s", entry->d_name);
+				continue;
+			}
+
+			r = usbfs_scan_busdir(ctx, &discdevs_new, busnum);
+			if (r < 0)
+				goto out;
+		}
 		discdevs = discdevs_new;
 	}
 
