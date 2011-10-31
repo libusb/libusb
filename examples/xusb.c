@@ -747,7 +747,6 @@ int test_device(uint16_t vid, uint16_t pid)
 int main(int argc, char** argv)
 {
 	bool show_help = false;
-	bool got_vidpid = false;
 	bool debug_mode = false;
 	const struct libusb_version* version;
 	int j, r;
@@ -828,7 +827,6 @@ int main(int argc, char** argv)
 					}
 					VID = (uint16_t)tmp_vid;
 					PID = (uint16_t)tmp_pid;
-					got_vidpid = true;
 				} else {
 					show_help = true;
 				}
