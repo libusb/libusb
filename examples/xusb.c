@@ -27,7 +27,7 @@
 
 #include "libusb.h"
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #define msleep(msecs) Sleep(msecs)
 #else
 #include <unistd.h>
