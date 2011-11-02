@@ -69,7 +69,7 @@ inline static int perr(char const *format, ...)
 	return r;
 }
 
-#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror(errcode)); return -1; } while (0)
+#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)errcode)); return -1; } while (0)
 #define CALL_CHECK(fcall) do { r=fcall; if (r < 0) ERR_EXIT(r); } while (0);
 #define B(x) (((x)!=0)?1:0)
 #define be_to_int32(buf) (((buf)[0]<<24)|((buf)[1]<<16)|((buf)[2]<<8)|(buf)[3])
@@ -430,10 +430,10 @@ void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoi
 // Mass Storage device to test bulk transfers (non destructive test)
 int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoint_out)
 {
-	int r;
+	int r, size;
 	uint8_t lun;
 	uint32_t expected_tag;
-	uint32_t i, size, max_lba, block_size;
+	uint32_t i, max_lba, block_size;
 	double device_size;
 	uint8_t cdb[16];	// SCSI Command Descriptor Block
 	uint8_t buffer[64];
@@ -450,7 +450,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	if (r == 0) {
 		lun = 0;
 	} else if (r < 0) {
-		perr("   Failed: %s", libusb_strerror(r));
+		perr("   Failed: %s", libusb_strerror((enum libusb_error)r));
 	}
 	printf("   Max LUN = %d\n", lun);
 
@@ -495,7 +495,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 		get_sense(handle, endpoint_in, endpoint_out);
 	}
 
-	data = malloc(block_size);
+	data = (unsigned char*) calloc(1, block_size);
 	if (data == NULL) {
 		perr("   unable to allocate data buffer\n");
 		return -1;
@@ -503,7 +503,6 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 
 	// Send Read
 	printf("Attempting to read %d bytes:\n", block_size);
-	memset(data, 0, block_size);
 	memset(cdb, 0, sizeof(cdb));
 
 	cdb[0] = 0x28;	// Read(10)
@@ -517,7 +516,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	} else {
 		display_buffer_hex(data, size);
 		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-			junk = fwrite(data, 1, size, fd);
+			junk = fwrite(data, 1, (size_t)size, fd);
 			fclose(fd);
 		}
 	}
@@ -558,7 +557,7 @@ void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bR
 		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient,
 			bRequest, ((iface_number)<< 8)|0x00, os_fd[i].index, os_desc, os_fd[i].header_size, 1000);
 		if (r < os_fd[i].header_size) {
-			perr("   Failed: %s", (r<0)?libusb_strerror(r):"header size is too small");
+			perr("   Failed: %s", (r<0)?libusb_strerror((enum libusb_error)r):"header size is too small");
 			return;
 		}
 		le_type_punning_IS_fine = (void*)os_desc;
@@ -571,7 +570,7 @@ void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bR
 		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient,
 			bRequest, ((iface_number)<< 8)|0x00, os_fd[i].index, os_desc, (uint16_t)length, 1000);
 		if (r < 0) {
-			perr("   Failed: %s", libusb_strerror(r));
+			perr("   Failed: %s", libusb_strerror((enum libusb_error)r));
 			return;
 		} else {
 			display_buffer_hex(os_desc, r);
@@ -702,12 +701,12 @@ int test_device(uint16_t vid, uint16_t pid)
 		if (string_index[i] == 0) {
 			continue;
 		}
-		if (libusb_get_string_descriptor_ascii(handle, string_index[i], string, 128) >= 0) {
+		if (libusb_get_string_descriptor_ascii(handle, string_index[i], (unsigned char*)string, 128) >= 0) {
 			printf("   String (0x%02X): \"%s\"\n", string_index[i], string);
 		}
 	}
 	// Read the OS String Descriptor 
-	if (libusb_get_string_descriptor_ascii(handle, 0xEE, string, 128) >= 0) {
+	if (libusb_get_string_descriptor_ascii(handle, 0xEE, (unsigned char*)string, 128) >= 0) {
 		printf("   String (0x%02X): \"%s\"\n", 0xEE, string);
 		// If this is a Microsoft OS String Descriptor, 
 		// attempt to read the WinUSB extended Feature Descriptors
