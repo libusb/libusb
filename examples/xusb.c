@@ -440,7 +440,6 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	char vid[9], pid[9], rev[5];
 	unsigned char *data;
 	FILE *fd;
-	size_t junk;
 
 	printf("Reading Max LUN:\n");
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
@@ -516,7 +515,9 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	} else {
 		display_buffer_hex(data, size);
 		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-			junk = fwrite(data, 1, (size_t)size, fd);
+			if (fwrite(data, 1, (size_t)size, fd) != size) {
+				perr("   unable to write binary data\n");
+			}
 			fclose(fd);
 		}
 	}
