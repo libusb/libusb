@@ -164,31 +164,31 @@ void display_buffer_hex(unsigned char *buffer, unsigned size)
 	printf("\n" );
 }
 
-int initalize_ps3(libusb_device_handle *handle)
-{
-	int r;
-	uint8_t input_report[49];
-	CALL_CHECK(libusb_control_transfer(handle, 0x80, 0x06, 0x0001, 0x0, input_report, 0x12, 1000));
-	CALL_CHECK(libusb_control_transfer(handle, 0x80, 0x06, 0x0002, 0x0, input_report, 0x09, 1000));
-	CALL_CHECK(libusb_control_transfer(handle, 0x80, 0x06, 0x0002, 0x0, input_report, 0x29, 1000));
-	CALL_CHECK(libusb_control_transfer(handle, 0xa1, 0x01, 0x03f2, 0x0, input_report, 0x11, 1000));
-	CALL_CHECK(libusb_control_transfer(handle, 0xa1, 0x01, 0x03f5, 0x0, input_report, 0x08, 1000));
-	return 0;
-}
-
 // The PS3 Controller is really a HID device that got its HID Report Descriptors
 // removed by Sony
 int display_ps3_status(libusb_device_handle *handle)
 {
 	int r;
 	uint8_t input_report[49];
+	uint8_t master_bt_address[8];
+	uint8_t device_bt_address[18];
 
-	//Ensure the controller is initialized and ready to send its state
-	initalize_ps3(handle);
+	// Get the controller's bluetooth address of its master device
+	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+		HID_GET_REPORT, 0x03f5, 0, master_bt_address, sizeof(master_bt_address), 100));
+	printf("\nMaster's bluetooth address: %02X:%02X:%02X:%02X:%02X:%02X\n", master_bt_address[2], master_bt_address[3],
+		master_bt_address[4], master_bt_address[5], master_bt_address[6], master_bt_address[7]);
 
+	// Get the controller's bluetooth address
+	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+		HID_GET_REPORT, 0x03f2, 0, device_bt_address, sizeof(device_bt_address), 100));
+	printf("\nMaster's bluetooth address: %02X:%02X:%02X:%02X:%02X:%02X\n", device_bt_address[4], device_bt_address[5],
+		device_bt_address[6], device_bt_address[7], device_bt_address[8], device_bt_address[9]);
+
+	// Get the status of the controller's buttons via its HID report
 	printf("\nReading PS3 Input Report...\n");
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
-		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x01, 0, input_report, 49, 1000));
+		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x01, 0, input_report, sizeof(input_report), 1000));
 	switch(input_report[2]){	/** Direction pad plus start, select, and joystick buttons */
 		case 0x01:
 			printf("\tSELECT pressed\n");
@@ -539,12 +539,12 @@ void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bR
 		uint8_t recipient;
 		uint16_t index;
 		uint16_t header_size;
-	} os_fd[2] = { 
+	} os_fd[2] = {
 		{"Extended Compat ID", LIBUSB_RECIPIENT_DEVICE, 0x0004, 0x10},
 		{"Extended Properties", LIBUSB_RECIPIENT_DEVICE, 0x0005, 0x0A}
 		// NB: LIBUSB_RECIPIENT_INTERFACE should be used for the Extended Properties.
 		// However, for Interface requests, the WinUSB DLL forces the low byte of wIndex
-		// to the interface number, regardless of what you set it to, so we have to 
+		// to the interface number, regardless of what you set it to, so we have to
 		// fallback to Device and hope the firmware answers both equally.
 		// See http://www.lvr.com/forum/index.php?topic=331
 	};
@@ -639,10 +639,10 @@ int test_device(uint16_t vid, uint16_t pid)
 	CALL_CHECK(libusb_get_config_descriptor(dev, 0, &conf_desc));
 	nb_ifaces = conf_desc->bNumInterfaces;
 	printf("             nb interfaces: %d\n", nb_ifaces);
-	if (nb_ifaces > 0) 
+	if (nb_ifaces > 0)
 		first_iface = conf_desc->usb_interface[0].altsetting[0].bInterfaceNumber;
 	for (i=0; i<nb_ifaces; i++) {
-		printf("              interface[%d]: id = %d\n", i, 
+		printf("              interface[%d]: id = %d\n", i,
 			conf_desc->usb_interface[i].altsetting[0].bInterfaceNumber);
 		for (j=0; j<conf_desc->usb_interface[i].num_altsetting; j++) {
 			printf("interface[%d].altsetting[%d]: num endpoints = %d\n",
@@ -706,10 +706,10 @@ int test_device(uint16_t vid, uint16_t pid)
 			printf("   String (0x%02X): \"%s\"\n", string_index[i], string);
 		}
 	}
-	// Read the OS String Descriptor 
+	// Read the OS String Descriptor
 	if (libusb_get_string_descriptor_ascii(handle, 0xEE, (unsigned char*)string, 128) >= 0) {
 		printf("   String (0x%02X): \"%s\"\n", 0xEE, string);
-		// If this is a Microsoft OS String Descriptor, 
+		// If this is a Microsoft OS String Descriptor,
 		// attempt to read the WinUSB extended Feature Descriptors
 		if (strncmp(string, "MSFT100", 7) == 0)
 			read_ms_winsub_feature_descriptors(handle, string[7], first_iface);
