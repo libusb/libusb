@@ -244,11 +244,11 @@ struct driver_lookup {
 /*
  * API macros - from libusb-win32 1.x
  */
-#define DLL_DECLARE_PREFIXED(api, ret, prefix, name, args)    \
+#define DLL_DECLARE_PREFIXNAME(api, ret, prefixname, name, args)    \
 	typedef ret (api * __dll_##name##_t)args;                 \
-	static __dll_##name##_t prefix##name = NULL
+	static __dll_##name##_t prefixname = NULL
 
-#define DLL_LOAD_PREFIXED(dll, prefix, name, ret_on_failure)  \
+#define DLL_LOAD_PREFIXNAME(dll, prefixname, name, ret_on_failure) \
 	do {                                                      \
 		HMODULE h = GetModuleHandleA(#dll);                   \
 	if (!h)                                                   \
@@ -257,18 +257,20 @@ struct driver_lookup {
 		if (ret_on_failure) { return LIBUSB_ERROR_NOT_FOUND; }\
 		else { break; }                                       \
 	}                                                         \
-	prefix##name = (__dll_##name##_t)GetProcAddress(h, #name);\
-	if (prefix##name) break;                                  \
-	prefix##name = (__dll_##name##_t)GetProcAddress(h, #name "A");\
-	if (prefix##name) break;                                  \
-	prefix##name = (__dll_##name##_t)GetProcAddress(h, #name "W");\
-	if (prefix##name) break;                                  \
+	prefixname = (__dll_##name##_t)GetProcAddress(h, #name);       \
+	if (prefixname) break;                                         \
+	prefixname = (__dll_##name##_t)GetProcAddress(h, #name "A");   \
+	if (prefixname) break;                                         \
+	prefixname = (__dll_##name##_t)GetProcAddress(h, #name "W");   \
+	if (prefixname) break;                                         \
 	if(ret_on_failure)                                        \
 		return LIBUSB_ERROR_NOT_FOUND;                        \
 	} while(0)
 
-#define DLL_DECLARE(api, ret, name, args)   DLL_DECLARE_PREFIXED(api, ret, , name, args)
-#define DLL_LOAD(dll, name, ret_on_failure) DLL_LOAD_PREFIXED(dll, , name, ret_on_failure)
+#define DLL_DECLARE(api, ret, name, args)   DLL_DECLARE_PREFIXNAME(api, ret, name, name, args)
+#define DLL_LOAD(dll, name, ret_on_failure) DLL_LOAD_PREFIXNAME(dll, name, name, ret_on_failure)
+#define DLL_DECLARE_PREFIXED(api, ret, prefix, name, args)   DLL_DECLARE_PREFIXNAME(api, ret, prefix##name, name, args)
+#define DLL_LOAD_PREFIXED(dll, prefix, name, ret_on_failure) DLL_LOAD_PREFIXNAME(dll, prefix##name, name, ret_on_failure)
 
 /* OLE32 dependency */
 DLL_DECLARE_PREFIXED(WINAPI, HRESULT, p, CLSIDFromString, (LPCOLESTR, LPCLSID));
