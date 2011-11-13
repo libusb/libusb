@@ -26,13 +26,13 @@ autoheader || exit 1
 autoconf || exit 1
 automake -a -c || exit 1
 ./configure --enable-toggable-debug
-make
+make -j2
 mkdir -p $target/static
 mkdir -p $target/dll
 cp -v libusb/.libs/libusb-1.0.a $target/static
 cp -v libusb/.libs/libusb-1.0.dll $target/dll
 cp -v libusb/.libs/libusb-1.0.dll.a $target/dll
-make clean
+make clean -j2
 
 #
 # 64 bit binaries
@@ -43,7 +43,7 @@ export LDFLAGS=""
 export RCFLAGS=""
 export DLLTOOLFLAGS=""
 ./configure --enable-toggable-debug
-make
+make -j2
 mkdir -p $target/static
 mkdir -p $target/dll
 cp -v libusb/.libs/libusb-1.0.a $target/static
