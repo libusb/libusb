@@ -515,7 +515,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	} else {
 		display_buffer_hex(data, size);
 		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-			if (fwrite(data, 1, (size_t)size, fd) != size) {
+			if (fwrite(data, 1, (size_t)size, fd) != (unsigned int)size) {
 				perr("   unable to write binary data\n");
 			}
 			fclose(fd);
@@ -555,8 +555,8 @@ void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bR
 		printf("\nReading %s OS Feature Descriptor (wIndex = 0x%04d):\n", os_fd[i].desc, os_fd[i].index);
 
 		// Read the header part
-		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient,
-			bRequest, ((iface_number)<< 8)|0x00, os_fd[i].index, os_desc, os_fd[i].header_size, 1000);
+		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient),
+			bRequest, (uint16_t)(((iface_number)<< 8)|0x00), os_fd[i].index, os_desc, os_fd[i].header_size, 1000);
 		if (r < os_fd[i].header_size) {
 			perr("   Failed: %s", (r<0)?libusb_strerror((enum libusb_error)r):"header size is too small");
 			return;
@@ -568,8 +568,8 @@ void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bR
 		}
 
 		// Read the full feature descriptor
-		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient,
-			bRequest, ((iface_number)<< 8)|0x00, os_fd[i].index, os_desc, (uint16_t)length, 1000);
+		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient),
+			bRequest, (uint16_t)(((iface_number)<< 8)|0x00), os_fd[i].index, os_desc, (uint16_t)length, 1000);
 		if (r < 0) {
 			perr("   Failed: %s", libusb_strerror((enum libusb_error)r));
 			return;
