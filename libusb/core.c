@@ -1566,6 +1566,35 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+/** \ingroup dev
+ * Determine if libusb can access a device or interface.
+ *
+ * \param dev a device handle
+ * \param interface_number the interface to check. On Windows, it is acceptable
+ * to pass a negative value as the interface number, for composite devices that
+ * have been split by the OS into multiple ones (MI_##), in which case the
+ * interface associated with the Windows device is assumed.
+ * \returns LIBUSB_SUCCESS if libusb can access the interface
+ * \returns LIBUSB_ERROR_DETACHEABLE_DRIVER_IN_USE if a libusb incompatible
+ * but detacheable driver is preventing access. See libusb_detach_kernel_driver.
+ * \returns LIBUSB_ERROR_NON_DETACHEABLE_DRIVER_IN_USE if a libusb incompatible
+ * and non detacheable driver is preventing access
+ * \returns LIBUSB_ERROR_NO_DRIVER on Windows if no driver has been installed
+ * for this device
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED on platforms where the functionality
+ * is not available
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+int LIBUSB_CALL libusb_is_device_interface_accessible(libusb_device_handle *dev,
+	int interface_number)
+{
+	usbi_dbg("interface %d", interface_number);
+	if (usbi_backend->is_device_interface_accessible)
+		return usbi_backend->is_device_interface_accessible(dev, interface_number);
+	else
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 /** \ingroup lib
  * Set message verbosity.
  *  - Level 0: no messages ever printed by the library (default)
