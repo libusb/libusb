@@ -762,10 +762,10 @@ enum libusb_error {
 
 	// TODO: libusb_strerror
 	/** A detacheable kernel driver is in use */
-	LIBUSB_ERROR_DETACHEABLE_DRIVER_IN_USE = -13,
+	LIBUSB_ERROR_DETACHABLE_DRIVER_IN_USE = -13,
 
 	/** A non-detacheable driver is in use */
-	LIBUSB_ERROR_NON_DETACHEABLE_DRIVER_IN_USE = -14,
+	LIBUSB_ERROR_NON_DETACHABLE_DRIVER_IN_USE = -14,
 
 	/** A driver has not been installed for this device (Windows) */
 	LIBUSB_ERROR_NO_DRIVER = -15,

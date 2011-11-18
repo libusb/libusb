@@ -1574,6 +1574,9 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
  * to pass a negative value as the interface number, for composite devices that
  * have been split by the OS into multiple ones (MI_##), in which case the
  * interface associated with the Windows device is assumed.
+ * Note that this routine does not protect against races: Even if an interface
+ * is reported as available, there is a possibility that another driver may
+ * already be using it by the time the program tries to claim it.
  * \returns LIBUSB_SUCCESS if libusb can access the interface
  * \returns LIBUSB_ERROR_DETACHEABLE_DRIVER_IN_USE if a libusb incompatible
  * but detacheable driver is preventing access. See libusb_detach_kernel_driver.
@@ -1862,6 +1865,12 @@ const char * LIBUSB_CALL libusb_strerror(enum libusb_error error_code)
 		return "Insufficient memory";
 	case LIBUSB_ERROR_NOT_SUPPORTED:
 		return "Operation not supported or unimplemented on this platform";
+	case LIBUSB_ERROR_DETACHABLE_DRIVER_IN_USE:
+		return "An incompatible driver is in use. This driver can be detached on request";
+	case LIBUSB_ERROR_NON_DETACHABLE_DRIVER_IN_USE:
+		return "An incompatible and non detachable driver is in use. This driver should be replaced to allow libusb access";
+	case LIBUSB_ERROR_NO_DRIVER:
+		return "No driver is installed. A libusb compatible driver must be installed to allow access";
 	case LIBUSB_ERROR_OTHER:
 		return "Other error";
 	}
