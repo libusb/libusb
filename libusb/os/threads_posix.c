@@ -28,7 +28,7 @@
 #define _XOPEN_SOURCE 500
 #endif /* _XOPEN_SOURCE */
 
-#include <pthread.h>
+#include "threads_posix.h"
 
 int usbi_mutex_init_recursive(pthread_mutex_t *mutex, pthread_mutexattr_t *attr)
 {
