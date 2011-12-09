@@ -30,6 +30,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <libkern/OSAtomic.h>
 
 #include <mach/clock.h>
 #include <mach/clock_types.h>
@@ -55,7 +56,7 @@ static clock_serv_t clock_realtime;
 static clock_serv_t clock_monotonic;
 
 static CFRunLoopRef libusb_darwin_acfl = NULL; /* async cf loop */
-static int initCount = 0;
+static volatile int32_t initCount = 0;
 
 /* async event thread */
 static pthread_t libusb_darwin_at;
@@ -384,7 +385,7 @@ static void *event_thread_main (void *arg0) {
 static int darwin_init(struct libusb_context *ctx) {
   host_name_port_t host_self;
 
-  if (!(initCount++)) {
+  if (OSAtomicIncrement32Barrier(&initCount) == 1) {
     /* create the clocks that will be used */
 
     host_self = mach_host_self();
@@ -407,7 +408,7 @@ static int darwin_init(struct libusb_context *ctx) {
 }
 
 static void darwin_exit (void) {
-  if (!(--initCount)) {
+  if (OSAtomicDecrement32Barrier(&initCount) == 0) {
     mach_port_deallocate(mach_task_self(), clock_realtime);
     mach_port_deallocate(mach_task_self(), clock_monotonic);
 
