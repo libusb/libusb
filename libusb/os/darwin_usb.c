@@ -339,7 +339,7 @@ static void *event_thread_main (void *arg0) {
   /* add the notification port to the run loop */
   libusb_notification_port     = IONotificationPortCreate (kIOMasterPortDefault);
   libusb_notification_cfsource = IONotificationPortGetRunLoopSource (libusb_notification_port);
-  CFRunLoopAddSource(CFRunLoopGetCurrent (), libusb_notification_cfsource, kCFRunLoopDefaultMode);
+  CFRunLoopAddSource(runloop, libusb_notification_cfsource, kCFRunLoopDefaultMode);
 
   /* create notifications for removed devices */
   kresult = IOServiceAddMatchingNotification (libusb_notification_port, kIOTerminatedNotification,
@@ -359,7 +359,7 @@ static void *event_thread_main (void *arg0) {
   usbi_info (ctx, "thread ready to receive events");
 
   /* let the main thread know about the async runloop */
-  libusb_darwin_acfl = CFRunLoopGetCurrent ();
+  libusb_darwin_acfl = runloop;
 
   /* signal the main thread */
   pthread_mutex_lock (&libusb_darwin_at_mutex);
