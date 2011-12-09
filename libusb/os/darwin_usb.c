@@ -358,11 +358,9 @@ static void *event_thread_main (void *arg0) {
 
   usbi_info (ctx, "thread ready to receive events");
 
-  /* let the main thread know about the async runloop */
-  libusb_darwin_acfl = runloop;
-
   /* signal the main thread */
   pthread_mutex_lock (&libusb_darwin_at_mutex);
+  libusb_darwin_acfl = runloop;
   pthread_cond_signal (&libusb_darwin_at_cond);
   pthread_mutex_unlock (&libusb_darwin_at_mutex);
 
