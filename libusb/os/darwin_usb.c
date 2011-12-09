@@ -358,7 +358,7 @@ static void *event_thread_main (void *arg0) {
 
   usbi_info (ctx, "thread ready to receive events");
 
-  /* signal the main thread */
+  /* signal the main thread that the async runloop has been created. */
   pthread_mutex_lock (&libusb_darwin_at_mutex);
   libusb_darwin_acfl = runloop;
   pthread_cond_signal (&libusb_darwin_at_cond);
@@ -410,7 +410,7 @@ static void darwin_exit (void) {
     mach_port_deallocate(mach_task_self(), clock_realtime);
     mach_port_deallocate(mach_task_self(), clock_monotonic);
 
-    /* stop the async runloop */
+    /* stop the async runloop and wait for the thread to terminate. */
     CFRunLoopStop (libusb_darwin_acfl);
     pthread_join (libusb_darwin_at, NULL);
   }
