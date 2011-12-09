@@ -1563,11 +1563,10 @@ int API_EXPORTED libusb_init(libusb_context **context)
 {
 	char *dbg = getenv("LIBUSB_DEBUG");
 	struct libusb_context *ctx;
-	int r;
+	int r = 0;
 
 	usbi_mutex_static_lock(&default_context_lock);
 	if (!context && usbi_default_context) {
-		r = 0;
 		usbi_dbg("reusing default context");
 		default_context_refcnt++;
 		usbi_mutex_static_unlock(&default_context_lock);
