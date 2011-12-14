@@ -2397,6 +2397,8 @@ out:
 	usbi_mutex_unlock(&ctx->pollfds_lock);
 	return (const struct libusb_pollfd **) ret;
 #else
+	usbi_err(ctx, "external polling of libusb's internal descriptors "\
+		"is not yet supported on Windows platforms");
 	return NULL;
 #endif
 }
