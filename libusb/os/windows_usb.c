@@ -1097,6 +1097,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		case 0: dev->speed = LIBUSB_SPEED_LOW; break;
 		case 1: dev->speed = LIBUSB_SPEED_FULL; break;
 		case 2: dev->speed = LIBUSB_SPEED_HIGH; break;
+		case 3: dev->speed = LIBUSB_SPEED_SUPER; break;
 		default:
 			usbi_warn(ctx, "Got unknown device speed %d", conn_info.Speed);
 			break;
