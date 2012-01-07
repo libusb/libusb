@@ -1787,11 +1787,6 @@ static int windows_detach_kernel_driver(struct libusb_device_handle *dev_handle,
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int windows_is_device_interface_accessible(struct libusb_device_handle *handle, int iface)
-{
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
 static void windows_destroy_device(struct libusb_device *dev)
 {
 	windows_device_priv_release(dev);
@@ -2186,7 +2181,6 @@ const struct usbi_os_backend windows_backend = {
 	windows_kernel_driver_active,
 	windows_detach_kernel_driver,
 	windows_attach_kernel_driver,
-	windows_is_device_interface_accessible,
 
 	windows_destroy_device,
 

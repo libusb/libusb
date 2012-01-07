@@ -1566,38 +1566,6 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-/** \ingroup dev
- * Determine if libusb can access a device or interface.
- *
- * \param dev a device handle
- * \param interface_number the interface to check. On Windows, it is acceptable
- * to pass a negative value as the interface number, for composite devices that
- * have been split by the OS into multiple ones (MI_##), in which case the
- * interface associated with the Windows device is assumed.
- * Note that this routine does not protect against races: Even if an interface
- * is reported as available, there is a possibility that another driver may
- * already be using it by the time the program tries to claim it.
- * \returns LIBUSB_SUCCESS if libusb can access the interface
- * \returns LIBUSB_ERROR_DETACHEABLE_DRIVER_IN_USE if a libusb incompatible
- * but detacheable driver is preventing access. See libusb_detach_kernel_driver.
- * \returns LIBUSB_ERROR_NON_DETACHEABLE_DRIVER_IN_USE if a libusb incompatible
- * and non detacheable driver is preventing access
- * \returns LIBUSB_ERROR_NO_DRIVER on Windows if no driver has been installed
- * for this device
- * \returns LIBUSB_ERROR_NOT_SUPPORTED on platforms where the functionality
- * is not available
- * \returns another LIBUSB_ERROR code on other failure
- */
-int LIBUSB_CALL libusb_is_device_interface_accessible(libusb_device_handle *dev,
-	int interface_number)
-{
-	usbi_dbg("interface %d", interface_number);
-	if (usbi_backend->is_device_interface_accessible)
-		return usbi_backend->is_device_interface_accessible(dev, interface_number);
-	else
-		return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
 /** \ingroup lib
  * Set message verbosity.
  *  - Level 0: no messages ever printed by the library (default)
@@ -1865,12 +1833,6 @@ const char * LIBUSB_CALL libusb_strerror(enum libusb_error error_code)
 		return "Insufficient memory";
 	case LIBUSB_ERROR_NOT_SUPPORTED:
 		return "Operation not supported or unimplemented on this platform";
-	case LIBUSB_ERROR_DETACHABLE_DRIVER_IN_USE:
-		return "An incompatible driver is in use. This driver can be detached on request";
-	case LIBUSB_ERROR_NON_DETACHABLE_DRIVER_IN_USE:
-		return "An incompatible and non detachable driver is in use. This driver should be replaced to allow libusb access";
-	case LIBUSB_ERROR_NO_DRIVER:
-		return "No driver is installed. A libusb compatible driver must be installed to allow access";
 	case LIBUSB_ERROR_OTHER:
 		return "Other error";
 	}

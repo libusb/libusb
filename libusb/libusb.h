@@ -760,16 +760,6 @@ enum libusb_error {
 	/** Operation not supported or unimplemented on this platform */
 	LIBUSB_ERROR_NOT_SUPPORTED = -12,
 
-	// TODO: libusb_strerror
-	/** A detacheable kernel driver is in use */
-	LIBUSB_ERROR_DETACHABLE_DRIVER_IN_USE = -13,
-
-	/** A non-detacheable driver is in use */
-	LIBUSB_ERROR_NON_DETACHABLE_DRIVER_IN_USE = -14,
-
-	/** A driver has not been installed for this device (Windows) */
-	LIBUSB_ERROR_NO_DRIVER = -15,
-
 	/** Other error */
 	LIBUSB_ERROR_OTHER = -99
 
@@ -971,9 +961,6 @@ int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *dev,
 int LIBUSB_CALL libusb_detach_kernel_driver(libusb_device_handle *dev,
 	int interface_number);
 int LIBUSB_CALL libusb_attach_kernel_driver(libusb_device_handle *dev,
-	int interface_number);
-
-int LIBUSB_CALL libusb_is_device_interface_accessible(libusb_device_handle *dev,
 	int interface_number);
 
 /* async I/O */

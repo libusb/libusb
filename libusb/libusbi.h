@@ -774,19 +774,6 @@ struct usbi_os_backend {
 	int (*attach_kernel_driver)(struct libusb_device_handle *handle,
 		int interface_number);
 
-	/* Determine if libusb can access a device or interface.
-	 *
-	 * Return:
-	 * - LIBUSB_SUCCESS if libusb can access the interface
-	 * - LIBUSB_ERROR_DETACHEABLE_DRIVER_IN_USE if a detacheable driver is in use
-	 * - LIBUSB_ERROR_NON_DETACHEABLE_DRIVER_IN_USE if a libusb incompatible
-	 *   and non detacheable driver is in use
-	 * - LIBUSB_ERROR_NO_DRIVER if no driver has been installed (Windows)
-	* - another LIBUSB_ERROR code on other failure
-	 */
-	int (*is_device_interface_accessible)(struct libusb_device_handle *handle,
-		int interface_number);
-
 	/* Destroy a device. Optional.
 	 *
 	 * This function is called when the last reference to a device is
