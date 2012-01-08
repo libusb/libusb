@@ -184,11 +184,26 @@ static int usb_setup_device_iterator (io_iterator_t *deviceIterator, long locati
   return IOServiceGetMatchingServices(kIOMasterPortDefault, matchingDict, deviceIterator);
 }
 
-static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 *locationp) {
+int get_ioregistry_value_number (io_service_t service, CFStringRef property, CFNumberType type, void *p) {
+  CFTypeRef cfNumber = IORegistryEntryCreateCFProperty (service, property, kCFAllocatorDefault, 0);
+  int ret = 0;
+
+  if (cfNumber) {
+    if (CFGetTypeID(cfNumber) == CFNumberGetTypeID()) {
+      ret = CFNumberGetValue(cfNumber, type, p);
+    }
+
+    CFRelease (cfNumber);
+  }
+
+  return ret;
+}
+
+static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 *locationp, UInt8 *portp, UInt32 *parent_locationp) {
   io_cf_plugin_ref_t *plugInInterface = NULL;
   usb_device_t **device;
-  io_service_t usbDevice;
-  long result;
+  io_service_t usbDevice, parent;
+  kern_return_t result;
   SInt32 score;
 
   if (!IOIteratorIsValid (deviceIterator))
@@ -202,6 +217,22 @@ static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 
 
     /* we are done with the usb_device_t */
     (void)IOObjectRelease(usbDevice);
+
+    if (portp) {
+      *portp = 0;
+      (void) get_ioregistry_value_number (usbDevice, CFSTR("PortNum"), kCFNumberSInt8Type, portp);
+    }
+
+    if (parent_locationp) {
+      *parent_locationp = 0;
+
+      result = IORegistryEntryGetParentEntry (usbDevice, kIOUSBPlane, &parent);
+
+      if (kIOReturnSuccess == result) {
+	(void) get_ioregistry_value_number (parent, CFSTR("locationID"), kCFNumberLongType, parent_locationp);
+      }
+    }
+
     if (kIOReturnSuccess == result && plugInInterface)
       break;
 
@@ -234,7 +265,7 @@ static kern_return_t darwin_get_device (uint32_t dev_location, usb_device_t ***d
     return kresult;
 
   /* This port of libusb uses locations to keep track of devices. */
-  while ((*darwin_device = usb_get_next_device (deviceIterator, &location)) != NULL) {
+  while ((*darwin_device = usb_get_next_device (deviceIterator, &location, NULL, NULL)) != NULL) {
     if (location == dev_location)
       break;
 
@@ -259,28 +290,16 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
 
   io_service_t device;
   long location;
-  bool locationValid;
-  CFTypeRef locationCF;
   UInt32 message;
 
   usbi_info (ctx, "a device has been detached");
 
   while ((device = IOIteratorNext (rem_devices)) != 0) {
     /* get the location from the i/o registry */
-    locationCF = IORegistryEntryCreateCFProperty (device, CFSTR(kUSBDevicePropertyLocationID), kCFAllocatorDefault, 0);
 
-    IOObjectRelease (device);
-
-    if (!locationCF)
+    if (!get_ioregistry_value_number (device, CFSTR(kUSBDevicePropertyLocationID), kCFNumberLongType, &location)) {
       continue;
-
-    locationValid = CFGetTypeID(locationCF) == CFNumberGetTypeID() &&
-	    CFNumberGetValue(locationCF, kCFNumberLongType, &location);
-
-    CFRelease (locationCF);
-
-    if (!locationValid)
-      continue;
+    }
 
     usbi_mutex_lock(&ctx->open_devs_lock);
     list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
@@ -693,9 +712,11 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct li
   return 0;
 }
 
-static int process_new_device (struct libusb_context *ctx, usb_device_t **device, UInt32 locationID, struct discovered_devs **_discdevs) {
+static int process_new_device (struct libusb_context *ctx, usb_device_t **device, UInt32 locationID,
+			       UInt32 parent_location, UInt8 port, struct discovered_devs **_discdevs) {
   struct darwin_device_priv *priv;
-  struct libusb_device *dev;
+  static struct libusb_device *last_dev = NULL;
+  struct libusb_device *dev, *parent = NULL;
   struct discovered_devs *discdevs;
   UInt16                address;
   UInt8                 devSpeed;
@@ -728,6 +749,19 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     if (ret < 0)
       break;
 
+    /* the device iterator provides devices in increasing order of location. given this property
+     * we can use the last device to find the parent. */
+    for (parent = last_dev ; parent ; parent = parent->parent_dev) {
+      struct darwin_device_priv *parent_priv = (struct darwin_device_priv *) parent->os_priv;
+
+      if (parent_priv->location == parent_location) {
+	break;
+      }
+    }
+
+    dev->parent_dev = parent;
+
+    dev->port_number    = port;
     dev->bus_number     = locationID >> 24;
     dev->device_address = address;
 
@@ -758,8 +792,10 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     }
 
     *_discdevs = discdevs;
+    last_dev = dev;
 
-    usbi_info (ctx, "found device with address %d at %s", dev->device_address, priv->sys_path);
+    usbi_info (ctx, "found device with address %d port = %d parent = %p at %p", dev->device_address,
+	       dev->port_number, priv->sys_path, (void *) parent);
   } while (0);
 
   if (need_unref)
@@ -772,14 +808,16 @@ static int darwin_get_device_list(struct libusb_context *ctx, struct discovered_
   io_iterator_t        deviceIterator;
   usb_device_t         **device;
   kern_return_t        kresult;
-  UInt32               location;
+  UInt32               location, parent_location;
+  UInt8                port;
+  int ret = 0;
 
   kresult = usb_setup_device_iterator (&deviceIterator, 0);
   if (kresult != kIOReturnSuccess)
     return darwin_to_libusb (kresult);
 
-  while ((device = usb_get_next_device (deviceIterator, &location)) != NULL) {
-    (void) process_new_device (ctx, device, location, _discdevs);
+  while ((device = usb_get_next_device (deviceIterator, &location, &port, &parent_location)) != NULL) {
+    (void) process_new_device (ctx, device, location, parent_location, port, _discdevs);
 
     (*(device))->Release(device);
   }
