@@ -10,7 +10,7 @@
 #endif
 /* LIBUSB_NANO may be used for Windows internal versioning. 0 means unused. */
 #ifndef LIBUSB_NANO
-#define LIBUSB_NANO 10347
+#define LIBUSB_NANO 10348
 #endif
 /* LIBUSB_RC is the release candidate suffix. Should normally be empty. */
 #ifndef LIBUSB_RC
