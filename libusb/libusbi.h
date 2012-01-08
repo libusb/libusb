@@ -18,14 +18,15 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef __LIBUSBI_H__
-#define __LIBUSBI_H__
+#ifndef LIBUSBI_H
+#define LIBUSBI_H
 
 #include <config.h>
 
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#include <stdarg.h>
 #ifdef HAVE_POLL_H
 #include <poll.h>
 #endif
@@ -110,8 +111,8 @@ static inline void list_del(struct list_head *entry)
 }
 
 #define container_of(ptr, type, member) ({                      \
-        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-        (type *)( (char *)__mptr - offsetof(type,member) );})
+        const typeof( ((type *)0)->member ) *mptr = (ptr);    \
+        (type *)( (char *)mptr - offsetof(type,member) );})
 
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
 #define MAX(a, b)	((a) > (b) ? (a) : (b))
@@ -127,6 +128,9 @@ enum usbi_log_level {
 
 void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 	const char *function, const char *format, ...);
+
+void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
+	const char *function, const char *format, va_list args);
 
 #if !defined(_MSC_VER) || _MSC_VER > 1200
 
@@ -147,9 +151,6 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 #define usbi_err(ctx, ...) _usbi_log(ctx, LOG_LEVEL_ERROR, __VA_ARGS__)
 
 #else /* !defined(_MSC_VER) || _MSC_VER > 1200 */
-
-void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
-	const char *function, const char *format, va_list args);
 
 #ifdef ENABLE_LOGGING
 #define LOG_BODY(ctxt, level) \
@@ -187,7 +188,7 @@ static inline void usbi_dbg(const char *format, ...)
 #define HANDLE_CTX(handle) (DEVICE_CTX((handle)->dev))
 #define TRANSFER_CTX(transfer) (HANDLE_CTX((transfer)->dev_handle))
 #define ITRANSFER_CTX(transfer) \
-	(TRANSFER_CTX(__USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)))
+	(TRANSFER_CTX(USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)))
 
 /* Internal abstractions for thread synchronization and poll */
 #if defined(THREADS_POSIX)
@@ -342,13 +343,13 @@ enum usbi_transfer_flags {
 	USBI_TRANSFER_CANCELLING = 1 << 2,
 
 	/* Operation on the transfer failed because the device disappeared */
-	USBI_TRANSFER_DEVICE_DISAPPEARED = 1 << 3,	
+	USBI_TRANSFER_DEVICE_DISAPPEARED = 1 << 3,
 };
 
-#define __USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
+#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
 	((struct libusb_transfer *)(((unsigned char *)(transfer)) \
 		+ sizeof(struct usbi_transfer)))
-#define __LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer) \
+#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer) \
 	((struct usbi_transfer *)(((unsigned char *)(transfer)) \
 		- sizeof(struct usbi_transfer)))
 

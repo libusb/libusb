@@ -350,6 +350,16 @@ EXPORTS
   libusb_handle_events@32 = libusb_handle_events
   libusb_handle_events@4 = libusb_handle_events
   libusb_handle_events@8 = libusb_handle_events
+  libusb_handle_events_completed
+  libusb_handle_events_completed@0 = libusb_handle_events_completed
+  libusb_handle_events_completed@12 = libusb_handle_events_completed
+  libusb_handle_events_completed@16 = libusb_handle_events_completed
+  libusb_handle_events_completed@20 = libusb_handle_events_completed
+  libusb_handle_events_completed@24 = libusb_handle_events_completed
+  libusb_handle_events_completed@28 = libusb_handle_events_completed
+  libusb_handle_events_completed@32 = libusb_handle_events_completed
+  libusb_handle_events_completed@4 = libusb_handle_events_completed
+  libusb_handle_events_completed@8 = libusb_handle_events_completed
   libusb_handle_events_locked
   libusb_handle_events_locked@0 = libusb_handle_events_locked
   libusb_handle_events_locked@12 = libusb_handle_events_locked
@@ -370,6 +380,26 @@ EXPORTS
   libusb_handle_events_timeout@32 = libusb_handle_events_timeout
   libusb_handle_events_timeout@4 = libusb_handle_events_timeout
   libusb_handle_events_timeout@8 = libusb_handle_events_timeout
+  libusb_handle_events_timeout_completed
+  libusb_handle_events_timeout_completed@0 = libusb_handle_events_timeout_completed
+  libusb_handle_events_timeout_completed@12 = libusb_handle_events_timeout_completed
+  libusb_handle_events_timeout_completed@16 = libusb_handle_events_timeout_completed
+  libusb_handle_events_timeout_completed@20 = libusb_handle_events_timeout_completed
+  libusb_handle_events_timeout_completed@24 = libusb_handle_events_timeout_completed
+  libusb_handle_events_timeout_completed@28 = libusb_handle_events_timeout_completed
+  libusb_handle_events_timeout_completed@32 = libusb_handle_events_timeout_completed
+  libusb_handle_events_timeout_completed@4 = libusb_handle_events_timeout_completed
+  libusb_handle_events_timeout_completed@8 = libusb_handle_events_timeout_completed
+  libusb_has_capability
+  libusb_has_capability@0 = libusb_has_capability
+  libusb_has_capability@12 = libusb_has_capability
+  libusb_has_capability@16 = libusb_has_capability
+  libusb_has_capability@20 = libusb_has_capability
+  libusb_has_capability@24 = libusb_has_capability
+  libusb_has_capability@28 = libusb_has_capability
+  libusb_has_capability@32 = libusb_has_capability
+  libusb_has_capability@4 = libusb_has_capability
+  libusb_has_capability@8 = libusb_has_capability
   libusb_init
   libusb_init@0 = libusb_init
   libusb_init@12 = libusb_init

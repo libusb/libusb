@@ -135,7 +135,7 @@ struct darwin_device_handle_priv {
   CFRunLoopSourceRef   cfSource;
   int                  fds[2];
 
-  struct __darwin_interface {
+  struct darwin_interface {
     usb_interface_t    **interface;
     uint8_t              num_endpoints;
     CFRunLoopSourceRef   cfSource;

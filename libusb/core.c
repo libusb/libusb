@@ -551,10 +551,8 @@ int usbi_sanitize_device(struct libusb_device *dev)
 	if (num_configurations > USB_MAXCONFIG) {
 		usbi_err(DEVICE_CTX(dev), "too many configurations");
 		return LIBUSB_ERROR_IO;
-	} else if (num_configurations < 1) {
-		usbi_dbg("no configurations?");
-		return LIBUSB_ERROR_IO;
-	}
+	} else if (0 == num_configurations)
+		usbi_dbg("zero configurations, maybe an unauthorized device");
 
 	dev->num_configurations = num_configurations;
 	return 0;
@@ -597,8 +595,8 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
  * \param ctx the context to operate on, or NULL for the default context
  * \param list output location for a list of devices. Must be later freed with
  * libusb_free_device_list().
- * \returns the number of devices in the outputted list, or LIBUSB_ERROR_NO_MEM
- * on memory allocation failure.
+ * \returns the number of devices in the outputted list, or any
+ * \ref libusb_error according to errors encountered by the backend.
  */
 ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list)
@@ -739,12 +737,12 @@ uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 }
 
 /** \ingroup dev
- * Get the negotiated speed of the device.
+ * Get the negotiated connection speed for a device.
  * \param dev a device
- * \returns the device speed or LIBUSB_SPEED_UNKNOWN if the OS doesn't know or
- * support returning the negotiated speed.
+ * \returns a \ref libusb_speed code, where LIBUSB_SPEED_UNKNOWN means that
+ * the OS doesn't know or doesn't support returning the negotiated speed.
  */
-enum libusb_speed API_EXPORTED libusb_get_device_speed(libusb_device *dev)
+int API_EXPORTED libusb_get_device_speed(libusb_device *dev)
 {
 	return dev->speed;
 }
@@ -1003,6 +1001,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 
 	r = usbi_backend->open(_handle);
 	if (r < 0) {
+		usbi_dbg("open %d.%d returns %d", dev->bus_number, dev->device_address, r);
 		libusb_unref_device(dev);
 		usbi_mutex_destroy(&_handle->lock);
 		free(_handle);
@@ -1091,7 +1090,7 @@ static void do_close(struct libusb_context *ctx,
 	/* safe iteration because transfers may be being deleted */
 	list_for_each_entry_safe(itransfer, tmp, &ctx->flying_transfers, list, struct usbi_transfer) {
 		struct libusb_transfer *transfer =
-		        __USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		        USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
 		if (transfer->dev_handle != dev_handle)
 			continue;
@@ -1728,6 +1727,22 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	usbi_mutex_destroy(&ctx->open_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
 	free(ctx);
+}
+
+/** \ingroup misc
+ * Check at runtime if the loaded library has a given capability.
+ *
+ * \param capability the \ref libusb_capability to check for
+ * \returns 1 if the running library has the capability, 0 otherwise
+ */
+int API_EXPORTED libusb_has_capability(uint32_t capability)
+{
+	enum libusb_capability cap = capability;
+	switch (cap) {
+	case LIBUSB_CAP_HAS_CAPABILITY:
+		return 1;
+	}
+	return 0;
 }
 
 void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,

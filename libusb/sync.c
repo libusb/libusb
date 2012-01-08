@@ -102,13 +102,13 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 	}
 
 	while (!completed) {
-		r = libusb_handle_events(HANDLE_CTX(dev_handle));
+		r = libusb_handle_events_completed(HANDLE_CTX(dev_handle), &completed);
 		if (r < 0) {
 			if (r == LIBUSB_ERROR_INTERRUPTED)
 				continue;
 			libusb_cancel_transfer(transfer);
 			while (!completed)
-				if (libusb_handle_events(HANDLE_CTX(dev_handle)) < 0)
+				if (libusb_handle_events_completed(HANDLE_CTX(dev_handle), &completed) < 0)
 					break;
 			libusb_free_transfer(transfer);
 			return r;
@@ -131,6 +131,9 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 		break;
 	case LIBUSB_TRANSFER_NO_DEVICE:
 		r = LIBUSB_ERROR_NO_DEVICE;
+		break;
+	case LIBUSB_TRANSFER_OVERFLOW:
+		r = LIBUSB_ERROR_OVERFLOW;
 		break;
 	default:
 		usbi_warn(HANDLE_CTX(dev_handle),
@@ -172,13 +175,13 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	}
 
 	while (!completed) {
-		r = libusb_handle_events(HANDLE_CTX(dev_handle));
+		r = libusb_handle_events_completed(HANDLE_CTX(dev_handle), &completed);
 		if (r < 0) {
 			if (r == LIBUSB_ERROR_INTERRUPTED)
 				continue;
 			libusb_cancel_transfer(transfer);
 			while (!completed)
-				if (libusb_handle_events(HANDLE_CTX(dev_handle)) < 0)
+				if (libusb_handle_events_completed(HANDLE_CTX(dev_handle), &completed) < 0)
 					break;
 			libusb_free_transfer(transfer);
 			return r;

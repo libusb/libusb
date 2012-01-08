@@ -18,8 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef __LIBUSB_H__
-#define __LIBUSB_H__
+#ifndef LIBUSB_H
+#define LIBUSB_H
 
 #ifdef _MSC_VER
 /* on MS environments, the inline keyword is available in C++ only */
@@ -40,6 +40,7 @@
 #if defined(_MSC_VER) && (_MSC_VER < 1600) && (!defined(_STDINT)) && (!defined(_STDINT_H))
 typedef unsigned __int8   uint8_t;
 typedef unsigned __int16  uint16_t;
+typedef unsigned __int32  uint32_t;
 #else
 #include <stdint.h>
 #endif
@@ -717,8 +718,8 @@ enum libusb_speed {
 /** \ingroup misc
  * Error codes. Most libusb functions return 0 on success or one of these
  * codes on failure.
- * You can use libusb_strerror() to retrieve a short string description of
- * a libusb_error enumeration value.
+ * You can use libusb_strerror() to retrieve a short string description
+ * of an error code.
  */
 enum libusb_error {
 	/** Success (no error) */
@@ -900,11 +901,22 @@ struct libusb_transfer {
 	;
 };
 
+/** \ingroup misc
+ * Capabilities supported by this instance of libusb. Test if the loaded
+ * library supports a given capability by calling
+ * \ref libusb_has_capability().
+ */
+enum libusb_capability {
+	/** The libusb_has_capability() API is available. */
+	LIBUSB_CAP_HAS_CAPABILITY = 0,
+};
+
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
 const char * LIBUSB_CALL libusb_strerror(enum libusb_error errcode);
 const struct libusb_version * LIBUSB_CALL libusb_getversion(void);
+int LIBUSB_CALL libusb_has_capability(uint32_t capability);
 
 ssize_t LIBUSB_CALL libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);
@@ -930,7 +942,7 @@ uint8_t LIBUSB_CALL libusb_get_port_number(libusb_device *dev);
 libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev);
 int LIBUSB_CALL libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t* path, uint8_t path_length);
 uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *dev);
-enum libusb_speed LIBUSB_CALL libusb_get_device_speed(libusb_device *dev);
+int LIBUSB_CALL libusb_get_device_speed(libusb_device *dev);
 int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint);
 int LIBUSB_CALL libusb_get_max_iso_packet_size(libusb_device *dev,
@@ -1335,7 +1347,10 @@ int LIBUSB_CALL libusb_wait_for_event(libusb_context *ctx, struct timeval *tv);
 
 int LIBUSB_CALL libusb_handle_events_timeout(libusb_context *ctx,
 	struct timeval *tv);
+int LIBUSB_CALL libusb_handle_events_timeout_completed(libusb_context *ctx,
+	struct timeval *tv, int *completed);
 int LIBUSB_CALL libusb_handle_events(libusb_context *ctx);
+int LIBUSB_CALL libusb_handle_events_completed(libusb_context *ctx, int *completed);
 int LIBUSB_CALL libusb_handle_events_locked(libusb_context *ctx,
 	struct timeval *tv);
 int LIBUSB_CALL libusb_pollfds_handle_timeouts(libusb_context *ctx);

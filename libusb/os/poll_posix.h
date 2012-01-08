@@ -1,5 +1,5 @@
-#ifndef __LIBUSB_POLL_POSIX_H__
-#define __LIBUSB_POLL_POSIX_H__
+#ifndef LIBUSB_POLL_POSIX_H
+#define LIBUSB_POLL_POSIX_H
 
 #define usbi_write write
 #define usbi_read read
@@ -7,4 +7,4 @@
 #define usbi_pipe pipe
 #define usbi_poll poll
 
-#endif /* __LIBUSB_POLL_POSIX_H__ */
+#endif /* LIBUSB_POLL_POSIX_H */

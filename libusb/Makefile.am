@@ -31,6 +31,8 @@ pkg_v_rc_0 = @echo "  RC     $@";
 
 .rc.lo:
 	$(pkg_v_rc)$(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=RC --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
+
+libusb-1.0.rc: version.h
 endif
 
 if THREADS_POSIX

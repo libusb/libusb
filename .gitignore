@@ -9,6 +9,7 @@ libtool
 ltmain.sh
 missing
 stamp-h1
+m4/
 autom4te.cache
 install-sh
 depcomp
@@ -16,7 +17,8 @@ configure
 aclocal.m4
 compile
 config.guess
-config.h
+config.h*
+!msvc/config.h
 config.log
 config.status
 config.sub
@@ -26,10 +28,8 @@ lsusb
 xusb
 dpfp
 dpfp_threaded
-.exe
+*.exe
 *.pc
-fpusb-*.tar.bz2
-fpusb-*.tar.gz
 ChangeLog
 doc/html
 *.plg

@@ -18,8 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef __LIBUSB_USBFS_H__
-#define __LIBUSB_USBFS_H__
+#ifndef LIBUSB_USBFS_H
+#define LIBUSB_USBFS_H
 
 #define SYSFS_DEVICE_PATH "/sys/bus/usb/devices"
 

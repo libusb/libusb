@@ -18,7 +18,7 @@
 #define ENABLE_LOGGING 1
 
 /* Windows backend */
-#define OS_WINDOWS /**/
+#define OS_WINDOWS 1
 
 /* type of second poll() argument */
 #define POLL_NFDS_TYPE unsigned int

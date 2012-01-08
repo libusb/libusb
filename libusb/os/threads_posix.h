@@ -18,8 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef __LIBUSB_THREADS_POSIX_H__
-#define __LIBUSB_THREADS_POSIX_H__
+#ifndef LIBUSB_THREADS_POSIX_H
+#define LIBUSB_THREADS_POSIX_H
 
 #include <pthread.h>
 
@@ -41,8 +41,8 @@
 #define usbi_cond_timedwait		pthread_cond_timedwait
 #define usbi_cond_broadcast		pthread_cond_broadcast
 #define usbi_cond_destroy		pthread_cond_destroy
-#define usbi_cond_signal	pthread_cond_signal
+#define usbi_cond_signal		pthread_cond_signal
 
 extern int usbi_mutex_init_recursive(pthread_mutex_t *mutex, pthread_mutexattr_t *attr);
 
-#endif /* __LIBUSB_THREADS_POSIX_H__ */
+#endif /* LIBUSB_THREADS_POSIX_H */
