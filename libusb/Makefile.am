@@ -19,12 +19,8 @@ endif
 if OS_WINDOWS
 OS_SRC = $(WINDOWS_USB_SRC)
 
-pkg_v_rc = $(pkg_v_rc_$(V))
-pkg_v_rc_ = $(pkg_v_rc_$(AM_DEFAULT_VERBOSITY))
-pkg_v_rc_0 = @echo "  RC     $@";
-
 .rc.lo:
-	$(pkg_v_rc)$(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=RC --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
+	$(AM_V_GEN)$(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=RC --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
 
 libusb-1.0.rc: version.h
 endif
