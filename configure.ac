@@ -72,6 +72,17 @@ case $host in
 		[AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])],
 		[#include <poll.h>])
 	;;
+*-openbsd*)
+	AC_DEFINE(OS_OPENBSD, 1, [OpenBSD backend])
+	AC_SUBST(OS_OPENBSD)
+	AC_MSG_RESULT([OpenBSD])
+	backend="openbsd"
+	threads="posix"
+	THREAD_CFLAGS="-pthread"
+	PC_LIBS_PRIVATE="-pthread"
+	AC_CHECK_HEADERS([poll.h])
+	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
+	;;
 *-mingw*)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
@@ -98,6 +109,7 @@ LIBS="${LIBS} ${PC_LIBS_PRIVATE}"
 
 AM_CONDITIONAL(OS_LINUX, test "x$backend" = xlinux)
 AM_CONDITIONAL(OS_DARWIN, test "x$backend" = xdarwin)
+AM_CONDITIONAL(OS_OPENBSD, test "x$backend" = xopenbsd)
 AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
 if test "$threads" = posix; then

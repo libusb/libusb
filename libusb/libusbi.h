@@ -196,7 +196,7 @@ static inline void usbi_dbg(const char *format, ...)
 #include <os/threads_windows.h>
 #endif
 
-#if defined(OS_LINUX) || defined(OS_DARWIN)
+#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD)
 #include <unistd.h>
 #include <os/poll_posix.h>
 #elif defined(OS_WINDOWS)
@@ -884,6 +884,7 @@ extern const struct usbi_os_backend * const usbi_backend;
 
 extern const struct usbi_os_backend linux_usbfs_backend;
 extern const struct usbi_os_backend darwin_backend;
+extern const struct usbi_os_backend openbsd_backend;
 extern const struct usbi_os_backend windows_backend;
 
 #endif
