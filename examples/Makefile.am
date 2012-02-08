@@ -1,8 +1,8 @@
 INCLUDES = -I$(top_srcdir)/libusb
-noinst_PROGRAMS = lsusb
+noinst_PROGRAMS = listdevs
 
-lsusb_SOURCES = lsusb.c
-lsusb_LDADD = ../libusb/libusb-1.0.la
+listdevs_SOURCES = listdevs.c
+listdevs_LDADD = ../libusb/libusb-1.0.la
 
 if HAVE_SIGACTION
 dpfp_SOURCES = dpfp.c

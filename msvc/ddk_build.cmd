@@ -66,23 +66,23 @@ copy %srcPath%\libusb-%version%.lib %dstPath%\lib
 
 @echo off
 
-if exist examples\lsusb_ddkbuild goto md7
-md examples\lsusb_ddkbuild
+if exist examples\listdevs_ddkbuild goto md7
+md examples\listdevs_ddkbuild
 :md7
 
-cd examples\lsusb_ddkbuild
-copy ..\..\msvc\lsusb_sources sources >NUL 2>&1
+cd examples\listdevs_ddkbuild
+copy ..\..\msvc\listdevs_sources sources >NUL 2>&1
 @echo on
 build -cwgZ
 @echo off
-if errorlevel 1 goto buildlsusberror
+if errorlevel 1 goto buildlistdevserror
 cd ..\..
 
-set srcPath=examples\lsusb_ddkbuild\obj%BUILD_ALT_DIR%\%cpudir%
+set srcPath=examples\listdevs_ddkbuild\obj%BUILD_ALT_DIR%\%cpudir%
 @echo on
 
-copy %srcPath%\lsusb.exe %dstPath%\examples
-copy %srcPath%\lsusb.pdb %dstPath%\examples
+copy %srcPath%\listdevs.exe %dstPath%\examples
+copy %srcPath%\listdevs.pdb %dstPath%\examples
 
 cd msvc
 goto done
@@ -93,9 +93,9 @@ cd ..\..\msvc
 echo Build failed
 goto done
 
-:buildlsusberror
+:buildlistdevserror
 cd ..\..\msvc
-echo lsusb build failed
+echo listdevs build failed
 goto done
 
 :usage

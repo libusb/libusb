@@ -27,7 +27,7 @@ Package=<4>
 
 ###############################################################################
 
-Project: "lsusb"=".\lsusb.dsp" - Package Owner=<4>
+Project: "listdevs"=".\listdevs.dsp" - Package Owner=<4>
 
 Package=<5>
 {{{

@@ -1,4 +1,4 @@
-TARGETNAME=lsusb
+TARGETNAME=listdevs
 TARGETTYPE=PROGRAM
 386_STDCALL=0
 
@@ -16,4 +16,4 @@ USE_MSVCRT=1
 UMTYPE=console
 INCLUDES=..\..\libusb;$(DDK_INC_PATH)
 UMLIBS=..\..\libusb\os\obj$(BUILD_ALT_DIR)\*\libusb-1.0.lib
-SOURCES=..\lsusb.c
+SOURCES=..\listdevs.c

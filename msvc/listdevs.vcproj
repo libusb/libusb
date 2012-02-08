@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="8.00"
-	Name="lsusb"
+	Name="listdevs"
 	ProjectGUID="{98CFD8FA-EE20-40D5-AF13-F8C4856D6CA5}"
 	RootNamespace="examples"
 	Keyword="Win32Proj"
@@ -334,7 +334,7 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath="..\examples\lsusb.c"
+				RelativePath="..\examples\listdevs.c"
 				>
 				<FileConfiguration
 					Name="Release|Win32"
