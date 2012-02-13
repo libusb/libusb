@@ -1439,7 +1439,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = TRANSFER_CTX(transfer);
 	uint8_t flags;
-	int r;
+	int r = 0;
 
 	/* FIXME: could be more intelligent with the timerfd here. we don't need
 	 * to disarm the timerfd if there was no timer running, and we only need
@@ -1448,12 +1448,13 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
 	list_del(&itransfer->list);
-	r = arm_timerfd_for_next_timeout(ctx);
+	if (usbi_using_timerfd(ctx))
+		r = arm_timerfd_for_next_timeout(ctx);
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
-	if (r < 0) {
-		return r;
-	} else if (r == 0) {
+	if (usbi_using_timerfd(ctx)) {
+		if (r < 0)
+			return r;
 		r = disarm_timerfd(ctx);
 		if (r < 0)
 			return r;
