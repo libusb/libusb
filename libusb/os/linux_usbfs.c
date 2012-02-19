@@ -216,37 +216,35 @@ static clockid_t find_monotonic_clock(void)
 	return CLOCK_REALTIME;
 }
 
-/* bulk continuation URB flag available from Linux 2.6.32 */
-static int check_flag_bulk_continuation(void)
+static int kernel_version_ge(int major, int minor, int sublevel)
 {
 	struct utsname uts;
-	int atoms, major, minor, sublevel;
+	int atoms, kmajor, kminor, ksublevel;
 
 	if (uname(&uts) < 0)
 		return -1;
-	atoms = sscanf(uts.release, "%d.%d.%d", &major, &minor, &sublevel);
+	atoms = sscanf(uts.release, "%d.%d.%d", &kmajor, &kminor, &ksublevel);
 	if (atoms < 1)
 		return -1;
 
-	if (major > 2)
+	if (kmajor > major)
 		return 1;
-	if (major < 2)
+	if (kmajor < major)
 		return 0;
 
+	/* kmajor == major */
 	if (atoms < 2)
+		return 0 == minor && 0 == sublevel;
+	if (kminor > minor)
+		return 1;
+	if (kminor < minor)
 		return 0;
 
-	/* major == 2 */
-	if (minor < 6)
-		return 0;
-	if (minor > 6) /* Does not exist, just here for correctness */
-		return 1;
+	/* kminor == minor */
+	if (atoms < 3)
+		return 0 == sublevel;
 
-	/* 2.6.x */
-	if (3 == atoms && sublevel >= 32)
-		return 1;
-
-	return 0;
+	return ksublevel >= sublevel;
 }
 
 /* Return 1 if filename exists inside dirname in sysfs.
@@ -280,7 +278,8 @@ static int op_init(struct libusb_context *ctx)
 		monotonic_clkid = find_monotonic_clock();
 
 	if (supports_flag_bulk_continuation == -1) {
-		supports_flag_bulk_continuation = check_flag_bulk_continuation();
+		/* bulk continuation URB flag available from Linux 2.6.32 */
+		supports_flag_bulk_continuation = kernel_version_ge(2,6,32);
 		if (supports_flag_bulk_continuation == -1) {
 			usbi_err(ctx, "error checking for bulk continuation support");
 			return LIBUSB_ERROR_OTHER;
