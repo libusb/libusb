@@ -436,7 +436,7 @@ obsd_submit_transfer(struct usbi_transfer *itransfer)
 		err = _sync_control_transfer(itransfer);
 		break;
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		if (transfer->endpoint & LIBUSB_ENDPOINT_OUT) {
+		if (0 == transfer->endpoint & LIBUSB_ENDPOINT_IN) {
 			/* Isochronous write is not supported */
 			err = LIBUSB_ERROR_NOT_SUPPORTED;
 			break;
