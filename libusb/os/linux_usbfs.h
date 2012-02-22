@@ -64,6 +64,7 @@ struct usbfs_getdriver {
 #define USBFS_URB_ISO_ASAP			0x02
 #define USBFS_URB_BULK_CONTINUATION	0x04
 #define USBFS_URB_QUEUE_BULK		0x10
+#define USBFS_URB_ZERO_PACKET		0x40
 
 enum usbfs_urb_type {
 	USBFS_URB_TYPE_ISO = 0,

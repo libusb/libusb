@@ -1846,6 +1846,9 @@ static int windows_submit_transfer(struct usbi_transfer *itransfer)
 		return submit_control_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_BULK:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
+		if (0 == transfer->endpoint & LIBUSB_ENDPOINT_IN &&
+		    transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)
+			return LIBUSB_ERROR_NOT_SUPPORTED;
 		return submit_bulk_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		return submit_iso_transfer(itransfer);

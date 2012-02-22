@@ -285,6 +285,14 @@ if (cfg != desired)
  * kernel where boundaries occur between logical libusb-level transfers. When
  * a short transfer (or other error) occurs, the kernel will cancel all the
  * subtransfers until the boundary without allowing those transfers to start.
+ *
+ * \section zlp Zero length packets
+ *
+ * - libusb is able to send a packet of zero length to an endpoint simply by
+ * submitting a transfer of zero length. On Linux, this did not work with
+ * libusb versions prior to 1.0.3 and kernel versions prior to 2.6.31.
+ * - The \ref libusb_transfer_flags::LIBUSB_TRANSFER_ADD_ZERO_PACKET
+ * "LIBUSB_TRANSFER_ADD_ZERO_PACKET" flag is currently only supported on Linux.
  */
 
 /**

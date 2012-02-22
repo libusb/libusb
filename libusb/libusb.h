@@ -799,6 +799,31 @@ enum libusb_transfer_flags {
 	 * from your transfer callback, as this will result in a double-free
 	 * when this flag is acted upon. */
 	LIBUSB_TRANSFER_FREE_TRANSFER = 1<<2,
+
+	/** Terminate transfers that are a multiple of the endpoint's
+	 * wMaxPacketSize with an extra zero length packet. This is useful
+	 * when a device protocol mandates that each logical request is
+	 * terminated by an incomplete packet (i.e. the logical requests are
+	 * not separated by other means).
+	 *
+	 * This flag only affects host-to-device transfers to bulk and interrupt
+	 * endpoints. In other situations, it is ignored.
+	 *
+	 * This flag only affects transfers with a length that is a multiple of
+	 * the endpoint's wMaxPacketSize. On transfers of other lengths, this
+	 * flag has no effect. Therefore, if you are working with a device that
+	 * needs a ZLP whenever the end of the logical request falls on a packet
+	 * boundary, then it is sensible to set this flag on <em>every</em>
+	 * transfer (you do not have to worry about only setting it on transfers
+	 * that end on the boundary).
+	 *
+	 * This flag is currently only supported on Linux.
+	 * On other systems, libusb_submit_transfer() will return
+	 * LIBUSB_ERROR_NOT_SUPPORTED for every transfer where this flag is set.
+	 *
+	 * Available since libusb-1.0.9.
+	 */
+	LIBUSB_TRANSFER_ADD_ZERO_PACKET = 1 << 3,
 };
 
 /** \ingroup asyncio

@@ -88,6 +88,12 @@ static const char *usbfs_path = NULL;
  */
 static int supports_flag_bulk_continuation = -1;
 
+/* Linux 2.6.31 fixes support for the zero length packet URB flag. This
+ * allows us to mark URBs that should be followed by a zero length data
+ * packet, which can be required by device- or class-specific protocols.
+ */
+static int supports_flag_zero_packet = -1;
+
 /* clock ID for monotonic clock, as not all clock sources are available on all
  * systems. appropriate choice made at initialization time. */
 static clockid_t monotonic_clkid = -1;
@@ -288,6 +294,18 @@ static int op_init(struct libusb_context *ctx)
 
 	if (supports_flag_bulk_continuation)
 		usbi_dbg("bulk continuation flag supported");
+
+	if (-1 == supports_flag_zero_packet) {
+		/* zero length packet URB flag fixed since Linux 2.6.31 */
+		supports_flag_zero_packet = kernel_version_ge(2,6,31);
+		if (-1 == supports_flag_zero_packet) {
+			usbi_err(ctx, "error checking for zero length packet support");
+			return LIBUSB_ERROR_OTHER;
+		}
+	}
+
+	if (supports_flag_zero_packet)
+		usbi_dbg("zero length packet flag supported");
 
 	r = stat(SYSFS_DEVICE_PATH, &statbuf);
 	if (r == 0 && S_ISDIR(statbuf.st_mode)) {
@@ -1510,6 +1528,10 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 	if (tpriv->urbs)
 		return LIBUSB_ERROR_BUSY;
 
+	if (is_out && transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET &&
+	    !supports_flag_zero_packet)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
 	/* usbfs places a 16kb limit on bulk URBs. we divide up larger requests
 	 * into smaller units to meet such restriction, then fire off all the
 	 * units at once. it would be simpler if we just fired one unit at a time,
@@ -1553,6 +1575,11 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 
 		if (i > 0 && supports_flag_bulk_continuation)
 			urb->flags |= USBFS_URB_BULK_CONTINUATION;
+
+		/* we have already checked that the flag is supported */
+		if (is_out && i == num_urbs - 1 &&
+		    transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)
+			urb->flags |= USBFS_URB_ZERO_PACKET;
 
 		r = ioctl(dpriv->fd, IOCTL_USBFS_SUBMITURB, urb);
 		if (r < 0) {

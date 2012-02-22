@@ -1278,6 +1278,9 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   /* are we reading or writing? */
   is_read = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
+  if (!is_read && transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)
+    return LIBUSB_ERROR_NOT_SUPPORTED;
+
   if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
     usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
 

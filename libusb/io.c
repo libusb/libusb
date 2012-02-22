@@ -1281,6 +1281,8 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns LIBUSB_ERROR_BUSY if the transfer has already been submitted.
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED if the transfer flags are not supported
+ * by the operating system.
  * \returns another LIBUSB_ERROR code on other failure
  */
 int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
