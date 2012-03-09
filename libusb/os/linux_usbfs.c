@@ -1978,6 +1978,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	case -ENOENT: /* cancelled */
 	case -ECONNRESET:
 		break;
+	case -ENODEV:
 	case -ESHUTDOWN:
 		usbi_dbg("device removed");
 		tpriv->reap_status = LIBUSB_TRANSFER_NO_DEVICE;
@@ -1996,6 +1997,8 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	case -ETIME:
 	case -EPROTO:
 	case -EILSEQ:
+	case -ECOMM:
+	case -ENOSR:
 		usbi_dbg("low level error %d", urb->status);
 		tpriv->reap_action = ERROR;
 		goto cancel_remaining;
@@ -2107,19 +2110,16 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	case 0:
 		break;
 	case -ENOENT: /* cancelled */
+	case -ECONNRESET:
 		break;
 	case -ESHUTDOWN:
 		usbi_dbg("device removed");
 		status = LIBUSB_TRANSFER_NO_DEVICE;
 		break;
-	case -ETIME:
-	case -EPROTO:
-	case -EILSEQ:
-		usbi_dbg("low-level USB error %d", urb->status);
-		break;
 	default:
 		usbi_warn(TRANSFER_CTX(transfer),
 			"unrecognised urb status %d", urb->status);
+		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	}
 
@@ -2165,6 +2165,7 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	case -ENOENT: /* cancelled */
 		status = LIBUSB_TRANSFER_CANCELLED;
 		break;
+	case -ENODEV:
 	case -ESHUTDOWN:
 		usbi_dbg("device removed");
 		status = LIBUSB_TRANSFER_NO_DEVICE;
@@ -2173,9 +2174,15 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 		usbi_dbg("unsupported control request");
 		status = LIBUSB_TRANSFER_STALL;
 		break;
+	case -EOVERFLOW:
+		usbi_dbg("control overflow error");
+		status = LIBUSB_TRANSFER_OVERFLOW;
+		break;
 	case -ETIME:
 	case -EPROTO:
 	case -EILSEQ:
+	case -ECOMM:
+	case -ENOSR:
 		usbi_dbg("low-level bus error occurred");
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
