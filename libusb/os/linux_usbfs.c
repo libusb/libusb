@@ -2079,7 +2079,41 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		struct usbfs_iso_packet_desc *urb_desc = &urb->iso_frame_desc[i];
 		struct libusb_iso_packet_descriptor *lib_desc =
 			&transfer->iso_packet_desc[tpriv->iso_packet_offset++];
-		lib_desc->status = urb_desc->status;
+		lib_desc->status = LIBUSB_TRANSFER_COMPLETED;
+		switch (urb_desc->status) {
+		case 0:
+			break;
+		case -ENOENT: /* cancelled */
+		case -ECONNRESET:
+			break;
+		case -ENODEV:
+		case -ESHUTDOWN:
+			usbi_dbg("device removed");
+			lib_desc->status = LIBUSB_TRANSFER_NO_DEVICE;
+			break;
+		case -EPIPE:
+			usbi_dbg("detected endpoint stall");
+			lib_desc->status = LIBUSB_TRANSFER_STALL;
+			break;
+		case -EOVERFLOW:
+			usbi_dbg("overflow error");
+			lib_desc->status = LIBUSB_TRANSFER_OVERFLOW;
+			break;
+		case -ETIME:
+		case -EPROTO:
+		case -EILSEQ:
+		case -ECOMM:
+		case -ENOSR:
+		case -EXDEV:
+			usbi_dbg("low-level USB error %d", urb_desc->status);
+			lib_desc->status = LIBUSB_TRANSFER_ERROR;
+			break;
+		default:
+			usbi_warn(TRANSFER_CTX(transfer),
+				"unrecognised urb status %d", urb_desc->status);
+			lib_desc->status = LIBUSB_TRANSFER_ERROR;
+			break;
+		}
 		lib_desc->actual_length = urb_desc->actual_length;
 	}
 
