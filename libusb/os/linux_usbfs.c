@@ -2122,9 +2122,6 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	if (tpriv->reap_action != NORMAL) { /* cancelled or submit_fail */
 		usbi_dbg("CANCEL: urb status %d", urb->status);
 
-		if (status == LIBUSB_TRANSFER_COMPLETED)
-			status = LIBUSB_TRANSFER_ERROR;
-
 		if (tpriv->num_retired == num_urbs) {
 			usbi_dbg("CANCEL: last URB handled, reporting");
 			free_iso_urbs(tpriv);
