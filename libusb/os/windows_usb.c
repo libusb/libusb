@@ -1785,7 +1785,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	}
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
-		(short)((transfer->endpoint & LIBUSB_ENDPOINT_IN)?POLLIN:POLLOUT));
+		(short)(IS_XFERIN(transfer) ? POLLIN : POLLOUT));
 #if !defined(DYNAMIC_FDS)
 	usbi_fd_notification(ctx);
 #endif
@@ -1807,7 +1807,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	}
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
-		(short)((transfer->endpoint & LIBUSB_ENDPOINT_IN)?POLLIN:POLLOUT));
+		(short)(IS_XFERIN(transfer) ? POLLIN : POLLOUT));
 #if !defined(DYNAMIC_FDS)
 	usbi_fd_notification(ctx);
 #endif
@@ -1846,7 +1846,7 @@ static int windows_submit_transfer(struct usbi_transfer *itransfer)
 		return submit_control_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_BULK:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-		if (0 == transfer->endpoint & LIBUSB_ENDPOINT_IN &&
+		if (IS_XFEROUT(transfer) &&
 		    transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)
 			return LIBUSB_ERROR_NOT_SUPPORTED;
 		return submit_bulk_transfer(itransfer);
@@ -2687,7 +2687,7 @@ static int winusb_submit_bulk_transfer(struct usbi_transfer *itransfer)
 	struct windows_device_handle_priv *handle_priv = _device_handle_priv(transfer->dev_handle);
 	struct windows_device_priv *priv = _device_priv(transfer->dev_handle->dev);
 	HANDLE winusb_handle;
-	bool direction_in, ret;
+	bool ret;
 	int current_interface;
 	struct winfd wfd;
 
@@ -2704,15 +2704,14 @@ static int winusb_submit_bulk_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("matched endpoint %02X with interface %d", transfer->endpoint, current_interface);
 
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
-	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(winusb_handle, direction_in?_O_RDONLY:_O_WRONLY);
+	wfd = usbi_create_fd(winusb_handle, IS_XFERIN(transfer) ? _O_RDONLY : _O_WRONLY);
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	if (direction_in) {
+	if (IS_XFERIN(transfer)) {
 		usbi_dbg("reading %d bytes", transfer->length);
 		ret = WinUsb_ReadPipe(wfd.handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, wfd.overlapped);
 	} else {
@@ -2842,7 +2841,7 @@ static int winusb_reset_device(struct libusb_device_handle *dev_handle)
 						priv->usb_interface[i].endpoint[j], windows_error_str(0));
 				}
 				// FlushPipe seems to fail on OUT pipes
-				if ( (priv->usb_interface[i].endpoint[j] & LIBUSB_ENDPOINT_IN)
+				if (IS_EPIN(priv->usb_interface[i].endpoint[j])
 				  && (!WinUsb_FlushPipe(winusb_handle, priv->usb_interface[i].endpoint[j])) ) {
 					usbi_err(ctx, "WinUsb_FlushPipe (pipe address %02X) failed: %s",
 						priv->usb_interface[i].endpoint[j], windows_error_str(0));

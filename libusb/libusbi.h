@@ -189,6 +189,11 @@ static inline void usbi_dbg(const char *format, ...)
 #define ITRANSFER_CTX(transfer) \
 	(TRANSFER_CTX(USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)))
 
+#define IS_EPIN(ep) (0 != ((ep) & LIBUSB_ENDPOINT_IN))
+#define IS_EPOUT(ep) (!IS_EPIN(ep))
+#define IS_XFERIN(xfer) (0 != ((xfer)->endpoint & LIBUSB_ENDPOINT_IN))
+#define IS_XFEROUT(xfer) (!IS_XFERIN(xfer))
+
 /* Internal abstractions for thread synchronization and poll */
 #if defined(THREADS_POSIX)
 #include <os/threads_posix.h>

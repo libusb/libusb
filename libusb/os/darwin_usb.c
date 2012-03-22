@@ -1267,7 +1267,6 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
 
   IOReturn               ret;
-  uint8_t                is_read; /* 0 = we're reading, 1 = we're writing */
   uint8_t                transferType;
   /* None of the values below are used in libusb for bulk transfers */
   uint8_t                direction, number, interval, pipeRef, iface;
@@ -1275,10 +1274,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
 
   struct darwin_interface *cInterface;
 
-  /* are we reading or writing? */
-  is_read = transfer->endpoint & LIBUSB_ENDPOINT_IN;
-
-  if (!is_read && transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)
+  if (IS_XFEROUT(transfer) && transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)
     return LIBUSB_ERROR_NOT_SUPPORTED;
 
   if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
@@ -1295,7 +1291,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   /* submit the request */
   /* timeouts are unavailable on interrupt endpoints */
   if (transferType == kUSBInterrupt) {
-    if (is_read)
+    if (IS_XFERIN(transfer))
       ret = (*(cInterface->interface))->ReadPipeAsync(cInterface->interface, pipeRef, transfer->buffer,
 						      transfer->length, darwin_async_io_callback, itransfer);
     else
@@ -1304,7 +1300,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   } else {
     itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
-    if (is_read)
+    if (IS_XFERIN(transfer))
       ret = (*(cInterface->interface))->ReadPipeAsyncTO(cInterface->interface, pipeRef, transfer->buffer,
 							transfer->length, transfer->timeout, transfer->timeout,
 							darwin_async_io_callback, (void *)itransfer);
@@ -1315,7 +1311,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   }
 
   if (ret)
-    usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", is_read ? "In" : "Out",
+    usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
 	       darwin_error_str(ret), ret);
 
   return darwin_to_libusb (ret);
@@ -1327,16 +1323,12 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
 
   IOReturn                kresult;
-  uint8_t                 is_read; /* 0 = we're writing, 1 = we're reading */
   uint8_t                 pipeRef, iface;
   UInt64                  frame;
   AbsoluteTime            atTime;
   int                     i;
 
   struct darwin_interface *cInterface;
-
-  /* are we reading or writing? */
-  is_read = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
   /* construct an array of IOUSBIsocFrames, reuse the old one if possible */
   if (tpriv->isoc_framelist && tpriv->num_iso_packets != transfer->num_iso_packets) {
@@ -1381,7 +1373,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
     frame = cInterface->frames[transfer->endpoint];
 
   /* submit the request */
-  if (is_read)
+  if (IS_XFERIN(transfer))
     kresult = (*(cInterface->interface))->ReadIsochPipeAsync(cInterface->interface, pipeRef, transfer->buffer, frame,
 							     transfer->num_iso_packets, tpriv->isoc_framelist, darwin_async_io_callback,
 							     itransfer);
@@ -1393,7 +1385,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets / 8;
 
   if (kresult != kIOReturnSuccess) {
-    usbi_err (TRANSFER_CTX (transfer), "isochronous transfer failed (dir: %s): %s", is_read ? "In" : "Out",
+    usbi_err (TRANSFER_CTX (transfer), "isochronous transfer failed (dir: %s): %s", IS_XFERIN(transfer) ? "In" : "Out",
 	       darwin_error_str(kresult));
     free (tpriv->isoc_framelist);
     tpriv->isoc_framelist = NULL;

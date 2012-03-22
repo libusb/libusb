@@ -436,7 +436,7 @@ obsd_submit_transfer(struct usbi_transfer *itransfer)
 		err = _sync_control_transfer(itransfer);
 		break;
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		if (0 == transfer->endpoint & LIBUSB_ENDPOINT_IN) {
+		if (IS_XFEROUT(transfer)) {
 			/* Isochronous write is not supported */
 			err = LIBUSB_ERROR_NOT_SUPPORTED;
 			break;
@@ -445,7 +445,7 @@ obsd_submit_transfer(struct usbi_transfer *itransfer)
 		break;
 	case LIBUSB_TRANSFER_TYPE_BULK:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-		if (0 == transfer->endpoint & LIBUSB_ENDPOINT_IN &&
+		if (IS_XFEROUT(transfer) &&
 		    transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET) {
 			err = LIBUSB_ERROR_NOT_SUPPORTED;
 			break;
@@ -659,7 +659,7 @@ _access_endpoint(struct libusb_transfer *transfer)
 	dpriv = (struct device_priv *)transfer->dev_handle->dev->os_priv;
 
 	endpt = UE_GET_ADDR(transfer->endpoint);
-	mode = (transfer->endpoint & LIBUSB_ENDPOINT_IN) ? O_RDONLY : O_WRONLY;
+	mode = IS_XFERIN(transfer) ? O_RDONLY : O_WRONLY;
 
 	usbi_dbg("endpoint %d mode %d", endpt, mode);
 
@@ -698,7 +698,7 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 	if ((ioctl(fd, USB_SET_TIMEOUT, &transfer->timeout)) < 0)
 		return _errno_to_libusb(errno);
 
-	if (transfer->endpoint & LIBUSB_ENDPOINT_IN) {
+	if (IS_XFERIN(transfer)) {
 		if ((transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) == 0)
 			if ((ioctl(fd, USB_SET_SHORT_XFER, &nr)) < 0)
 				return _errno_to_libusb(errno);
