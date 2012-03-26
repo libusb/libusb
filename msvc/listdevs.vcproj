@@ -172,8 +172,8 @@
 		</Configuration>
 		<Configuration
 			Name="Debug|x64"
-			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)"
-			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)"
+			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)\examples"
+			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)\examples\$(ProjectName)"
 			ConfigurationType="1"
 			CharacterSet="1"
 			>
@@ -249,8 +249,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release|x64"
-			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)"
-			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)"
+			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)\examples"
+			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)\examples\$(ProjectName)"
 			ConfigurationType="1"
 			CharacterSet="1"
 			WholeProgramOptimization="1"

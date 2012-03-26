@@ -146,8 +146,8 @@
 		</Configuration>
 		<Configuration
 			Name="Debug|x64"
-			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)"
-			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)"
+			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)\lib"
+			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)\lib\libusb-1.0"
 			ConfigurationType="4"
 			CharacterSet="1"
 			>
@@ -211,8 +211,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release|x64"
-			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)"
-			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)"
+			OutputDirectory="..\$(PlatformName)\$(ConfigurationName)\lib"
+			IntermediateDirectory="..\$(PlatformName)\$(ConfigurationName)\lib\libusb-1.0"
 			ConfigurationType="4"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
