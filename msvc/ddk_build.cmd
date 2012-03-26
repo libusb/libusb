@@ -1,18 +1,20 @@
-@rem default builds static library.
-@rem you can pass the following arguments (case insensitive):
-@rem - "DLL" to build a DLL instead of a static library
-@rem - "/MT" to build a static library compatible with MSVC's /MT option (LIBCMT vs MSVCRT)
 @echo off
+::# default builds static library. 
+::# you can pass the following arguments (case insensitive):
+::# - "DLL" to build a DLL instead of a static library
+::# - "/MT" to build a static library compatible with MSVC's /MT option (LIBCMT vs MSVCRT)
 
 if Test%BUILD_ALT_DIR%==Test goto usage
 
-rem process commandline parameters
+::# process commandline parameters
 set TARGET=LIBRARY
 set STATIC_LIBC=
 set version=1.0
+set PWD=%~dp0
+set BUILD_CMD=build -bcwgZ -M2
 
 if "%1" == "" goto no_more_args
-rem /I for case insensitive
+::# /I for case insensitive
 if /I Test%1==TestDLL set TARGET=DYNLINK
 if /I Test%1==Test/MT set STATIC_LIBC=1
 :no_more_args
@@ -22,7 +24,7 @@ echo TARGETTYPE=%TARGET% > target
 copy target+..\..\msvc\libusb_sources sources >NUL 2>&1
 del target
 @echo on
-build -cwgZ
+%BUILD_CMD%
 @echo off
 if errorlevel 1 goto builderror
 cd ..\..
@@ -73,9 +75,9 @@ md examples\listdevs_ddkbuild
 cd examples\listdevs_ddkbuild
 copy ..\..\msvc\listdevs_sources sources >NUL 2>&1
 @echo on
-build -cwgZ
+%BUILD_CMD%
 @echo off
-if errorlevel 1 goto buildlistdevserror
+if errorlevel 1 goto builderror
 cd ..\..
 
 set srcPath=examples\listdevs_ddkbuild\obj%BUILD_ALT_DIR%\%cpudir%
@@ -84,18 +86,29 @@ set srcPath=examples\listdevs_ddkbuild\obj%BUILD_ALT_DIR%\%cpudir%
 copy %srcPath%\listdevs.exe %dstPath%\examples
 copy %srcPath%\listdevs.pdb %dstPath%\examples
 
+@echo off
+
+if exist examples\xusb_ddkbuild goto md8
+md examples\xusb_ddkbuild
+:md8
+
+cd examples\xusb_ddkbuild
+copy ..\..\msvc\xusb_sources sources >NUL 2>&1
+@echo on
+%BUILD_CMD%
+@echo off
+if errorlevel 1 goto builderror
+cd ..\..
+
+set srcPath=examples\xusb_ddkbuild\obj%BUILD_ALT_DIR%\%cpudir%
+@echo on
+
+copy %srcPath%\xusb.exe %dstPath%\examples
+copy %srcPath%\xusb.pdb %dstPath%\examples
+
+@echo off
+
 cd msvc
-goto done
-
-
-:builderror
-cd ..\..\msvc
-echo Build failed
-goto done
-
-:buildlistdevserror
-cd ..\..\msvc
-echo listdevs build failed
 goto done
 
 :usage
@@ -103,4 +116,8 @@ echo ddk_build must be run in a WDK build environment
 pause
 goto done
 
+:builderror
+echo Build failed
+
 :done
+cd %PWD%
