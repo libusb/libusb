@@ -2154,8 +2154,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		break;
 	}
 
-	/* if we're the last urb or we got less data than requested then we're
-	 * done */
+	/* if we're the last urb then we're done */
 	if (urb_idx == num_urbs) {
 		usbi_dbg("last URB in transfer --> complete!");
 		free_iso_urbs(tpriv);
