@@ -22,6 +22,15 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "listdevs", "listdevs.vcproj
 		{5AB6B770-1925-48D5-ABC2-930F3259C020} = {5AB6B770-1925-48D5-ABC2-930F3259C020}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xusb", "xusb.vcproj", "{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}"
+	ProjectSection(WebsiteProperties) = preProject
+		Debug.AspNetCompiler.Debug = "True"
+		Release.AspNetCompiler.Debug = "False"
+	EndProjectSection
+	ProjectSection(ProjectDependencies) = postProject
+		{5AB6B770-1925-48D5-ABC2-930F3259C020} = {5AB6B770-1925-48D5-ABC2-930F3259C020}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -54,6 +63,14 @@ Global
 		{98CFD8FA-EE20-40D5-AF13-F8C4856D6CA5}.Release|Win32.Build.0 = Release|Win32
 		{98CFD8FA-EE20-40D5-AF13-F8C4856D6CA5}.Release|x64.ActiveCfg = Release|x64
 		{98CFD8FA-EE20-40D5-AF13-F8C4856D6CA5}.Release|x64.Build.0 = Release|x64
+		{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}.Debug|Win32.ActiveCfg = Debug|Win32
+		{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}.Debug|Win32.Build.0 = Debug|Win32
+		{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}.Debug|x64.ActiveCfg = Debug|x64
+		{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}.Debug|x64.Build.0 = Debug|x64
+		{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}.Release|Win32.ActiveCfg = Release|Win32
+		{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}.Release|Win32.Build.0 = Release|Win32
+		{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}.Release|x64.ActiveCfg = Release|x64
+		{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
