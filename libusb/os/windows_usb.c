@@ -1179,7 +1179,7 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
  */
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs)
 {
-	struct discovered_devs *discdevs = *_discdevs;
+	struct discovered_devs *discdevs;
 	HDEVINFO dev_info = { 0 };
 	char* usb_class[2] = {"USB", "NUSB3"};
 	SP_DEVINFO_DATA dev_info_data;
@@ -1258,7 +1258,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			safe_free(dev_interface_details);
 			safe_free(dev_interface_path);
 			safe_free(dev_id_path);
-			session_id = 0;
 			priv = parent_priv = NULL;
 			dev = parent_dev = NULL;
 
