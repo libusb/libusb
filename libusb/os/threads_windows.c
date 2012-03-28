@@ -99,7 +99,6 @@ int usbi_cond_destroy(usbi_cond_t *cond) {
 		prev_pos = pos;
 	}
 	free(prev_pos);
-	prev_pos = pos = NULL;
 
 	return 0;
 }
