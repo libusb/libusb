@@ -5,3 +5,5 @@
 *.dsp eol=crlf whitespace=space-before-tab
 *.sln eol=crlf
 *.vcxproj* eol=crlf
+.gitattributes export-ignore
+.gitignore export-ignore
