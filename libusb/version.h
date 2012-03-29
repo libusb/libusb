@@ -6,7 +6,7 @@
 #define LIBUSB_MINOR 0
 #endif
 #ifndef LIBUSB_MICRO
-#define LIBUSB_MICRO 8
+#define LIBUSB_MICRO 9
 #endif
 /* LIBUSB_NANO may be used for Windows internal versioning. 0 means unused. */
 #ifndef LIBUSB_NANO
@@ -14,5 +14,5 @@
 #endif
 /* LIBUSB_RC is the release candidate suffix. Should normally be empty. */
 #ifndef LIBUSB_RC
-#define LIBUSB_RC ""
+#define LIBUSB_RC "-rc4"
 #endif
