@@ -1547,7 +1547,11 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 
   usbi_info (ITRANSFER_CTX (itransfer), "an async io operation has completed");
 
-  size = (UInt32) arg0;
+  /* The size should never be larger than 4 GB - Also see libusb bug #117 */
+  if ((intptr_t) arg0 > UINT32_MAX)
+    usbi_err (ITRANSFER_CTX (itransfer),
+      "async size truncation detected - please report this error");
+  size = (UInt32) (intptr_t) arg0;
 
   /* send a completion message to the device's file descriptor */
   message = MESSAGE_ASYNC_IO_COMPLETE;
