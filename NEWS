@@ -1,5 +1,13 @@
-This file lists notable changes in each release. For the full history of all
-changes, see ChangeLog.
+This file lists notable changes in each release. 
+For fine grained history, please see the git log at:
+http://libusbx.git.sourceforge.net/git/gitweb.cgi?p=libusbx/libusbx;a=log
+
+2012-03-30: v1.0.9-rc5
+* Add libusb_get_device_speed (all, except BSD) and libusb_error_name
+* Add Windows support (WinUSB driver only)
+* Add OpenBSD support
+* Add xusb sample
+* Tons of bug fixes
 
 2010-05-07: v1.0.8
 * Bug fixes
