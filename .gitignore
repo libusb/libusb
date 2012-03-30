@@ -30,7 +30,6 @@ dpfp
 dpfp_threaded
 *.exe
 *.pc
-ChangeLog
 doc/html
 *.plg
 *.ncb

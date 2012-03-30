@@ -1,7 +1,6 @@
 AUTOMAKE_OPTIONS = dist-bzip2 no-dist-gzip
 ACLOCAL_AMFLAGS = -I m4
 DISTCLEANFILES = libusb-1.0.pc
-MAINTAINERCLEANFILES = ChangeLog
 EXTRA_DIST = TODO PORTING
 SUBDIRS = libusb doc
 
@@ -12,11 +11,7 @@ endif
 pkgconfigdir=$(libdir)/pkgconfig
 pkgconfig_DATA=libusb-1.0.pc
 
-.PHONY: ChangeLog dist-up
-ChangeLog:
-	git --git-dir $(top_srcdir)/.git log > ChangeLog || touch ChangeLog
-
-dist-hook: ChangeLog
+.PHONY: dist-up
 
 reldir = .release/$(distdir)
 dist-up: dist
