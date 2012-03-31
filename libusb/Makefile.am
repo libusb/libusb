@@ -3,7 +3,8 @@ lib_LTLIBRARIES = libusb-1.0.la
 LINUX_USBFS_SRC = os/linux_usbfs.c
 DARWIN_USB_SRC = os/darwin_usb.c
 OPENBSD_USB_SRC = os/openbsd_usb.c
-WINDOWS_USB_SRC = os/poll_windows.c os/windows_usb.c libusb-1.0.rc
+WINDOWS_USB_SRC = os/poll_windows.c os/windows_usb.c libusb-1.0.rc \
+	libusb-1.0.def
 
 EXTRA_DIST = $(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) $(OPENBSD_USB_SRC) \
 	$(WINDOWS_USB_SRC) os/threads_posix.c os/threads_windows.c
