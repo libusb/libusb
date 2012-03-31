@@ -52,9 +52,9 @@
 #if defined(DEBUG_POLL_WINDOWS)
 #define poll_dbg usbi_dbg
 #else
-// MSVC6 cannot use a variadic argument and non MSVC
-// compilers produce warnings if parenthesis are ommitted.
-#if defined(_MSC_VER)
+// MSVC++ < 2005 cannot use a variadic argument and non MSVC
+// compilers produce warnings if parenthesis are omitted.
+#if defined(_MSC_VER) && _MSC_VER < 1400
 #define poll_dbg
 #else
 #define poll_dbg(...)

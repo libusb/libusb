@@ -131,7 +131,7 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
 void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	const char *function, const char *format, va_list args);
 
-#if !defined(_MSC_VER) || _MSC_VER > 1200
+#if !defined(_MSC_VER) || _MSC_VER >= 1400
 
 #ifdef ENABLE_LOGGING
 #define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __FUNCTION__, __VA_ARGS__)
@@ -149,10 +149,13 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 #define usbi_warn(ctx, ...) _usbi_log(ctx, LOG_LEVEL_WARNING, __VA_ARGS__)
 #define usbi_err(ctx, ...) _usbi_log(ctx, LOG_LEVEL_ERROR, __VA_ARGS__)
 
-#else /* !defined(_MSC_VER) || _MSC_VER > 1200 */
+#else /* !defined(_MSC_VER) || _MSC_VER >= 1400 */
 
 /* Old MS compilers don't support variadic macros. The code is simple, so we
  * repeat it for each loglevel. Note that the debug case is special.
+ *
+ * Support for variadic macros was introduced in Visual C++ 2005.
+ * http://msdn.microsoft.com/en-us/library/ms177415%28v=VS.80%29.aspx
  */
 
 static inline void usbi_info(struct libusb_context *ctx, const char *fmt, ...)
@@ -203,7 +206,7 @@ static inline void usbi_dbg(const char *fmt, ...)
 #endif
 }
 
-#endif /* !defined(_MSC_VER) || _MSC_VER > 1200 */
+#endif /* !defined(_MSC_VER) || _MSC_VER >= 1400 */
 
 #define USBI_GET_CONTEXT(ctx) if (!(ctx)) (ctx) = usbi_default_context
 #define DEVICE_CTX(dev) ((dev)->ctx)
