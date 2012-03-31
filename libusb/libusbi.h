@@ -151,34 +151,57 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 
 #else /* !defined(_MSC_VER) || _MSC_VER > 1200 */
 
+/* Old MS compilers don't support variadic macros. The code is simple, so we
+ * repeat it for each loglevel. Note that the debug case is special.
+ */
+
+static inline void usbi_info(struct libusb_context *ctx, const char *fmt, ...)
+{
 #ifdef ENABLE_LOGGING
-#define LOG_BODY(ctxt, level) \
-{                             \
-	va_list args;             \
-	va_start (args, format);  \
-	usbi_log_v(ctxt, level, "", format, args); \
-	va_end(args);             \
+	va_list args;
+	va_start(args, fmt);
+	usbi_log_v(ctx, LOG_LEVEL_INFO, "", fmt, args);
+	va_end(args);
+#else
+	(void)ctx;
+#endif
 }
+
+static inline void usbi_warn(struct libusb_context *ctx, const char *fmt, ...)
+{
+#ifdef ENABLE_LOGGING
+	va_list args;
+	va_start(args, fmt);
+	usbi_log_v(ctx, LOG_LEVEL_WARNING, "", fmt, args);
+	va_end(args);
 #else
-#define LOG_BODY(ctxt, level) do { (void)(ctxt); } while(0)
+	(void)ctx;
 #endif
+}
 
-static inline void usbi_info(struct libusb_context *ctx, const char *format,
-	...)
-	LOG_BODY(ctx,LOG_LEVEL_INFO)
-static inline void usbi_warn(struct libusb_context *ctx, const char *format,
-	...)
-	LOG_BODY(ctx,LOG_LEVEL_WARNING)
-static inline void usbi_err( struct libusb_context *ctx, const char *format,
-	...)
-	LOG_BODY(ctx,LOG_LEVEL_ERROR)
+static inline void usbi_err(struct libusb_context *ctx, const char *fmt, ...)
+{
+#ifdef ENABLE_LOGGING
+	va_list args;
+	va_start(args, fmt);
+	usbi_log_v(ctx, LOG_LEVEL_ERROR, "", fmt, args);
+	va_end(args);
+#else
+	(void)ctx;
+#endif
+}
 
-static inline void usbi_dbg(const char *format, ...)
+static inline void usbi_dbg(const char *fmt, ...)
+{
 #ifdef ENABLE_DEBUG_LOGGING
-	LOG_BODY(NULL,LOG_LEVEL_DEBUG)
+	va_list args;
+	va_start(args, fmt);
+	usbi_log_v(NULL, LOG_LEVEL_DEBUG, "", fmt, args);
+	va_end(args);
 #else
-{ }
+	(void)fmt;
 #endif
+}
 
 #endif /* !defined(_MSC_VER) || _MSC_VER > 1200 */
 
