@@ -551,7 +551,7 @@ void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bR
 
 		// Read the header part
 		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|LIBUSB_RECIPIENT_DEVICE),
-			// NB: We should use os_fd[i].recipient instead of LIBUSB_RECIPIENT_DEVICE above, as 
+			// NB: We should use os_fd[i].recipient instead of LIBUSB_RECIPIENT_DEVICE above, as
 			// LIBUSB_RECIPIENT_INTERFACE should be used for the Extended Properties.
 			// However, for Interface requests, the WinUSB DLL forces the low byte of wIndex
 			// to the interface number, regardless of what you set it to, so we have to
@@ -584,7 +584,7 @@ int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
 	libusb_device *dev;
-#ifdef HAS_GETPORTPATH	
+#ifdef HAS_GETPORTPATH
 	uint8_t bus, port_path[8];
 #endif
 	struct libusb_config_descriptor *conf_desc;
@@ -759,7 +759,7 @@ int main(int argc, char** argv)
 {
 	bool show_help = false;
 	bool debug_mode = false;
-#ifdef HAS_GETVERSION	
+#ifdef HAS_GETVERSION
 	const struct libusb_version* version;
 #endif
 	int j, r;
