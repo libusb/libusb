@@ -2,7 +2,8 @@ This file lists notable changes in each release.
 For fine grained history, please see the git log at:
 http://libusbx.git.sourceforge.net/git/gitweb.cgi?p=libusbx/libusbx;a=log
 
-2012-03-30: v1.0.9-rc5
+2012-04-02: v1.0.9
+* First libusbx release
 * Add libusb_get_device_speed (all, except BSD) and libusb_error_name
 * Add Windows support (WinUSB driver only)
 * Add OpenBSD support
@@ -61,4 +62,3 @@ http://libusbx.git.sourceforge.net/git/gitweb.cgi?p=libusbx/libusbx;a=log
 
 2008-05-25: v0.9.0 release
  * First libusb-1.0 beta release
-

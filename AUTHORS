@@ -1,24 +1,40 @@
-Copyright (C) 2007-2009 Daniel Drake <dsd@gentoo.org>
-Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
-Copyright (C) 2008-2010 Nathan Hjelm <hjelmn@users.sourceforge.net>
-Copyright (C) 2009-2010 Pete Batard <pbatard@gmail.com>
-Copyright (C) 2010 Michael Plante <michael.plante@gmail.com>
+Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
+Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
+Copyright © 2008-2011 Nathan Hjelm <hjelmn@users.sourceforge.net>
+Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
+Copyright © 2010-2012 Michael Plante <michael.plante@gmail.com>
+Copyright © 2011-2012 Hans de Goede <hdegoede@redhat.com>
+Copyright © 2012 Martin Pieuchot <mpi@openbsd.org>
 
 Other contributors:
+Alan Ott
+Alan Stern
 Alex Vatchenko
 Artem Egorkine
 Aurelien Jarno
 Bastien Nocera
+Dave Camarillo
 David Engraf
 David Moore
 Felipe Balbi
+Francesco Montorsi
+Graeme Gill
 Hans Ulrich Niedermann
+Hector Martin
 Hoi-Ho Chan
+Konrad Rzepecki
 Ludovic Rousseau
 Martin Koegler
+Mike Frysinger
 Mikhail Gusarov
+Pekka Nikander
 Peter Stuge
 Rob Walker
+Sean McBride
+Sebastian Pipping
+Thomas Röfer
 Toby Peterson
+Trygve Laugstøl
 Vasily Khoruzhick
-
+Vitali Lovich
+Xiaofan Chen
