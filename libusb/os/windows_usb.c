@@ -702,7 +702,7 @@ static void auto_release(struct usbi_transfer *itransfer)
  * init: libusbx backend init function
  *
  * This function enumerates the HCDs (Host Controller Drivers) and populates our private HCD list
- * In our implementation, we equate Windows' "HCD" to LibUSB's "bus". Note that bus is zero indexed.
+ * In our implementation, we equate Windows' "HCD" to libusbx's "bus". Note that bus is zero indexed.
  * HCDs are not expected to change after init (might not hold true for hot pluggable USB PCI card?)
  */
 static int windows_init(struct libusb_context *ctx)

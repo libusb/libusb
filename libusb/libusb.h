@@ -67,7 +67,7 @@ typedef unsigned __int32  uint32_t;
 
 /** \def LIBUSB_CALL
  * \ingroup misc
- * libusb's Windows calling convention.
+ * libusbx's Windows calling convention.
  *
  * Under Windows, the selection of available compilers and configurations
  * means that, unlike other platforms, there is not <em>one true calling

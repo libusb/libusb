@@ -129,7 +129,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  * above.
  *
  * Instead of providing which functions that block until the I/O has complete,
- * libusb's asynchronous interface presents non-blocking functions which
+ * libusbx's asynchronous interface presents non-blocking functions which
  * begin a transfer and then return immediately. Your application passes a
  * callback function pointer to this non-blocking function, which libusbx will
  * call with the results of the transaction when it has completed.
@@ -157,7 +157,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  * results are handled. This becomes particularly obvious when you want to
  * submit a second transfer based on the results of an earlier transfer.
  *
- * Internally, libusb's synchronous interface is expressed in terms of function
+ * Internally, libusbx's synchronous interface is expressed in terms of function
  * calls to the asynchronous interface.
  *
  * For details on how to use the asynchronous API, see the
@@ -210,7 +210,7 @@ if (r == 0 && actual_length == sizeof(data)) {
 /**
  * @defgroup asyncio Asynchronous device I/O
  *
- * This page details libusb's asynchronous (non-blocking) API for USB device
+ * This page details libusbx's asynchronous (non-blocking) API for USB device
  * I/O. This interface is very powerful but is also quite complex - you will
  * need to read this page carefully to understand the necessary considerations
  * and issues surrounding use of this interface. Simplistic applications
@@ -524,14 +524,14 @@ if (r == 0 && actual_length == sizeof(data)) {
  * this. Your main loop is probably already calling poll() or select() or a
  * variant on a set of file descriptors for other event sources (e.g. keyboard
  * button presses, mouse movements, network sockets, etc). You then add
- * libusb's file descriptors to your poll()/select() calls, and when activity
+ * libusbx's file descriptors to your poll()/select() calls, and when activity
  * is detected on such descriptors you know it is time to call
  * libusb_handle_events().
  *
  * There is one final event handling complication. libusbx supports
  * asynchronous transfers which time out after a specified time period, and
  * this requires that libusbx is called into at or after the timeout so that
- * the timeout can be handled. So, in addition to considering libusb's file
+ * the timeout can be handled. So, in addition to considering libusbx's file
  * descriptors in your main event loop, you must also consider that libusbx
  * sometimes needs to be called into at fixed points in time even when there
  * is no file descriptor activity.
@@ -543,7 +543,7 @@ if (r == 0 && actual_length == sizeof(data)) {
 /**
  * @defgroup poll Polling and timing
  *
- * This page documents libusb's functions for polling events and timing.
+ * This page documents libusbx's functions for polling events and timing.
  * These functions are only necessary for users of the
  * \ref asyncio "asynchronous API". If you are only using the simpler
  * \ref syncio "synchronous API" then you do not need to ever call these
@@ -593,7 +593,7 @@ while (user_has_not_requested_exit)
  *
  * In addition to polling file descriptors for the other event sources, you
  * take a set of file descriptors from libusbx and monitor those too. When you
- * detect activity on libusb's file descriptors, you call
+ * detect activity on libusbx's file descriptors, you call
  * libusb_handle_events_timeout() in non-blocking mode.
  *
  * What's more, libusbx may also need to handle events at specific moments in
@@ -671,7 +671,7 @@ while (user has not requested application exit) {
  *
  * You can use the libusb_pollfds_handle_timeouts() function to do a runtime
  * check to see if it is safe to ignore the time-based event complications.
- * If your application has taken the shortcut of ignoring libusb's next timeout
+ * If your application has taken the shortcut of ignoring libusbx's next timeout
  * in your main loop, then you are advised to check the return value of
  * libusb_pollfds_handle_timeouts() during application startup, and to abort
  * if the platform does suffer from these timing complications.
@@ -710,7 +710,7 @@ while (user has not requested application exit) {
  * asynchonrous interface, therefore the same considerations apply.
  *
  * The issue is that if two or more threads are concurrently calling poll()
- * or select() on libusb's file descriptors then only one of those threads
+ * or select() on libusbx's file descriptors then only one of those threads
  * will be woken up when an event arrives. The others will be completely
  * oblivious that anything has happened.
  *
@@ -753,7 +753,7 @@ void myfunc() {
  * The poll() loop has a long timeout to minimize CPU usage during situations
  * when nothing is happening (it could reasonably be unlimited).
  *
- * If this is the only thread that is polling libusb's file descriptors, there
+ * If this is the only thread that is polling libusbx's file descriptors, there
  * is no problem: there is no danger that another thread will swallow up the
  * event that we are interested in. On the other hand, if there is another
  * thread polling the same descriptors, there is a chance that it will receive
@@ -820,7 +820,7 @@ void myfunc() {
  * The problem is when we consider the fact that libusbx exposes file
  * descriptors to allow for you to integrate asynchronous USB I/O into
  * existing main loops, effectively allowing you to do some work behind
- * libusb's back. If you do take libusb's file descriptors and pass them to
+ * libusbx's back. If you do take libusbx's file descriptors and pass them to
  * poll()/select() yourself, you need to be aware of the associated issues.
  *
  * The first concept to be introduced is the events lock. The events lock
@@ -937,7 +937,7 @@ printf("completed!\n");
  *    libusb_handle_events_timeout() that you can call while holding the
  *    events lock. libusb_handle_events_timeout() itself implements similar
  *    logic to the above, so be sure not to call it when you are
- *    "working behind libusb's back", as is the case here.
+ *    "working behind libusbx's back", as is the case here.
  * -# libusb_event_handler_active() determines if someone is currently
  *    holding the events lock
  *
@@ -951,7 +951,7 @@ printf("completed!\n");
  *
  * The above explanation should be enough to get you going, but if you're
  * really thinking through the issues then you may be left with some more
- * questions regarding libusb's internals. If you're curious, read on, and if
+ * questions regarding libusbx's internals. If you're curious, read on, and if
  * not, skip to the next section to avoid confusing yourself!
  *
  * The immediate question that may spring to mind is: what if one thread
@@ -1021,7 +1021,7 @@ printf("completed!\n");
  *
  * The above may seem a little complicated, but hopefully I have made it clear
  * why such complications are necessary. Also, do not forget that this only
- * applies to applications that take libusb's file descriptors and integrate
+ * applies to applications that take libusbx's file descriptors and integrate
  * them into their own polling loops.
  *
  * You may decide that it is OK for your multi-threaded application to ignore
@@ -1514,8 +1514,8 @@ int usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
  * only one thread is monitoring libusbx event sources at any one time.
  *
  * You only need to use this lock if you are developing an application
- * which calls poll() or select() on libusb's file descriptors directly.
- * If you stick to libusb's event handling loop functions (e.g.
+ * which calls poll() or select() on libusbx's file descriptors directly.
+ * If you stick to libusbx's event handling loop functions (e.g.
  * libusb_handle_events()) then you do not need to be concerned with this
  * locking.
  *
@@ -1557,8 +1557,8 @@ int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
  * monitoring libusbx event sources at any one time.
  *
  * You only need to use this lock if you are developing an application
- * which calls poll() or select() on libusb's file descriptors directly.
- * If you stick to libusb's event handling loop functions (e.g.
+ * which calls poll() or select() on libusbx's file descriptors directly.
+ * If you stick to libusbx's event handling loop functions (e.g.
  * libusb_handle_events()) then you do not need to be concerned with this
  * locking.
  *
@@ -1675,9 +1675,9 @@ int API_EXPORTED libusb_event_handler_active(libusb_context *ctx)
  * events, then call libusb_wait_for_event().
  *
  * You only need to use this lock if you are developing an application
- * which calls poll() or select() on libusb's file descriptors directly,
+ * which calls poll() or select() on libusbx's file descriptors directly,
  * <b>and</b> may potentially be handling events from 2 threads simultaenously.
- * If you stick to libusb's event handling loop functions (e.g.
+ * If you stick to libusbx's event handling loop functions (e.g.
  * libusb_handle_events()) then you do not need to be concerned with this
  * locking.
  *
@@ -2128,9 +2128,9 @@ int API_EXPORTED libusb_handle_events_completed(libusb_context *ctx,
  * held, see libusb_lock_events().
  *
  * This function is designed to be called under the situation where you have
- * taken the event lock and are calling poll()/select() directly on libusb's
+ * taken the event lock and are calling poll()/select() directly on libusbx's
  * file descriptors (as opposed to using libusb_handle_events() or similar).
- * You detect events on libusb's descriptors, so you then call this function
+ * You detect events on libusbx's descriptors, so you then call this function
  * with a zero timeout value (while still holding the event lock).
  *
  * \param ctx the context to operate on, or NULL for the default context
@@ -2157,12 +2157,12 @@ int API_EXPORTED libusb_handle_events_locked(libusb_context *ctx,
 
 /** \ingroup poll
  * Determines whether your application must apply special timing considerations
- * when monitoring libusb's file descriptors.
+ * when monitoring libusbx's file descriptors.
  *
  * This function is only useful for applications which retrieve and poll
- * libusb's file descriptors in their own main loop (\ref pollmain).
+ * libusbx's file descriptors in their own main loop (\ref pollmain).
  *
- * Ordinarily, libusb's event handler needs to be called into at specific
+ * Ordinarily, libusbx's event handler needs to be called into at specific
  * moments in time (in addition to times when there is activity on the file
  * descriptor set). The usual approach is to use libusb_get_next_timeout()
  * to learn about when the next timeout occurs, and to adjust your
@@ -2197,7 +2197,7 @@ int API_EXPORTED libusb_pollfds_handle_timeouts(libusb_context *ctx)
 /** \ingroup poll
  * Determine the next internal timeout that libusbx needs to handle. You only
  * need to use this function if you are calling poll() or select() or similar
- * on libusb's file descriptors yourself - you do not need to use it if you
+ * on libusbx's file descriptors yourself - you do not need to use it if you
  * are calling libusb_handle_events() or a variant directly.
  *
  * You should call this function in your main loop in order to determine how
@@ -2403,7 +2403,7 @@ out:
 	usbi_mutex_unlock(&ctx->pollfds_lock);
 	return (const struct libusb_pollfd **) ret;
 #else
-	usbi_err(ctx, "external polling of libusb's internal descriptors "\
+	usbi_err(ctx, "external polling of libusbx's internal descriptors "\
 		"is not yet supported on Windows platforms");
 	return NULL;
 #endif

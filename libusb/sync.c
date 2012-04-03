@@ -28,7 +28,7 @@
 /**
  * @defgroup syncio Synchronous device I/O
  *
- * This page documents libusb's synchronous (blocking) API for USB device I/O.
+ * This page documents libusbx's synchronous (blocking) API for USB device I/O.
  * This interface is easy to use but has some limitations. More advanced users
  * may wish to consider using the \ref asyncio "asynchronous I/O API" instead.
  */
