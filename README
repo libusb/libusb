@@ -1,23 +1,24 @@
-libusb
-======
+libusbx
+=======
 
-libusb is a library for USB device access from Linux, Mac OS X and
-Windows userspace.
+libusbx is a library for USB device access from Linux, Mac OS X,
+OpenBSD and Windows userspace.
 It is written in C and licensed under the LGPL-2.1 (see COPYING).
 
-libusb is abstracted internally in such a way that it can hopefully
-be ported to other operating systems. See the PORTING file for some
-information, if you fancy a challenge :)
+libusbx is abstracted internally in such a way that it can hopefully
+be ported to other operating systems. Please see the PORTING file
+for more information.
 
-libusb homepage:
-http://libusb.org/
+libusbx homepage:
+http://libusbx.org/
 
 Developers will wish to consult the API documentation:
-http://libusb.sourceforge.net/api-1.0/
+http://libusbx.sourceforge.net/api-1.0/
 
 Use the mailing list for questions, comments, etc:
-https://sourceforge.net/mailarchive/forum.php?forum_name=libusb-devel
+https://lists.sourceforge.net/lists/listinfo/libusbx-devel
 
-- Daniel Drake <dsd@gentoo.org>
-- Peter Stuge <peter@stuge.se>
+- Pete Batard <pete@akeo.ie>
+- Hans de Goede <hdegoede@redhat.com>
+- Xiaofan Chen <xiaofanc@gmail.com>
 (use the mailing list rather than mailing developers directly)

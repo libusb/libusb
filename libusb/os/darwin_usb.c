@@ -1,6 +1,6 @@
 /*
- * darwin backend for libusb 1.0
- * Copyright (C) 2008-2011 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * darwin backend for libusbx 1.0
+ * Copyright © 2008-2011 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -1268,7 +1268,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
 
   IOReturn               ret;
   uint8_t                transferType;
-  /* None of the values below are used in libusb for bulk transfers */
+  /* None of the values below are used in libusbx for bulk transfers */
   uint8_t                direction, number, interval, pipeRef, iface;
   uint16_t               maxPacketSize;
 
@@ -1343,7 +1343,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
       return LIBUSB_ERROR_NO_MEM;
   }
 
-  /* copy the frame list from the libusb descriptor (the structures differ only is member order) */
+  /* copy the frame list from the libusbx descriptor (the structures differ only is member order) */
   for (i = 0 ; i < transfer->num_iso_packets ; i++)
     tpriv->isoc_framelist[i].frReqCount = transfer->iso_packet_desc[i].length;
 
@@ -1412,7 +1412,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   tpriv->req.wValue            = OSSwapLittleToHostInt16 (setup->wValue);
   tpriv->req.wIndex            = OSSwapLittleToHostInt16 (setup->wIndex);
   tpriv->req.wLength           = OSSwapLittleToHostInt16 (setup->wLength);
-  /* data is stored after the libusb control block */
+  /* data is stored after the libusbx control block */
   tpriv->req.pData             = transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
   tpriv->req.completionTimeout = transfer->timeout;
   tpriv->req.noDataTimeout     = transfer->timeout;
@@ -1751,4 +1751,3 @@ const struct usbi_os_backend darwin_backend = {
 	.transfer_priv_size = sizeof(struct darwin_transfer_priv),
 	.add_iso_packet_size = 0,
 };
-

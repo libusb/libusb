@@ -1,6 +1,6 @@
 /*
- * Synchronous I/O functions for libusb
- * Copyright (C) 2007-2008 Daniel Drake <dsd@gentoo.org>
+ * Synchronous I/O functions for libusbx
+ * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -228,9 +228,9 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * Not all of the data may have been written.
  *
  * Also check <tt>transferred</tt> when dealing with a timeout error code.
- * libusb may have to split your transfer into a number of chunks to satisfy
+ * libusbx may have to split your transfer into a number of chunks to satisfy
  * underlying O/S requirements, meaning that the timeout may expire after
- * the first few chunks have completed. libusb is careful not to lose any data
+ * the first few chunks have completed. libusbx is careful not to lose any data
  * that may have been transferred; do not assume that timeout conditions
  * indicate a complete lack of I/O.
  *
@@ -276,9 +276,9 @@ int API_EXPORTED libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
  * writes. Not all of the data may have been written.
  *
  * Also check <tt>transferred</tt> when dealing with a timeout error code.
- * libusb may have to split your transfer into a number of chunks to satisfy
+ * libusbx may have to split your transfer into a number of chunks to satisfy
  * underlying O/S requirements, meaning that the timeout may expire after
- * the first few chunks have completed. libusb is careful not to lose any data
+ * the first few chunks have completed. libusbx is careful not to lose any data
  * that may have been transferred; do not assume that timeout conditions
  * indicate a complete lack of I/O.
  *
@@ -311,4 +311,3 @@ int API_EXPORTED libusb_interrupt_transfer(
 	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
 		transferred, timeout, LIBUSB_TRANSFER_TYPE_INTERRUPT);
 }
-

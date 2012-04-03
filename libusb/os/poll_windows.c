@@ -1,6 +1,6 @@
 /*
  * poll_windows: poll compatibility wrapper for Windows
- * Copyright (C) 2009-2010 Pete Batard <pbatard@gmail.com>
+ * Copyright © 2009-2010 Pete Batard <pbatard@gmail.com>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of poll implementation from libusb-win32, by Stephan Meyer et al.
  *
@@ -21,7 +21,7 @@
  */
 
 /*
- * poll() and pipe() Windows compatibility layer for libusb 1.0
+ * poll() and pipe() Windows compatibility layer for libusbx 1.0
  *
  * The way this layer works is by using OVERLAPPED with async I/O transfers, as
  * OVERLAPPED have an associated event which is flagged for I/O completion.
@@ -263,7 +263,7 @@ void exit_polling(void)
 
 /*
  * Create a fake pipe.
- * As libusb only uses pipes for signaling, all we need from a pipe is an
+ * As libusbx only uses pipes for signaling, all we need from a pipe is an
  * event. To that extent, we create a single wfd and overlapped as a means
  * to access that event.
  */

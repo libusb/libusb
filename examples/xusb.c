@@ -1,8 +1,7 @@
 /*
  * xusb: Generic USB test program
- * Copyright (c) 2009-2011 Pete Batard <pbatard@gmail.com>
- * Based on lsusb, copyright (c) 2007 Daniel Drake <dsd@gentoo.org>
- * With contributions to Mass Storage test by Alan Stern.
+ * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
+ * Contributions to Mass Storage by Alan Stern.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -49,7 +48,7 @@
 #endif
 
 
-// Future versions of libusb will use usb_interface instead of interface
+// Future versions of libusbx will use usb_interface instead of interface
 // in libusb_config_descriptor => catter for that
 #define usb_interface interface
 
@@ -862,7 +861,7 @@ int main(int argc, char** argv)
 
 #ifdef HAS_GETVERSION
 	version = libusb_getversion(); */
-	printf("Using libusb v%d.%d.%d.%d\n\n", version->major, version->minor, version->micro, version->nano);
+	printf("Using libusbx v%d.%d.%d.%d\n\n", version->major, version->minor, version->micro, version->nano);
 #endif
 	r = libusb_init(NULL);
 	if (r < 0)

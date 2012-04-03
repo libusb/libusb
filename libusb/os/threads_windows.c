@@ -1,7 +1,7 @@
 /*
- * libusb synchronization on Microsoft Windows
+ * libusbx synchronization on Microsoft Windows
  *
- * Copyright (C) 2010 Michael Plante <michael.plante@gmail.com>
+ * Copyright © 2010 Michael Plante <michael.plante@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -204,4 +204,3 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 
 	return usbi_cond_intwait(cond, mutex, millis);
 }
-

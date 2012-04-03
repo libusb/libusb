@@ -1,7 +1,7 @@
 /*
- * Linux usbfs backend for libusb
- * Copyright (C) 2007-2009 Daniel Drake <dsd@gentoo.org>
- * Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
+ * Linux usbfs backend for libusbx
+ * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
+ * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -341,7 +341,7 @@ static int op_init(struct libusb_context *ctx)
 			if (strncmp(entry->d_name, "usb", 3) != 0)
 				continue;
 
-			/* Check for the files libusb needs from sysfs. */
+			/* Check for the files libusbx needs from sysfs. */
 			has_busnum = sysfs_has_file(entry->d_name, "busnum");
 			has_devnum = sysfs_has_file(entry->d_name, "devnum");
 			has_descriptors = sysfs_has_file(entry->d_name, "descriptors");
@@ -1162,13 +1162,13 @@ static int op_open(struct libusb_device_handle *handle)
 	hpriv->fd = open(filename, O_RDWR);
 	if (hpriv->fd < 0) {
 		if (errno == EACCES) {
-			usbi_err(HANDLE_CTX(handle), "libusb couldn't open USB device %s: "
+			usbi_err(HANDLE_CTX(handle), "libusbx couldn't open USB device %s: "
 				"Permission denied.", filename);
 			usbi_err(HANDLE_CTX(handle),
-				"libusb requires write access to USB device nodes.");
+				"libusbx requires write access to USB device nodes.");
 			return LIBUSB_ERROR_ACCESS;
 		} else if (errno == ENOENT) {
-			usbi_err(HANDLE_CTX(handle), "libusb couldn't open USB device %s: "
+			usbi_err(HANDLE_CTX(handle), "libusbx couldn't open USB device %s: "
 				"No such file or directory.", filename);
 			return LIBUSB_ERROR_NO_DEVICE;
 		} else {
@@ -1608,7 +1608,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 			 * complications:
 			 *  - discarding is asynchronous - discarded urbs will be reaped
 			 *    later. the user must not have freed the transfer when the
-			 *    discarded URBs are reaped, otherwise libusb will be using
+			 *    discarded URBs are reaped, otherwise libusbx will be using
 			 *    freed memory.
 			 *  - the earlier URBs may have completed successfully and we do
 			 *    not want to throw away any data.
@@ -1766,7 +1766,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 			 * complications:
 			 *  - discarding is asynchronous - discarded urbs will be reaped
 			 *    later. the user must not have freed the transfer when the
-			 *    discarded URBs are reaped, otherwise libusb will be using
+			 *    discarded URBs are reaped, otherwise libusbx will be using
 			 *    freed memory.
 			 *  - the earlier URBs may have completed successfully and we do
 			 *    not want to throw away any data.
@@ -1942,7 +1942,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		 *
 		 * When this happens, our objectives are not to lose any "surplus" data,
 		 * and also to stick it at the end of the previously-received data
-		 * (closing any holes), so that libusb reports the total amount of
+		 * (closing any holes), so that libusbx reports the total amount of
 		 * transferred data and presents it in a contiguous chunk.
 		 */
 		if (urb->actual_length > 0) {
@@ -2376,4 +2376,3 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.transfer_priv_size = sizeof(struct linux_transfer_priv),
 	.add_iso_packet_size = 0,
 };
-

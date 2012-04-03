@@ -1,7 +1,7 @@
 /*
- * Internal header for libusb
- * Copyright (C) 2007-2009 Daniel Drake <dsd@gentoo.org>
- * Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
+ * Internal header for libusbx
+ * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
+ * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -33,11 +33,11 @@
 
 #include <libusb.h>
 
-/* Inside the libusb code, mark all public functions as follows:
+/* Inside the libusbx code, mark all public functions as follows:
  *   return_type API_EXPORTED function_name(params) { ... }
  * But if the function returns a pointer, mark it as follows:
  *   DEFAULT_VISIBILITY return_type * LIBUSB_CALL function_name(params) { ... }
- * In the libusb public header, mark all declarations as:
+ * In the libusbx public header, mark all declarations as:
  *   return_type LIBUSB_CALL function_name(params);
  */
 #define API_EXPORTED LIBUSB_CALL DEFAULT_VISIBILITY
@@ -433,7 +433,7 @@ struct usbi_os_backend {
 	 * to determine specific capabilities of the system, allocate required
 	 * data structures for later, etc.
 	 *
-	 * This function is called when a libusb user initializes the library
+	 * This function is called when a libusbx user initializes the library
 	 * prior to use.
 	 *
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
@@ -463,7 +463,7 @@ struct usbi_os_backend {
 	 * but that is an unlikely case.
 	 *
 	 * After computing a session ID for a device, call
-	 * usbi_get_device_by_session_id(). This function checks if libusb already
+	 * usbi_get_device_by_session_id(). This function checks if libusbx already
 	 * knows about the device, and if so, it provides you with a libusb_device
 	 * structure for it.
 	 *
@@ -505,7 +505,7 @@ struct usbi_os_backend {
 	 *
 	 * Your backend should allocate any internal resources required for I/O
 	 * and other operations so that those operations can happen (hopefully)
-	 * without hiccup. This is also a good place to inform libusb that it
+	 * without hiccup. This is also a good place to inform libusbx that it
 	 * should monitor certain file descriptors related to this device -
 	 * see the usbi_add_pollfd() function.
 	 *
@@ -529,7 +529,7 @@ struct usbi_os_backend {
 	/* Close a device such that the handle cannot be used again. Your backend
 	 * should destroy any resources that were allocated in the open path.
 	 * This may also be a good place to call usbi_remove_pollfd() to inform
-	 * libusb of any file descriptors associated with this device that should
+	 * libusbx of any file descriptors associated with this device that should
 	 * no longer be monitored.
 	 *
 	 * This function is called when the user closes a device handle.
@@ -614,7 +614,7 @@ struct usbi_os_backend {
 	 *
 	 * If you cannot retrieve this from cache, either do not implement this
 	 * function, or return LIBUSB_ERROR_NOT_SUPPORTED. This will cause
-	 * libusb to retrieve the information through a standard control transfer.
+	 * libusbx to retrieve the information through a standard control transfer.
 	 *
 	 * This function must be non-blocking.
 	 * Return:
@@ -811,7 +811,7 @@ struct usbi_os_backend {
 	 * all private data from the transfer as if you were just about to report
 	 * completion or cancellation.
 	 *
-	 * This function might seem a bit out of place. It is used when libusb
+	 * This function might seem a bit out of place. It is used when libusbx
 	 * detects a disconnected device - it calls this function for all pending
 	 * transfers before reporting completion (with the disconnect code) to
 	 * the user. Maybe we can improve upon this internal interface in future.
@@ -893,4 +893,3 @@ extern const struct usbi_os_backend openbsd_backend;
 extern const struct usbi_os_backend windows_backend;
 
 #endif
-
