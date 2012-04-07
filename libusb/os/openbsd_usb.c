@@ -484,7 +484,7 @@ obsd_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds,
     int num_ready)
 {
 	struct libusb_device_handle *handle;
-	struct handle_priv *hpriv;
+	struct handle_priv *hpriv = NULL;
 	struct usbi_transfer *itransfer;
 	struct pollfd *pollfd;
 	int i, err = 0;
@@ -498,6 +498,7 @@ obsd_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds,
 		if (!pollfd->revents)
 			continue;
 
+		hpriv = NULL;
 		num_ready--;
 		list_for_each_entry(handle, &ctx->open_devs, list,
 		    struct libusb_device_handle) {
@@ -505,6 +506,14 @@ obsd_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds,
 
 			if (hpriv->pipe[0] == pollfd->fd)
 				break;
+
+			hpriv = NULL;
+		}
+
+		if (NULL == hpriv) {
+			usbi_dbg("fd %d is not an event pipe!", pollfd->fd);
+			err = ENOENT;
+			break;
 		}
 
 		if (pollfd->revents & POLLERR) {
