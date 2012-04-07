@@ -226,7 +226,7 @@ static int save_to_file(unsigned char *data)
 	FILE *fd;
 	char filename[64];
 
-	sprintf(filename, "finger%d.pgm", img_idx++);
+	snprintf(filename, sizeof(filename), "finger%d.pgm", img_idx++);
 	fd = fopen(filename, "w");
 	if (!fd)
 		return -1;
