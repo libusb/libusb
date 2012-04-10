@@ -758,9 +758,7 @@ int main(int argc, char** argv)
 {
 	bool show_help = false;
 	bool debug_mode = false;
-#ifdef HAS_GETVERSION
 	const struct libusb_version* version;
-#endif
 	int j, r;
 	size_t i, arglen;
 	unsigned tmp_vid, tmp_pid;
@@ -859,10 +857,8 @@ int main(int argc, char** argv)
 		return 0;
 	}
 
-#ifdef HAS_GETVERSION
-	version = libusb_getversion(); */
+	version = libusb_get_version();
 	printf("Using libusbx v%d.%d.%d.%d\n\n", version->major, version->minor, version->micro, version->nano);
-#endif
 	r = libusb_init(NULL);
 	if (r < 0)
 		return r;

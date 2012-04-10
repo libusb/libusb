@@ -639,6 +639,16 @@ struct libusb_device;
 struct libusb_device_handle;
 
 /** \ingroup lib
+ * Structure providing the version of libusbx currently in use
+ */
+struct libusb_version {
+	uint16_t major;
+	uint16_t minor;
+	uint16_t micro;
+	uint16_t nano;
+};
+
+/** \ingroup lib
  * Structure representing a libusbx session. The concept of individual libusbx
  * sessions allows for your program to use two libraries (or dynamically
  * load two modules) which both independently use libusb. This will prevent
@@ -689,20 +699,20 @@ typedef struct libusb_device_handle libusb_device_handle;
  * Speed codes. Indicates the speed at which the device is operating.
  */
 enum libusb_speed {
-    /** The OS doesn't report or know the device speed. */
-    LIBUSB_SPEED_UNKNOWN = 0,
+	/** The OS doesn't report or know the device speed. */
+	LIBUSB_SPEED_UNKNOWN = 0,
 
-    /** The device is operating at low speed (1.5MBit/s). */
-    LIBUSB_SPEED_LOW = 1,
+	/** The device is operating at low speed (1.5MBit/s). */
+	LIBUSB_SPEED_LOW = 1,
 
-    /** The device is operating at full speed (12MBit/s). */
-    LIBUSB_SPEED_FULL = 2,
+	/** The device is operating at full speed (12MBit/s). */
+	LIBUSB_SPEED_FULL = 2,
 
-    /** The device is operating at high speed (480MBit/s). */
-    LIBUSB_SPEED_HIGH = 3,
+	/** The device is operating at high speed (480MBit/s). */
+	LIBUSB_SPEED_HIGH = 3,
 
-    /** The device is operating at super speed (5000MBit/s). */
-    LIBUSB_SPEED_SUPER = 4,
+	/** The device is operating at super speed (5000MBit/s). */
+	LIBUSB_SPEED_SUPER = 4,
 };
 
 /** \ingroup misc
@@ -929,6 +939,7 @@ enum libusb_capability {
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
+const struct libusb_version * LIBUSB_CALL libusb_get_version(void);
 int LIBUSB_CALL libusb_has_capability(uint32_t capability);
 const char * LIBUSB_CALL libusb_error_name(int errcode);
 

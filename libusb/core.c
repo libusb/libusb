@@ -42,6 +42,8 @@ const struct usbi_os_backend * const usbi_backend = &windows_backend;
 #endif
 
 struct libusb_context *usbi_default_context = NULL;
+const struct libusb_version libusb_version_internal =
+	{ LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO};
 static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 
@@ -577,7 +579,7 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
  * \param ctx the context to operate on, or NULL for the default context
  * \param list output location for a list of devices. Must be later freed with
  * libusb_free_device_list().
- * \returns The number of devices in the outputted list, or any
+ * \returns the number of devices in the outputted list, or any
  * \ref libusb_error according to errors encountered by the backend.
  */
 ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
@@ -1759,4 +1761,14 @@ DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
 		return "LIBUSB_ERROR_OTHER";
 	}
 	return "**UNKNOWN**";
+}
+
+/** \ingroup misc
+ * Fills a libusb_version struct with the full version (major, minor,
+ * micro, nano) of this library
+ */
+DEFAULT_VISIBILITY
+const struct libusb_version * LIBUSB_CALL libusb_get_version(void)
+{
+	return &libusb_version_internal;
 }
