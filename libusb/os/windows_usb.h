@@ -217,9 +217,7 @@ struct interface_handle_t {
 struct windows_device_handle_priv {
 	int active_interface;
 	struct interface_handle_t interface_handle[USB_MAXINTERFACES];
-#if defined(AUTO_CLAIM)
 	int autoclaim_count[USB_MAXINTERFACES]; // For auto-release
-#endif
 };
 
 static inline struct windows_device_handle_priv *_device_handle_priv(
