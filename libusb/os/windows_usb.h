@@ -245,26 +245,26 @@ struct driver_lookup {
  * API macros - from libusb-win32 1.x
  */
 #define DLL_DECLARE_PREFIXNAME(api, ret, prefixname, name, args)    \
-	typedef ret (api * __dll_##name##_t)args;                 \
+	typedef ret (api * __dll_##name##_t)args;                       \
 	static __dll_##name##_t prefixname = NULL
 
 #define DLL_LOAD_PREFIXNAME(dll, prefixname, name, ret_on_failure) \
-	do {                                                      \
-		HMODULE h = GetModuleHandleA(#dll);                   \
-	if (!h)                                                   \
-		h = LoadLibraryA(#dll);                               \
-	if (!h) {                                                 \
-		if (ret_on_failure) { return LIBUSB_ERROR_NOT_FOUND; }\
-		else { break; }                                       \
-	}                                                         \
+	do {                                                           \
+		HMODULE h = GetModuleHandleA(#dll);                        \
+	if (!h)                                                        \
+		h = LoadLibraryA(#dll);                                    \
+	if (!h) {                                                      \
+		if (ret_on_failure) { return LIBUSB_ERROR_NOT_FOUND; }     \
+		else { break; }                                            \
+	}                                                              \
 	prefixname = (__dll_##name##_t)GetProcAddress(h, #name);       \
 	if (prefixname) break;                                         \
 	prefixname = (__dll_##name##_t)GetProcAddress(h, #name "A");   \
 	if (prefixname) break;                                         \
 	prefixname = (__dll_##name##_t)GetProcAddress(h, #name "W");   \
 	if (prefixname) break;                                         \
-	if(ret_on_failure)                                        \
-		return LIBUSB_ERROR_NOT_FOUND;                        \
+	if(ret_on_failure)                                             \
+		return LIBUSB_ERROR_NOT_FOUND;                             \
 	} while(0)
 
 #define DLL_DECLARE(api, ret, name, args)   DLL_DECLARE_PREFIXNAME(api, ret, name, name, args)

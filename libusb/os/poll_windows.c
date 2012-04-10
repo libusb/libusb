@@ -182,7 +182,7 @@ int _fd_to_index_and_lock(int fd)
 
 OVERLAPPED *create_overlapped(void)
 {
-	OVERLAPPED *overlapped = calloc(1, sizeof(OVERLAPPED));
+	OVERLAPPED *overlapped = (OVERLAPPED*) calloc(1, sizeof(OVERLAPPED));
 	if (overlapped == NULL) {
 		return NULL;
 	}
@@ -274,7 +274,7 @@ int usbi_pipe(int filedes[2])
 
 	CHECK_INIT_POLLING;
 
-	overlapped = calloc(1, sizeof(OVERLAPPED));
+	overlapped = (OVERLAPPED*) calloc(1, sizeof(OVERLAPPED));
 	if (overlapped == NULL) {
 		return -1;
 	}
@@ -572,8 +572,8 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 	CHECK_INIT_POLLING;
 
 	triggered = 0;
-	handles_to_wait_on = malloc((nfds+1)*sizeof(HANDLE));	// +1 for fd_update
-	handle_to_index = malloc(nfds*sizeof(int));
+	handles_to_wait_on = (HANDLE*) calloc(nfds+1, sizeof(HANDLE));	// +1 for fd_update
+	handle_to_index = (int*) calloc(nfds, sizeof(int));
 	if ((handles_to_wait_on == NULL) || (handle_to_index == NULL)) {
 		errno = ENOMEM;
 		triggered = -1;
