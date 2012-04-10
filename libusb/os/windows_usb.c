@@ -21,14 +21,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-// COMPILATION OPTIONS:
-// - Should libusbx automatically claim (and release) the interfaces it requires?
-#define AUTO_CLAIM
-// - Forces instant overlapped completion on timeouts: can prevents extensive
-//   wait in poll, after a timeout, but might affect subsequent API calls.
-//   ***USE AT YOUR OWN RISKS***
-//#define FORCE_INSTANT_TIMEOUTS
-
 #include <config.h>
 #include <windows.h>
 #include <setupapi.h>
@@ -100,9 +92,7 @@ const uint64_t epoch_time = UINT64_C(116444736000000000);	// 1970.01.01 00:00:00
 enum windows_version windows_version = WINDOWS_UNSUPPORTED;
 // Concurrency
 static int concurrent_usage = -1;
-#if defined(AUTO_CLAIM)
 usbi_mutex_t autoclaim_lock;
-#endif
 // Timer thread
 // NB: index 0 is for monotonic and 1 is for the thread exit event
 HANDLE timer_thread = NULL;
@@ -629,7 +619,6 @@ static bool is_api_driver(char* driver, uint8_t api)
 /*
  * auto-claiming and auto-release helper functions
  */
-#if defined(AUTO_CLAIM)
 static int auto_claim(struct libusb_transfer *transfer, int *interface_number, int api_type)
 {
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
@@ -695,8 +684,6 @@ static void auto_release(struct usbi_transfer *itransfer)
 	}
 	usbi_mutex_unlock(&autoclaim_lock);
 }
-#endif
-
 
 /*
  * init: libusbx backend init function
@@ -749,10 +736,8 @@ static int windows_init(struct libusb_context *ctx)
 			goto init_exit;
 		}
 
-#if defined(AUTO_CLAIM)
 		// We need a lock for proper auto-release
 		usbi_mutex_init(&autoclaim_lock, NULL);
-#endif
 
 		// Initialize pollable file descriptors
 		init_polling();
@@ -1765,10 +1750,8 @@ static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
 	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
 
 	usbi_free_fd(transfer_priv->pollable_fd.fd);
-#if defined(AUTO_CLAIM)
 	// When auto claim is in use, attempt to release the auto-claimed interface
 	auto_release(itransfer);
-#endif
 }
 
 static int submit_bulk_transfer(struct usbi_transfer *itransfer)
@@ -1786,9 +1769,6 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
 		(short)(IS_XFERIN(transfer) ? POLLIN : POLLOUT));
-#if !defined(DYNAMIC_FDS)
-	usbi_fd_notification(ctx);
-#endif
 
 	return LIBUSB_SUCCESS;
 }
@@ -1808,9 +1788,6 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
 		(short)(IS_XFERIN(transfer) ? POLLIN : POLLOUT));
-#if !defined(DYNAMIC_FDS)
-	usbi_fd_notification(ctx);
-#endif
 
 	return LIBUSB_SUCCESS;
 }
@@ -1829,9 +1806,6 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	}
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, POLLIN);
-#if !defined(DYNAMIC_FDS)
-	usbi_fd_notification(ctx);
-#endif
 
 	return LIBUSB_SUCCESS;
 
@@ -1877,14 +1851,7 @@ static int windows_abort_transfers(struct usbi_transfer *itransfer)
 static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-#if defined(FORCE_INSTANT_TIMEOUTS)
-	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 
-	// Forces instant overlapped completion on timeouts - use at your own risks
-	if (itransfer->flags & USBI_TRANSFER_TIMED_OUT) {
-		transfer_priv->pollable_fd.overlapped->Internal &= ~STATUS_PENDING;
-	}
-#endif
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
 		return windows_abort_control(itransfer);
@@ -2484,7 +2451,6 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 		// It is a requirement for multiple interface devices using WinUSB that you
 		// must first claim the first interface before you claim any other
 		if ((winusb_handle == 0) || (winusb_handle == INVALID_HANDLE_VALUE)) {
-#if defined(AUTO_CLAIM)
 			file_handle = handle_priv->interface_handle[0].dev_handle;
 			if (WinUsb_Initialize(file_handle, &winusb_handle)) {
 				handle_priv->interface_handle[0].api_handle = winusb_handle;
@@ -2493,10 +2459,6 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, int i
 				usbi_warn(ctx, "failed to auto-claim interface 0 (required to claim %d with WinUSB)", iface);
 				return LIBUSB_ERROR_ACCESS;
 			}
-#else
-			usbi_warn(ctx, "you must claim interface 0 before you can claim %d with WinUSB", iface);
-			return LIBUSB_ERROR_ACCESS;
-#endif
 		}
 		if (!WinUsb_GetAssociatedInterface(winusb_handle, (UCHAR)(iface-1),
 			&handle_priv->interface_handle[iface].api_handle)) {
@@ -2604,14 +2566,9 @@ static int winusb_submit_control_transfer(struct usbi_transfer *itransfer)
 
 	current_interface = winusb_get_valid_interface(transfer->dev_handle);
 	if (current_interface < 0) {
-#if defined(AUTO_CLAIM)
 		if (auto_claim(transfer, &current_interface, USB_API_WINUSB) != LIBUSB_SUCCESS) {
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
-#else
-		usbi_warn(ctx, "no interface available for control transfer");
-		return LIBUSB_ERROR_NOT_FOUND;
-#endif
 	}
 
 	usbi_dbg("will use interface %d", current_interface);
