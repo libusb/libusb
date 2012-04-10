@@ -1460,6 +1460,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					priv->usb_interface[0].path = (char*) calloc(safe_strlen(priv->path)+1, 1);
 					if (priv->usb_interface[0].path != NULL) {
 						safe_strcpy(priv->usb_interface[0].path, safe_strlen(priv->path)+1, priv->path);
+					} else {
+						usbi_warn(ctx, "could not duplicate interface path '%s'", priv->path);
 					}
 					// The following is needed if we want API calls to work for both simple
 					// and composite devices.
