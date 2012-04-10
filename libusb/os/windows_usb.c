@@ -332,7 +332,7 @@ static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_co
 		goto err_exit;
 	}
 
-	if ((dev_interface_details = malloc(size)) == NULL) {
+	if ((dev_interface_details = (SP_DEVICE_INTERFACE_DETAIL_DATA_A*) calloc(size, 1)) == NULL) {
 		usbi_err(ctx, "could not allocate interface data for index %u.", _index);
 		goto err_exit;
 	}
@@ -506,7 +506,7 @@ static unsigned long htab_hash(char* str)
 	// string (same hash, different string) at the same time is extremely low
 	safe_free(htab_table[idx].str);
 	htab_table[idx].used = hval;
-	htab_table[idx].str = malloc(safe_strlen(str)+1);
+	htab_table[idx].str = (char*) calloc(1, safe_strlen(str)+1);
 	if (htab_table[idx].str == NULL) {
 		usbi_err(NULL, "could not duplicate string for hash table");
 		usbi_mutex_unlock(&htab_write_mutex);
@@ -576,7 +576,7 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int
 		return LIBUSB_SUCCESS;
 	}
 
-	priv->usb_interface[iface].endpoint = malloc(if_desc->bNumEndpoints);
+	priv->usb_interface[iface].endpoint = (uint8_t*) calloc(1, if_desc->bNumEndpoints);
 	if (priv->usb_interface[iface].endpoint == NULL) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -605,7 +605,7 @@ static bool is_api_driver(char* driver, uint8_t api)
 	size_t len = safe_strlen(driver);
 
 	if (len == 0) return false;
-	tmp_str = calloc(len+1, 1);
+	tmp_str = (char*) calloc(1, len+1);
 	if (tmp_str == NULL) return false;
 	memcpy(tmp_str, driver, len+1);
 	tok = strtok(tmp_str, sep_str);
@@ -887,7 +887,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 	if (dev->num_configurations == 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	priv->config_descriptor = malloc(dev->num_configurations * sizeof(PUSB_CONFIGURATION_DESCRIPTOR));
+	priv->config_descriptor = (unsigned char**) calloc(dev->num_configurations, sizeof(PUSB_CONFIGURATION_DESCRIPTOR));
 	if (priv->config_descriptor == NULL)
 		return LIBUSB_ERROR_NO_MEM;
 	for (i=0; i<dev->num_configurations; i++)
@@ -925,7 +925,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		}
 
 		size = sizeof(USB_DESCRIPTOR_REQUEST) + cd_buf_short.data.wTotalLength;
-		if ((cd_buf_actual = (PUSB_DESCRIPTOR_REQUEST)malloc(size)) == NULL) {
+		if ((cd_buf_actual = (PUSB_DESCRIPTOR_REQUEST) calloc(1, size)) == NULL) {
 			usbi_err(ctx, "could not allocate configuration descriptor buffer for '%s'.", device_id);
 			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 		}
@@ -961,10 +961,9 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 			i, cd_data->bConfigurationValue, cd_data->wTotalLength);
 
 		// Cache the descriptor
-		priv->config_descriptor[i] = malloc(cd_data->wTotalLength);
+		priv->config_descriptor[i] = (unsigned char*) calloc(1, cd_data->wTotalLength);
 		if (priv->config_descriptor[i] == NULL)
 			return LIBUSB_ERROR_NO_MEM;
-
 		memcpy(priv->config_descriptor[i], cd_data, cd_data->wTotalLength);
 	}
 	return LIBUSB_SUCCESS;
@@ -1226,7 +1225,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	guid[DEV_PASS] = &GUID_DEVINTERFACE_USB_DEVICE;
 	nb_guids = DEV_PASS+1;
 
-	unref_list = malloc(unref_size*sizeof(libusb_device*));
+	unref_list = (libusb_device**) calloc(unref_size, sizeof(libusb_device*));
 	if (unref_list == NULL) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -1347,7 +1346,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 							usbi_err(ctx, "program assertion failed: too many GUIDs");
 							LOOP_BREAK(LIBUSB_ERROR_OVERFLOW);
 						}
-						if_guid = calloc(1, sizeof(GUID));
+						if_guid = (GUID*) calloc(1, sizeof(GUID));
 						pCLSIDFromString(guid_string_w, if_guid);
 						guid[nb_guids++] = if_guid;
 						usbi_dbg("extra GUID: %s", guid_to_string(if_guid));
@@ -1456,7 +1455,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					break;
 				default:
 					// For other devices, the first interface is the same as the device
-					priv->usb_interface[0].path = malloc(safe_strlen(priv->path)+1);
+					priv->usb_interface[0].path = (char*) calloc(safe_strlen(priv->path)+1, 1);
 					if (priv->usb_interface[0].path != NULL) {
 						safe_strcpy(priv->usb_interface[0].path, safe_strlen(priv->path)+1, priv->path);
 					}

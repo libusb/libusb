@@ -142,7 +142,7 @@ static int __inline usbi_cond_intwait(usbi_cond_t *cond,
 		}
 	}
 	if(!found) {
-		pos      = malloc(sizeof(struct usbi_cond_perthread));
+		pos      = (struct usbi_cond_perthread*) calloc(1, sizeof(struct usbi_cond_perthread));
 		if(!pos) return ((errno=ENOMEM)); // This errno is not POSIX-allowed.
 		pos->tid = tid;
 		pos->event = CreateEvent(NULL, FALSE, FALSE, NULL); // auto-reset.
