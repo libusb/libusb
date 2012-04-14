@@ -534,7 +534,7 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 	uint32_t length;
 	void* le_type_punning_IS_fine;
 	struct {
-		char* desc;
+		const char* desc;
 		uint8_t recipient;
 		uint16_t index;
 		uint16_t header_size;
@@ -595,7 +595,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 	int iface_detached = -1;
 #endif
 	struct libusb_device_descriptor dev_desc;
-	char* speed_name[5] = { "Unknown", "1.5 Mbit/s (USB 1.0 LowSpeed)", "12 Mbit/s (USB 1.0 FullSpeed)",
+	const char* speed_name[5] = { "Unknown", "1.5 Mbit/s (USB 1.0 LowSpeed)", "12 Mbit/s (USB 1.0 FullSpeed)",
 		"480 Mbit/s (USB 2.0 HighSpeed)", "5000 Mbit/s (USB 3.0 SuperSpeed)"};
 	char string[128];
 	uint8_t string_index[3];	// indexes of the string descriptors
