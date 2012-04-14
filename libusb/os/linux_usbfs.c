@@ -207,10 +207,10 @@ static const char *find_usbfs_path(void)
  * seem to lack it). fall back to REALTIME if we have to. */
 static clockid_t find_monotonic_clock(void)
 {
+#ifdef CLOCK_MONOTONIC
 	struct timespec ts;
 	int r;
 
-#ifdef CLOCK_MONOTONIC
 	/* Linux 2.6.28 adds CLOCK_MONOTONIC_RAW but we don't use it
 	 * because it's not available through timerfd */
 	r = clock_gettime(CLOCK_MONOTONIC, &ts);
