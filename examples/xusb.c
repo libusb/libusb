@@ -135,7 +135,7 @@ enum test_type {
 } test_mode;
 uint16_t VID, PID;
 
-void display_buffer_hex(unsigned char *buffer, unsigned size)
+static void display_buffer_hex(unsigned char *buffer, unsigned size)
 {
 	unsigned i, j, k;
 
@@ -165,7 +165,7 @@ void display_buffer_hex(unsigned char *buffer, unsigned size)
 
 // The PS3 Controller is really a HID device that got its HID Report Descriptors
 // removed by Sony
-int display_ps3_status(libusb_device_handle *handle)
+static int display_ps3_status(libusb_device_handle *handle)
 {
 	int r;
 	uint8_t input_report[49];
@@ -256,7 +256,7 @@ int display_ps3_status(libusb_device_handle *handle)
 // The XBOX Controller is really a HID device that got its HID Report Descriptors
 // removed by Microsoft.
 // Input/Output reports described at http://euc.jp/periphs/xbox-controller.ja.html
-int display_xbox_status(libusb_device_handle *handle)
+static int display_xbox_status(libusb_device_handle *handle)
 {
 	int r;
 	uint8_t input_report[20];
@@ -277,7 +277,7 @@ int display_xbox_status(libusb_device_handle *handle)
 	return 0;
 }
 
-int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_t right)
+static int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_t right)
 {
 	int r;
 	uint8_t output_report[6];
@@ -294,7 +294,7 @@ int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_t right
 	return 0;
 }
 
-int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, uint8_t lun,
+static int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, uint8_t lun,
 	uint8_t *cdb, uint8_t direction, int data_length, uint32_t *ret_tag)
 {
 	static uint32_t tag = 1;
@@ -350,7 +350,7 @@ int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, ui
 	return 0;
 }
 
-int get_mass_storage_status(libusb_device_handle *handle, uint8_t endpoint, uint32_t expected_tag)
+static int get_mass_storage_status(libusb_device_handle *handle, uint8_t endpoint, uint32_t expected_tag)
 {
 	int i, r, size;
 	struct command_status_wrapper csw;
@@ -397,7 +397,7 @@ int get_mass_storage_status(libusb_device_handle *handle, uint8_t endpoint, uint
 	return 0;
 }
 
-void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoint_out)
+static void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoint_out)
 {
 	uint8_t cdb[16];	// SCSI Command Descriptor Block
 	uint8_t sense[18];
@@ -427,7 +427,7 @@ void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoi
 }
 
 // Mass Storage device to test bulk transfers (non destructive test)
-int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoint_out)
+static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t endpoint_out)
 {
 	int r, size;
 	uint8_t lun;
@@ -526,7 +526,7 @@ int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 }
 
 // Read the MS WinUSB Feature Descriptors, that are used on Windows 8 for automated driver installation
-void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bRequest, int iface_number)
+static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bRequest, int iface_number)
 {
 #define MAX_OS_FD_LENGTH 256
 	int i, r;
@@ -579,7 +579,7 @@ void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bR
 	}
 }
 
-int test_device(uint16_t vid, uint16_t pid)
+static int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
 	libusb_device *dev;
