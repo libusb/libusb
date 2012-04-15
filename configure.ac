@@ -58,6 +58,10 @@ case $host in
 	AC_MSG_RESULT([OpenBSD])
 	backend="openbsd"
 	;;
+*-netbsd*)
+	AC_MSG_RESULT([NetBSD (using OpenBSD backend)])
+	backend="openbsd"
+	;;
 *-mingw*)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
