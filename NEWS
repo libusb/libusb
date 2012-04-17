@@ -2,11 +2,12 @@ This file lists notable changes in each release.
 For fine grained history, please see the git log at:
 http://libusbx.git.sourceforge.net/git/gitweb.cgi?p=libusbx/libusbx;a=log
 
-2012-04-13: v1.0.10-rc1
+2012-04-17: v1.0.10
 * Public release
 * Add libusb_get_version
 * Add Visual Studio 2010 project files
 * Some Windows code cleanup
+* Fix xusb sample warnings 
 
 2012-04-02: v1.0.9
 * First libusbx release

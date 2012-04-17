@@ -2,7 +2,8 @@ libusbx
 =======
 
 libusbx is a library for USB device access from Linux, Mac OS X,
-OpenBSD and Windows userspace.
+Windows and OpenBSD userspace (with OpenBSD, and to a lesser extent
+Windows, currently being considered EXPERIMENTAL).
 It is written in C and licensed under the GNU Lesser General Public
 License version 2.1 or (at your option) any later version (see COPYING).
 
