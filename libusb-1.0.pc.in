@@ -4,7 +4,7 @@ libdir=@libdir@
 includedir=@includedir@
 
 Name: libusb-1.0
-Description: C API for USB device access from Linux, Mac OS X and Windows userspace
+Description: C API for USB device access from Linux, Mac OS X, OpenBSD, NetBSD and Windows userspace
 Version: @VERSION@
 Libs: -L${libdir} -lusb-1.0
 Libs.private: @PC_LIBS_PRIVATE@
