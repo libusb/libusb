@@ -62,6 +62,8 @@ EXPORTS
   libusb_get_pollfds@4 = libusb_get_pollfds
   libusb_get_string_descriptor_ascii
   libusb_get_string_descriptor_ascii@16 = libusb_get_string_descriptor_ascii
+  libusb_get_version
+  libusb_get_version@0 = libusb_get_version
   libusb_handle_events
   libusb_handle_events@4 = libusb_handle_events
   libusb_handle_events_completed

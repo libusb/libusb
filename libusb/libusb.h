@@ -639,6 +639,29 @@ struct libusb_device;
 struct libusb_device_handle;
 
 /** \ingroup lib
+ * Structure representing the libusb version.
+ */
+struct libusb_version {
+	/** Library major version. */
+	const uint16_t major;
+
+	/** Library minor version. */
+	const uint16_t minor;
+
+	/** Library micro version. */
+	const uint16_t micro;
+
+	/** Library nano version. This field is only nonzero on Windows. */
+	const uint16_t nano;
+
+	/** Library release candidate suffix string, e.g. "-rc4". */
+	const char *rc;
+
+	/** Output of `git describe --tags` at library build time. */
+	const char *describe;
+};
+
+/** \ingroup lib
  * Structure representing a libusb session. The concept of individual libusb
  * sessions allows for your program to use two libraries (or dynamically
  * load two modules) which both independently use libusb. This will prevent
@@ -929,6 +952,7 @@ enum libusb_capability {
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
+const struct libusb_version * LIBUSB_CALL libusb_get_version(void);
 int LIBUSB_CALL libusb_has_capability(uint32_t capability);
 const char * LIBUSB_CALL libusb_error_name(int errcode);
 

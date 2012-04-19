@@ -37,7 +37,8 @@ else
 THREADS_SRC = os/threads_windows.h os/threads_windows.c
 endif
 
-libusb_1_0_la_CFLAGS = $(VISIBILITY_CFLAGS) $(AM_CFLAGS) $(THREAD_CFLAGS)
+libusb_1_0_la_CFLAGS = $(VISIBILITY_CFLAGS) $(AM_CFLAGS) $(THREAD_CFLAGS) \
+	-DLIBUSB_DESCRIBE=\"`git --git-dir "$(top_srcdir)/.git" describe --tags 2>/dev/null`\"
 libusb_1_0_la_LDFLAGS = $(LTLDFLAGS)
 libusb_1_0_la_SOURCES = libusbi.h core.c descriptor.c io.c sync.c $(OS_SRC) \
 	os/linux_usbfs.h os/darwin_usb.h os/windows_usb.h \
