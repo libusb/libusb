@@ -1,4 +1,3 @@
 libusb-pbatard has now been superseded by libusbx-pbatard and libusbx.
 
 Please visit http://libusbx.org for details.
-
