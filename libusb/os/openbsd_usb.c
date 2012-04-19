@@ -165,6 +165,7 @@ obsd_get_device_list(struct libusb_context * ctx,
 
 			dev->bus_number = di.udi_bus;
 			dev->device_address = di.udi_addr;
+			dev->speed = di.udi_speed;
 
 			dpriv = (struct device_priv *)dev->os_priv;
 			strlcpy(dpriv->devnode, devnode, sizeof(devnode));
