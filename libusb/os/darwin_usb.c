@@ -1547,7 +1547,7 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 
   usbi_info (ITRANSFER_CTX (itransfer), "an async io operation has completed");
 
-  size = (UInt32) arg0;
+  size = (UInt32) (uintptr_t) arg0;
 
   /* send a completion message to the device's file descriptor */
   message = MESSAGE_ASYNC_IO_COMPLETE;
