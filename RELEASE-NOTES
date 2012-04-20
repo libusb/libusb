@@ -1,0 +1,35 @@
+libusb 1.0.9
+
+This release has taken much too long to finish, but this also means that it
+has a long list of bugs fixes and many other improvements.
+
+Perhaps the most exciting improvement is the addition of the backend for
+Microsoft Windows, which closes ticket #1.
+
+A very special thanks goes to Pete Batard, Michael Plante, Tim Roberts,
+Orin Eman, Graeme Gill, and everyone else in the community who help work
+on the Windows support!
+
+Because Windows is a peculiar beast you may encounter some bugs when using
+this first release with the Windows backend. In that case, please get in
+touch with the libusb community so that we can help resolve them. File a
+ticket at http://libusb.org/newticket or let us know via email or on IRC.
+Visit http://libusb.org/ for all contact details.
+
+Another exciting improvement is the new OpenBSD backend, which also works
+on NetBSD systems.
+
+All known downstream bugs and all known severe bugs reported directly to
+libusb.org have been fixed in this release, so please report new ones!
+
+
+This release would not have been what it is without help, code, reports,
+and advice from friends like these:
+
+ Alan Ott, Alan Stern, Brian Shirley, Dave Camarillo, Graeme Gill,
+ Hans de Goede, Hector Martin, James Hanko, Konrad Rzepecki,
+ Ludovic Rousseau, Martin Pieuchot, Mike Frysinger, Orin Eman,
+ Pekka Nikander, Pete Batard, Sean McBride, Sebastian Pipping,
+ Stephan Meyer, Thomas Röfer, Trygve Laugstøl, Vitali Lovich, Xiaofan Chen
+
+	Thanks!

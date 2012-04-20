@@ -1,6 +1,15 @@
 This file lists notable changes in each release. For the full history of all
 changes, see ChangeLog.
 
+2012-04-20: 1.0.9
+* Numerous bug fixes and improvements
+* Backend for Windows, for devices using the WinUSB.sys driver
+* Backend for OpenBSD and NetBSD, for devices using the ugen driver
+* Add libusb_get_device_speed()
+* Add libusb_has_capability()
+* Add libusb_error_name()
+* Add libusb_get_version()
+
 2010-05-07: v1.0.8
 * Bug fixes
 
