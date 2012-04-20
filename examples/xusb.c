@@ -731,7 +731,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 		break;
 	case USE_SCSI:
 		CALL_CHECK(test_mass_storage(handle, endpoint_in, endpoint_out));
-	default:
+	case USE_GENERIC:
 		break;
 	}
 
