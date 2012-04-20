@@ -1599,7 +1599,13 @@ int API_EXPORTED libusb_init(libusb_context **context)
 			ctx->debug_fixed = 1;
 	}
 
-	usbi_dbg("");
+	usbi_dbg("libusb-%d.%d.%d%s%s%s",
+	         libusb_version_internal.major,
+	         libusb_version_internal.minor,
+	         libusb_version_internal.micro,
+	         libusb_version_internal.rc,
+	         libusb_version_internal.describe[0] ? " git:" : "",
+	         libusb_version_internal.describe);
 
 	if (usbi_backend->init) {
 		r = usbi_backend->init(ctx);
