@@ -56,7 +56,7 @@
 bool binary_dump = false;
 char binary_name[64];
 
-inline static int perr(char const *format, ...)
+static int perr(char const *format, ...)
 {
 	va_list args;
 	int r;
