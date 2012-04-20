@@ -139,7 +139,7 @@ struct linux_transfer_priv {
 
 	enum reap_action reap_action;
 	int num_urbs;
-	unsigned int num_retired;
+	int num_retired;
 	enum libusb_transfer_status reap_status;
 
 	/* next iso packet in user-supplied transfer to be populated */
@@ -1667,7 +1667,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 	/* calculate how many URBs we need */
 	for (i = 0; i < num_packets; i++) {
-		int space_remaining = MAX_ISO_BUFFER_LENGTH - this_urb_len;
+		unsigned int space_remaining = MAX_ISO_BUFFER_LENGTH - this_urb_len;
 		packet_len = transfer->iso_packet_desc[i].length;
 
 		if (packet_len > space_remaining) {
@@ -1694,7 +1694,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	/* allocate + initialize each URB with the correct number of packets */
 	for (i = 0; i < num_urbs; i++) {
 		struct usbfs_urb *urb;
-		int space_remaining_in_urb = MAX_ISO_BUFFER_LENGTH;
+		unsigned int space_remaining_in_urb = MAX_ISO_BUFFER_LENGTH;
 		int urb_packet_offset = 0;
 		unsigned char *urb_buffer_orig = urb_buffer;
 		int j;
@@ -2276,7 +2276,7 @@ static int op_handle_events(struct libusb_context *ctx,
 	struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready)
 {
 	int r;
-	int i = 0;
+	unsigned int i = 0;
 
 	usbi_mutex_lock(&ctx->open_devs_lock);
 	for (i = 0; i < nfds && num_ready > 0; i++) {
