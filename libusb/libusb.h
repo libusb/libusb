@@ -639,13 +639,26 @@ struct libusb_device;
 struct libusb_device_handle;
 
 /** \ingroup lib
- * Structure providing the version of libusbx currently in use
+ * Structure providing the version of the libusbx runtime
  */
 struct libusb_version {
-	uint16_t major;
-	uint16_t minor;
-	uint16_t micro;
-	uint16_t nano;
+	/** Library major version. */
+	const uint16_t major;
+
+	/** Library minor version. */
+	const uint16_t minor;
+
+	/** Library micro version. */
+	const uint16_t micro;
+
+	/** Library nano version. */
+	const uint16_t nano;
+
+	/** Library release candidate suffix string, e.g. "-rc4". */
+	const char *rc;
+
+	/** For ABI compatibility only. */
+	const char* describe;
 };
 
 /** \ingroup lib

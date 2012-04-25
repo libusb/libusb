@@ -43,7 +43,8 @@ const struct usbi_os_backend * const usbi_backend = &windows_backend;
 
 struct libusb_context *usbi_default_context = NULL;
 const struct libusb_version libusb_version_internal =
-	{ LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO};
+	{ LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO,
+	  LIBUSB_RC, "unused - please use the nano" };
 static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 
@@ -1764,8 +1765,8 @@ DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
 }
 
 /** \ingroup misc
- * Fills a libusb_version struct with the full version (major, minor,
- * micro, nano) of this library
+ * Returns a pointer to const struct libusb_version with the version
+ * (major, minor, micro, nano and rc) of the running library.
  */
 DEFAULT_VISIBILITY
 const struct libusb_version * LIBUSB_CALL libusb_get_version(void)
