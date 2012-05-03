@@ -1292,6 +1292,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
 	int first;
+	int updated_fds;
 
 	usbi_mutex_lock(&itransfer->lock);
 	itransfer->transferred = 0;
@@ -1325,7 +1326,10 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 #endif
 
 out:
+	updated_fds = (itransfer->flags & USBI_TRANSFER_UPDATED_FDS);
 	usbi_mutex_unlock(&itransfer->lock);
+	if (updated_fds)
+		usbi_fd_notification(ctx);
 	return r;
 }
 

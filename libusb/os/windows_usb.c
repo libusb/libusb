@@ -1770,7 +1770,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
 		(short)(IS_XFERIN(transfer) ? POLLIN : POLLOUT));
 
-	usbi_fd_notification(ctx);
+	itransfer->flags |= USBI_TRANSFER_UPDATED_FDS;
 	return LIBUSB_SUCCESS;
 }
 
@@ -1790,7 +1790,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd,
 		(short)(IS_XFERIN(transfer) ? POLLIN : POLLOUT));
 
-	usbi_fd_notification(ctx);
+	itransfer->flags |= USBI_TRANSFER_UPDATED_FDS;
 	return LIBUSB_SUCCESS;
 }
 
@@ -1809,7 +1809,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, POLLIN);
 
-	usbi_fd_notification(ctx);
+	itransfer->flags |= USBI_TRANSFER_UPDATED_FDS;
 	return LIBUSB_SUCCESS;
 
 }

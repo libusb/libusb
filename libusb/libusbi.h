@@ -347,6 +347,9 @@ enum usbi_transfer_flags {
 
 	/* Operation on the transfer failed because the device disappeared */
 	USBI_TRANSFER_DEVICE_DISAPPEARED = 1 << 3,
+
+	/* Set by backend submit_transfer() if the fds in use have been updated */
+	USBI_TRANSFER_UPDATED_FDS = 1 << 4,
 };
 
 #define USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
