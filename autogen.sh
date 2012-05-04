@@ -1,3 +1,3 @@
 #!/bin/sh
-source ./bootstrap.sh
+./bootstrap.sh
 ./configure --enable-maintainer-mode --enable-examples-build $*
