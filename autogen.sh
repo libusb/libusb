@@ -3,4 +3,4 @@
 set -e
 
 ./bootstrap.sh
-./configure --enable-maintainer-mode --enable-examples-build $*
+./configure --enable-maintainer-mode --enable-examples-build "$@"
