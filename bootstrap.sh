@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 # use libtoolize if available, otherwise look for glibtoolize (darwin)
 if (libtoolize --version) < /dev/null > /dev/null 2>&1; then
   LIBTOOLIZE=libtoolize
