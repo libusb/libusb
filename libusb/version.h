@@ -6,12 +6,12 @@
 #define LIBUSB_MINOR 0
 #endif
 #ifndef LIBUSB_MICRO
-#define LIBUSB_MICRO 10
+#define LIBUSB_MICRO 11
 #endif
 #ifndef LIBUSB_NANO
-#define LIBUSB_NANO 10493
+#define LIBUSB_NANO 10494
 #endif
 /* LIBUSB_RC is the release candidate suffix. Should normally be empty. */
 #ifndef LIBUSB_RC
-#define LIBUSB_RC ""
+#define LIBUSB_RC "-rc1"
 #endif

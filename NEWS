@@ -2,6 +2,15 @@ This file lists notable changes in each release.
 For fine grained history, please see the git log at:
 http://libusbx.git.sourceforge.net/git/gitweb.cgi?p=libusbx/libusbx;a=log
 
+2012-05-06: v1.0.11
+* Revert removal of critical Windows event handling that was introduced in 1.0.10
+* Fix a possible deadlock in Windows when submitting transfers
+* Add timestamped logging
+* Add NetBSD support (experimental) and BSD libusb_get_device_speed() data
+* Add bootstrap.sh alongside autogen.sh (bootstrap.sh doesn't invoke configure)
+* Search for device nodes in /dev for Android support
+* Other bug fixes
+
 2012-04-17: v1.0.10
 * Public release
 * Add libusb_get_version
