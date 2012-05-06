@@ -45,4 +45,6 @@
 
 extern int usbi_mutex_init_recursive(pthread_mutex_t *mutex, pthread_mutexattr_t *attr);
 
+int usbi_get_tid(void);
+
 #endif /* LIBUSB_THREADS_POSIX_H */

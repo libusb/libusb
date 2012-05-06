@@ -209,6 +209,18 @@ static inline void usbi_dbg(const char *format, ...)
 #include <os/poll_windows.h>
 #endif
 
+#if defined(OS_WINDOWS) && !defined(__GCC__)
+#undef HAVE_GETTIMEOFDAY
+int usbi_gettimeofday(struct timeval *tp, void *tzp);
+#define LIBUSB_GETTIMEOFDAY_WIN32
+#define HAVE_USBI_GETTIMEOFDAY
+#else
+#ifdef HAVE_GETTIMEOFDAY
+#define usbi_gettimeofday(tv, tz) gettimeofday((tv), (tz))
+#define HAVE_USBI_GETTIMEOFDAY
+#endif
+#endif
+
 extern struct libusb_context *usbi_default_context;
 
 struct libusb_context {

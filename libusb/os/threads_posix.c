@@ -19,6 +19,13 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#if defined(__linux__)
+# include <unistd.h>
+# include <sys/syscall.h>
+#elif defined(__APPLE__)
+# include <mach/mach.h>
+#endif
+
 #ifdef _XOPEN_SOURCE
 # if _XOPEN_SOURCE < 500
 #  undef _XOPEN_SOURCE
@@ -52,4 +59,17 @@ finish:
 		pthread_mutexattr_destroy(&stack_attr);
 
 	return err;
+}
+
+int usbi_get_tid(void)
+{
+	int ret = -1;
+#if defined(__linux__)
+	ret = syscall(SYS_gettid);
+#elif defined(__APPLE__)
+	ret = mach_thread_self();
+	mach_port_deallocate(mach_task_self(), ret);
+#endif
+/* TODO: OpenBSD and NetBSD thread ID support */
+	return ret;
 }

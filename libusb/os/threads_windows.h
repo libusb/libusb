@@ -82,4 +82,6 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 int usbi_cond_broadcast(usbi_cond_t *cond);
 int usbi_cond_signal(usbi_cond_t *cond);
 
+int usbi_get_tid(void);
+
 #endif /* LIBUSB_THREADS_WINDOWS_H */

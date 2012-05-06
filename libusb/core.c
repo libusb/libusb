@@ -27,6 +27,10 @@
 #include <string.h>
 #include <sys/types.h>
 
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+
 #include "libusbi.h"
 
 #if defined(OS_LINUX)
@@ -1665,11 +1669,59 @@ int API_EXPORTED libusb_has_capability(uint32_t capability)
 	return 0;
 }
 
+/* this is defined in libusbi.h if needed */
+#ifdef LIBUSB_GETTIMEOFDAY_WIN32
+/*
+ * gettimeofday
+ * Implementation according to:
+ * The Open Group Base Specifications Issue 6
+ * IEEE Std 1003.1, 2004 Edition
+ */
+
+/*
+ *  THIS SOFTWARE IS NOT COPYRIGHTED
+ *
+ *  This source code is offered for use in the public domain. You may
+ *  use, modify or distribute it freely.
+ *
+ *  This code is distributed in the hope that it will be useful but
+ *  WITHOUT ANY WARRANTY. ALL WARRANTIES, EXPRESS OR IMPLIED ARE HEREBY
+ *  DISCLAIMED. This includes but is not limited to warranties of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ *  Contributed by:
+ *  Danny Smith <dannysmith@users.sourceforge.net>
+ */
+
+/* Offset between 1/1/1601 and 1/1/1970 in 100 nanosec units */
+#define _W32_FT_OFFSET (116444736000000000)
+
+int usbi_gettimeofday(struct timeval *tp, void *tzp)
+ {
+  union {
+    unsigned __int64 ns100; /*time since 1 Jan 1601 in 100ns units */
+    FILETIME ft;
+  }  _now;
+
+  if(tp)
+    {
+      GetSystemTimeAsFileTime (&_now.ft);
+      tp->tv_usec=(long)((_now.ns100 / 10) % 1000000 );
+      tp->tv_sec= (long)((_now.ns100 - _W32_FT_OFFSET) / 10000000);
+    }
+  /* Always return 0 as per Open Group Base Specifications Issue 6.
+     Do not set errno on error.  */
+  return 0;
+}
+#endif
+
 void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	const char *function, const char *format, va_list args)
 {
 	FILE *stream = stdout;
 	const char *prefix;
+	struct timeval now;
+	static struct timeval first = { 0, 0 };
 
 #ifndef ENABLE_DEBUG_LOGGING
 	USBI_GET_CONTEXT(ctx);
@@ -1680,6 +1732,20 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	if (level == LOG_LEVEL_INFO && ctx->debug < 3)
 		return;
 #endif
+
+	usbi_gettimeofday(&now, NULL);
+	if (!first.tv_sec) {
+		first.tv_sec = now.tv_sec;
+		first.tv_usec = now.tv_usec;
+		fprintf(stream, "[timestamp] [threadID] facility level [function call] <message>\n");
+		fprintf(stream, "--------------------------------------------------------------------------------\n");
+	}
+	if (now.tv_usec < first.tv_usec) {
+		now.tv_sec--;
+		now.tv_usec += 1000000;
+	}
+	now.tv_sec -= first.tv_sec;
+	now.tv_usec -= first.tv_usec;
 
 	switch (level) {
 	case LOG_LEVEL_INFO:
@@ -1703,7 +1769,8 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 		break;
 	}
 
-	fprintf(stream, "libusb:%s [%s] ", prefix, function);
+	fprintf(stream, "[%2d.%06d] [%08x] libusbx: %s [%s] ",
+		(int)now.tv_sec, (int)now.tv_usec, usbi_get_tid(), prefix, function);
 
 	vfprintf(stream, format, args);
 

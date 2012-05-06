@@ -204,3 +204,7 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 
 	return usbi_cond_intwait(cond, mutex, millis);
 }
+
+int usbi_get_tid(void) {
+	return GetCurrentThreadId();
+}
