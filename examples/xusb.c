@@ -54,7 +54,7 @@
 
 // Global variables
 bool binary_dump = false;
-char binary_name[64];
+char binary_name[64] = "raw.bin";
 
 static int perr(char const *format, ...)
 {
@@ -778,7 +778,6 @@ int main(int argc, char** argv)
 					debug_mode = true;
 					break;
 				case 'b':
-					strcat(binary_name, "raw.bin");
 					if (j+1 < argc) {
 						strncpy(binary_name, argv[j+1], 64);
 						j++;
