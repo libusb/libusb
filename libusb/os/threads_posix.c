@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__OpenBSD__)
 # include <unistd.h>
 # include <sys/syscall.h>
 #elif defined(__APPLE__)
@@ -66,10 +66,14 @@ int usbi_get_tid(void)
 	int ret = -1;
 #if defined(__linux__)
 	ret = syscall(SYS_gettid);
+#elif defined(__OpenBSD__)
+	/* The following only works with OpenBSD > 5.1 as it requires
+	   real thread support. For 5.1 and earlier, -1 is returned. */
+	ret = syscall(SYS_getthrid);
 #elif defined(__APPLE__)
 	ret = mach_thread_self();
 	mach_port_deallocate(mach_task_self(), ret);
 #endif
-/* TODO: OpenBSD and NetBSD thread ID support */
+/* TODO: NetBSD thread ID support */
 	return ret;
 }
