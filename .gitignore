@@ -30,6 +30,7 @@ examples/dpfp
 examples/dpfp_threaded
 examples/fxload
 examples/hotplugtest
+examples/sam3u_benchmark
 tests/stress
 *.exe
 *.pc

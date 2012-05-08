@@ -10,6 +10,9 @@ if THREADS_POSIX
 dpfp_threaded_CFLAGS = $(AM_CFLAGS)
 noinst_PROGRAMS += dpfp_threaded
 endif
+
+sam3u_benchmark_SOURCES = sam3u_benchmark.c
+noinst_PROGRAMS += sam3u_benchmark
 endif
 
 fxload_SOURCES = ezusb.c ezusb.h fxload.c
