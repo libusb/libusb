@@ -135,6 +135,10 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 	case LIBUSB_TRANSFER_OVERFLOW:
 		r = LIBUSB_ERROR_OVERFLOW;
 		break;
+	case LIBUSB_TRANSFER_ERROR:
+	case LIBUSB_TRANSFER_CANCELLED:
+		r = LIBUSB_ERROR_IO;
+		break;
 	default:
 		usbi_warn(HANDLE_CTX(dev_handle),
 			"unrecognised status code %d", transfer->status);
@@ -204,6 +208,10 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 		break;
 	case LIBUSB_TRANSFER_NO_DEVICE:
 		r = LIBUSB_ERROR_NO_DEVICE;
+		break;
+	case LIBUSB_TRANSFER_ERROR:
+	case LIBUSB_TRANSFER_CANCELLED:
+		r = LIBUSB_ERROR_IO;
 		break;
 	default:
 		usbi_warn(HANDLE_CTX(dev_handle),
