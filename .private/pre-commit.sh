@@ -26,13 +26,7 @@
 BRANCH_OFFSET=10000
 ################################################################################
 
-type -P sed &>/dev/null || { echo "sed command not found. Aborting." >&2; exit 1; }
 type -P git &>/dev/null || { echo "git command not found. Aborting." >&2; exit 1; }
-
-# The -b option of sed, which we use to prevent CRLF conversions on Windows
-# was only introduced recently, and Linux distros may not have it
-SED_CMD='sed -b'
-$SED_CMD --version > /dev/null 2>&1 || SED_CMD='sed'
 
 NANO=`git log --oneline | wc -l`
 NANO=`expr $NANO + $BRANCH_OFFSET`
@@ -44,7 +38,5 @@ if [ -f .amend ]; then
   NANO=`expr $NANO - 1`
 fi
 echo "setting nano to $NANO"
-# -i option of sed is useless on Windows.
-$SED_CMD -e "s/^#define LIBUSB_NANO.*/#define LIBUSB_NANO $NANO/" libusb/version.h > libusb/version.h~
-mv libusb/version.h~ libusb/version.h
-git add libusb/version.h
+echo "#define LIBUSB_NANO $NANO" > libusb/version_nano.h
+git add libusb/version_nano.h
