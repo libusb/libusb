@@ -660,6 +660,70 @@ uint8_t API_EXPORTED libusb_get_bus_number(libusb_device *dev)
 }
 
 /** \ingroup dev
+ * Get the number of the port that a device is connected to
+ * \param dev a device
+ * \returns the port number (0 if not available)
+ */
+uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
+{
+	return dev->port_number;
+}
+
+/** \ingroup dev
+ * Get the list of all port numbers from root for the specified device
+ * \param dev a device
+ * \param path the array that should contain the port numbers
+ * \param path_len the maximum length of the array. As per the USB 3.0
+ * specs, the current maximum limit for the depth is 7.
+ * \returns the number of elements filled
+ * \returns LIBUSB_ERROR_OVERFLOW if the array is too small
+ */
+int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t* path, uint8_t path_len)
+{
+	int i = path_len;
+	ssize_t r;
+	struct libusb_device **devs;
+
+	/* The device needs to be open, else the parents may have been destroyed */
+	r = libusb_get_device_list(ctx, &devs);
+	if (r < 0)
+		return (int)r;
+
+	while(dev) {
+		// HCDs can be listed as devices and would have port #0
+		// TODO: see how the other backends want to implement HCDs as parents
+		if (dev->port_number == 0)
+			break;
+		i--;
+		if (i < 0) {
+			return LIBUSB_ERROR_OVERFLOW;
+		}
+		path[i] = dev->port_number;
+		dev = dev->parent_dev;
+	}
+	libusb_free_device_list(devs, 1);
+	memmove(path, &path[i], path_len-i);
+	return path_len-i;
+}
+
+/** \ingroup dev
+ * Get the the parent from the specified device [EXPERIMENTAL]
+ * \param dev a device
+ * \returns the device parent or NULL if not available
+ * You should issue a libusb_get_device_list() before calling this
+ * function and make sure that you only access the parent before issuing
+ * libusb_free_device_list(). The reason is that libusbx currently does
+ * not maintain a permanent list of device instances, and therefore can
+ * only guarantee that parents are fully instantiated within a 
+ * libusb_get_device_list() - libusb_free_device_list() block.
+ */
+DEFAULT_VISIBILITY
+libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev)
+{
+	return dev->parent_dev;
+}
+
+/** \ingroup dev
  * Get the address of the device on the bus it is connected to.
  * \param dev a device
  * \returns the device address

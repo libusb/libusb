@@ -576,9 +576,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
 	libusb_device *dev;
-#ifdef HAS_GETPORTPATH
 	uint8_t bus, port_path[8];
-#endif
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
@@ -603,7 +601,6 @@ static int test_device(uint16_t vid, uint16_t pid)
 	}
 
 	dev = libusb_get_device(handle);
-#ifdef HAS_GETPORTPATH
 	bus = libusb_get_bus_number(dev);
 	r = libusb_get_port_path(NULL, dev, port_path, sizeof(port_path));
 	if (r > 0) {
@@ -613,7 +610,6 @@ static int test_device(uint16_t vid, uint16_t pid)
 		}
 		printf("\n");
 	}
-#endif
 	r = libusb_get_device_speed(dev);
 	if ((r<0) || (r>4)) r=0;
 	printf("speed: %s\n", speed_name[r]);

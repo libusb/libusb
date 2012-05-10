@@ -293,6 +293,8 @@ struct libusb_device {
 	struct libusb_context *ctx;
 
 	uint8_t bus_number;
+	uint8_t port_number;
+	struct libusb_device* parent_dev;
 	uint8_t device_address;
 	uint8_t num_configurations;
 	enum libusb_speed speed;
