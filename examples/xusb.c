@@ -583,7 +583,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
 	int iface, nb_ifaces, first_iface = -1;
-#if defined(__linux)
+#if defined(__linux__)
 	// Attaching/detaching the kernel driver is only relevant for Linux
 	int iface_detached = -1;
 #endif
@@ -679,7 +679,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 	{
 		printf("\nClaiming interface %d...\n", iface);
 		r = libusb_claim_interface(handle, iface);
-#if defined(__linux)
+#if defined(__linux__)
 		if ((r != LIBUSB_SUCCESS) && (iface == 0)) {
 			// Maybe we need to detach the driver
 			perr("   Failed. Trying to detach driver...\n");
@@ -734,7 +734,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 		libusb_release_interface(handle, iface);
 	}
 
-#if defined(__linux)
+#if defined(__linux__)
 	if (iface_detached >= 0) {
 		printf("Re-attaching kernel driver...\n");
 		libusb_attach_kernel_driver(handle, iface_detached);
