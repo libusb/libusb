@@ -24,6 +24,8 @@
 # include <sys/syscall.h>
 #elif defined(__APPLE__)
 # include <mach/mach.h>
+#elif defined(__CYGWIN__)
+# include <windows.h>
 #endif
 
 #ifdef _XOPEN_SOURCE
@@ -73,6 +75,8 @@ int usbi_get_tid(void)
 #elif defined(__APPLE__)
 	ret = mach_thread_self();
 	mach_port_deallocate(mach_task_self(), ret);
+#elif defined(__CYGWIN__)
+	ret = GetCurrentThreadId();
 #endif
 /* TODO: NetBSD thread ID support */
 	return ret;
