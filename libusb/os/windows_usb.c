@@ -901,15 +901,16 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		cd_buf_short.req.SetupPacket.wIndex = i;
 		cd_buf_short.req.SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
 
-		// Dummy call to get the required data size
+		// Dummy call to get the required data size. Initial failures are reported as info rather
+		// than error as they can occur for non-penalizing situations, such as with some hubs.
 		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
 			&cd_buf_short, size, &ret_size, NULL)) {
-			usbi_err(ctx, "could not access configuration descriptor (dummy) for '%s': %s", device_id, windows_error_str(0));
+			usbi_info(ctx, "could not access configuration descriptor (dummy) for '%s': %s", device_id, windows_error_str(0));
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
 		if ((ret_size != size) || (cd_buf_short.data.wTotalLength < sizeof(USB_CONFIGURATION_DESCRIPTOR))) {
-			usbi_err(ctx, "unexpected configuration descriptor size (dummy) for '%s'.", device_id);
+			usbi_info(ctx, "unexpected configuration descriptor size (dummy) for '%s'.", device_id);
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
