@@ -1,7 +1,7 @@
 /*
  * libusbx synchronization using POSIX Threads
  *
- * Copyright © 2010 Peter Stuge <peter@stuge.se>
+ * Copyright Â© 2010 Peter Stuge <peter@stuge.se>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

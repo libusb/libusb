@@ -1,6 +1,6 @@
 /*
  * xusb: Generic USB test program
- * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
+ * Copyright Â© 2009-2012 Pete Batard <pete@akeo.ie>
  * Contributions to Mass Storage by Alan Stern.
  *
  * This library is free software; you can redistribute it and/or

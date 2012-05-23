@@ -1,6 +1,6 @@
 /*
  * windows backend for libusbx 1.0
- * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
+ * Copyright Â© 2009-2012 Pete Batard <pete@akeo.ie>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
  * Hash table functions adapted from glibc, by Ulrich Drepper et al.

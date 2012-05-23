@@ -1,7 +1,7 @@
 /*
  * Public libusbx header file
- * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
- * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
+ * Copyright Â© 2007-2008 Daniel Drake <dsd@gentoo.org>
+ * Copyright Â© 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

@@ -1,6 +1,6 @@
 /*
  * darwin backend for libusbx 1.0
- * Copyright © 2008-2009 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright Â© 2008-2009 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

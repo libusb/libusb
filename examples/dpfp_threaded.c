@@ -1,6 +1,6 @@
 /*
  * libusbx example program to manipulate U.are.U 4000B fingerprint scanner.
- * Copyright © 2007 Daniel Drake <dsd@gentoo.org>
+ * Copyright Â© 2007 Daniel Drake <dsd@gentoo.org>
  *
  * Basic image capture program only, does not consider the powerup quirks or
  * the fact that image encryption may be enabled. Not expected to work
@@ -542,4 +542,3 @@ out:
 	libusb_exit(NULL);
 	return r >= 0 ? r : -r;
 }
-
