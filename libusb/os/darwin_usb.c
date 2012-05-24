@@ -134,7 +134,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
 
   int8_t i, iface;
 
-  usbi_info (HANDLE_CTX(dev_handle), "converting ep address 0x%02x to pipeRef and interface", ep);
+  usbi_dbg ("converting ep address 0x%02x to pipeRef and interface", ep);
 
   for (iface = 0 ; iface < USB_MAXINTERFACES ; iface++) {
     cInterface = &priv->interfaces[iface];
@@ -144,7 +144,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
 	if (cInterface->endpoint_addrs[i] == ep) {
 	  *pipep = i + 1;
 	  *ifcp = iface;
-	  usbi_info (HANDLE_CTX(dev_handle), "pipe %d on interface %d matches", *pipep, *ifcp);
+	  usbi_dbg ("pipe %d on interface %d matches", *pipep, *ifcp);
 	  return 0;
 	}
       }
@@ -295,7 +295,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
   CFTypeRef locationCF;
   UInt32 message;
 
-  usbi_info (ctx, "a device has been detached");
+  usbi_dbg ("a device has been detached");
 
   while ((device = IOIteratorNext (rem_devices)) != 0) {
     /* get the location from the i/o registry */
@@ -362,7 +362,7 @@ static void *event_thread_main (void *arg0) {
   io_notification_port_t libusb_notification_port;
   io_iterator_t          libusb_rem_device_iterator;
 
-  usbi_info (ctx, "creating hotplug event source");
+  usbi_dbg ("creating hotplug event source");
 
   runloop = CFRunLoopGetCurrent ();
   CFRetain (runloop);
@@ -387,7 +387,7 @@ static void *event_thread_main (void *arg0) {
   /* arm notifiers */
   darwin_clear_iterator (libusb_rem_device_iterator);
 
-  usbi_info (ctx, "thread ready to receive events");
+  usbi_dbg ("thread ready to receive events");
 
   /* signal the main thread that the async runloop has been created. */
   pthread_mutex_lock (&libusb_darwin_at_mutex);
@@ -398,7 +398,7 @@ static void *event_thread_main (void *arg0) {
   /* run the runloop */
   CFRunLoopRun();
 
-  usbi_info (ctx, "thread exiting");
+  usbi_dbg ("thread exiting");
 
   /* delete notification port */
   IONotificationPortDestroy (libusb_notification_port);
@@ -586,7 +586,7 @@ static int darwin_check_configuration (struct libusb_context *ctx, struct libusb
     /* not configured */
     priv->active_config = 0;
   
-  usbi_info (ctx, "active config: %u, first config: %u", priv->active_config, priv->first_config);
+  usbi_dbg ("active config: %u, first config: %u", priv->active_config, priv->first_config);
 
   return 0;
 }
@@ -735,11 +735,11 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
   do {
     dev = usbi_get_device_by_session_id(ctx, locationID);
     if (!dev) {
-      usbi_info (ctx, "allocating new device for location 0x%08x", locationID);
+      usbi_dbg ("allocating new device for location 0x%08x", locationID);
       dev = usbi_alloc_device(ctx, locationID);
       need_unref = 1;
     } else
-      usbi_info (ctx, "using existing device for location 0x%08x", locationID);
+      usbi_dbg ("using existing device for location 0x%08x", locationID);
 
     if (!dev) {
       ret = LIBUSB_ERROR_NO_MEM;
@@ -804,7 +804,7 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     *_discdevs = discdevs;
     *last_dev = dev;
 
-    usbi_info (ctx, "found device with address %d port = %d parent = %p at %p", dev->device_address,
+    usbi_dbg ("found device with address %d port = %d parent = %p at %p", dev->device_address,
 	       dev->port_number, priv->sys_path, (void *) parent);
   } while (0);
 
@@ -902,7 +902,7 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
 
   usbi_add_pollfd(HANDLE_CTX(dev_handle), priv->fds[0], POLLIN);
 
-  usbi_info (HANDLE_CTX (dev_handle), "device open for access");
+  usbi_dbg ("device open for access");
 
   return 0;
 }
@@ -1037,7 +1037,7 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
   u_int16_t dont_care2;
   int i;
 
-  usbi_info (HANDLE_CTX (dev_handle), "building table of endpoints.");
+  usbi_dbg ("building table of endpoints.");
 
   /* retrieve the total number of endpoints on this interface */
   kresult = (*(cInterface->interface))->GetNumEndpoints(cInterface->interface, &numep);
@@ -1057,7 +1057,7 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
       return darwin_to_libusb (kresult);
     }
 
-    usbi_info (HANDLE_CTX (dev_handle), "interface: %i pipe %i: dir: %i number: %i", iface, i, direction, number);
+    usbi_dbg ("interface: %i pipe %i: dir: %i number: %i", iface, i, direction, number);
 
     cInterface->endpoint_addrs[i - 1] = ((direction << 7 & LIBUSB_ENDPOINT_DIR_MASK) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
   }
@@ -1165,7 +1165,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
   /* add the cfSource to the async thread's run loop */
   CFRunLoopAddSource(libusb_darwin_acfl, cInterface->cfSource, kCFRunLoopDefaultMode);
 
-  usbi_info (HANDLE_CTX (dev_handle), "interface opened");
+  usbi_dbg ("interface opened");
 
   return 0;
 }
@@ -1516,7 +1516,7 @@ static int cancel_control_transfer(struct usbi_transfer *itransfer) {
   struct darwin_device_priv *dpriv = (struct darwin_device_priv *)transfer->dev_handle->dev->os_priv;
   IOReturn kresult;
 
-  usbi_info (ITRANSFER_CTX (itransfer), "WARNING: aborting all transactions control pipe");
+  usbi_warn (ITRANSFER_CTX (itransfer), "aborting all transactions control pipe");
 
   if (!dpriv->device)
     return LIBUSB_ERROR_NO_DEVICE;
@@ -1545,12 +1545,12 @@ static int darwin_abort_transfers (struct usbi_transfer *itransfer) {
   if (!dpriv->device)
     return LIBUSB_ERROR_NO_DEVICE;
 
-  usbi_info (ITRANSFER_CTX (itransfer), "WARNING: aborting all transactions on interface %d pipe %d", iface, pipeRef);
+  usbi_warn (ITRANSFER_CTX (itransfer), "aborting all transactions on interface %d pipe %d", iface, pipeRef);
 
   /* abort transactions */
   (*(cInterface->interface))->AbortPipe (cInterface->interface, pipeRef);
 
-  usbi_info (ITRANSFER_CTX (itransfer), "calling clear pipe stall to clear the data toggle bit");
+  usbi_dbg ("calling clear pipe stall to clear the data toggle bit");
 
   /* clear the data toggle bit */
 #if (InterfaceVersion < 190)
@@ -1595,7 +1595,7 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
   UInt32 message, size;
 
-  usbi_info (ITRANSFER_CTX (itransfer), "an async io operation has completed");
+  usbi_dbg ("an async io operation has completed");
 
   /* The size should never be larger than 4 GB - Also see libusb bug #117 */
   if ((intptr_t) arg0 > UINT32_MAX)
@@ -1651,7 +1651,7 @@ static void darwin_handle_callback (struct usbi_transfer *itransfer, kern_return
     return;
   }
 
-  usbi_info (ITRANSFER_CTX (itransfer), "handling %s completion with kernel status %d",
+  usbi_dbg ("handling %s completion with kernel status %d",
 	     isControl ? "control" : isBulk ? "bulk" : isIsoc ? "isoc" : "interrupt", result);
 
   if (kIOReturnSuccess == result || kIOReturnUnderrun == result) {
@@ -1685,7 +1685,7 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL
     struct libusb_device_handle *handle;
     struct darwin_device_handle_priv *hpriv = NULL;
 
-    usbi_info (ctx, "checking fd %i with revents = %x", fds[i], pollfd->revents);
+    usbi_dbg ("checking fd %i with revents = %x", fds[i], pollfd->revents);
 
     if (!pollfd->revents)
       continue;
