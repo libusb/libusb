@@ -949,6 +949,24 @@ enum libusb_capability {
 	LIBUSB_CAP_HAS_CAPABILITY = 0,
 };
 
+/** \ingroup lib
+ *  Log message levels.
+ *  - LOG_LEVEL_NONE (0)    : no messages ever printed by the library (default)
+ *  - LOG_LEVEL_ERROR (1)   : error messages are printed to stderr
+ *  - LOG_LEVEL_WARNING (2) : warning and error messages are printed to stderr
+ *  - LOG_LEVEL_INFO (3)    : informational messages are printed to stdout, warning
+ *    and error messages are printed to stderr
+ *  - LOG_LEVEL_DEBUG (4)   : debug and informational messages are printed to stdout,
+ *    warnings and errors to stderr
+ */
+enum usbi_log_level {
+	LOG_LEVEL_NONE = 0,
+	LOG_LEVEL_ERROR,
+	LOG_LEVEL_WARNING,
+	LOG_LEVEL_INFO,
+	LOG_LEVEL_DEBUG,
+};
+
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);

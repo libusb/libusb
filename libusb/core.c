@@ -1563,20 +1563,16 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
 }
 
 /** \ingroup lib
- * Set message verbosity.
- *  - Level 0: no messages ever printed by the library (default)
- *  - Level 1: error messages are printed to stderr
- *  - Level 2: warning and error messages are printed to stderr
- *  - Level 3: informational messages are printed to stdout, warning and error
- *    messages are printed to stderr
+ * Set log message verbosity.
  *
- * The default level is 0, which means no messages are ever printed. If you
- * choose to increase the message verbosity level, ensure that your
- * application does not close the stdout/stderr file descriptors.
+ * The default level is \ref LOG_LEVEL_NONE, which means no messages are ever
+ * printed. If you choose to increase the message verbosity level, ensure
+ * that your application does not close the stdout/stderr file descriptors.
  *
- * You are advised to set level 3. libusbx is conservative with its message
- * logging and most of the time, will only log messages that explain error
- * conditions and other oddities. This will help you debug your software.
+ * You are advised to use level \ref LOG_LEVEL_WARNING. libusbx is conservative
+ * with its message logging and most of the time, will only log messages that
+ * explain error conditions and other oddities. This will help you debug
+ * your software.
  *
  * If the LIBUSB_DEBUG environment variable was set when libusbx was
  * initialized, this function does nothing: the message verbosity is fixed
@@ -1791,9 +1787,9 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	USBI_GET_CONTEXT(ctx);
 	if (!ctx->debug)
 		return;
-	if (level == LOG_LEVEL_WARNING && ctx->debug < 2)
+	if (level == LOG_LEVEL_WARNING && ctx->debug < LOG_LEVEL_WARNING)
 		return;
-	if (level == LOG_LEVEL_INFO && ctx->debug < 3)
+	if (level == LOG_LEVEL_INFO && ctx->debug < LOG_LEVEL_INFO)
 		return;
 #endif
 
