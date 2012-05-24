@@ -51,6 +51,7 @@ const struct libusb_version libusb_version_internal =
 	  LIBUSB_RC, "unused - please use the nano" };
 static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
+static struct timeval timestamp_origin = { 0, 0 };
 
 /**
  * \mainpage libusbx-1.0 API Reference
@@ -1614,6 +1615,11 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	int r = 0;
 
 	usbi_mutex_static_lock(&default_context_lock);
+
+	if (!timestamp_origin.tv_sec) {
+		usbi_gettimeofday(&timestamp_origin, NULL);
+	}
+
 	if (!context && usbi_default_context) {
 		usbi_dbg("reusing default context");
 		default_context_refcnt++;
@@ -1781,10 +1787,14 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	FILE *stream = stdout;
 	const char *prefix;
 	struct timeval now;
-	static struct timeval first = { 0, 0 };
+	int global_debug;
+	static int has_debug_header_been_displayed = 0;
 
-#ifndef ENABLE_DEBUG_LOGGING
+#ifdef ENABLE_DEBUG_LOGGING
+	global_debug = 1;
+#else
 	USBI_GET_CONTEXT(ctx);
+	global_debug = (ctx->debug == LOG_LEVEL_DEBUG);
 	if (!ctx->debug)
 		return;
 	if (level == LOG_LEVEL_WARNING && ctx->debug < LOG_LEVEL_WARNING)
@@ -1794,18 +1804,17 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 #endif
 
 	usbi_gettimeofday(&now, NULL);
-	if (!first.tv_sec) {
-		first.tv_sec = now.tv_sec;
-		first.tv_usec = now.tv_usec;
+	if ((global_debug) && (!has_debug_header_been_displayed)) {
+		has_debug_header_been_displayed = 1;
 		fprintf(stream, "[timestamp] [threadID] facility level [function call] <message>\n");
 		fprintf(stream, "--------------------------------------------------------------------------------\n");
 	}
-	if (now.tv_usec < first.tv_usec) {
+	if (now.tv_usec < timestamp_origin.tv_usec) {
 		now.tv_sec--;
 		now.tv_usec += 1000000;
 	}
-	now.tv_sec -= first.tv_sec;
-	now.tv_usec -= first.tv_usec;
+	now.tv_sec -= timestamp_origin.tv_sec;
+	now.tv_usec -= timestamp_origin.tv_usec;
 
 	switch (level) {
 	case LOG_LEVEL_INFO:
@@ -1829,8 +1838,12 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 		break;
 	}
 
-	fprintf(stream, "[%2d.%06d] [%08x] libusbx: %s [%s] ",
-		(int)now.tv_sec, (int)now.tv_usec, usbi_get_tid(), prefix, function);
+	if (global_debug) {
+		fprintf(stream, "[%2d.%06d] [%08x] libusbx: %s [%s]",
+			(int)now.tv_sec, (int)now.tv_usec, usbi_get_tid(), prefix, function);
+	} else {
+		fprintf(stream, "libusbx: %s [%s] ", prefix, function);
+	}
 
 	vfprintf(stream, format, args);
 
