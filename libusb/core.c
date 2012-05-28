@@ -111,8 +111,8 @@ static struct timeval timestamp_origin = { 0, 0 };
  * free to close stdout/stderr and those descriptors may be reused without
  * worry.
  *
- * The libusb_set_debug() function can be used to enable stdout/stderr logging
- * of certain messages. Under standard configuration, libusbx doesn't really
+ * The libusb_set_debug() function can be used to enable stderr logging of
+ * certain messages. Under standard configuration, libusbx doesn't really
  * log much at all, so you are advised to use this function to enable all
  * error/warning/informational messages. It will help you debug problems with
  * your software.
@@ -121,7 +121,7 @@ static struct timeval timestamp_origin = { 0, 0 };
  * between messages being logged and success or failure return codes from
  * libusbx functions. There is no format to the messages, so you should not
  * try to capture or parse them. They are not and will not be localized.
- * These messages are not suitable for being passed to your application user;
+ * These messages are not intended to being passed to your application user;
  * instead, you should interpret the error codes returned from libusbx functions
  * and provide appropriate notification to the user. The messages are simply
  * there to aid you as a programmer, and if you're confused because you're
@@ -129,8 +129,8 @@ static struct timeval timestamp_origin = { 0, 0 };
  * logging may give you a suitable explanation.
  *
  * The LIBUSB_DEBUG environment variable can be used to enable message logging
- * at run-time. This environment variable should be set to a number, which is
- * interpreted the same as the libusb_set_debug() parameter. When this
+ * at run-time. This environment variable should be set to a log level number,
+ * which is interpreted the same as the libusb_set_debug() parameter. When this
  * environment variable is set, the message logging verbosity level is fixed
  * and libusb_set_debug() effectively does nothing.
  *
@@ -1784,7 +1784,6 @@ int usbi_gettimeofday(struct timeval *tp, void *tzp)
 void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	const char *function, const char *format, va_list args)
 {
-	FILE *stream = stdout;
 	const char *prefix;
 	struct timeval now;
 	int global_debug;
@@ -1806,8 +1805,8 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	usbi_gettimeofday(&now, NULL);
 	if ((global_debug) && (!has_debug_header_been_displayed)) {
 		has_debug_header_been_displayed = 1;
-		fprintf(stream, "[timestamp] [threadID] facility level [function call] <message>\n");
-		fprintf(stream, "--------------------------------------------------------------------------------\n");
+		fprintf(stderr, "[timestamp] [threadID] facility level [function call] <message>\n");
+		fprintf(stderr, "--------------------------------------------------------------------------------\n");
 	}
 	if (now.tv_usec < timestamp_origin.tv_usec) {
 		now.tv_sec--;
@@ -1821,33 +1820,29 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 		prefix = "info";
 		break;
 	case LOG_LEVEL_WARNING:
-		stream = stderr;
 		prefix = "warning";
 		break;
 	case LOG_LEVEL_ERROR:
-		stream = stderr;
 		prefix = "error";
 		break;
 	case LOG_LEVEL_DEBUG:
-		stream = stderr;
 		prefix = "debug";
 		break;
 	default:
-		stream = stderr;
 		prefix = "unknown";
 		break;
 	}
 
 	if (global_debug) {
-		fprintf(stream, "[%2d.%06d] [%08x] libusbx: %s [%s]",
+		fprintf(stderr, "[%2d.%06d] [%08x] libusbx: %s [%s]",
 			(int)now.tv_sec, (int)now.tv_usec, usbi_get_tid(), prefix, function);
 	} else {
-		fprintf(stream, "libusbx: %s [%s] ", prefix, function);
+		fprintf(stderr, "libusbx: %s [%s] ", prefix, function);
 	}
 
-	vfprintf(stream, format, args);
+	vfprintf(stderr, format, args);
 
-	fprintf(stream, "\n");
+	fprintf(stderr, "\n");
 }
 
 void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
