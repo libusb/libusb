@@ -58,8 +58,14 @@ EXPORTS
   libusb_get_max_packet_size@8 = libusb_get_max_packet_size
   libusb_get_next_timeout
   libusb_get_next_timeout@8 = libusb_get_next_timeout
+  libusb_get_parent
+  libusb_get_parent@4 = libusb_get_parent
   libusb_get_pollfds
   libusb_get_pollfds@4 = libusb_get_pollfds
+  libusb_get_port_number
+  libusb_get_port_number@4 = libusb_get_port_number
+  libusb_get_port_path
+  libusb_get_port_path@16 = libusb_get_port_path
   libusb_get_string_descriptor_ascii
   libusb_get_string_descriptor_ascii@16 = libusb_get_string_descriptor_ascii
   libusb_get_version
