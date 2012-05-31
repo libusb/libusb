@@ -67,6 +67,7 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, int
 static int darwin_reset_device(struct libusb_device_handle *dev_handle);
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0);
 
+#ifdef ENABLE_LOGGING
 static const char *darwin_error_str (int result) {
   switch (result) {
   case kIOReturnSuccess:
@@ -99,6 +100,7 @@ static const char *darwin_error_str (int result) {
     return "unknown error";
   }
 }
+#endif
 
 static int darwin_to_libusb (int result) {
   switch (result) {
@@ -856,7 +858,7 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
     kresult = (*(dpriv->device))->USBDeviceOpenSeize (dpriv->device);
 
     if (kresult != kIOReturnSuccess) {
-      usbi_err (HANDLE_CTX (dev_handle), "USBDeviceOpen: %s", darwin_error_str(kresult));
+      usbi_warn (HANDLE_CTX (dev_handle), "USBDeviceOpen: %s", darwin_error_str(kresult));
 
       switch (kresult) {
       case kIOReturnExclusiveAccess:
@@ -939,7 +941,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
       if (kresult) {
 	/* Log the fact that we had a problem closing the file, however failing a
 	 * close isn't really an error, so return success anyway */
-	usbi_err (HANDLE_CTX (dev_handle), "USBDeviceClose: %s", darwin_error_str(kresult));
+	usbi_warn (HANDLE_CTX (dev_handle), "USBDeviceClose: %s", darwin_error_str(kresult));
       }
     }
 
@@ -947,7 +949,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
     if (kresult) {
       /* Log the fact that we had a problem closing the file, however failing a
        * close isn't really an error, so return success anyway */
-      usbi_err (HANDLE_CTX (dev_handle), "Release: %s", darwin_error_str(kresult));
+      usbi_warn (HANDLE_CTX (dev_handle), "Release: %s", darwin_error_str(kresult));
     }
 
     dpriv->device = NULL;
@@ -1192,11 +1194,11 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, int
 
   kresult = (*(cInterface->interface))->USBInterfaceClose(cInterface->interface);
   if (kresult)
-    usbi_err (HANDLE_CTX (dev_handle), "USBInterfaceClose: %s", darwin_error_str(kresult));
+    usbi_warn (HANDLE_CTX (dev_handle), "USBInterfaceClose: %s", darwin_error_str(kresult));
 
   kresult = (*(cInterface->interface))->Release(cInterface->interface);
   if (kresult != kIOReturnSuccess)
-    usbi_err (HANDLE_CTX (dev_handle), "Release: %s", darwin_error_str(kresult));
+    usbi_warn (HANDLE_CTX (dev_handle), "Release: %s", darwin_error_str(kresult));
 
   cInterface->interface = IO_OBJECT_NULL;
 
@@ -1253,7 +1255,7 @@ static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
   kresult = (*(cInterface->interface))->ClearPipeStallBothEnds(cInterface->interface, pipeRef);
 #endif
   if (kresult)
-    usbi_err (HANDLE_CTX (dev_handle), "ClearPipeStall: %s", darwin_error_str (kresult));
+    usbi_warn (HANDLE_CTX (dev_handle), "ClearPipeStall: %s", darwin_error_str (kresult));
 
   return darwin_to_libusb (kresult);
 }
@@ -1622,17 +1624,17 @@ static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_
   case kIOReturnAborted:
     return LIBUSB_TRANSFER_CANCELLED;
   case kIOUSBPipeStalled:
-    usbi_warn (ITRANSFER_CTX (itransfer), "transfer error: pipe is stalled");
+    usbi_dbg ("transfer error: pipe is stalled");
     return LIBUSB_TRANSFER_STALL;
   case kIOReturnOverrun:
-    usbi_err (ITRANSFER_CTX (itransfer), "transfer error: data overrun");
+    usbi_warn (ITRANSFER_CTX (itransfer), "transfer error: data overrun");
     return LIBUSB_TRANSFER_OVERFLOW;
   case kIOUSBTransactionTimeout:
-    usbi_err (ITRANSFER_CTX (itransfer), "transfer error: timed out");
+    usbi_warn (ITRANSFER_CTX (itransfer), "transfer error: timed out");
     itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
     return LIBUSB_TRANSFER_TIMED_OUT;
   default:
-    usbi_err (ITRANSFER_CTX (itransfer), "transfer error: %s (value = 0x%08x)", darwin_error_str (result), result);
+    usbi_warn (ITRANSFER_CTX (itransfer), "transfer error: %s (value = 0x%08x)", darwin_error_str (result), result);
     return LIBUSB_TRANSFER_ERROR;
   }
 }
@@ -1728,7 +1730,7 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL
       darwin_handle_callback (itransfer, kresult, io_size);
       break;
     default:
-      usbi_err (ctx, "unknown message received from device pipe");
+      usbi_warn (ctx, "unknown message received from device pipe");
     }
   }
 
