@@ -8,7 +8,7 @@
 /* Default visibility */
 #define DEFAULT_VISIBILITY /**/
 
-/* Debug message logging */
+/* Start with debug message logging enabled */
 //#define ENABLE_DEBUG_LOGGING 1
 
 /* Message logging */

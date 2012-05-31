@@ -1634,10 +1634,20 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	}
 	memset(ctx, 0, sizeof(*ctx));
 
+#ifdef ENABLE_DEBUG_LOGGING
+	ctx->debug = LOG_LEVEL_DEBUG;
+#endif
+
 	if (dbg) {
 		ctx->debug = atoi(dbg);
 		if (ctx->debug)
 			ctx->debug_fixed = 1;
+	}
+
+	/* default context should be initialized before calling usbi_dbg */
+	if (!usbi_default_context) {
+		usbi_default_context = ctx;
+		usbi_dbg("created default context");
 	}
 
 	usbi_dbg("");
@@ -1793,12 +1803,16 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	global_debug = 1;
 #else
 	USBI_GET_CONTEXT(ctx);
+	if (ctx == NULL)
+		return;
 	global_debug = (ctx->debug == LOG_LEVEL_DEBUG);
 	if (!ctx->debug)
 		return;
 	if (level == LOG_LEVEL_WARNING && ctx->debug < LOG_LEVEL_WARNING)
 		return;
 	if (level == LOG_LEVEL_INFO && ctx->debug < LOG_LEVEL_INFO)
+		return;
+	if (level == LOG_LEVEL_DEBUG && ctx->debug < LOG_LEVEL_DEBUG)
 		return;
 #endif
 
@@ -1836,7 +1850,7 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	}
 
 	if (global_debug) {
-		fprintf(stderr, "[%2d.%06d] [%08x] libusbx: %s [%s]",
+		fprintf(stderr, "[%2d.%06d] [%08x] libusbx: %s [%s] ",
 			(int)now.tv_sec, (int)now.tv_usec, usbi_get_tid(), prefix, function);
 	} else {
 		fprintf(stderr, "libusbx: %s [%s] ", prefix, function);

@@ -171,11 +171,11 @@ if test "x$log_enabled" != "xno"; then
 fi
 
 AC_ARG_ENABLE([debug-log], [AS_HELP_STRING([--enable-debug-log],
-	[enable debug logging (default n)])],
+	[start with debug message logging enabled (default n)])],
 	[debug_log_enabled=$enableval],
 	[debug_log_enabled='no'])
 if test "x$debug_log_enabled" != "xno"; then
-	AC_DEFINE([ENABLE_DEBUG_LOGGING], 1, [Debug message logging])
+	AC_DEFINE([ENABLE_DEBUG_LOGGING], 1, [Start with debug message logging enabled])
 fi
 
 # Examples build

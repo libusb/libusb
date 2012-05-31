@@ -129,13 +129,9 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 
 #ifdef ENABLE_LOGGING
 #define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __FUNCTION__, __VA_ARGS__)
-#else
-#define _usbi_log(ctx, level, ...) do { (void)(ctx); } while(0)
-#endif
-
-#ifdef ENABLE_DEBUG_LOGGING
 #define usbi_dbg(...) _usbi_log(NULL, LOG_LEVEL_DEBUG, __VA_ARGS__)
 #else
+#define _usbi_log(ctx, level, ...) do { (void)(ctx); } while(0)
 #define usbi_dbg(...) do {} while(0)
 #endif
 
@@ -168,11 +164,7 @@ static inline void usbi_err( struct libusb_context *ctx, const char *format,
 	LOG_BODY(ctx,LOG_LEVEL_ERROR)
 
 static inline void usbi_dbg(const char *format, ...)
-#ifdef ENABLE_DEBUG_LOGGING
 	LOG_BODY(NULL,LOG_LEVEL_DEBUG)
-#else
-{ }
-#endif
 
 #endif /* !defined(_MSC_VER) || _MSC_VER >= 1400 */
 
