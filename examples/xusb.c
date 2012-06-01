@@ -532,7 +532,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 }
 
 // HID
-int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int type)
+static int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int type)
 {
 	uint8_t i, j = 0;
 	uint8_t offset;
@@ -586,7 +586,7 @@ int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int type)
 	}
 }
 
-int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
+static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 {
 	int r, size, descriptor_size;
 	uint8_t hid_report_descriptor[256];
