@@ -8,14 +8,14 @@ m4_define([LU_DEFINE_VERSION_RC_ATOM],
 	[^#define\s*$1\s*"\(-rc[0-9]*\)".*], [\1]))])
 dnl The m4_bregexp() returns (only) the numbers following the #define named
 dnl in the first macro parameter. m4_define() then defines the name for use
-dnl in AC_INIT().
+dnl in AC_INIT.
 
 LU_DEFINE_VERSION_ATOM([LIBUSB_MAJOR])
 LU_DEFINE_VERSION_ATOM([LIBUSB_MINOR])
 LU_DEFINE_VERSION_ATOM([LIBUSB_MICRO])
 LU_DEFINE_VERSION_RC_ATOM([LIBUSB_RC])
 
-AC_INIT([libusbx], LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO[]LIBUSB_RC, [libusbx-devel@lists.sourceforge.net], [libusbx], [http://www.libusbx.org/])
+AC_INIT([libusbx],[LIBUSB_MAJOR.LIBUSB_MINOR.LIBUSB_MICROLIBUSB_RC],[libusbx-devel@lists.sourceforge.net],[libusbx],[http://www.libusbx.org/])
 
 # Library versioning
 # These numbers should be tweaked on every release. Read carefully:
@@ -31,12 +31,12 @@ AM_MAINTAINER_MODE
 
 AC_CONFIG_SRCDIR([libusb/core.c])
 AC_CONFIG_MACRO_DIR([m4])
-AM_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AC_PREREQ([2.50])
 AC_PROG_CC
-AC_PROG_LIBTOOL
+LT_INIT
 LT_LANG([Windows Resource])
 AC_C_INLINE
 AM_PROG_CC_C_O
