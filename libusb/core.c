@@ -1784,7 +1784,7 @@ int usbi_gettimeofday(struct timeval *tp, void *tzp)
 void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	const char *function, const char *format, va_list args)
 {
-	const char *prefix;
+	const char *prefix = "";
 	struct timeval now;
 	int global_debug;
 	static int has_debug_header_been_displayed = 0;
@@ -1827,6 +1827,8 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 		break;
 	case LOG_LEVEL_DEBUG:
 		prefix = "debug";
+		break;
+	case LOG_LEVEL_NONE:
 		break;
 	default:
 		prefix = "unknown";
