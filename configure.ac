@@ -15,7 +15,7 @@ LU_DEFINE_VERSION_ATOM([LIBUSB_MINOR])
 LU_DEFINE_VERSION_ATOM([LIBUSB_MICRO])
 LU_DEFINE_VERSION_RC_ATOM([LIBUSB_RC])
 
-AC_INIT([libusbx],[LIBUSB_MAJOR.LIBUSB_MINOR.LIBUSB_MICROLIBUSB_RC],[libusbx-devel@lists.sourceforge.net],[libusbx],[http://www.libusbx.org/])
+AC_INIT([libusbx],[LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO[]LIBUSB_RC],[libusbx-devel@lists.sourceforge.net],[libusbx],[http://www.libusbx.org/])
 
 # Library versioning
 # These numbers should be tweaked on every release. Read carefully:
