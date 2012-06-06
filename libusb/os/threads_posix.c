@@ -20,6 +20,11 @@
  */
 
 #if defined(__linux__) || defined(__OpenBSD__)
+# if defined(__linux__)
+#  define _GNU_SOURCE
+# else
+#  define _BSD_SOURCE
+# endif
 # include <unistd.h>
 # include <sys/syscall.h>
 #elif defined(__APPLE__)
@@ -27,15 +32,6 @@
 #elif defined(__CYGWIN__)
 # include <windows.h>
 #endif
-
-#ifdef _XOPEN_SOURCE
-# if _XOPEN_SOURCE < 500
-#  undef _XOPEN_SOURCE
-#  define _XOPEN_SOURCE 500
-# endif
-#else
-#define _XOPEN_SOURCE 500
-#endif /* _XOPEN_SOURCE */
 
 #include "threads_posix.h"
 
@@ -50,6 +46,7 @@ int usbi_mutex_init_recursive(pthread_mutex_t *mutex, pthread_mutexattr_t *attr)
 			return err;
 	}
 
+	/* mutexattr_settype requires _GNU_SOURCE or _XOPEN_SOURCE >= 500 on Linux */
 	err = pthread_mutexattr_settype(attr, PTHREAD_MUTEX_RECURSIVE);
 	if (err != 0)
 		goto finish;
