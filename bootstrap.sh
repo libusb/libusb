@@ -8,8 +8,8 @@ if (libtoolize --version) < /dev/null > /dev/null 2>&1; then
 elif (glibtoolize --version) < /dev/null > /dev/null 2>&1; then
   LIBTOOLIZE=glibtoolize
 else
-  echo "libtoolize or glibtoolize was not found! Please install libtool."
-  exit
+  echo "libtoolize or glibtoolize was not found! Please install libtool." 1>&2
+  exit 1
 fi
 
 $LIBTOOLIZE --copy --force || exit 1
