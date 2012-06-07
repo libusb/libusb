@@ -1471,7 +1471,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					unref_list[unref_cur++] = dev;
 					if (unref_cur >= unref_size) {
 						unref_size += 64;
-						unref_list = realloc(unref_list, unref_size*sizeof(libusb_device*));
+						unref_list = usbi_reallocf(unref_list, unref_size*sizeof(libusb_device*));
 						if (unref_list == NULL) {
 							usbi_err(ctx, "could not realloc list for unref - aborting.");
 							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);

@@ -472,7 +472,7 @@ struct discovered_devs *discovered_devs_append(
 	/* exceeded capacity, need to grow */
 	usbi_dbg("need to increase capacity");
 	capacity = discdevs->capacity + DISCOVERED_DEVICES_SIZE_STEP;
-	discdevs = realloc(discdevs,
+	discdevs = usbi_reallocf(discdevs,
 		sizeof(*discdevs) + (sizeof(void *) * capacity));
 	if (discdevs) {
 		discdevs->capacity = capacity;

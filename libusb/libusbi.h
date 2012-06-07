@@ -110,6 +110,14 @@ static inline void list_del(struct list_head *entry)
 	entry->prev->next = entry->next;
 }
 
+static inline void *usbi_reallocf(void *ptr, size_t size)
+{
+	void *ret = realloc(ptr, size);
+	if (!ret)
+		free(ptr);
+	return ret;
+}
+
 #define container_of(ptr, type, member) ({                      \
         const typeof( ((type *)0)->member ) *mptr = (ptr);    \
         (type *)( (char *)mptr - offsetof(type,member) );})
