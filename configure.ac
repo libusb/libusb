@@ -71,6 +71,7 @@ case $host in
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	threads="windows"
+	AM_CFLAGS="${AM_CFLAGS} -fno-omit-frame-pointer"
 	;;
 *-cygwin*)
 	AC_MSG_RESULT([Cygwin (using Windows backend)])
@@ -212,7 +213,7 @@ AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
 AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_FUNCS(gettimeofday)
 
-AM_CFLAGS="-std=gnu99 -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
+AM_CFLAGS="${AM_CFLAGS} -std=gnu99 -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow"
 
 AC_SUBST(VISIBILITY_CFLAGS)
 AC_SUBST(AM_CFLAGS)
