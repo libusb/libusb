@@ -1,3 +1,5 @@
+all: libusb-1.0.la libusb-1.0.dll
+
 lib_LTLIBRARIES = libusb-1.0.la
 
 LINUX_USBFS_SRC = os/linux_usbfs.c
@@ -29,6 +31,13 @@ OS_SRC = $(WINDOWS_USB_SRC)
 
 libusb-1.0.rc: version.h
 endif
+
+libusb-1.0.dll:
+if CREATE_IMPORT_LIB
+# Rebuild the import lib from the .def so that MS and MinGW DLLs can be interchanged
+	$(AM_V_GEN)$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $(srcdir)/libusb-1.0.def --dllname $@ --output-lib .libs/$@.a
+endif
+
 
 if THREADS_POSIX
 THREADS_SRC = os/threads_posix.h os/threads_posix.c

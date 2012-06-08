@@ -71,6 +71,7 @@ case $host in
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	threads="windows"
+	create_import_lib="yes"
 	AM_CFLAGS="${AM_CFLAGS} -fno-omit-frame-pointer"
 	;;
 *-cygwin*)
@@ -129,6 +130,7 @@ AM_CONDITIONAL(OS_DARWIN, test "x$backend" = xdarwin)
 AM_CONDITIONAL(OS_OPENBSD, test "x$backend" = xbsd)
 AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
+AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = "xyes") 
 if test "$threads" = posix; then
 	AC_DEFINE(THREADS_POSIX, 1, [Use POSIX Threads])
 fi
