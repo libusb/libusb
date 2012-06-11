@@ -2,6 +2,19 @@ This file lists notable changes in each release.
 For fine grained history, please see the git log at:
 http://libusbx.git.sourceforge.net/git/gitweb.cgi?p=libusbx/libusbx;a=log
 
+2012-06-11: v1.0.12-rc1
+* Fix a potential major regression with pthread on Linux
+* Fix missing thread ID from debug log output on cygwin
+* Fix possible crash when using longjmp and MinGW's gcc 4.6
+* Add topology calls: libusb_get_port_number(), libusb_get_parent() & libusb_get_port_path()
+* Add toggleable debug, using libusb_set_debug() or the LIBUSB_DEBUG environment variable
+* Define log levels in libusb.h and set timestamp origin to first init call
+* All logging is now sent to to stderr (info was sent to stdout previously)
+* Update log messages severity and avoid polluting log output on OS-X
+* Add HID driver support on Windows
+* Enable MSVC and MinGW DLLs to be interchanged
+* Other bug fixes and improvements
+
 2012-05-08: v1.0.11
 * Revert removal of critical Windows event handling that was introduced in 1.0.10
 * Fix a possible deadlock in Windows when submitting transfers
