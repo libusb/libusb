@@ -29,10 +29,10 @@ OS_SRC = $(WINDOWS_USB_SRC)
 .rc.lo:
 	$(AM_V_GEN)$(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=RC --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
 
-libusb-1.0.rc: version.h
+libusb-1.0.rc: version.h version_nano.h
 endif
 
-libusb-1.0.dll:
+libusb-1.0.dll: libusb-1.0.def
 if CREATE_IMPORT_LIB
 # Rebuild the import lib from the .def so that MS and MinGW DLLs can be interchanged
 	$(AM_V_GEN)$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $(srcdir)/libusb-1.0.def --dllname $@ --output-lib .libs/$@.a
