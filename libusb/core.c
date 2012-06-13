@@ -609,7 +609,7 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 
 	/* convert discovered_devs into a list */
 	len = discdevs->len;
-	ret = malloc(sizeof(void *) * (len + 1));
+	ret = calloc(len + 1, sizeof(struct libusb_device *));
 	if (!ret) {
 		len = LIBUSB_ERROR_NO_MEM;
 		goto out;
@@ -697,6 +697,7 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev, u
 			break;
 		i--;
 		if (i < 0) {
+			libusb_free_device_list(devs, 1);
 			return LIBUSB_ERROR_OVERFLOW;
 		}
 		path[i] = dev->port_number;

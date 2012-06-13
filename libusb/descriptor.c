@@ -486,8 +486,10 @@ int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 	if (r < 0)
 		goto err;
 
+	_config->wTotalLength = 0;
 	usbi_parse_descriptor(tmp, "bbw", _config, host_endian);
-	buf = malloc(_config->wTotalLength);
+	if (_config->wTotalLength != 0)
+		buf = malloc(_config->wTotalLength);
 	if (!buf) {
 		r = LIBUSB_ERROR_NO_MEM;
 		goto err;

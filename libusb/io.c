@@ -1857,7 +1857,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	int r;
 	struct usbi_pollfd *ipollfd;
 	POLL_NFDS_TYPE nfds = 0;
-	struct pollfd *fds;
+	struct pollfd *fds = NULL;
 	int i = -1;
 	int timeout_ms;
 
@@ -1866,7 +1866,8 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		nfds++;
 
 	/* TODO: malloc when number of fd's changes, not on every poll */
-	fds = malloc(sizeof(*fds) * nfds);
+	if (nfds != 0)
+		fds = malloc(sizeof(*fds) * nfds);
 	if (!fds) {
 		usbi_mutex_unlock(&ctx->pollfds_lock);
 		return LIBUSB_ERROR_NO_MEM;
@@ -2272,7 +2273,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	r = usbi_backend->clock_gettime(USBI_CLOCK_MONOTONIC, &cur_ts);
 	if (r < 0) {
 		usbi_err(ctx, "failed to read monotonic clock, errno=%d", errno);
-		return LIBUSB_ERROR_OTHER;
+		return 0;
 	}
 	TIMESPEC_TO_TIMEVAL(&cur_tv, &cur_ts);
 
