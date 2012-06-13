@@ -901,7 +901,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 	if (dev->num_configurations == 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	priv->config_descriptor = (unsigned char**) calloc(dev->num_configurations, sizeof(PUSB_CONFIGURATION_DESCRIPTOR));
+	priv->config_descriptor = (unsigned char**) calloc(dev->num_configurations, sizeof(unsigned char*));
 	if (priv->config_descriptor == NULL)
 		return LIBUSB_ERROR_NO_MEM;
 	for (i=0; i<dev->num_configurations; i++)
