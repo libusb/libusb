@@ -743,8 +743,8 @@ static int test_device(uint16_t vid, uint16_t pid)
 	int iface_detached = -1;
 #endif
 	struct libusb_device_descriptor dev_desc;
-	const char* speed_name[5] = { "Unknown", "1.5 Mbit/s (USB 1.0 LowSpeed)", "12 Mbit/s (USB 1.0 FullSpeed)",
-		"480 Mbit/s (USB 2.0 HighSpeed)", "5000 Mbit/s (USB 3.0 SuperSpeed)"};
+	const char* speed_name[5] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
+		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)"};
 	char string[128];
 	uint8_t string_index[3];	// indexes of the string descriptors
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
