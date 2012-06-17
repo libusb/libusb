@@ -1,4 +1,4 @@
-LIBRARY
+LIBRARY "libusb-1.0.dll"
 EXPORTS
   libusb_alloc_transfer
   libusb_alloc_transfer@4 = libusb_alloc_transfer
