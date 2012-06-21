@@ -158,7 +158,7 @@ static char err_string[ERR_BUFFER_SIZE];
 
 	error_code = retval?retval:GetLastError();
 
-	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%d] ", error_code);
+	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%u] ", error_code);
 
 	size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
 		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &err_string[safe_strlen(err_string)],
@@ -2121,8 +2121,6 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 			return 0;
 		}
 	}
-	usbi_dbg("ERROR: broken timer thread");
-	return 1;
 }
 
 static int windows_clock_gettime(int clk_id, struct timespec *tp)
@@ -3510,13 +3508,13 @@ static int hid_open(struct libusb_device_handle *dev_handle)
 		size[0] = capabilities.NumberInputValueCaps;
 		size[1] = capabilities.NumberOutputValueCaps;
 		size[2] = capabilities.NumberFeatureValueCaps;
-		for (j=0; j<3; j++) {
+		for (j=HidP_Input; j<=HidP_Feature; j++) {
 			usbi_dbg("%d HID %s report value(s) found", size[j], type[j]);
 			priv->hid->uses_report_ids[j] = false;
 			if (size[j] > 0) {
 				value_caps = (HIDP_VALUE_CAPS*) calloc(size[j], sizeof(HIDP_VALUE_CAPS));
 				if ( (value_caps != NULL)
-				  && (HidP_GetValueCaps(j, value_caps, &size[j], preparsed_data) == HIDP_STATUS_SUCCESS)
+				  && (HidP_GetValueCaps((HIDP_REPORT_TYPE)j, value_caps, &size[j], preparsed_data) == HIDP_STATUS_SUCCESS)
 				  && (size[j] >= 1) ) {
 					nb_ids[0] = 0;
 					nb_ids[1] = 0;

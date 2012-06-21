@@ -857,7 +857,7 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	val = ep->wMaxPacketSize;
-	ep_type = ep->bmAttributes & 0x3;
+	ep_type = (enum libusb_transfer_type) (ep->bmAttributes & 0x3);
 	libusb_free_config_descriptor(config);
 
 	r = val & 0x07ff;
@@ -1739,8 +1739,7 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
  */
 int API_EXPORTED libusb_has_capability(uint32_t capability)
 {
-	enum libusb_capability cap = capability;
-	switch (cap) {
+	switch (capability) {
 	case LIBUSB_CAP_HAS_CAPABILITY:
 		return 1;
 	}
@@ -1883,8 +1882,7 @@ void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
  */
 DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
 {
-	enum libusb_error error = error_code;
-	switch (error) {
+	switch (error_code) {
 	case LIBUSB_SUCCESS:
 		return "LIBUSB_SUCCESS";
 	case LIBUSB_ERROR_IO:
@@ -1913,8 +1911,9 @@ DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
 		return "LIBUSB_ERROR_NOT_SUPPORTED";
 	case LIBUSB_ERROR_OTHER:
 		return "LIBUSB_ERROR_OTHER";
+	default:
+		return "**UNKNOWN**";
 	}
-	return "**UNKNOWN**";
 }
 
 /** \ingroup misc
