@@ -28,6 +28,7 @@
 
 int usbi_mutex_init(usbi_mutex_t *mutex,
 					const usbi_mutexattr_t *attr) {
+	UNUSED(attr);
 	if(! mutex) return ((errno=EINVAL));
 	*mutex = CreateMutex(NULL, FALSE, NULL);
 	if(!*mutex) return ((errno=ENOMEM));
@@ -83,6 +84,7 @@ int usbi_mutex_static_unlock(usbi_mutex_static_t *mutex) {
 
 int usbi_cond_init(usbi_cond_t *cond,
 				   const usbi_condattr_t *attr) {
+	UNUSED(attr);
 	if(!cond)           return ((errno=EINVAL));
 	list_init(&cond->waiters    );
 	list_init(&cond->not_waiting);

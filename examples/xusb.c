@@ -935,7 +935,10 @@ int main(int argc, char** argv)
 					break;
 				case 'b':
 					if (j+1 < argc) {
-						strncpy(binary_name, argv[j+1], 64);
+						// WDK's OACR doesn't like strncpy...
+						for (i=0; (i<(sizeof(binary_name)-1)) && (argv[j+1][i] != 0); i++)
+							binary_name[i] = argv[j+1][i];
+						binary_name[i] = 0;
 						j++;
 					}
 					binary_dump = true;

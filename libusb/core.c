@@ -1611,7 +1611,7 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
  */
 int API_EXPORTED libusb_init(libusb_context **context)
 {
-	char *dbg = getenv("LIBUSB_DEBUG");
+	char *dbg;
 	struct libusb_context *ctx;
 	int r = 0;
 
@@ -1639,6 +1639,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	ctx->debug = LOG_LEVEL_DEBUG;
 #endif
 
+	dbg = getenv("LIBUSB_DEBUG");
 	if (dbg) {
 		ctx->debug = atoi(dbg);
 		if (ctx->debug)
@@ -1774,21 +1775,21 @@ int API_EXPORTED libusb_has_capability(uint32_t capability)
 #define _W32_FT_OFFSET (116444736000000000)
 
 int usbi_gettimeofday(struct timeval *tp, void *tzp)
- {
-  union {
-    unsigned __int64 ns100; /*time since 1 Jan 1601 in 100ns units */
-    FILETIME ft;
-  }  _now;
+{
+	union {
+		unsigned __int64 ns100; /* Time since 1 Jan 1601, in 100ns units */
+		FILETIME ft;
+	} _now;
+	UNUSED(tzp);
 
-  if(tp)
-    {
-      GetSystemTimeAsFileTime (&_now.ft);
-      tp->tv_usec=(long)((_now.ns100 / 10) % 1000000 );
-      tp->tv_sec= (long)((_now.ns100 - _W32_FT_OFFSET) / 10000000);
-    }
-  /* Always return 0 as per Open Group Base Specifications Issue 6.
-     Do not set errno on error.  */
-  return 0;
+	if(tp) {
+		GetSystemTimeAsFileTime (&_now.ft);
+		tp->tv_usec=(long)((_now.ns100 / 10) % 1000000 );
+		tp->tv_sec= (long)((_now.ns100 - _W32_FT_OFFSET) / 10000000);
+	}
+	/* Always return 0 as per Open Group Base Specifications Issue 6.
+	   Do not set errno on error.  */
+	return 0;
 }
 #endif
 

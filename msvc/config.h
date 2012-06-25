@@ -5,6 +5,15 @@
 #error "Please make sure the msvc/ directory is removed from your build path."
 #endif
 
+/* Disable: warning C4200: nonstandard extension used : zero-sized array in struct/union */
+#pragma warning(disable:4200)
+#if defined(_PREFAST_)
+/* Disable "Banned API" errors when using the MS's WDK OACR/Prefast */
+#pragma warning(disable:28719)
+/* Disable "The function 'InitializeCriticalSection' must be called from within a try/except block" */
+#pragma warning(disable:28125)
+#endif
+
 /* Default visibility */
 #define DEFAULT_VISIBILITY /**/
 

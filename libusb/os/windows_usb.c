@@ -38,11 +38,6 @@
 #include "poll_windows.h"
 #include "windows_usb.h"
 
-// The following prevents "banned API" errors when using the MS's WDK OACR/Prefast
-#if defined(_PREFAST_)
-#pragma warning(disable:28719)
-#endif
-
 // The 2 macros below are used in conjunction with safe loops.
 #define LOOP_CHECK(fcall) { r=fcall; if (r != LIBUSB_SUCCESS) continue; }
 #define LOOP_BREAK(err) { r=err; continue; }
@@ -455,7 +450,7 @@ static unsigned long htab_hash(char* str)
 	char* sz = str;
 
 	// Compute main hash value (algorithm suggested by Nokia)
-	while ((c = *sz++))
+	while ((c = *sz++) != 0)
 		r = ((r << 5) + r) + c;
 	if (r == 0)
 		++r;
@@ -1193,6 +1188,8 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 	priv->usb_interface[interface_number].apib = &usb_api_backend[api];
 	if ((api == USB_API_HID) && (priv->hid == NULL)) {
 		priv->hid = calloc(1, sizeof(struct hid_device_priv));
+		if (priv->hid == NULL)
+			return LIBUSB_ERROR_NO_MEM;
 	}
 	priv->composite_api_flags |= 1<<api;
 
@@ -1223,7 +1220,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	struct discovered_devs *discdevs;
 	HDEVINFO dev_info = { 0 };
 	char* usb_class[2] = {"USB", "NUSB3"};
-	SP_DEVINFO_DATA dev_info_data;
+	SP_DEVINFO_DATA dev_info_data = { 0 };
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	GUID hid_guid;
 #define MAX_ENUM_GUIDS 64
@@ -1244,7 +1241,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	char* dev_id_path = NULL;
 	unsigned long session_id;
 	DWORD size, reg_type, port_nr, install_state;
-	BOOL b = FALSE;
 	HKEY key;
 	WCHAR guid_string_w[MAX_GUID_STRING_LENGTH];
 	GUID* if_guid;
@@ -1333,12 +1329,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			} else {
 				// Workaround for a Nec/Renesas USB 3.0 driver bug where root hubs are
 				// being listed under the "NUSB3" PnP Symbolic Name rather than "USB"
-				while ( (class_index < 2) &&
-					    (!(b = get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i))) ) {
-						class_index++;
-						i = 0;
+				for (; class_index < 2; class_index++) {
+					if (get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i))
+						break;
+					i = 0;
 				}
-				if (!b) break;
+				if (class_index >= 2)
+					break;
 			}
 
 			// Read the Device ID path. This is what we'll use as UID

@@ -139,7 +139,7 @@ void init_polling(void)
 		}
 		is_polling_set = TRUE;
 	}
-	compat_spinlock = 0;
+	InterlockedExchange((LONG *)&compat_spinlock, 0);
 }
 
 // Internal function to retrieve the table index (and lock the fd mutex)
@@ -237,7 +237,7 @@ void exit_polling(void)
 			DeleteCriticalSection(&_poll_fd[i].mutex);
 		}
 	}
-	compat_spinlock = 0;
+	InterlockedExchange((LONG *)&compat_spinlock, 0);
 }
 
 /*
@@ -672,6 +672,7 @@ int usbi_close(int fd)
 ssize_t usbi_write(int fd, const void *buf, size_t count)
 {
 	int _index;
+	UNUSED(buf);
 
 	CHECK_INIT_POLLING;
 
@@ -708,6 +709,7 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 {
 	int _index;
 	ssize_t r = -1;
+	UNUSED(buf);
 
 	CHECK_INIT_POLLING;
 
