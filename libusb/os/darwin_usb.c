@@ -1698,6 +1698,8 @@ static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL
       if (hpriv->fds[0] == pollfd->fd)
 	break;
     }
+    if (!hpriv)
+      continue;
 
     if (!(pollfd->revents & POLLERR)) {
       ret = read (hpriv->fds[0], &message, sizeof (message));

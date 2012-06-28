@@ -683,7 +683,7 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev, u
 {
 	int i = path_len;
 	ssize_t r;
-	struct libusb_device **devs;
+	struct libusb_device **devs = NULL;
 
 	/* The device needs to be open, else the parents may have been destroyed */
 	r = libusb_get_device_list(ctx, &devs);

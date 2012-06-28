@@ -193,7 +193,7 @@ static void LIBUSB_CALL cb_mode_changed(struct libusb_transfer *transfer)
 
 static int set_mode_async(unsigned char data)
 {
-	unsigned char *buf = malloc(LIBUSB_CONTROL_SETUP_SIZE + 1);
+	unsigned char *buf = (unsigned char*) malloc(LIBUSB_CONTROL_SETUP_SIZE + 1);
 	struct libusb_transfer *transfer;
 
 	if (!buf)
