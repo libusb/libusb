@@ -1567,11 +1567,11 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
 /** \ingroup lib
  * Set log message verbosity.
  *
- * The default level is \ref LOG_LEVEL_NONE, which means no messages are ever
+ * The default level is LIBUSB_LOG_LEVEL_NONE, which means no messages are ever
  * printed. If you choose to increase the message verbosity level, ensure
  * that your application does not close the stdout/stderr file descriptors.
  *
- * You are advised to use level \ref LOG_LEVEL_WARNING. libusbx is conservative
+ * You are advised to use level LIBUSB_LOG_LEVEL_WARNING. libusbx is conservative
  * with its message logging and most of the time, will only log messages that
  * explain error conditions and other oddities. This will help you debug
  * your software.
@@ -1636,7 +1636,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	memset(ctx, 0, sizeof(*ctx));
 
 #ifdef ENABLE_DEBUG_LOGGING
-	ctx->debug = LOG_LEVEL_DEBUG;
+	ctx->debug = LIBUSB_LOG_LEVEL_DEBUG;
 #endif
 
 	dbg = getenv("LIBUSB_DEBUG");
@@ -1793,7 +1793,7 @@ int usbi_gettimeofday(struct timeval *tp, void *tzp)
 }
 #endif
 
-void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
+void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, va_list args)
 {
 	const char *prefix = "";
@@ -1807,14 +1807,14 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	USBI_GET_CONTEXT(ctx);
 	if (ctx == NULL)
 		return;
-	global_debug = (ctx->debug == LOG_LEVEL_DEBUG);
+	global_debug = (ctx->debug == LIBUSB_LOG_LEVEL_DEBUG);
 	if (!ctx->debug)
 		return;
-	if (level == LOG_LEVEL_WARNING && ctx->debug < LOG_LEVEL_WARNING)
+	if (level == LIBUSB_LOG_LEVEL_WARNING && ctx->debug < LIBUSB_LOG_LEVEL_WARNING)
 		return;
-	if (level == LOG_LEVEL_INFO && ctx->debug < LOG_LEVEL_INFO)
+	if (level == LIBUSB_LOG_LEVEL_INFO && ctx->debug < LIBUSB_LOG_LEVEL_INFO)
 		return;
-	if (level == LOG_LEVEL_DEBUG && ctx->debug < LOG_LEVEL_DEBUG)
+	if (level == LIBUSB_LOG_LEVEL_DEBUG && ctx->debug < LIBUSB_LOG_LEVEL_DEBUG)
 		return;
 #endif
 
@@ -1832,19 +1832,19 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	now.tv_usec -= timestamp_origin.tv_usec;
 
 	switch (level) {
-	case LOG_LEVEL_INFO:
+	case LIBUSB_LOG_LEVEL_INFO:
 		prefix = "info";
 		break;
-	case LOG_LEVEL_WARNING:
+	case LIBUSB_LOG_LEVEL_WARNING:
 		prefix = "warning";
 		break;
-	case LOG_LEVEL_ERROR:
+	case LIBUSB_LOG_LEVEL_ERROR:
 		prefix = "error";
 		break;
-	case LOG_LEVEL_DEBUG:
+	case LIBUSB_LOG_LEVEL_DEBUG:
 		prefix = "debug";
 		break;
-	case LOG_LEVEL_NONE:
+	case LIBUSB_LOG_LEVEL_NONE:
 		break;
 	default:
 		prefix = "unknown";
@@ -1863,7 +1863,7 @@ void usbi_log_v(struct libusb_context *ctx, enum usbi_log_level level,
 	fprintf(stderr, "\n");
 }
 
-void usbi_log(struct libusb_context *ctx, enum usbi_log_level level,
+void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, ...)
 {
 	va_list args;

@@ -1021,7 +1021,7 @@ int main(int argc, char** argv)
 	if (r < 0)
 		return r;
 
-	libusb_set_debug(NULL, debug_mode?LOG_LEVEL_DEBUG:LOG_LEVEL_INFO);
+	libusb_set_debug(NULL, debug_mode?LIBUSB_LOG_LEVEL_DEBUG:LIBUSB_LOG_LEVEL_INFO);
 
 	test_device(VID, PID);
 
