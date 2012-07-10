@@ -97,6 +97,7 @@ int usbi_cond_destroy(usbi_cond_t *cond) {
 	if(!list_empty(&cond->waiters)) return ((errno=EBUSY )); // (!see above!)
 	list_for_each_entry(pos, &cond->not_waiting, list, struct usbi_cond_perthread) {
 		free(prev_pos);
+		CloseHandle(pos->event);
 		list_del(&pos->list);
 		prev_pos = pos;
 	}
