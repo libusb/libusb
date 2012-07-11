@@ -1232,11 +1232,10 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 		+ sizeof(struct libusb_transfer)
 		+ (sizeof(struct libusb_iso_packet_descriptor) * iso_packets)
 		+ os_alloc_size;
-	struct usbi_transfer *itransfer = malloc(alloc_size);
+	struct usbi_transfer *itransfer = calloc(1, alloc_size);
 	if (!itransfer)
 		return NULL;
 
-	memset(itransfer, 0, alloc_size);
 	itransfer->num_iso_packets = iso_packets;
 	usbi_mutex_init(&itransfer->lock, NULL);
 	return USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);

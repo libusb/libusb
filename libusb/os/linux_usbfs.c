@@ -1679,10 +1679,9 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 	usbi_dbg("need %d urbs for new transfer with length %d", num_urbs,
 		transfer->length);
 	alloc_size = num_urbs * sizeof(struct usbfs_urb);
-	urbs = malloc(alloc_size);
+	urbs = calloc(1, alloc_size);
 	if (!urbs)
 		return LIBUSB_ERROR_NO_MEM;
-	memset(urbs, 0, alloc_size);
 	tpriv->urbs = urbs;
 	tpriv->num_urbs = num_urbs;
 	tpriv->num_retired = 0;
@@ -1808,10 +1807,9 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("need %d 32k URBs for transfer", num_urbs);
 
 	alloc_size = num_urbs * sizeof(*urbs);
-	urbs = malloc(alloc_size);
+	urbs = calloc(1, alloc_size);
 	if (!urbs)
 		return LIBUSB_ERROR_NO_MEM;
-	memset(urbs, 0, alloc_size);
 
 	tpriv->iso_urbs = urbs;
 	tpriv->num_urbs = num_urbs;
@@ -1845,12 +1843,11 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 		alloc_size = sizeof(*urb)
 			+ (urb_packet_offset * sizeof(struct usbfs_iso_packet_desc));
-		urb = malloc(alloc_size);
+		urb = calloc(1, alloc_size);
 		if (!urb) {
 			free_iso_urbs(tpriv);
 			return LIBUSB_ERROR_NO_MEM;
 		}
-		memset(urb, 0, alloc_size);
 		urbs[i] = urb;
 
 		/* populate packet lengths */
@@ -1934,10 +1931,9 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	if (transfer->length - LIBUSB_CONTROL_SETUP_SIZE > MAX_CTRL_BUFFER_LENGTH)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	urb = malloc(sizeof(struct usbfs_urb));
+	urb = calloc(1, sizeof(struct usbfs_urb));
 	if (!urb)
 		return LIBUSB_ERROR_NO_MEM;
-	memset(urb, 0, sizeof(struct usbfs_urb));
 	tpriv->urbs = urb;
 	tpriv->num_urbs = 1;
 	tpriv->reap_action = NORMAL;

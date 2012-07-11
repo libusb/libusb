@@ -1628,12 +1628,11 @@ int API_EXPORTED libusb_init(libusb_context **context)
 		return 0;
 	}
 
-	ctx = malloc(sizeof(*ctx));
+	ctx = calloc(1, sizeof(*ctx));
 	if (!ctx) {
 		r = LIBUSB_ERROR_NO_MEM;
 		goto err_unlock;
 	}
-	memset(ctx, 0, sizeof(*ctx));
 
 #ifdef ENABLE_DEBUG_LOGGING
 	ctx->debug = LIBUSB_LOG_LEVEL_DEBUG;
