@@ -1,27 +1,7 @@
-libusbx
-=======
+*** THE LIBUSBX GIT REPOSITORY HAS CHANGED ***
 
-libusbx is a library for USB device access from Linux, Mac OS X,
-Windows and OpenBSD userspace (with OpenBSD, and to a lesser extent
-Windows, currently being considered EXPERIMENTAL).
-It is written in C and licensed under the GNU Lesser General Public
-License version 2.1 or (at your option) any later version (see COPYING).
+Please update your git configuration or clone a new 
+repository using our new git URL:
+   git://github.com/libusbx/libusbx.git
 
-libusbx is abstracted internally in such a way that it can hopefully
-be ported to other operating systems. Please see the PORTING file
-for more information.
-
-libusbx homepage:
-http://libusbx.org/
-
-Developers will wish to consult the API documentation:
-http://libusbx.sourceforge.net/api-1.0/
-
-Use the mailing list for questions, comments, etc:
-https://lists.sourceforge.net/lists/listinfo/libusbx-devel
-
-- Pete Batard <pete@akeo.ie>
-- Hans de Goede <hdegoede@redhat.com>
-- Xiaofan Chen <xiaofanc@gmail.com>
-- Ludovic Rousseau <ludovic.rousseau@gmail.com>
-(use the mailing list rather than mailing developers directly)
+The libusbx team apologizes for any inconvenience caused.
