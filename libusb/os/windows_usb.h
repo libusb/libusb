@@ -120,6 +120,8 @@ const GUID GUID_NULL = { 0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x
 #define USB_API_WINUSB      3
 #define USB_API_HID         4
 #define USB_API_MAX         5
+// The following is used to indicate if the HID or composite extra props have already been set.
+#define USB_API_SET         (1<<USB_API_MAX) 
 
 #define CLASS_GUID_UNSUPPORTED      GUID_NULL
 const GUID CLASS_GUID_HID           = { 0x745A17A0, 0x74D3, 0x11D0, {0xB6, 0xFE, 0x00, 0xA0, 0xC9, 0x0F, 0x57, 0xDA} };
@@ -229,9 +231,11 @@ typedef struct libusb_device_descriptor USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESC
 struct windows_device_priv {
 	uint8_t depth;						// distance to HCD
 	uint8_t port;						// port number on the hub
+	uint8_t active_config;
+	uint8_t api_flags;					// HID and composite devices require additional data
 	struct libusb_device *parent_dev;	// access to parent is required for usermode ops
-	char *path;							// device interface path
 	struct windows_usb_api_backend const *apib;
+	char *path;							// device interface path
 	struct {
 		char *path;						// each interface needs a device interface path,
 		struct windows_usb_api_backend const *apib; // an API backend (multiple drivers support),
@@ -240,9 +244,7 @@ struct windows_device_priv {
 		bool restricted_functionality;	// indicates if the interface functionality is restricted
 										// by Windows (eg. HID keyboards or mice cannot do R/W)
 	} usb_interface[USB_MAXINTERFACES];
-	uint8_t composite_api_flags;		// HID and composite devices require additional data
 	struct hid_device_priv *hid;
-	uint8_t active_config;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
 	unsigned char **config_descriptor;	// list of pointers to the cached config descriptors
 };
@@ -259,7 +261,7 @@ static inline void windows_device_priv_init(libusb_device* dev) {
 	p->parent_dev = NULL;
 	p->path = NULL;
 	p->apib = &usb_api_backend[USB_API_UNSUPPORTED];
-	p->composite_api_flags = 0;
+	p->api_flags = 0;
 	p->hid = NULL;
 	p->active_config = 0;
 	p->config_descriptor = NULL;

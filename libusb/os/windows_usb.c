@@ -1149,6 +1149,8 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 	struct windows_device_priv *priv = _device_priv(dev);
 	int interface_number;
 
+	if (priv->api_flags & USB_API_SET)
+		return LIBUSB_SUCCESS;
 	if (priv->apib->id != USB_API_COMPOSITE) {
 		usbi_err(ctx, "program assertion failed: '%s' is not composite", device_id);
 		return LIBUSB_ERROR_NO_DEVICE;
@@ -1191,7 +1193,7 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 		if (priv->hid == NULL)
 			return LIBUSB_ERROR_NO_MEM;
 	}
-	priv->composite_api_flags |= 1<<api;
+	priv->api_flags |= USB_API_SET | (1<<api);
 
 	return LIBUSB_SUCCESS;
 }
@@ -1201,14 +1203,21 @@ static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* d
 {
 	struct windows_device_priv *priv = _device_priv(dev);
 
+	if (priv->api_flags & USB_API_SET)
+		return LIBUSB_SUCCESS;
 	if (priv->hid == NULL) {
 		usbi_err(ctx, "program assertion failed: parent is not HID");
+		return LIBUSB_ERROR_NO_DEVICE;
+	}
+	if (priv->hid->nb_interfaces == USB_MAXINTERFACES) {
+		usbi_err(ctx, "program assertion failed: max USB interfaces reached for HID device");
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
 	priv->usb_interface[priv->hid->nb_interfaces].path = dev_interface_path;
 	priv->usb_interface[priv->hid->nb_interfaces].apib = &usb_api_backend[USB_API_HID];
 	usbi_dbg("interface[%d] = %s", priv->hid->nb_interfaces, dev_interface_path);
 	priv->hid->nb_interfaces++;
+	priv->api_flags |= USB_API_SET;
 	return LIBUSB_SUCCESS;
 }
 
@@ -3983,7 +3992,7 @@ static int composite_open(struct libusb_device_handle *dev_handle)
 	uint8_t flag = 1<<USB_API_WINUSB;
 
 	for (api=USB_API_WINUSB; api<USB_API_MAX; api++) {
-		if (priv->composite_api_flags & flag) {
+		if (priv->api_flags & flag) {
 			r = usb_api_backend[api].open(dev_handle);
 			if (r != LIBUSB_SUCCESS) {
 				return r;
@@ -4001,7 +4010,7 @@ static void composite_close(struct libusb_device_handle *dev_handle)
 	uint8_t flag = 1<<USB_API_WINUSB;
 
 	for (api=USB_API_WINUSB; api<USB_API_MAX; api++) {
-		if (priv->composite_api_flags & flag) {
+		if (priv->api_flags & flag) {
 			usb_api_backend[api].close(dev_handle);
 		}
 		flag <<= 1;
@@ -4126,7 +4135,7 @@ static int composite_reset_device(struct libusb_device_handle *dev_handle)
 	uint8_t flag = 1<<USB_API_WINUSB;
 
 	for (api=USB_API_WINUSB; api<USB_API_MAX; api++) {
-		if (priv->composite_api_flags & flag) {
+		if (priv->api_flags & flag) {
 			r = usb_api_backend[api].reset_device(dev_handle);
 			if (r != LIBUSB_SUCCESS) {
 				return r;
