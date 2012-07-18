@@ -1067,7 +1067,10 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		if (conn_info.DeviceAddress > UINT8_MAX) {
 			usbi_err(ctx, "program assertion failed: device address overflow");
 		}
-		dev->device_address = (uint8_t)conn_info.DeviceAddress;
+		dev->device_address = (uint8_t)conn_info.DeviceAddress + 1;
+		if (dev->device_address == 1) {
+			usbi_err(ctx, "program assertion failed: device address collision with root hub");
+		}
 		switch (conn_info.Speed) {
 		case 0: dev->speed = LIBUSB_SPEED_LOW; break;
 		case 1: dev->speed = LIBUSB_SPEED_FULL; break;
@@ -1078,7 +1081,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			break;
 		}
 	} else {
-		dev->device_address = UINT8_MAX;	// Hubs from HCD have a devaddr of 255
+		dev->device_address = 1;	// root hubs are set to use device number 1
 		force_hcd_device_descriptor(dev);
 	}
 
