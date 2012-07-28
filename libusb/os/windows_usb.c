@@ -1231,7 +1231,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 {
 	struct discovered_devs *discdevs;
 	HDEVINFO dev_info = { 0 };
-	char* usb_class[2] = {"USB", "NUSB3"};
+	char* usb_class[] = {"USB", "NUSB3", "IUSB3"};
+#define MAX_USB_CLASS (sizeof(usb_class)/sizeof(usb_class[0]))
 	SP_DEVINFO_DATA dev_info_data = { 0 };
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	GUID hid_guid;
@@ -1340,13 +1341,14 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				}
 			} else {
 				// Workaround for a Nec/Renesas USB 3.0 driver bug where root hubs are
-				// being listed under the "NUSB3" PnP Symbolic Name rather than "USB"
-				for (; class_index < 2; class_index++) {
+				// being listed under the "NUSB3" PnP Symbolic Name rather than "USB".
+				// The Intel USB 3.0 driver behaves similar, but uses "IUSB3"
+				for (; class_index < MAX_USB_CLASS; class_index++) {
 					if (get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i))
 						break;
 					i = 0;
 				}
-				if (class_index >= 2)
+				if (class_index >= MAX_USB_CLASS)
 					break;
 			}
 
@@ -2274,7 +2276,7 @@ static int unsupported_copy_transfer_data(struct usbi_transfer *itransfer, uint3
 }
 
 // These names must be uppercase
-const char* hub_driver_names[] = {"USBHUB", "USBHUB3", "NUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3"};
+const char* hub_driver_names[] = {"USBHUB", "USBHUB3", "NUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3", "IUSB3HUB"};
 const char* composite_driver_names[] = {"USBCCGP"};
 const char* winusb_driver_names[] = {"WINUSB"};
 const char* hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
