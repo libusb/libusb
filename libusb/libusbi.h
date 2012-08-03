@@ -111,6 +111,7 @@ static inline void list_del(struct list_head *entry)
 {
 	entry->next->prev = entry->prev;
 	entry->prev->next = entry->next;
+	entry->next = entry->prev = NULL;
 }
 
 static inline void *usbi_reallocf(void *ptr, size_t size)

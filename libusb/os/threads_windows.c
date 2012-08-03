@@ -92,16 +92,14 @@ int usbi_cond_init(usbi_cond_t *cond,
 }
 int usbi_cond_destroy(usbi_cond_t *cond) {
 	// This assumes no one is using this anymore.  The check MAY NOT BE safe.
-	struct usbi_cond_perthread *pos, *prev_pos = NULL;
+	struct usbi_cond_perthread *pos, *next_pos = NULL;
 	if(!cond) return ((errno=EINVAL));
 	if(!list_empty(&cond->waiters)) return ((errno=EBUSY )); // (!see above!)
-	list_for_each_entry(pos, &cond->not_waiting, list, struct usbi_cond_perthread) {
-		free(prev_pos);
+	list_for_each_entry_safe(pos, next_pos, &cond->not_waiting, list, struct usbi_cond_perthread) {
 		CloseHandle(pos->event);
 		list_del(&pos->list);
-		prev_pos = pos;
+		free(pos);
 	}
-	free(prev_pos);
 
 	return 0;
 }
