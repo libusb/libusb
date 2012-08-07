@@ -50,7 +50,7 @@
 #define USB_MAXCONFIG		8
 
 /* The following is used to silence warnings for unused variables */
-#define UNUSED(var)			(void)sizeof(var)
+#define UNUSED(var)			(void)(var)
 
 struct list_head {
 	struct list_head *prev, *next;

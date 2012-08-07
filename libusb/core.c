@@ -1000,7 +1000,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 
 	r = usbi_backend->open(_handle);
 	if (r < 0) {
-		usbi_dbg("open %d.%d returns %d", dev->bus_number, dev->device_address, r);
+		usbi_dbg("could not open device: %s", libusb_error_name(r));
 		libusb_unref_device(dev);
 		usbi_mutex_destroy(&_handle->lock);
 		free(_handle);
@@ -1802,6 +1802,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 
 #ifdef ENABLE_DEBUG_LOGGING
 	global_debug = 1;
+	UNUSED(ctx);
 #else
 	USBI_GET_CONTEXT(ctx);
 	if (ctx == NULL)
