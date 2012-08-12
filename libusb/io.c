@@ -1199,12 +1199,13 @@ out:
 		/* if this transfer has the lowest timeout of all active transfers,
 		 * rearm the timerfd with this transfer's timeout */
 		const struct itimerspec it = { {0, 0},
-			{ transfer->timeout.tv_sec, transfer->timeout.tv_usec * 1000 } };
+			{ timeout->tv_sec, timeout->tv_usec * 1000 } };
 		usbi_dbg("arm timerfd for timeout in %dms (first in line)",
 			USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)->timeout);
 		r = timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &it, NULL);
 		if (r < 0) {
-			usbi_warn(ctx, "failed to arm first timerfd (error %d)", r);
+			usbi_warn(ctx, "failed to arm first timerfd (errno %d, it_value = %d:%d)",
+				errno, it.it_value.tv_sec, it.it_value.tv_nsec);
 			r = LIBUSB_ERROR_OTHER;
 		}
 	}
