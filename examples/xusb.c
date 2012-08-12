@@ -54,7 +54,7 @@
 
 // Global variables
 bool binary_dump = false;
-char binary_name[64] = "raw.bin";
+const char* binary_name = NULL;
 
 static int perr(char const *format, ...)
 {
@@ -934,13 +934,11 @@ int main(int argc, char** argv)
 					debug_mode = true;
 					break;
 				case 'b':
-					if (j+1 < argc) {
-						// WDK's OACR doesn't like strncpy...
-						for (i=0; (i<(sizeof(binary_name)-1)) && (argv[j+1][i] != 0); i++)
-							binary_name[i] = argv[j+1][i];
-						binary_name[i] = 0;
-						j++;
+					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
+						printf("   Option -b requires a file name");
+						return 1;
 					}
+					binary_name = argv[++j];
 					binary_dump = true;
 					break;
 				case 'g':
@@ -1002,7 +1000,7 @@ int main(int argc, char** argv)
 	}
 
 	if ((show_help) || (argc == 1) || (argc > 7)) {
-		printf("usage: %s [-d] [-b [file]] [-h] [-i] [-j] [-k] [-x] [vid:pid]\n", argv[0]);
+		printf("usage: %s [-d] [-b file] [-h] [-i] [-j] [-k] [-x] [vid:pid]\n", argv[0]);
 		printf("   -h: display usage\n");
 		printf("   -d: enable debug output (if library was compiled with debug enabled)\n");
 		printf("   -b: dump Mass Storage first block to binary file\n");
