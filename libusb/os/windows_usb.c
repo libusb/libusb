@@ -2370,7 +2370,7 @@ static int common_configure_endpoints(int sub_api, struct libusb_device_handle *
 	return LIBUSB_SUCCESS;
 }
 // These names must be uppercase
-const char* hub_driver_names[] = {"USBHUB", "USBHUB3", "NUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3", "IUSB3HUB"};
+const char* hub_driver_names[] = {"USBHUB", "USBHUB3", "NUSB3HUB", "RUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3", "IUSB3HUB"};
 const char* composite_driver_names[] = {"USBCCGP"};
 const char* winusbx_driver_names[] = WINUSBX_DRV_NAMES;
 const char* hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
