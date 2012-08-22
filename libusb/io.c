@@ -1141,7 +1141,7 @@ static int calculate_timeout(struct usbi_transfer *transfer)
 	current_time.tv_sec += timeout / 1000;
 	current_time.tv_nsec += (timeout % 1000) * 1000000;
 
-	if (current_time.tv_nsec > 1000000000) {
+	while (current_time.tv_nsec >= 1000000000) {
 		current_time.tv_nsec -= 1000000000;
 		current_time.tv_sec++;
 	}
@@ -1204,8 +1204,7 @@ out:
 			USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)->timeout);
 		r = timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &it, NULL);
 		if (r < 0) {
-			usbi_warn(ctx, "failed to arm first timerfd (errno %d, it_value = %d:%d)",
-				errno, it.it_value.tv_sec, it.it_value.tv_nsec);
+			usbi_warn(ctx, "failed to arm first timerfd (errno %d)", errno);
 			r = LIBUSB_ERROR_OTHER;
 		}
 	}
@@ -1745,7 +1744,7 @@ int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 
 	timeout.tv_sec += tv->tv_sec;
 	timeout.tv_nsec += tv->tv_usec * 1000;
-	if (timeout.tv_nsec > 1000000000) {
+	while (timeout.tv_nsec >= 1000000000) {
 		timeout.tv_nsec -= 1000000000;
 		timeout.tv_sec++;
 	}
