@@ -1668,6 +1668,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 	struct usbfs_urb *urbs;
 	int is_out = (transfer->endpoint & LIBUSB_ENDPOINT_DIR_MASK)
 		== LIBUSB_ENDPOINT_OUT;
+	int bulk_buffer_len, use_bulk_continuation;
 	int r;
 	int i;
 	size_t alloc_size;
@@ -1679,16 +1680,54 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 			!(dpriv->caps & USBFS_CAP_ZERO_PACKET))
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 
-	/* usbfs places a 16kb limit on bulk URBs. we divide up larger requests
-	 * into smaller units to meet such restriction, then fire off all the
-	 * units at once. it would be simpler if we just fired one unit at a time,
-	 * but there is a big performance gain through doing it this way. */
-	int num_urbs = transfer->length / MAX_BULK_BUFFER_LENGTH;
+	/*
+	 * Older versions of usbfs place a 16kb limit on bulk URBs. We work
+	 * around this by splitting large transfers into 16k blocks, and then
+	 * submit all urbs at once. it would be simpler to submit one urb at
+	 * a time, but there is a big performance gain doing it this way.
+	 *
+	 * Newer versions lift the 16k limit (USBFS_CAP_NO_PACKET_SIZE_LIM),
+	 * using arbritary large transfers can still be a bad idea though, as
+	 * the kernel needs to allocate physical contiguous memory for this,
+	 * which may fail for large buffers.
+	 *
+	 * The kernel solves this problem by splitting the transfer into
+	 * blocks itself when the host-controller is scatter-gather capable
+	 * (USBFS_CAP_BULK_SCATTER_GATHER), which most controllers are.
+	 *
+	 * Last, there is the issue of short-transfers when splitting, for
+	 * short split-transfers to work reliable USBFS_CAP_BULK_CONTINUATION
+	 * is needed, but this is not always available.
+	 */
+	if (dpriv->caps & USBFS_CAP_BULK_SCATTER_GATHER) {
+		/* Good! Just submit everything in one go */
+		bulk_buffer_len = transfer->length ? transfer->length : 1;
+		use_bulk_continuation = 0;
+	} else if (dpriv->caps & USBFS_CAP_BULK_CONTINUATION) {
+		/* Split the transfers and use bulk-continuation to
+		   avoid issues with short-transfers */
+		bulk_buffer_len = MAX_BULK_BUFFER_LENGTH;
+		use_bulk_continuation = 1;
+	} else if (dpriv->caps & USBFS_CAP_NO_PACKET_SIZE_LIM) {
+		/* Don't split, assume the kernel can alloc the buffer
+		   (otherwise the submit will fail with -ENOMEM) */
+		bulk_buffer_len = transfer->length ? transfer->length : 1;
+		use_bulk_continuation = 0;
+	} else {
+		/* Bad, splitting without bulk-continuation, short transfers
+		   which end before the last urb will not work reliable! */
+		/* Note we don't warn here as this is "normal" on kernels <
+		   2.6.32 and not a problem for most applications */
+		bulk_buffer_len = MAX_BULK_BUFFER_LENGTH;
+		use_bulk_continuation = 0;
+	}
+
+	int num_urbs = transfer->length / bulk_buffer_len;
 	int last_urb_partial = 0;
 
 	if (transfer->length == 0) {
 		num_urbs = 1;
-	} else if ((transfer->length % MAX_BULK_BUFFER_LENGTH) > 0) {
+	} else if ((transfer->length % bulk_buffer_len) > 0) {
 		last_urb_partial = 1;
 		num_urbs++;
 	}
@@ -1709,17 +1748,17 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 		urb->usercontext = itransfer;
 		urb->type = urb_type;
 		urb->endpoint = transfer->endpoint;
-		urb->buffer = transfer->buffer + (i * MAX_BULK_BUFFER_LENGTH);
-		if ((dpriv->caps & USBFS_CAP_BULK_CONTINUATION) && !is_out)
+		urb->buffer = transfer->buffer + (i * bulk_buffer_len);
+		if (use_bulk_continuation && !is_out)
 			urb->flags = USBFS_URB_SHORT_NOT_OK;
 		if (i == num_urbs - 1 && last_urb_partial)
-			urb->buffer_length = transfer->length % MAX_BULK_BUFFER_LENGTH;
+			urb->buffer_length = transfer->length % bulk_buffer_len;
 		else if (transfer->length == 0)
 			urb->buffer_length = 0;
 		else
-			urb->buffer_length = MAX_BULK_BUFFER_LENGTH;
+			urb->buffer_length = bulk_buffer_len;
 
-		if (i > 0 && (dpriv->caps & USBFS_CAP_BULK_CONTINUATION))
+		if (i > 0 && use_bulk_continuation)
 			urb->flags |= USBFS_URB_BULK_CONTINUATION;
 
 		/* we have already checked that the flag is supported */
@@ -1806,7 +1845,13 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	/* usbfs places a 32kb limit on iso URBs. we divide up larger requests
 	 * into smaller units to meet such restriction, then fire off all the
 	 * units at once. it would be simpler if we just fired one unit at a time,
-	 * but there is a big performance gain through doing it this way. */
+	 * but there is a big performance gain through doing it this way.
+	 *
+	 * Newer kernels lift the 32k limit (USBFS_CAP_NO_PACKET_SIZE_LIM),
+	 * using arbritary large transfers is still be a bad idea though, as
+	 * the kernel needs to allocate physical contiguous memory for this,
+	 * which may fail for large buffers.
+	 */
 
 	/* calculate how many URBs we need */
 	for (i = 0; i < num_packets; i++) {
