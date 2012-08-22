@@ -15,10 +15,10 @@ libusbx homepage:
 http://libusbx.org/
 
 Developers will wish to consult the API documentation:
-http://libusbx.sourceforge.net/api-1.0/
+http://api.libusbx.org
 
 Use the mailing list for questions, comments, etc:
-https://lists.sourceforge.net/lists/listinfo/libusbx-devel
+http://mailing-list.libusbx.org
 
 - Pete Batard <pete@akeo.ie>
 - Hans de Goede <hdegoede@redhat.com>

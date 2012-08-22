@@ -1,6 +1,6 @@
 This file lists notable changes in each release. 
 For fine grained history, please see the git log at:
-http://libusbx.git.sourceforge.net/git/gitweb.cgi?p=libusbx/libusbx;a=log
+http://log.libusbx.org
 
 2012-06-15: v1.0.12
 * Fix a potential major regression with pthread on Linux

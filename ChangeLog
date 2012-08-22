@@ -1,5 +1,5 @@
 For the latest change log, please visit:
-http://libusbx.git.sourceforge.net/git/gitweb.cgi?p=libusbx/libusbx;a=log
+http://log.libusbx.org
 
-Alternatively, if you have retrieved the libusbx git repository, you can simply
-navigate to it and issue the command 'git log'.
+Alternatively, if you have retrieved the libusbx git repository,
+simply navigate to it and issue the command 'git log'.

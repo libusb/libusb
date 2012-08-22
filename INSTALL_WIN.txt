@@ -50,7 +50,7 @@ Links
 *****
 
 Additional information related to the Windows backend:
-  https://sourceforge.net/apps/mediawiki/libusbx/index.php?title=Windows
+  http://windows.libusbx.org
 
 Latest Windows Driver (Development) Kit (WDK):
   http://www.microsoft.com/downloads/details.aspx?displaylang=en&FamilyID=36a2630f-5d56-43b5-b996-7633f2ec14ff

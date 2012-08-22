@@ -60,13 +60,12 @@ static struct timeval timestamp_origin = { 0, 0 };
  *
  * libusbx is an open source library that allows you to communicate with USB
  * devices from userspace. For more info, see the
- * <a href="http://libusbx.sourceforge.net">libusbx homepage</a>.
+ * <a href="http://libusbx.org">libusbx homepage</a>.
  *
  * This documentation is aimed at application developers wishing to
  * communicate with USB peripherals from their own software. After reviewing
  * this documentation, feedback and questions can be sent to the
- * <a href="https://lists.sourceforge.net/lists/listinfo/libusbx-devel">libusbx-devel mailing
- * list</a>.
+ * <a href="http://mailing-list.libusbx.org">libusbx-devel mailing list</a>.
  *
  * This documentation assumes knowledge of how to operate USB devices from
  * a software standpoint (descriptors, configurations, interfaces, endpoints,

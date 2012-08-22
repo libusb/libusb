@@ -51,10 +51,10 @@ o MinGW/cygwin
 
 o Additional information:
   - The libusbx 1.0 API documentation can be accessed at:
-    http://libusbx.sourceforge.net/api-1.0/modules.html
+    http://api.libusbx.org
   - For some libusb samples (including source), please have a look in examples/
   - For additional information on the libusbx 1.0 Windows backend please visit:
-    https://sourceforge.net/apps/mediawiki/libusbx/index.php?title=Windows
+    http://windows.libusbx.org
   - The MinGW and MS generated DLLs are fully interchangeable, provided that you
     use the import libs provided or generate one from the .def also provided.
   - If you find any issue, please visit http://libusbx.org/ and check the
