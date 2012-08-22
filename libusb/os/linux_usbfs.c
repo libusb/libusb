@@ -1538,11 +1538,17 @@ static int op_detach_kernel_driver(struct libusb_device_handle *handle,
 {
 	int fd = _device_handle_priv(handle)->fd;
 	struct usbfs_ioctl command;
+	struct usbfs_getdriver getdrv;
 	int r;
 
 	command.ifno = interface;
 	command.ioctl_code = IOCTL_USBFS_DISCONNECT;
 	command.data = NULL;
+
+	getdrv.interface = interface;
+	r = ioctl(fd, IOCTL_USBFS_GETDRIVER, &getdrv);
+	if (r == 0 && strcmp(getdrv.driver, "usbfs") == 0)
+		return LIBUSB_ERROR_NOT_FOUND;
 
 	r = ioctl(fd, IOCTL_USBFS_IOCTL, &command);
 	if (r) {

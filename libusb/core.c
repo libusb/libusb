@@ -1512,6 +1512,10 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev,
  *
  * This functionality is not available on Darwin or Windows.
  *
+ * Note that libusbx itself also talks to the device through a special kernel
+ * driver, if this driver is already attached to the device, this call will
+ * not detach it and return LIBUSB_ERROR_NOT_FOUND.
+ *
  * \param dev a device handle
  * \param interface_number the interface to detach the driver from
  * \returns 0 on success
