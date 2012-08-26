@@ -2699,12 +2699,12 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 		}
 
 		if (!WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
-			usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(0));
 			handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
 
 			switch(GetLastError()) {
 			case ERROR_BAD_COMMAND:
 				// The device was disconnected
+				usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(0));
 				return LIBUSB_ERROR_NO_DEVICE;
 			default:
 				// it may be that we're using the libusb0 filter driver.
@@ -2734,7 +2734,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 					}
 				}
 				if (!found_filter) {
-					usbi_err(ctx, "could not claim interface %d: %s", iface, windows_error_str(0));
+					usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(0));
 					return LIBUSB_ERROR_ACCESS;
 				}
 			}
