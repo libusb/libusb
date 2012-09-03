@@ -54,6 +54,7 @@
 
 // Global variables
 bool binary_dump = false;
+bool extra_info = false;
 const char* binary_name = NULL;
 
 static int perr(char const *format, ...)
@@ -759,17 +760,21 @@ static int test_device(uint16_t vid, uint16_t pid)
 
 	dev = libusb_get_device(handle);
 	bus = libusb_get_bus_number(dev);
-	r = libusb_get_port_path(NULL, dev, port_path, sizeof(port_path));
-	if (r > 0) {
-		printf("bus: %d, port path from HCD: %d", bus, port_path[0]);
-		for (i=1; i<r; i++) {
-			printf("->%d", port_path[i]);
+	if (extra_info) {
+		r = libusb_get_port_path(NULL, dev, port_path, sizeof(port_path));
+		if (r > 0) {
+			printf("\nDevice properties:\n");
+			printf("        bus number: %d\n", bus);
+			printf("         port path: %d", port_path[0]);
+			for (i=1; i<r; i++) {
+				printf("->%d", port_path[i]);
+			}
+			printf(" (from root hub)\n");
 		}
-		printf("\n");
+		r = libusb_get_device_speed(dev);
+		if ((r<0) || (r>4)) r=0;
+		printf("             speed: %s\n", speed_name[r]);
 	}
-	r = libusb_get_device_speed(dev);
-	if ((r<0) || (r>4)) r=0;
-	printf("speed: %s\n", speed_name[r]);
 
 	printf("\nReading device descriptor:\n");
 	CALL_CHECK(libusb_get_device_descriptor(dev, &dev_desc));
@@ -933,6 +938,9 @@ int main(int argc, char** argv)
 				case 'd':
 					debug_mode = true;
 					break;
+				case 'i':
+					extra_info = true;
+					break;
 				case 'b':
 					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
 						printf("   Option -b requires a file name");
@@ -940,8 +948,6 @@ int main(int argc, char** argv)
 					}
 					binary_name = argv[++j];
 					binary_dump = true;
-					break;
-				case 'g':
 					break;
 				case 'j':
 					// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
@@ -1000,16 +1006,17 @@ int main(int argc, char** argv)
 	}
 
 	if ((show_help) || (argc == 1) || (argc > 7)) {
-		printf("usage: %s [-d] [-b file] [-h] [-i] [-j] [-k] [-x] [vid:pid]\n", argv[0]);
-		printf("   -h: display usage\n");
-		printf("   -d: enable debug output (if library was compiled with debug enabled)\n");
-		printf("   -b: dump Mass Storage first block to binary file\n");
-		printf("   -g: short generic test (default)\n");
-		printf("   -k: test generic Mass Storage USB device (using WinUSB)\n");
-		printf("   -j: test FTDI based JTAG device (using WinUSB)\n");
-		printf("   -p: test Sony PS3 SixAxis controller (using WinUSB)\n");
-		printf("   -s: test Microsoft Sidewinder Precision Pro (using HID)\n");
-		printf("   -x: test Microsoft XBox Controller Type S (using WinUSB)\n");
+		printf("usage: %s [-h] [-d] [-i] [-k] [-b file] [-j] [-x] [-s] [-p] [vid:pid]\n", argv[0]);
+		printf("   -h      : display usage\n");
+		printf("   -d      : enable debug output\n");
+		printf("   -i      : print topology and speed info\n");
+		printf("   -j      : test composite FTDI based JTAG device\n");
+		printf("   -k      : test Mass Storage device\n");
+		printf("   -b file : dump Mass Storage data to file 'file'\n");
+		printf("   -p      : test Sony PS3 SixAxis controller\n");
+		printf("   -s      : test Microsoft Sidewinder Precision Pro (HID)\n");
+		printf("   -x      : test Microsoft XBox Controller Type S\n");
+		printf("If no option is provided, xusb attempts to run the most appropriate test\n");
 		return 0;
 	}
 
