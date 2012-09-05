@@ -432,7 +432,7 @@ SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details_filter(struct libusb_co
 					// libusb0.sys is connected to this device instance.
 					// If the the device interface guid is {F9F3FF14-AE21-48A0-8A25-8011A7A931D9} then it's a filter.
 					safe_sprintf(filter_path, sizeof("\\\\.\\libusb0-0000"), "\\\\.\\libusb0-%04d", libusb0_symboliclink_index);
-					usbi_info(ctx,"assigned libusb0 symbolic link %s", filter_path);
+					usbi_dbg("assigned libusb0 symbolic link %s", filter_path);
 				} else {
 					// libusb0.sys was connected to this device instance at one time; but not anymore.
 				}
@@ -1238,8 +1238,6 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 	struct windows_device_priv *priv = _device_priv(dev);
 	int interface_number;
 
-	if (priv->api_flags & USB_API_SET)
-		return LIBUSB_SUCCESS;
 	if (priv->apib->id != USB_API_COMPOSITE) {
 		usbi_err(ctx, "program assertion failed: '%s' is not composite", device_id);
 		return LIBUSB_ERROR_NO_DEVICE;
@@ -1263,15 +1261,15 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 			device_id, interface_number);
 	}
 
-	// HID devices can have multiple collections (COL##) for each MI_## interface
 	if (priv->usb_interface[interface_number].path != NULL) {
-		if (api != USB_API_HID) {
-			usbi_warn(ctx, "program assertion failed %s is not an USB HID collection", device_id);
-			return LIBUSB_ERROR_OTHER;
+		if (api == USB_API_HID) {
+			// HID devices can have multiple collections (COL##) for each MI_## interface
+			usbi_dbg("interface[%d] already set - ignoring HID collection: %s",
+				interface_number, device_id);
+			return LIBUSB_ERROR_ACCESS;
 		}
-		usbi_dbg("interface[%d] already set - ignoring HID collection: %s",
-			interface_number, device_id);
-		return LIBUSB_ERROR_ACCESS;
+		// In other cases, just use the latest data
+		safe_free(priv->usb_interface[interface_number].path);
 	}
 
 	usbi_dbg("interface[%d] = %s", interface_number, dev_interface_path);
@@ -1283,7 +1281,6 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 		if (priv->hid == NULL)
 			return LIBUSB_ERROR_NO_MEM;
 	}
-	priv->api_flags |= USB_API_SET | (1<<api);
 
 	return LIBUSB_SUCCESS;
 }
@@ -1293,8 +1290,6 @@ static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* d
 {
 	struct windows_device_priv *priv = _device_priv(dev);
 
-	if (priv->api_flags & USB_API_SET)
-		return LIBUSB_SUCCESS;
 	if (priv->hid == NULL) {
 		usbi_err(ctx, "program assertion failed: parent is not HID");
 		return LIBUSB_ERROR_NO_DEVICE;
@@ -1303,11 +1298,14 @@ static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* d
 		usbi_err(ctx, "program assertion failed: max USB interfaces reached for HID device");
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
+	if (priv->usb_interface[priv->hid->nb_interfaces].path != NULL) {
+		safe_free(priv->usb_interface[priv->hid->nb_interfaces].path);
+	}
+
 	priv->usb_interface[priv->hid->nb_interfaces].path = dev_interface_path;
 	priv->usb_interface[priv->hid->nb_interfaces].apib = &usb_api_backend[USB_API_HID];
 	usbi_dbg("interface[%d] = %s", priv->hid->nb_interfaces, dev_interface_path);
 	priv->hid->nb_interfaces++;
-	priv->api_flags |= USB_API_SET;
 	return LIBUSB_SUCCESS;
 }
 
@@ -1375,26 +1373,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	for (pass = 0; ((pass < nb_guids) && (r == LIBUSB_SUCCESS)); pass++) {
 //#define ENUM_DEBUG
 #ifdef ENUM_DEBUG
-		switch(pass) {
-		case HCD_PASS:
-			usbi_dbg("PROCESSING HCDs %s", guid_to_string(guid[pass]));
-			break;
-		case HUB_PASS:
-			usbi_dbg("PROCESSING HUBs %s", guid_to_string(guid[pass]));
-			break;
-		case DEV_PASS:
-			usbi_dbg("PROCESSING DEVs %s", guid_to_string(guid[pass]));
-			break;
-		case GEN_PASS:
-			usbi_dbg("PROCESSING GENs");
-			break;
-		case HID_PASS:
-			usbi_dbg("PROCESSING HIDs %s", guid_to_string(guid[pass]));
-			break;
-		default:
-			usbi_dbg("PROCESSING EXTs %s", guid_to_string(guid[pass]));
-			break;
-		}
+		const char *passname[] = { "HCD", "HUB", "GEN", "DEV", "HID", "EXT" };
+		usbi_dbg("\n#### PROCESSING %ss %s", passname[(pass<=HID_PASS)?pass:HID_PASS+1],
+			(pass!=GEN_PASS)?guid_to_string(guid[pass]):"");
 #endif
 		for (i = 0; ; i++) {
 			// safe loop: free up any (unprotected) dynamic resource
@@ -1652,7 +1633,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					dev_interface_path = NULL;
 				} else if (parent_priv->apib->id == USB_API_COMPOSITE) {
 					usbi_dbg("setting composite interface for [%lX]:", parent_dev->session_data);
-					switch (set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api, SUB_API_NOTSET)) {
+					switch (set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api, sub_api)) {
 					case LIBUSB_SUCCESS:
 						dev_interface_path = NULL;
 						break;
@@ -4274,7 +4255,7 @@ static int composite_submit_control_transfer(int sub_api, struct usbi_transfer *
 					continue;
 				}
 				usbi_dbg("using interface %d", i);
-				return priv->usb_interface[i].apib->submit_control_transfer(sub_api, itransfer);
+				return priv->usb_interface[i].apib->submit_control_transfer(priv->usb_interface[i].sub_api, itransfer);
 			}
 		}
 	}

@@ -238,7 +238,6 @@ struct windows_device_priv {
 	uint8_t depth;						// distance to HCD
 	uint8_t port;						// port number on the hub
 	uint8_t active_config;
-	uint8_t api_flags;					// HID and composite devices require additional data
 	struct libusb_device *parent_dev;	// access to parent is required for usermode ops
 	struct windows_usb_api_backend const *apib;
 	char *path;							// device interface path
@@ -269,7 +268,6 @@ static inline void windows_device_priv_init(libusb_device* dev) {
 	p->parent_dev = NULL;
 	p->path = NULL;
 	p->apib = &usb_api_backend[USB_API_UNSUPPORTED];
-	p->api_flags = 0;
 	p->sub_api = SUB_API_NOTSET;
 	p->hid = NULL;
 	p->active_config = 0;
