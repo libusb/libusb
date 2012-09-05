@@ -3192,7 +3192,7 @@ static int _hid_get_config_descriptor(struct hid_device_priv* dev, void *data, s
 	cd->bConfigurationValue = 1;
 	cd->iConfiguration = 0;
 	cd->bmAttributes = 1 << 7; /* bus powered */
-	cd->MaxPower = 50;
+	cd->bMaxPower = 50;
 
 	id->bLength = LIBUSB_DT_INTERFACE_SIZE;
 	id->bDescriptorType = LIBUSB_DT_INTERFACE;
