@@ -106,15 +106,18 @@ static struct timeval timestamp_origin = { 0, 0 };
  *
  * \section msglog Debug message logging
  *
- * libusbx does not log any messages by default. Your application is therefore
- * free to close stdout/stderr and those descriptors may be reused without
- * worry.
+ * libusbx uses stderr for all logging. By default, logging is set to NONE,
+ * which means that no output will be produced. However, unless the library
+ * has been compiled with logging disabled, then any application calls to
+ * libusb_set_debug(), or the setting of the environmental variable
+ * LIBUSB_DEBUG outside of the application, can result in logging being
+ * produced. Your application should therefore not close stderr, but instead
+ * direct it to the null device if its output is undesireable.
  *
- * The libusb_set_debug() function can be used to enable stderr logging of
- * certain messages. Under standard configuration, libusbx doesn't really
- * log much at all, so you are advised to use this function to enable all
- * error/warning/informational messages. It will help you debug problems with
- * your software.
+ * The libusb_set_debug() function can be used to enable logging of certain
+ * messages. Under standard configuration, libusbx doesn't really log much
+ * so you are advised to use this function to enable all error/warning/
+ * informational messages. It will help debug problems with your software.
  *
  * The logged messages are unstructured. There is no one-to-one correspondence
  * between messages being logged and success or failure return codes from
@@ -137,10 +140,10 @@ static struct timeval timestamp_origin = { 0, 0 };
  * systems. In this case, libusb_set_debug() and the LIBUSB_DEBUG environment
  * variable have no effects.
  *
- * libusbx can also be compiled with verbose debugging messages. When the
- * library is compiled in this way, all messages of all verbosities are always
- * logged.  libusb_set_debug() and the LIBUSB_DEBUG environment variable have
- * no effects.
+ * libusbx can also be compiled with verbose debugging messages always. When
+ * the library is compiled in this way, all messages of all verbosities are
+ * always logged. libusb_set_debug() and the LIBUSB_DEBUG environment variable
+ * have no effects.
  *
  * \section remarks Other remarks
  *
