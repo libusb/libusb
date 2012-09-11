@@ -108,6 +108,38 @@ copy %srcPath%\xusb.pdb %dstPath%\examples
 
 @echo off
 
+if exist examples\getopt\getopt_ddkbuild goto md9
+md examples\getopt\getopt_ddkbuild
+:md9
+
+cd examples\getopt\getopt_ddkbuild
+copy ..\..\..\msvc\getopt_sources sources >NUL 2>&1
+@echo on
+%BUILD_CMD%
+@echo off
+if errorlevel 1 goto builderror
+cd ..\..\..
+
+if exist examples\fxload_ddkbuild goto md8
+md examples\fxload_ddkbuild
+:md8
+
+cd examples\fxload_ddkbuild
+copy ..\..\msvc\fxload_sources sources >NUL 2>&1
+@echo on
+%BUILD_CMD%
+@echo off
+if errorlevel 1 goto builderror
+cd ..\..
+
+set srcPath=examples\fxload_ddkbuild\obj%BUILD_ALT_DIR%\%cpudir%
+@echo on
+
+copy %srcPath%\fxload.exe %dstPath%\examples
+copy %srcPath%\fxload.pdb %dstPath%\examples
+
+@echo off
+
 cd msvc
 goto done
 
