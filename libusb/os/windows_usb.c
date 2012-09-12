@@ -2877,7 +2877,7 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 	} else {
 		if (!WinUSBX[sub_api].ControlTransfer(wfd.handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, wfd.overlapped)) {
 			if(GetLastError() != ERROR_IO_PENDING) {
-				usbi_err(ctx, "ControlTransfer failed: %s", windows_error_str(0));
+				usbi_warn(ctx, "ControlTransfer failed: %s", windows_error_str(0));
 				usbi_free_fd(wfd.fd);
 				return LIBUSB_ERROR_IO;
 			}
