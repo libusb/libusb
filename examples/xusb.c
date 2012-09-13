@@ -750,7 +750,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 	uint8_t string_index[3];	// indexes of the string descriptors
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
 
-	printf("Opening device...\n");
+	printf("Opening device %04X:%04X...\n", vid, pid);
 	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
 
 	if (handle == NULL) {
@@ -1016,7 +1016,7 @@ int main(int argc, char** argv)
 		printf("   -p      : test Sony PS3 SixAxis controller\n");
 		printf("   -s      : test Microsoft Sidewinder Precision Pro (HID)\n");
 		printf("   -x      : test Microsoft XBox Controller Type S\n");
-		printf("If no option is provided, xusb attempts to run the most appropriate test\n");
+		printf("If only the vid:pid is provided, xusb attempts to run the most appropriate test\n");
 		return 0;
 	}
 
