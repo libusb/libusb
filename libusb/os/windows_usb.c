@@ -2639,11 +2639,13 @@ static int winusbx_configure_endpoints(int sub_api, struct libusb_device_handle 
 			IGNORE_SHORT_PACKETS, sizeof(UCHAR), &policy)) {
 			usbi_dbg("failed to disable IGNORE_SHORT_PACKETS for endpoint %02X", endpoint_address);
 		}
+		policy = true;
+		/* ALLOW_PARTIAL_READS must be enabled due to likely libusbK bug. See:
+		   https://sourceforge.net/mailarchive/message.php?msg_id=29736015 */
 		if (!WinUSBX[sub_api].SetPipePolicy(winusb_handle, endpoint_address,
 			ALLOW_PARTIAL_READS, sizeof(UCHAR), &policy)) {
-			usbi_dbg("failed to disable ALLOW_PARTIAL_READS for endpoint %02X", endpoint_address);
+			usbi_dbg("failed to enable ALLOW_PARTIAL_READS for endpoint %02X", endpoint_address);
 		}
-		policy = true;
 		if (!WinUSBX[sub_api].SetPipePolicy(winusb_handle, endpoint_address,
 			AUTO_CLEAR_STALL, sizeof(UCHAR), &policy)) {
 			usbi_dbg("failed to enable AUTO_CLEAR_STALL for endpoint %02X", endpoint_address);
