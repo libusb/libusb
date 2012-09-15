@@ -2,6 +2,25 @@ This file lists notable changes in each release.
 For fine grained history, please see the git log at:
 http://log.libusbx.org
 
+2012-09-16: v1.0.13-rc1
+* [MAJOR] Fix a typo in the API with struct libusb_config_descriptor where
+  MaxPower was used instead of bMaxPower, as defined in the specs. If your 
+  application was accessing the MaxPower attribute, and you need to maintain
+  compatibility with libusb or older versions, see APPENDIX A below.
+* Fix broken support for the 0.1 -> 1.0 libusb-compat layer
+* Fix unwanted cancellation of pending timeouts as well as major timeout related bugs
+* Fix handling of HID and composite devices on Windows
+* Introduce LIBUSBX_API_VERSION macro
+* Add Cypress FX/FX2 firmware upload sample, based fxload from
+  http://linux-hotplug.sourceforge.net
+* Add libusb0 (libusb-win32) and libusbK driver support on Windows. Note that using
+  the libusb-win32 filter driver with composite member devices is not supported yet
+* Add support for the new get_capabilities ioctl on Linux and avoid unnecessary
+  splitting of bulk transfers
+* Improve support for newer Intel and Renesas USB 3.0 controllers on Windows
+* Harmonize the device number for root hubs accross platforms
+* Other bug fixes and improvements
+
 2012-06-15: v1.0.12
 * Fix a potential major regression with pthread on Linux
 * Fix missing thread ID from debug log output on cygwin
@@ -91,3 +110,23 @@ http://log.libusbx.org
 
 2008-05-25: v0.9.0 release
  * First libusb-1.0 beta release
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+APPENDIX A - How to maintain code compatibility with versions of libusb and
+libusbx that use MaxPower:
+
+If you must to maintain compatibility with versions of the library that aren't
+using the bMaxPower attribute in struct libusb_config_descriptor, the 
+recommended way is to use the new LIBUSBX_API_VERSION macro with an #ifdef.
+For instance, if your code was written as follows:
+
+  if (dev->config[0].MaxPower < 250)
+
+Then you should modify it to have:
+
+#if defined(LIBUSBX_API_VERSION) && (LIBUSBX_API_VERSION >= 0x01000100)
+  if (dev->config[0].bMaxPower < 250)
+#else
+  if (dev->config[0].MaxPower < 250)
+#endif

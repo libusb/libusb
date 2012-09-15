@@ -18,7 +18,7 @@ Notes related to submitting new developments:
 If you submit a new development to libusbx (eg: new backend), that is unlikely
 to fit in a couple of small patches, we would kindly suggest that you create a
 public account on github, if you don't have one already, and then fork a new
-libsubx repository under this account from https://github.com/libusbx/libusbx.
+libusbx repository under this account from https://github.com/libusbx/libusbx.
 
 Then you can create a git branch for your work, that we will be able to better
 reference and test. 
