@@ -121,7 +121,7 @@ static bool fx2lp_is_external(uint32_t addr, size_t len)
 /*
  * Issues the specified vendor-specific write request.
  */
-static int ezusb_write(libusb_device_handle *device, char *label,
+static int ezusb_write(libusb_device_handle *device, const char *label,
 	uint8_t opcode, uint32_t addr, const unsigned char *data, size_t len)
 {
 	int status;
@@ -160,7 +160,7 @@ static bool ezusb_cpucs(libusb_device_handle *device, uint32_t addr, bool doRun)
 		/* We may get an I/O error from libusbx as the device disappears */
 		((!doRun) || (status != LIBUSB_ERROR_IO)))
 	{
-		char *mesg = "can't modify CPUCS";
+		const char *mesg = "can't modify CPUCS";
 		if (status < 0)
 			logerror("%s: %s\n", mesg, libusb_error_name(status));
 		else
@@ -188,8 +188,10 @@ static bool ezusb_cpucs(libusb_device_handle *device, uint32_t addr, bool doRun)
  * Caller is responsible for halting CPU as needed, such as when
  * overwriting a second stage loader.
  */
-int parse_ihex(FILE *image, void *context, bool (*is_external)(uint32_t addr, size_t len),
-	int (*poke) (void *context, uint32_t addr, bool external, const unsigned char *data, size_t len))
+static int parse_ihex(FILE *image, void *context,
+	bool (*is_external)(uint32_t addr, size_t len),
+	int (*poke) (void *context, uint32_t addr, bool external,
+	const unsigned char *data, size_t len))
 {
 	unsigned char data[1023];
 	uint32_t data_addr = 0;
@@ -335,8 +337,9 @@ int parse_ihex(FILE *image, void *context, bool (*is_external)(uint32_t addr, si
  * Caller is responsible for halting CPU as needed, such as when
  * overwriting a second stage loader.
  */
-int parse_bin(FILE *image, void *context, bool (*is_external)(uint32_t addr, size_t len),
-	int (*poke)(void *context, uint32_t addr, bool external, const unsigned char *data, size_t len))
+static int parse_bin(FILE *image, void *context,
+	bool (*is_external)(uint32_t addr, size_t len), int (*poke)(void *context,
+	uint32_t addr, bool external, const unsigned char *data, size_t len))
 {
 	unsigned char data[4096];
 	uint32_t data_addr = 0;
@@ -372,7 +375,8 @@ int parse_bin(FILE *image, void *context, bool (*is_external)(uint32_t addr, siz
  * Caller is responsible for halting CPU as needed, such as when
  * overwriting a second stage loader.
  */
-int parse_iic(FILE *image, void *context, bool (*is_external)(uint32_t addr, size_t len),
+static int parse_iic(FILE *image, void *context,
+	bool (*is_external)(uint32_t addr, size_t len),
 	int (*poke)(void *context, uint32_t addr, bool external, const unsigned char *data, size_t len))
 {
 	unsigned char data[4096];
@@ -474,6 +478,7 @@ static int ram_poke(void *context, uint32_t addr, bool external,
 			return 0;
 		}
 		break;
+	case _undef:
 	default:
 		logerror("bug\n");
 		return -EDOM;
