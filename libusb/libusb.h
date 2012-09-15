@@ -107,6 +107,29 @@ typedef unsigned __int32  uint32_t;
 #define LIBUSB_CALL
 #endif
 
+/** \def LIBUSBX_API_VERSION
+ * \ingroup misc
+ * libusbx's API version.
+ *
+ * Since version 1.0.13, to help with feature detection, libusbx defines
+ * a LIBUSBX_API_VERSION macro that gets increased every time there is a
+ * significant change to the API, such as the introduction of a new call,
+ * the definition of a new macro/enum member, or any other element that
+ * libusbx applications may want to detect at compilation time.
+ *
+ * The macro is typically used in an application as follows:
+ * #if defined(LIBUSBX_API_VERSION) && (LIBUSBX_API_VERSION >= 0x01001234)
+ * // Use one of the newer features from the libusbx API
+ * #endif
+ *
+ * Another feature of LIBUSBX_API_VERSION is that it can be used to detect
+ * whether you are compiling against the libusb or the libusbx library.
+ *
+ * Internally, LIBUSBX_API_VERSION is defined as follows:
+ * (libusbx major << 24) | (libusbx minor << 16) | (16 bit incremental)
+ */
+#define LIBUSBX_API_VERSION 0x01000100
+
 #ifdef __cplusplus
 extern "C" {
 #endif
