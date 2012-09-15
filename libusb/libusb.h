@@ -820,6 +820,9 @@ enum libusb_transfer_status {
 
 	/** Device sent more data than requested */
 	LIBUSB_TRANSFER_OVERFLOW,
+
+	/* NB! Remember to update libusb_error_name()
+	   when adding new status codes here. */
 };
 
 /** \ingroup asyncio

@@ -1881,17 +1881,17 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 
 /** \ingroup misc
  * Returns a constant NULL-terminated string with the ASCII name of a libusb
- * error code. The caller must not free() the returned string.
+ * error or transfer status code. The caller must not free() the returned
+ * string.
  *
- * \param error_code The \ref libusb_error code to return the name of.
+ * \param error_code The \ref libusb_error or libusb_transfer_status code to
+ * return the name of.
  * \returns The error name, or the string **UNKNOWN** if the value of
- * error_code is not a known error code.
+ * error_code is not a known error / status code.
  */
 DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
 {
 	switch (error_code) {
-	case LIBUSB_SUCCESS:
-		return "LIBUSB_SUCCESS";
 	case LIBUSB_ERROR_IO:
 		return "LIBUSB_ERROR_IO";
 	case LIBUSB_ERROR_INVALID_PARAM:
@@ -1918,6 +1918,22 @@ DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
 		return "LIBUSB_ERROR_NOT_SUPPORTED";
 	case LIBUSB_ERROR_OTHER:
 		return "LIBUSB_ERROR_OTHER";
+
+	case LIBUSB_TRANSFER_ERROR:
+		return "LIBUSB_TRANSFER_ERROR";
+	case LIBUSB_TRANSFER_TIMED_OUT:
+		return "LIBUSB_TRANSFER_TIMED_OUT";
+	case LIBUSB_TRANSFER_CANCELLED:
+		return "LIBUSB_TRANSFER_CANCELLED";
+	case LIBUSB_TRANSFER_STALL:
+		return "LIBUSB_TRANSFER_STALL";
+	case LIBUSB_TRANSFER_NO_DEVICE:
+		return "LIBUSB_TRANSFER_NO_DEVICE";
+	case LIBUSB_TRANSFER_OVERFLOW:
+		return "LIBUSB_TRANSFER_OVERFLOW";
+
+	case 0:
+		return "LIBUSB_SUCCESS / LIBUSB_TRANSFER_COMPLETED";
 	default:
 		return "**UNKNOWN**";
 	}
