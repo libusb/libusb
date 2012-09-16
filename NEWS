@@ -13,8 +13,9 @@ http://log.libusbx.org
 * Introduce LIBUSBX_API_VERSION macro
 * Add Cypress FX/FX2 firmware upload sample, based fxload from
   http://linux-hotplug.sourceforge.net
-* Add libusb0 (libusb-win32) and libusbK driver support on Windows. Note that using
-  the libusb-win32 filter driver with composite member devices is not supported yet
+* Add libusb0 (libusb-win32) and libusbK driver support on Windows. Note that
+  isochronous transfers are not supported yet for these drivers, and that using the
+  libusb-win32 filter driver against a composite member devices is also not supported
 * Add support for the new get_capabilities ioctl on Linux and avoid unnecessary
   splitting of bulk transfers
 * Improve support for newer Intel and Renesas USB 3.0 controllers on Windows
