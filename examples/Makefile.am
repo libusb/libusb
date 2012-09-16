@@ -14,5 +14,5 @@ noinst_PROGRAMS += dpfp_threaded
 endif
 endif
 
-fxload_SOURCES = ezusb.c fxload.c
+fxload_SOURCES = ezusb.c ezusb.h fxload.c
 fxload_CFLAGS = $(THREAD_CFLAGS) $(AM_CFLAGS)
