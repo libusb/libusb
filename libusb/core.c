@@ -674,6 +674,7 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
 
 /** \ingroup dev
  * Get the list of all port numbers from root for the specified device
+ * \param ctx the context to operate on, or NULL for the default context
  * \param dev a device
  * \param path the array that should contain the port numbers
  * \param path_len the maximum length of the array. As per the USB 3.0

@@ -118,9 +118,11 @@ typedef unsigned __int32  uint32_t;
  * libusbx applications may want to detect at compilation time.
  *
  * The macro is typically used in an application as follows:
+ * \code
  * #if defined(LIBUSBX_API_VERSION) && (LIBUSBX_API_VERSION >= 0x01001234)
  * // Use one of the newer features from the libusbx API
  * #endif
+ * \endcode
  *
  * Another feature of LIBUSBX_API_VERSION is that it can be used to detect
  * whether you are compiling against the libusb or the libusbx library.
