@@ -48,7 +48,7 @@ const struct usbi_os_backend * const usbi_backend = &windows_backend;
 struct libusb_context *usbi_default_context = NULL;
 const struct libusb_version libusb_version_internal =
 	{ LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO,
-	  LIBUSB_RC, "unused - please use the nano" };
+	  LIBUSB_RC, "http://libusbx.org" };
 static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 static struct timeval timestamp_origin = { 0, 0 };
