@@ -13,6 +13,8 @@ for %%A in (MS32 MS64) do mkdir E:\dailies\%DATE%\%%A\dll
 for %%A in (source bin32 bin64) do mkdir E:\dailies\%DATE%\examples\%%A
 copy examples\listdevs.c E:\dailies\%DATE%\examples\source
 copy examples\xusb.c E:\dailies\%DATE%\examples\source
+copy examples\ezusb.? E:\dailies\%DATE%\examples\source
+copy examples\fxload.c E:\dailies\%DATE%\examples\source
 copy msvc\stdint.h E:\dailies\%DATE%\examples\source
 copy .private\wbs.txt E:\dailies\%DATE%\README.txt
 
@@ -36,6 +38,7 @@ cd ..
 copy Win32\Release\lib\libusb-1.0.lib E:\dailies\%DATE%\MS32\static
 copy Win32\Release\examples\listdevs.exe E:\dailies\%DATE%\examples\bin32
 copy Win32\Release\examples\xusb.exe E:\dailies\%DATE%\examples\bin32
+copy Win32\Release\examples\fxload.exe E:\dailies\%DATE%\examples\bin32
 
 cd msvc
 call ddk_build DLL
@@ -60,6 +63,7 @@ cd ..
 copy x64\Release\lib\libusb-1.0.lib E:\dailies\%DATE%\MS64\static
 copy x64\Release\examples\listdevs.exe E:\dailies\%DATE%\examples\bin64
 copy x64\Release\examples\xusb.exe E:\dailies\%DATE%\examples\bin64
+copy x64\Release\examples\fxload.exe E:\dailies\%DATE%\examples\bin64
 
 cd msvc
 call ddk_build DLL
