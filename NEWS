@@ -2,7 +2,7 @@ This file lists notable changes in each release.
 For fine grained history, please see the git log at:
 http://log.libusbx.org
 
-2012-09-16: v1.0.13-rc1
+2012-09-20: v1.0.13
 * [MAJOR] Fix a typo in the API with struct libusb_config_descriptor where
   MaxPower was used instead of bMaxPower, as defined in the specs. If your 
   application was accessing the MaxPower attribute, and you need to maintain
