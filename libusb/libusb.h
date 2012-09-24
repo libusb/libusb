@@ -130,7 +130,7 @@ typedef unsigned __int32  uint32_t;
  * Internally, LIBUSBX_API_VERSION is defined as follows:
  * (libusbx major << 24) | (libusbx minor << 16) | (16 bit incremental)
  */
-#define LIBUSBX_API_VERSION 0x01000100
+#define LIBUSBX_API_VERSION 0x010000FF
 
 #ifdef __cplusplus
 extern "C" {
@@ -627,7 +627,7 @@ struct libusb_config_descriptor {
 	/** Maximum power consumption of the USB device from this bus in this
 	 * configuration when the device is fully opreation. Expressed in units
 	 * of 2 mA. */
-	uint8_t  bMaxPower;
+	uint8_t  MaxPower;
 
 	/** Array of interfaces supported by this configuration. The length of
 	 * this array is determined by the bNumInterfaces field. */
