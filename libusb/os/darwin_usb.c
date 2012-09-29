@@ -1,6 +1,6 @@
 /*
  * darwin backend for libusbx 1.0
- * Copyright © 2008-2011 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2008-2012 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -595,7 +595,7 @@ static int darwin_check_configuration (struct libusb_context *ctx, struct libusb
 
 static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct libusb_device *dev, usb_device_t **device) {
   struct darwin_device_priv *priv;
-  int retries = 5, delay = 30000;
+  int retries = 2, delay = 30000;
   int unsuspended = 0, try_unsuspend = 1, try_reconfigure = 1;
   int is_open = 0;
   int ret = 0, ret2;
