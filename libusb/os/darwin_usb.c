@@ -247,9 +247,8 @@ static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 
 
   (void)(*plugInInterface)->QueryInterface(plugInInterface, CFUUIDGetUUIDBytes(DeviceInterfaceID),
 					   (LPVOID)&device);
-
-  (*plugInInterface)->Stop(plugInInterface);
-  IODestroyPlugInInterface (plugInInterface);
+  /* Use release instead of IODestroyPlugInInterface to avoid stopping IOServices associated with this device */
+  (*plugInInterface)->Release (plugInInterface);
 
   /* get the location from the device */
   if (locationp)
@@ -1134,7 +1133,8 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
 					       CFUUIDGetUUIDBytes(kIOUSBInterfaceInterfaceID),
 					       (LPVOID)&cInterface->interface);
   /* We no longer need the intermediate plug-in */
-  IODestroyPlugInInterface (plugInInterface);
+  /* Use release instead of IODestroyPlugInInterface to avoid stopping IOServices associated with this device */
+  (*plugInInterface)->Release (plugInInterface);
   if (kresult || !cInterface->interface) {
     usbi_err (HANDLE_CTX (dev_handle), "QueryInterface: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
