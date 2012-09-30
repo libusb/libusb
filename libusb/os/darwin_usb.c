@@ -285,10 +285,8 @@ static kern_return_t darwin_get_device (uint32_t dev_location, usb_device_t ***d
   return kIOReturnSuccess;
 }
 
-
-
 static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
-  struct libusb_context *ctx = (struct libusb_context *)ptr;
+  struct libusb_context *ctx;
   struct libusb_device_handle *handle;
   struct darwin_device_priv *dpriv;
   struct darwin_device_handle_priv *priv;
@@ -311,27 +309,36 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
       continue;
 
     locationValid = CFGetTypeID(locationCF) == CFNumberGetTypeID() &&
-	    CFNumberGetValue(locationCF, kCFNumberSInt32Type, &location);
+            CFNumberGetValue(locationCF, kCFNumberSInt32Type, &location);
 
     CFRelease (locationCF);
 
     if (!locationValid)
       continue;
 
-    usbi_mutex_lock(&ctx->open_devs_lock);
-    list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
-      dpriv = (struct darwin_device_priv *)handle->dev->os_priv;
+    usbi_mutex_lock(&active_contexts_lock);
 
-      /* the device may have been opened several times. write to each handle's event descriptor */
-      if (dpriv->location == location  && handle->os_priv) {
-	priv  = (struct darwin_device_handle_priv *)handle->os_priv;
+    list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
+      usbi_mutex_lock(&ctx->open_devs_lock);
 
-	message = MESSAGE_DEVICE_GONE;
-	write (priv->fds[1], &message, sizeof (message));
+      usbi_dbg ("libusb/darwin.c darwin_devices_detached: notifying context %p of device disconnect", ctx);
+
+      list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
+        dpriv = (struct darwin_device_priv *)handle->dev->os_priv;
+
+        /* the device may have been opened several times. write to each handle's event descriptor */
+        if (dpriv->location == location  && handle->os_priv) {
+          priv  = (struct darwin_device_handle_priv *)handle->os_priv;
+
+          message = MESSAGE_DEVICE_GONE;
+          write (priv->fds[1], &message, sizeof (message));
+        }
       }
+
+      usbi_mutex_unlock(&ctx->open_devs_lock);
     }
 
-    usbi_mutex_unlock(&ctx->open_devs_lock);
+    usbi_mutex_unlock(&active_contexts_lock);
   }
 }
 

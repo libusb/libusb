@@ -261,6 +261,8 @@ struct libusb_context {
 	 * this timerfd is maintained to trigger on the next pending timeout */
 	int timerfd;
 #endif
+
+	struct list_head list;
 };
 
 #ifdef USBI_TIMERFD_AVAILABLE
@@ -916,5 +918,8 @@ extern const struct usbi_os_backend darwin_backend;
 extern const struct usbi_os_backend openbsd_backend;
 extern const struct usbi_os_backend windows_backend;
 extern const struct usbi_os_backend wince_backend;
+
+extern struct list_head active_contexts_list;
+extern usbi_mutex_static_t active_contexts_lock;
 
 #endif

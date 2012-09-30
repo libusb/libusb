@@ -56,6 +56,9 @@ static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 static struct timeval timestamp_origin = { 0, 0 };
 
+usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
+struct list_head active_contexts_list;
+
 /**
  * \mainpage libusbx-1.0 API Reference
  *
@@ -1623,6 +1626,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 {
 	char *dbg;
 	struct libusb_context *ctx;
+	static int first_init = 1;
 	int r = 0;
 
 	usbi_mutex_static_lock(&default_context_lock);
@@ -1688,6 +1692,16 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	}
 	usbi_mutex_static_unlock(&default_context_lock);
 
+	usbi_mutex_static_lock(&active_contexts_lock);
+	if (first_init) {
+		first_init = 0;
+		list_init (&active_contexts_list);
+	}
+
+	list_add (&ctx->list, &active_contexts_list);
+	usbi_mutex_static_unlock(&active_contexts_lock);
+
+
 	return 0;
 
 err_destroy_mutex:
@@ -1723,6 +1737,10 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 		usbi_default_context = NULL;
 		usbi_mutex_static_unlock(&default_context_lock);
 	}
+
+	usbi_mutex_static_lock(&active_contexts_lock);
+	list_del (&ctx->list);
+	usbi_mutex_static_unlock(&active_contexts_lock);
 
 	/* a little sanity check. doesn't bother with open_devs locking because
 	 * unless there is an application bug, nobody will be accessing this. */
