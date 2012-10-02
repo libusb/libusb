@@ -71,7 +71,13 @@
 #endif
 
 /* IOUSBDeviceInterface */
-#if defined (kIOUSBDeviceInterfaceID320)
+#if defined (kIOUSBDeviceInterfaceID500)
+
+#define usb_device_t    IOUSBDeviceInterface500
+#define DeviceInterfaceID kIOUSBDeviceInterfaceID500
+#define DeviceVersion 500
+
+#elif defined (kIOUSBDeviceInterfaceID320)
 
 #define usb_device_t    IOUSBDeviceInterface320
 #define DeviceInterfaceID kIOUSBDeviceInterfaceID320
