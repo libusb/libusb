@@ -2594,6 +2594,8 @@ static void winusbx_close(int sub_api, struct libusb_device_handle *dev_handle)
 	HANDLE file_handle;
 	int i;
 
+	if (sub_api == SUB_API_NOTSET)
+		sub_api = priv->sub_api;
 	if (!WinUSBX[sub_api].initialized)
 		return;
 
