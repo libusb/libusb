@@ -11,6 +11,18 @@ configure with a default set of options, and will therefore generate a Makefile,
 whereas the latter does not invoke configure at all. If using autogen.sh, note
 that you can also append options, that will be passed as is to configure.
 
+OS X-specific notes:
+-------------------
+
+Starting with Xcode 4.3, neither Xcode.app nor the Xcode 'command line tools'
+includes autotools and so running either autogen.sh or bootstrap.sh will result
+in the message:
+
+libtoolize or glibtoolize was not found! Please install libtool.
+
+To proceed, you must find and install it from somewhere.
+
+Alternatively, you can use the Xcode project at Xcode/libusbx.xcodeproj.
 
 Notes related to submitting new developments:
 --------------------------------------------
