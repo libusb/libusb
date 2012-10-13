@@ -1878,7 +1878,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	}
 	usbi_mutex_unlock(&ctx->pollfds_lock);
 
-	timeout_ms = (tv->tv_sec * 1000) + (tv->tv_usec / 1000);
+	timeout_ms = (int)(tv->tv_sec * 1000) + (tv->tv_usec / 1000);
 
 	/* round up to next millisecond */
 	if (tv->tv_usec % 1000)
