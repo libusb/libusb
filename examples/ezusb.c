@@ -248,7 +248,7 @@ static int parse_ihex(FILE *image, void *context,
 		/* Read the target offset (address up to 64KB) */
 		tmp = buf[7];
 		buf[7] = 0;
-		off = strtoul(buf+3, NULL, 16);
+		off = (int)strtoul(buf+3, NULL, 16);
 		buf[7] = tmp;
 
 		/* Initialize data_addr */
