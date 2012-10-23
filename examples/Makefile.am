@@ -9,7 +9,7 @@ endif
 
 if THREADS_POSIX
 if HAVE_SIGACTION
-dpfp_threaded_CFLAGS = $(THREAD_CFLAGS) $(AM_CFLAGS)
+dpfp_threaded_CFLAGS = $(AM_CFLAGS)
 noinst_PROGRAMS += dpfp_threaded
 endif
 endif
