@@ -275,7 +275,8 @@
 				008FBF7B1628B7E800BC5BE2 /* version.h */,
 				008FBF7C1628B7E800BC5BE2 /* version_nano.h */,
 			);
-			path = libusb;
+			name = libusb;
+			path = ../libusb;
 			sourceTree = "<group>";
 		};
 		008FBF6B1628B7E800BC5BE2 /* os */ = {
@@ -301,7 +302,8 @@
 				008FBFED1628BA0E00BC5BE2 /* xusb.c */,
 				008FBFDD1628BA0E00BC5BE2 /* ezusb.h */,
 			);
-			path = examples;
+			name = examples;
+			path = ../examples;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
