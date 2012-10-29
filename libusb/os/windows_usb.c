@@ -1277,7 +1277,7 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 	priv->usb_interface[interface_number].apib = &usb_api_backend[api];
 	priv->usb_interface[interface_number].sub_api = sub_api;
 	if ((api == USB_API_HID) && (priv->hid == NULL)) {
-		priv->hid = calloc(1, sizeof(struct hid_device_priv));
+		priv->hid = (struct hid_device_priv*) calloc(1, sizeof(struct hid_device_priv));
 		if (priv->hid == NULL)
 			return LIBUSB_ERROR_NO_MEM;
 	}
@@ -3886,7 +3886,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	wfd = usbi_create_fd(hid_handle, _O_RDONLY);
 	if (wfd.fd < 0) {
-		return LIBUSB_ERROR_NO_MEM;
+		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
 	switch(LIBUSB_REQ_TYPE(setup->request_type)) {
@@ -4171,30 +4171,37 @@ static int composite_exit(int sub_api)
 static int composite_open(int sub_api, struct libusb_device_handle *dev_handle)
 {
 	struct windows_device_priv *priv = _device_priv(dev_handle->dev);
-	int r;
+	int r = LIBUSB_ERROR_NOT_FOUND;
 	uint8_t i;
-	bool available[SUB_API_MAX];
-
-	for (i = 0; i<SUB_API_MAX; i++) {
-		available[i] = false;
-	}
+	// SUB_API_MAX+1 as the SUB_API_MAX pos is used to indicate availability of HID
+	bool available[SUB_API_MAX+1] = {0};
 
 	for (i=0; i<USB_MAXINTERFACES; i++) {
-		if ( (priv->usb_interface[i].apib->id == USB_API_WINUSBX)
-		  && (priv->usb_interface[i].sub_api != SUB_API_NOTSET) ) {
-			available[priv->usb_interface[i].sub_api] = true;
+		switch (priv->usb_interface[i].apib->id) {
+		case USB_API_WINUSBX:
+			if (priv->usb_interface[i].sub_api != SUB_API_NOTSET)
+				available[priv->usb_interface[i].sub_api] = true;
+			break;
+		case USB_API_HID:
+			available[SUB_API_MAX] = true;
+			break;
+		default:
+			break;
 		}
 	}
 
-	for (i=0; i<SUB_API_MAX; i++) {
+	for (i=0; i<SUB_API_MAX; i++) {	// WinUSB-like drivers
 		if (available[i]) {
-			r = usb_api_backend[USB_API_WINUSBX].open(SUB_API_NOTSET, dev_handle);
+			r = usb_api_backend[USB_API_WINUSBX].open(i, dev_handle);
 			if (r != LIBUSB_SUCCESS) {
 				return r;
 			}
 		}
 	}
-	return LIBUSB_SUCCESS;
+	if (available[SUB_API_MAX]) {	// HID driver
+		r = hid_open(SUB_API_NOTSET, dev_handle);
+	}
+	return r;
 }
 
 static void composite_close(int sub_api, struct libusb_device_handle *dev_handle)
