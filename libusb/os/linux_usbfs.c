@@ -690,7 +690,7 @@ static int sysfs_get_active_config_descriptor(struct libusb_device *dev,
 			r = LIBUSB_ERROR_NOT_FOUND;
 		} else if (r < len - sizeof(tmp)) {
 			usbi_err(DEVICE_CTX(dev), "short read %d/%d", r, len);
-			r = LIBUSB_ERROR_IO;
+			r = 0;
 		}
 	} else {
 		r = 0;
@@ -740,7 +740,6 @@ static int get_config_descriptor(struct libusb_context *ctx, int fd,
 		return LIBUSB_ERROR_IO;
 	} else if (r < len) {
 		usbi_err(ctx, "short output read %d/%d", r, len);
-		return LIBUSB_ERROR_IO;
 	}
 
 	return 0;

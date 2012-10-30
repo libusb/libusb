@@ -229,6 +229,12 @@ static int parse_interface(libusb_context *ctx,
 					header.bLength);
 				r = LIBUSB_ERROR_IO;
 				goto err;
+			} else if (header.bLength > size) {
+				usbi_warn(ctx, "invalid descriptor of length %d",
+					header.bLength);
+				/* The remaining bytes are bogus, but at least
+				 * one interface is OK, so let's continue. */
+				break;
 			}
 
 			/* If we find another "proper" descriptor then we're done */
@@ -370,6 +376,14 @@ static int parse_configuration(struct libusb_context *ctx,
 		begin = buffer;
 		while (size >= DESC_HEADER_LENGTH) {
 			usbi_parse_descriptor(buffer, "bb", &header, 0);
+
+			/* If we've parsed at least one config descriptor then
+			 * let's return that. */
+			if (header.bLength > size && i) {
+				usbi_warn(ctx, "invalid descriptor length of %d",
+					header.bLength);
+				return size;
+			}
 
 			if ((header.bLength > size) ||
 					(header.bLength < DESC_HEADER_LENGTH)) {
