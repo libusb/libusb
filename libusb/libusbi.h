@@ -21,7 +21,7 @@
 #ifndef LIBUSBI_H
 #define LIBUSBI_H
 
-#include <config.h>
+#include "config.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -31,7 +31,7 @@
 #include <poll.h>
 #endif
 
-#include <libusb.h>
+#include "libusb.h"
 #include "version.h"
 
 /* Inside the libusbx code, mark all public functions as follows:
