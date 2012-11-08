@@ -633,7 +633,7 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct li
       /* received an overrun error but we still received a device descriptor */
       ret = kIOReturnSuccess;
 
-    if (kAppleVendorID == idVendor) {
+    if (kIOUSBVendorIDAppleComputer == idVendor) {
       /* NTH: don't bother retrying or unsuspending Apple devices */
       break;
     }
