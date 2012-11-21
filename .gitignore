@@ -28,6 +28,8 @@ listdevs
 xusb
 dpfp
 dpfp_threaded
+fxload
+stress
 *.exe
 *.pc
 doc/html

@@ -9,6 +9,10 @@ if BUILD_EXAMPLES
 SUBDIRS += examples
 endif
 
+if BUILD_TESTS
+SUBDIRS += tests
+endif
+
 pkgconfigdir=$(libdir)/pkgconfig
 pkgconfig_DATA=libusb-1.0.pc
 

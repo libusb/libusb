@@ -186,6 +186,13 @@ AC_ARG_ENABLE([examples-build], [AS_HELP_STRING([--enable-examples-build],
 	[build_examples='no'])
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != "xno"])
 
+# Tests build
+AC_ARG_ENABLE([tests-build], [AS_HELP_STRING([--enable-tests-build],
+	[build test applications (default n)])],
+	[build_tests=$enableval],
+	[build_tests='no'])
+AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != "xno"])
+
 # check for -fvisibility=hidden compiler support (GCC >= 3.4)
 saved_cflags="$CFLAGS"
 # -Werror required for cygwin
@@ -222,6 +229,7 @@ AC_CONFIG_FILES([libusb-1.0.pc])
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([libusb/Makefile])
 AC_CONFIG_FILES([examples/Makefile])
+AC_CONFIG_FILES([tests/Makefile])
 AC_CONFIG_FILES([doc/Makefile])
 AC_CONFIG_FILES([doc/doxygen.cfg])
 AC_OUTPUT
