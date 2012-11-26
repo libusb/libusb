@@ -1655,6 +1655,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	/* default context should be initialized before calling usbi_dbg */
 	if (!usbi_default_context) {
 		usbi_default_context = ctx;
+		default_context_refcnt++;
 		usbi_dbg("created default context");
 	}
 
@@ -1681,10 +1682,6 @@ int API_EXPORTED libusb_init(libusb_context **context)
 
 	if (context) {
 		*context = ctx;
-	} else if (!usbi_default_context) {
-		usbi_dbg("created default context");
-		usbi_default_context = ctx;
-		default_context_refcnt++;
 	}
 	usbi_mutex_static_unlock(&default_context_lock);
 
