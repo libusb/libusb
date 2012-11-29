@@ -224,6 +224,11 @@ struct libusb_context {
 	struct list_head open_devs;
 	usbi_mutex_t open_devs_lock;
 
+	/* A list of registered hotplug callbacks */
+	struct list_head hotplug_cbs;
+	usbi_mutex_t hotplug_cbs_lock;
+	int hotplug_pipe[2];
+
 	/* this is a list of in-flight transfer handles, sorted by timeout
 	 * expiration. URBs to timeout the soonest are placed at the beginning of
 	 * the list, URBs that will time out later are placed after, and urbs with
@@ -290,6 +295,7 @@ struct libusb_device {
 	unsigned long session_data;
 
 	struct libusb_device_descriptor device_descriptor;
+	int attached;
 
 	unsigned char os_priv[0];
 };
@@ -400,6 +406,9 @@ int usbi_parse_descriptor(unsigned char *source, const char *descriptor,
 int usbi_device_cache_descriptor(libusb_device *dev);
 int usbi_get_config_index_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, int *idx);
+
+void usbi_connect_device (struct libusb_device *dev);
+void usbi_disconnect_device (struct libusb_device *dev);
 
 /* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
 #if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD)

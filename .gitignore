@@ -29,6 +29,7 @@ examples/xusb
 examples/dpfp
 examples/dpfp_threaded
 examples/fxload
+examples/hotplugtest
 tests/stress
 *.exe
 *.pc

@@ -24,6 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifndef OS_WINDOWS
+#include <fcntl.h>
+#endif
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
 #endif
@@ -35,6 +38,7 @@
 #endif
 
 #include "libusbi.h"
+#include "hotplug.h"
 
 /**
  * \page io Synchronous and asynchronous device I/O
@@ -1070,6 +1074,20 @@ int usbi_io_init(struct libusb_context *ctx)
 	if (r < 0)
 		goto err_close_pipe;
 
+	/* create hotplug pipe */
+	r = usbi_pipe(ctx->hotplug_pipe);
+	if (r < 0) {
+		r = LIBUSB_ERROR_OTHER;
+		goto err;
+	}
+
+#ifndef OS_WINDOWS
+	fcntl(ctx->hotplug_pipe[1], F_SETFD, O_NONBLOCK);
+#endif
+	r = usbi_add_pollfd(ctx, ctx->hotplug_pipe[0], POLLIN);
+	if (r < 0)
+		goto err_close_hp_pipe;
+
 #ifdef USBI_TIMERFD_AVAILABLE
 	ctx->timerfd = timerfd_create(usbi_backend->get_timerfd_clockid(),
 		TFD_NONBLOCK);
@@ -1079,7 +1097,7 @@ int usbi_io_init(struct libusb_context *ctx)
 		if (r < 0) {
 			usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
 			close(ctx->timerfd);
-			goto err_close_pipe;
+			goto err_close_hp_pipe;
 		}
 	} else {
 		usbi_dbg("timerfd not available (code %d error %d)", ctx->timerfd, errno);
@@ -1089,6 +1107,9 @@ int usbi_io_init(struct libusb_context *ctx)
 
 	return 0;
 
+err_close_hp_pipe:
+	usbi_close(ctx->hotplug_pipe[0]);
+	usbi_close(ctx->hotplug_pipe[1]);
 err_close_pipe:
 	usbi_close(ctx->ctrl_pipe[0]);
 	usbi_close(ctx->ctrl_pipe[1]);
@@ -1107,6 +1128,9 @@ void usbi_io_exit(struct libusb_context *ctx)
 	usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
 	usbi_close(ctx->ctrl_pipe[0]);
 	usbi_close(ctx->ctrl_pipe[1]);
+	usbi_remove_pollfd(ctx, ctx->hotplug_pipe[0]);
+	usbi_close(ctx->hotplug_pipe[0]);
+	usbi_close(ctx->hotplug_pipe[1]);
 #ifdef USBI_TIMERFD_AVAILABLE
 	if (usbi_using_timerfd(ctx)) {
 		usbi_remove_pollfd(ctx, ctx->timerfd);
@@ -1913,9 +1937,32 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		}
 	}
 
+	/* fd[1] is always the hotplug pipe */
+	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG) && fds[1].revents) {
+		libusb_hotplug_message message;
+		ssize_t ret;
+
+		/* read the message from the hotplug thread */
+		ret = usbi_read(ctx->hotplug_pipe[0], &message, sizeof (message));
+		if (ret < sizeof(message)) {
+			ret = LIBUSB_ERROR_OTHER;
+			goto handled;
+		}
+
+		usbi_hotplug_match(message.device, message.event);
+
+		/* the device left. dereference the device */
+		if (LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT == message.event)
+			libusb_unref_device(message.device);
+
+		fds[1].revents = 0;
+		if (1 == r--)
+			goto handled;
+	} /* else there shouldn't be anything on this pipe */
+
 #ifdef USBI_TIMERFD_AVAILABLE
-	/* on timerfd configurations, fds[1] is the timerfd */
-	if (usbi_using_timerfd(ctx) && fds[1].revents) {
+	/* on timerfd configurations, fds[2] is the timerfd */
+	if (usbi_using_timerfd(ctx) && fds[2].revents) {
 		/* timerfd indicates that a timeout has expired */
 		int ret;
 		usbi_dbg("timerfd triggered");
@@ -1932,7 +1979,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		} else {
 			/* more events pending...
 			 * prevent OS backend from trying to handle events on timerfd */
-			fds[1].revents = 0;
+			fds[2].revents = 0;
 			r--;
 		}
 	}
