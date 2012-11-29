@@ -885,55 +885,39 @@ static int darwin_scan_devices(struct libusb_context *ctx) {
 static int darwin_open (struct libusb_device_handle *dev_handle) {
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)dev_handle->os_priv;
   struct darwin_device_priv *dpriv = (struct darwin_device_priv *)dev_handle->dev->os_priv;
-  usb_device_t  **darwin_device;
   IOReturn kresult;
 
   if (0 == dpriv->open_count) {
-    kresult = darwin_get_device (dpriv->location, &darwin_device);
-    if (kresult) {
-      usbi_err (HANDLE_CTX (dev_handle), "could not find device: %s", darwin_error_str (kresult));
-      return darwin_to_libusb (kresult);
-    }
-
-    dpriv->device = darwin_device;
-
     /* try to open the device */
     kresult = (*(dpriv->device))->USBDeviceOpenSeize (dpriv->device);
-
     if (kresult != kIOReturnSuccess) {
       usbi_warn (HANDLE_CTX (dev_handle), "USBDeviceOpen: %s", darwin_error_str(kresult));
 
-      switch (kresult) {
-      case kIOReturnExclusiveAccess:
-        /* it is possible to perform some actions on a device that is not open so do not return an error */
-        priv->is_open = 0;
-
-        break;
-      default:
-        (*(dpriv->device))->Release (dpriv->device);
-        dpriv->device = NULL;
+      if (kIOReturnExclusiveAccess != kresult) {
         return darwin_to_libusb (kresult);
       }
+
+      /* it is possible to perform some actions on a device that is not open so do not return an error */
+      priv->is_open = 0;
     } else {
-      /* create async event source */
-      kresult = (*(dpriv->device))->CreateDeviceAsyncEventSource (dpriv->device, &priv->cfSource);
-      if (kresult != kIOReturnSuccess) {
-        usbi_err (HANDLE_CTX (dev_handle), "CreateDeviceAsyncEventSource: %s", darwin_error_str(kresult));
+      priv->is_open = 1;
+    }
 
+    /* create async event source */
+    kresult = (*(dpriv->device))->CreateDeviceAsyncEventSource (dpriv->device, &priv->cfSource);
+    if (kresult != kIOReturnSuccess) {
+      usbi_err (HANDLE_CTX (dev_handle), "CreateDeviceAsyncEventSource: %s", darwin_error_str(kresult));
+
+      if (priv->is_open) {
         (*(dpriv->device))->USBDeviceClose (dpriv->device);
-        (*(dpriv->device))->Release (dpriv->device);
-
-        dpriv->device = NULL;
-        return darwin_to_libusb (kresult);
       }
 
-      priv->is_open = 1;
+      priv->is_open = 0;
 
-      CFRetain (libusb_darwin_acfl);
-
-      /* add the cfSource to the aync run loop */
-      CFRunLoopAddSource(libusb_darwin_acfl, priv->cfSource, kCFRunLoopCommonModes);
+      return darwin_to_libusb (kresult);
     }
+
+    CFRetain (libusb_darwin_acfl);
 
     /* add the cfSource to the aync run loop */
     CFRunLoopAddSource(libusb_darwin_acfl, priv->cfSource, kCFRunLoopCommonModes);
@@ -975,13 +959,14 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
       libusb_release_interface (dev_handle, i);
 
   if (0 == dpriv->open_count) {
-    if (priv->is_open) {
-      /* delete the device's async event source */
-      if (priv->cfSource) {
-        CFRunLoopRemoveSource (libusb_darwin_acfl, priv->cfSource, kCFRunLoopDefaultMode);
-        CFRelease (priv->cfSource);
-      }
+    /* delete the device's async event source */
+    if (priv->cfSource) {
+      CFRunLoopRemoveSource (libusb_darwin_acfl, priv->cfSource, kCFRunLoopDefaultMode);
+      CFRelease (priv->cfSource);
+      priv->cfSource = NULL;
+    }
 
+    if (priv->is_open) {
       /* close the device */
       kresult = (*(dpriv->device))->USBDeviceClose(dpriv->device);
       if (kresult) {
@@ -990,15 +975,6 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
         usbi_warn (HANDLE_CTX (dev_handle), "USBDeviceClose: %s", darwin_error_str(kresult));
       }
     }
-
-    kresult = (*(dpriv->device))->Release(dpriv->device);
-    if (kresult) {
-      /* Log the fact that we had a problem closing the file, however failing a
-       * close isn't really an error, so return success anyway */
-      usbi_warn (HANDLE_CTX (dev_handle), "Release: %s", darwin_error_str(kresult));
-    }
-
-    dpriv->device = NULL;
   }
 
   /* file descriptors are maintained per-instance */
