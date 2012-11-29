@@ -88,6 +88,18 @@ linux)
 	AC_DEFINE(OS_LINUX, 1, [Linux backend])
 	AC_SUBST(OS_LINUX)
 	AC_SEARCH_LIBS(clock_gettime, rt, [], [], -pthread)
+	AC_ARG_ENABLE([udev],
+		[AC_HELP_STRING([--with-udev], [use udev for device enumeration and hotplug support (recommended, default: yes)])],
+		[], [enable_udev="yes"])
+		if test "x$enable_udev" = "xyes" ; then
+			# system has udev. use it or fail!
+			AC_CHECK_HEADERS([libudev.h],[],[AC_ERROR(["udev support requested but libudev not installed"])])
+			AC_CHECK_LIB([udev], [udev_new], [], [AC_ERROR(["udev support requested but libudev not installed"])])
+			AC_DEFINE(USE_UDEV, 1, [Use udev for device enumeration/hotplug])
+		else
+			AC_CHECK_HEADERS([linux/netlink.h linux/filter.h], [], [AC_ERROR(["Linux netlink headers not found"])])
+		fi
+		AC_SUBST(USE_UDEV)
 	THREAD_CFLAGS="-pthread"
 	LIBS="${LIBS} -pthread"
 	AC_CHECK_HEADERS([poll.h])
@@ -128,7 +140,8 @@ AM_CONDITIONAL(OS_DARWIN, test "x$backend" = xdarwin)
 AM_CONDITIONAL(OS_OPENBSD, test "x$backend" = xbsd)
 AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
-AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = "xyes") 
+AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = "xyes")
+AM_CONDITIONAL(USE_UDEV, test "x$enable_udev" = xyes)
 if test "$threads" = posix; then
 	AC_DEFINE(THREADS_POSIX, 1, [Use POSIX Threads])
 fi

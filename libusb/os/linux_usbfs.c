@@ -2,6 +2,7 @@
  * Linux usbfs backend for libusbx
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
+ * Copyright © 2013 Nathan Hjelm <hjelmn@mac.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -107,6 +108,20 @@ static int sysfs_can_relate_devices = 0;
 
 /* do we have a descriptors file? */
 static int sysfs_has_descriptors = 0;
+
+/* how many times have we initted (and not exited) ? */
+static volatile int init_count = 0;
+
+/* lock for init_count */
+static pthread_mutex_t hotplug_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static int linux_start_event_monitor(void);
+static int linux_stop_event_monitor(void);
+static int linux_scan_devices(struct libusb_context *ctx);
+
+#if !defined(USE_UDEV)
+static int linux_default_scan_devices (struct libusb_context *ctx);
+#endif
 
 struct linux_device_priv {
 	char *sysfs_dir;
@@ -416,7 +431,62 @@ static int op_init(struct libusb_context *ctx)
 		sysfs_can_relate_devices = 0;
 	}
 
-	return 0;
+	pthread_mutex_lock(&hotplug_lock);
+	if (!init_count++) {
+		/* start up hotplug event handler */
+		r = linux_start_event_monitor();
+		if (LIBUSB_SUCCESS != r) {
+			usbi_err(ctx, "error starting hotplug event monitor");
+			return r;
+		}
+	}
+	pthread_mutex_unlock(&hotplug_lock);
+
+	r = linux_scan_devices(ctx);
+
+	return r;
+}
+
+static void op_exit(void)
+{
+	if (!init_count) {
+		/* should not happen */
+		return;
+	}
+
+	pthread_mutex_lock(&hotplug_lock);
+	if (!--init_count) {
+		/* tear down event handler */
+		(void)linux_stop_event_monitor();
+	}
+	pthread_mutex_unlock(&hotplug_lock);
+}
+
+static int linux_start_event_monitor(void)
+{
+#if defined(USE_UDEV)
+	return linux_udev_start_event_monitor();
+#else
+	return linux_netlink_start_event_monitor();
+#endif
+}
+
+static int linux_stop_event_monitor(void)
+{
+#if defined(USE_UDEV)
+	return linux_udev_stop_event_monitor();
+#else
+	return linux_netlink_stop_event_monitor();
+#endif
+}
+
+static int linux_scan_devices(struct libusb_context *ctx)
+{
+#if defined(USE_UDEV)
+	return linux_udev_scan_devices(ctx);
+#else
+	return linux_default_scan_devices(ctx);
+#endif
 }
 
 static int usbfs_get_device_descriptor(struct libusb_device *dev,
@@ -512,6 +582,7 @@ static int op_get_device_descriptor(struct libusb_device *dev,
 	unsigned char *buffer, int *host_endian)
 {
 	if (sysfs_has_descriptors) {
+		*host_endian = 0;
 		return sysfs_get_device_descriptor(dev, buffer);
 	} else {
 		*host_endian = 1;
@@ -698,6 +769,45 @@ static int sysfs_get_active_config_descriptor(struct libusb_device *dev,
 
 	close(fd);
 	return r;
+}
+
+int linux_get_device_address (struct libusb_context *ctx, int detached,
+	uint8_t *busnum, uint8_t *devaddr,const char *dev_node,
+	const char *sys_name)
+{
+	usbi_dbg("getting address for device: %s detached: %d", sys_name, detached);
+	/* can't use sysfs to read the bus and device number if the
+	 * device has been detached */
+	if (!sysfs_can_relate_devices || detached || NULL == sys_name) {
+		if (NULL == dev_node) {
+			return LIBUSB_ERROR_OTHER;
+		}
+
+		/* will this work with all supported kernel versions? */
+		if (!strncmp(dev_node, "/dev/bus/usb", 12)) {
+			sscanf (dev_node, "/dev/bus/usb/%hhd/%hhd", busnum, devaddr);
+		} else if (!strncmp(dev_node, "/proc/bus/usb", 13)) {
+			sscanf (dev_node, "/proc/bus/usb/%hhd/%hhd", busnum, devaddr);
+		}
+
+		return LIBUSB_SUCCESS;
+	}
+
+	usbi_dbg("scan %s", sys_name);
+
+	*busnum = __read_sysfs_attr(ctx, sys_name, "busnum");
+	if (0 > *busnum)
+		return *busnum;
+
+	*devaddr = __read_sysfs_attr(ctx, sys_name, "devnum");
+	if (0 > *devaddr)
+		return *devaddr;
+
+	usbi_dbg("bus=%d dev=%d", *busnum, *devaddr);
+	if (*busnum > 255 || *devaddr > 255)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	return LIBUSB_SUCCESS;
 }
 
 static int op_get_active_config_descriptor(struct libusb_device *dev,
@@ -984,13 +1094,10 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	return 0;
 }
 
-static int enumerate_device(struct libusb_context *ctx,
-	struct discovered_devs **_discdevs, uint8_t busnum, uint8_t devaddr,
-	const char *sysfs_dir)
+int linux_enumerate_device(struct libusb_context *ctx,
+	uint8_t busnum, uint8_t devaddr, const char *sysfs_dir)
 {
-	struct discovered_devs *discdevs;
 	unsigned long session_id;
-	int need_unref = 0;
 	struct libusb_device *dev;
 	int r = 0;
 
@@ -1001,48 +1108,64 @@ static int enumerate_device(struct libusb_context *ctx,
 	usbi_dbg("busnum %d devaddr %d session_id %ld", busnum, devaddr,
 		session_id);
 
-	dev = usbi_get_device_by_session_id(ctx, session_id);
-	if (dev) {
-		usbi_dbg("using existing device for %d/%d (session %ld)",
-			busnum, devaddr, session_id);
-	} else {
-		usbi_dbg("allocating new device for %d/%d (session %ld)",
-			busnum, devaddr, session_id);
-		dev = usbi_alloc_device(ctx, session_id);
-		if (!dev)
-			return LIBUSB_ERROR_NO_MEM;
-		need_unref = 1;
-		r = initialize_device(dev, busnum, devaddr, sysfs_dir);
-		if (r < 0)
-			goto out;
-		r = usbi_sanitize_device(dev);
-		if (r < 0)
-			goto out;
-	}
+	usbi_dbg("allocating new device for %d/%d (session %ld)",
+		 busnum, devaddr, session_id);
+	dev = usbi_alloc_device(ctx, session_id);
+	if (!dev)
+		return LIBUSB_ERROR_NO_MEM;
 
-	discdevs = discovered_devs_append(*_discdevs, dev);
-	if (!discdevs)
-		r = LIBUSB_ERROR_NO_MEM;
-	else
-		*_discdevs = discdevs;
-
+	r = initialize_device(dev, busnum, devaddr, sysfs_dir);
+	if (r < 0)
+		goto out;
+	r = usbi_sanitize_device(dev);
+	if (r < 0)
+		goto out;
 out:
-	if (need_unref)
+	if (r < 0)
 		libusb_unref_device(dev);
+	else
+		usbi_connect_device(dev);
+
 	return r;
 }
 
-/* open a bus directory and adds all discovered devices to discdevs. on
- * failure (non-zero return) the pre-existing discdevs should be destroyed
- * (and devices freed). on success, the new discdevs pointer should be used
- * as it may have been moved. */
-static int usbfs_scan_busdir(struct libusb_context *ctx,
-	struct discovered_devs **_discdevs, uint8_t busnum)
+void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_name)
+{
+	struct libusb_context *ctx;
+
+	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
+		if (usbi_get_device_by_session_id(ctx, busnum << 8 | devaddr)) {
+			/* device already exists in the context */
+			usbi_dbg("device already exists in context");
+			continue;
+		}
+
+		linux_enumerate_device(ctx, busnum, devaddr, sys_name);
+	}
+}
+
+void linux_hotplug_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys_name)
+{
+	struct libusb_context *ctx;
+	struct libusb_device *dev;
+
+	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
+		dev = usbi_get_device_by_session_id (ctx, busnum << 8 | devaddr);
+		if (NULL != dev) {
+			usbi_disconnect_device (dev);
+		} else {
+			usbi_err(ctx, "device not found for session %x", busnum << 8 | devaddr);
+		}
+	}
+}
+
+#if !defined(USE_UDEV)
+/* open a bus directory and adds all discovered devices to the context */
+static int usbfs_scan_busdir(struct libusb_context *ctx, uint8_t busnum)
 {
 	DIR *dir;
 	char dirpath[PATH_MAX];
 	struct dirent *entry;
-	struct discovered_devs *discdevs = *_discdevs;
 	int r = LIBUSB_ERROR_IO;
 
 	snprintf(dirpath, PATH_MAX, "%s/%03d", usbfs_path, busnum);
@@ -1067,7 +1190,7 @@ static int usbfs_scan_busdir(struct libusb_context *ctx,
 			continue;
 		}
 
-		if (enumerate_device(ctx, &discdevs, busnum, (uint8_t) devaddr, NULL)) {
+		if (linux_enumerate_device(ctx, busnum, (uint8_t) devaddr, NULL)) {
 			usbi_dbg("failed to enumerate dir entry %s", entry->d_name);
 			continue;
 		}
@@ -1075,18 +1198,14 @@ static int usbfs_scan_busdir(struct libusb_context *ctx,
 		r = 0;
 	}
 
-	if (!r)
-		*_discdevs = discdevs;
 	closedir(dir);
 	return r;
 }
 
-static int usbfs_get_device_list(struct libusb_context *ctx,
-	struct discovered_devs **_discdevs)
+static int usbfs_get_device_list(struct libusb_context *ctx)
 {
 	struct dirent *entry;
 	DIR *buses = opendir(usbfs_path);
-	struct discovered_devs *discdevs = *_discdevs;
 	int r = 0;
 
 	if (!buses) {
@@ -1095,7 +1214,6 @@ static int usbfs_get_device_list(struct libusb_context *ctx,
 	}
 
 	while ((entry = readdir(buses))) {
-		struct discovered_devs *discdevs_new = discdevs;
 		int busnum;
 
 		if (entry->d_name[0] == '.')
@@ -1106,8 +1224,7 @@ static int usbfs_get_device_list(struct libusb_context *ctx,
 			if (!_is_usbdev_entry(entry, &busnum, &devaddr))
 				continue;
 
-			r = enumerate_device(ctx, &discdevs_new, busnum,
-				(uint8_t) devaddr, NULL);
+			r = linux_enumerate_device(ctx, busnum, (uint8_t) devaddr, NULL);
 			if (r < 0) {
 				usbi_dbg("failed to enumerate dir entry %s", entry->d_name);
 				continue;
@@ -1119,41 +1236,28 @@ static int usbfs_get_device_list(struct libusb_context *ctx,
 				continue;
 			}
 
-			r = usbfs_scan_busdir(ctx, &discdevs_new, busnum);
+			r = usbfs_scan_busdir(ctx, busnum);
 			if (r < 0)
-				goto out;
+				break;
 		}
-		discdevs = discdevs_new;
 	}
 
-out:
 	closedir(buses);
-	*_discdevs = discdevs;
 	return r;
 
 }
 
-static int sysfs_scan_device(struct libusb_context *ctx,
-	struct discovered_devs **_discdevs, const char *devname)
+static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 {
-	int busnum;
-	int devaddr;
+	uint8_t busnum, devaddr;
+	int ret;
 
-	usbi_dbg("scan %s", devname);
+	ret = linux_get_device_address (ctx, 0, &busnum, &devaddr, NULL, devname);
+	if (LIBUSB_SUCCESS != ret) {
+		return ret;
+	}
 
-	busnum = __read_sysfs_attr(ctx, devname, "busnum");
-	if (busnum < 0)
-		return busnum;
-
-	devaddr = __read_sysfs_attr(ctx, devname, "devnum");
-	if (devaddr < 0)
-		return devaddr;
-
-	usbi_dbg("bus=%d dev=%d", busnum, devaddr);
-	if (busnum > 255 || devaddr > 255)
-		return LIBUSB_ERROR_INVALID_PARAM;
-
-	return enumerate_device(ctx, _discdevs, busnum & 0xff, devaddr & 0xff,
+	return linux_enumerate_device(ctx, busnum & 0xff, devaddr & 0xff,
 		devname);
 }
 
@@ -1225,10 +1329,8 @@ static void sysfs_analyze_topology(struct discovered_devs *discdevs)
 	}
 }
 
-static int sysfs_get_device_list(struct libusb_context *ctx,
-	struct discovered_devs **_discdevs)
+static int sysfs_get_device_list(struct libusb_context *ctx)
 {
-	struct discovered_devs *discdevs = *_discdevs;
 	DIR *devices = opendir(SYSFS_DEVICE_PATH);
 	struct dirent *entry;
 	int r = LIBUSB_ERROR_IO;
@@ -1239,30 +1341,24 @@ static int sysfs_get_device_list(struct libusb_context *ctx,
 	}
 
 	while ((entry = readdir(devices))) {
-		struct discovered_devs *discdevs_new = discdevs;
-
 		if ((!isdigit(entry->d_name[0]) && strncmp(entry->d_name, "usb", 3))
 				|| strchr(entry->d_name, ':'))
 			continue;
 
-		if (sysfs_scan_device(ctx, &discdevs_new, entry->d_name)) {
+		if (sysfs_scan_device(ctx, entry->d_name)) {
 			usbi_dbg("failed to enumerate dir entry %s", entry->d_name);
 			continue;
 		}
 
 		r = 0;
-		discdevs = discdevs_new;
 	}
 
-	if (!r)
-		*_discdevs = discdevs;
 	closedir(devices);
 	sysfs_analyze_topology(discdevs);
 	return r;
 }
 
-static int op_get_device_list(struct libusb_context *ctx,
-	struct discovered_devs **_discdevs)
+static int linux_default_scan_devices (struct libusb_context *ctx)
 {
 	/* we can retrieve device list and descriptors from sysfs or usbfs.
 	 * sysfs is preferable, because if we use usbfs we end up resuming
@@ -1275,10 +1371,11 @@ static int op_get_device_list(struct libusb_context *ctx,
 	 * adequacy of sysfs and sets sysfs_can_relate_devices.
 	 */
 	if (sysfs_can_relate_devices != 0)
-		return sysfs_get_device_list(ctx, _discdevs);
+		return sysfs_get_device_list(ctx);
 	else
-		return usbfs_get_device_list(ctx, _discdevs);
+		return usbfs_get_device_list(ctx);
 }
+#endif
 
 static int op_open(struct libusb_device_handle *handle)
 {
@@ -2529,8 +2626,8 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.name = "Linux usbfs",
 	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
 	.init = op_init,
-	.exit = NULL,
-	.get_device_list = op_get_device_list,
+	.exit = op_exit,
+	.get_device_list = NULL,
 	.get_device_descriptor = op_get_device_descriptor,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,
