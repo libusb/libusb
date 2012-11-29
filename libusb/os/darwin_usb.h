@@ -166,10 +166,7 @@ struct darwin_transfer_priv {
 };
 
 enum {
-  MESSAGE_DEVICE_GONE,
   MESSAGE_ASYNC_IO_COMPLETE
 };
-
-
 
 #endif
