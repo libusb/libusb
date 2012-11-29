@@ -437,6 +437,25 @@ err:
 	return r;
 }
 
+int usbi_device_cache_descriptor(libusb_device *dev)
+{
+	int r, host_endian;
+
+	r = usbi_backend->get_device_descriptor(dev, (unsigned char *) &dev->device_descriptor,
+						&host_endian);
+	if (r < 0)
+		return r;
+
+	if (!host_endian) {
+		dev->device_descriptor.bcdUSB = libusb_le16_to_cpu(dev->device_descriptor.bcdUSB);
+		dev->device_descriptor.idVendor = libusb_le16_to_cpu(dev->device_descriptor.idVendor);
+		dev->device_descriptor.idProduct = libusb_le16_to_cpu(dev->device_descriptor.idProduct);
+		dev->device_descriptor.bcdDevice = libusb_le16_to_cpu(dev->device_descriptor.bcdDevice);
+	}
+
+	return LIBUSB_SUCCESS;
+}
+
 /** \ingroup desc
  * Get the USB device descriptor for a given device.
  *
@@ -449,22 +468,9 @@ err:
 int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
 	struct libusb_device_descriptor *desc)
 {
-	unsigned char raw_desc[DEVICE_DESC_LENGTH];
-	int host_endian = 0;
-	int r;
-
 	usbi_dbg("");
-	r = usbi_backend->get_device_descriptor(dev, raw_desc, &host_endian);
-	if (r < 0)
-		return r;
-
-	memcpy((unsigned char *) desc, raw_desc, sizeof(raw_desc));
-	if (!host_endian) {
-		desc->bcdUSB = libusb_le16_to_cpu(desc->bcdUSB);
-		desc->idVendor = libusb_le16_to_cpu(desc->idVendor);
-		desc->idProduct = libusb_le16_to_cpu(desc->idProduct);
-		desc->bcdDevice = libusb_le16_to_cpu(desc->bcdDevice);
-	}
+	memcpy((unsigned char *) desc, (unsigned char *) &dev->device_descriptor,
+	       sizeof (dev->device_descriptor));
 	return 0;
 }
 

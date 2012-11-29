@@ -288,6 +288,9 @@ struct libusb_device {
 
 	struct list_head list;
 	unsigned long session_data;
+
+	struct libusb_device_descriptor device_descriptor;
+
 	unsigned char os_priv[0];
 };
 
@@ -394,6 +397,7 @@ int usbi_handle_transfer_cancellation(struct usbi_transfer *transfer);
 
 int usbi_parse_descriptor(unsigned char *source, const char *descriptor,
 	void *dest, int host_endian);
+int usbi_device_cache_descriptor(libusb_device *dev);
 int usbi_get_config_index_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, int *idx);
 

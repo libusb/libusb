@@ -537,15 +537,13 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 int usbi_sanitize_device(struct libusb_device *dev)
 {
 	int r;
-	unsigned char raw_desc[DEVICE_DESC_LENGTH];
 	uint8_t num_configurations;
-	int host_endian;
 
-	r = usbi_backend->get_device_descriptor(dev, raw_desc, &host_endian);
+	r = usbi_device_cache_descriptor(dev);
 	if (r < 0)
 		return r;
 
-	num_configurations = raw_desc[DEVICE_DESC_LENGTH - 1];
+	num_configurations = dev->device_descriptor.bNumConfigurations;
 	if (num_configurations > USB_MAXCONFIG) {
 		usbi_err(DEVICE_CTX(dev), "too many configurations");
 		return LIBUSB_ERROR_IO;
