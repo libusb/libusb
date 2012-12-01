@@ -263,31 +263,6 @@ static usb_device_t **usb_get_next_device (io_iterator_t deviceIterator, UInt32 
   return device;
 }
 
-static kern_return_t darwin_get_device (uint32_t dev_location, usb_device_t ***darwin_device) {
-  kern_return_t kresult;
-  UInt32        location;
-  io_iterator_t deviceIterator;
-
-  kresult = usb_setup_device_iterator (&deviceIterator, dev_location);
-  if (kresult)
-    return kresult;
-
-  /* This port of libusb uses locations to keep track of devices. */
-  while ((*darwin_device = usb_get_next_device (deviceIterator, &location, NULL, NULL)) != NULL) {
-    if (location == dev_location)
-      break;
-
-    (**darwin_device)->Release(*darwin_device);
-  }
-
-  IOObjectRelease (deviceIterator);
-
-  if (!(*darwin_device))
-    return kIOReturnNoDevice;
-
-  return kIOReturnSuccess;
-}
-
 static void darwin_devices_attached (void *ptr, io_iterator_t add_devices) {
   struct libusb_context *ctx;
   usb_device_t **device;
@@ -543,24 +518,11 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
   struct darwin_device_priv *priv = (struct darwin_device_priv *)dev->os_priv;
   IOUSBConfigurationDescriptorPtr desc;
   IOReturn kresult;
-  usb_device_t **device = NULL;
 
-  if (!priv)
+  if (!priv || !priv->device)
     return LIBUSB_ERROR_OTHER;
 
-  if (!priv->device) {
-    kresult = darwin_get_device (priv->location, &device);
-    if (kresult || !device) {
-      usbi_err (DEVICE_CTX (dev), "could not find device: %s", darwin_error_str (kresult));
-
-      return darwin_to_libusb (kresult);
-    }
-
-    /* don't have to open the device to get a config descriptor */
-  } else
-    device = priv->device;
-
-  kresult = (*device)->GetConfigurationDescriptorPtr (device, config_index, &desc);
+  kresult = (*priv->device)->GetConfigurationDescriptorPtr (priv->device, config_index, &desc);
   if (kresult == kIOReturnSuccess) {
     /* copy descriptor */
     if (libusb_le16_to_cpu(desc->wTotalLength) < len)
@@ -571,9 +533,6 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
     /* GetConfigurationDescriptorPtr returns the descriptor in USB bus order */
     *host_endian = 0;
   }
-
-  if (!priv->device)
-    (*device)->Release (device);
 
   return darwin_to_libusb (kresult);
 }
