@@ -734,7 +734,7 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
 		if (di >= (length - 1))
 			break;
 
-		if (tbuf[si + 1]) /* high byte */
+		if ((tbuf[si] & 0x80) || (tbuf[si + 1])) /* non-ASCII */
 			data[di++] = '?';
 		else
 			data[di++] = tbuf[si];
