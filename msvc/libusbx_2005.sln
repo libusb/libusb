@@ -1,28 +1,19 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 9.00
 # Visual Studio 2005
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-1.0 (static)", "libusb_static.vcproj", "{5AB6B770-1925-48D5-ABC2-930F3259C020}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-1.0 (static)", "libusb_static_2005.vcproj", "{5AB6B770-1925-48D5-ABC2-930F3259C020}"
 	ProjectSection(WebsiteProperties) = preProject
 		Debug.AspNetCompiler.Debug = "True"
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-1.0 (dll)", "libusb_dll.vcproj", "{8224C054-5968-4238-832C-167155E7ECC3}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-1.0 (dll)", "libusb_dll_2005.vcproj", "{8224C054-5968-4238-832C-167155E7ECC3}"
 	ProjectSection(WebsiteProperties) = preProject
 		Debug.AspNetCompiler.Debug = "True"
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "listdevs", "listdevs.vcproj", "{98CFD8FA-EE20-40D5-AF13-F8C4856D6CA5}"
-	ProjectSection(WebsiteProperties) = preProject
-		Debug.AspNetCompiler.Debug = "True"
-		Release.AspNetCompiler.Debug = "False"
-	EndProjectSection
-	ProjectSection(ProjectDependencies) = postProject
-		{5AB6B770-1925-48D5-ABC2-930F3259C020} = {5AB6B770-1925-48D5-ABC2-930F3259C020}
-	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xusb", "xusb.vcproj", "{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "listdevs", "listdevs_2005.vcproj", "{98CFD8FA-EE20-40D5-AF13-F8C4856D6CA5}"
 	ProjectSection(WebsiteProperties) = preProject
 		Debug.AspNetCompiler.Debug = "True"
 		Release.AspNetCompiler.Debug = "False"
@@ -31,7 +22,16 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xusb", "xusb.vcproj", "{08A
 		{5AB6B770-1925-48D5-ABC2-930F3259C020} = {5AB6B770-1925-48D5-ABC2-930F3259C020}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stress", "stress.vcproj", "{53942EFF-C810-458D-B3CB-EE5CE9F1E781}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xusb", "xusb_2005.vcproj", "{08A6FA39-21B7-4A05-9252-2F9864A5E5A4}"
+	ProjectSection(WebsiteProperties) = preProject
+		Debug.AspNetCompiler.Debug = "True"
+		Release.AspNetCompiler.Debug = "False"
+	EndProjectSection
+	ProjectSection(ProjectDependencies) = postProject
+		{5AB6B770-1925-48D5-ABC2-930F3259C020} = {5AB6B770-1925-48D5-ABC2-930F3259C020}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stress", "stress_2005.vcproj", "{53942EFF-C810-458D-B3CB-EE5CE9F1E781}"
 	ProjectSection(WebsiteProperties) = preProject
 		Debug.AspNetCompiler.Debug = "True"
 		Release.AspNetCompiler.Debug = "False"
