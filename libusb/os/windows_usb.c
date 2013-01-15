@@ -2862,7 +2862,7 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 	usbi_dbg("will use interface %d", current_interface);
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	wfd = usbi_create_fd(winusb_handle, _O_RDONLY);
+	wfd = usbi_create_fd(winusb_handle, RW_READ, NULL, NULL);
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
@@ -2951,7 +2951,7 @@ static int winusbx_submit_bulk_transfer(int sub_api, struct usbi_transfer *itran
 
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	wfd = usbi_create_fd(winusb_handle, IS_XFERIN(transfer) ? _O_RDONLY : _O_WRONLY);
+	wfd = usbi_create_fd(winusb_handle, IS_XFERIN(transfer) ? RW_READ : RW_WRITE, NULL, NULL);
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
@@ -3884,7 +3884,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 	usbi_dbg("will use interface %d", current_interface);
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
-	wfd = usbi_create_fd(hid_handle, _O_RDONLY);
+	wfd = usbi_create_fd(hid_handle, RW_READ, NULL, NULL);
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
@@ -3990,7 +3990,7 @@ static int hid_submit_bulk_transfer(int sub_api, struct usbi_transfer *itransfer
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 	direction_in = transfer->endpoint & LIBUSB_ENDPOINT_IN;
 
-	wfd = usbi_create_fd(hid_handle, direction_in?_O_RDONLY:_O_WRONLY);
+	wfd = usbi_create_fd(hid_handle, direction_in?RW_READ:RW_WRITE, NULL, NULL);
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;

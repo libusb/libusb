@@ -192,30 +192,11 @@ static inline void usbi_dbg(const char *format, ...)
 #define IS_XFERIN(xfer) (0 != ((xfer)->endpoint & LIBUSB_ENDPOINT_IN))
 #define IS_XFEROUT(xfer) (!IS_XFERIN(xfer))
 
-/* Internal abstractions for thread synchronization and poll */
+/* Internal abstraction for thread synchronization */
 #if defined(THREADS_POSIX)
 #include "os/threads_posix.h"
 #elif defined(OS_WINDOWS)
 #include <os/threads_windows.h>
-#endif
-
-#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD)
-#include <unistd.h>
-#include "os/poll_posix.h"
-#elif defined(OS_WINDOWS)
-#include <os/poll_windows.h>
-#endif
-
-#if defined(OS_WINDOWS) && !defined(__GCC__)
-#undef HAVE_GETTIMEOFDAY
-int usbi_gettimeofday(struct timeval *tp, void *tzp);
-#define LIBUSB_GETTIMEOFDAY_WIN32
-#define HAVE_USBI_GETTIMEOFDAY
-#else
-#ifdef HAVE_GETTIMEOFDAY
-#define usbi_gettimeofday(tv, tz) gettimeofday((tv), (tz))
-#define HAVE_USBI_GETTIMEOFDAY
-#endif
 #endif
 
 extern struct libusb_context *usbi_default_context;
@@ -407,7 +388,25 @@ int usbi_parse_descriptor(unsigned char *source, const char *descriptor,
 int usbi_get_config_index_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, int *idx);
 
-/* polling */
+/* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
+#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD)
+#include <unistd.h>
+#include "os/poll_posix.h"
+#elif defined(OS_WINDOWS) || defined(OS_WINCE)
+#include <os/poll_windows.h>
+#endif
+
+#if defined(OS_WINDOWS) && !defined(__GCC__)
+#undef HAVE_GETTIMEOFDAY
+int usbi_gettimeofday(struct timeval *tp, void *tzp);
+#define LIBUSB_GETTIMEOFDAY_WIN32
+#define HAVE_USBI_GETTIMEOFDAY
+#else
+#ifdef HAVE_GETTIMEOFDAY
+#define usbi_gettimeofday(tv, tz) gettimeofday((tv), (tz))
+#define HAVE_USBI_GETTIMEOFDAY
+#endif
+#endif
 
 struct usbi_pollfd {
 	/* must come first */

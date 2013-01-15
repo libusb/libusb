@@ -31,7 +31,7 @@
  *   OVERLAPPED mode
  * - call usbi_create_fd with this handle to obtain a custom fd.
  *   Note that if you need simultaneous R/W access, you need to call create_fd
- *   twice, once in _O_RDONLY and once in _O_WRONLY mode to obtain 2 separate
+ *   twice, once in RW_READ and once in RW_WRITE mode to obtain 2 separate
  *   pollable fds
  * - leave the core functions call the poll routine and flag POLLIN/POLLOUT
  *
@@ -40,10 +40,8 @@
  * context.
  */
 #include <errno.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <io.h>
 
 #include <libusbi.h>
 
@@ -65,20 +63,16 @@
 #pragma warning(disable:28719)
 #endif
 
-#if defined(__CYGWIN__)
-// cygwin produces a warning unless these prototypes are defined
-extern int _open(char* name, int flags);
-extern int _close(int fd);
-extern int _snprintf(char *buffer, size_t count, const char *format, ...);
-#define NUL_DEVICE "/dev/null"
+#if defined(_WIN32_WCE)
+#define usbi_sleep(ms) Sleep(ms)
 #else
-#define NUL_DEVICE "NUL"
+#define usbi_sleep(ms) SleepEx(ms, TRUE)
 #endif
 
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
 
 // public fd data
-const struct winfd INVALID_WINFD = {-1, INVALID_HANDLE_VALUE, NULL, RW_NONE};
+const struct winfd INVALID_WINFD = {-1, INVALID_HANDLE_VALUE, NULL, NULL, NULL, RW_NONE};
 struct winfd poll_fd[MAX_FDS];
 // internal fd data
 struct {
@@ -93,12 +87,22 @@ BOOLEAN is_polling_set = FALSE;
 LONG pipe_number = 0;
 static volatile LONG compat_spinlock = 0;
 
+#if !defined(_WIN32_WCE)
 // CancelIoEx, available on Vista and later only, provides the ability to cancel
 // a single transfer (OVERLAPPED) when used. As it may not be part of any of the
 // platform headers, we hook into the Kernel32 system DLL directly to seek it.
 static BOOL (__stdcall *pCancelIoEx)(HANDLE, LPOVERLAPPED) = NULL;
-#define CancelIoEx_Available (pCancelIoEx != NULL)
-static __inline BOOL cancel_io(int _index)
+#define Use_Duplicate_Handles (pCancelIoEx == NULL)
+
+static inline void setup_cancel_io(void)
+{
+	pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
+		GetProcAddress(GetModuleHandleA("KERNEL32"), "CancelIoEx");
+	usbi_dbg("Will use CancelIo%s for I/O cancellation",
+		Use_Duplicate_Handles?"":"Ex");
+}
+
+static inline BOOL cancel_io(int _index)
 {
 	if ((_index < 0) || (_index >= MAX_FDS)) {
 		return FALSE;
@@ -108,7 +112,12 @@ static __inline BOOL cancel_io(int _index)
 	  || (poll_fd[_index].handle == 0) || (poll_fd[_index].overlapped == NULL) ) {
 		return TRUE;
 	}
-	if (CancelIoEx_Available) {
+	if (poll_fd[_index].itransfer && poll_fd[_index].cancel_fn) {
+		// Cancel outstanding transfer via the specific callback
+		(*poll_fd[_index].cancel_fn)(poll_fd[_index].itransfer);
+		return TRUE;
+	}
+	if (pCancelIoEx != NULL) {
 		return (*pCancelIoEx)(poll_fd[_index].handle, poll_fd[_index].overlapped);
 	}
 	if (_poll_fd[_index].thread_id == GetCurrentThreadId()) {
@@ -117,6 +126,30 @@ static __inline BOOL cancel_io(int _index)
 	usbi_warn(NULL, "Unable to cancel I/O that was started from another thread");
 	return FALSE;
 }
+#else
+#define Use_Duplicate_Handles FALSE
+
+static __inline void setup_cancel_io()
+{
+	// No setup needed on WinCE
+}
+
+static __inline BOOL cancel_io(int _index)
+{
+	if ((_index < 0) || (_index >= MAX_FDS)) {
+		return FALSE;
+	}
+	if ( (poll_fd[_index].fd < 0) || (poll_fd[_index].handle == INVALID_HANDLE_VALUE)
+	  || (poll_fd[_index].handle == 0) || (poll_fd[_index].overlapped == NULL) ) {
+		return TRUE;
+	}
+	if (poll_fd[_index].itransfer && poll_fd[_index].cancel_fn) {
+		// Cancel outstanding transfer via the specific callback
+		(*poll_fd[_index].cancel_fn)(poll_fd[_index].itransfer);
+	}
+	return TRUE;
+}
+#endif
 
 // Init
 void init_polling(void)
@@ -124,13 +157,10 @@ void init_polling(void)
 	int i;
 
 	while (InterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
-		SleepEx(0, TRUE);
+		usbi_sleep(0);
 	}
 	if (!is_polling_set) {
-		pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
-			GetProcAddress(GetModuleHandleA("KERNEL32"), "CancelIoEx");
-		usbi_dbg("Will use CancelIo%s for I/O cancellation",
-			CancelIoEx_Available?"Ex":"");
+		setup_cancel_io();
 		for (i=0; i<MAX_FDS; i++) {
 			poll_fd[i] = INVALID_WINFD;
 			_poll_fd[i].original_handle = INVALID_HANDLE_VALUE;
@@ -147,7 +177,7 @@ int _fd_to_index_and_lock(int fd)
 {
 	int i;
 
-	if (fd <= 0)
+	if (fd < 0)
 		return -1;
 
 	for (i=0; i<MAX_FDS; i++) {
@@ -209,7 +239,7 @@ void exit_polling(void)
 	int i;
 
 	while (InterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
-		SleepEx(0, TRUE);
+		usbi_sleep(0);
 	}
 	if (is_polling_set) {
 		is_polling_set = FALSE;
@@ -221,12 +251,8 @@ void exit_polling(void)
 			// terminating, and we should be able to access the fd
 			// mutex lock before too long
 			EnterCriticalSection(&_poll_fd[i].mutex);
-			if ( (poll_fd[i].fd > 0) && (poll_fd[i].handle != INVALID_HANDLE_VALUE) && (poll_fd[i].handle != 0)
-			  && (GetFileType(poll_fd[i].handle) == FILE_TYPE_UNKNOWN) ) {
-				_close(poll_fd[i].fd);
-			}
 			free_overlapped(poll_fd[i].overlapped);
-			if (!CancelIoEx_Available) {
+			if (Use_Duplicate_Handles) {
 				// Close duplicate handle
 				if (_poll_fd[i].original_handle != INVALID_HANDLE_VALUE) {
 					CloseHandle(poll_fd[i].handle);
@@ -253,29 +279,14 @@ int usbi_pipe(int filedes[2])
 
 	CHECK_INIT_POLLING;
 
-	overlapped = (OVERLAPPED*) calloc(1, sizeof(OVERLAPPED));
+	overlapped = create_overlapped();
+
 	if (overlapped == NULL) {
 		return -1;
 	}
 	// The overlapped must have status pending for signaling to work in poll
 	overlapped->Internal = STATUS_PENDING;
 	overlapped->InternalHigh = 0;
-
-	// Read end of the "pipe"
-	filedes[0] = _open(NUL_DEVICE, _O_WRONLY);
-	if (filedes[0] < 0) {
-		usbi_err(NULL, "could not create pipe: errno %d", errno);
-		goto out1;
-	}
-	// We can use the same handle for both ends
-	filedes[1] = filedes[0];
-	poll_dbg("pipe filedes = %d", filedes[0]);
-
-	// Note: manual reset must be true (second param) as the reset occurs in read
-	overlapped->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!overlapped->hEvent) {
-		goto out2;
-	}
 
 	for (i=0; i<MAX_FDS; i++) {
 		if (poll_fd[i].fd < 0) {
@@ -286,7 +297,13 @@ int usbi_pipe(int filedes[2])
 				continue;
 			}
 
-			poll_fd[i].fd = filedes[0];
+			// Use index as the unique fd number
+			poll_fd[i].fd = i;
+			// Read end of the "pipe"
+			filedes[0] = poll_fd[i].fd;
+			// We can use the same handle for both ends
+			filedes[1] = filedes[0];
+
 			poll_fd[i].handle = DUMMY_HANDLE;
 			poll_fd[i].overlapped = overlapped;
 			// There's no polling on the write end, so we just use READ for our needs
@@ -296,12 +313,7 @@ int usbi_pipe(int filedes[2])
 			return 0;
 		}
 	}
-
-	CloseHandle(overlapped->hEvent);
-out2:
-	_close(filedes[0]);
-out1:
-	free(overlapped);
+	free_overlapped(overlapped);
 	return -1;
 }
 
@@ -319,9 +331,9 @@ out1:
  * read and one for write. Using a single R/W fd is unsupported and will
  * produce unexpected results
  */
-struct winfd usbi_create_fd(HANDLE handle, int access_mode)
+struct winfd usbi_create_fd(HANDLE handle, int access_mode, struct usbi_transfer *itransfer, cancel_transfer *cancel_fn)
 {
-	int i, fd;
+	int i;
 	struct winfd wfd = INVALID_WINFD;
 	OVERLAPPED* overlapped = NULL;
 
@@ -331,27 +343,22 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 		return INVALID_WINFD;
 	}
 
-	if ((access_mode != _O_RDONLY) && (access_mode != _O_WRONLY)) {
-		usbi_warn(NULL, "only one of _O_RDONLY or _O_WRONLY are supported.\n"
+	wfd.itransfer = itransfer;
+	wfd.cancel_fn = cancel_fn;
+
+	if ((access_mode != RW_READ) && (access_mode != RW_WRITE)) {
+		usbi_warn(NULL, "only one of RW_READ or RW_WRITE are supported.\n"
 			"If you want to poll for R/W simultaneously, create multiple fds from the same handle.");
 		return INVALID_WINFD;
 	}
-	if (access_mode == _O_RDONLY) {
+	if (access_mode == RW_READ) {
 		wfd.rw = RW_READ;
 	} else {
 		wfd.rw = RW_WRITE;
 	}
 
-	// Ensure that we get a non system conflicting unique fd, using
-	// the same fd attribution system as the pipe ends
-	fd = _open(NUL_DEVICE, _O_WRONLY);
-	if (fd < 0) {
-		return INVALID_WINFD;
-	}
-
 	overlapped = create_overlapped();
 	if(overlapped == NULL) {
-		_close(fd);
 		return INVALID_WINFD;
 	}
 
@@ -363,10 +370,11 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 				LeaveCriticalSection(&_poll_fd[i].mutex);
 				continue;
 			}
-			wfd.fd = fd;
+			// Use index as the unique fd number
+			wfd.fd = i;
 			// Attempt to emulate some of the CancelIoEx behaviour on platforms
 			// that don't have it
-			if (!CancelIoEx_Available) {
+			if (Use_Duplicate_Handles) {
 				_poll_fd[i].thread_id = GetCurrentThreadId();
 				if (!DuplicateHandle(GetCurrentProcess(), handle, GetCurrentProcess(),
 					&wfd.handle, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
@@ -387,7 +395,6 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode)
 		}
 	}
 	free_overlapped(overlapped);
-	_close(fd);
 	return INVALID_WINFD;
 }
 
@@ -395,13 +402,8 @@ void _free_index(int _index)
 {
 	// Cancel any async IO (Don't care about the validity of our handles for this)
 	cancel_io(_index);
-	// close fake handle for devices
-	if ( (poll_fd[_index].handle != INVALID_HANDLE_VALUE) && (poll_fd[_index].handle != 0)
-	  && (GetFileType(poll_fd[_index].handle) == FILE_TYPE_UNKNOWN) ) {
-		_close(poll_fd[_index].fd);
-	}
 	// close the duplicate handle (if we have an actual duplicate)
-	if (!CancelIoEx_Available) {
+	if (Use_Duplicate_Handles) {
 		if (_poll_fd[_index].original_handle != INVALID_HANDLE_VALUE) {
 			CloseHandle(poll_fd[_index].handle);
 		}
@@ -651,15 +653,7 @@ int usbi_close(int fd)
 	if (_index < 0) {
 		errno = EBADF;
 	} else {
-		if (poll_fd[_index].overlapped != NULL) {
-			// Must be a different event for each end of the pipe
-			CloseHandle(poll_fd[_index].overlapped->hEvent);
-			free(poll_fd[_index].overlapped);
-		}
-		r = _close(poll_fd[_index].fd);
-		if (r != 0) {
-			errno = EIO;
-		}
+		free_overlapped(poll_fd[_index].overlapped);
 		poll_fd[_index] = INVALID_WINFD;
 		LeaveCriticalSection(&_poll_fd[_index].mutex);
 	}
