@@ -219,6 +219,7 @@ AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
 # headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_FUNCS(gettimeofday)
+AC_CHECK_HEADERS([signal.h])
 
 AM_CFLAGS="${AM_CFLAGS} -std=gnu99 -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow ${THREAD_CFLAGS} ${VISIBILITY_CFLAGS}"
 

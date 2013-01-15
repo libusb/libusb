@@ -28,3 +28,9 @@
 
 /* type of second poll() argument */
 #define POLL_NFDS_TYPE unsigned int
+
+/* Define to 1 if you have the <signal.h> header file. */
+#define HAVE_SIGNAL_H 1
+
+/* Define to 1 if you have the <sys/types.h> header file. */
+#define HAVE_SYS_TYPES_H 1
