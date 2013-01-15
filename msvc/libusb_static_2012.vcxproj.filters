@@ -52,5 +52,8 @@
     <ClInclude Include="..\libusb\os\windows_usb.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\libusb\os\windows_common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -143,6 +143,7 @@
     <ClInclude Include="..\libusb\os\poll_windows.h" />
     <ClInclude Include="..\libusb\os\threads_windows.h" />
     <ClInclude Include="..\libusb\os\windows_usb.h" />
+    <ClInclude Include="..\libusb\os\windows_common.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

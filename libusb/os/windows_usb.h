@@ -22,23 +22,14 @@
 
 #pragma once
 
+#include "windows_common.h"
+
 #if defined(_MSC_VER)
 // disable /W4 MSVC warnings that are benign
 #pragma warning(disable:4127) // conditional expression is constant
 #pragma warning(disable:4100) // unreferenced formal parameter
 #pragma warning(disable:4214) // bit field types other than int
 #pragma warning(disable:4201) // nameless struct/union
-#endif
-
-// Windows API default is uppercase - ugh!
-#if !defined(bool)
-#define bool BOOL
-#endif
-#if !defined(true)
-#define true TRUE
-#endif
-#if !defined(false)
-#define false FALSE
 #endif
 
 // Missing from MSVC6 setupapi.h
@@ -57,24 +48,6 @@ extern char *_strdup(const char *strSource);
 // _beginthreadex is MSVCRT => unavailable for cygwin. Fallback to using CreateThread
 #define _beginthreadex(a, b, c, d, e, f) CreateThread(a, b, (LPTHREAD_START_ROUTINE)c, d, e, f)
 #endif
-#define safe_free(p) do {if (p != NULL) {free((void*)p); p = NULL;}} while(0)
-#define safe_closehandle(h) do {if (h != INVALID_HANDLE_VALUE) {CloseHandle(h); h = INVALID_HANDLE_VALUE;}} while(0)
-#define safe_min(a, b) min((size_t)(a), (size_t)(b))
-#define safe_strcp(dst, dst_max, src, count) do {memcpy(dst, src, safe_min(count, dst_max)); \
-	((char*)dst)[safe_min(count, dst_max)-1] = 0;} while(0)
-#define safe_strcpy(dst, dst_max, src) safe_strcp(dst, dst_max, src, safe_strlen(src)+1)
-#define safe_strncat(dst, dst_max, src, count) strncat(dst, src, safe_min(count, dst_max - safe_strlen(dst) - 1))
-#define safe_strcat(dst, dst_max, src) safe_strncat(dst, dst_max, src, safe_strlen(src)+1)
-#define safe_strcmp(str1, str2) strcmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2))
-#define safe_stricmp(str1, str2) _stricmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2))
-#define safe_strncmp(str1, str2, count) strncmp(((str1==NULL)?"<NULL>":str1), ((str2==NULL)?"<NULL>":str2), count)
-#define safe_strlen(str) ((str==NULL)?0:strlen(str))
-#define safe_sprintf _snprintf
-#define safe_unref_device(dev) do {if (dev != NULL) {libusb_unref_device(dev); dev = NULL;}} while(0)
-#define wchar_to_utf8_ms(wstr, str, strlen) WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, strlen, NULL, NULL)
-#ifndef ARRAYSIZE
-#define ARRAYSIZE(A) (sizeof(A)/sizeof((A)[0]))
-#endif
 
 #define MAX_CTRL_BUFFER_LENGTH      4096
 #define MAX_USB_DEVICES             256
@@ -84,9 +57,6 @@ extern char *_strdup(const char *strSource);
 #define MAX_GUID_STRING_LENGTH      40
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
-#define MAX_TIMER_SEMAPHORES        128
-#define TIMER_REQUEST_RETRY_MS      100
-#define ERR_BUFFER_SIZE             256
 #define LIST_SEPARATOR              ';'
 #define HTAB_SIZE                   1021
 
@@ -331,37 +301,6 @@ struct driver_lookup {
 	const DWORD reg_prop;		// SPDRP registry key to use to retreive list
 	const char* designation;	// internal designation (for debug output)
 };
-
-/*
- * API macros - from libusb-win32 1.x
- */
-#define DLL_DECLARE_PREFIXNAME(api, ret, prefixname, name, args)    \
-	typedef ret (api * __dll_##name##_t)args;                       \
-	static __dll_##name##_t prefixname = NULL
-
-#define DLL_LOAD_PREFIXNAME(dll, prefixname, name, ret_on_failure) \
-	do {                                                           \
-		HMODULE h = GetModuleHandleA(#dll);                        \
-	if (!h)                                                        \
-		h = LoadLibraryA(#dll);                                    \
-	if (!h) {                                                      \
-		if (ret_on_failure) { return LIBUSB_ERROR_NOT_FOUND; }     \
-		else { break; }                                            \
-	}                                                              \
-	prefixname = (__dll_##name##_t)GetProcAddress(h, #name);       \
-	if (prefixname) break;                                         \
-	prefixname = (__dll_##name##_t)GetProcAddress(h, #name "A");   \
-	if (prefixname) break;                                         \
-	prefixname = (__dll_##name##_t)GetProcAddress(h, #name "W");   \
-	if (prefixname) break;                                         \
-	if(ret_on_failure)                                             \
-		return LIBUSB_ERROR_NOT_FOUND;                             \
-	} while(0)
-
-#define DLL_DECLARE(api, ret, name, args)   DLL_DECLARE_PREFIXNAME(api, ret, name, name, args)
-#define DLL_LOAD(dll, name, ret_on_failure) DLL_LOAD_PREFIXNAME(dll, name, name, ret_on_failure)
-#define DLL_DECLARE_PREFIXED(api, ret, prefix, name, args)   DLL_DECLARE_PREFIXNAME(api, ret, prefix##name, name, args)
-#define DLL_LOAD_PREFIXED(dll, prefix, name, ret_on_failure) DLL_LOAD_PREFIXNAME(dll, prefix##name, name, ret_on_failure)
 
 /* OLE32 dependency */
 DLL_DECLARE_PREFIXED(WINAPI, HRESULT, p, CLSIDFromString, (LPCOLESTR, LPCLSID));

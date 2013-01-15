@@ -165,6 +165,10 @@ SOURCE=..\libusb\os\threads_windows.h
 
 SOURCE=..\libusb\os\windows_usb.h
 # End Source File
+# Begin Source File
+
+SOURCE=..\libusb\os\windows_common.h
+# End Source File
 # End Group
 # End Target
 # End Project

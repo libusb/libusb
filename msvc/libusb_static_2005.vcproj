@@ -339,6 +339,10 @@
 				RelativePath="..\libusb\os\windows_usb.h"
 				>
 			</File>
+			<File
+				RelativePath="..\libusb\os\windows_common.h"
+				>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>
