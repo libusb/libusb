@@ -39,3 +39,4 @@ doc/html
 Debug
 Release
 *.user
+*.suo
