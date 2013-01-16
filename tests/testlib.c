@@ -23,11 +23,17 @@
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
+#if !defined(_WIN32_WCE)
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#endif
 
-#ifdef _WIN32
+#if defined(_WIN32_WCE)
+// No support for selective redirection of STDOUT on WinCE.
+#define DISABLE_STDOUT_REDIRECTION
+#define STDOUT_FILENO 1
+#elif defined(_WIN32)
 #include <io.h>
 #define dup _dup
 #define dup2 _dup2
@@ -72,6 +78,7 @@ static void print_usage(int argc, char ** argv)
 
 static void cleanup_test_output(libusbx_testlib_ctx * ctx)
 {
+#ifndef DISABLE_STDOUT_REDIRECTION
 	if (ctx->output_file != NULL) {
 		fclose(ctx->output_file);
 		ctx->output_file = NULL;
@@ -84,6 +91,7 @@ static void cleanup_test_output(libusbx_testlib_ctx * ctx)
 		close(ctx->null_fd);
 		ctx->null_fd = INVALID_FD;
 	}
+#endif
 }
 
 /**
@@ -92,6 +100,11 @@ static void cleanup_test_output(libusbx_testlib_ctx * ctx)
  */
 static int setup_test_output(libusbx_testlib_ctx * ctx)
 {
+#ifdef DISABLE_STDOUT_REDIRECTION
+    ctx->output_fd = STDOUT_FILENO;
+	ctx->output_file = stdout;
+	return 0;
+#else
 	/* Keep a copy of STDOUT for test output */
 	ctx->output_fd = dup(STDOUT_FILENO);
 	if (ctx->output_fd < 0) {
@@ -122,6 +135,7 @@ static int setup_test_output(libusbx_testlib_ctx * ctx)
 		}
 	}
 	return 0;
+#endif
 }
 
 void libusbx_testlib_logf(libusbx_testlib_ctx * ctx,

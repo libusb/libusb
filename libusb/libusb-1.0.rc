@@ -5,7 +5,9 @@
  * The information can then be queried using standard APIs and can also be
  * viewed with utilities such as Windows Explorer.
  */
+#ifndef _WIN32_WCE
 #include "winresrc.h"
+#endif
 
 #include "version.h"
 #ifndef LIBUSB_VERSIONSTRING

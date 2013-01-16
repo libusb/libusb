@@ -34,6 +34,10 @@
 #include <sys/time.h>
 #endif
 
+#if defined(OS_WINCE)
+#include "missing.h"	// getenv()
+#endif
+
 #include "libusbi.h"
 
 #if defined(OS_LINUX)
@@ -44,6 +48,8 @@ const struct usbi_os_backend * const usbi_backend = &darwin_backend;
 const struct usbi_os_backend * const usbi_backend = &openbsd_backend;
 #elif defined(OS_WINDOWS)
 const struct usbi_os_backend * const usbi_backend = &windows_backend;
+#elif defined(OS_WINCE)
+const struct usbi_os_backend * const usbi_backend = &wince_backend;
 #else
 #error "Unsupported OS"
 #endif
@@ -1789,7 +1795,13 @@ int usbi_gettimeofday(struct timeval *tp, void *tzp)
 	UNUSED(tzp);
 
 	if(tp) {
+#if defined(OS_WINCE)
+		SYSTEMTIME st;
+		GetSystemTime(&st);
+		SystemTimeToFileTime(&st, &_now.ft);
+#else
 		GetSystemTimeAsFileTime (&_now.ft);
+#endif
 		tp->tv_usec=(long)((_now.ns100 / 10) % 1000000 );
 		tp->tv_sec= (long)((_now.ns100 - _W32_FT_OFFSET) / 10000000);
 	}

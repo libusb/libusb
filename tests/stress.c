@@ -18,8 +18,10 @@
  */
 
 #include <stdio.h>
-#include <sys/types.h>
 #include <memory.h>
+#if !defined(_WIN32_WCE)
+#include <sys/types.h>
+#endif
 
 #include "libusb.h"
 

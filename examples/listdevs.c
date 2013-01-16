@@ -18,7 +18,9 @@
  */
 
 #include <stdio.h>
+#if !defined(_WIN32_WCE)
 #include <sys/types.h>
+#endif
 
 #include "libusb.h"
 
