@@ -2732,11 +2732,11 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 		// must first claim the first interface before you claim the others
 		if ((winusb_handle == 0) || (winusb_handle == INVALID_HANDLE_VALUE)) {
 			file_handle = handle_priv->interface_handle[0].dev_handle;
-			if (!WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
+			if (WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
 				handle_priv->interface_handle[0].api_handle = winusb_handle;
 				usbi_warn(ctx, "auto-claimed interface 0 (required to claim %d with WinUSB)", iface);
 			} else {
-				usbi_warn(ctx, "failed to auto-claim interface 0 (required to claim %d with WinUSB)", iface);
+				usbi_warn(ctx, "failed to auto-claim interface 0 (required to claim %d with WinUSB): %s", iface, windows_error_str(0));
 				return LIBUSB_ERROR_ACCESS;
 			}
 		}
