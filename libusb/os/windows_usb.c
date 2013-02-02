@@ -635,7 +635,7 @@ static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 	if (CM_Get_Device_IDA(devinst, path, MAX_PATH_LENGTH, 0) != CR_SUCCESS) {
 		return 0;
 	}
-	// TODO (post hotplug): try without sanitizing
+	// TODO: (post hotplug): try without sanitizing
 	sanitized_path = sanitize_path(path);
 	if (sanitized_path == NULL) {
 		return 0;
@@ -2664,6 +2664,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 	struct windows_device_priv *priv = _device_priv(dev_handle->dev);
 	bool is_using_usbccgp = (priv->apib->id == USB_API_COMPOSITE);
 	HANDLE file_handle, winusb_handle;
+	DWORD err;
 	int i;
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	HDEVINFO dev_info;
@@ -2685,15 +2686,15 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 
 		if (!WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
 			handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
-
-			switch(GetLastError()) {
+			err = GetLastError();
+			switch(err) {
 			case ERROR_BAD_COMMAND:
 				// The device was disconnected
 				usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(0));
 				return LIBUSB_ERROR_NO_DEVICE;
 			default:
 				// it may be that we're using the libusb0 filter driver.
-				// [TODO] can we move this whole business into the K/0 DLL?
+				// TODO: can we move this whole business into the K/0 DLL?
 				for (i = 0; ; i++) {
 					safe_free(dev_interface_details);
 					safe_free(dev_path_no_guid);
@@ -2719,7 +2720,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 					}
 				}
 				if (!found_filter) {
-					usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(0));
+					usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(err));
 					return LIBUSB_ERROR_ACCESS;
 				}
 			}
@@ -3057,7 +3058,7 @@ static int winusbx_abort_transfers(int sub_api, struct usbi_transfer *itransfer)
  * IOCTL_USB_HUB_CYCLE_PORT ioctl was removed from Vista => the best we can do is
  * cycle the pipes (and even then, the control pipe can not be reset using WinUSB)
  */
-// TODO (post hotplug): see if we can force eject the device and redetect it (reuse hotplug?)
+// TODO: (post hotplug): see if we can force eject the device and redetect it (reuse hotplug?)
 static int winusbx_reset_device(int sub_api, struct libusb_device_handle *dev_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
