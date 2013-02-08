@@ -1374,9 +1374,6 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
 
   struct darwin_interface *cInterface;
 
-  if (IS_XFEROUT(transfer) && transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)
-    return LIBUSB_ERROR_NOT_SUPPORTED;
-
   if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
     usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
 
@@ -1387,6 +1384,11 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
 
   (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
                                                  &transferType, &maxPacketSize, &interval);
+
+  if (0 != (transfer->length % maxPacketSize)) {
+    /* do not need a zero packet */
+    transfer->flags &= ~LIBUSB_TRANSFER_ADD_ZERO_PACKET;
+  }
 
   /* submit the request */
   /* timeouts are unavailable on interrupt endpoints */
@@ -1653,11 +1655,18 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 
   usbi_dbg ("an async io operation has completed");
 
-  /* The size should never be larger than 4 GB - Also see libusb bug #117 */
-  if ((intptr_t) arg0 > UINT32_MAX)
-    usbi_err (ITRANSFER_CTX (itransfer),
-      "async size truncation detected - please report this error");
-  size = (UInt32) (intptr_t) arg0;
+  /* if requested write a zero packet */
+  if (kIOReturnSuccess == result && IS_XFEROUT(transfer) && transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET) {
+    struct darwin_interface *cInterface;
+    uint8_t iface, pipeRef;
+
+    (void) ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface);
+    cInterface = &priv->interfaces[iface];
+
+    (*(cInterface->interface))->WritePipe (cInterface->interface, pipeRef, transfer->buffer, 0);
+  }
+
+  size = (UInt32) (uintptr_t) arg0;
 
   /* send a completion message to the device's file descriptor */
   message = MESSAGE_ASYNC_IO_COMPLETE;
