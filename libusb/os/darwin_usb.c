@@ -595,13 +595,28 @@ static int darwin_check_configuration (struct libusb_context *ctx, struct libusb
   return 0;
 }
 
+static int darwin_request_descriptor (usb_device_t **device, UInt8 desc, UInt8 desc_index, void *buffer, size_t buffer_size) {
+  IOUSBDevRequest req;
+
+  memset (buffer, 0, buffer_size);
+
+  /* Set up request for descriptor/ */
+  req.bmRequestType = USBmakebmRequestType(kUSBIn, kUSBStandard, kUSBDevice);
+  req.bRequest      = kUSBRqGetDescriptor;
+  req.wValue        = desc << 8;
+  req.wIndex        = desc_index;
+  req.wLength       = buffer_size;
+  req.pData         = buffer;
+
+  return (*device)->DeviceRequest (device, &req);
+}
+
 static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct libusb_device *dev, usb_device_t **device) {
   struct darwin_device_priv *priv;
   int retries = 2, delay = 30000;
   int unsuspended = 0, try_unsuspend = 1, try_reconfigure = 1;
   int is_open = 0;
   int ret = 0, ret2;
-  IOUSBDevRequest req;
   UInt8 bDeviceClass;
   UInt16 idProduct, idVendor;
 
@@ -616,20 +631,11 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct li
 
   /**** retrieve device descriptor ****/
   do {
-    /* Set up request for device descriptor */
-    memset (&(priv->dev_descriptor), 0, sizeof(IOUSBDeviceDescriptor));
-    req.bmRequestType = USBmakebmRequestType(kUSBIn, kUSBStandard, kUSBDevice);
-    req.bRequest      = kUSBRqGetDescriptor;
-    req.wValue        = kUSBDeviceDesc << 8;
-    req.wIndex        = 0;
-    req.wLength       = sizeof(priv->dev_descriptor);
-    req.pData         = &(priv->dev_descriptor);
-
     /* according to Apple's documentation the device must be open for DeviceRequest but we may not be able to open some
      * devices and Apple's USB Prober doesn't bother to open the device before issuing a descriptor request.  Still,
      * to follow the spec as closely as possible, try opening the device */
+    ret = darwin_request_descriptor (device, kUSBDeviceDesc, 0, &priv->dev_descriptor, sizeof(priv->dev_descriptor));
 
-    ret = (*(device))->DeviceRequest (device, &req);
 
     if (kIOReturnOverrun == ret && kUSBDeviceDesc == priv->dev_descriptor.bDescriptorType)
       /* received an overrun error but we still received a device descriptor */
@@ -1256,13 +1262,54 @@ static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
 
 static int darwin_reset_device(struct libusb_device_handle *dev_handle) {
   struct darwin_device_priv *dpriv = (struct darwin_device_priv *)dev_handle->dev->os_priv;
+  IOUSBDeviceDescriptor descriptor;
+  IOUSBConfigurationDescriptorPtr cached_configuration;
+  IOUSBConfigurationDescriptor configuration;
+  bool reenumerate = false;
   IOReturn kresult;
+  int i;
 
   kresult = (*(dpriv->device))->ResetDevice (dpriv->device);
-  if (kresult)
+  if (kresult) {
     usbi_err (HANDLE_CTX (dev_handle), "ResetDevice: %s", darwin_error_str (kresult));
+    return darwin_to_libusb (kresult);
+  }
 
-  return darwin_to_libusb (kresult);
+  do {
+    usbi_dbg ("darwin/reset_device: checking if device descriptor changed");
+
+    /* ignore return code. if we can't get a descriptor it might be worthwhile re-enumerating anway */
+    (void) darwin_request_descriptor (dpriv->device, kUSBDeviceDesc, 0, &descriptor, sizeof (descriptor));
+
+    /* check if the device descriptor has changed */
+    if (0 != memcmp (&dpriv->dev_descriptor, &descriptor, sizeof (descriptor))) {
+      reenumerate = true;
+      break;
+    }
+
+    /* check if any configuration descriptor has changed */
+    for (i = 0 ; i < descriptor.bNumConfigurations ; ++i) {
+      usbi_dbg ("darwin/reset_device: checking if configuration descriptor %d changed", i);
+
+      (void) darwin_request_descriptor (dpriv->device, kUSBConfDesc, i, &configuration, sizeof (configuration));
+      (*(dpriv->device))->GetConfigurationDescriptorPtr (dpriv->device, i, &cached_configuration);
+
+      if (!cached_configuration || 0 != memcmp (cached_configuration, &configuration, sizeof (configuration))) {
+        reenumerate = true;
+        break;
+      }
+    }
+  } while (0);
+
+  if (reenumerate) {
+    usbi_dbg ("darwin/reset_device: device requires reenumeration");
+    (void) (*(dpriv->device))->USBDeviceReEnumerate (dpriv->device, 0);
+    return LIBUSB_ERROR_NOT_FOUND;
+  }
+
+  usbi_dbg ("darwin/reset_device: device reset complete");
+
+  return LIBUSB_SUCCESS;
 }
 
 static int darwin_kernel_driver_active(struct libusb_device_handle *dev_handle, int interface) {
