@@ -1754,7 +1754,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 		urb->type = urb_type;
 		urb->endpoint = transfer->endpoint;
 		urb->buffer = transfer->buffer + (i * bulk_buffer_len);
-		if (use_bulk_continuation && !is_out)
+		if (use_bulk_continuation && !is_out && (i != num_urbs - 1))
 			urb->flags = USBFS_URB_SHORT_NOT_OK;
 		if (i == num_urbs - 1 && last_urb_partial)
 			urb->buffer_length = transfer->length % bulk_buffer_len;
