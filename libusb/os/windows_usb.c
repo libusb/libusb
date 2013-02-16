@@ -365,7 +365,7 @@ err_exit:
 }
 
 /* For libusb0 filter */
-SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details_filter(struct libusb_context *ctx,
+static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details_filter(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID* guid, unsigned _index, char* filter_path){
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
@@ -688,7 +688,7 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int
 
 // Lookup for a match in the list of API driver names
 // return -1 if not found, driver match number otherwise
-int get_sub_api(char* driver, int api){
+static int get_sub_api(char* driver, int api){
 	int i;
 	const char sep_str[2] = {LIST_SEPARATOR, 0};
 	char *tok, *tmp_str;
@@ -1176,7 +1176,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 }
 
 // Returns the api type, or 0 if not found/unsupported
-void get_api_type(struct libusb_context *ctx, HDEVINFO *dev_info,
+static void get_api_type(struct libusb_context *ctx, HDEVINFO *dev_info,
 	SP_DEVINFO_DATA *dev_info_data, int *api, int *sub_api)
 {
 	// Precedence for filter drivers vs driver is in the order of this array
