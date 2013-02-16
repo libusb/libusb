@@ -173,7 +173,7 @@ void init_polling(void)
 }
 
 // Internal function to retrieve the table index (and lock the fd mutex)
-int _fd_to_index_and_lock(int fd)
+static int _fd_to_index_and_lock(int fd)
 {
 	int i;
 
@@ -194,7 +194,7 @@ int _fd_to_index_and_lock(int fd)
 	return -1;
 }
 
-OVERLAPPED *create_overlapped(void)
+static OVERLAPPED *create_overlapped(void)
 {
 	OVERLAPPED *overlapped = (OVERLAPPED*) calloc(1, sizeof(OVERLAPPED));
 	if (overlapped == NULL) {
@@ -208,7 +208,7 @@ OVERLAPPED *create_overlapped(void)
 	return overlapped;
 }
 
-void free_overlapped(OVERLAPPED *overlapped)
+static void free_overlapped(OVERLAPPED *overlapped)
 {
 	if (overlapped == NULL)
 		return;
@@ -220,7 +220,7 @@ void free_overlapped(OVERLAPPED *overlapped)
 	free(overlapped);
 }
 
-void reset_overlapped(OVERLAPPED *overlapped)
+static void reset_overlapped(OVERLAPPED *overlapped)
 {
 	HANDLE event_handle;
 	if (overlapped == NULL)
@@ -398,7 +398,7 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode, struct usbi_transfer
 	return INVALID_WINFD;
 }
 
-void _free_index(int _index)
+static void _free_index(int _index)
 {
 	// Cancel any async IO (Don't care about the validity of our handles for this)
 	cancel_io(_index);
