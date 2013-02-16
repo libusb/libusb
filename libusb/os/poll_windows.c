@@ -220,20 +220,6 @@ static void free_overlapped(OVERLAPPED *overlapped)
 	free(overlapped);
 }
 
-static void reset_overlapped(OVERLAPPED *overlapped)
-{
-	HANDLE event_handle;
-	if (overlapped == NULL)
-		return;
-
-	event_handle = overlapped->hEvent;
-	if (event_handle != NULL) {
-		ResetEvent(event_handle);
-	}
-	memset(overlapped, 0, sizeof(OVERLAPPED));
-	overlapped->hEvent = event_handle;
-}
-
 void exit_polling(void)
 {
 	int i;
