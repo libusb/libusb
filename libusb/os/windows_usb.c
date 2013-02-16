@@ -42,8 +42,6 @@
 #define LOOP_CHECK(fcall) { r=fcall; if (r != LIBUSB_SUCCESS) continue; }
 #define LOOP_BREAK(err) { r=err; continue; }
 
-extern void usbi_fd_notification(struct libusb_context *ctx);
-
 // Helper prototypes
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
 static int windows_clock_gettime(int clk_id, struct timespec *tp);
