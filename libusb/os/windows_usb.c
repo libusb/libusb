@@ -259,7 +259,7 @@ static int init_dlls(void)
  * incremented index starting at zero) until all interfaces have been returned.
  */
 static bool get_devinfo_data(struct libusb_context *ctx,
-	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, char* usb_class, unsigned _index)
+	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const char* usb_class, unsigned _index)
 {
 	if (_index <= 0) {
 		*dev_info = pSetupDiGetClassDevsA(NULL, usb_class, NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
@@ -1314,7 +1314,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 {
 	struct discovered_devs *discdevs;
 	HDEVINFO dev_info = { 0 };
-	char* usb_class[] = {"USB", "NUSB3", "IUSB3"};
+	const char* usb_class[] = {"USB", "NUSB3", "IUSB3"};
 	SP_DEVINFO_DATA dev_info_data = { 0 };
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	GUID hid_guid;
@@ -3631,7 +3631,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 	int i, j;
 	// report IDs handling
 	ULONG size[3];
-	char* type[3] = {"input", "output", "feature"};
+	const char* type[3] = {"input", "output", "feature"};
 	int nb_ids[2];	// zero and nonzero report IDs
 
 	CHECK_HID_AVAILABLE;
