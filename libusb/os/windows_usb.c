@@ -1327,7 +1327,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 #define HID_PASS 4
 	int r = LIBUSB_SUCCESS;
 	int api, sub_api;
-	int class_index = 0;
+	size_t class_index = 0;
 	unsigned int nb_guids, pass, i, j, ancestor;
 	char path[MAX_PATH_LENGTH];
 	char strbuf[MAX_PATH_LENGTH];
