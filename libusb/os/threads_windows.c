@@ -31,6 +31,8 @@
 #define usbi_sleep(ms) SleepEx(ms, TRUE)
 #endif
 
+extern const uint64_t epoch_time;
+
 int usbi_mutex_init(usbi_mutex_t *mutex,
 					const usbi_mutexattr_t *attr) {
 	UNUSED(attr);
@@ -187,7 +189,6 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 	struct timeval targ_time, cur_time, delta_time;
 	struct timespec cur_time_ns;
 	DWORD millis;
-	extern const uint64_t epoch_time;
 
 #ifdef _WIN32_WCE
 	SYSTEMTIME st;
