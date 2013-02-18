@@ -136,7 +136,7 @@ int usbi_cond_signal(usbi_cond_t *cond) {
 	// The wait function will remove its respective item from the list.
 	return SetEvent(pos->event) ? 0 : ((errno=EINVAL));
 }
-static int __inline usbi_cond_intwait(usbi_cond_t *cond,
+__inline static int usbi_cond_intwait(usbi_cond_t *cond,
 									  usbi_mutex_t *mutex,
 									  DWORD timeout_ms) {
 	struct usbi_cond_perthread *pos;
