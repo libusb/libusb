@@ -1286,6 +1286,7 @@ static int set_composite_interface(struct libusb_context* ctx, struct libusb_dev
 static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* dev,
 							char* dev_interface_path)
 {
+	int i;
 	struct windows_device_priv *priv = _device_priv(dev);
 
 	if (priv->hid == NULL) {
@@ -1296,8 +1297,11 @@ static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* d
 		usbi_err(ctx, "program assertion failed: max USB interfaces reached for HID device");
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
-	if (priv->usb_interface[priv->hid->nb_interfaces].path != NULL) {
-		safe_free(priv->usb_interface[priv->hid->nb_interfaces].path);
+	for (i=0; i<priv->hid->nb_interfaces; i++) {
+		if (safe_strcmp(priv->usb_interface[i].path, dev_interface_path) == 0) {
+			usbi_dbg("interface[%d] already set to %s", i, dev_interface_path);
+			return LIBUSB_SUCCESS;
+		}
 	}
 
 	priv->usb_interface[priv->hid->nb_interfaces].path = dev_interface_path;
