@@ -79,17 +79,23 @@ static void print_usage(int argc, char ** argv)
 static void cleanup_test_output(libusbx_testlib_ctx * ctx)
 {
 #ifndef DISABLE_STDOUT_REDIRECTION
-	if (ctx->output_file != NULL) {
-		fclose(ctx->output_file);
-		ctx->output_file = NULL;
-	}
-	if (ctx->output_fd != INVALID_FD) {
-		close(ctx->output_fd);
-		ctx->output_fd = INVALID_FD;
-	}
-	if (ctx->null_fd != INVALID_FD) {
-		close(ctx->null_fd);
-		ctx->null_fd = INVALID_FD;
+	if (!ctx->verbose) {
+		if (ctx->old_stdout != INVALID_FD) {
+			_dup2(ctx->old_stdout, STDOUT_FILENO);
+			ctx->old_stdout = INVALID_FD;
+		}
+		if (ctx->old_stderr != INVALID_FD) {
+			_dup2(ctx->old_stderr, STDERR_FILENO);
+			ctx->old_stderr = INVALID_FD;
+		}
+		if (ctx->null_fd != INVALID_FD) {
+			close(ctx->null_fd);
+			ctx->null_fd = INVALID_FD;
+		}
+		if (ctx->output_file != stdout) {
+			fclose(ctx->output_file);
+			ctx->output_file = stdout;
+		}
 	}
 #endif
 }
@@ -100,26 +106,23 @@ static void cleanup_test_output(libusbx_testlib_ctx * ctx)
  */
 static int setup_test_output(libusbx_testlib_ctx * ctx)
 {
-#ifdef DISABLE_STDOUT_REDIRECTION
-    ctx->output_fd = STDOUT_FILENO;
-	ctx->output_file = stdout;
-	return 0;
-#else
-	/* Keep a copy of STDOUT for test output */
-	ctx->output_fd = dup(STDOUT_FILENO);
-	if (ctx->output_fd < 0) {
-		ctx->output_fd = INVALID_FD;
-		printf("Failed to duplicate output handle: %d\n", errno);
-		return 1;
-	}
-	ctx->output_file = fdopen(ctx->output_fd, "w");
-	if (!ctx->output_file) {
-		cleanup_test_output(ctx);
-		printf("Failed to open FILE for output handle: %d\n", errno);
-		return 1;
-	}
+#ifndef DISABLE_STDOUT_REDIRECTION
 	/* Stop output to stdout and stderr from being displayed if using non-verbose output */
 	if (!ctx->verbose) {
+		/* Keep a copy of STDOUT and STDERR */
+		ctx->old_stdout = dup(STDOUT_FILENO);
+		if (ctx->old_stdout < 0) {
+			ctx->old_stdout = INVALID_FD;
+			printf("Failed to duplicate stdout handle: %d\n", errno);
+			return 1;
+		}
+		ctx->old_stderr = dup(STDERR_FILENO);
+		if (ctx->old_stderr < 0) {
+			ctx->old_stderr = INVALID_FD;
+			cleanup_test_output(ctx);
+			printf("Failed to duplicate stderr handle: %d\n", errno);
+			return 1;
+		}
 		/* Redirect STDOUT_FILENO and STDERR_FILENO to /dev/null or "nul"*/
 		ctx->null_fd = open(NULL_PATH, O_WRONLY);
 		if (ctx->null_fd < 0) {
@@ -133,17 +136,21 @@ static int setup_test_output(libusbx_testlib_ctx * ctx)
 				cleanup_test_output(ctx);
 				return 1;
 		}
+		ctx->output_file = fdopen(ctx->old_stdout, "w");
+		if (!ctx->output_file) {
+			cleanup_test_output(ctx);
+			printf("Failed to open FILE for output handle: %d\n", errno);
+			return 1;
+		}
 	}
-	return 0;
 #endif
+	return 0;
 }
 
 void libusbx_testlib_logf(libusbx_testlib_ctx * ctx,
 	const char* fmt, ...)
 {
 	va_list va;
-	if (!ctx->output_file)
-		return;
 	va_start(va, fmt);
 	vfprintf(ctx->output_file, fmt, va);
 	va_end(va);
@@ -171,8 +178,9 @@ int libusbx_testlib_run_tests(int argc,
 	ctx.test_count = 0;
 	ctx.list_tests = false;
 	ctx.verbose = false;
-	ctx.output_fd = INVALID_FD;
-	ctx.output_file = NULL;
+	ctx.old_stdout = INVALID_FD;
+	ctx.old_stderr = INVALID_FD;
+	ctx.output_file = stdout;
 	ctx.null_fd = INVALID_FD;
 
 	/* Parse command line options */

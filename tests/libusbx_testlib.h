@@ -53,7 +53,8 @@ typedef struct {
 	int test_count;
 	bool list_tests;
 	bool verbose;
-	int output_fd;
+	int old_stdout;
+	int old_stderr;
 	FILE* output_file;
 	int null_fd;
 } libusbx_testlib_ctx;
