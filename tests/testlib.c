@@ -81,11 +81,11 @@ static void cleanup_test_output(libusbx_testlib_ctx * ctx)
 #ifndef DISABLE_STDOUT_REDIRECTION
 	if (!ctx->verbose) {
 		if (ctx->old_stdout != INVALID_FD) {
-			_dup2(ctx->old_stdout, STDOUT_FILENO);
+			dup2(ctx->old_stdout, STDOUT_FILENO);
 			ctx->old_stdout = INVALID_FD;
 		}
 		if (ctx->old_stderr != INVALID_FD) {
-			_dup2(ctx->old_stderr, STDERR_FILENO);
+			dup2(ctx->old_stderr, STDERR_FILENO);
 			ctx->old_stderr = INVALID_FD;
 		}
 		if (ctx->null_fd != INVALID_FD) {
