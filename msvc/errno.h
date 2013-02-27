@@ -59,12 +59,14 @@
 /* 35 - Unknown Error */
 #define	EDEADLOCK	36	/* Resource deadlock avoided (non-Cyg) */
 #define	EDEADLK		36
+#if 0
 /* 37 - Unknown Error */
 #define	ENAMETOOLONG	38	/* Filename too long (91 in Cyg?) */
 #define	ENOLCK		39	/* No locks available (46 in Cyg?) */
 #define	ENOSYS		40	/* Function not implemented (88 in Cyg?) */
 #define	ENOTEMPTY	41	/* Directory not empty (90 in Cyg?) */
 #define	EILSEQ		42	/* Illegal byte sequence */
+#endif
 
 /*
  * NOTE: ENAMETOOLONG and ENOTEMPTY conflict with definitions in the

@@ -17,28 +17,21 @@
 /* Default visibility */
 #define DEFAULT_VISIBILITY /**/
 
-/* Start with debug message logging enabled */
-//#define ENABLE_DEBUG_LOGGING 1
-
-/* Message logging */
+/* Enable global message logging */
 #define ENABLE_LOGGING 1
 
-/* Windows/WinCE backend */
-#if defined(_WIN32_WCE)
-#define OS_WINCE 1
-#else
-#define OS_WINDOWS 1
-#endif
+/* Uncomment to start with debug message logging enabled */
+// #define ENABLE_DEBUG_LOGGING 1
 
 /* type of second poll() argument */
 #define POLL_NFDS_TYPE unsigned int
 
-#if !defined(_WIN32_WCE)
-
-/* Define to 1 if you have the <signal.h> header file. */
+/* Windows/WinCE backend */
+#if defined(_WIN32_WCE)
+#define OS_WINCE 1
+#define HAVE_MISSING_H
+#else
+#define OS_WINDOWS 1
 #define HAVE_SIGNAL_H 1
-
-/* Define to 1 if you have the <sys/types.h> header file. */
 #define HAVE_SYS_TYPES_H 1
-
 #endif

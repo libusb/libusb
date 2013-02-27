@@ -105,4 +105,3 @@
 #define DLL_LOAD(dll, name, ret_on_failure) DLL_LOAD_PREFIXNAME(dll, name, name, ret_on_failure)
 #define DLL_DECLARE_PREFIXED(api, ret, prefix, name, args)   DLL_DECLARE_PREFIXNAME(api, ret, prefix##name, name, args)
 #define DLL_LOAD_PREFIXED(dll, prefix, name, ret_on_failure) DLL_LOAD_PREFIXNAME(dll, prefix##name, name, ret_on_failure)
-

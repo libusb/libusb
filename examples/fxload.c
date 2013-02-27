@@ -49,7 +49,7 @@ static bool dosyslog = false;
 #endif
 
 #ifndef FXLOAD_VERSION
-#define FXLOAD_VERSION (__DATE__ " (development)")
+#define FXLOAD_VERSION (__DATE__ " (libusbx)")
 #endif
 
 #ifndef ARRAYSIZE

@@ -24,15 +24,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
 #endif
-
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
-
 #ifdef USBI_TIMERFD_AVAILABLE
 #include <sys/timerfd.h>
 #endif

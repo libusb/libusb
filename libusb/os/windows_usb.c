@@ -34,7 +34,7 @@
 #include <objbase.h>
 #include <winioctl.h>
 
-#include <libusbi.h>
+#include "libusbi.h"
 #include "poll_windows.h"
 #include "windows_usb.h"
 

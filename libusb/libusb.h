@@ -40,7 +40,7 @@
 #endif /* _SSIZE_T_DEFINED */
 #endif /* _MSC_VER */
 
-/* stdint.h is also not usually available on MS */
+/* stdint.h is not available on older MSVC */
 #if defined(_MSC_VER) && (_MSC_VER < 1600) && (!defined(_STDINT)) && (!defined(_STDINT_H))
 typedef unsigned __int8   uint8_t;
 typedef unsigned __int16  uint16_t;
@@ -52,12 +52,13 @@ typedef unsigned __int32  uint32_t;
 #if !defined(_WIN32_WCE)
 #include <sys/types.h>
 #endif
-#include <time.h>
-#include <limits.h>
 
 #if defined(__linux) || defined(__APPLE__) || defined(__CYGWIN__)
 #include <sys/time.h>
 #endif
+
+#include <time.h>
+#include <limits.h>
 
 /* 'interface' might be defined as a macro on Windows, so we need to
  * undefine it so as not to break the current libusbx API, because
@@ -69,9 +70,8 @@ typedef unsigned __int32  uint32_t;
 #if defined(interface)
 #undef interface
 #endif
-#if defined(_WIN32_WCE)
-// Needed for "struct timeval" definition
-#include <winsock2.h>
+#if !defined(__CYGWIN__)
+#include <winsock.h>
 #endif
 #endif
 

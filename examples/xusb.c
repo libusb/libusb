@@ -33,10 +33,6 @@
 #define msleep(msecs) usleep(1000*msecs)
 #endif
 
-#if !defined(_MSC_VER) || _MSC_VER<=1200 || defined(_WIN32_WCE)
-#define sscanf_s sscanf
-#endif
-
 #if !defined(bool)
 #define bool int
 #endif
@@ -46,7 +42,6 @@
 #if !defined(false)
 #define false (!true)
 #endif
-
 
 // Future versions of libusbx will use usb_interface instead of interface
 // in libusb_config_descriptor => catter for that
@@ -992,7 +987,7 @@ int main(int argc, char** argv)
 						break;
 				}
 				if (i != arglen) {
-					if (sscanf_s(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
+					if (sscanf(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
 						printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
 						return 1;
 					}

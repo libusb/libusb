@@ -19,12 +19,8 @@
 
 #include <stdio.h>
 #include <memory.h>
-#if !defined(_WIN32_WCE)
-#include <sys/types.h>
-#endif
 
 #include "libusb.h"
-
 #include "libusbx_testlib.h"
 
 /** Test that creates and destroys a single concurrent context

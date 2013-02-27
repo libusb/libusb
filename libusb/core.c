@@ -25,20 +25,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
 
-#if defined(OS_WINCE)
-#include "missing.h"	// getenv()
-#endif
-
 #include "libusbi.h"
+#ifdef HAVE_MISSING_H
+#include "missing.h"
+#endif
 
 #if defined(OS_LINUX)
 const struct usbi_os_backend * const usbi_backend = &linux_usbfs_backend;
