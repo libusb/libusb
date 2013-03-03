@@ -25,12 +25,6 @@
 
 #include "libusbi.h"
 
-#if defined(_WIN32_WCE)
-#define usbi_sleep(ms) Sleep(ms)
-#else
-#define usbi_sleep(ms) SleepEx(ms, TRUE)
-#endif
-
 extern const uint64_t epoch_time;
 
 int usbi_mutex_init(usbi_mutex_t *mutex,
@@ -77,7 +71,7 @@ int usbi_mutex_unlock(usbi_mutex_t *mutex) {
 int usbi_mutex_static_lock(usbi_mutex_static_t *mutex) {
 	if(!mutex)               return ((errno=EINVAL));
 	while (InterlockedExchange((LONG *)mutex, 1) == 1) {
-		usbi_sleep(0);
+		SleepEx(0, TRUE);
 	}
 	return 0;
 }
@@ -86,8 +80,6 @@ int usbi_mutex_static_unlock(usbi_mutex_static_t *mutex) {
 	*mutex = 0;
 	return 0;
 }
-
-
 
 int usbi_cond_init(usbi_cond_t *cond,
 				   const usbi_condattr_t *attr) {
@@ -190,13 +182,10 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 	struct timespec cur_time_ns;
 	DWORD millis;
 
-#ifdef _WIN32_WCE
+	// GetSystemTimeAsFileTime() is not available on CE
 	SYSTEMTIME st;
 	GetSystemTime(&st);
 	SystemTimeToFileTime(&st, &filetime);
-#else
-	GetSystemTimeAsFileTime(&filetime);
-#endif
 	rtime.LowPart   = filetime.dwLowDateTime;
 	rtime.HighPart  = filetime.dwHighDateTime;
 	rtime.QuadPart -= epoch_time;

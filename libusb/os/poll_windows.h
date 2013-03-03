@@ -1,6 +1,7 @@
 /*
  * Windows compat: POSIX compatibility wrapper
- * Copyright © 2009-2010 Pete Batard <pbatard@gmail.com>
+ * Copyright © 2012-2013 RealVNC Ltd.
+ * Copyright © 2009-2010 Pete Batard <pete@akeo.ie>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of poll implementation from libusb-win32, by Stephan Meyer et al.
  *

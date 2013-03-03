@@ -1,8 +1,8 @@
 /*
- * Windows CE backend for libusb 1.0
- * Copyright (C) 2011-2012 RealVNC Ltd.
+ * Windows CE backend for libusbx 1.0
+ * Copyright © 2011-2013 RealVNC Ltd.
  * Large portions taken from Windows backend, which is
- * Copyright (C) 2009-2010 Pete Batard <pbatard@gmail.com>
+ * Copyright © 2009-2010 Pete Batard <pbatard@gmail.com>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
  * Major code testing contribution by Xiaofan Chen

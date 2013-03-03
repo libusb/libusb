@@ -1,6 +1,6 @@
 /*
  * Header file for missing WinCE functionality
- * Copyright © 2012 RealVNC Ltd.
+ * Copyright © 2012-2013 RealVNC Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,6 +19,9 @@
 
 #ifndef MISSING_H
 #define MISSING_H
+
+/* Windows CE doesn't have SleepEx() - Fallback to Sleep() */
+#define SleepEx(m, a) Sleep(m)
 
 /* Windows CE doesn't have any APIs to query environment variables.
  *

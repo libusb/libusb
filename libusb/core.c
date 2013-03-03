@@ -33,9 +33,6 @@
 #endif
 
 #include "libusbi.h"
-#ifdef HAVE_MISSING_H
-#include "missing.h"
-#endif
 
 #if defined(OS_LINUX)
 const struct usbi_os_backend * const usbi_backend = &linux_usbfs_backend;

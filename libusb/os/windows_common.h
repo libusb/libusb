@@ -3,6 +3,7 @@
  *
  * This file brings together header code common between
  * the desktop Windows and Windows CE backends.
+ * Copyright © 2012-2013 RealVNC Ltd.
  * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer

@@ -31,6 +31,9 @@
 #include <poll.h>
 #endif
 
+#ifdef HAVE_MISSING_H
+#include "missing.h"
+#endif
 #include "libusb.h"
 #include "version.h"
 

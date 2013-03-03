@@ -1,6 +1,7 @@
 /*
  * poll_windows: poll compatibility wrapper for Windows
- * Copyright © 2009-2010 Pete Batard <pbatard@gmail.com>
+ * Copyright © 2012-2013 RealVNC Ltd.
+ * Copyright © 2009-2010 Pete Batard <pete@akeo.ie>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of poll implementation from libusb-win32, by Stephan Meyer et al.
  *
@@ -52,7 +53,7 @@
 #else
 // MSVC++ < 2005 cannot use a variadic argument and non MSVC
 // compilers produce warnings if parenthesis are ommitted.
-#if defined(_MSC_VER) && _MSC_VER < 1400
+#if defined(_MSC_VER) && (_MSC_VER < 1400)
 #define poll_dbg
 #else
 #define poll_dbg(...)
@@ -61,12 +62,6 @@
 
 #if defined(_PREFAST_)
 #pragma warning(disable:28719)
-#endif
-
-#if defined(_WIN32_WCE)
-#define usbi_sleep(ms) Sleep(ms)
-#else
-#define usbi_sleep(ms) SleepEx(ms, TRUE)
 #endif
 
 #define CHECK_INIT_POLLING do {if(!is_polling_set) init_polling();} while(0)
@@ -157,7 +152,7 @@ void init_polling(void)
 	int i;
 
 	while (InterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
-		usbi_sleep(0);
+		SleepEx(0, TRUE);
 	}
 	if (!is_polling_set) {
 		setup_cancel_io();
@@ -225,7 +220,7 @@ void exit_polling(void)
 	int i;
 
 	while (InterlockedExchange((LONG *)&compat_spinlock, 1) == 1) {
-		usbi_sleep(0);
+		SleepEx(0, TRUE);
 	}
 	if (is_polling_set) {
 		is_polling_set = FALSE;
