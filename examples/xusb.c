@@ -688,11 +688,12 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 	void* le_type_punning_IS_fine;
 	struct {
 		const char* desc;
+		uint8_t recipient;
 		uint16_t index;
 		uint16_t header_size;
 	} os_fd[2] = {
-		{"Extended Compat ID", 0x0004, 0x10},
-		{"Extended Properties", 0x0005, 0x0A}
+		{"Extended Compat ID", LIBUSB_RECIPIENT_DEVICE, 0x0004, 0x10},
+		{"Extended Properties", LIBUSB_RECIPIENT_INTERFACE, 0x0005, 0x0A}
 	};
 
 	if (iface_number < 0) return;
@@ -701,7 +702,7 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 		printf("\nReading %s OS Feature Descriptor (wIndex = 0x%04d):\n", os_fd[i].desc, os_fd[i].index);
 
 		// Read the header part
-		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|LIBUSB_RECIPIENT_DEVICE),
+		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient),
 			bRequest, (uint16_t)(((iface_number)<< 8)|0x00), os_fd[i].index, os_desc, os_fd[i].header_size, 1000);
 		if (r < os_fd[i].header_size) {
 			perr("   Failed: %s", (r<0)?libusb_error_name((enum libusb_error)r):"header size is too small");
@@ -714,7 +715,7 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 		}
 
 		// Read the full feature descriptor
-		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|LIBUSB_RECIPIENT_DEVICE),
+		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient),
 			bRequest, (uint16_t)(((iface_number)<< 8)|0x00), os_fd[i].index, os_desc, (uint16_t)length, 1000);
 		if (r < 0) {
 			perr("   Failed: %s", libusb_error_name((enum libusb_error)r));
