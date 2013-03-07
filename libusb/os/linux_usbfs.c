@@ -2490,7 +2490,9 @@ static int op_handle_events(struct libusb_context *ctx,
 			continue;
 		}
 
-		r = reap_for_handle(handle);
+		do {
+			r = reap_for_handle(handle);
+		} while (r == 0);
 		if (r == 1 || r == LIBUSB_ERROR_NO_DEVICE)
 			continue;
 		else if (r < 0)
