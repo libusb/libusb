@@ -3,6 +3,7 @@
 /*
  * Copyright © 2001 Stephen Williams (steve@icarus.com)
  * Copyright © 2002 David Brownell (dbrownell@users.sourceforge.net)
+ * Copyright © 2013 Federico Manzan (f.manzan@gmail.com)
  *
  *    This source code is free software; you can redistribute it
  *    and/or modify it in source code form under the terms of the GNU
@@ -42,15 +43,17 @@
 #define FX_TYPE_FX1        1	/* Updated Cypress versions */
 #define FX_TYPE_FX2        2	/* USB 2.0 versions */
 #define FX_TYPE_FX2LP      3	/* Updated FX2 */
-#define FX_TYPE_MAX        4
-#define FX_TYPE_NAMES      { "an21", "fx", "fx2", "fx2lp" }
+#define FX_TYPE_FX3        4	/* USB 3.0 versions */
+#define FX_TYPE_MAX        5
+#define FX_TYPE_NAMES      { "an21", "fx", "fx2", "fx2lp", "fx3" }
 
 #define IMG_TYPE_UNDEFINED -1
 #define IMG_TYPE_HEX       0	/* Intel HEX */
 #define IMG_TYPE_IIC       1	/* Cypress 8051 IIC */
 #define IMG_TYPE_BIX       2	/* Cypress 8051 BIX */
-#define IMG_TYPE_MAX       3
-#define IMG_TYPE_NAMES     { "Intel HEX", "Cypress 8051 IIC", "Cypress 8051 BIX" }
+#define IMG_TYPE_IMG       3	/* Cypress IMG format */
+#define IMG_TYPE_MAX       4
+#define IMG_TYPE_NAMES     { "Intel HEX", "Cypress 8051 IIC", "Cypress 8051 BIX", "Cypress IMG format" }
 
 /* 
  * Automatically identified devices (VID, PID, type, designation).
@@ -75,6 +78,7 @@ typedef struct {
 	{ 0x0547, 0x2236, FX_TYPE_AN21, "Cypress EZ-USB (2236)" },\
 	{ 0x04b4, 0x6473, FX_TYPE_FX1, "Cypress EZ-USB FX1" },\
 	{ 0x04b4, 0x8613, FX_TYPE_FX2LP, "Cypress EZ-USB FX2LP (68013A/68014A/68015A/68016A)" }, \
+	{ 0x04b4, 0x00f3, FX_TYPE_FX3, "Cypress FX3" },\
 }
 
 /*

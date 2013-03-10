@@ -24,7 +24,7 @@
  * This program supports uploading firmware into a target USB device.
  *
  *     -I <path>       -- Upload this firmware
- *     -t <type>       -- uController type: an21, fx, fx2, fx2lp
+ *     -t <type>       -- uController type: an21, fx, fx2, fx2lp, fx3
  *
  *     -D <vid:pid>    -- Use this device, instead of $DEVICE
  *
@@ -123,7 +123,7 @@ int main(int argc, char*argv[])
 		logerror("no firmware specified!\n");
 usage:
 		fprintf(stderr, "\nusage: %s [-vV] [-t type] [-D vid:pid] -I firmware\n", argv[0]);
-		fprintf(stderr, "      type: one of an21, fx, fx2, fx2lp\n");
+		fprintf(stderr, "      type: one of an21, fx, fx2, fx2lp, fx3\n");
 		return -1;
 	}
 
@@ -237,6 +237,8 @@ usage:
 				img_type[i] = IMG_TYPE_IIC;
 			else if (_stricmp(ext, ".bix") == 0)
 				img_type[i] = IMG_TYPE_BIX;
+			else if (_stricmp(ext, ".img") == 0)
+				img_type[i] = IMG_TYPE_IMG;
 			else {
 				logerror("%s is not a recognized image type\n", path[i]);
 				goto err;
