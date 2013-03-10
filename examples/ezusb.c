@@ -532,9 +532,9 @@ static int ram_poke(void *context, uint32_t addr, bool external,
  */
 int fx3_load_ram(libusb_device_handle *device, const char *path)
 {
-	unsigned int dCheckSum, dExpectedCheckSum, dAddress, i, dLen, dLength;
-	unsigned short wSignature;
-	unsigned int dImageBuf[512 * 1024];
+	uint32_t dCheckSum, dExpectedCheckSum, dAddress, i, dLen, dLength;
+	uint16_t wSignature;
+	uint32_t* dImageBuf;
 	unsigned char *bBuf, rBuf[4096];
 	FILE *image;
 
@@ -545,22 +545,38 @@ int fx3_load_ram(libusb_device_handle *device, const char *path)
 	} else if (verbose)
 		logerror("open firmware image %s for RAM upload\n", path);
 
-	fread(&wSignature, 1, 2, image); // read signature bytes
-	if (wSignature != 0x5943) { // check CY signature byte
-		logerror("Invalid image");
+	if ((fread(&wSignature, sizeof(uint16_t), 1, image) != 1) ||
+		(wSignature != 0x5943)) { // check "CY" signature byte
+		logerror("invalid image (signature error)");
 		return -3;
 	}
-	fread(&i, 2, 1, image); // skip 2 dummy bytes
+	if (fread(&i, 1, 2, image) != 2) { // skip 2 dummy bytes
+		logerror("could not read image");
+		return -3;
+	}
 
 	dCheckSum = 0;
 	while (1) {
-		fread(&dLength, 4, 1, image); // read dLength
-		fread(&dAddress, 4, 1, image); // read dAddress
+		if ((fread(&dLength, sizeof(uint32_t), 1, image) != 1) ||  // read dLength
+			(fread(&dAddress, sizeof(uint32_t), 1, image) != 1)) { // read dAddress
+			logerror("could not read image");
+			return -3;
+		}
 		if (dLength == 0)
 			break; // done
 
+		dImageBuf = calloc(dLength, sizeof(uint32_t));
+		if (dImageBuf == NULL) {
+			logerror("could not allocate buffer for image chunk\n");
+			return -4;
+		}
+
 		// read sections
-		fread(dImageBuf, 4, dLength, image);
+		if (fread(dImageBuf, sizeof(uint32_t), dLength, image) != dLength) {
+			logerror("could not read image");
+			free(dImageBuf);
+			return -3;
+		}
 		for (i = 0; i < dLength; i++)
 			dCheckSum += dImageBuf[i];
 		dLength <<= 2; // convert to Byte length
@@ -570,13 +586,18 @@ int fx3_load_ram(libusb_device_handle *device, const char *path)
 			dLen = 4096; // 4K max
 			if (dLen > dLength)
 				dLen = dLength;
-			ezusb_write(device, "Write firmware", RW_INTERNAL, dAddress, bBuf, dLen);
-			ezusb_read(device, "Read firmware", RW_INTERNAL, dAddress, rBuf, dLen);
+			if ((ezusb_write(device, "write firmware", RW_INTERNAL, dAddress, bBuf, dLen) < 0) ||
+				(ezusb_read(device, "read firmware", RW_INTERNAL, dAddress, rBuf, dLen) < 0)) {
+				logerror("R/W error\n");
+				free(dImageBuf);
+				return -5;
+			}
 			// Verify data: rBuf with bBuf
 			for (i = 0; i < dLen; i++) {
 				if (rBuf[i] != bBuf[i]) {
-					logerror("Fail to verify image");
-					return -3;
+					logerror("verify error");
+					free(dImageBuf);
+					return -6;
 				}
 			}
 
@@ -584,19 +605,22 @@ int fx3_load_ram(libusb_device_handle *device, const char *path)
 			bBuf += dLen;
 			dAddress += dLen;
 		}
+		free(dImageBuf);
 	}
 
 	// read pre-computed checksum data
-	fread(&dExpectedCheckSum, 4, 1, image);
-	if (dCheckSum != dExpectedCheckSum) {
-		logerror("Fail to boot due to checksum error\n");
-		return -4;
+	if ((fread(&dExpectedCheckSum, sizeof(uint32_t), 1, image) != 1) ||
+		(dCheckSum != dExpectedCheckSum)) {
+		logerror("checksum error\n");
+		return -7;
 	}
 
 	// transfer execution to Program Entry
-	ezusb_write(device, "Jump command", RW_INTERNAL, dAddress, NULL, 0);
+	if (ezusb_write(device, "Jump command", RW_INTERNAL, dAddress, NULL, 0) < 0) {
+		logerror("failed to send jump command\n");
+		return -6;
+	}
 
-	logerror("Done!\n");
 	return 0;
 }
 

@@ -55,6 +55,10 @@
 #define IMG_TYPE_MAX       4
 #define IMG_TYPE_NAMES     { "Intel HEX", "Cypress 8051 IIC", "Cypress 8051 BIX", "Cypress IMG format" }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* 
  * Automatically identified devices (VID, PID, type, designation).
  * TODO: Could use some validation. Also where's the FX2?
@@ -108,4 +112,9 @@ extern int ezusb_load_eeprom(libusb_device_handle *device,
 
 /* boolean flag, says whether to write extra messages to stderr */
 extern int verbose;
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

@@ -3,6 +3,7 @@
  * Copyright © 2001-2002 David Brownell (dbrownell@users.sourceforge.net)
  * Copyright © 2008 Roger Williams (rawqux@users.sourceforge.net)
  * Copyright © 2012 Pete Batard (pete@akeo.ie)
+ * Copyright © 2013 Federico Manzan (f.manzan@gmail.com)
  *
  *    This source code is free software; you can redistribute it
  *    and/or modify it in source code form under the terms of the GNU
@@ -20,16 +21,6 @@
  *    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
 
-/*
- * This program supports uploading firmware into a target USB device.
- *
- *     -I <path>       -- Upload this firmware
- *     -t <type>       -- uController type: an21, fx, fx2, fx2lp, fx3
- *
- *     -D <vid:pid>    -- Use this device, instead of $DEVICE
- *
- *     -V              -- Print version ID for program
- */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -79,24 +70,39 @@ int main(int argc, char*argv[])
 {
 	fx_known_device known_device[] = FX_KNOWN_DEVICES;
 	const char *path[] = { NULL, NULL };
-	const char *device_id = getenv("DEVICE");
+	const char *device_id = NULL;
+	const char *device_path = getenv("DEVICE");
 	const char *type = NULL;
 	const char *fx_name[FX_TYPE_MAX] = FX_TYPE_NAMES;
 	const char *ext, *img_name[] = IMG_TYPE_NAMES;
 	int fx_type = FX_TYPE_UNDEFINED, img_type[ARRAYSIZE(path)];
 	int i, j, opt, status;
 	unsigned vid = 0, pid = 0;
+	unsigned busnum = 0, devaddr = 0;
 	libusb_device *dev, **devs;
 	libusb_device_handle *device = NULL;
 	struct libusb_device_descriptor desc;
 
-	while ((opt = getopt(argc, argv, "vV?D:I:c:s:t:")) != EOF)
+	while ((opt = getopt(argc, argv, "vV?hd:a:i:I:t:")) != EOF)
 		switch (opt) {
 
-		case 'D':
+		case 'd':
 			device_id = optarg;
+			if (sscanf(device_id, "%x:%x" , &vid, &pid) != 2 ) {
+				fputs ("please specify VID & PID as \"vid:pid\", in hexadecimal format\n", stderr);
+				return -1;
+			}
 			break;
 
+		case 'a':
+			device_path = optarg;
+			if (sscanf(device_path, "%u:%u", &busnum, &devaddr) != 2 ) {
+				fputs ("please specify bus number & device address as \"bus:addr\", in decimal format\n", stderr);
+				return -1;
+			}
+			break;
+
+		case 'i':
 		case 'I':
 			path[FIRMWARE] = optarg;
 			break;
@@ -114,6 +120,7 @@ int main(int argc, char*argv[])
 			break;
 
 		case '?':
+		case 'h':
 		default:
 			goto usage;
 
@@ -122,13 +129,13 @@ int main(int argc, char*argv[])
 	if (path[FIRMWARE] == NULL) {
 		logerror("no firmware specified!\n");
 usage:
-		fprintf(stderr, "\nusage: %s [-vV] [-t type] [-D vid:pid] -I firmware\n", argv[0]);
-		fprintf(stderr, "      type: one of an21, fx, fx2, fx2lp, fx3\n");
-		return -1;
-	}
-
-	if ((device_id != NULL) && (sscanf(device_id, "%x:%x" , &vid, &pid) != 2 )) {
-		fputs ("please specify VID & PID as \"vid:pid\" in hexadecimal format\n", stderr);
+		fprintf(stderr, "\nUsage: fxload [-v] [-V] [-t type] [-d vid:pid] [-a bus:addr] -i firmware\n");
+		fprintf(stderr, "  -i <path>       -- Firmware to upload\n");
+		fprintf(stderr, "  -t <type>       -- Target type: an21, fx, fx2, fx2lp, fx3\n");
+		fprintf(stderr, "  -d <vid:pid>    -- Target device, as an USB VID:PID\n");
+		fprintf(stderr, "  -a <bus:addr>   -- Target device, as a libusbx bus and address\n");
+		fprintf(stderr, "  -v              -- Increase verbosity\n");
+		fprintf(stderr, "  -V              -- Print program version\n");
 		return -1;
 	}
 
@@ -155,12 +162,17 @@ usage:
 	libusb_set_debug(NULL, verbose);
 
 	/* try to pick up missing parameters from known devices */
-	if ((type == NULL) || (device_id == NULL)) {
+	if (device_path || (type == NULL) || (device_id == NULL)) {
 		if (libusb_get_device_list(NULL, &devs) < 0) {
 			logerror("libusb_get_device_list() failed: %s\n", libusb_error_name(status));
 			goto err;
 		}
 		for (i=0; (dev=devs[i]) != NULL; i++) {
+			if (device_path) {
+				if ((libusb_get_bus_number(dev) == busnum) && (libusb_get_device_address(dev) == devaddr))
+					break;
+				continue;
+			}
 			status = libusb_get_device_descriptor(dev, &desc);
 			if (status >= 0) {
 				if (verbose >= 2)
@@ -195,7 +207,7 @@ usage:
 		}
 		if (dev == NULL) {
 			libusb_free_device_list(devs, 1);
-			logerror("could not find a known device - please specify type and/or vid:pid\n");
+			logerror("could not find a known device - please specify type and/or vid:pid or bus:addr\n");
 			goto usage;
 		}
 		status = libusb_open(dev, &device);
@@ -211,6 +223,7 @@ usage:
 			goto err;
 		}
 	}
+
 	/* We need to claim the first interface */
 	status = libusb_claim_interface(device, 0);
 #if defined(__linux__)
