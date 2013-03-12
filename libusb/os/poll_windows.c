@@ -91,8 +91,11 @@ static BOOL (__stdcall *pCancelIoEx)(HANDLE, LPOVERLAPPED) = NULL;
 
 static inline void setup_cancel_io(void)
 {
-	pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
-		GetProcAddress(GetModuleHandleA("KERNEL32"), "CancelIoEx");
+	HMODULE hKernel32 = GetModuleHandleA("KERNEL32");
+	if (hKernel32 != NULL) {
+		pCancelIoEx = (BOOL (__stdcall *)(HANDLE,LPOVERLAPPED))
+			GetProcAddress(hKernel32, "CancelIoEx");
+	}
 	usbi_dbg("Will use CancelIo%s for I/O cancellation",
 		Use_Duplicate_Handles?"":"Ex");
 }

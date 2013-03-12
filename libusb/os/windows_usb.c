@@ -151,7 +151,7 @@ static char *windows_error_str(uint32_t retval)
 static char err_string[ERR_BUFFER_SIZE];
 
 	DWORD size;
-	size_t i;
+	ssize_t i;
 	uint32_t error_code, format_error;
 
 	error_code = retval?retval:GetLastError();
@@ -170,7 +170,7 @@ static char err_string[ERR_BUFFER_SIZE];
 			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", error_code);
 	} else {
 		// Remove CR/LF terminators
-		for (i=safe_strlen(err_string)-1; ((err_string[i]==0x0A) || (err_string[i]==0x0D)); i--) {
+		for (i=safe_strlen(err_string)-1; (i>=0) && ((err_string[i]==0x0A) || (err_string[i]==0x0D)); i--) {
 			err_string[i] = 0;
 		}
 	}
@@ -534,6 +534,9 @@ static unsigned long htab_hash(char* str)
 	unsigned long r = 5381;
 	int c;
 	char* sz = str;
+
+	if (str == NULL)
+		return 0;
 
 	// Compute main hash value (algorithm suggested by Nokia)
 	while ((c = *sz++) != 0)
@@ -2673,7 +2676,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 	DWORD err;
 	int i;
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
-	HDEVINFO dev_info;
+	HDEVINFO dev_info = INVALID_HANDLE_VALUE;
 	SP_DEVINFO_DATA dev_info_data;
 	char* dev_path_no_guid = NULL;
 	char filter_path[] = "\\\\.\\libusb0-0000";
@@ -4019,7 +4022,7 @@ static int hid_submit_bulk_transfer(int sub_api, struct usbi_transfer *itransfer
 
 	if (direction_in) {
 		transfer_priv->hid_dest = transfer->buffer;
-		usbi_dbg("reading %d bytes (report ID: 0x%02X)", length, transfer_priv->hid_buffer[0]);
+		usbi_dbg("reading %d bytes (report ID: 0x00)", length);
 		ret = ReadFile(wfd.handle, transfer_priv->hid_buffer, length+1, &size, wfd.overlapped);
 	} else {
 		if (!priv->hid->uses_report_ids[1]) {
