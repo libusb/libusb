@@ -1445,7 +1445,10 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
                                                               transfer->num_iso_packets, tpriv->isoc_framelist, darwin_async_io_callback,
                                                               itransfer);
 
-  cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets / 8;
+  if (transfer->dev_handle->dev->speed == LIBUSB_SPEED_FULL)
+    cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets;
+  else
+    cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets / 8;
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (TRANSFER_CTX (transfer), "isochronous transfer failed (dir: %s): %s", IS_XFERIN(transfer) ? "In" : "Out",
