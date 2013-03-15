@@ -530,7 +530,7 @@ static int ram_poke(void *context, uint32_t addr, bool external,
  * Load an Cypress Image file into target RAM.
  * The file is assumed to be in Cypress IMG format.
  */
-int fx3_load_ram(libusb_device_handle *device, const char *path)
+static int fx3_load_ram(libusb_device_handle *device, const char *path)
 {
 	uint32_t dCheckSum, dExpectedCheckSum, dAddress, i, dLen, dLength;
 	uint16_t wSignature;
