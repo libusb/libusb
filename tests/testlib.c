@@ -48,6 +48,7 @@
 #define NULL_PATH "/dev/null"
 #endif
 #define INVALID_FD -1
+#define IGNORE_RETVAL(expr) do { (void)(expr); } while(0)
 
 /**
  * Converts a test result code into a human readable string.
@@ -81,11 +82,11 @@ static void cleanup_test_output(libusbx_testlib_ctx * ctx)
 #ifndef DISABLE_STDOUT_REDIRECTION
 	if (!ctx->verbose) {
 		if (ctx->old_stdout != INVALID_FD) {
-			dup2(ctx->old_stdout, STDOUT_FILENO);
+			IGNORE_RETVAL(dup2(ctx->old_stdout, STDOUT_FILENO));
 			ctx->old_stdout = INVALID_FD;
 		}
 		if (ctx->old_stderr != INVALID_FD) {
-			dup2(ctx->old_stderr, STDERR_FILENO);
+			IGNORE_RETVAL(dup2(ctx->old_stderr, STDERR_FILENO));
 			ctx->old_stderr = INVALID_FD;
 		}
 		if (ctx->null_fd != INVALID_FD) {
