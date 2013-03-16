@@ -533,25 +533,30 @@ static int ram_poke(void *context, uint32_t addr, bool external,
 static int fx3_load_ram(libusb_device_handle *device, const char *path)
 {
 	uint32_t dCheckSum, dExpectedCheckSum, dAddress, i, dLen, dLength;
-	uint16_t wSignature;
 	uint32_t* dImageBuf;
-	unsigned char *bBuf, rBuf[4096];
+	unsigned char *bBuf, hBuf[4], rBuf[4096];
 	FILE *image;
 
 	image = fopen(path, "rb");
 	if (image == NULL) {
-		logerror("%s: unable to open for input.\n", path);
+		logerror("unable to open '%s' for input\n", path);
 		return -2;
 	} else if (verbose)
 		logerror("open firmware image %s for RAM upload\n", path);
 
-	if ((fread(&wSignature, sizeof(uint16_t), 1, image) != 1) ||
-		(wSignature != 0x5943)) { // check "CY" signature byte
-		logerror("invalid image (signature error)");
+	// Read header
+	if (fread(hBuf, sizeof(char), sizeof(hBuf), image) != sizeof(hBuf)) {
+		logerror("could not read image header");
 		return -3;
 	}
-	if (fread(&i, 1, 2, image) != 2) { // skip 2 dummy bytes
-		logerror("could not read image");
+
+	// check "CY" signature byte and format
+	if ((hBuf[0] != 'C') || (hBuf[1] != 'Y')) {
+		logerror("image doesn't have a CYpress signature\n");
+		return -3;
+	}
+	if (hBuf[3] != 0xB0) {
+		logerror("invalid file format 0x%02X, expected 0xB0\n", hBuf[3]);
 		return -3;
 	}
 

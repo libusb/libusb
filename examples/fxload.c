@@ -64,6 +64,17 @@ void logerror(const char *format, ...)
 	va_end(ap);
 }
 
+static int print_usage(int errcode) {
+	fprintf(stderr, "\nUsage: fxload [-v] [-V] [-t type] [-d vid:pid] [-p bus,addr] -i firmware\n");
+	fprintf(stderr, "  -i <path>       -- Firmware to upload\n");
+	fprintf(stderr, "  -t <type>       -- Target type: an21, fx, fx2, fx2lp, fx3\n");
+	fprintf(stderr, "  -d <vid:pid>    -- Target device, as an USB VID:PID\n");
+	fprintf(stderr, "  -p <bus,addr>   -- Target device, as a libusbx bus number and device address path\n");
+	fprintf(stderr, "  -v              -- Increase verbosity\n");
+	fprintf(stderr, "  -V              -- Print program version\n");
+	return errcode;
+}
+
 #define FIRMWARE 0
 #define LOADER 1
 int main(int argc, char*argv[])
@@ -78,26 +89,26 @@ int main(int argc, char*argv[])
 	int fx_type = FX_TYPE_UNDEFINED, img_type[ARRAYSIZE(path)];
 	int i, j, opt, status;
 	unsigned vid = 0, pid = 0;
-	unsigned busnum = 0, devaddr = 0;
+	unsigned busnum = 0, devaddr = 0, _busnum, _devaddr;
 	libusb_device *dev, **devs;
 	libusb_device_handle *device = NULL;
 	struct libusb_device_descriptor desc;
 
-	while ((opt = getopt(argc, argv, "vV?hd:a:i:I:t:")) != EOF)
+	while ((opt = getopt(argc, argv, "vV?hd:p:i:I:t:")) != EOF)
 		switch (opt) {
 
 		case 'd':
 			device_id = optarg;
 			if (sscanf(device_id, "%x:%x" , &vid, &pid) != 2 ) {
-				fputs ("please specify VID & PID as \"vid:pid\", in hexadecimal format\n", stderr);
+				fputs ("please specify VID & PID as \"vid:pid\" in hexadecimal format\n", stderr);
 				return -1;
 			}
 			break;
 
-		case 'a':
+		case 'p':
 			device_path = optarg;
-			if (sscanf(device_path, "%u:%u", &busnum, &devaddr) != 2 ) {
-				fputs ("please specify bus number & device address as \"bus:addr\", in decimal format\n", stderr);
+			if (sscanf(device_path, "%u,%u", &busnum, &devaddr) != 2 ) {
+				fputs ("please specify bus number & device number as \"bus,dev\" in decimal format\n", stderr);
 				return -1;
 			}
 			break;
@@ -122,21 +133,17 @@ int main(int argc, char*argv[])
 		case '?':
 		case 'h':
 		default:
-			goto usage;
+			return print_usage(-1);
 
 	}
 
 	if (path[FIRMWARE] == NULL) {
 		logerror("no firmware specified!\n");
-usage:
-		fprintf(stderr, "\nUsage: fxload [-v] [-V] [-t type] [-d vid:pid] [-a bus:addr] -i firmware\n");
-		fprintf(stderr, "  -i <path>       -- Firmware to upload\n");
-		fprintf(stderr, "  -t <type>       -- Target type: an21, fx, fx2, fx2lp, fx3\n");
-		fprintf(stderr, "  -d <vid:pid>    -- Target device, as an USB VID:PID\n");
-		fprintf(stderr, "  -a <bus:addr>   -- Target device, as a libusbx bus and address\n");
-		fprintf(stderr, "  -v              -- Increase verbosity\n");
-		fprintf(stderr, "  -V              -- Print program version\n");
-		return -1;
+		return print_usage(-1);
+	}
+	if ((device_id != NULL) && (device_path != NULL)) {
+		logerror("only one of -d or -a can be specified\n");
+		return print_usage(-1);
 	}
 
 	/* determine the target type */
@@ -149,7 +156,7 @@ usage:
 		}
 		if (i >= FX_TYPE_MAX) {
 			logerror("illegal microcontroller type: %s\n", type);
-			goto usage;
+			return print_usage(-1);
 		}
 	}
 
@@ -162,53 +169,58 @@ usage:
 	libusb_set_debug(NULL, verbose);
 
 	/* try to pick up missing parameters from known devices */
-	if (device_path || (type == NULL) || (device_id == NULL)) {
+	if ((type == NULL) || (device_id == NULL) || (device_path != NULL)) {
 		if (libusb_get_device_list(NULL, &devs) < 0) {
 			logerror("libusb_get_device_list() failed: %s\n", libusb_error_name(status));
 			goto err;
 		}
 		for (i=0; (dev=devs[i]) != NULL; i++) {
-			if (device_path) {
+			_busnum = libusb_get_bus_number(dev);
+			_devaddr = libusb_get_device_address(dev);
+			if ((type != NULL) && (device_path != NULL)) {
+				// if both a type and bus,addr were specified, we just need to find our match
 				if ((libusb_get_bus_number(dev) == busnum) && (libusb_get_device_address(dev) == devaddr))
 					break;
-				continue;
-			}
-			status = libusb_get_device_descriptor(dev, &desc);
-			if (status >= 0) {
-				if (verbose >= 2)
-					logerror("trying to match against %04x:%04x\n", desc.idVendor, desc.idProduct);
-				for (j=0; j<ARRAYSIZE(known_device); j++) {
-					if ((desc.idVendor == known_device[j].vid)
-						&& (desc.idProduct == known_device[j].pid)) {
-						if ((type == NULL) && (device_id == NULL)) {
-							fx_type = known_device[j].type;
-							vid = desc.idVendor;
-							pid = desc.idProduct;
-							break;
-						} else if ((type == NULL) && (vid == desc.idVendor)
-							&& (pid == desc.idProduct)) {
-							fx_type = known_device[j].type;
-							break;
-						} else if ((device_id == NULL)
-							&& (fx_type == known_device[j].type)) {
-							vid = desc.idVendor;
-							pid = desc.idProduct;
-							break;
+			} else {
+				status = libusb_get_device_descriptor(dev, &desc);
+				if (status >= 0) {
+					if (verbose >= 2) {
+						logerror("trying to match against %04x:%04x (%d,%d)\n",
+							desc.idVendor, desc.idProduct, _busnum, _devaddr);
+					}
+					for (j=0; j<ARRAYSIZE(known_device); j++) {
+						if ((desc.idVendor == known_device[j].vid)
+							&& (desc.idProduct == known_device[j].pid)) {
+							if (// nothing was specified
+								((type == NULL) && (device_id == NULL) && (device_path == NULL)) ||
+								// vid:pid was specified and we have a match
+								((type == NULL) && (device_id != NULL) && (vid == desc.idVendor) && (pid == desc.idProduct)) ||
+								// bus,addr was specified and we have a match
+								((type == NULL) && (device_path != NULL) && (busnum == _busnum) && (devaddr == _devaddr)) ||
+								// type was specified and we have a match
+								((type != NULL) && (device_id == NULL) && (device_path == NULL) && (fx_type == known_device[j].type)) ) {
+								fx_type = known_device[j].type;
+								vid = desc.idVendor;
+								pid = desc.idProduct;
+								busnum = _busnum;
+								devaddr = _devaddr;
+								break;
+							}
 						}
 					}
-				}
-				if (j < ARRAYSIZE(known_device)) {
-					if (verbose)
-						logerror("found device '%s' [%04x:%04x]\n",
-							known_device[j].designation, vid, pid);
-					break;
+					if (j < ARRAYSIZE(known_device)) {
+						if (verbose)
+							logerror("found device '%s' [%04x:%04x] (%d,%d)\n",
+								known_device[j].designation, vid, pid, busnum, devaddr);
+						break;
+					}
 				}
 			}
 		}
 		if (dev == NULL) {
 			libusb_free_device_list(devs, 1);
-			logerror("could not find a known device - please specify type and/or vid:pid or bus:addr\n");
-			goto usage;
+			logerror("could not find a known device - please specify type and/or vid:pid and/or bus,dev\n");
+			return print_usage(-1);
 		}
 		status = libusb_open(dev, &device);
 		if (status < 0) {
@@ -216,7 +228,7 @@ usage:
 			goto err;
 		}
 		libusb_free_device_list(devs, 1);
-	} else {
+	} else if (device_id != NULL) {
 		device = libusb_open_device_with_vid_pid(NULL, (uint16_t)vid, (uint16_t)pid);
 		if (device == NULL) {
 			logerror("libusb_open() failed\n");
