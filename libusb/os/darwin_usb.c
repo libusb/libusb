@@ -1782,6 +1782,7 @@ static int darwin_clock_gettime(int clk_id, struct timespec *tp) {
 
 const struct usbi_os_backend darwin_backend = {
         .name = "Darwin",
+        .caps = 0,
         .init = darwin_init,
         .exit = darwin_exit,
         .get_device_list = darwin_get_device_list,

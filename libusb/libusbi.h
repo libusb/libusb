@@ -52,8 +52,12 @@
 #define USB_MAXINTERFACES	32
 #define USB_MAXCONFIG		8
 
+/* Backend specific capabilities */
+#define USBI_CAP_HAS_HID_ACCESS					0x00010000
+#define USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER	0x00020000
+
 /* The following is used to silence warnings for unused variables */
-#define UNUSED(var)			(void)(var)
+#define UNUSED(var)			do { (void)(var); } while(0)
 
 struct list_head {
 	struct list_head *prev, *next;
@@ -445,6 +449,9 @@ struct discovered_devs *discovered_devs_append(
 struct usbi_os_backend {
 	/* A human-readable name for your backend, e.g. "Linux usbfs" */
 	const char *name;
+
+	/* Binary mask for backend specific capabilities */
+	uint32_t caps;
 
 	/* Perform initialization of your backend. You might use this function
 	 * to determine specific capabilities of the system, allocate required

@@ -89,6 +89,7 @@ static int _access_endpoint(struct libusb_transfer *);
 
 const struct usbi_os_backend openbsd_backend = {
 	"Synchronous OpenBSD backend",
+	0,
 	NULL,				/* init() */
 	NULL,				/* exit() */
 	obsd_get_device_list,

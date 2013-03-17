@@ -2262,6 +2262,7 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 // NB: MSVC6 does not support named initializers.
 const struct usbi_os_backend windows_backend = {
 	"Windows",
+	USBI_CAP_HAS_HID_ACCESS,
 	windows_init,
 	windows_exit,
 

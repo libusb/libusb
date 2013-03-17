@@ -1740,15 +1740,21 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 
 /** \ingroup misc
  * Check at runtime if the loaded library has a given capability.
+ * This call should be performed after \ref libusb_init(), to ensure the
+ * backend has updated its capability set.
  *
  * \param capability the \ref libusb_capability to check for
- * \returns 1 if the running library has the capability, 0 otherwise
+ * \returns nonzero if the running library has the capability, 0 otherwise
  */
 int API_EXPORTED libusb_has_capability(uint32_t capability)
 {
 	switch (capability) {
 	case LIBUSB_CAP_HAS_CAPABILITY:
 		return 1;
+	case LIBUSB_CAP_HAS_HID_ACCESS:
+		return (usbi_backend->caps && USBI_CAP_HAS_HID_ACCESS);
+	case LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER:
+		return (usbi_backend->caps && USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER);
 	}
 	return 0;
 }
