@@ -3226,8 +3226,7 @@ static int _hid_get_config_descriptor(struct hid_device_priv* dev, void *data, s
 		ed->bmAttributes = 3;
 		ed->wMaxPacketSize = dev->input_report_size - 1;
 		ed->bInterval = 10;
-
-		ed++;
+		ed = (struct libusb_endpoint_descriptor *)((char*)ed + LIBUSB_DT_ENDPOINT_SIZE);
 	}
 
 	if (dev->output_report_size) {
