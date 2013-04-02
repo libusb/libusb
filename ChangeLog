@@ -1,6 +1,19 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusbx.org
 
+2013-04-02: v1.0.15-rc1
+* Improve tranfer cancellation and avoid short read failures on broken descriptors
+* Filter out 8-bit characters in libusb_get_string_descriptor_ascii()
+* Add WinCE support
+* Add library stress tests
+* Add FX3 firmware upload support for fxload
+* Add HID and kernel driver detach support capabilities detection
+* Add SuperSpeed detection on OS X
+* Fix issues with autoclaim, composite HID devices, interface autoclaim and
+  early abort in libusb_close() on Windows. Also add VS 2012 solution files.
+* Improve fd event handling on Linux
+* Other bug fixes and improvements
+
 2012-09-26: v1.0.14
 * Reverts the previous API change with regards to bMaxPower.
   If this doesn't matter to you, you are encouraged to keep using v1.0.13,

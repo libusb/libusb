@@ -3,4 +3,4 @@ LDADD = ../libusb/libusb-1.0.la
 
 noinst_PROGRAMS = stress
 
-stress_SOURCES = stress.c testlib.c
+stress_SOURCES = stress.c libusbx_testlib.h testlib.c
