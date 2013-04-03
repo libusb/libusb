@@ -1459,6 +1459,10 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
 
   cInterface = &priv->interfaces[iface];
 
+  /* determine the properties of this endpoint and the speed of the device */
+  (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
+                                                 &transferType, &maxPacketSize, &interval);
+
   /* Last but not least we need the bus frame number */
   kresult = (*(cInterface->interface))->GetBusFrameNumber(cInterface->interface, &frame, &atTime);
   if (kresult) {
@@ -1488,9 +1492,12 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
                                                               transfer->num_iso_packets, tpriv->isoc_framelist, darwin_async_io_callback,
                                                               itransfer);
 
-  cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets * (1 << (interval - 1));
-  if (transfer->dev_handle->dev->speed >= LIBUSB_SPEED_HIGH)
-    cInterface->frames[transfer->endpoint] /= 8;
+  if (LIBUSB_SPEED_FULL == transfer->dev_handle->dev->speed)
+    /* Full speed */
+    cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets * (1 << (interval - 1));
+  else
+    /* High/super speed */
+    cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets * (1 << (interval - 1)) / 8;
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (TRANSFER_CTX (transfer), "isochronous transfer failed (dir: %s): %s", IS_XFERIN(transfer) ? "In" : "Out",
