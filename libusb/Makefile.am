@@ -6,9 +6,11 @@ LINUX_USBFS_SRC = os/linux_usbfs.c
 DARWIN_USB_SRC = os/darwin_usb.c
 OPENBSD_USB_SRC = os/openbsd_usb.c
 WINDOWS_USB_SRC = os/poll_windows.c os/windows_usb.c libusb-1.0.rc
+WINCE_USB_SRC = os/wince_usb.c os/wince_usb.h
 
 EXTRA_DIST = $(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) $(OPENBSD_USB_SRC) \
-	$(WINDOWS_USB_SRC) os/threads_posix.c os/threads_windows.c
+	$(WINDOWS_USB_SRC) $(WINCE_USB_SRC) \
+	os/threads_posix.c os/threads_windows.c
 
 if OS_LINUX
 OS_SRC = $(LINUX_USBFS_SRC)
