@@ -1385,11 +1385,12 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
 
-  IOReturn                kresult;
-  uint8_t                 pipeRef, iface;
-  UInt64                  frame;
-  AbsoluteTime            atTime;
-  int                     i;
+  IOReturn kresult;
+  uint8_t direction, number, interval, pipeRef, iface, transferType;
+  uint16_t maxPacketSize;
+  UInt64 frame;
+  AbsoluteTime atTime;
+  int i;
 
   struct darwin_interface *cInterface;
 
@@ -1429,6 +1430,14 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
     return darwin_to_libusb (kresult);
   }
 
+  (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
+                                                 &transferType, &maxPacketSize, &interval);
+
+  /* work around buggy devices */
+  if (0 == interval) {
+    interval = 9;
+  }
+
   /* schedule for a frame a little in the future */
   frame += 4;
 
@@ -1445,10 +1454,9 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
                                                               transfer->num_iso_packets, tpriv->isoc_framelist, darwin_async_io_callback,
                                                               itransfer);
 
-  if (transfer->dev_handle->dev->speed == LIBUSB_SPEED_FULL)
-    cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets;
-  else
-    cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets / 8;
+  cInterface->frames[transfer->endpoint] = frame + transfer->num_iso_packets * (1 << (interval - 1));
+  if (transfer->dev_handle->dev->speed >= LIBUSB_SPEED_HIGH)
+    cInterface->frames[transfer->endpoint] /= 8;
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (TRANSFER_CTX (transfer), "isochronous transfer failed (dir: %s): %s", IS_XFERIN(transfer) ? "In" : "Out",
