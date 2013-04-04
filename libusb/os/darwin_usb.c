@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusbx 1.0
- * Copyright © 2008-2012 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2008-2013 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -1432,11 +1432,6 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
 
   (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
                                                  &transferType, &maxPacketSize, &interval);
-
-  /* work around buggy devices */
-  if (0 == interval) {
-    interval = 9;
-  }
 
   /* schedule for a frame a little in the future */
   frame += 4;
