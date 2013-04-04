@@ -523,6 +523,7 @@
 				Name="VCLinkerTool"
 				GenerateDebugInformation="true"
 				SubSystem="9"
+				IgnoreDefaultLibraryNames="oldnames.lib,libc.lib"
 				EntryPointSymbol="mainACRTStartup"
 				TargetMachine="0"
 			/>
@@ -1053,6 +1054,7 @@
 				Name="VCLinkerTool"
 				GenerateDebugInformation="true"
 				SubSystem="9"
+				IgnoreDefaultLibraryNames="oldnames.lib,libc.lib"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				EntryPointSymbol="mainACRTStartup"

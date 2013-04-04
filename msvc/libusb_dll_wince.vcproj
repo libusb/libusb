@@ -543,6 +543,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
+				IgnoreDefaultLibraryNames="oldnames.lib,libc.lib"
 				ModuleDefinitionFile="../libusb/libusb-1.0.def"
 				GenerateDebugInformation="true"
 				SubSystem="9"
@@ -1094,6 +1095,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				OutputFile="$(OutDir)\libusb-1.0.dll"
+				IgnoreDefaultLibraryNames="oldnames.lib,libc.lib"
 				ModuleDefinitionFile="../libusb/libusb-1.0.def"
 				GenerateDebugInformation="true"
 				SubSystem="9"
