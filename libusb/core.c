@@ -1752,9 +1752,9 @@ int API_EXPORTED libusb_has_capability(uint32_t capability)
 	case LIBUSB_CAP_HAS_CAPABILITY:
 		return 1;
 	case LIBUSB_CAP_HAS_HID_ACCESS:
-		return (usbi_backend->caps && USBI_CAP_HAS_HID_ACCESS);
+		return (usbi_backend->caps & USBI_CAP_HAS_HID_ACCESS);
 	case LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER:
-		return (usbi_backend->caps && USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER);
+		return (usbi_backend->caps & USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER);
 	}
 	return 0;
 }
