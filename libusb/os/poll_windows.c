@@ -403,17 +403,18 @@ static void _free_index(int _index)
  *
  * Note that the associated Windows handle is not closed by this call
  */
-void usbi_free_fd(int fd)
+void usbi_free_fd(struct winfd *wfd)
 {
 	int _index;
 
 	CHECK_INIT_POLLING;
 
-	_index = _fd_to_index_and_lock(fd);
+	_index = _fd_to_index_and_lock(wfd->fd);
 	if (_index < 0) {
 		return;
 	}
 	_free_index(_index);
+	*wfd = INVALID_WINFD;
 	LeaveCriticalSection(&_poll_fd[_index].mutex);
 }
 

@@ -593,7 +593,7 @@ static void wince_clear_transfer_priv(
 	// No need to cancel transfer as it is either complete or abandoned
 	wfd.itransfer = NULL;
 	CloseHandle(wfd.handle);
-	usbi_free_fd(transfer_priv->pollable_fd.fd);
+	usbi_free_fd(&transfer_priv->pollable_fd);
 }
 
 static int wince_cancel_transfer(

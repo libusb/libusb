@@ -1911,7 +1911,7 @@ static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
 
-	usbi_free_fd(transfer_priv->pollable_fd.fd);
+	usbi_free_fd(&transfer_priv->pollable_fd);
 	safe_free(transfer_priv->hid_buffer);
 	// When auto claim is in use, attempt to release the auto-claimed interface
 	auto_release(itransfer);
@@ -2884,7 +2884,7 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 	  && (setup->request == LIBUSB_REQUEST_SET_CONFIGURATION) ) {
 		if (setup->value != priv->active_config) {
 			usbi_warn(ctx, "cannot set configuration other than the default one");
-			usbi_free_fd(wfd.fd);
+			usbi_free_fd(&wfd);
 			return LIBUSB_ERROR_INVALID_PARAM;
 		}
 		wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
@@ -2893,7 +2893,7 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 		if (!WinUSBX[sub_api].ControlTransfer(wfd.handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, wfd.overlapped)) {
 			if(GetLastError() != ERROR_IO_PENDING) {
 				usbi_warn(ctx, "ControlTransfer failed: %s", windows_error_str(0));
-				usbi_free_fd(wfd.fd);
+				usbi_free_fd(&wfd);
 				return LIBUSB_ERROR_IO;
 			}
 		} else {
@@ -2978,7 +2978,7 @@ static int winusbx_submit_bulk_transfer(int sub_api, struct usbi_transfer *itran
 	if (!ret) {
 		if(GetLastError() != ERROR_IO_PENDING) {
 			usbi_err(ctx, "ReadPipe/WritePipe failed: %s", windows_error_str(0));
-			usbi_free_fd(wfd.fd);
+			usbi_free_fd(&wfd);
 			return LIBUSB_ERROR_IO;
 		}
 	} else {
@@ -3087,7 +3087,7 @@ static int winusbx_reset_device(int sub_api, struct libusb_device_handle *dev_ha
 		{
 			// Cancel any pollable I/O
 			usbi_remove_pollfd(ctx, wfd.fd);
-			usbi_free_fd(wfd.fd);
+			usbi_free_fd(&wfd);
 			wfd = handle_to_winfd(winusb_handle);
 		}
 
@@ -3964,7 +3964,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 		transfer_priv->pollable_fd = wfd;
 		transfer_priv->interface_number = (uint8_t)current_interface;
 	} else {
-		usbi_free_fd(wfd.fd);
+		usbi_free_fd(&wfd);
 	}
 
 	return r;
@@ -4037,7 +4037,7 @@ static int hid_submit_bulk_transfer(int sub_api, struct usbi_transfer *itransfer
 	if (!ret) {
 		if (GetLastError() != ERROR_IO_PENDING) {
 			usbi_err(ctx, "HID transfer failed: %s", windows_error_str(0));
-			usbi_free_fd(wfd.fd);
+			usbi_free_fd(&wfd);
 			safe_free(transfer_priv->hid_buffer);
 			return LIBUSB_ERROR_IO;
 		}

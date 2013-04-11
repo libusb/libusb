@@ -94,7 +94,7 @@ void init_polling(void);
 void exit_polling(void);
 struct winfd usbi_create_fd(HANDLE handle, int access_mode, 
 	struct usbi_transfer *transfer, cancel_transfer *cancel_fn);
-void usbi_free_fd(int fd);
+void usbi_free_fd(struct winfd* winfd);
 struct winfd fd_to_winfd(int fd);
 struct winfd handle_to_winfd(HANDLE handle);
 struct winfd overlapped_to_winfd(OVERLAPPED* overlapped);
