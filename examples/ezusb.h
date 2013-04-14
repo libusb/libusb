@@ -110,7 +110,7 @@ extern int ezusb_load_ram(libusb_device_handle *device,
 extern int ezusb_load_eeprom(libusb_device_handle *device,
 	const char *path, int fx_type, int img_type, int config);
 
-/* boolean flag, says whether to write extra messages to stderr */
+/* Verbosity level (default 1). Can be increased or decreased with options v/q  */
 extern int verbose;
 
 #ifdef __cplusplus

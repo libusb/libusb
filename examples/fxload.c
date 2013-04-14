@@ -64,15 +64,16 @@ void logerror(const char *format, ...)
 	va_end(ap);
 }
 
-static int print_usage(int errcode) {
+static int print_usage(int error_code) {
 	fprintf(stderr, "\nUsage: fxload [-v] [-V] [-t type] [-d vid:pid] [-p bus,addr] -i firmware\n");
 	fprintf(stderr, "  -i <path>       -- Firmware to upload\n");
 	fprintf(stderr, "  -t <type>       -- Target type: an21, fx, fx2, fx2lp, fx3\n");
 	fprintf(stderr, "  -d <vid:pid>    -- Target device, as an USB VID:PID\n");
 	fprintf(stderr, "  -p <bus,addr>   -- Target device, as a libusbx bus number and device address path\n");
 	fprintf(stderr, "  -v              -- Increase verbosity\n");
+	fprintf(stderr, "  -q              -- Decrease verbosity (silent mode)\n");
 	fprintf(stderr, "  -V              -- Print program version\n");
-	return errcode;
+	return error_code;
 }
 
 #define FIRMWARE 0
@@ -94,7 +95,7 @@ int main(int argc, char*argv[])
 	libusb_device_handle *device = NULL;
 	struct libusb_device_descriptor desc;
 
-	while ((opt = getopt(argc, argv, "vV?hd:p:i:I:t:")) != EOF)
+	while ((opt = getopt(argc, argv, "qvV?hd:p:i:I:t:")) != EOF)
 		switch (opt) {
 
 		case 'd':
@@ -128,6 +129,10 @@ int main(int argc, char*argv[])
 
 		case 'v':
 			verbose++;
+			break;
+
+		case 'q':
+			verbose--;
 			break;
 
 		case '?':
@@ -184,8 +189,8 @@ int main(int argc, char*argv[])
 			} else {
 				status = libusb_get_device_descriptor(dev, &desc);
 				if (status >= 0) {
-					if (verbose >= 2) {
-						logerror("trying to match against %04x:%04x (%d,%d)\n",
+					if (verbose >= 3) {
+						logerror("examining %04x:%04x (%d,%d)\n",
 							desc.idVendor, desc.idProduct, _busnum, _devaddr);
 					}
 					for (j=0; j<ARRAYSIZE(known_device); j++) {
@@ -274,7 +279,7 @@ int main(int argc, char*argv[])
 	}
 
 	/* single stage, put into internal memory */
-	if (verbose)
+	if (verbose > 1)
 		logerror("single stage: load on-chip memory\n");
 	status = ezusb_load_ram(device, path[FIRMWARE], fx_type, img_type[FIRMWARE], 0);
 

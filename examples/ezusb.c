@@ -47,7 +47,7 @@ extern void logerror(const char *format, ...)
  * The Cypress FX parts are largely compatible with the Anchorhip ones.
  */
 
-int verbose;
+int verbose = 1;
 
 /*
  * return true if [addr,addr+len] includes external RAM
@@ -127,7 +127,7 @@ static int ezusb_write(libusb_device_handle *device, const char *label,
 {
 	int status;
 
-	if (verbose)
+	if (verbose > 1)
 		logerror("%s, addr 0x%08x len %4u (0x%04x)\n", label, addr, (unsigned)len, (unsigned)len);
 	status = libusb_control_transfer(device,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
@@ -150,7 +150,7 @@ static int ezusb_read(libusb_device_handle *device, const char *label,
 {
 	int status;
 
-	if (verbose)
+	if (verbose > 1)
 		logerror("%s, addr 0x%08x len %4u (0x%04x)\n", label, addr, (unsigned)len, (unsigned)len);
 	status = libusb_control_transfer(device,
 		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
@@ -185,6 +185,33 @@ static bool ezusb_cpucs(libusb_device_handle *device, uint32_t addr, bool doRun)
 		((!doRun) || (status != LIBUSB_ERROR_IO)))
 	{
 		const char *mesg = "can't modify CPUCS";
+		if (status < 0)
+			logerror("%s: %s\n", mesg, libusb_error_name(status));
+		else
+			logerror("%s\n", mesg);
+		return false;
+	} else
+		return true;
+}
+
+/*
+ * Send an FX3 jumpt to address command
+ * Returns false on error.
+ */
+static bool ezusb_fx3_jump(libusb_device_handle *device, uint32_t addr)
+{
+	int status;
+
+	if (verbose)
+		logerror("transfer execution to Program Entry at 0x%08x\n", addr);
+	status = libusb_control_transfer(device,
+		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
+		RW_INTERNAL, addr & 0xFFFF, addr >> 16,
+		NULL, 0, 1000);
+	/* We may get an I/O error from libusbx as the device disappears */
+	if ((status != 0) && (status != LIBUSB_ERROR_IO))
+	{
+		const char *mesg = "failed to send jump command";
 		if (status < 0)
 			logerror("%s: %s\n", mesg, libusb_error_name(status));
 		else
@@ -527,14 +554,14 @@ static int ram_poke(void *context, uint32_t addr, bool external,
 }
 
 /*
- * Load an Cypress Image file into target RAM.
- * The file is assumed to be in Cypress IMG format.
+ * Load a Cypress Image file into target RAM.
+ * See http://www.cypress.com/?docID=41351 (AN76405 PDF) for more info.
  */
 static int fx3_load_ram(libusb_device_handle *device, const char *path)
 {
 	uint32_t dCheckSum, dExpectedCheckSum, dAddress, i, dLen, dLength;
 	uint32_t* dImageBuf;
-	unsigned char *bBuf, hBuf[4], rBuf[4096];
+	unsigned char *bBuf, hBuf[4], blBuf[4], rBuf[4096];
 	FILE *image;
 
 	image = fopen(path, "rb");
@@ -555,12 +582,36 @@ static int fx3_load_ram(libusb_device_handle *device, const char *path)
 		logerror("image doesn't have a CYpress signature\n");
 		return -3;
 	}
-	if (hBuf[3] != 0xB0) {
-		logerror("invalid file format 0x%02X, expected 0xB0\n", hBuf[3]);
+
+	// Check bImageType
+	switch(hBuf[3]) {
+	case 0xB0:
+		if (verbose)
+			logerror("normal FW binary %s image with checksum\n", (hBuf[2]&0x01)?"data":"executable");
+		break;
+	case 0xB1:
+		logerror("security binary image is not currently supported\n");
+		return -3;
+	case 0xB2:
+		logerror("VID:PID image is not currently supported\n");
+		return -3;
+	default:
+		logerror("invalid image type 0x%02X\n", hBuf[3]);
 		return -3;
 	}
 
+	// Read the bootloader version
+	if (verbose) {
+		if ((ezusb_read(device, "read bootloader version", RW_INTERNAL, 0xFFFF0020, blBuf, 4) < 0)) {
+			logerror("Could not read bootloader version\n");
+			return -8;
+		}
+		logerror("FX3 bootloader version: 0x%02X%02X%02X%02X\n", blBuf[3], blBuf[2], blBuf[1], blBuf[0]);
+	}
+
 	dCheckSum = 0;
+	if (verbose)
+		logerror("writing image...\n");
 	while (1) {
 		if ((fread(&dLength, sizeof(uint32_t), 1, image) != 1) ||  // read dLength
 			(fread(&dAddress, sizeof(uint32_t), 1, image) != 1)) { // read dAddress
@@ -621,8 +672,7 @@ static int fx3_load_ram(libusb_device_handle *device, const char *path)
 	}
 
 	// transfer execution to Program Entry
-	if (ezusb_write(device, "Jump command", RW_INTERNAL, dAddress, NULL, 0) < 0) {
-		logerror("failed to send jump command\n");
+	if (!ezusb_fx3_jump(device, dAddress)) {
 		return -6;
 	}
 
@@ -659,7 +709,7 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 	if (image == NULL) {
 		logerror("%s: unable to open for input.\n", path);
 		return -2;
-	} else if (verbose)
+	} else if (verbose > 1)
 		logerror("open firmware image %s for RAM upload\n", path);
 
 	if (img_type == IMG_TYPE_IIC) {
