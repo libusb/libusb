@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusbx.org
 
-2013-04-03: v1.0.15-rc2
+2013-04-15: v1.0.15
 * Improve transfer cancellation and avoid short read failures on broken descriptors
 * Filter out 8-bit characters in libusb_get_string_descriptor_ascii()
 * Add WinCE support
@@ -9,7 +9,7 @@ visit: http://log.libusbx.org
 * Add Cypress FX3 firmware upload support for fxload sample
 * Add HID and kernel driver detach support capabilities detection
 * Add SuperSpeed detection on OS X
-* Don't assume high speed for isochronous or an interval of 1 on OS X
+* Fix bInterval value interpretation on OS X
 * Fix issues with autoclaim, composite HID devices, interface autoclaim and
   early abort in libusb_close() on Windows. Also add VS2012 solution files.
 * Improve fd event handling on Linux
@@ -20,7 +20,7 @@ visit: http://log.libusbx.org
   If this doesn't matter to you, you are encouraged to keep using v1.0.13,
   as it will use the same attribute as v2.0, to be released soon.
 * Note that LIBUSBX_API_VERSION is *decreased* to 0x010000FF and the previous
-  guidelines with regards to concurent use of MaxPower/bMaxPower still apply.
+  guidelines with regards to concurrent use of MaxPower/bMaxPower still apply.
 
 2012-09-20: v1.0.13
 * [MAJOR] Fix a typo in the API with struct libusb_config_descriptor where
