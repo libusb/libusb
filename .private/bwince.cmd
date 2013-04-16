@@ -33,6 +33,7 @@ copy examples\listdevs.c %WINCE_TARGET_DIR%\examples\source
 copy examples\xusb.c %WINCE_TARGET_DIR%\examples\source
 copy msvc\stdint.h %WINCE_TARGET_DIR%\examples\source
 copy .private\wbs_wince.txt %WINCE_TARGET_DIR%\README.txt
+copy COPYING %WINCE_TARGET_DIR%\COPYING
 
 rem Perform the rebuild
 for %%A in (%WINCE_TARGET_ARCHES%) do %MSBUILD_CMD% %WINCE_SLN% /property:Platform="%PLATFORM_PREFIX%%%A%PLATFORM_POSTFIX%" /property:Configuration=%MSBUILD_CONFIGURATION% /target:%MSBUILD_TARGET%"

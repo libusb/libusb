@@ -5,6 +5,11 @@
    *         https://sourceforge.net/projects/libusbx/files/           *
    *********************************************************************
 
+The binaries contained in this snapshot are licensed under the
+GNU Lesser General Public License version 2.1 or, at your option, any later
+version (see COPYING for further details). The source code for these binaries
+is available for download at the same location as this binary snapshot.
+
 o Visual Studio:
   - Open existing or create a new project for your application
   - Copy libusb.h, from the include\libusbx-1.0\ directory, into your project and
