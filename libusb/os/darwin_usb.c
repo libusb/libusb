@@ -1664,7 +1664,8 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
   struct usbi_transfer *itransfer = (struct usbi_transfer *)refcon;
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
-  UInt32 message, size;
+  struct darwin_msg_async_io_complete message = {.itransfer = itransfer, .result = result,
+                                                 .size = (UInt32) (uintptr_t) arg0};
 
   usbi_dbg ("an async io operation has completed");
 
@@ -1679,14 +1680,8 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
     (*(cInterface->interface))->WritePipe (cInterface->interface, pipeRef, transfer->buffer, 0);
   }
 
-  size = (UInt32) (uintptr_t) arg0;
-
   /* send a completion message to the device's file descriptor */
-  message = MESSAGE_ASYNC_IO_COMPLETE;
   write (priv->fds[1], &message, sizeof (message));
-  write (priv->fds[1], &itransfer, sizeof (itransfer));
-  write (priv->fds[1], &result, sizeof (IOReturn));
-  write (priv->fds[1], &size, sizeof (size));
 }
 
 static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_t result) {
@@ -1750,64 +1745,35 @@ static void darwin_handle_callback (struct usbi_transfer *itransfer, kern_return
 }
 
 static int op_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready) {
-  struct usbi_transfer *itransfer;
-  UInt32 io_size;
-  IOReturn kresult;
+  struct darwin_msg_async_io_complete message;
   POLL_NFDS_TYPE i = 0;
   ssize_t ret;
-  UInt32 message;
 
   usbi_mutex_lock(&ctx->open_devs_lock);
+
   for (i = 0; i < nfds && num_ready > 0; i++) {
     struct pollfd *pollfd = &fds[i];
-    struct libusb_device_handle *handle;
-    struct darwin_device_handle_priv *hpriv = NULL;
 
-    usbi_dbg ("checking fd %i with revents = %x", fds[i], pollfd->revents);
+    usbi_dbg ("checking fd %i with revents = %x", pollfd->fd, pollfd->revents);
 
     if (!pollfd->revents)
       continue;
 
     num_ready--;
-    list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
-      hpriv =  (struct darwin_device_handle_priv *)handle->os_priv;
-      if (hpriv->fds[0] == pollfd->fd)
-        break;
-    }
-    if (!hpriv)
+
+    if (pollfd->revents & POLLERR) {
+      /* this probably will never happen so ignore the error an move on. */
       continue;
-
-    if (!(pollfd->revents & POLLERR)) {
-      ret = read (hpriv->fds[0], &message, sizeof (message));
-      if (ret < (ssize_t)sizeof (message))
-        continue;
-    } else {
-      /* could not poll the device-- response is to delete the device (this seems a little heavy-handed) */
-      /* remove the device's async port from the runloop */
-      if (hpriv->cfSource) {
-        if (libusb_darwin_acfl)
-          CFRunLoopRemoveSource (libusb_darwin_acfl, hpriv->cfSource, kCFRunLoopDefaultMode);
-        CFRelease (hpriv->cfSource);
-        hpriv->cfSource = NULL;
-      }
-
-      usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->fds[0]);
-      usbi_handle_disconnect(handle);
-
-      /* done with this device */
     }
 
-    switch (message) {
-    case MESSAGE_ASYNC_IO_COMPLETE:
-      read (hpriv->fds[0], &itransfer, sizeof (itransfer));
-      read (hpriv->fds[0], &kresult, sizeof (IOReturn));
-      read (hpriv->fds[0], &io_size, sizeof (UInt32));
-
-      darwin_handle_callback (itransfer, kresult, io_size);
-      break;
-    default:
-      usbi_warn (ctx, "unknown message received from device pipe");
+    /* there is only one type of message */
+    ret = read (pollfd->fd, &message, sizeof (message));
+    if (ret < (ssize_t) sizeof (message)) {
+      usbi_dbg ("WARNING: short read on async io completion pipe\n");
+      continue;
     }
+
+    darwin_handle_callback (message.itransfer, message.result, message.size);
   }
 
   usbi_mutex_unlock(&ctx->open_devs_lock);

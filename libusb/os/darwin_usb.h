@@ -1,6 +1,6 @@
 /*
  * darwin backend for libusbx 1.0
- * Copyright © 2008-2009 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2008-2013 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -165,8 +165,11 @@ struct darwin_transfer_priv {
   /* Bulk */
 };
 
-enum {
-  MESSAGE_ASYNC_IO_COMPLETE
+/* structure for signaling io completion */
+struct darwin_msg_async_io_complete {
+  struct usbi_transfer *itransfer;
+  IOReturn result;
+  UInt32 size;
 };
 
 #endif
