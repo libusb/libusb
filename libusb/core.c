@@ -1714,7 +1714,8 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
  */
 int API_EXPORTED libusb_init(libusb_context **context)
 {
-	char *dbg;
+	struct libusb_device *dev, *next;
+	char *dbg = getenv("LIBUSB_DEBUG");
 	struct libusb_context *ctx;
 	static int first_init = 1;
 	int r = 0;
@@ -1742,7 +1743,6 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	ctx->debug = LIBUSB_LOG_LEVEL_DEBUG;
 #endif
 
-	dbg = getenv("LIBUSB_DEBUG");
 	if (dbg) {
 		ctx->debug = atoi(dbg);
 		if (ctx->debug)
@@ -1793,13 +1793,18 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	list_add (&ctx->list, &active_contexts_list);
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
-
 	return 0;
 
 err_destroy_mutex:
 	usbi_mutex_destroy(&ctx->open_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
 err_free_ctx:
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
+		list_del(&dev->list);
+		libusb_unref_device(dev);
+	}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
 	free(ctx);
 err_unlock:
 	usbi_mutex_static_unlock(&default_context_lock);
@@ -1813,6 +1818,8 @@ err_unlock:
  */
 void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 {
+	struct libusb_device *dev, *next;
+
 	usbi_dbg("");
 	USBI_GET_CONTEXT(ctx);
 
@@ -1835,6 +1842,13 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
 	usbi_hotplug_deregister_all(ctx);
+
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
+		list_del(&dev->list);
+		libusb_unref_device(dev);
+	}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
 
 	/* a little sanity check. doesn't bother with open_devs locking because
 	 * unless there is an application bug, nobody will be accessing this. */
