@@ -100,6 +100,8 @@ static const char *darwin_error_str (int result) {
     return "data overrun";
   case kIOReturnCannotWire:
     return "physical memory can not be wired down";
+  case kIOReturnNoResources:
+    return "out of resources";
   default:
     return "unknown error";
   }
@@ -287,7 +289,6 @@ static void darwin_devices_attached (void *ptr, io_iterator_t add_devices) {
 static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
   struct libusb_device *dev = NULL;
   struct libusb_context *ctx;
-  struct darwin_device_priv *dpriv;
 
   io_service_t device;
   bool locationValid;
@@ -320,7 +321,6 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
       if (!dev) {
         continue;
       }
-      dpriv = (struct darwin_device_priv *) dev->os_priv;
 
       /* signal the core that this device has been disconnected. the core will tear down this device
          when the reference count reaches 0 */
@@ -413,6 +413,9 @@ static void *darwin_event_thread_main (void *arg0) {
   CFRunLoopRun();
 
   usbi_dbg ("thread exiting");
+
+  /* remove the notification cfsource */
+  CFRunLoopRemoveSource(runloop, libusb_notification_cfsource, kCFRunLoopDefaultMode);
 
   /* delete notification port */
   IONotificationPortDestroy (libusb_notification_port);
@@ -929,6 +932,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
       CFRunLoopRemoveSource (libusb_darwin_acfl, priv->cfSource, kCFRunLoopDefaultMode);
       CFRelease (priv->cfSource);
       priv->cfSource = NULL;
+      CFRelease (libusb_darwin_acfl);
     }
 
     if (priv->is_open) {
@@ -1011,6 +1015,8 @@ static int darwin_get_interface (usb_device_t **darwin_device, uint8_t ifc, io_s
     }
 
     CFNumberGetValue(bInterfaceNumberCF, kCFNumberIntType, &bInterfaceNumber);
+
+    CFRelease(bInterfaceNumberCF);
 
     if ((uint8_t) bInterfaceNumber == ifc) {
       break;
