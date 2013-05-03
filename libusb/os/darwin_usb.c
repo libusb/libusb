@@ -508,7 +508,7 @@ static int darwin_get_active_config_descriptor(struct libusb_device *dev, unsign
   int config_index;
 
   if (0 == priv->active_config)
-    return LIBUSB_ERROR_INVALID_PARAM;
+    return LIBUSB_ERROR_NOT_FOUND;
 
   config_index = get_configuration_index (dev, priv->active_config);
   if (config_index < 0)
