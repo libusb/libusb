@@ -2496,6 +2496,9 @@ void usbi_handle_disconnect(struct libusb_device_handle *handle)
 		if (!to_cancel)
 			break;
 
+		usbi_dbg("cancelling transfer %p from disconnect",
+			 USBI_TRANSFER_TO_LIBUSB_TRANSFER(to_cancel));
+
 		usbi_backend->clear_transfer_priv(to_cancel);
 		usbi_handle_transfer_completion(to_cancel, LIBUSB_TRANSFER_NO_DEVICE);
 	}
