@@ -1176,8 +1176,10 @@ static int calculate_timeout(struct usbi_transfer *transfer)
 }
 
 /* add a transfer to the (timeout-sorted) active transfers list.
- * returns 1 if the transfer has a timeout and it is the timeout next to
- * expire */
+ * Callers of this function must hold the flying_transfers_lock.
+ * This function *always* adds the transfer to the flying_transfers list,
+ * it will return non 0 if it fails to update the timer, but even then the
+ * transfer is added to the flying_transfers list. */
 static int add_to_flying_list(struct usbi_transfer *transfer)
 {
 	struct usbi_transfer *cur;
@@ -1185,8 +1187,6 @@ static int add_to_flying_list(struct usbi_transfer *transfer)
 	struct libusb_context *ctx = ITRANSFER_CTX(transfer);
 	int r = 0;
 	int first = 1;
-
-	usbi_mutex_lock(&ctx->flying_transfers_lock);
 
 	/* if we have no other flying transfers, start the list with this one */
 	if (list_empty(&ctx->flying_transfers)) {
@@ -1237,7 +1237,6 @@ out:
 	UNUSED(first);
 #endif
 
-	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 	return r;
 }
 
@@ -1399,16 +1398,16 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		goto out;
 	}
 
+	usbi_mutex_lock(&ctx->flying_transfers_lock);
 	r = add_to_flying_list(itransfer);
-	if (r)
-		goto out;
-	r = usbi_backend->submit_transfer(itransfer);
-	if (r) {
-		usbi_mutex_lock(&ctx->flying_transfers_lock);
+	if (r == LIBUSB_SUCCESS) {
+		r = usbi_backend->submit_transfer(itransfer);
+	}
+	if (r != LIBUSB_SUCCESS) {
 		list_del(&itransfer->list);
 		arm_timerfd_for_next_timeout(ctx);
-		usbi_mutex_unlock(&ctx->flying_transfers_lock);
 	}
+	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
 out:
 	updated_fds = (itransfer->flags & USBI_TRANSFER_UPDATED_FDS);
@@ -2459,8 +2458,9 @@ out:
 #endif
 }
 
-/* Backends call this from handle_events to report disconnection of a device.
- * The transfers get cancelled appropriately.
+/* Backends may call this from handle_events to report disconnection of a
+ * device. This function ensures transfers get cancelled appropriately.
+ * Callers of this function must hold the events_lock.
  */
 void usbi_handle_disconnect(struct libusb_device_handle *handle)
 {
@@ -2475,12 +2475,22 @@ void usbi_handle_disconnect(struct libusb_device_handle *handle)
 	 *
 	 * this is a bit tricky because:
 	 * 1. we can't do transfer completion while holding flying_transfers_lock
+	 *    because the completion handler may try to re-submit the transfer
 	 * 2. the transfers list can change underneath us - if we were to build a
-	 *    list of transfers to complete (while holding look), the situation
+	 *    list of transfers to complete (while holding lock), the situation
 	 *    might be different by the time we come to free them
 	 *
 	 * so we resort to a loop-based approach as below
-	 * FIXME: is this still potentially racy?
+	 *
+	 * This is safe because transfers are only removed from the
+	 * flying_transfer list by usbi_handle_transfer_completion and
+	 * libusb_close, both of which hold the events_lock while doing so,
+	 * so usbi_handle_disconnect cannot be running at the same time.
+	 *
+	 * Note that libusb_submit_transfer also removes the transfer from
+	 * the flying_transfer list on submission failure, but it keeps the
+	 * flying_transfer list locked between addition and removal, so
+	 * usbi_handle_disconnect never sees such transfers.
 	 */
 
 	while (1) {

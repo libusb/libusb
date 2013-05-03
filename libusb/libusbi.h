@@ -848,6 +848,8 @@ struct usbi_os_backend {
 	 *
 	 * This function must not block.
 	 *
+	 * This function gets called with the flying_transfers_lock locked!
+	 *
 	 * Return:
 	 * - 0 on success
 	 * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
