@@ -401,7 +401,7 @@ static void *darwin_event_thread_main (void *arg0) {
   darwin_clear_iterator (libusb_rem_device_iterator);
   darwin_clear_iterator (libusb_add_device_iterator);
 
-  usbi_dbg ("thread ready to receive events");
+  usbi_dbg ("darwin event thread ready to receive events");
 
   /* signal the main thread that the hotplug runloop has been created. */
   pthread_mutex_lock (&libusb_darwin_at_mutex);
@@ -412,7 +412,7 @@ static void *darwin_event_thread_main (void *arg0) {
   /* run the runloop */
   CFRunLoopRun();
 
-  usbi_dbg ("thread exiting");
+  usbi_dbg ("darwin event thread exiting");
 
   /* remove the notification cfsource */
   CFRunLoopRemoveSource(runloop, libusb_notification_cfsource, kCFRunLoopDefaultMode);

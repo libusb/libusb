@@ -1074,7 +1074,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 
 	r = usbi_backend->open(_handle);
 	if (r < 0) {
-		usbi_dbg("could not open device: %s", libusb_error_name(r));
+		usbi_dbg("open %d.%d returns %d", dev->bus_number, dev->device_address, r);
 		libusb_unref_device(dev);
 		usbi_mutex_destroy(&_handle->lock);
 		free(_handle);
@@ -1163,7 +1163,7 @@ static void do_close(struct libusb_context *ctx,
 	/* safe iteration because transfers may be being deleted */
 	list_for_each_entry_safe(itransfer, tmp, &ctx->flying_transfers, list, struct usbi_transfer) {
 		struct libusb_transfer *transfer =
-		        USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+			USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
 		if (transfer->dev_handle != dev_handle)
 			continue;
@@ -1782,6 +1782,10 @@ int API_EXPORTED libusb_init(libusb_context **context)
 
 	if (context) {
 		*context = ctx;
+	} else if (!usbi_default_context) {
+		usbi_dbg("created default context");
+		usbi_default_context = ctx;
+		default_context_refcnt++;
 	}
 	usbi_mutex_static_unlock(&default_context_lock);
 
@@ -2023,7 +2027,7 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 }
 
 /** \ingroup misc
- * Returns a constant NULL-terminated string with the ASCII name of a libusb
+ * Returns a constant NULL-terminated string with the ASCII name of a libusbx
  * error or transfer status code. The caller must not free() the returned
  * string.
  *
