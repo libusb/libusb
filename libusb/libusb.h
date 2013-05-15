@@ -137,7 +137,7 @@ typedef unsigned __int32  uint32_t;
  * Internally, LIBUSBX_API_VERSION is defined as follows:
  * (libusbx major << 24) | (libusbx minor << 16) | (16 bit incremental)
  */
-#define LIBUSBX_API_VERSION 0x01000101
+#define LIBUSBX_API_VERSION 0x01000102
 
 #ifdef __cplusplus
 extern "C" {
@@ -1525,11 +1525,16 @@ void LIBUSB_CALL libusb_set_pollfd_notifiers(libusb_context *ctx,
  * per libusb_context and it is safe to call libusb_hotplug_deregister_callback()
  * on an already deregisted callback.
  *
+ * Since version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102
+ *
  * For more information, see \ref hotplug.
  */
 typedef int libusb_hotplug_callback_handle;
 
 /** \ingroup hotplug
+ *
+ * Since version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102
+ *
  * Flags for hotplug events */
 typedef enum {
 	/** Arm the callback and fire it for all matching currently attached devices. */
@@ -1537,6 +1542,9 @@ typedef enum {
 } libusb_hotplug_flag;
 
 /** \ingroup hotplug
+ *
+ * Since version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102
+ *
  * Hotplug events */
 typedef enum {
 	/** A device has been plugged in and is ready to use */
@@ -1565,6 +1573,8 @@ typedef enum {
  * It is safe to call either libusb_hotplug_register_callback() or
  * libusb_hotplug_deregister_callback() from within a callback function.
  *
+ * Since version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102
+ *
  * \param libusb_context context of this notification
  * \param device         libusb_device this event occurred on
  * \param event          event that occurred
@@ -1584,6 +1594,8 @@ typedef int (LIBUSB_CALL *libusb_hotplug_callback_fn)(libusb_context *ctx,
  * when a matching event occurs on a matching device. The callback is
  * armed until either it is deregistered with libusb_hotplug_deregister_callback()
  * or the supplied callback returns 1 to indicate it is finished processing events.
+ *
+ * Since version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102
  *
  * \param[in] ctx context to register this callback with
  * \param[in] events bitwise or of events that will trigger this callback. See \ref
@@ -1611,6 +1623,8 @@ int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
  *
  * Deregister a callback from a libusb_context. This function is safe to call from within
  * a hotplug callback.
+ *
+ * Since version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102
  *
  * \param[in] ctx context this callback is registered with
  * \param[in] handle the handle of the callback to deregister
