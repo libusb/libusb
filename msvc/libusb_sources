@@ -30,6 +30,7 @@ SOURCES=..\core.c \
 	..\descriptor.c \
 	..\io.c \
 	..\sync.c \
+	..\hotplug.c \
 	threads_windows.c \
 	poll_windows.c \
 	windows_usb.c \

@@ -120,9 +120,9 @@ copy ..\..\..\msvc\getopt_sources sources >NUL 2>&1
 if errorlevel 1 goto builderror
 cd ..\..\..
 
-if exist examples\fxload_ddkbuild goto md8
+if exist examples\fxload_ddkbuild goto md10
 md examples\fxload_ddkbuild
-:md8
+:md10
 
 cd examples\fxload_ddkbuild
 copy ..\..\msvc\fxload_sources sources >NUL 2>&1
@@ -137,6 +137,26 @@ set srcPath=examples\fxload_ddkbuild\obj%BUILD_ALT_DIR%\%cpudir%
 
 copy %srcPath%\fxload.exe %dstPath%\examples
 copy %srcPath%\fxload.pdb %dstPath%\examples
+
+@echo off
+
+if exist examples\hotplugtest_ddkbuild goto md11
+md examples\hotplugtest_ddkbuild
+:md11
+
+cd examples\hotplugtest_ddkbuild
+copy ..\..\msvc\hotplugtest_sources sources >NUL 2>&1
+@echo on
+%BUILD_CMD%
+@echo off
+if errorlevel 1 goto builderror
+cd ..\..
+
+set srcPath=examples\hotplugtest_ddkbuild\obj%BUILD_ALT_DIR%\%cpudir%
+@echo on
+
+copy %srcPath%\hotplugtest.exe %dstPath%\examples
+copy %srcPath%\hotplugtest.pdb %dstPath%\examples
 
 @echo off
 

@@ -290,6 +290,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\libusb\hotplug.c"
+				>
+			</File>
+			<File
 				RelativePath="..\libusb\io.c"
 				>
 			</File>
@@ -317,6 +321,10 @@
 			>
 			<File
 				RelativePath=".\config.h"
+				>
+			</File>
+			<File
+				RelativePath="..\libusb\hotplug.h"
 				>
 			</File>
 			<File

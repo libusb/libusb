@@ -17,6 +17,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "getopt", "getopt_2010.vcxpr
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stress", "stress_2010.vcxproj", "{53942EFF-C810-458D-B3CB-EE5CE9F1E781}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hotplugtest", "hotplugtest_2010.vcxproj", "{99D2AC64-DC66-4422-91CE-6715C403C9E5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -77,6 +79,14 @@ Global
 		{53942EFF-C810-458D-B3CB-EE5CE9F1E781}.Release|Win32.Build.0 = Release|Win32
 		{53942EFF-C810-458D-B3CB-EE5CE9F1E781}.Release|x64.ActiveCfg = Release|x64
 		{53942EFF-C810-458D-B3CB-EE5CE9F1E781}.Release|x64.Build.0 = Release|x64
+		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Debug|Win32.ActiveCfg = Debug|Win32
+		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Debug|Win32.Build.0 = Debug|Win32
+		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Debug|x64.ActiveCfg = Debug|x64
+		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Debug|x64.Build.0 = Debug|x64
+		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Release|Win32.ActiveCfg = Release|Win32
+		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Release|Win32.Build.0 = Release|Win32
+		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Release|x64.ActiveCfg = Release|x64
+		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

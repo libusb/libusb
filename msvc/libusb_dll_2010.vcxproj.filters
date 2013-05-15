@@ -20,6 +20,9 @@
     <ClCompile Include="..\libusb\descriptor.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\libusb\hotplug.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\libusb\io.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -40,6 +43,9 @@
     <ClInclude Include=".\config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClCompile Include="..\libusb\hotplug.h">
+      <Filter>Header Files</Filter>
+    </ClCompile>
     <ClInclude Include="..\libusb\libusb.h">
       <Filter>Header Files</Filter>
     </ClInclude>
