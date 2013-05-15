@@ -1094,6 +1094,53 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	return 0;
 }
 
+static struct libusb_device *linux_parent_dev(struct libusb_context *ctx, const char *sysfs_dir)
+{
+	struct libusb_device *dev, *parent_dev = NULL;
+	char *parent_sysfs_dir, *tmp;
+	int ret;
+
+	/* XXX -- can we figure out the topology when using usbfs? */
+	if (NULL == sysfs_dir || 0 == strncmp(sysfs_dir, "usb", 3)) {
+		/* either using usbfs or finding the parent of a root hub */
+		return NULL;
+	}
+
+	parent_sysfs_dir = strdup(sysfs_dir);
+	if (NULL != (tmp = strchr(parent_sysfs_dir, '.')) ||
+	    NULL != (tmp = strchr(parent_sysfs_dir, '-'))) {
+		*tmp = '\0';
+	} else {
+		free (parent_sysfs_dir);
+		/* shouldn't happen */
+		return NULL;
+	}
+
+	/* is the parent a root hub? */
+	if (NULL == strchr(parent_sysfs_dir, '-')) {
+		tmp = parent_sysfs_dir;
+		ret = asprintf (&parent_sysfs_dir, "usb%s", tmp);
+		free (tmp);
+		if (0 > ret) {
+			return NULL;
+		}
+	}
+
+	/* find the parent in the context */
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device) {
+		struct linux_device_priv *priv = _device_priv(dev);
+		if (0 == strcmp (priv->sysfs_dir, parent_sysfs_dir)) {
+			parent_dev = dev;
+			break;
+		}
+	}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
+
+	free (parent_sysfs_dir);
+	return parent_dev;
+}
+
 int linux_enumerate_device(struct libusb_context *ctx,
 	uint8_t busnum, uint8_t devaddr, const char *sysfs_dir)
 {
@@ -1120,6 +1167,10 @@ int linux_enumerate_device(struct libusb_context *ctx,
 	r = usbi_sanitize_device(dev);
 	if (r < 0)
 		goto out;
+
+	dev->parent_dev = linux_parent_dev(ctx, sysfs_dir);
+	fprintf (stderr, "Dev %p (%s) has parent %p\n", dev, sysfs_dir,
+		 dev->parent_dev);
 out:
 	if (r < 0)
 		libusb_unref_device(dev);
@@ -1261,74 +1312,6 @@ static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 		devname);
 }
 
-static void sysfs_analyze_topology(struct discovered_devs *discdevs)
-{
-	struct linux_device_priv *priv;
-	int i, j;
-	struct libusb_device *dev1, *dev2;
-	const char *sysfs_dir1, *sysfs_dir2;
-	const char *p;
-	int n, boundary_char;
-
-	/* Fill in the port_number and parent_dev fields for each device */
-
-	for (i = 0; i < discdevs->len; ++i) {
-		dev1 = discdevs->devices[i];
-		priv = _device_priv(dev1);
-		if (!priv)
-			continue;
-		sysfs_dir1 = priv->sysfs_dir;
-
-		/* Root hubs have sysfs_dir names of the form "usbB",
-		 * where B is the bus number.  All other devices have
-		 * sysfs_dir names of the form "B-P[.P ...]", where the
-		 * P values are port numbers leading from the root hub
-		 * to the device.
-		 */
-
-		/* Root hubs don't have parents or port numbers */
-		if (sysfs_dir1[0] == 'u')
-			continue;
-
-		/* The rightmost component is the device's port number */
-		p = strrchr(sysfs_dir1, '.');
-		if (!p) {
-			p = strchr(sysfs_dir1, '-');
-			if (!p)
-				continue;	/* Should never happen */
-		}
-		dev1->port_number = atoi(p + 1);
-
-		/* Search for the parent device */
-		boundary_char = *p;
-		n = p - sysfs_dir1;
-		for (j = 0; j < discdevs->len; ++j) {
-			dev2 = discdevs->devices[j];
-			priv = _device_priv(dev2);
-			if (!priv)
-				continue;
-			sysfs_dir2 = priv->sysfs_dir;
-
-			if (boundary_char == '-') {
-				/* The parent's name must begin with 'usb';
-				 * skip past that part of sysfs_dir2.
-				 */
-				if (sysfs_dir2[0] != 'u')
-					continue;
-				sysfs_dir2 += 3;
-			}
-
-			/* The remainder of the parent's name must be equal to
-			 * the first n bytes of sysfs_dir1.
-			 */
-			if (memcmp(sysfs_dir1, sysfs_dir2, n) == 0 && !sysfs_dir2[n]) {
-				dev1->parent_dev = dev2;
-				break;
-			}
-		}
-	}
-}
-
 static int sysfs_get_device_list(struct libusb_context *ctx)
 {
 	DIR *devices = opendir(SYSFS_DEVICE_PATH);
@@ -1354,7 +1337,6 @@ static int sysfs_get_device_list(struct libusb_context *ctx)
 	}
 
 	closedir(devices);
-	sysfs_analyze_topology(discdevs);
 	return r;
 }
 
