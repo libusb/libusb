@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * I/O functions for libusbx
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>

@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * Core functions for libusbx
  * Copyright © 2012-2013 Nathan Hjelm <hjelmn@cs.unm.edu>

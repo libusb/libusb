@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * USB descriptor handling functions for libusbx
  * Copyright © 2007 Daniel Drake <dsd@gentoo.org>
