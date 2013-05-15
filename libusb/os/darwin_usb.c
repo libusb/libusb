@@ -767,21 +767,8 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     if (ret < 0)
       break;
 
-    /* the device iterator provides devices in increasing order of location. given this property
-     * we can use the last device to find the parent. */
-/* TODO: FIX TOPOLOGY!
-    for (parent = *last_dev ; parent ; parent = parent->parent_dev) {
-      struct darwin_device_priv *parent_priv = (struct darwin_device_priv *) parent->os_priv;
-
-      if (parent_priv->location == parent_location) {
-        break;
-      }
-    }
-
-    dev->parent_dev = parent;
-
+    dev->parent_dev     = usbi_get_device_by_session_id (ctx, parent_location);
     dev->port_number    = port;
-*/
     dev->bus_number     = locationID >> 24;
     dev->device_address = address;
 
