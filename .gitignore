@@ -24,12 +24,12 @@ config.status
 config.sub
 *.swp
 doxygen.cfg
-listdevs
-xusb
-dpfp
-dpfp_threaded
-fxload
-stress
+examples/listdevs
+examples/xusb
+examples/dpfp
+examples/dpfp_threaded
+examples/fxload
+tests/stress
 *.exe
 *.pc
 doc/html
@@ -40,3 +40,6 @@ Debug
 Release
 *.user
 *.suo
+*.patch
+*~
+*.orig
