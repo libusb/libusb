@@ -24,7 +24,8 @@
 static void print_devs(libusb_device **devs)
 {
 	libusb_device *dev;
-	int i = 0;
+	int i = 0, j = 0;
+	uint8_t path[8]; 
 
 	while ((dev = devs[i++]) != NULL) {
 		struct libusb_device_descriptor desc;
@@ -34,9 +35,21 @@ static void print_devs(libusb_device **devs)
 			return;
 		}
 
-		printf("%04x:%04x (bus %d, device %d)\n",
+		printf("%04x:%04x (bus %d, device %d)",
 			desc.idVendor, desc.idProduct,
 			libusb_get_bus_number(dev), libusb_get_device_address(dev));
+
+		r = libusb_get_port_path(NULL, dev, path, sizeof(path));
+		if (r > 0)
+			printf(" path: ");
+		j = 0;
+		while(j < r) {
+			printf("%d", path[j]);
+			j++;
+			if (j < r)
+				printf(".");
+		}
+		printf("\n");
 	}
 }
 
