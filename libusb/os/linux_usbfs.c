@@ -112,8 +112,8 @@ static int sysfs_has_descriptors = 0;
 /* how many times have we initted (and not exited) ? */
 static volatile int init_count = 0;
 
-/* lock for init_count */
-static pthread_mutex_t hotplug_lock = PTHREAD_MUTEX_INITIALIZER;
+/* Protects init_count and serializes scan_devices versus the hotplug-thread */
+static usbi_mutex_static_t hotplug_lock = USBI_MUTEX_INITIALIZER;
 
 static int linux_start_event_monitor(void);
 static int linux_stop_event_monitor(void);
@@ -431,7 +431,7 @@ static int op_init(struct libusb_context *ctx)
 		sysfs_can_relate_devices = 0;
 	}
 
-	pthread_mutex_lock(&hotplug_lock);
+	usbi_mutex_static_lock(&hotplug_lock);
 	r = LIBUSB_SUCCESS;
 	if (!init_count++) {
 		/* start up hotplug event handler */
@@ -442,7 +442,7 @@ static int op_init(struct libusb_context *ctx)
 	}
 	if (r == LIBUSB_SUCCESS)
 		r = linux_scan_devices(ctx);
-	pthread_mutex_unlock(&hotplug_lock);
+	usbi_mutex_static_unlock(&hotplug_lock);
 
 	return r;
 }
@@ -454,12 +454,12 @@ static void op_exit(void)
 		return;
 	}
 
-	pthread_mutex_lock(&hotplug_lock);
+	usbi_mutex_static_lock(&hotplug_lock);
 	if (!--init_count) {
 		/* tear down event handler */
 		(void)linux_stop_event_monitor();
 	}
-	pthread_mutex_unlock(&hotplug_lock);
+	usbi_mutex_static_unlock(&hotplug_lock);
 }
 
 static int linux_start_event_monitor(void)
@@ -1184,7 +1184,7 @@ void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_na
 {
 	struct libusb_context *ctx;
 
-	pthread_mutex_lock(&hotplug_lock);
+	usbi_mutex_static_lock(&hotplug_lock);
 	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
 		if (usbi_get_device_by_session_id(ctx, busnum << 8 | devaddr)) {
 			/* device already exists in the context */
@@ -1194,7 +1194,7 @@ void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_na
 
 		linux_enumerate_device(ctx, busnum, devaddr, sys_name);
 	}
-	pthread_mutex_unlock(&hotplug_lock);
+	usbi_mutex_static_unlock(&hotplug_lock);
 }
 
 void linux_hotplug_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys_name)
@@ -1202,7 +1202,7 @@ void linux_hotplug_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys
 	struct libusb_context *ctx;
 	struct libusb_device *dev;
 
-	pthread_mutex_lock(&hotplug_lock);
+	usbi_mutex_static_lock(&hotplug_lock);
 	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
 		dev = usbi_get_device_by_session_id (ctx, busnum << 8 | devaddr);
 		if (NULL != dev) {
@@ -1211,7 +1211,7 @@ void linux_hotplug_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys
 			usbi_err(ctx, "device not found for session %x", busnum << 8 | devaddr);
 		}
 	}
-	pthread_mutex_unlock(&hotplug_lock);
+	usbi_mutex_static_unlock(&hotplug_lock);
 }
 
 #if !defined(USE_UDEV)
