@@ -1216,15 +1216,16 @@ void linux_hotplug_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys
 {
 	struct libusb_context *ctx;
 	struct libusb_device *dev;
+	unsigned long session_id = busnum << 8 | devaddr;
 
 	usbi_mutex_static_lock(&active_contexts_lock);
 	usbi_mutex_static_lock(&hotplug_lock);
 	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
-		dev = usbi_get_device_by_session_id (ctx, busnum << 8 | devaddr);
+		dev = usbi_get_device_by_session_id (ctx, session_id);
 		if (NULL != dev) {
 			usbi_disconnect_device (dev);
 		} else {
-			usbi_err(ctx, "device not found for session %x", busnum << 8 | devaddr);
+			usbi_dbg("device not found for session %x", session_id);
 		}
 	}
 	usbi_mutex_static_unlock(&hotplug_lock);
