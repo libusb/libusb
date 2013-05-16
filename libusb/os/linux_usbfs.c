@@ -1096,7 +1096,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	return 0;
 }
 
-static void linux_get_parent_info(struct libusb_device *dev, const char *sysfs_dir)
+static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_dir)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device *it;
@@ -1106,7 +1106,7 @@ static void linux_get_parent_info(struct libusb_device *dev, const char *sysfs_d
 	/* XXX -- can we figure out the topology when using usbfs? */
 	if (NULL == sysfs_dir || 0 == strncmp(sysfs_dir, "usb", 3)) {
 		/* either using usbfs or finding the parent of a root hub */
-		return;
+		return LIBUSB_SUCCESS;
 	}
 
 	parent_sysfs_dir = strdup(sysfs_dir);
@@ -1118,7 +1118,7 @@ static void linux_get_parent_info(struct libusb_device *dev, const char *sysfs_d
 		usbi_warn(ctx, "Can not parse sysfs_dir: %s, no parent info",
 			  parent_sysfs_dir);
 		free (parent_sysfs_dir);
-		return;
+		return LIBUSB_SUCCESS;
 	}
 
 	/* is the parent a root hub? */
@@ -1127,7 +1127,7 @@ static void linux_get_parent_info(struct libusb_device *dev, const char *sysfs_d
 		ret = asprintf (&parent_sysfs_dir, "usb%s", tmp);
 		free (tmp);
 		if (0 > ret) {
-			return;
+			return LIBUSB_ERROR_NO_MEM;
 		}
 	}
 
@@ -1155,6 +1155,8 @@ retry:
 		 dev->parent_dev, parent_sysfs_dir, dev->port_number);
 
 	free (parent_sysfs_dir);
+
+	return LIBUSB_SUCCESS;
 }
 
 int linux_enumerate_device(struct libusb_context *ctx,
@@ -1190,7 +1192,9 @@ int linux_enumerate_device(struct libusb_context *ctx,
 	if (r < 0)
 		goto out;
 
-	linux_get_parent_info(dev, sysfs_dir);
+	r = linux_get_parent_info(dev, sysfs_dir);
+	if (r < 0)
+		goto out;
 out:
 	if (r < 0)
 		libusb_unref_device(dev);
