@@ -118,6 +118,7 @@ static usbi_mutex_static_t hotplug_lock = USBI_MUTEX_INITIALIZER;
 static int linux_start_event_monitor(void);
 static int linux_stop_event_monitor(void);
 static int linux_scan_devices(struct libusb_context *ctx);
+static int sysfs_scan_device(struct libusb_context *ctx, const char *devname);
 
 #if !defined(USE_UDEV)
 static int linux_default_scan_devices (struct libusb_context *ctx);
@@ -1098,7 +1099,7 @@ static struct libusb_device *linux_parent_dev(struct libusb_context *ctx, const 
 {
 	struct libusb_device *dev, *parent_dev = NULL;
 	char *parent_sysfs_dir, *tmp;
-	int ret;
+	int ret, add_parent = 1;
 
 	/* XXX -- can we figure out the topology when using usbfs? */
 	if (NULL == sysfs_dir || 0 == strncmp(sysfs_dir, "usb", 3)) {
@@ -1126,6 +1127,7 @@ static struct libusb_device *linux_parent_dev(struct libusb_context *ctx, const 
 		}
 	}
 
+retry:
 	/* find the parent in the context */
 	usbi_mutex_lock(&ctx->usb_devs_lock);
 	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device) {
@@ -1136,6 +1138,14 @@ static struct libusb_device *linux_parent_dev(struct libusb_context *ctx, const 
 		}
 	}
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
+
+	if (!parent_dev && add_parent) {
+		usbi_dbg("parent_dev %s not enumerated yet, enumerating now",
+			 parent_sysfs_dir);
+		sysfs_scan_device(ctx, parent_sysfs_dir);
+		add_parent = 0;
+		goto retry;
+	}
 
 	free (parent_sysfs_dir);
 	return parent_dev;
@@ -1305,6 +1315,7 @@ static int usbfs_get_device_list(struct libusb_context *ctx)
 	return r;
 
 }
+#endif
 
 static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 {
@@ -1320,6 +1331,7 @@ static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 		devname);
 }
 
+#if !defined(USE_UDEV)
 static int sysfs_get_device_list(struct libusb_context *ctx)
 {
 	DIR *devices = opendir(SYSFS_DEVICE_PATH);
