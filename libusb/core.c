@@ -1785,14 +1785,10 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	if (r < 0)
 		goto err_backend_exit;
 
-	if (context) {
-		*context = ctx;
-	} else if (!usbi_default_context) {
-		usbi_dbg("created default context");
-		usbi_default_context = ctx;
-		default_context_refcnt++;
-	}
 	usbi_mutex_static_unlock(&default_context_lock);
+
+	if (context)
+		*context = ctx;
 
 	return 0;
 
@@ -1800,6 +1796,9 @@ err_backend_exit:
 	if (usbi_backend->exit)
 		usbi_backend->exit();
 err_free_ctx:
+	if (ctx == usbi_default_context)
+		usbi_default_context = NULL;
+
 	usbi_mutex_destroy(&ctx->open_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
 	usbi_mutex_destroy(&ctx->hotplug_cbs_lock);
@@ -1835,8 +1834,8 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 
 	/* if working with default context, only actually do the deinitialization
 	 * if we're the last user */
+	usbi_mutex_static_lock(&default_context_lock);
 	if (ctx == usbi_default_context) {
-		usbi_mutex_static_lock(&default_context_lock);
 		if (--default_context_refcnt > 0) {
 			usbi_dbg("not destroying default context");
 			usbi_mutex_static_unlock(&default_context_lock);
@@ -1844,8 +1843,8 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 		}
 		usbi_dbg("destroying default context");
 		usbi_default_context = NULL;
-		usbi_mutex_static_unlock(&default_context_lock);
 	}
+	usbi_mutex_static_unlock(&default_context_lock);
 
 	usbi_mutex_static_lock(&active_contexts_lock);
 	list_del (&ctx->list);
