@@ -1110,7 +1110,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	dev->port_number = port_number;
 	priv->depth = parent_priv->depth + 1;
 	priv->parent_dev = parent_dev;
-	dev->parent_dev = parent_dev;
+	dev->parent_dev = libusb_ref_device(parent_dev);
 
 	// If the device address is already set, we can stop here
 	if (dev->device_address != 0) {

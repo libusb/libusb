@@ -751,13 +751,6 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
 int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t* path, uint8_t path_len)
 {
 	int i = path_len;
-	ssize_t r;
-	struct libusb_device **devs = NULL;
-
-	/* The device needs to be open, else the parents may have been destroyed */
-	r = libusb_get_device_list(ctx, &devs);
-	if (r < 0)
-		return (int)r;
 
 	while(dev) {
 		// HCDs can be listed as devices and would have port #0
@@ -766,13 +759,11 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev, u
 			break;
 		i--;
 		if (i < 0) {
-			libusb_free_device_list(devs, 1);
 			return LIBUSB_ERROR_OVERFLOW;
 		}
 		path[i] = dev->port_number;
 		dev = dev->parent_dev;
 	}
-	libusb_free_device_list(devs, 1);
 	memmove(path, &path[i], path_len-i);
 	return path_len-i;
 }
@@ -968,6 +959,8 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 
 	if (refcnt == 0) {
 		usbi_dbg("destroy device %d.%d", dev->bus_number, dev->device_address);
+
+		libusb_unref_device(dev->parent_dev);
 
 		if (usbi_backend->destroy_device)
 			usbi_backend->destroy_device(dev);

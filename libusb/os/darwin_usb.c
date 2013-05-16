@@ -767,7 +767,7 @@ static int process_new_device (struct libusb_context *ctx, usb_device_t **device
     if (ret < 0)
       break;
 
-    dev->parent_dev     = usbi_get_device_by_session_id (ctx, parent_location);
+    dev->parent_dev     = libusb_ref_device (usbi_get_device_by_session_id (ctx, parent_location));
     dev->port_number    = port;
     dev->bus_number     = locationID >> 24;
     dev->device_address = address;
