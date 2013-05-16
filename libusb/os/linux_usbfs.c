@@ -1155,6 +1155,12 @@ int linux_enumerate_device(struct libusb_context *ctx,
 	usbi_dbg("busnum %d devaddr %d session_id %ld", busnum, devaddr,
 		session_id);
 
+	if (usbi_get_device_by_session_id(ctx, session_id)) {
+		/* device already exists in the context */
+		usbi_dbg("session_id %ld already exists", session_id);
+		return LIBUSB_SUCCESS;
+	}
+
 	usbi_dbg("allocating new device for %d/%d (session %ld)",
 		 busnum, devaddr, session_id);
 	dev = usbi_alloc_device(ctx, session_id);
@@ -1187,12 +1193,6 @@ void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_na
 	usbi_mutex_static_lock(&active_contexts_lock);
 	usbi_mutex_static_lock(&hotplug_lock);
 	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
-		if (usbi_get_device_by_session_id(ctx, busnum << 8 | devaddr)) {
-			/* device already exists in the context */
-			usbi_dbg("device already exists in context");
-			continue;
-		}
-
 		linux_enumerate_device(ctx, busnum, devaddr, sys_name);
 	}
 	usbi_mutex_static_unlock(&hotplug_lock);
