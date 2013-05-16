@@ -1114,8 +1114,9 @@ static void linux_get_parent_info(struct libusb_device *dev, const char *sysfs_d
 	        dev->port_number = atoi(tmp + 1);
 		*tmp = '\0';
 	} else {
+		usbi_warn(ctx, "Can not parse sysfs_dir: %s, no parent info",
+			  parent_sysfs_dir);
 		free (parent_sysfs_dir);
-		/* shouldn't happen */
 		return;
 	}
 
@@ -1148,6 +1149,9 @@ retry:
 		add_parent = 0;
 		goto retry;
 	}
+
+	usbi_dbg("Dev %p (%s) has parent %p (%s) port %d", dev, sysfs_dir,
+		 dev->parent_dev, parent_sysfs_dir, dev->port_number);
 
 	free (parent_sysfs_dir);
 }
@@ -1186,8 +1190,6 @@ int linux_enumerate_device(struct libusb_context *ctx,
 		goto out;
 
 	linux_get_parent_info(dev, sysfs_dir);
-	fprintf (stderr, "Dev %p (%s) has parent %p\n", dev, sysfs_dir,
-		 dev->parent_dev);
 out:
 	if (r < 0)
 		libusb_unref_device(dev);
