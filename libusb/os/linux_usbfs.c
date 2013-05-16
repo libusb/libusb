@@ -1107,8 +1107,8 @@ static struct libusb_device *linux_parent_dev(struct libusb_context *ctx, const 
 	}
 
 	parent_sysfs_dir = strdup(sysfs_dir);
-	if (NULL != (tmp = strchr(parent_sysfs_dir, '.')) ||
-	    NULL != (tmp = strchr(parent_sysfs_dir, '-'))) {
+	if (NULL != (tmp = strrchr(parent_sysfs_dir, '.')) ||
+	    NULL != (tmp = strrchr(parent_sysfs_dir, '-'))) {
 		*tmp = '\0';
 	} else {
 		free (parent_sysfs_dir);
