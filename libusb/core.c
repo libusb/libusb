@@ -1782,11 +1782,8 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	}
 
 	r = usbi_io_init(ctx);
-	if (r < 0) {
-		if (usbi_backend->exit)
-			usbi_backend->exit();
-		goto err_destroy_mutex;
-	}
+	if (r < 0)
+		goto err_backend_exit;
 
 	if (context) {
 		*context = ctx;
@@ -1799,19 +1796,25 @@ int API_EXPORTED libusb_init(libusb_context **context)
 
 	return 0;
 
-err_destroy_mutex:
+err_backend_exit:
+	if (usbi_backend->exit)
+		usbi_backend->exit();
+err_free_ctx:
 	usbi_mutex_destroy(&ctx->open_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
-err_free_ctx:
+	usbi_mutex_destroy(&ctx->hotplug_cbs_lock);
+
 	usbi_mutex_static_lock(&active_contexts_lock);
 	list_del (&ctx->list);
 	usbi_mutex_static_unlock(&active_contexts_lock);
+
 	usbi_mutex_lock(&ctx->usb_devs_lock);
 	list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
 		list_del(&dev->list);
 		libusb_unref_device(dev);
 	}
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
+
 	free(ctx);
 err_unlock:
 	usbi_mutex_static_unlock(&default_context_lock);
