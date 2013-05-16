@@ -89,7 +89,7 @@ linux)
 	AC_SUBST(OS_LINUX)
 	AC_SEARCH_LIBS(clock_gettime, rt, [], [], -pthread)
 	AC_ARG_ENABLE([udev],
-		[AC_HELP_STRING([--with-udev], [use udev for device enumeration and hotplug support (recommended, default: yes)])],
+		[AC_HELP_STRING([--enable-udev], [use udev for device enumeration and hotplug support (recommended, default: yes)])],
 		[], [enable_udev="yes"])
 		if test "x$enable_udev" = "xyes" ; then
 			# system has udev. use it or fail!
