@@ -1095,26 +1095,28 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	return 0;
 }
 
-static struct libusb_device *linux_parent_dev(struct libusb_context *ctx, const char *sysfs_dir)
+static void linux_get_parent_info(struct libusb_device *dev, const char *sysfs_dir)
 {
-	struct libusb_device *dev, *parent_dev = NULL;
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_device *it;
 	char *parent_sysfs_dir, *tmp;
 	int ret, add_parent = 1;
 
 	/* XXX -- can we figure out the topology when using usbfs? */
 	if (NULL == sysfs_dir || 0 == strncmp(sysfs_dir, "usb", 3)) {
 		/* either using usbfs or finding the parent of a root hub */
-		return NULL;
+		return;
 	}
 
 	parent_sysfs_dir = strdup(sysfs_dir);
 	if (NULL != (tmp = strrchr(parent_sysfs_dir, '.')) ||
 	    NULL != (tmp = strrchr(parent_sysfs_dir, '-'))) {
+	        dev->port_number = atoi(tmp + 1);
 		*tmp = '\0';
 	} else {
 		free (parent_sysfs_dir);
 		/* shouldn't happen */
-		return NULL;
+		return;
 	}
 
 	/* is the parent a root hub? */
@@ -1123,23 +1125,23 @@ static struct libusb_device *linux_parent_dev(struct libusb_context *ctx, const 
 		ret = asprintf (&parent_sysfs_dir, "usb%s", tmp);
 		free (tmp);
 		if (0 > ret) {
-			return NULL;
+			return;
 		}
 	}
 
 retry:
 	/* find the parent in the context */
 	usbi_mutex_lock(&ctx->usb_devs_lock);
-	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device) {
-		struct linux_device_priv *priv = _device_priv(dev);
+	list_for_each_entry(it, &ctx->usb_devs, list, struct libusb_device) {
+		struct linux_device_priv *priv = _device_priv(it);
 		if (0 == strcmp (priv->sysfs_dir, parent_sysfs_dir)) {
-			parent_dev = dev;
+			dev->parent_dev = it;
 			break;
 		}
 	}
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
 
-	if (!parent_dev && add_parent) {
+	if (!dev->parent_dev && add_parent) {
 		usbi_dbg("parent_dev %s not enumerated yet, enumerating now",
 			 parent_sysfs_dir);
 		sysfs_scan_device(ctx, parent_sysfs_dir);
@@ -1148,7 +1150,6 @@ retry:
 	}
 
 	free (parent_sysfs_dir);
-	return parent_dev;
 }
 
 int linux_enumerate_device(struct libusb_context *ctx,
@@ -1184,7 +1185,7 @@ int linux_enumerate_device(struct libusb_context *ctx,
 	if (r < 0)
 		goto out;
 
-	dev->parent_dev = linux_parent_dev(ctx, sysfs_dir);
+	linux_get_parent_info(dev, sysfs_dir);
 	fprintf (stderr, "Dev %p (%s) has parent %p\n", dev, sysfs_dir,
 		 dev->parent_dev);
 out:
