@@ -20,7 +20,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
+#include "config.h"
+
+#include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -54,11 +56,11 @@ int linux_udev_start_event_monitor(void)
 {
 	int r;
 
-	if (NULL == udev_ctx) {
-		udev_ctx = udev_new();
-		if (!udev_ctx) {
-			return LIBUSB_ERROR_OTHER;
-		}
+	assert(udev_ctx == NULL);
+	udev_ctx = udev_new();
+	if (!udev_ctx) {
+		usbi_err(NULL, "could not create udev context");
+		return LIBUSB_ERROR_OTHER;
 	}
 
 	udev_monitor = udev_monitor_new_from_netlink(udev_ctx, "udev");
@@ -87,10 +89,9 @@ int linux_udev_start_event_monitor(void)
 
 int linux_udev_stop_event_monitor(void)
 {
-	if (-1 == udev_monitor_fd) {
-		/* this should never happen */
-		return LIBUSB_ERROR_OTHER;
-	}
+	assert(udev_ctx != NULL);
+	assert(udev_monitor != NULL);
+	assert(udev_monitor_fd != -1);
 
 	/* Cancel the event thread. This is the only way to garauntee the thread
 	   exits since closing the monitor fd won't necessarily cause poll
@@ -202,12 +203,7 @@ int linux_udev_scan_devices(struct libusb_context *ctx)
 	const char *sys_name;
 	int r;
 
-	if (NULL == udev_ctx) {
-		udev_ctx = udev_new();
-		if (!udev_ctx) {
-			return LIBUSB_ERROR_OTHER;
-		}
-	}
+	assert(udev_ctx != NULL);
 
 	enumerator = udev_enumerate_new(udev_ctx);
 	if (NULL == enumerator) {

@@ -19,7 +19,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
+#include "config.h"
+
+#include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -450,12 +452,8 @@ static int op_init(struct libusb_context *ctx)
 
 static void op_exit(void)
 {
-	if (!init_count) {
-		/* should not happen */
-		return;
-	}
-
 	usbi_mutex_static_lock(&hotplug_lock);
+	assert(init_count != 0);
 	if (!--init_count) {
 		/* tear down event handler */
 		(void)linux_stop_event_monitor();
