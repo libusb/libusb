@@ -66,25 +66,38 @@ int linux_udev_start_event_monitor(void)
 	udev_monitor = udev_monitor_new_from_netlink(udev_ctx, "udev");
 	if (!udev_monitor) {
 		usbi_err(NULL, "could not initialize udev monitor");
-		return LIBUSB_ERROR_OTHER;
+		goto err_free_ctx;
 	}
 
 	r = udev_monitor_filter_add_match_subsystem_devtype(udev_monitor, "usb", 0);
 	if (r) {
 		usbi_err(NULL, "could not initialize udev monitor filter for \"usb\" subsystem");
-		return LIBUSB_ERROR_OTHER;
+		goto err_free_monitor;
 	}
 
 	if (udev_monitor_enable_receiving(udev_monitor)) {
 		usbi_err(NULL, "failed to enable the udev monitor");
-		return LIBUSB_ERROR_OTHER;
+		goto err_free_monitor;
 	}
 
 	udev_monitor_fd = udev_monitor_get_fd(udev_monitor);
 
-	pthread_create(&linux_event_thread, NULL, linux_udev_event_thread_main, NULL);
+	r = pthread_create(&linux_event_thread, NULL, linux_udev_event_thread_main, NULL);
+	if (r) {
+		usbi_err(NULL, "could not create linux hotplug event thread");
+		goto err_free_monitor;
+	}
 
 	return LIBUSB_SUCCESS;
+
+err_free_monitor:
+	udev_monitor_unref(udev_monitor);
+	udev_monitor = NULL;
+	udev_monitor_fd = -1;
+err_free_ctx:
+	udev_unref(udev_ctx);
+	udev_ctx = NULL;
+	return LIBUSB_ERROR_OTHER;
 }
 
 int linux_udev_stop_event_monitor(void)
