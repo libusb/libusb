@@ -1943,9 +1943,13 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		libusb_hotplug_message message;
 		ssize_t ret;
 
+		usbi_dbg("caught a fish on the hotplug pipe");
+
 		/* read the message from the hotplug thread */
 		ret = usbi_read(ctx->hotplug_pipe[0], &message, sizeof (message));
 		if (ret < sizeof(message)) {
+			usbi_err(ctx, "hotplug pipe read error %d < %d",
+				 ret, sizeof(message));
 			ret = LIBUSB_ERROR_OTHER;
 			goto handled;
 		}
