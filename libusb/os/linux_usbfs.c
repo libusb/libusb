@@ -1184,6 +1184,7 @@ void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_na
 {
 	struct libusb_context *ctx;
 
+	usbi_mutex_static_lock(&active_contexts_lock);
 	usbi_mutex_static_lock(&hotplug_lock);
 	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
 		if (usbi_get_device_by_session_id(ctx, busnum << 8 | devaddr)) {
@@ -1195,6 +1196,7 @@ void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_na
 		linux_enumerate_device(ctx, busnum, devaddr, sys_name);
 	}
 	usbi_mutex_static_unlock(&hotplug_lock);
+	usbi_mutex_static_unlock(&active_contexts_lock);
 }
 
 void linux_hotplug_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys_name)
@@ -1202,6 +1204,7 @@ void linux_hotplug_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys
 	struct libusb_context *ctx;
 	struct libusb_device *dev;
 
+	usbi_mutex_static_lock(&active_contexts_lock);
 	usbi_mutex_static_lock(&hotplug_lock);
 	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
 		dev = usbi_get_device_by_session_id (ctx, busnum << 8 | devaddr);
@@ -1212,6 +1215,7 @@ void linux_hotplug_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys
 		}
 	}
 	usbi_mutex_static_unlock(&hotplug_lock);
+	usbi_mutex_static_unlock(&active_contexts_lock);
 }
 
 #if !defined(USE_UDEV)
