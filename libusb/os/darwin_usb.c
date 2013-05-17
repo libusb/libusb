@@ -865,6 +865,11 @@ static int process_new_device (struct libusb_context *ctx, io_service_t service)
     dev->bus_number     = cached_device->location >> 24;
     dev->device_address = cached_device->address;
 
+    /* need to add a reference to the parent device */
+    if (dev->parent_dev) {
+      libusb_ref_device(dev->parent_dev);
+    }
+
     (*(priv->dev->device))->GetDeviceSpeed (priv->dev->device, &devSpeed);
 
     switch (devSpeed) {
