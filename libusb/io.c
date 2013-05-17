@@ -1949,7 +1949,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		if (ret < sizeof(message)) {
 			usbi_err(ctx, "hotplug pipe read error %d < %d",
 				 ret, sizeof(message));
-			ret = LIBUSB_ERROR_OTHER;
+			r = LIBUSB_ERROR_OTHER;
 			goto handled;
 		}
 
