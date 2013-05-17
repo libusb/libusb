@@ -76,6 +76,13 @@ typedef unsigned __int32  uint32_t;
 #endif
 #endif
 
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
+#define LIBUSB_DEPRECATED_FOR(f) \
+  __attribute__((deprecated("Use " #f " instead")))
+#else
+#define LIBUSB_DEPRECATED_FOR(f)
+#endif /* __GNUC__ */
+
 /** \def LIBUSB_CALL
  * \ingroup misc
  * libusbx's Windows calling convention.
@@ -1055,8 +1062,10 @@ void LIBUSB_CALL libusb_free_config_descriptor(
 	struct libusb_config_descriptor *config);
 uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_port_number(libusb_device *dev);
-libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev);
+int LIBUSB_CALL libusb_get_port_numbers(libusb_device *dev, uint8_t* port_numbers, int port_numbers_len);
+LIBUSB_DEPRECATED_FOR(libusb_get_port_numbers)
 int LIBUSB_CALL libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t* path, uint8_t path_length);
+libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *dev);
 int LIBUSB_CALL libusb_get_device_speed(libusb_device *dev);
 int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,

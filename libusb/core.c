@@ -740,17 +740,19 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
 
 /** \ingroup dev
  * Get the list of all port numbers from root for the specified device
- * \param ctx the context to operate on, or NULL for the default context
+ *
+ * Since version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102
  * \param dev a device
- * \param path the array that should contain the port numbers
- * \param path_len the maximum length of the array. As per the USB 3.0
+ * \param port_numbers the array that should contain the port numbers
+ * \param port_numbers_len the maximum length of the array. As per the USB 3.0
  * specs, the current maximum limit for the depth is 7.
  * \returns the number of elements filled
  * \returns LIBUSB_ERROR_OVERFLOW if the array is too small
  */
-int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t* path, uint8_t path_len)
+int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
+	uint8_t* port_numbers, int port_numbers_len)
 {
-	int i = path_len;
+	int i = port_numbers_len;
 
 	while(dev) {
 		// HCDs can be listed as devices and would have port #0
@@ -759,13 +761,26 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev, u
 			break;
 		i--;
 		if (i < 0) {
+			usbi_warn(DEVICE_CTX(dev),
+				"port numbers array too small");
 			return LIBUSB_ERROR_OVERFLOW;
 		}
-		path[i] = dev->port_number;
+		port_numbers[i] = dev->port_number;
 		dev = dev->parent_dev;
 	}
-	memmove(path, &path[i], path_len-i);
-	return path_len-i;
+	memmove(port_numbers, &port_numbers[i], port_numbers_len - i);
+	return port_numbers_len - i;
+}
+
+/** \ingroup dev
+ * Deprecated please use libusb_get_port_numbers instead.
+ */
+int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
+	uint8_t* port_numbers, uint8_t port_numbers_len)
+{
+	UNUSED(ctx);
+
+	return libusb_get_port_numbers(dev, port_numbers, port_numbers_len);
 }
 
 /** \ingroup dev
