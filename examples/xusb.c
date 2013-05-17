@@ -755,7 +755,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 	dev = libusb_get_device(handle);
 	bus = libusb_get_bus_number(dev);
 	if (extra_info) {
-		r = libusb_get_port_path(NULL, dev, port_path, sizeof(port_path));
+		r = libusb_get_port_numbers(dev, port_path, sizeof(port_path));
 		if (r > 0) {
 			printf("\nDevice properties:\n");
 			printf("        bus number: %d\n", bus);

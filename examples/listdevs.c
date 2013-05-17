@@ -39,15 +39,11 @@ static void print_devs(libusb_device **devs)
 			desc.idVendor, desc.idProduct,
 			libusb_get_bus_number(dev), libusb_get_device_address(dev));
 
-		r = libusb_get_port_path(NULL, dev, path, sizeof(path));
-		if (r > 0)
-			printf(" path: ");
-		j = 0;
-		while(j < r) {
-			printf("%d", path[j]);
-			j++;
-			if (j < r)
-				printf(".");
+		r = libusb_get_port_numbers(dev, path, sizeof(path));
+		if (r > 0) {
+			printf(" path: %d", path[0]);
+			for (j = 1; j < r; j++)
+				printf(".%d", path[j]);
 		}
 		printf("\n");
 	}
