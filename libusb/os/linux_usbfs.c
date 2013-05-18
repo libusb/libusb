@@ -587,7 +587,7 @@ static int op_get_device_descriptor(struct libusb_device *dev,
 		*host_endian = 0;
 		return sysfs_get_device_descriptor(dev, buffer);
 	} else {
-		*host_endian = 1;
+		*host_endian = 1; /* usbfs converts the device desc to host */
 		return usbfs_get_device_descriptor(dev, buffer);
 	}
 }
@@ -649,8 +649,7 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 
 /* takes a usbfs/descriptors fd seeked to the start of a configuration, and
  * seeks to the next one. */
-static int seek_to_next_config(struct libusb_context *ctx, int fd,
-	int host_endian)
+static int seek_to_next_config(struct libusb_context *ctx, int fd)
 {
 	struct libusb_config_descriptor config;
 	unsigned char tmp[6];
@@ -668,7 +667,7 @@ static int seek_to_next_config(struct libusb_context *ctx, int fd,
 	}
 
 	/* seek forward to end of config */
-	usbi_parse_descriptor(tmp, "bbwbb", &config, host_endian);
+	usbi_parse_descriptor(tmp, "bbwbb", &config, 0);
 	off = lseek(fd, config.wTotalLength - sizeof(tmp), SEEK_CUR);
 	if (off < 0) {
 		usbi_err(ctx, "seek failed ret=%d errno=%d", off, errno);
@@ -745,7 +744,7 @@ static int sysfs_get_active_config_descriptor(struct libusb_device *dev,
 		if (off < 0)
 			return LIBUSB_ERROR_IO;
 
-		r = seek_to_next_config(DEVICE_CTX(dev), fd, 0);
+		r = seek_to_next_config(DEVICE_CTX(dev), fd);
 		if (r < 0)
 			return r;
 	}
@@ -815,6 +814,8 @@ int linux_get_device_address (struct libusb_context *ctx, int detached,
 static int op_get_active_config_descriptor(struct libusb_device *dev,
 	unsigned char *buffer, size_t len, int *host_endian)
 {
+	/* Unlike the device desc. config descs. are always in raw format */
+	*host_endian = 0;
 	if (sysfs_has_descriptors) {
 		return sysfs_get_active_config_descriptor(dev, buffer, len);
 	} else {
@@ -839,7 +840,7 @@ static int get_config_descriptor(struct libusb_context *ctx, int fd,
 	/* might need to skip some configuration descriptors to reach the
 	 * requested configuration */
 	while (config_index > 0) {
-		r = seek_to_next_config(ctx, fd, 1);
+		r = seek_to_next_config(ctx, fd);
 		if (r < 0)
 			return r;
 		config_index--;
@@ -863,6 +864,9 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 	char filename[PATH_MAX];
 	int fd;
 	int r;
+
+	/* Unlike the device desc. config descs. are always in raw format */
+	*host_endian = 0;
 
 	/* always read from usbfs: sysfs only has the active descriptor
 	 * this will involve waking the device up, but oh well! */
