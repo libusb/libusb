@@ -482,7 +482,7 @@ static int get_configuration_index (struct libusb_device *dev, int config_value)
   }
 
   /* configuration not found */
-  return LIBUSB_ERROR_OTHER;
+  return LIBUSB_ERROR_NOT_FOUND;
 }
 
 static int darwin_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian) {
