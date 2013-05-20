@@ -435,7 +435,7 @@ static int wince_get_active_config_descriptor(
 {
 	struct wince_device_priv *priv = _device_priv(device);
 	DWORD actualSize = len;
-	*host_endian = 1;
+	*host_endian = 0;
 	if (!UkwGetConfigDescriptor(priv->dev, UKW_ACTIVE_CONFIGURATION, buffer, len, &actualSize)) {
 		return translate_driver_error(GetLastError());
 	}
