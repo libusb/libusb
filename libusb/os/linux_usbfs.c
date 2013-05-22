@@ -128,7 +128,8 @@ static int linux_default_scan_devices (struct libusb_context *ctx);
 
 struct linux_device_priv {
 	char *sysfs_dir;
-	unsigned char *dev_descriptor;
+	unsigned char *descriptors;
+	int descriptors_len;
 	unsigned char *config_descriptor;
 };
 
@@ -513,16 +514,6 @@ static int linux_scan_devices(struct libusb_context *ctx)
 #endif
 }
 
-static int usbfs_get_device_descriptor(struct libusb_device *dev,
-	unsigned char *buffer)
-{
-	struct linux_device_priv *priv = _device_priv(dev);
-
-	/* return cached copy */
-	memcpy(buffer, priv->dev_descriptor, DEVICE_DESC_LENGTH);
-	return 0;
-}
-
 static int _open_sysfs_attr(struct libusb_device *dev, const char *attr)
 {
 	struct linux_device_priv *priv = _device_priv(dev);
@@ -576,42 +567,15 @@ static int __read_sysfs_attr(struct libusb_context *ctx,
 	return value;
 }
 
-static int sysfs_get_device_descriptor(struct libusb_device *dev,
-	unsigned char *buffer)
-{
-	int fd;
-	ssize_t r;
-
-	/* sysfs provides access to an in-memory copy of the device descriptor,
-	 * so we use that rather than keeping our own copy */
-
-	fd = _open_sysfs_attr(dev, "descriptors");
-	if (fd < 0)
-		return fd;
-
-	r = read(fd, buffer, DEVICE_DESC_LENGTH);;
-	close(fd);
-	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev), "read failed, ret=%d errno=%d", fd, errno);
-		return LIBUSB_ERROR_IO;
-	} else if (r < DEVICE_DESC_LENGTH) {
-		usbi_err(DEVICE_CTX(dev), "short read %d/%d", r, DEVICE_DESC_LENGTH);
-		return LIBUSB_ERROR_IO;
-	}
-
-	return 0;
-}
-
 static int op_get_device_descriptor(struct libusb_device *dev,
 	unsigned char *buffer, int *host_endian)
 {
-	if (sysfs_has_descriptors) {
-		*host_endian = 0;
-		return sysfs_get_device_descriptor(dev, buffer);
-	} else {
-		*host_endian = 1; /* usbfs converts the device desc to host */
-		return usbfs_get_device_descriptor(dev, buffer);
-	}
+	struct linux_device_priv *priv = _device_priv(dev);
+
+	*host_endian = sysfs_has_descriptors ? 0 : 1;
+	memcpy(buffer, priv->descriptors, DEVICE_DESC_LENGTH);
+
+	return 0;
 }
 
 static int usbfs_get_active_config_descriptor(struct libusb_device *dev,
@@ -986,7 +950,8 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	uint8_t devaddr, const char *sysfs_dir)
 {
 	struct linux_device_priv *priv = _device_priv(dev);
-	unsigned char *dev_buf;
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	int descriptors_size = 512; /* Begin with a 1024 byte alloc */
 	char path[PATH_MAX];
 	int fd, speed;
 	int active_config = 0;
@@ -1017,13 +982,47 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		}
 	}
 
+	/* cache descriptors in memory */
+	if (sysfs_has_descriptors)
+		fd = _open_sysfs_attr(dev, "descriptors");
+	else
+		fd = _get_usbfs_fd(dev, O_RDONLY, 0);
+	if (fd < 0)
+		return fd;
+
+	do {
+		descriptors_size *= 2;
+		priv->descriptors = usbi_reallocf(priv->descriptors,
+						  descriptors_size);
+		if (!priv->descriptors) {
+			close(fd);
+			return LIBUSB_ERROR_NO_MEM;
+		}
+		r = read(fd, priv->descriptors + priv->descriptors_len,
+			 descriptors_size - priv->descriptors_len);
+		if (r < 0) {
+			usbi_err(ctx, "read descriptor failed ret=%d errno=%d",
+				 fd, errno);
+			close(fd);
+			return LIBUSB_ERROR_IO;
+		}
+		priv->descriptors_len += r;
+	} while (priv->descriptors_len == descriptors_size);
+	
+	close(fd);
+
+	if (priv->descriptors_len < DEVICE_DESC_LENGTH) {
+		usbi_err(ctx, "short descriptor read (%d)",
+			 priv->descriptors_len);
+		return LIBUSB_ERROR_IO;
+	}
+
 	if (sysfs_has_descriptors)
 		return 0;
 
 	/* cache device descriptor in memory so that we can retrieve it later
 	 * without waking the device up (op_get_device_descriptor) */
 
-	priv->dev_descriptor = NULL;
 	priv->config_descriptor = NULL;
 
 	if (sysfs_can_relate_devices) {
@@ -1077,42 +1076,15 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		}
 	}
 
-	dev_buf = malloc(DEVICE_DESC_LENGTH);
-	if (!dev_buf) {
-		close(fd);
-		return LIBUSB_ERROR_NO_MEM;
-	}
-
-	r = read(fd, dev_buf, DEVICE_DESC_LENGTH);
-	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev),
-			"read descriptor failed ret=%d errno=%d", fd, errno);
-		free(dev_buf);
-		close(fd);
-		return LIBUSB_ERROR_IO;
-	} else if (r < DEVICE_DESC_LENGTH) {
-		usbi_err(DEVICE_CTX(dev), "short descriptor read (%d)", r);
-		free(dev_buf);
-		close(fd);
-		return LIBUSB_ERROR_IO;
-	}
-
 	/* bit of a hack: set num_configurations now because cache_active_config()
 	 * calls usbi_get_config_index_by_value() which uses it */
-	dev->num_configurations = dev_buf[DEVICE_DESC_LENGTH - 1];
+	dev->num_configurations = priv->descriptors[DEVICE_DESC_LENGTH - 1];
 
-	if (device_configured) {
+	if (device_configured)
 		r = cache_active_config(dev, fd, active_config);
-		if (r < 0) {
-			close(fd);
-			free(dev_buf);
-			return r;
-		}
-	}
 
 	close(fd);
-	priv->dev_descriptor = dev_buf;
-	return 0;
+	return r;
 }
 
 static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_dir)
@@ -1710,11 +1682,11 @@ static void op_destroy_device(struct libusb_device *dev)
 {
 	struct linux_device_priv *priv = _device_priv(dev);
 	if (!sysfs_has_descriptors) {
-		if (priv->dev_descriptor)
-			free(priv->dev_descriptor);
 		if (priv->config_descriptor)
 			free(priv->config_descriptor);
 	}
+	if (priv->descriptors)
+		free(priv->descriptors);
 	if (priv->sysfs_dir)
 		free(priv->sysfs_dir);
 }
