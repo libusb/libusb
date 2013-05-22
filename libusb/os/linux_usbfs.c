@@ -3,6 +3,7 @@
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  * Copyright © 2013 Nathan Hjelm <hjelmn@mac.com>
+ * Copyright © 2012-2013 Hans de Goede <hdegoede@redhat.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -135,7 +136,7 @@ struct linux_device_priv {
 	char *sysfs_dir;
 	unsigned char *descriptors;
 	int descriptors_len;
-	unsigned char *config_descriptor;
+	int active_config; /* cache val for !sysfs_can_relate_devices  */
 };
 
 struct linux_device_handle_priv {
@@ -538,18 +539,6 @@ static int op_get_device_descriptor(struct libusb_device *dev,
 	return 0;
 }
 
-static int usbfs_get_active_config_descriptor(struct libusb_device *dev,
-	unsigned char *buffer, size_t len)
-{
-	struct linux_device_priv *priv = _device_priv(dev);
-	if (!priv->config_descriptor)
-		return LIBUSB_ERROR_NOT_FOUND; /* device is unconfigured */
-
-	/* retrieve cached copy */
-	memcpy(buffer, priv->config_descriptor, len);
-	return 0;
-}
-
 /* read the bConfigurationValue for a device */
 static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 {
@@ -593,131 +582,6 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 	return 0;
 }
 
-/* takes a usbfs/descriptors fd seeked to the start of a configuration, and
- * seeks to the next one. */
-static int seek_to_next_config(struct libusb_context *ctx, int fd)
-{
-	struct libusb_config_descriptor config;
-	unsigned char tmp[6];
-	off_t off;
-	ssize_t r;
-
-	/* read first 6 bytes of descriptor */
-	r = read(fd, tmp, sizeof(tmp));
-	if (r < 0) {
-		usbi_err(ctx, "read failed ret=%d errno=%d", r, errno);
-		return LIBUSB_ERROR_IO;
-	} else if (r < sizeof(tmp)) {
-		usbi_err(ctx, "short descriptor read %d/%d", r, sizeof(tmp));
-		return LIBUSB_ERROR_IO;
-	}
-
-	/* seek forward to end of config */
-	usbi_parse_descriptor(tmp, "bbwbb", &config, 0);
-	off = lseek(fd, config.wTotalLength - sizeof(tmp), SEEK_CUR);
-	if (off < 0) {
-		usbi_err(ctx, "seek failed ret=%d errno=%d", off, errno);
-		return LIBUSB_ERROR_IO;
-	}
-
-	return 0;
-}
-
-static int sysfs_get_active_config_descriptor(struct libusb_device *dev,
-	unsigned char *buffer, size_t len)
-{
-	int fd;
-	ssize_t r;
-	off_t off;
-	int to_copy;
-	int config;
-	unsigned char tmp[6];
-
-	r = sysfs_get_active_config(dev, &config);
-	if (r < 0)
-		return r;
-	if (config == -1)
-		return LIBUSB_ERROR_NOT_FOUND;
-
-	usbi_dbg("active configuration %d", config);
-
-	/* sysfs provides access to an in-memory copy of the device descriptor,
-	 * so we use that rather than keeping our own copy */
-
-	fd = _open_sysfs_attr(dev, "descriptors");
-	if (fd < 0)
-		return fd;
-
-	/* device might have been unconfigured since we read bConfigurationValue,
-	 * so first check that there is any config descriptor data at all... */
-	off = lseek(fd, 0, SEEK_END);
-	if (off < 1) {
-		usbi_err(DEVICE_CTX(dev), "end seek failed, ret=%d errno=%d",
-			off, errno);
-		close(fd);
-		return LIBUSB_ERROR_IO;
-	} else if (off == DEVICE_DESC_LENGTH) {
-		close(fd);
-		return LIBUSB_ERROR_NOT_FOUND;
-	}
-
-	off = lseek(fd, DEVICE_DESC_LENGTH, SEEK_SET);
-	if (off < 0) {
-		usbi_err(DEVICE_CTX(dev), "seek failed, ret=%d errno=%d", off, errno);
-		close(fd);
-		return LIBUSB_ERROR_IO;
-	}
-
-	/* unbounded loop: we expect the descriptor to be present under all
-	 * circumstances */
-	while (1) {
-		r = read(fd, tmp, sizeof(tmp));
-		if (r < 0) {
-			usbi_err(DEVICE_CTX(dev), "read failed, ret=%d errno=%d",
-				fd, errno);
-			return LIBUSB_ERROR_IO;
-		} else if (r < sizeof(tmp)) {
-			usbi_err(DEVICE_CTX(dev), "short read %d/%d", r, sizeof(tmp));
-			return LIBUSB_ERROR_IO;
-		}
-
-		/* check bConfigurationValue */
-		if (tmp[5] == config)
-			break;
-
-		/* try the next descriptor */
-		off = lseek(fd, 0 - sizeof(tmp), SEEK_CUR);
-		if (off < 0)
-			return LIBUSB_ERROR_IO;
-
-		r = seek_to_next_config(DEVICE_CTX(dev), fd);
-		if (r < 0)
-			return r;
-	}
-
-	to_copy = (len < sizeof(tmp)) ? len : sizeof(tmp);
-	memcpy(buffer, tmp, to_copy);
-	if (len > sizeof(tmp)) {
-		r = read(fd, buffer + sizeof(tmp), len - sizeof(tmp));
-		if (r < 0) {
-			usbi_err(DEVICE_CTX(dev), "read failed, ret=%d errno=%d",
-				fd, errno);
-			r = LIBUSB_ERROR_IO;
-		} else if (r == 0) {
-			usbi_dbg("device is unconfigured");
-			r = LIBUSB_ERROR_NOT_FOUND;
-		} else if (r < len - sizeof(tmp)) {
-			usbi_err(DEVICE_CTX(dev), "short read %d/%d", r, len);
-			r = 0;
-		}
-	} else {
-		r = 0;
-	}
-
-	close(fd);
-	return r;
-}
-
 int linux_get_device_address (struct libusb_context *ctx, int detached,
 	uint8_t *busnum, uint8_t *devaddr,const char *dev_node,
 	const char *sys_name)
@@ -757,123 +621,122 @@ int linux_get_device_address (struct libusb_context *ctx, int detached,
 	return LIBUSB_SUCCESS;
 }
 
-static int op_get_active_config_descriptor(struct libusb_device *dev,
-	unsigned char *buffer, size_t len, int *host_endian)
+/* Return offset to next config */
+static int seek_to_next_config(struct libusb_context *ctx,
+	unsigned char *buffer, int size)
 {
-	/* Unlike the device desc. config descs. are always in raw format */
-	*host_endian = 0;
-	if (sysfs_has_descriptors) {
-		return sysfs_get_active_config_descriptor(dev, buffer, len);
-	} else {
-		return usbfs_get_active_config_descriptor(dev, buffer, len);
+	struct libusb_config_descriptor config;
+
+	if (size == 0)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	if (size < LIBUSB_DT_CONFIG_SIZE) {
+		usbi_err(ctx, "short descriptor read %d/%d",
+			 size, LIBUSB_DT_CONFIG_SIZE);
+		return LIBUSB_ERROR_IO;
+	}
+
+	usbi_parse_descriptor(buffer, "bbwbbbbb", &config, 0);
+
+	if (config.wTotalLength < LIBUSB_DT_CONFIG_SIZE) {
+		usbi_err(ctx, "invalid wTotalLength %d", config.wTotalLength);
+		return LIBUSB_ERROR_IO;
+	} else if (config.wTotalLength > size) {
+		usbi_warn(ctx, "short descriptor read %d/%d",
+			  size, config.wTotalLength);
+		return size;
+	} else
+		return config.wTotalLength;
+}
+
+static int get_config_descriptor_by_value(struct libusb_device *dev,
+	unsigned char **buffer, uint8_t value)
+{
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct linux_device_priv *priv = _device_priv(dev);
+	unsigned char *descriptors = priv->descriptors;
+	int size = priv->descriptors_len;
+	struct libusb_config_descriptor *config;
+
+	*buffer = NULL;
+
+	/* Skip device header */
+	descriptors += DEVICE_DESC_LENGTH;
+	size -= DEVICE_DESC_LENGTH;
+
+	/* Seek till the config is found, or till "EOF" */
+	while (1) {
+		int next = seek_to_next_config(ctx, descriptors, size);
+		if (next < 0)
+			return next;
+		config = (struct libusb_config_descriptor *)descriptors;
+		if (config->bConfigurationValue == value) {
+			*buffer = descriptors;
+			return next;
+		}
+		size -= next;
+		descriptors += next;
 	}
 }
 
-/* takes a usbfs fd, attempts to find the requested config and copy a certain
- * amount of it into an output buffer. */
-static int get_config_descriptor(struct libusb_context *ctx, int fd,
-	uint8_t config_index, unsigned char *buffer, size_t len)
+static int op_get_active_config_descriptor(struct libusb_device *dev,
+	unsigned char *buffer, size_t len, int *host_endian)
 {
-	off_t off;
-	ssize_t r;
+	int r, config;
+	unsigned char *config_desc;
 
-	off = lseek(fd, DEVICE_DESC_LENGTH, SEEK_SET);
-	if (off < 0) {
-		usbi_err(ctx, "seek failed ret=%d errno=%d", off, errno);
-		return LIBUSB_ERROR_IO;
-	}
+	/* Unlike the device desc. config descs. are always in raw format */
+	*host_endian = 0;
 
-	/* might need to skip some configuration descriptors to reach the
-	 * requested configuration */
-	while (config_index > 0) {
-		r = seek_to_next_config(ctx, fd);
+	if (sysfs_can_relate_devices) {
+		r = sysfs_get_active_config(dev, &config);
 		if (r < 0)
 			return r;
-		config_index--;
+	} else {
+		/* Use cached bConfigurationValue */
+		struct linux_device_priv *priv = _device_priv(dev);
+		config = priv->active_config;
 	}
+	if (config == -1)
+		return LIBUSB_ERROR_NOT_FOUND;
 
-	/* read the rest of the descriptor */
-	r = read(fd, buffer, len);
-	if (r < 0) {
-		usbi_err(ctx, "read failed ret=%d errno=%d", r, errno);
-		return LIBUSB_ERROR_IO;
-	} else if (r < len) {
-		usbi_err(ctx, "short output read %d/%d", r, len);
-	}
+	r = get_config_descriptor_by_value(dev, &config_desc, config);
+	if (r < 0)
+		return r;
 
-	return 0;
+	len = MIN(len, r);
+	memcpy(buffer, config_desc, len);
+	return len;
 }
 
 static int op_get_config_descriptor(struct libusb_device *dev,
 	uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
 {
-	int fd;
-	int r;
+	struct linux_device_priv *priv = _device_priv(dev);
+	unsigned char *descriptors = priv->descriptors;
+	int i, r, size = priv->descriptors_len;
 
 	/* Unlike the device desc. config descs. are always in raw format */
 	*host_endian = 0;
 
-	/* always read from usbfs: sysfs only has the active descriptor
-	 * this will involve waking the device up, but oh well! */
+	/* Skip device header */
+	descriptors += DEVICE_DESC_LENGTH;
+	size -= DEVICE_DESC_LENGTH;
 
-	/* FIXME: the above is no longer true, new kernels have all descriptors
-	 * in the descriptors file. but its kinda hard to detect if the kernel
-	 * is sufficiently new. */
-
-	fd = _get_usbfs_fd(dev, O_RDONLY, 0);
-	if (fd < 0)
-		return fd;
-
-	r = get_config_descriptor(DEVICE_CTX(dev), fd, config_index, buffer, len);
-	close(fd);
-	return r;
-}
-
-/* cache the active config descriptor in memory. a value of -1 means that
- * we aren't sure which one is active, so just assume the first one. 
- * only for usbfs. */
-static int cache_active_config(struct libusb_device *dev, int fd,
-	int active_config)
-{
-	struct linux_device_priv *priv = _device_priv(dev);
-	struct libusb_config_descriptor config;
-	unsigned char tmp[8];
-	unsigned char *buf;
-	int idx;
-	int r;
-
-	if (active_config == -1) {
-		idx = 0;
-	} else {
-		r = usbi_get_config_index_by_value(dev, active_config, &idx);
+	/* Seek till the config is found, or till "EOF" */
+	for (i = 0; ; i++) {
+		r = seek_to_next_config(DEVICE_CTX(dev), descriptors, size);
 		if (r < 0)
 			return r;
-		if (idx == -1)
-			return LIBUSB_ERROR_NOT_FOUND;
+		if (i == config_index)
+			break;
+		size -= r;
+		descriptors += r;
 	}
 
-	r = get_config_descriptor(DEVICE_CTX(dev), fd, idx, tmp, sizeof(tmp));
-	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev), "first read error %d", r);
-		return r;
-	}
-
-	usbi_parse_descriptor(tmp, "bbw", &config, 0);
-	buf = malloc(config.wTotalLength);
-	if (!buf)
-		return LIBUSB_ERROR_NO_MEM;
-
-	r = get_config_descriptor(DEVICE_CTX(dev), fd, idx, buf,
-		config.wTotalLength);
-	if (r < 0) {
-		free(buf);
-		return r;
-	}
-
-	if (priv->config_descriptor)
-		free(priv->config_descriptor);
-	priv->config_descriptor = buf;
-	return 0;
+	len = MIN(len, r);
+	memcpy(buffer, descriptors, len);
+	return len;
 }
 
 /* send a control message to retrieve active configuration */
@@ -912,10 +775,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	struct linux_device_priv *priv = _device_priv(dev);
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	int descriptors_size = 512; /* Begin with a 1024 byte alloc */
-	char path[PATH_MAX];
 	int fd, speed;
-	int active_config = 0;
-	int device_configured = 1;
 	ssize_t r;
 
 	dev->bus_number = busnum;
@@ -982,71 +842,50 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		return LIBUSB_ERROR_IO;
 	}
 
-	if (sysfs_has_descriptors)
-		return 0;
+	if (sysfs_can_relate_devices)
+		return LIBUSB_SUCCESS;
 
-	/* cache device descriptor in memory so that we can retrieve it later
-	 * without waking the device up (op_get_device_descriptor) */
-
-	priv->config_descriptor = NULL;
-
-	if (sysfs_can_relate_devices) {
-		int tmp = sysfs_get_active_config(dev, &active_config);
-		if (tmp < 0)
-			return tmp;
-		if (active_config == -1)
-			device_configured = 0;
-	}
-
+	/* cache active config */
 	fd = _get_usbfs_fd(dev, O_RDWR, 1);
-	if (fd == LIBUSB_ERROR_ACCESS) {
-		fd = _get_usbfs_fd(dev, O_RDONLY, 0);
-		/* if we only have read-only access to the device, we cannot
-		 * send a control message to determine the active config. just
-		 * assume the first one is active. */
-		active_config = -1;
-	}
-
 	if (fd < 0) {
-		return LIBUSB_ERROR_IO;
+		/* cannot send a control message to determine the active
+		 * config. just assume the first one is active. */
+		usbi_warn(ctx, "Missing rw usbfs access; cannot determine "
+			       "active configuration descriptor");
+		if (priv->descriptors_len >=
+				(DEVICE_DESC_LENGTH + LIBUSB_DT_CONFIG_SIZE)) {
+			struct libusb_config_descriptor config;
+			usbi_parse_descriptor(
+				priv->descriptors + DEVICE_DESC_LENGTH,
+				"bbwbbbbb", &config, 0);
+			priv->active_config = config.bConfigurationValue;
+		} else
+			priv->active_config = -1; /* No config dt */
+
+		return LIBUSB_SUCCESS;
 	}
 
-	if (!sysfs_can_relate_devices) {
-		if (active_config == -1) {
-			/* if we only have read-only access to the device, we cannot
-			 * send a control message to determine the active config. just
-			 * assume the first one is active. */
-			usbi_warn(DEVICE_CTX(dev), "access to %s is read-only; cannot "
-				"determine active configuration descriptor", path);
-		} else {
-			active_config = usbfs_get_active_config(dev, fd);
-			if (active_config == LIBUSB_ERROR_IO) {
-				/* buggy devices sometimes fail to report their active config.
-				 * assume unconfigured and continue the probing */
-				usbi_warn(DEVICE_CTX(dev), "couldn't query active "
-					"configuration, assumung unconfigured");
-				device_configured = 0;
-			} else if (active_config < 0) {
-				close(fd);
-				return active_config;
-			} else if (active_config == 0) {
-				/* some buggy devices have a configuration 0, but we're
-				 * reaching into the corner of a corner case here, so let's
-				 * not support buggy devices in these circumstances.
-				 * stick to the specs: a configuration value of 0 means
-				 * unconfigured. */
-				usbi_dbg("active cfg 0? assuming unconfigured device");
-				device_configured = 0;
-			}
-		}
-	}
-
-	/* bit of a hack: set num_configurations now because cache_active_config()
-	 * calls usbi_get_config_index_by_value() which uses it */
-	dev->num_configurations = priv->descriptors[DEVICE_DESC_LENGTH - 1];
-
-	if (device_configured)
-		r = cache_active_config(dev, fd, active_config);
+	r = usbfs_get_active_config(dev, fd);
+	if (r > 0) {
+		priv->active_config = r;
+		r = LIBUSB_SUCCESS;
+	} else if (r == 0) {
+		/* some buggy devices have a configuration 0, but we're
+		 * reaching into the corner of a corner case here, so let's
+		 * not support buggy devices in these circumstances.
+		 * stick to the specs: a configuration value of 0 means
+		 * unconfigured. */
+		usbi_dbg("active cfg 0? assuming unconfigured device");
+		priv->active_config = -1;
+		r = LIBUSB_SUCCESS;
+	} else if (r == LIBUSB_ERROR_IO) {
+		/* buggy devices sometimes fail to report their active config.
+		 * assume unconfigured and continue the probing */
+		usbi_warn(ctx, "couldn't query active configuration, assuming"
+			       " unconfigured");
+		priv->active_config = -1;
+		r = LIBUSB_SUCCESS;
+	} /* else r < 0, just return the error code */
 
 	close(fd);
 	return r;
@@ -1412,22 +1251,10 @@ static int op_set_configuration(struct libusb_device_handle *handle, int config)
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	if (!sysfs_has_descriptors) {
-		/* update our cached active config descriptor */
-		if (config == -1) {
-			if (priv->config_descriptor) {
-				free(priv->config_descriptor);
-				priv->config_descriptor = NULL;
-			}
-		} else {
-			r = cache_active_config(handle->dev, fd, config);
-			if (r < 0)
-				usbi_warn(HANDLE_CTX(handle),
-					"failed to update cached config descriptor, error %d", r);
-		}
-	}
+	/* update our cached active config descriptor */
+	priv->active_config = config;
 
-	return 0;
+	return LIBUSB_SUCCESS;
 }
 
 static int op_claim_interface(struct libusb_device_handle *handle, int iface)
@@ -1646,10 +1473,6 @@ static int op_attach_kernel_driver(struct libusb_device_handle *handle,
 static void op_destroy_device(struct libusb_device *dev)
 {
 	struct linux_device_priv *priv = _device_priv(dev);
-	if (!sysfs_has_descriptors) {
-		if (priv->config_descriptor)
-			free(priv->config_descriptor);
-	}
 	if (priv->descriptors)
 		free(priv->descriptors);
 	if (priv->sysfs_dir)
