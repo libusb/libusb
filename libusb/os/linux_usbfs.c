@@ -46,7 +46,11 @@
  *
  * sysfs allows us to read the kernel's in-memory copies of device descriptors
  * and so forth, avoiding the need to open the device:
- *  - The binary "descriptors" file was added in 2.6.23.
+ *  - The binary "descriptors" file contains all config descriptors since
+ *    2.6.26, commit 217a9081d8e69026186067711131b77f0ce219ed 
+ *  - The binary "descriptors" file was added in 2.6.23, commit
+ *    69d42a78f935d19384d1f6e4f94b65bb162b36df, but it only contains the
+ *    active config descriptors
  *  - The "busnum" file was added in 2.6.22
  *  - The "devnum" file has been present since pre-2.6.18
  *  - the "bConfigurationValue" file has been present since pre-2.6.18
@@ -57,12 +61,8 @@
  * The busnum file is important as that is the only way we can relate sysfs
  * devices to usbfs nodes.
  *
- * If we also have descriptors, we can obtain the device descriptor and active 
+ * If we also have all descriptors, we can obtain the device descriptor and
  * configuration without touching usbfs at all.
- *
- * The descriptors file originally only contained the active configuration
- * descriptor alongside the device descriptor, but all configurations are
- * included as of Linux 2.6.26.
  */
 
 /* endianness for multi-byte fields:
@@ -70,6 +70,8 @@
  * Descriptors exposed by usbfs have the multi-byte fields in the device
  * descriptor as host endian. Multi-byte fields in the other descriptors are
  * bus-endian. The kernel documentation says otherwise, but it is wrong.
+ *
+ * In sysfs all descriptors are bus-endian.
  */
 
 static const char *usbfs_path = NULL;
@@ -108,8 +110,10 @@ static clockid_t monotonic_clkid = -1;
  * the active configuration through bConfigurationValue */
 static int sysfs_can_relate_devices = 0;
 
-/* do we have a descriptors file? */
-static int sysfs_has_descriptors = 0;
+/* Linux 2.6.26 (commit 217a9081d8e69026186067711131b77f0ce219ed) adds all
+ * config descriptors (rather then just the active config) to the sysfs
+ * descriptors file, so from then on we can use them. */
+static int sysfs_has_descriptors = -1;
 
 /* how many times have we initted (and not exited) ? */
 static volatile int init_count = 0;
@@ -395,6 +399,15 @@ static int op_init(struct libusb_context *ctx)
 	if (supports_flag_zero_packet)
 		usbi_dbg("zero length packet flag supported");
 
+	if (-1 == sysfs_has_descriptors) {
+		/* sysfs descriptors has all descriptors since Linux 2.6.26 */
+		sysfs_has_descriptors = kernel_version_ge(2,6,26);
+		if (-1 == sysfs_has_descriptors) {
+			usbi_err(ctx, "error checking for sysfs descriptors");
+			return LIBUSB_ERROR_OTHER;
+		}
+	}
+
 	r = stat(SYSFS_DEVICE_PATH, &statbuf);
 	if (r == 0 && S_ISDIR(statbuf.st_mode)) {
 		DIR *devices = opendir(SYSFS_DEVICE_PATH);
@@ -422,7 +435,7 @@ static int op_init(struct libusb_context *ctx)
 		 * See the "sysfs vs usbfs" comment at the top of this file
 		 * for more details.  */
 		while ((entry = readdir(devices))) {
-			int has_busnum=0, has_devnum=0, has_descriptors=0;
+			int has_busnum=0, has_devnum=0;
 			int has_configuration_value=0;
 
 			/* Only check the usbN directories. */
@@ -432,25 +445,14 @@ static int op_init(struct libusb_context *ctx)
 			/* Check for the files libusbx needs from sysfs. */
 			has_busnum = sysfs_has_file(entry->d_name, "busnum");
 			has_devnum = sysfs_has_file(entry->d_name, "devnum");
-			has_descriptors = sysfs_has_file(entry->d_name, "descriptors");
 			has_configuration_value = sysfs_has_file(entry->d_name, "bConfigurationValue");
 
-			if (has_busnum && has_devnum && has_configuration_value)
+			if (has_busnum && has_devnum && has_configuration_value) {
 				sysfs_can_relate_devices = 1;
-			if (has_descriptors)
-				sysfs_has_descriptors = 1;
-
-			/* Only need to check until we've found ONE device which
-			   has all the attributes. */
-			if (sysfs_has_descriptors && sysfs_can_relate_devices)
 				break;
+			}
 		}
 		closedir(devices);
-
-		/* Only use sysfs descriptors if the rest of
-		   sysfs will work for libusb. */
-		if (!sysfs_can_relate_devices)
-			sysfs_has_descriptors = 0;
 	} else {
 		usbi_dbg("sysfs usb info not available");
 		sysfs_has_descriptors = 0;
