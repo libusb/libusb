@@ -998,6 +998,11 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 			close(fd);
 			return LIBUSB_ERROR_NO_MEM;
 		}
+		/* usbfs has holes in the file */
+		if (!sysfs_has_descriptors) {
+			memset(priv->descriptors + priv->descriptors_len,
+			       0, descriptors_size - priv->descriptors_len);
+		}
 		r = read(fd, priv->descriptors + priv->descriptors_len,
 			 descriptors_size - priv->descriptors_len);
 		if (r < 0) {
