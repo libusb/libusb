@@ -168,14 +168,36 @@ struct linux_transfer_priv {
 	int iso_packet_offset;
 };
 
-static void _get_usbfs_path(struct libusb_device *dev, char *path)
+static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 {
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	char path[PATH_MAX];
+	int fd;
+
 	if (usbdev_names)
 		snprintf(path, PATH_MAX, "%s/usbdev%d.%d",
 			usbfs_path, dev->bus_number, dev->device_address);
 	else
 		snprintf(path, PATH_MAX, "%s/%03d/%03d",
 			usbfs_path, dev->bus_number, dev->device_address);
+
+	fd = open(path, mode);
+	if (fd != -1)
+		return fd; /* Success */
+
+	if (!silent) {
+		usbi_err(ctx, "libusbx couldn't open USB device %s: %s",
+			 path, strerror(errno));
+		if (errno == EACCES && mode == O_RDWR)
+			usbi_err(ctx, "libusbx requires write access to USB "
+				      "device nodes.");
+	}
+
+	if (errno == EACCES)
+		return LIBUSB_ERROR_ACCESS;
+	if (errno == ENOENT)
+		return LIBUSB_ERROR_NO_DEVICE;
+	return LIBUSB_ERROR_IO;
 }
 
 static struct linux_device_priv *_device_priv(struct libusb_device *dev)
@@ -861,7 +883,6 @@ static int get_config_descriptor(struct libusb_context *ctx, int fd,
 static int op_get_config_descriptor(struct libusb_device *dev,
 	uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
 {
-	char filename[PATH_MAX];
 	int fd;
 	int r;
 
@@ -875,13 +896,9 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 	 * in the descriptors file. but its kinda hard to detect if the kernel
 	 * is sufficiently new. */
 
-	_get_usbfs_path(dev, filename);
-	fd = open(filename, O_RDONLY);
-	if (fd < 0) {
-		usbi_err(DEVICE_CTX(dev),
-			"open '%s' failed, ret=%d errno=%d", filename, fd, errno);
-		return LIBUSB_ERROR_IO;
-	}
+	fd = _get_usbfs_fd(dev, O_RDONLY, 0);
+	if (fd < 0)
+		return fd;
 
 	r = get_config_descriptor(DEVICE_CTX(dev), fd, config_index, buffer, len);
 	close(fd);
@@ -1017,10 +1034,9 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 			device_configured = 0;
 	}
 
-	_get_usbfs_path(dev, path);
-	fd = open(path, O_RDWR);
-	if (fd < 0 && errno == EACCES) {
-		fd = open(path, O_RDONLY);
+	fd = _get_usbfs_fd(dev, O_RDWR, 1);
+	if (fd == LIBUSB_ERROR_ACCESS) {
+		fd = _get_usbfs_fd(dev, O_RDONLY, 0);
 		/* if we only have read-only access to the device, we cannot
 		 * send a control message to determine the active config. just
 		 * assume the first one is active. */
@@ -1028,7 +1044,6 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	}
 
 	if (fd < 0) {
-		usbi_err(DEVICE_CTX(dev), "open failed, ret=%d errno=%d", fd, errno);
 		return LIBUSB_ERROR_IO;
 	}
 
@@ -1395,37 +1410,18 @@ static int linux_default_scan_devices (struct libusb_context *ctx)
 static int op_open(struct libusb_device_handle *handle)
 {
 	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
-	char filename[PATH_MAX];
 	int r;
 
-	_get_usbfs_path(handle->dev, filename);
-	usbi_dbg("opening %s", filename);
-	hpriv->fd = open(filename, O_RDWR);
-	if (hpriv->fd < 0) {
-		if (errno == EACCES) {
-			usbi_err(HANDLE_CTX(handle), "libusbx couldn't open USB device %s: "
-				"Permission denied.", filename);
-			usbi_err(HANDLE_CTX(handle),
-				"libusbx requires write access to USB device nodes.");
-			return LIBUSB_ERROR_ACCESS;
-		} else if (errno == ENOENT) {
-			usbi_err(HANDLE_CTX(handle), "libusbx couldn't open USB device %s: "
-				"No such file or directory.", filename);
-			return LIBUSB_ERROR_NO_DEVICE;
-		} else {
-			usbi_err(HANDLE_CTX(handle),
-				"open failed, code %d errno %d", hpriv->fd, errno);
-			return LIBUSB_ERROR_IO;
-		}
-	}
+	hpriv->fd = _get_usbfs_fd(handle->dev, O_RDWR, 0);
+	if (hpriv->fd < 0)
+		return hpriv->fd;
 
 	r = ioctl(hpriv->fd, IOCTL_USBFS_GET_CAPABILITIES, &hpriv->caps);
 	if (r < 0) {
 		if (errno == ENOTTY)
-			usbi_dbg("%s: getcap not available", filename);
+			usbi_dbg("getcap not available");
 		else
-			usbi_err(HANDLE_CTX(handle),
-				 "%s: getcap failed (%d)", filename, errno);
+			usbi_err(HANDLE_CTX(handle), "getcap failed (%d)", errno);
 		hpriv->caps = 0;
 		if (supports_flag_zero_packet)
 			hpriv->caps |= USBFS_CAP_ZERO_PACKET;
