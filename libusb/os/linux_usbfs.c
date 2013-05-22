@@ -51,13 +51,13 @@
  *  - The binary "descriptors" file was added in 2.6.23, commit
  *    69d42a78f935d19384d1f6e4f94b65bb162b36df, but it only contains the
  *    active config descriptors
- *  - The "busnum" file was added in 2.6.22
+ *  - The "busnum" file was added in 2.6.22, commit
+ *    83f7d958eab2fbc6b159ee92bf1493924e1d0f72
  *  - The "devnum" file has been present since pre-2.6.18
  *  - the "bConfigurationValue" file has been present since pre-2.6.18
  *
  * If we have bConfigurationValue, busnum, and devnum, then we can determine
  * the active configuration without having to open the usbfs node in RDWR mode.
- * We assume this is the case if we see the busnum file (indicates 2.6.22+).
  * The busnum file is important as that is the only way we can relate sysfs
  * devices to usbfs nodes.
  *
@@ -106,9 +106,10 @@ static int supports_flag_zero_packet = -1;
  * systems. appropriate choice made at initialization time. */
 static clockid_t monotonic_clkid = -1;
 
-/* do we have a busnum to relate devices? this also implies that we can read
+/* Linux 2.6.22 (commit 83f7d958eab2fbc6b159ee92bf1493924e1d0f72) adds a busnum
+ * to sysfs, so we can relate devices. This also implies that we can read
  * the active configuration through bConfigurationValue */
-static int sysfs_can_relate_devices = 0;
+static int sysfs_can_relate_devices = -1;
 
 /* Linux 2.6.26 (commit 217a9081d8e69026186067711131b77f0ce219ed) adds all
  * config descriptors (rather then just the active config) to the sysfs
@@ -345,22 +346,6 @@ static int kernel_version_ge(int major, int minor, int sublevel)
 	return ksublevel >= sublevel;
 }
 
-/* Return 1 if filename exists inside dirname in sysfs.
-   SYSFS_DEVICE_PATH is assumed to be the beginning of the path. */
-static int sysfs_has_file(const char *dirname, const char *filename)
-{
-	struct stat statbuf;
-	char path[PATH_MAX];
-	int r;
-
-	snprintf(path, PATH_MAX, "%s/%s/%s", SYSFS_DEVICE_PATH, dirname, filename);
-	r = stat(path, &statbuf);
-	if (r == 0 && S_ISREG(statbuf.st_mode))
-		return 1;
-
-	return 0;
-}
-
 static int op_init(struct libusb_context *ctx)
 {
 	struct stat statbuf;
@@ -408,56 +393,29 @@ static int op_init(struct libusb_context *ctx)
 		}
 	}
 
-	r = stat(SYSFS_DEVICE_PATH, &statbuf);
-	if (r == 0 && S_ISDIR(statbuf.st_mode)) {
-		DIR *devices = opendir(SYSFS_DEVICE_PATH);
-		struct dirent *entry;
-
-		usbi_dbg("found usb devices in sysfs");
-
-		if (!devices) {
-			usbi_err(ctx, "opendir devices failed errno=%d", errno);
-			return LIBUSB_ERROR_IO;
+	if (-1 == sysfs_can_relate_devices) {
+		/* sysfs has busnum since Linux 2.6.22 */
+		sysfs_can_relate_devices = kernel_version_ge(2,6,22);
+		if (-1 == sysfs_can_relate_devices) {
+			usbi_err(ctx, "error checking for sysfs busnum");
+			return LIBUSB_ERROR_OTHER;
 		}
-
-		/* Make sure sysfs supports all the required files. If it
-		 * does not, then usbfs will be used instead.  Determine
-		 * this by looping through the directories in
-		 * SYSFS_DEVICE_PATH.  With the assumption that there will
-		 * always be subdirectories of the name usbN (usb1, usb2,
-		 * etc) representing the root hubs, check the usbN
-		 * subdirectories to see if they have all the needed files.
-		 * This algorithm uses the usbN subdirectories (root hubs)
-		 * because a device disconnection will cause a race
-		 * condition regarding which files are available, sometimes
-		 * causing an incorrect result.  The root hubs are used
-		 * because it is assumed that they will always be present.
-		 * See the "sysfs vs usbfs" comment at the top of this file
-		 * for more details.  */
-		while ((entry = readdir(devices))) {
-			int has_busnum=0, has_devnum=0;
-			int has_configuration_value=0;
-
-			/* Only check the usbN directories. */
-			if (strncmp(entry->d_name, "usb", 3) != 0)
-				continue;
-
-			/* Check for the files libusbx needs from sysfs. */
-			has_busnum = sysfs_has_file(entry->d_name, "busnum");
-			has_devnum = sysfs_has_file(entry->d_name, "devnum");
-			has_configuration_value = sysfs_has_file(entry->d_name, "bConfigurationValue");
-
-			if (has_busnum && has_devnum && has_configuration_value) {
-				sysfs_can_relate_devices = 1;
-				break;
-			}
-		}
-		closedir(devices);
-	} else {
-		usbi_dbg("sysfs usb info not available");
-		sysfs_has_descriptors = 0;
-		sysfs_can_relate_devices = 0;
 	}
+
+	if (sysfs_can_relate_devices || sysfs_has_descriptors) {
+		r = stat(SYSFS_DEVICE_PATH, &statbuf);
+		if (r != 0 || !S_ISDIR(statbuf.st_mode)) {
+			usbi_warn(ctx, "sysfs not mounted");
+			sysfs_can_relate_devices = 0;
+			sysfs_has_descriptors = 0;
+		}
+	}
+
+	if (sysfs_can_relate_devices)
+		usbi_dbg("sysfs can relate devices");
+
+	if (sysfs_has_descriptors)
+		usbi_dbg("sysfs has complete descriptors");
 
 	usbi_mutex_static_lock(&hotplug_lock);
 	r = LIBUSB_SUCCESS;
