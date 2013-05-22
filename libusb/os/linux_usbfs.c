@@ -427,7 +427,7 @@ static int op_init(struct libusb_context *ctx)
 		r = linux_scan_devices(ctx);
 		if (r == LIBUSB_SUCCESS)
 			init_count++;
-		else
+		else if (init_count == 0)
 			linux_stop_event_monitor();
 	} else
 		usbi_err(ctx, "error starting hotplug event monitor");
