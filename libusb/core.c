@@ -514,7 +514,6 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	dev->refcnt = 1;
 	dev->session_data = session_id;
 	dev->speed = LIBUSB_SPEED_UNKNOWN;
-	memset(&dev->os_priv, 0, priv_size);
 
 	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
 		usbi_connect_device (dev);
