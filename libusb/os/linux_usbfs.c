@@ -1219,10 +1219,13 @@ static int op_get_configuration(struct libusb_device_handle *handle,
 	int *config)
 {
 	int r;
-	if (sysfs_can_relate_devices != 1)
-		return LIBUSB_ERROR_NOT_SUPPORTED;
 
-	r = sysfs_get_active_config(handle->dev, config);
+	if (sysfs_can_relate_devices) {
+		r = sysfs_get_active_config(handle->dev, config);
+	} else {
+		r = usbfs_get_active_config(handle->dev,
+					    _device_handle_priv(handle)->fd);
+	}
 	if (r < 0)
 		return r;
 
