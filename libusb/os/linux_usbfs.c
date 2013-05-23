@@ -621,6 +621,30 @@ int linux_get_device_address (struct libusb_context *ctx, int detached,
 	return LIBUSB_SUCCESS;
 }
 
+/* Return offset of the next descriptor with the given type */
+static int seek_to_next_descriptor(struct libusb_context *ctx,
+	uint8_t descriptor_type, unsigned char *buffer, int size)
+{
+	struct usb_descriptor_header header;
+	int i;
+
+	for (i = 0; size >= 0; i += header.bLength, size -= header.bLength) {
+		if (size == 0)
+			return LIBUSB_ERROR_NOT_FOUND;
+
+		if (size < 2) {
+			usbi_err(ctx, "short descriptor read %d/2", size);
+			return LIBUSB_ERROR_IO;
+		}
+		usbi_parse_descriptor(buffer + i, "bb", &header, 0);
+
+		if (i && header.bDescriptorType == descriptor_type)
+			return i;
+	}
+	usbi_err(ctx, "bLength overflow by %d bytes", -size);
+	return LIBUSB_ERROR_IO;
+}
+
 /* Return offset to next config */
 static int seek_to_next_config(struct libusb_context *ctx,
 	unsigned char *buffer, int size)
@@ -637,16 +661,44 @@ static int seek_to_next_config(struct libusb_context *ctx,
 	}
 
 	usbi_parse_descriptor(buffer, "bbwbbbbb", &config, 0);
-
-	if (config.wTotalLength < LIBUSB_DT_CONFIG_SIZE) {
-		usbi_err(ctx, "invalid wTotalLength %d", config.wTotalLength);
+	if (config.bDescriptorType != LIBUSB_DT_CONFIG) {
+		usbi_err(ctx, "descriptor is not a config desc (type 0x%02x)",
+			 config.bDescriptorType);
 		return LIBUSB_ERROR_IO;
-	} else if (config.wTotalLength > size) {
-		usbi_warn(ctx, "short descriptor read %d/%d",
-			  size, config.wTotalLength);
-		return size;
-	} else
-		return config.wTotalLength;
+	}
+
+	/*
+	 * In usbfs the config descriptors are config.wTotalLength bytes apart,
+	 * with any short reads from the device appearing as holes in the file.
+	 *
+	 * In sysfs wTotalLength is ignored, instead the kernel returns a
+	 * config descriptor with verified bLength fields, with descriptors
+	 * with an invalid bLength removed.
+	 */
+	if (sysfs_has_descriptors) {
+		int next = seek_to_next_descriptor(ctx, LIBUSB_DT_CONFIG,
+						   buffer, size);
+		if (next == LIBUSB_ERROR_NOT_FOUND)
+			next = size;
+		if (next < 0)
+			return next;
+
+		if (next != config.wTotalLength)
+			usbi_warn(ctx, "config length mismatch wTotalLength "
+				  "%d real %d", config.wTotalLength, next);
+		return next;
+	} else {
+		if (config.wTotalLength < LIBUSB_DT_CONFIG_SIZE) {
+			usbi_err(ctx, "invalid wTotalLength %d",
+				 config.wTotalLength);
+			return LIBUSB_ERROR_IO;
+		} else if (config.wTotalLength > size) {
+			usbi_warn(ctx, "short descriptor read %d/%d",
+				  size, config.wTotalLength);
+			return size;
+		} else
+			return config.wTotalLength;
+	}
 }
 
 static int get_config_descriptor_by_value(struct libusb_device *dev,
