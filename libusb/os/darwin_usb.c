@@ -515,6 +515,7 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
   struct darwin_device_priv *priv = (struct darwin_device_priv *)dev->os_priv;
   IOUSBConfigurationDescriptorPtr desc;
   IOReturn kresult;
+  int ret;
 
   if (!priv || !priv->device)
     return LIBUSB_ERROR_OTHER;
@@ -531,7 +532,11 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
     *host_endian = 0;
   }
 
-  return darwin_to_libusb (kresult);
+  ret = darwin_to_libusb (kresult);
+  if (ret != LIBUSB_SUCCESS)
+    return ret;
+
+  return len;
 }
 
 /* check whether the os has configured the device */

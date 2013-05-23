@@ -338,17 +338,15 @@ static void clear_configuration(struct libusb_config_descriptor *config)
 
 static int parse_configuration(struct libusb_context *ctx,
 	struct libusb_config_descriptor *config, unsigned char *buffer,
-	int host_endian)
+	int size, int host_endian)
 {
 	int i;
 	int r;
-	int size;
 	size_t tmp;
 	struct usb_descriptor_header header;
 	struct libusb_interface *usb_interface;
 
 	usbi_parse_descriptor(buffer, "bbwbbbbb", config, host_endian);
-	size = config->wTotalLength;
 
 	if (config->bNumInterfaces > USB_MAXINTERFACES) {
 		usbi_err(ctx, "too many interfaces (%d)", config->bNumInterfaces);
@@ -521,7 +519,7 @@ int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 	if (r < 0)
 		goto err;
 
-	r = parse_configuration(dev->ctx, _config, buf, host_endian);
+	r = parse_configuration(dev->ctx, _config, buf, r, host_endian);
 	if (r < 0) {
 		usbi_err(dev->ctx, "parse_configuration failed with error %d", r);
 		goto err;
@@ -591,7 +589,7 @@ int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 	if (r < 0)
 		goto err;
 
-	r = parse_configuration(dev->ctx, _config, buf, host_endian);
+	r = parse_configuration(dev->ctx, _config, buf, r, host_endian);
 	if (r < 0) {
 		usbi_err(dev->ctx, "parse_configuration failed with error %d", r);
 		goto err;

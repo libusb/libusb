@@ -269,7 +269,7 @@ obsd_get_active_config_descriptor(struct libusb_device *dev,
 
 	*host_endian = 0;
 
-	return (LIBUSB_SUCCESS);
+	return len;
 }
 
 int
@@ -307,7 +307,7 @@ obsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 
 	*host_endian = 0;
 
-	return (LIBUSB_SUCCESS);
+	return len;
 }
 
 int
