@@ -665,6 +665,22 @@ struct usbi_os_backend {
 		uint8_t config_index, unsigned char *buffer, size_t len,
 		int *host_endian);
 
+	/* Like get_config_descriptor but then by bConfigurationValue instead
+	 * of by index.
+	 *
+	 * Optional, if not present the core will call get_config_descriptor
+	 * for all configs until it finds the desired bConfigurationValue.
+	 *
+	 * Returns a pointer to the raw-descriptor in *buffer, this memory
+	 * is valid as long as device is valid.
+	 *
+	 * Returns the length of the returned raw-descriptor on success,
+	 * or a LIBUSB_ERROR code on failure.
+	 */
+	int (*get_config_descriptor_by_value)(struct libusb_device *device,
+		uint8_t bConfigurationValue, unsigned char **buffer,
+		int *host_endian);
+
 	/* Get the bConfigurationValue for the active configuration for a device.
 	 * Optional. This should only be implemented if you can retrieve it from
 	 * cache (don't generate I/O).

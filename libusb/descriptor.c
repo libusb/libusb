@@ -678,8 +678,18 @@ int usbi_get_config_index_by_value(struct libusb_device *dev,
 int API_EXPORTED libusb_get_config_descriptor_by_value(libusb_device *dev,
 	uint8_t bConfigurationValue, struct libusb_config_descriptor **config)
 {
-	int idx;
-	int r = usbi_get_config_index_by_value(dev, bConfigurationValue, &idx);
+	int r, idx, host_endian;
+	unsigned char *buf = NULL;
+
+	if (usbi_backend->get_config_descriptor_by_value) {
+		r = usbi_backend->get_config_descriptor_by_value(dev,
+			bConfigurationValue, &buf, &host_endian);
+		if (r < 0)
+			return r;
+		return raw_desc_to_config(dev->ctx, buf, r, host_endian, config);
+	}
+
+	r = usbi_get_config_index_by_value(dev, bConfigurationValue, &idx);
 	if (r < 0)
 		return r;
 	else if (idx == -1)

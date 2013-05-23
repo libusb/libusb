@@ -2275,6 +2275,7 @@ const struct usbi_os_backend windows_backend = {
 	windows_get_device_descriptor,
 	windows_get_active_config_descriptor,
 	windows_get_config_descriptor,
+	NULL,				/* get_config_descriptor_by_value() */
 
 	windows_get_configuration,
 	windows_set_configuration,

@@ -701,8 +701,8 @@ static int seek_to_next_config(struct libusb_context *ctx,
 	}
 }
 
-static int get_config_descriptor_by_value(struct libusb_device *dev,
-	unsigned char **buffer, uint8_t value)
+static int op_get_config_descriptor_by_value(struct libusb_device *dev,
+	uint8_t value, unsigned char **buffer, int *host_endian)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct linux_device_priv *priv = _device_priv(dev);
@@ -711,6 +711,8 @@ static int get_config_descriptor_by_value(struct libusb_device *dev,
 	struct libusb_config_descriptor *config;
 
 	*buffer = NULL;
+	/* Unlike the device desc. config descs. are always in raw format */
+	*host_endian = 0;
 
 	/* Skip device header */
 	descriptors += DEVICE_DESC_LENGTH;
@@ -737,9 +739,6 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 	int r, config;
 	unsigned char *config_desc;
 
-	/* Unlike the device desc. config descs. are always in raw format */
-	*host_endian = 0;
-
 	if (sysfs_can_relate_devices) {
 		r = sysfs_get_active_config(dev, &config);
 		if (r < 0)
@@ -752,7 +751,8 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 	if (config == -1)
 		return LIBUSB_ERROR_NOT_FOUND;
 
-	r = get_config_descriptor_by_value(dev, &config_desc, config);
+	r = op_get_config_descriptor_by_value(dev, config, &config_desc,
+					      host_endian);
 	if (r < 0)
 		return r;
 
@@ -2458,6 +2458,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.get_device_descriptor = op_get_device_descriptor,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,
+	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
 
 	.open = op_open,
 	.close = op_close,
