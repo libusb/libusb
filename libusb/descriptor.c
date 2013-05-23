@@ -346,6 +346,12 @@ static int parse_configuration(struct libusb_context *ctx,
 	struct usb_descriptor_header header;
 	struct libusb_interface *usb_interface;
 
+	if (size < LIBUSB_DT_CONFIG_SIZE) {
+		usbi_err(ctx, "short config descriptor read %d/%d",
+			 size, LIBUSB_DT_CONFIG_SIZE);
+		return LIBUSB_ERROR_IO;
+	}
+
 	usbi_parse_descriptor(buffer, "bbwbbbbb", config, host_endian);
 
 	if (config->bNumInterfaces > USB_MAXINTERFACES) {
@@ -491,7 +497,7 @@ int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 	struct libusb_config_descriptor **config)
 {
 	struct libusb_config_descriptor *_config = malloc(sizeof(*_config));
-	unsigned char tmp[8];
+	unsigned char tmp[LIBUSB_DT_CONFIG_SIZE];
 	unsigned char *buf = NULL;
 	int host_endian = 0;
 	int r;
@@ -500,10 +506,16 @@ int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 	if (!_config)
 		return LIBUSB_ERROR_NO_MEM;
 
-	r = usbi_backend->get_active_config_descriptor(dev, tmp, sizeof(tmp),
-		&host_endian);
+	r = usbi_backend->get_active_config_descriptor(dev, tmp,
+		LIBUSB_DT_CONFIG_SIZE, &host_endian);
 	if (r < 0)
 		goto err;
+	if (r < LIBUSB_DT_CONFIG_SIZE) {
+		usbi_err(dev->ctx, "short config descriptor read %d/%d",
+			 r, LIBUSB_DT_CONFIG_SIZE);
+		r = LIBUSB_ERROR_IO;
+		goto err;
+	}
 
 	_config->wTotalLength = 0;
 	usbi_parse_descriptor(tmp, "bbw", _config, host_endian);
@@ -558,7 +570,7 @@ int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 	uint8_t config_index, struct libusb_config_descriptor **config)
 {
 	struct libusb_config_descriptor *_config;
-	unsigned char tmp[8];
+	unsigned char tmp[LIBUSB_DT_CONFIG_SIZE];
 	unsigned char *buf = NULL;
 	int host_endian = 0;
 	int r;
@@ -572,9 +584,15 @@ int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 		return LIBUSB_ERROR_NO_MEM;
 
 	r = usbi_backend->get_config_descriptor(dev, config_index, tmp,
-		sizeof(tmp), &host_endian);
+		LIBUSB_DT_CONFIG_SIZE, &host_endian);
 	if (r < 0)
 		goto err;
+	if (r < LIBUSB_DT_CONFIG_SIZE) {
+		usbi_err(dev->ctx, "short config descriptor read %d/%d",
+			 r, LIBUSB_DT_CONFIG_SIZE);
+		r = LIBUSB_ERROR_IO;
+		goto err;
+	}
 
 	usbi_parse_descriptor(tmp, "bbw", _config, host_endian);
 	buf = malloc(_config->wTotalLength);
