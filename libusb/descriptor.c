@@ -86,25 +86,31 @@ static int parse_endpoint(struct libusb_context *ctx,
 	int parsed = 0;
 	int len;
 
-	usbi_parse_descriptor(buffer, "bb", &header, 0);
-
-	/* Everything should be fine being passed into here, but we sanity */
-	/*  check JIC */
-	if (header.bLength > size) {
-		usbi_err(ctx, "ran out of descriptors parsing");
-		return -1;
+	if (size < DESC_HEADER_LENGTH) {
+		usbi_err(ctx, "short endpoint descriptor read %d/%d",
+			 size, DESC_HEADER_LENGTH);
+		return LIBUSB_ERROR_IO;
 	}
 
+	usbi_parse_descriptor(buffer, "bb", &header, 0);
 	if (header.bDescriptorType != LIBUSB_DT_ENDPOINT) {
 		usbi_err(ctx, "unexpected descriptor %x (expected %x)",
 			header.bDescriptorType, LIBUSB_DT_ENDPOINT);
 		return parsed;
 	}
-
+	if (header.bLength > size) {
+		usbi_warn(ctx, "short endpoint descriptor read %d/%d",
+			  size, header.bLength);
+		return parsed;
+	}
 	if (header.bLength >= ENDPOINT_AUDIO_DESC_LENGTH)
 		usbi_parse_descriptor(buffer, "bbbbwbbb", endpoint, host_endian);
 	else if (header.bLength >= ENDPOINT_DESC_LENGTH)
 		usbi_parse_descriptor(buffer, "bbbbwb", endpoint, host_endian);
+	else {
+		usbi_err(ctx, "invalid endpoint bLength (%d)", header.bLength);
+		return LIBUSB_ERROR_IO;
+	}
 
 	buffer += header.bLength;
 	size -= header.bLength;
@@ -115,10 +121,14 @@ static int parse_endpoint(struct libusb_context *ctx,
 	begin = buffer;
 	while (size >= DESC_HEADER_LENGTH) {
 		usbi_parse_descriptor(buffer, "bb", &header, 0);
-
-		if (header.bLength < 2) {
-			usbi_err(ctx, "invalid descriptor length %d", header.bLength);
-			return -1;
+		if (header.bLength < DESC_HEADER_LENGTH) {
+			usbi_err(ctx, "invalid extra ep desc len (%d)",
+				 header.bLength);
+			return LIBUSB_ERROR_IO;
+		} else if (header.bLength > size) {
+			usbi_warn(ctx, "short extra ep desc read %d/%d",
+				  size, header.bLength);
+			return parsed;
 		}
 
 		/* If we find another "proper" descriptor then we're done  */
@@ -209,8 +219,30 @@ static int parse_interface(libusb_context *ctx,
 		usb_interface->altsetting = altsetting;
 
 		ifp = altsetting + usb_interface->num_altsetting;
-		usb_interface->num_altsetting++;
 		usbi_parse_descriptor(buffer, "bbbbbbbbb", ifp, 0);
+		if (ifp->bDescriptorType != LIBUSB_DT_INTERFACE) {
+			usbi_err(ctx, "unexpected descriptor %x (expected %x)",
+				 ifp->bDescriptorType, LIBUSB_DT_INTERFACE);
+			return parsed;
+		}
+		if (ifp->bLength < INTERFACE_DESC_LENGTH) {
+			usbi_err(ctx, "invalid interface bLength (%d)",
+				 ifp->bLength);
+			r = LIBUSB_ERROR_IO;
+			goto err;
+		}
+		if (ifp->bLength > size) {
+			usbi_warn(ctx, "short intf descriptor read %d/%d",
+				 size, ifp->bLength);
+			return parsed;
+		}
+		if (ifp->bNumEndpoints > USB_MAXENDPOINTS) {
+			usbi_err(ctx, "too many endpoints (%d)", ifp->bNumEndpoints);
+			r = LIBUSB_ERROR_IO;
+			goto err;
+		}
+
+		usb_interface->num_altsetting++;
 		ifp->extra = NULL;
 		ifp->extra_length = 0;
 		ifp->endpoint = NULL;
@@ -225,17 +257,17 @@ static int parse_interface(libusb_context *ctx,
 		/* Skip over any interface, class or vendor descriptors */
 		while (size >= DESC_HEADER_LENGTH) {
 			usbi_parse_descriptor(buffer, "bb", &header, 0);
-			if (header.bLength < 2) {
-				usbi_err(ctx, "invalid descriptor of length %d",
-					header.bLength);
+			if (header.bLength < DESC_HEADER_LENGTH) {
+				usbi_err(ctx,
+					 "invalid extra intf desc len (%d)",
+					 header.bLength);
 				r = LIBUSB_ERROR_IO;
 				goto err;
 			} else if (header.bLength > size) {
-				usbi_warn(ctx, "invalid descriptor of length %d",
-					header.bLength);
-				/* The remaining bytes are bogus, but at least
-				 * one interface is OK, so let's continue. */
-				break;
+				usbi_warn(ctx,
+					  "short extra intf desc read %d/%d",
+					  size, header.bLength);
+				return parsed;
 			}
 
 			/* If we find another "proper" descriptor then we're done */
@@ -263,21 +295,6 @@ static int parse_interface(libusb_context *ctx,
 			ifp->extra_length = len;
 		}
 
-		/* Did we hit an unexpected descriptor? */
-		if (size >= DESC_HEADER_LENGTH) {
-			usbi_parse_descriptor(buffer, "bb", &header, 0);
-			if ((header.bDescriptorType == LIBUSB_DT_CONFIG) ||
-			    (header.bDescriptorType == LIBUSB_DT_DEVICE)) {
-				return parsed;
-			}
-		}
-
-		if (ifp->bNumEndpoints > USB_MAXENDPOINTS) {
-			usbi_err(ctx, "too many endpoints (%d)", ifp->bNumEndpoints);
-			r = LIBUSB_ERROR_IO;
-			goto err;
-		}
-
 		if (ifp->bNumEndpoints > 0) {
 			struct libusb_endpoint_descriptor *endpoint;
 			tmp = ifp->bNumEndpoints * sizeof(struct libusb_endpoint_descriptor);
@@ -290,18 +307,14 @@ static int parse_interface(libusb_context *ctx,
 
 			memset(endpoint, 0, tmp);
 			for (i = 0; i < ifp->bNumEndpoints; i++) {
-				usbi_parse_descriptor(buffer, "bb", &header, 0);
-
-				if (header.bLength > size) {
-					usbi_err(ctx, "ran out of descriptors parsing");
-					r = LIBUSB_ERROR_IO;
-					goto err;
-				}
-
 				r = parse_endpoint(ctx, endpoint + i, buffer, size,
 					host_endian);
 				if (r < 0)
 					goto err;
+				if (r == 0) {
+					ifp->bNumEndpoints = i;
+					break;;
+				}
 
 				buffer += r;
 				parsed += r;
@@ -353,7 +366,20 @@ static int parse_configuration(struct libusb_context *ctx,
 	}
 
 	usbi_parse_descriptor(buffer, "bbwbbbbb", config, host_endian);
-
+	if (config->bDescriptorType != LIBUSB_DT_CONFIG) {
+		usbi_err(ctx, "unexpected descriptor %x (expected %x)",
+			 config->bDescriptorType, LIBUSB_DT_CONFIG);
+		return LIBUSB_ERROR_IO;
+	}
+	if (config->bLength < LIBUSB_DT_CONFIG_SIZE) {
+		usbi_err(ctx, "invalid config bLength (%d)", config->bLength);
+		return LIBUSB_ERROR_IO;
+	}
+	if (config->bLength > size) {
+		usbi_err(ctx, "short config descriptor read %d/%d",
+			 size, config->bLength);
+		return LIBUSB_ERROR_IO;
+	}
 	if (config->bNumInterfaces > USB_MAXINTERFACES) {
 		usbi_err(ctx, "too many interfaces (%d)", config->bNumInterfaces);
 		return LIBUSB_ERROR_IO;
@@ -382,20 +408,18 @@ static int parse_configuration(struct libusb_context *ctx,
 		while (size >= DESC_HEADER_LENGTH) {
 			usbi_parse_descriptor(buffer, "bb", &header, 0);
 
-			/* If we've parsed at least one config descriptor then
-			 * let's return that. */
-			if (header.bLength > size && i) {
-				usbi_warn(ctx, "invalid descriptor length of %d",
-					header.bLength);
-				return size;
-			}
-
-			if ((header.bLength > size) ||
-					(header.bLength < DESC_HEADER_LENGTH)) {
-				usbi_err(ctx, "invalid descriptor length of %d",
-					header.bLength);
+			if (header.bLength < DESC_HEADER_LENGTH) {
+				usbi_err(ctx,
+					 "invalid extra config desc len (%d)",
+					 header.bLength);
 				r = LIBUSB_ERROR_IO;
 				goto err;
+			} else if (header.bLength > size) {
+				usbi_warn(ctx,
+					  "short extra config desc read %d/%d",
+					  size, header.bLength);
+				config->bNumInterfaces = i;
+				return size;
 			}
 
 			/* If we find another "proper" descriptor then we're done */
@@ -430,6 +454,10 @@ static int parse_configuration(struct libusb_context *ctx,
 		r = parse_interface(ctx, usb_interface + i, buffer, size, host_endian);
 		if (r < 0)
 			goto err;
+		if (r == 0) {
+			config->bNumInterfaces = i;
+			break;
+		}
 
 		buffer += r;
 		size -= r;
