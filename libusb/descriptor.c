@@ -470,6 +470,29 @@ err:
 	return r;
 }
 
+static int raw_desc_to_config(struct libusb_context *ctx,
+	unsigned char *buf, int size, int host_endian,
+	struct libusb_config_descriptor **config)
+{
+	struct libusb_config_descriptor *_config = malloc(sizeof(*_config));
+	int r;
+	
+	if (!_config)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = parse_configuration(ctx, _config, buf, size, host_endian);
+	if (r < 0) {
+		usbi_err(ctx, "parse_configuration failed with error %d", r);
+		free(_config);
+		return r;
+	} else if (r > 0) {
+		usbi_warn(ctx, "still %d bytes of descriptor data left", r);
+	}
+	
+	*config = _config;
+	return LIBUSB_SUCCESS;
+}
+
 int usbi_device_cache_descriptor(libusb_device *dev)
 {
 	int r, host_endian;
@@ -524,57 +547,33 @@ int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
 int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 	struct libusb_config_descriptor **config)
 {
-	struct libusb_config_descriptor *_config = malloc(sizeof(*_config));
+	struct libusb_config_descriptor _config;
 	unsigned char tmp[LIBUSB_DT_CONFIG_SIZE];
 	unsigned char *buf = NULL;
 	int host_endian = 0;
 	int r;
 
-	usbi_dbg("");
-	if (!_config)
-		return LIBUSB_ERROR_NO_MEM;
-
 	r = usbi_backend->get_active_config_descriptor(dev, tmp,
 		LIBUSB_DT_CONFIG_SIZE, &host_endian);
 	if (r < 0)
-		goto err;
+		return r;
 	if (r < LIBUSB_DT_CONFIG_SIZE) {
 		usbi_err(dev->ctx, "short config descriptor read %d/%d",
 			 r, LIBUSB_DT_CONFIG_SIZE);
-		r = LIBUSB_ERROR_IO;
-		goto err;
+		return LIBUSB_ERROR_IO;
 	}
 
-	_config->wTotalLength = 0;
-	usbi_parse_descriptor(tmp, "bbw", _config, host_endian);
-	if (_config->wTotalLength != 0)
-		buf = malloc(_config->wTotalLength);
-	if (!buf) {
-		r = LIBUSB_ERROR_NO_MEM;
-		goto err;
-	}
+	usbi_parse_descriptor(tmp, "bbw", &_config, host_endian);
+	buf = malloc(_config.wTotalLength);
+	if (!buf)
+		return LIBUSB_ERROR_NO_MEM;
 
 	r = usbi_backend->get_active_config_descriptor(dev, buf,
-		_config->wTotalLength, &host_endian);
-	if (r < 0)
-		goto err;
-
-	r = parse_configuration(dev->ctx, _config, buf, r, host_endian);
-	if (r < 0) {
-		usbi_err(dev->ctx, "parse_configuration failed with error %d", r);
-		goto err;
-	} else if (r > 0) {
-		usbi_warn(dev->ctx, "descriptor data still left");
-	}
+		_config.wTotalLength, &host_endian);
+	if (r >= 0)
+		r = raw_desc_to_config(dev->ctx, buf, r, host_endian, config);
 
 	free(buf);
-	*config = _config;
-	return 0;
-
-err:
-	free(_config);
-	if (buf)
-		free(buf);
 	return r;
 }
 
@@ -597,7 +596,7 @@ err:
 int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 	uint8_t config_index, struct libusb_config_descriptor **config)
 {
-	struct libusb_config_descriptor *_config;
+	struct libusb_config_descriptor _config;
 	unsigned char tmp[LIBUSB_DT_CONFIG_SIZE];
 	unsigned char *buf = NULL;
 	int host_endian = 0;
@@ -607,50 +606,27 @@ int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 	if (config_index >= dev->num_configurations)
 		return LIBUSB_ERROR_NOT_FOUND;
 
-	_config = malloc(sizeof(*_config));
-	if (!_config)
-		return LIBUSB_ERROR_NO_MEM;
-
 	r = usbi_backend->get_config_descriptor(dev, config_index, tmp,
 		LIBUSB_DT_CONFIG_SIZE, &host_endian);
 	if (r < 0)
-		goto err;
+		return r;
 	if (r < LIBUSB_DT_CONFIG_SIZE) {
 		usbi_err(dev->ctx, "short config descriptor read %d/%d",
 			 r, LIBUSB_DT_CONFIG_SIZE);
-		r = LIBUSB_ERROR_IO;
-		goto err;
+		return LIBUSB_ERROR_IO;
 	}
 
-	usbi_parse_descriptor(tmp, "bbw", _config, host_endian);
-	buf = malloc(_config->wTotalLength);
-	if (!buf) {
-		r = LIBUSB_ERROR_NO_MEM;
-		goto err;
-	}
+	usbi_parse_descriptor(tmp, "bbw", &_config, host_endian);
+	buf = malloc(_config.wTotalLength);
+	if (!buf)
+		return LIBUSB_ERROR_NO_MEM;
 
-	host_endian = 0;
 	r = usbi_backend->get_config_descriptor(dev, config_index, buf,
-		_config->wTotalLength, &host_endian);
-	if (r < 0)
-		goto err;
-
-	r = parse_configuration(dev->ctx, _config, buf, r, host_endian);
-	if (r < 0) {
-		usbi_err(dev->ctx, "parse_configuration failed with error %d", r);
-		goto err;
-	} else if (r > 0) {
-		usbi_warn(dev->ctx, "descriptor data still left");
-	}
+		_config.wTotalLength, &host_endian);
+	if (r >= 0)
+		r = raw_desc_to_config(dev->ctx, buf, r, host_endian, config);
 
 	free(buf);
-	*config = _config;
-	return 0;
-
-err:
-	free(_config);
-	if (buf)
-		free(buf);
 	return r;
 }
 
