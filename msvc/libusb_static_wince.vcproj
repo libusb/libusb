@@ -1087,6 +1087,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\libusb\hotplug.c"
+				>
+			</File>
+			<File
 				RelativePath="..\libusb\io.c"
 				>
 			</File>
