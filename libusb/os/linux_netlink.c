@@ -127,10 +127,12 @@ static int linux_netlink_parse(char *buffer, size_t len, int *detached, const ch
 	*devaddr  = 0;
 
 	tmp = netlink_message_parse((const char *) buffer, len, "ACTION");
+	if (tmp == NULL)
+		return -1;
 	if (0 == strcmp(tmp, "remove")) {
 		*detached = 1;
 	} else if (0 != strcmp(tmp, "add")) {
-		usbi_dbg("unknown device action");
+		usbi_dbg("unknown device action %s", tmp);
 		return -1;
 	}
 
@@ -180,51 +182,59 @@ static int linux_netlink_parse(char *buffer, size_t len, int *detached, const ch
 	return 0;
 }
 
-static void *linux_netlink_event_thread_main(void *arg)
+static int linux_netlink_read_message(void)
 {
-	struct pollfd fds = {.fd = linux_netlink_socket,
-			     .events = POLLIN};
 	unsigned char buffer[1024];
 	struct iovec iov = {.iov_base = buffer, .iov_len = sizeof(buffer)};
 	struct msghdr meh = { .msg_iov=&iov, .msg_iovlen=1,
 			     .msg_name=&snl, .msg_namelen=sizeof(snl) };
+	const char *sys_name = NULL;
 	uint8_t busnum, devaddr;
 	int detached, r;
 	size_t len;
+
+	/* read netlink message */
+	memset(buffer, 0, sizeof(buffer));
+	len = recvmsg(linux_netlink_socket, &meh, 0);
+	if (len < 32) {
+		if (errno != EAGAIN)
+			usbi_dbg("error recieving message from netlink");
+		return -1;
+	}
+
+	/* TODO -- authenticate this message is from the kernel or udevd */
+
+	r = linux_netlink_parse(buffer, len, &detached, &sys_name,
+				&busnum, &devaddr);
+	if (r)
+		return r;
+
+	usbi_dbg("netlink hotplug found device busnum: %hhu, devaddr: %hhu, sys_name: %s, removed: %s",
+		 busnum, devaddr, sys_name, detached ? "yes" : "no");
+
+	/* signal device is available (or not) to all contexts */
+	if (detached)
+		linux_hotplug_disconnected(busnum, devaddr, sys_name);
+	else
+		linux_hotplug_enumerate(busnum, devaddr, sys_name);
+
+	return 0;
+}
+
+static void *linux_netlink_event_thread_main(void *arg)
+{
+	struct pollfd fds = {.fd = linux_netlink_socket,
+			     .events = POLLIN};
 
 	/* silence compiler warning */
 	(void) arg;
 
 	while (1 == poll(&fds, 1, -1)) {
-		const char *sys_name = NULL;
-
 		if (POLLIN != fds.revents) {
 			break;
 		}
 
-		/* read netlink message */
-		memset(buffer, 0, sizeof(buffer));
-		len = recvmsg(linux_netlink_socket, &meh, 0);
-		if (len < 32) {
-			usbi_dbg("error recieving message from netlink");
-			continue;
-		}
-
-		/* TODO -- authenticate this message is from the kernel or udevd */
-
-		r = linux_netlink_parse(buffer, len, &detached, &sys_name,
-					&busnum, &devaddr);
-		if (r)
-			continue;
-
-		usbi_dbg("netlink hotplug found device busnum: %hhu, devaddr: %hhu, sys_name: %s, removed: %s",
-			 busnum, devaddr, sys_name, detached ? "yes" : "no");
-
-		/* signal device is available (or not) to all contexts */
-		if (detached)
-			linux_hotplug_disconnected(busnum, devaddr, sys_name);
-		else
-			linux_hotplug_enumerate(busnum, devaddr, sys_name);
+		linux_netlink_read_message();
 	}
 
 	return NULL;
