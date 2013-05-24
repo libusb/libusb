@@ -25,9 +25,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#ifndef OS_WINDOWS
-#include <fcntl.h>
-#endif
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
 #endif
@@ -1082,9 +1079,6 @@ int usbi_io_init(struct libusb_context *ctx)
 		goto err;
 	}
 
-#ifndef OS_WINDOWS
-	fcntl(ctx->hotplug_pipe[1], F_SETFD, O_NONBLOCK);
-#endif
 	r = usbi_add_pollfd(ctx, ctx->hotplug_pipe[0], POLLIN);
 	if (r < 0)
 		goto err_close_hp_pipe;
