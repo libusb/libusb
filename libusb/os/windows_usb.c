@@ -1757,6 +1757,7 @@ static int windows_get_config_descriptor(struct libusb_device *dev, uint8_t conf
 
 	size = min(config_header->wTotalLength, len);
 	memcpy(buffer, priv->config_descriptor[config_index], size);
+	*host_endian = 0;
 
 	return size;
 }

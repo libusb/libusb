@@ -495,7 +495,7 @@ static int raw_desc_to_config(struct libusb_context *ctx,
 
 int usbi_device_cache_descriptor(libusb_device *dev)
 {
-	int r, host_endian;
+	int r, host_endian = 0;
 
 	r = usbi_backend->get_device_descriptor(dev, (unsigned char *) &dev->device_descriptor,
 						&host_endian);
