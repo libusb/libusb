@@ -135,7 +135,9 @@ static void *linux_udev_event_thread_main(void *arg)
 			break;
 		}
 
+		usbi_mutex_static_lock(&linux_hotplug_lock);
 		udev_hotplug_event();
+		usbi_mutex_static_unlock(&linux_hotplug_lock);
 	}
 
 	usbi_dbg("udev event thread exiting");

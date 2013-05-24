@@ -146,6 +146,8 @@ struct usbfs_hub_portinfo {
 #define IOCTL_USBFS_RELEASE_PORT	_IOR('U', 25, unsigned int)
 #define IOCTL_USBFS_GET_CAPABILITIES	_IOR('U', 26, __u32)
 
+extern usbi_mutex_static_t linux_hotplug_lock;
+
 #if defined(HAVE_LIBUDEV)
 int linux_udev_start_event_monitor(void);
 int linux_udev_stop_event_monitor(void);

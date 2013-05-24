@@ -234,7 +234,9 @@ static void *linux_netlink_event_thread_main(void *arg)
 			break;
 		}
 
+		usbi_mutex_static_lock(&linux_hotplug_lock);
 		linux_netlink_read_message();
+		usbi_mutex_static_unlock(&linux_hotplug_lock);
 	}
 
 	return NULL;
