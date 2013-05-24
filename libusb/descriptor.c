@@ -199,6 +199,7 @@ static int parse_interface(libusb_context *ctx,
 	int len;
 	int r;
 	int parsed = 0;
+	int interface_number = -1;
 	size_t tmp;
 	struct usb_descriptor_header header;
 	struct libusb_interface_descriptor *ifp;
@@ -246,6 +247,9 @@ static int parse_interface(libusb_context *ctx,
 		ifp->extra = NULL;
 		ifp->extra_length = 0;
 		ifp->endpoint = NULL;
+
+		if (interface_number == -1)
+			interface_number = ifp->bInterfaceNumber;
 
 		/* Skip over the interface */
 		buffer += ifp->bLength;
@@ -326,7 +330,7 @@ static int parse_interface(libusb_context *ctx,
 		ifp = (struct libusb_interface_descriptor *) buffer;
 		if (size < LIBUSB_DT_INTERFACE_SIZE ||
 				ifp->bDescriptorType != LIBUSB_DT_INTERFACE ||
-				!ifp->bAlternateSetting)
+				ifp->bInterfaceNumber != interface_number)
 			return parsed;
 	}
 
