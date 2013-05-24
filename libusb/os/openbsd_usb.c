@@ -93,6 +93,7 @@ const struct usbi_os_backend openbsd_backend = {
 	NULL,				/* init() */
 	NULL,				/* exit() */
 	obsd_get_device_list,
+	NULL,				/* hotplug_poll */
 	obsd_open,
 	obsd_close,
 

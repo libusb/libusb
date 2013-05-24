@@ -978,6 +978,7 @@ const struct usbi_os_backend wince_backend = {
         wince_exit,
 
         wince_get_device_list,
+	NULL,				/* hotplug_poll */
         wince_open,
         wince_close,
 

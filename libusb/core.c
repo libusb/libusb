@@ -654,6 +654,9 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 		/* backend provides hotplug support */
 		struct libusb_device *dev;
 
+		if (usbi_backend->hotplug_poll)
+			usbi_backend->hotplug_poll();
+
 		usbi_mutex_lock(&ctx->usb_devs_lock);
 		list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device) {
 			discdevs = discovered_devs_append(discdevs, dev);

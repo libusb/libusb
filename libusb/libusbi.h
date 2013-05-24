@@ -551,10 +551,29 @@ struct usbi_os_backend {
 	 * This function is executed when the user wishes to retrieve a list
 	 * of USB devices connected to the system.
 	 *
+	 * If the backend has hotplug support, this function is not used!
+	 *
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */
 	int (*get_device_list)(struct libusb_context *ctx,
 		struct discovered_devs **discdevs);
+
+	/* Apps which were written before hotplug support, may listen for
+	 * hotplug events on their own and call libusb_get_device_list on
+	 * device addition. In this case libusb_get_device_list will likely
+	 * return a list without the new device in there, as the hotplug
+	 * event thread will still be busy enumerating the device, which may
+	 * take a while, or may not even have seen the event yet.
+	 *
+	 * To avoid this libusb_get_device_list will call this optional
+	 * function for backends with hotplug support before copying
+	 * ctx->usb_devs to the user. In this function the backend should
+	 * ensure any pending hotplug events are fully processed before
+	 * returning.
+	 *
+	 * Optional, should be implemented by backends with hotplug support.
+	 */
+	void (*hotplug_poll)(void);
 
 	/* Open a device for I/O and other USB operations. The device handle
 	 * is preallocated for you, you can retrieve the device in question

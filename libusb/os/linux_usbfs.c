@@ -475,6 +475,15 @@ static int linux_scan_devices(struct libusb_context *ctx)
 #endif
 }
 
+static void op_hotplug_poll(void)
+{
+#if defined(USE_UDEV)
+	linux_udev_hotplug_poll();
+#else
+	linux_netlink_hotplug_poll();
+#endif
+}
+
 static int _open_sysfs_attr(struct libusb_device *dev, const char *attr)
 {
 	struct linux_device_priv *priv = _device_priv(dev);
@@ -2451,6 +2460,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.init = op_init,
 	.exit = op_exit,
 	.get_device_list = NULL,
+	.hotplug_poll = op_hotplug_poll,
 	.get_device_descriptor = op_get_device_descriptor,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,

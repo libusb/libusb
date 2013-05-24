@@ -152,9 +152,11 @@ extern usbi_mutex_static_t linux_hotplug_lock;
 int linux_udev_start_event_monitor(void);
 int linux_udev_stop_event_monitor(void);
 int linux_udev_scan_devices(struct libusb_context *ctx);
+void linux_udev_hotplug_poll(void);
 #else
 int linux_netlink_start_event_monitor(void);
 int linux_netlink_stop_event_monitor(void);
+void linux_netlink_hotplug_poll(void);
 #endif
 
 void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_name);

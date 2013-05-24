@@ -49,7 +49,7 @@ static int udev_monitor_fd = -1;
 static struct udev_monitor *udev_monitor = NULL;
 static pthread_t linux_event_thread;
 
-static void udev_hotplug_event(void);
+static void udev_hotplug_event(struct udev_device* udev_dev);
 static void *linux_udev_event_thread_main(void *arg);
 
 int linux_udev_start_event_monitor(void)
@@ -125,6 +125,7 @@ int linux_udev_stop_event_monitor(void)
 
 static void *linux_udev_event_thread_main(void *arg)
 {
+	struct udev_device* udev_dev;
 	struct pollfd fds = {.fd = udev_monitor_fd,
 			     .events = POLLIN};
 
@@ -136,7 +137,9 @@ static void *linux_udev_event_thread_main(void *arg)
 		}
 
 		usbi_mutex_static_lock(&linux_hotplug_lock);
-		udev_hotplug_event();
+		udev_dev = udev_monitor_receive_device(udev_monitor);
+		if (udev_dev)
+			udev_hotplug_event(udev_dev);
 		usbi_mutex_static_unlock(&linux_hotplug_lock);
 	}
 
@@ -164,26 +167,15 @@ static int udev_device_info(struct libusb_context *ctx, int detached,
 					dev_node, *sys_name);
 }
 
-static void udev_hotplug_event(void)
+static void udev_hotplug_event(struct udev_device* udev_dev)
 {
-	struct udev_device* udev_dev;
 	const char* udev_action;
 	const char* sys_name = NULL;
 	uint8_t busnum = 0, devaddr = 0;
 	int detached;
 	int r;
 
-	if (NULL == udev_monitor) {
-		return;
-	}
-
 	do {
-		udev_dev = udev_monitor_receive_device(udev_monitor);
-		if (!udev_dev) {
-			usbi_err(NULL, "failed to read data from udev monitor socket.");
-			return;
-		}
-
 		udev_action = udev_device_get_action(udev_dev);
 		if (!udev_action) {
 			break;
@@ -249,4 +241,19 @@ int linux_udev_scan_devices(struct libusb_context *ctx)
 	udev_enumerate_unref(enumerator);
 
 	return LIBUSB_SUCCESS;
+}
+
+void linux_udev_hotplug_poll(void)
+{
+	struct udev_device* udev_dev;
+
+	usbi_mutex_static_lock(&linux_hotplug_lock);
+	do {
+		udev_dev = udev_monitor_receive_device(udev_monitor);
+		if (udev_dev) {
+			usbi_dbg("Handling hotplug event from hotplug_poll");
+			udev_hotplug_event(udev_dev);
+		}
+	} while (udev_dev);
+	usbi_mutex_static_unlock(&linux_hotplug_lock);
 }

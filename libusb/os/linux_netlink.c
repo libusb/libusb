@@ -241,3 +241,14 @@ static void *linux_netlink_event_thread_main(void *arg)
 
 	return NULL;
 }
+
+void linux_netlink_hotplug_poll(void)
+{
+	int r;
+
+	usbi_mutex_static_lock(&linux_hotplug_lock);
+	do {
+		r = linux_netlink_read_message();
+	} while (r == 0);
+	usbi_mutex_static_unlock(&linux_hotplug_lock);
+}
