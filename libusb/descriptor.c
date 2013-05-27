@@ -804,6 +804,329 @@ void API_EXPORTED libusb_free_ss_endpoint_companion_descriptor(
 	free(ep_comp);
 }
 
+static int parse_bos(struct libusb_context *ctx,
+	struct libusb_bos_descriptor **bos,
+	unsigned char *buffer, int size, int host_endian)
+{
+	struct libusb_bos_descriptor bos_header, *_bos;
+	struct libusb_bos_dev_capability_descriptor dev_cap;
+	int i;
+
+	if (size < LIBUSB_DT_BOS_SIZE) {
+		usbi_err(ctx, "short bos descriptor read %d/%d",
+			 size, LIBUSB_DT_BOS_SIZE);
+		return LIBUSB_ERROR_IO;
+	}
+
+	usbi_parse_descriptor(buffer, "bbwb", &bos_header, host_endian);
+	if (bos_header.bDescriptorType != LIBUSB_DT_BOS) {
+		usbi_err(ctx, "unexpected descriptor %x (expected %x)",
+			 bos_header.bDescriptorType, LIBUSB_DT_BOS);
+		return LIBUSB_ERROR_IO;
+	}
+	if (bos_header.bLength < LIBUSB_DT_BOS_SIZE) {
+		usbi_err(ctx, "invalid bos bLength (%d)", bos_header.bLength);
+		return LIBUSB_ERROR_IO;
+	}
+	if (bos_header.bLength > size) {
+		usbi_err(ctx, "short bos descriptor read %d/%d",
+			 size, bos_header.bLength);
+		return LIBUSB_ERROR_IO;
+	}
+
+	_bos = calloc (1,
+		sizeof(*_bos) + bos_header.bNumDeviceCaps * sizeof(void *));
+	if (!_bos)
+		return LIBUSB_ERROR_NO_MEM;
+
+	usbi_parse_descriptor(buffer, "bbwb", _bos, host_endian);
+	buffer += bos_header.bLength;
+	size -= bos_header.bLength;
+
+	/* Get the device capability descriptors */
+	for (i = 0; i < bos_header.bNumDeviceCaps; i++) {
+		if (size < LIBUSB_DT_DEVICE_CAPABILITY_SIZE) {
+			usbi_warn(ctx, "short dev-cap descriptor read %d/%d",
+				  size, LIBUSB_DT_DEVICE_CAPABILITY_SIZE);
+			break;
+		}
+		usbi_parse_descriptor(buffer, "bbb", &dev_cap, host_endian);
+		if (dev_cap.bDescriptorType != LIBUSB_DT_DEVICE_CAPABILITY) {
+			usbi_warn(ctx, "unexpected descriptor %x (expected %x)",
+				  dev_cap.bDescriptorType, LIBUSB_DT_DEVICE_CAPABILITY);
+			break;
+		}
+		if (dev_cap.bLength < LIBUSB_DT_DEVICE_CAPABILITY_SIZE) {
+			usbi_err(ctx, "invalid dev-cap bLength (%d)",
+				 dev_cap.bLength);
+			libusb_free_bos_descriptor(_bos);
+			return LIBUSB_ERROR_IO;
+		}
+		if (dev_cap.bLength > size) {
+			usbi_warn(ctx, "short dev-cap descriptor read %d/%d",
+				  size, dev_cap.bLength);
+			break;
+		}
+
+		_bos->dev_capability[i] = malloc(dev_cap.bLength);
+		if (!_bos->dev_capability[i]) {
+			libusb_free_bos_descriptor(_bos);
+			return LIBUSB_ERROR_NO_MEM;
+		}
+		memcpy(_bos->dev_capability[i], buffer, dev_cap.bLength);
+		buffer += dev_cap.bLength;
+		size -= dev_cap.bLength;
+	}
+	_bos->bNumDeviceCaps = i;
+	*bos = _bos;
+
+	return LIBUSB_SUCCESS;
+}
+
+/** \ingroup desc
+ * Get a Binary Object Store (BOS) descriptor
+ * This is a BLOCKING function, which will send requests to the device.
+ *
+ * \param handle the handle of an open libusb device
+ * \param bos output location for the BOS descriptor. Only valid if 0 was returned.
+ * Must be freed with \ref libusb_free_bos_descriptor() after use.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if the device doesn't have a BOS descriptor
+ * \returns another LIBUSB_ERROR code on error
+ */
+int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *handle,
+	struct libusb_bos_descriptor **bos)
+{
+	struct libusb_bos_descriptor _bos;
+	uint8_t bos_header[LIBUSB_DT_BOS_SIZE] = {0};
+	unsigned char *bos_data = NULL;
+	const int host_endian = 0;
+	int r;
+
+	/* Read the BOS. This generates 2 requests on the bus,
+	 * one for the header, and one for the full BOS */
+	r = libusb_get_descriptor(handle, LIBUSB_DT_BOS, 0, bos_header,
+				  LIBUSB_DT_BOS_SIZE);
+	if (r < 0) {
+		usbi_err(handle->dev->ctx, "failed to read BOS (%d)", r);
+		return r;
+	}
+	if (r < LIBUSB_DT_BOS_SIZE) {
+		usbi_err(handle->dev->ctx, "short BOS read %d/%d",
+			 r, LIBUSB_DT_BOS_SIZE);
+		return LIBUSB_ERROR_IO;
+	}
+
+	usbi_parse_descriptor(bos_header, "bbwb", &_bos, host_endian);
+	usbi_dbg("found BOS descriptor: size %d bytes, %d capabilities",
+		 _bos.wTotalLength, _bos.bNumDeviceCaps);
+	bos_data = calloc(_bos.wTotalLength, 1);
+	if (bos_data == NULL)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = libusb_get_descriptor(handle, LIBUSB_DT_BOS, 0, bos_data,
+				  _bos.wTotalLength);
+	if (r >= 0)
+		r = parse_bos(handle->dev->ctx, bos, bos_data, r, host_endian);
+	else
+		usbi_err(handle->dev->ctx, "failed to read BOS (%d)", r);
+
+	free(bos_data);
+	return r;
+}
+
+/** \ingroup desc
+ * Free a BOS descriptor obtained from libusb_get_bos_descriptor().
+ * It is safe to call this function with a NULL bos parameter, in which
+ * case the function simply returns.
+ *
+ * \param bos the BOS descriptor to free
+ */
+void API_EXPORTED libusb_free_bos_descriptor(struct libusb_bos_descriptor *bos)
+{
+	int i;
+
+	if (!bos)
+		return;
+
+	for (i = 0; i < bos->bNumDeviceCaps; i++)
+		free(bos->dev_capability[i]);
+	free(bos);
+}
+
+/** \ingroup desc
+ * Get an USB 2.0 Extension descriptor
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
+ * \ref libusb_capability_type::LIBUSB_BT_USB_2_0_EXTENSION
+ * LIBUSB_BT_USB_2_0_EXTENSION
+ * \param usb_2_0_extension output location for the USB 2.0 Extension
+ * descriptor. Only valid if 0 was returned. Must be freed with
+ * libusb_free_usb_2_0_extension_descriptor() after use.
+ * \returns 0 on success
+ * \returns a LIBUSB_ERROR code on error
+ */
+int API_EXPORTED libusb_get_usb_2_0_extension_descriptor(
+	struct libusb_context *ctx,
+	struct libusb_bos_dev_capability_descriptor *dev_cap,
+	struct libusb_usb_2_0_extension_descriptor **usb_2_0_extension)
+{
+	struct libusb_usb_2_0_extension_descriptor *_usb_2_0_extension;
+	const int host_endian = 0;
+
+	if (dev_cap->bDevCapabilityType != LIBUSB_BT_USB_2_0_EXTENSION) {
+		usbi_err(ctx, "unexpected bDevCapabilityType %x (expected %x)",
+			 dev_cap->bDevCapabilityType,
+			 LIBUSB_BT_USB_2_0_EXTENSION);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	if (dev_cap->bLength < LIBUSB_BT_USB_2_0_EXTENSION_SIZE) {
+		usbi_err(ctx, "short dev-cap descriptor read %d/%d",
+			 dev_cap->bLength, LIBUSB_BT_USB_2_0_EXTENSION_SIZE);
+		return LIBUSB_ERROR_IO;
+	}
+
+	_usb_2_0_extension = malloc(sizeof(*_usb_2_0_extension));
+	if (!_usb_2_0_extension)
+		return LIBUSB_ERROR_NO_MEM;
+
+	usbi_parse_descriptor((unsigned char *)dev_cap, "bbbd",
+			      _usb_2_0_extension, host_endian);
+
+	*usb_2_0_extension = _usb_2_0_extension;
+	return LIBUSB_SUCCESS;
+}
+
+/** \ingroup desc
+ * Free a USB 2.0 Extension descriptor obtained from
+ * libusb_get_usb_2_0_extension_descriptor().
+ * It is safe to call this function with a NULL usb_2_0_extension parameter,
+ * in which case the function simply returns.
+ *
+ * \param usb_2_0_extension the USB 2.0 Extension descriptor to free
+ */
+void API_EXPORTED libusb_free_usb_2_0_extension_descriptor(
+	struct libusb_usb_2_0_extension_descriptor *usb_2_0_extension)
+{
+	free(usb_2_0_extension);
+}
+
+/** \ingroup desc
+ * Get a SuperSpeed USB Device Capability descriptor
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
+ * \ref libusb_capability_type::LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
+ * LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
+ * \param ss_usb_device_cap output location for the SuperSpeed USB Device
+ * Capability descriptor. Only valid if 0 was returned. Must be freed with
+ * libusb_free_ss_usb_device_capability_descriptor() after use.
+ * \returns 0 on success
+ * \returns a LIBUSB_ERROR code on error
+ */
+int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
+	struct libusb_context *ctx,
+	struct libusb_bos_dev_capability_descriptor *dev_cap,
+	struct libusb_ss_usb_device_capability_descriptor **ss_usb_device_cap)
+{
+	struct libusb_ss_usb_device_capability_descriptor *_ss_usb_device_cap;
+	const int host_endian = 0;
+
+	if (dev_cap->bDevCapabilityType != LIBUSB_BT_SS_USB_DEVICE_CAPABILITY) {
+		usbi_err(ctx, "unexpected bDevCapabilityType %x (expected %x)",
+			 dev_cap->bDevCapabilityType,
+			 LIBUSB_BT_SS_USB_DEVICE_CAPABILITY);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	if (dev_cap->bLength < LIBUSB_BT_SS_USB_DEVICE_CAPABILITY_SIZE) {
+		usbi_err(ctx, "short dev-cap descriptor read %d/%d",
+			 dev_cap->bLength, LIBUSB_BT_SS_USB_DEVICE_CAPABILITY_SIZE);
+		return LIBUSB_ERROR_IO;
+	}
+
+	_ss_usb_device_cap = malloc(sizeof(*_ss_usb_device_cap));
+	if (!_ss_usb_device_cap)
+		return LIBUSB_ERROR_NO_MEM;
+
+	usbi_parse_descriptor((unsigned char *)dev_cap, "bbbbwbbw",
+			      _ss_usb_device_cap, host_endian);
+
+	*ss_usb_device_cap = _ss_usb_device_cap;
+	return LIBUSB_SUCCESS;
+}
+
+/** \ingroup desc
+ * Free a SuperSpeed USB Device Capability descriptor obtained from
+ * libusb_get_ss_usb_device_capability_descriptor().
+ * It is safe to call this function with a NULL ss_usb_device_cap
+ * parameter, in which case the function simply returns.
+ *
+ * \param ss_usb_device_cap the USB 2.0 Extension descriptor to free
+ */
+void API_EXPORTED libusb_free_ss_usb_device_capability_descriptor(
+	struct libusb_ss_usb_device_capability_descriptor *ss_usb_device_cap)
+{
+	free(ss_usb_device_cap);
+}
+
+/** \ingroup desc
+ * Get a Container ID descriptor
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
+ * \ref libusb_capability_type::LIBUSB_BT_CONTAINER_ID
+ * LIBUSB_BT_CONTAINER_ID
+ * \param container_id output location for the Container ID descriptor.
+ * Only valid if 0 was returned. Must be freed with
+ * libusb_free_container_id_descriptor() after use.
+ * \returns 0 on success
+ * \returns a LIBUSB_ERROR code on error
+ */
+int API_EXPORTED libusb_get_container_id_descriptor(struct libusb_context *ctx,
+	struct libusb_bos_dev_capability_descriptor *dev_cap,
+	struct libusb_container_id_descriptor **container_id)
+{
+	struct libusb_container_id_descriptor *_container_id;
+	const int host_endian = 0;
+
+	if (dev_cap->bDevCapabilityType != LIBUSB_BT_CONTAINER_ID) {
+		usbi_err(ctx, "unexpected bDevCapabilityType %x (expected %x)",
+			 dev_cap->bDevCapabilityType,
+			 LIBUSB_BT_CONTAINER_ID);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	if (dev_cap->bLength < LIBUSB_BT_CONTAINER_ID_SIZE) {
+		usbi_err(ctx, "short dev-cap descriptor read %d/%d",
+			 dev_cap->bLength, LIBUSB_BT_CONTAINER_ID_SIZE);
+		return LIBUSB_ERROR_IO;
+	}
+
+	_container_id = malloc(sizeof(*_container_id));
+	if (!_container_id)
+		return LIBUSB_ERROR_NO_MEM;
+
+	usbi_parse_descriptor((unsigned char *)dev_cap, "bbbbu",
+			      _container_id, host_endian);
+
+	*container_id = _container_id;
+	return LIBUSB_SUCCESS;
+}
+
+/** \ingroup desc
+ * Free a Container ID descriptor obtained from
+ * libusb_get_container_id_descriptor().
+ * It is safe to call this function with a NULL container_id parameter,
+ * in which case the function simply returns.
+ *
+ * \param container_id the USB 2.0 Extension descriptor to free
+ */
+void API_EXPORTED libusb_free_container_id_descriptor(
+	struct libusb_container_id_descriptor *container_id)
+{
+	free(container_id);
+}
+
 /** \ingroup desc
  * Retrieve a string descriptor in C style ASCII.
  *

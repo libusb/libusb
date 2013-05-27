@@ -165,6 +165,16 @@ static void display_buffer_hex(unsigned char *buffer, unsigned size)
 	printf("\n" );
 }
 
+static char* uuid_to_string(const uint8_t* uuid)
+{
+	static char uuid_string[40];
+	if (uuid == NULL) return NULL;
+	sprintf(uuid_string, "{%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x}",
+		uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7],
+		uuid[8], uuid[9], uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]);
+	return uuid_string;
+}
+
 // The PS3 Controller is really a HID device that got its HID Report Descriptors
 // removed by Sony
 static int display_ps3_status(libusb_device_handle *handle)
@@ -726,11 +736,51 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 	}
 }
 
+static void print_device_cap(struct libusb_bos_dev_capability_descriptor *dev_cap)
+{
+	switch(dev_cap->bDevCapabilityType) {
+	case LIBUSB_BT_USB_2_0_EXTENSION: {
+		struct libusb_usb_2_0_extension_descriptor *usb_2_0_ext = NULL;
+		libusb_get_usb_2_0_extension_descriptor(NULL, dev_cap, &usb_2_0_ext);
+		if (usb_2_0_ext) {
+			printf("    USB 2.0 extension:\n");
+			printf("      attributes             : %02X\n", usb_2_0_ext->bmAttributes);
+			libusb_free_usb_2_0_extension_descriptor(usb_2_0_ext);
+		}
+		break;
+	}
+	case LIBUSB_BT_SS_USB_DEVICE_CAPABILITY: {
+		struct libusb_ss_usb_device_capability_descriptor *ss_usb_device_cap = NULL;
+		libusb_get_ss_usb_device_capability_descriptor(NULL, dev_cap, &ss_usb_device_cap);
+		if (ss_usb_device_cap) {
+			printf("    USB 3.0 capabilities:\n");
+			printf("      attributes             : %02X\n", ss_usb_device_cap->bmAttributes);
+			printf("      supported speeds       : %04X\n", ss_usb_device_cap->wSpeedSupported);
+			printf("      supported functionality: %02X\n", ss_usb_device_cap->bFunctionalitySupport);
+			libusb_free_ss_usb_device_capability_descriptor(ss_usb_device_cap);
+		}
+		break;
+	}
+	case LIBUSB_BT_CONTAINER_ID: {
+		struct libusb_container_id_descriptor *container_id = NULL;
+		libusb_get_container_id_descriptor(NULL, dev_cap, &container_id);
+		if (container_id) {
+			printf("    Container ID:\n      %s\n", uuid_to_string(container_id->ContainerID));
+			libusb_free_container_id_descriptor(container_id);
+		}
+		break;
+	}
+	default:
+		printf("    Unknown BOS device capability %02x:\n", dev_cap->bDevCapabilityType);
+	}	
+}
+
 static int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
 	libusb_device *dev;
 	uint8_t bus, port_path[8];
+	struct libusb_bos_descriptor *bos_desc;
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
@@ -784,7 +834,17 @@ static int test_device(uint16_t vid, uint16_t pid)
 	string_index[1] = dev_desc.iProduct;
 	string_index[2] = dev_desc.iSerialNumber;
 
-	printf("\nReading configuration descriptors:\n");
+	printf("\nReading BOS descriptor: ");
+	if (libusb_get_bos_descriptor(handle, &bos_desc) == LIBUSB_SUCCESS) {
+		printf("%d caps\n", bos_desc->bNumDeviceCaps);
+		for (i = 0; i < bos_desc->bNumDeviceCaps; i++)
+			print_device_cap(bos_desc->dev_capability[i]);
+		libusb_free_bos_descriptor(bos_desc);
+	} else {
+		printf("no descriptor\n");
+	}
+
+	printf("\nReading first configuration descriptor:\n");
 	CALL_CHECK(libusb_get_config_descriptor(dev, 0, &conf_desc));
 	nb_ifaces = conf_desc->bNumInterfaces;
 	printf("             nb interfaces: %d\n", nb_ifaces);

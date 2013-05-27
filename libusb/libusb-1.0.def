@@ -26,16 +26,26 @@ EXPORTS
   libusb_event_handling_ok@4 = libusb_event_handling_ok
   libusb_exit
   libusb_exit@4 = libusb_exit
+  libusb_free_bos_descriptor
+  libusb_free_bos_descriptor@4 = libusb_free_bos_descriptor
   libusb_free_config_descriptor
   libusb_free_config_descriptor@4 = libusb_free_config_descriptor
+  libusb_free_container_id_descriptor
+  libusb_free_container_id_descriptor@4 = libusb_free_container_id_descriptor
   libusb_free_device_list
   libusb_free_device_list@8 = libusb_free_device_list
   libusb_free_ss_endpoint_companion_descriptor
   libusb_free_ss_endpoint_companion_descriptor@4 = libusb_free_ss_endpoint_companion_descriptor
+  libusb_free_ss_usb_device_capability_descriptor
+  libusb_free_ss_usb_device_capability_descriptor@4 = libusb_free_ss_usb_device_capability_descriptor
   libusb_free_transfer
   libusb_free_transfer@4 = libusb_free_transfer
+  libusb_free_usb_2_0_extension_descriptor
+  libusb_free_usb_2_0_extension_descriptor@4 = libusb_free_usb_2_0_extension_descriptor
   libusb_get_active_config_descriptor
   libusb_get_active_config_descriptor@8 = libusb_get_active_config_descriptor
+  libusb_get_bos_descriptor
+  libusb_get_bos_descriptor@8 = libusb_get_bos_descriptor
   libusb_get_bus_number
   libusb_get_bus_number@4 = libusb_get_bus_number
   libusb_get_config_descriptor
@@ -44,6 +54,8 @@ EXPORTS
   libusb_get_config_descriptor_by_value@12 = libusb_get_config_descriptor_by_value
   libusb_get_configuration
   libusb_get_configuration@8 = libusb_get_configuration
+  libusb_get_container_id_descriptor
+  libusb_get_container_id_descriptor@12 = libusb_get_container_id_descriptor
   libusb_get_device
   libusb_get_device@4 = libusb_get_device
   libusb_get_device_address
@@ -70,8 +82,12 @@ EXPORTS
   libusb_get_port_path@16 = libusb_get_port_path
   libusb_get_ss_endpoint_companion_descriptor
   libusb_get_ss_endpoint_companion_descriptor@12 = libusb_get_ss_endpoint_companion_descriptor
+  libusb_get_ss_usb_device_capability_descriptor
+  libusb_get_ss_usb_device_capability_descriptor@12 = libusb_get_ss_usb_device_capability_descriptor
   libusb_get_string_descriptor_ascii
   libusb_get_string_descriptor_ascii@16 = libusb_get_string_descriptor_ascii
+  libusb_get_usb_2_0_extension_descriptor
+  libusb_get_usb_2_0_extension_descriptor@12 = libusb_get_usb_2_0_extension_descriptor
   libusb_get_version
   libusb_get_version@0 = libusb_get_version
   libusb_handle_events
