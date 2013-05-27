@@ -808,6 +808,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 				test_mode = USE_SCSI;
 			}
 			for (k=0; k<conf_desc->usb_interface[i].altsetting[j].bNumEndpoints; k++) {
+				struct libusb_ss_endpoint_companion_descriptor *ep_comp = NULL;
 				endpoint = &conf_desc->usb_interface[i].altsetting[j].endpoint[k];
 				printf("       endpoint[%d].address: %02X\n", k, endpoint->bEndpointAddress);
 				// Use the first interrupt or bulk IN/OUT endpoints as default for testing
@@ -822,6 +823,12 @@ static int test_device(uint16_t vid, uint16_t pid)
 				}
 				printf("           max packet size: %04X\n", endpoint->wMaxPacketSize);
 				printf("          polling interval: %02X\n", endpoint->bInterval);
+				libusb_get_ss_endpoint_companion_descriptor(NULL, endpoint, &ep_comp);
+				if (ep_comp) {
+					printf("                 max burst: %02X   (USB 3.0)\n", ep_comp->bMaxBurst);
+					printf("        bytes per interval: %04X (USB 3.0)\n", ep_comp->wBytesPerInterval);
+					libusb_free_ss_endpoint_companion_descriptor(ep_comp);
+				}
 			}
 		}
 	}

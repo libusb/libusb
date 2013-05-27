@@ -30,6 +30,8 @@ EXPORTS
   libusb_free_config_descriptor@4 = libusb_free_config_descriptor
   libusb_free_device_list
   libusb_free_device_list@8 = libusb_free_device_list
+  libusb_free_ss_endpoint_companion_descriptor
+  libusb_free_ss_endpoint_companion_descriptor@4 = libusb_free_ss_endpoint_companion_descriptor
   libusb_free_transfer
   libusb_free_transfer@4 = libusb_free_transfer
   libusb_get_active_config_descriptor
@@ -66,6 +68,8 @@ EXPORTS
   libusb_get_port_number@4 = libusb_get_port_number
   libusb_get_port_path
   libusb_get_port_path@16 = libusb_get_port_path
+  libusb_get_ss_endpoint_companion_descriptor
+  libusb_get_ss_endpoint_companion_descriptor@12 = libusb_get_ss_endpoint_companion_descriptor
   libusb_get_string_descriptor_ascii
   libusb_get_string_descriptor_ascii@16 = libusb_get_string_descriptor_ascii
   libusb_get_version

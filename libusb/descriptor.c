@@ -40,12 +40,14 @@
 
 /* set host_endian if the w values are already in host endian format,
  * as opposed to bus endian. */
-int usbi_parse_descriptor(unsigned char *source, const char *descriptor,
+int usbi_parse_descriptor(const unsigned char *source, const char *descriptor,
 	void *dest, int host_endian)
 {
-	unsigned char *sp = source, *dp = dest;
+	const unsigned char *sp = source;
+	unsigned char *dp = dest;
 	uint16_t w;
 	const char *cp;
+	uint32_t d;
 
 	for (cp = descriptor; *cp; cp++) {
 		switch (*cp) {
@@ -63,6 +65,24 @@ int usbi_parse_descriptor(unsigned char *source, const char *descriptor,
 				}
 				sp += 2;
 				dp += 2;
+				break;
+			case 'd':	/* 32-bit word, convert from little endian to CPU */
+				dp += ((uintptr_t)dp & 1);	/* Align to word boundary */
+
+				if (host_endian) {
+					memcpy(dp, sp, 4);
+				} else {
+					d = (sp[3] << 24) | (sp[2] << 16) |
+						(sp[1] << 8) | sp[0];
+					*((uint32_t *)dp) = d;
+				}
+				sp += 4;
+				dp += 4;
+				break;
+			case 'u':	/* 16 byte UUID */
+				memcpy(dp, sp, 16);
+				sp += 16;
+				dp += 16;
 				break;
 		}
 	}
@@ -718,6 +738,70 @@ void API_EXPORTED libusb_free_config_descriptor(
 
 	clear_configuration(config);
 	free(config);
+}
+
+/** \ingroup desc
+ * Get an endpoints superspeed endpoint companion descriptor (if any)
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param endpoint endpoint descriptor from which to get the superspeed
+ * endpoint companion descriptor
+ * \param ep_comp output location for the superspeed endpoint companion
+ * descriptor. Only valid if 0 was returned. Must be freed with
+ * libusb_free_ss_endpoint_companion_descriptor() after use.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if the configuration does not exist
+ * \returns another LIBUSB_ERROR code on error
+ */
+int API_EXPORTED libusb_get_ss_endpoint_companion_descriptor(
+	struct libusb_context *ctx,
+	const struct libusb_endpoint_descriptor *endpoint,
+	struct libusb_ss_endpoint_companion_descriptor **ep_comp)
+{
+	struct usb_descriptor_header header;
+	int size = endpoint->extra_length;
+	const unsigned char *buffer = endpoint->extra;
+
+	*ep_comp = NULL;
+
+	while (size >= DESC_HEADER_LENGTH) {
+		usbi_parse_descriptor(buffer, "bb", &header, 0);
+		if (header.bLength < 2 || header.bLength > size) {
+			usbi_err(ctx, "invalid descriptor length %d",
+				 header.bLength);
+			return LIBUSB_ERROR_IO;
+		}
+		if (header.bDescriptorType != LIBUSB_DT_SS_ENDPOINT_COMPANION) {
+			buffer += header.bLength;
+			size -= header.bLength;
+			continue;
+		}
+		if (header.bLength < LIBUSB_DT_SS_ENDPOINT_COMPANION_SIZE) {
+			usbi_err(ctx, "invalid ss-ep-comp-desc length %d",
+				 header.bLength);
+			return LIBUSB_ERROR_IO;
+		}
+		*ep_comp = malloc(sizeof(**ep_comp));
+		if (*ep_comp == NULL)
+			return LIBUSB_ERROR_NO_MEM;
+		usbi_parse_descriptor(buffer, "bbbbw", *ep_comp, 0);
+		return LIBUSB_SUCCESS;
+	}
+	return LIBUSB_ERROR_NOT_FOUND;
+}
+
+/** \ingroup desc
+ * Free a superspeed endpoint companion descriptor obtained from
+ * libusb_get_ss_endpoint_companion_descriptor().
+ * It is safe to call this function with a NULL ep_comp parameter, in which
+ * case the function simply returns.
+ *
+ * \param ep_comp the superspeed endpoint companion descriptor to free
+ */
+void API_EXPORTED libusb_free_ss_endpoint_companion_descriptor(
+	struct libusb_ss_endpoint_companion_descriptor *ep_comp)
+{
+	free(ep_comp);
 }
 
 /** \ingroup desc
