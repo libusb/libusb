@@ -336,7 +336,7 @@ static int parse_interface(libusb_context *ctx,
 				if (r < 0)
 					goto err;
 				if (r == 0) {
-					ifp->bNumEndpoints = i;
+					ifp->bNumEndpoints = (uint8_t)i;
 					break;;
 				}
 
@@ -442,7 +442,7 @@ static int parse_configuration(struct libusb_context *ctx,
 				usbi_warn(ctx,
 					  "short extra config desc read %d/%d",
 					  size, header.bLength);
-				config->bNumInterfaces = i;
+				config->bNumInterfaces = (uint8_t)i;
 				return size;
 			}
 
@@ -479,7 +479,7 @@ static int parse_configuration(struct libusb_context *ctx,
 		if (r < 0)
 			goto err;
 		if (r == 0) {
-			config->bNumInterfaces = i;
+			config->bNumInterfaces = (uint8_t)i;
 			break;
 		}
 
@@ -877,7 +877,7 @@ static int parse_bos(struct libusb_context *ctx,
 		buffer += dev_cap.bLength;
 		size -= dev_cap.bLength;
 	}
-	_bos->bNumDeviceCaps = i;
+	_bos->bNumDeviceCaps = (uint8_t)i;
 	*bos = _bos;
 
 	return LIBUSB_SUCCESS;
