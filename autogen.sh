@@ -3,4 +3,6 @@
 set -e
 
 ./bootstrap.sh
-./configure --enable-maintainer-mode --enable-examples-build --enable-tests-build "$@"
+if test -z "$NOCONFIGURE"; then
+    exec ./configure --enable-maintainer-mode --enable-examples-build --enable-tests-build "$@"
+fi
