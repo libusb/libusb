@@ -28,7 +28,19 @@
 #include <IOKit/IOCFPlugIn.h>
 
 /* IOUSBInterfaceInferface */
-#if defined (kIOUSBInterfaceInterfaceID300)
+#if defined (kIOUSBInterfaceInterfaceID550)
+
+#define usb_interface_t IOUSBInterfaceInterface550
+#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID550
+#define InterfaceVersion 550
+
+#elif defined (kIOUSBInterfaceInterfaceID500)
+
+#define usb_interface_t IOUSBInterfaceInterface500
+#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID500
+#define InterfaceVersion 500
+
+#elif defined (kIOUSBInterfaceInterfaceID300)
 
 #define usb_interface_t IOUSBInterfaceInterface300
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID300
@@ -45,24 +57,6 @@
 #define usb_interface_t IOUSBInterfaceInterface220
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID220
 #define InterfaceVersion 220
-
-#elif defined (kIOUSBInterfaceInterfaceID197)
-
-#define usb_interface_t IOUSBInterfaceInterface197
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID197
-#define InterfaceVersion 197
-
-#elif defined (kIOUSBInterfaceInterfaceID190)
-
-#define usb_interface_t IOUSBInterfaceInterface190
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID190
-#define InterfaceVersion 190
-
-#elif defined (kIOUSBInterfaceInterfaceID182)
-
-#define usb_interface_t IOUSBInterfaceInterface182
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID182
-#define InterfaceVersion 182
 
 #else
 
@@ -95,23 +89,10 @@
 #define DeviceInterfaceID kIOUSBDeviceInterfaceID245
 #define DeviceVersion 245
 
-#elif defined (kIOUSBDeviceInterfaceID197)
-
+#elif defined (kIOUSBDeviceInterfaceID220)
 #define usb_device_t    IOUSBDeviceInterface197
 #define DeviceInterfaceID kIOUSBDeviceInterfaceID197
 #define DeviceVersion 197
-
-#elif defined (kIOUSBDeviceInterfaceID187)
-
-#define usb_device_t    IOUSBDeviceInterface187
-#define DeviceInterfaceID kIOUSBDeviceInterfaceID187
-#define DeviceVersion 187
-
-#elif defined (kIOUSBDeviceInterfaceID182)
-
-#define usb_device_t    IOUSBDeviceInterface182
-#define DeviceInterfaceID kIOUSBDeviceInterfaceID182
-#define DeviceVersion 182
 
 #else
 
@@ -127,13 +108,23 @@ typedef IOCFPlugInInterface *io_cf_plugin_ref_t;
 typedef IONotificationPortRef io_notification_port_t;
 
 /* private structures */
-struct darwin_device_priv {
+struct darwin_cached_device {
+  struct list_head      list;
   IOUSBDeviceDescriptor dev_descriptor;
   UInt32                location;
+  UInt64                parent_session;
+  UInt64                session;
+  UInt16                address;
   char                  sys_path[21];
   usb_device_t        **device;
   int                   open_count;
-  UInt8                 first_config, active_config;
+  UInt8                 first_config, active_config, port;  
+  int                   can_enumerate;
+  int                   refcount;
+};
+
+struct darwin_device_priv {
+  struct darwin_cached_device *dev;
 };
 
 struct darwin_device_handle_priv {
@@ -156,11 +147,7 @@ struct darwin_transfer_priv {
   int num_iso_packets;
 
   /* Control */
-#if !defined (LIBUSB_NO_TIMEOUT_DEVICE)
   IOUSBDevRequestTO req;
-#else
-  IOUSBDevRequest req;
-#endif
 
   /* Bulk */
 };
