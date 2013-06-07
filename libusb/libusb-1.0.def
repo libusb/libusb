@@ -78,6 +78,8 @@ EXPORTS
   libusb_get_pollfds@4 = libusb_get_pollfds
   libusb_get_port_number
   libusb_get_port_number@4 = libusb_get_port_number
+  libusb_get_port_numbers
+  libusb_get_port_numbers@12 = libusb_get_port_numbers
   libusb_get_port_path
   libusb_get_port_path@16 = libusb_get_port_path
   libusb_get_ss_endpoint_companion_descriptor
@@ -136,6 +138,10 @@ EXPORTS
   libusb_set_interface_alt_setting@12 = libusb_set_interface_alt_setting
   libusb_set_pollfd_notifiers
   libusb_set_pollfd_notifiers@16 = libusb_set_pollfd_notifiers
+  libusb_setlocale
+  libusb_setlocale@4 = libusb_setlocale
+  libusb_strerror
+  libusb_strerror@4 = libusb_strerror
   libusb_submit_transfer
   libusb_submit_transfer@4 = libusb_submit_transfer
   libusb_try_lock_events
@@ -148,5 +154,3 @@ EXPORTS
   libusb_unref_device@4 = libusb_unref_device
   libusb_wait_for_event
   libusb_wait_for_event@8 = libusb_wait_for_event
-  libusb_get_port_numbers
-  libusb_get_port_numbers@12 = libusb_get_port_numbers

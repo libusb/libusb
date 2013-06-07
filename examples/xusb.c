@@ -64,7 +64,7 @@ static int perr(char const *format, ...)
 	return r;
 }
 
-#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_error_name((enum libusb_error)errcode)); return -1; } while (0)
+#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)errcode)); return -1; } while (0)
 #define CALL_CHECK(fcall) do { r=fcall; if (r < 0) ERR_EXIT(r); } while (0);
 #define B(x) (((x)!=0)?1:0)
 #define be_to_int32(buf) (((buf)[0]<<24)|((buf)[1]<<16)|((buf)[2]<<8)|(buf)[3])
@@ -354,7 +354,7 @@ static int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpo
 		i++;
 	} while ((r == LIBUSB_ERROR_PIPE) && (i<RETRY_MAX));
 	if (r != LIBUSB_SUCCESS) {
-		perr("   send_mass_storage_command: %s\n", libusb_error_name(r));
+		perr("   send_mass_storage_command: %s\n", libusb_strerror((enum libusb_error)r));
 		return -1;
 	}
 
@@ -378,7 +378,7 @@ static int get_mass_storage_status(libusb_device_handle *handle, uint8_t endpoin
 		i++;
 	} while ((r == LIBUSB_ERROR_PIPE) && (i<RETRY_MAX));
 	if (r != LIBUSB_SUCCESS) {
-		perr("   get_mass_storage_status: %s\n", libusb_error_name(r));
+		perr("   get_mass_storage_status: %s\n", libusb_strerror((enum libusb_error)r));
 		return -1;
 	}
 	if (size != 13) {
@@ -460,7 +460,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	if (r == 0) {
 		lun = 0;
 	} else if (r < 0) {
-		perr("   Failed: %s", libusb_error_name((enum libusb_error)r));
+		perr("   Failed: %s", libusb_strerror((enum libusb_error)r));
 	}
 	printf("   Max LUN = %d\n", lun);
 
@@ -638,7 +638,7 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 				libusb_clear_halt(handle, 0);
 				break;
 			default:
-				printf("   Error: %s\n", libusb_error_name(r));
+				printf("   Error: %s\n", libusb_strerror((enum libusb_error)r));
 				break;
 			}
 		}
@@ -669,7 +669,7 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 				libusb_clear_halt(handle, 0);
 				break;
 			default:
-				printf("   Error: %s\n", libusb_error_name(r));
+				printf("   Error: %s\n", libusb_strerror((enum libusb_error)r));
 				break;
 			}
 		}
@@ -680,7 +680,7 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		if (r >= 0) {
 			display_buffer_hex(report_buffer, size);
 		} else {
-			printf("   %s\n", libusb_error_name(r));
+			printf("   %s\n", libusb_strerror((enum libusb_error)r));
 		}
 
 		free(report_buffer);
@@ -715,7 +715,7 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient),
 			bRequest, (uint16_t)(((iface_number)<< 8)|0x00), os_fd[i].index, os_desc, os_fd[i].header_size, 1000);
 		if (r < os_fd[i].header_size) {
-			perr("   Failed: %s", (r<0)?libusb_error_name((enum libusb_error)r):"header size is too small");
+			perr("   Failed: %s", (r<0)?libusb_strerror((enum libusb_error)r):"header size is too small");
 			return;
 		}
 		le_type_punning_IS_fine = (void*)os_desc;
@@ -728,7 +728,7 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient),
 			bRequest, (uint16_t)(((iface_number)<< 8)|0x00), os_fd[i].index, os_desc, (uint16_t)length, 1000);
 		if (r < 0) {
-			perr("   Failed: %s", libusb_error_name((enum libusb_error)r));
+			perr("   Failed: %s", libusb_strerror((enum libusb_error)r));
 			return;
 		} else {
 			display_buffer_hex(os_desc, r);
@@ -977,6 +977,7 @@ int main(int argc, char** argv)
 	size_t i, arglen;
 	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
+	char* error_lang = NULL;
 
 	// Default to generic, expecting VID:PID
 	VID = 0;
@@ -1008,6 +1009,13 @@ int main(int argc, char** argv)
 					}
 					binary_name = argv[++j];
 					binary_dump = true;
+					break;
+				case 'l':
+					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
+						printf("   Option -l requires an ISO 639-1 language parameter");
+						return 1;
+					}
+					error_lang = argv[++j];
 					break;
 				case 'j':
 					// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
@@ -1066,7 +1074,7 @@ int main(int argc, char** argv)
 	}
 
 	if ((show_help) || (argc == 1) || (argc > 7)) {
-		printf("usage: %s [-h] [-d] [-i] [-k] [-b file] [-j] [-x] [-s] [-p] [vid:pid]\n", argv[0]);
+		printf("usage: %s [-h] [-d] [-i] [-k] [-b file] [-l lang] [-j] [-x] [-s] [-p] [vid:pid]\n", argv[0]);
 		printf("   -h      : display usage\n");
 		printf("   -d      : enable debug output\n");
 		printf("   -i      : print topology and speed info\n");
@@ -1076,6 +1084,7 @@ int main(int argc, char** argv)
 		printf("   -p      : test Sony PS3 SixAxis controller\n");
 		printf("   -s      : test Microsoft Sidewinder Precision Pro (HID)\n");
 		printf("   -x      : test Microsoft XBox Controller Type S\n");
+		printf("   -l lang : language to report errors in (ISO 639-1)\n");
 		printf("If only the vid:pid is provided, xusb attempts to run the most appropriate test\n");
 		return 0;
 	}
@@ -1087,6 +1096,11 @@ int main(int argc, char** argv)
 		return r;
 
 	libusb_set_debug(NULL, debug_mode?LIBUSB_LOG_LEVEL_DEBUG:LIBUSB_LOG_LEVEL_INFO);
+	if (error_lang != NULL) {
+		r = libusb_setlocale(error_lang);
+		if (r < 0)
+			printf("Invalid or unsupported locale '%s': %s\n", error_lang, libusb_strerror((enum libusb_error)r));
+	}
 
 	test_device(VID, PID);
 

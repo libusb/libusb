@@ -26,6 +26,9 @@
     <ClCompile Include="..\libusb\os\poll_windows.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\libusb\strerror.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\libusb\sync.c">
       <Filter>Source Files</Filter>
     </ClCompile>

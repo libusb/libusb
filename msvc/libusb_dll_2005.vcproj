@@ -362,6 +362,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\libusb\strerror.c"
+				>
+			</File>
+			<File
 				RelativePath="..\libusb\sync.c"
 				>
 			</File>

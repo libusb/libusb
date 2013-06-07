@@ -59,6 +59,10 @@
 /* The following is used to silence warnings for unused variables */
 #define UNUSED(var)			do { (void)(var); } while(0)
 
+#if !defined(ARRAYSIZE)
+#define ARRAYSIZE(array) (sizeof(array)/sizeof(array[0]))
+#endif
+
 struct list_head {
 	struct list_head *prev, *next;
 };

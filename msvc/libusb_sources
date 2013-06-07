@@ -29,6 +29,7 @@ TARGETLIBS=$(SDK_LIB_PATH)\kernel32.lib
 SOURCES=..\core.c \
 	..\descriptor.c \
 	..\io.c \
+	..\strerror.c \
 	..\sync.c \
 	..\hotplug.c \
 	threads_windows.c \

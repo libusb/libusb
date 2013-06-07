@@ -1044,8 +1044,9 @@ enum libusb_bos_type {
 /** \ingroup misc
  * Error codes. Most libusbx functions return 0 on success or one of these
  * codes on failure.
- * You can call \ref libusb_error_name() to retrieve a string representation
- * of an error code.
+ * You can call libusb_error_name() to retrieve a string representation of an
+ * error code or libusb_strerror() to get an end-user suitable description of
+ * an error code.
  */
 enum libusb_error {
 	/** Success (no error) */
@@ -1087,12 +1088,15 @@ enum libusb_error {
 	/** Operation not supported or unimplemented on this platform */
 	LIBUSB_ERROR_NOT_SUPPORTED = -12,
 
-	/* NB! Remember to update libusb_error_name()
-	   when adding new error codes here. */
+	/* NB: Remember to update LIBUSB_ERROR_COUNT below as well as the
+	   message strings in strerror.c when adding new error codes here. */
 
 	/** Other error */
 	LIBUSB_ERROR_OTHER = -99,
 };
+
+/* Total number of error codes in enum libusb_error */
+#define LIBUSB_ERROR_COUNT 14
 
 /** \ingroup asyncio
  * Transfer status codes */
@@ -1299,6 +1303,8 @@ void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
 const struct libusb_version * LIBUSB_CALL libusb_get_version(void);
 int LIBUSB_CALL libusb_has_capability(uint32_t capability);
 const char * LIBUSB_CALL libusb_error_name(int errcode);
+int LIBUSB_CALL libusb_setlocale(const char *locale);
+const char * LIBUSB_CALL libusb_strerror(enum libusb_error errcode);
 
 ssize_t LIBUSB_CALL libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);
