@@ -1004,7 +1004,7 @@ int main(int argc, char** argv)
 					break;
 				case 'b':
 					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
-						printf("   Option -b requires a file name");
+						printf("   Option -b requires a file name\n");
 						return 1;
 					}
 					binary_name = argv[++j];
@@ -1012,7 +1012,7 @@ int main(int argc, char** argv)
 					break;
 				case 'l':
 					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
-						printf("   Option -l requires an ISO 639-1 language parameter");
+						printf("   Option -l requires an ISO 639-1 language parameter\n");
 						return 1;
 					}
 					error_lang = argv[++j];
