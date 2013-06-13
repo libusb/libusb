@@ -82,6 +82,19 @@ int linux_udev_start_event_monitor(void)
 
 	udev_monitor_fd = udev_monitor_get_fd(udev_monitor);
 
+	/* Some older versions of udev are not non-blocking by default,
+	 * so make sure this is set */
+	r = fcntl(udev_monitor_fd, F_GETFL);
+	if (r == -1) {
+		usbi_err(NULL, "getting udev monitor fd flags (%d)", errno);
+		goto err_free_monitor;
+	}
+	r = fcntl(udev_monitor_fd, F_SETFL, r | O_NONBLOCK);
+	if (r) {
+		usbi_err(NULL, "setting udev monitor fd flags (%d)", errno);
+		goto err_free_monitor;
+	}
+
 	r = pthread_create(&linux_event_thread, NULL, linux_udev_event_thread_main, NULL);
 	if (r) {
 		usbi_err(NULL, "creating hotplug event thread (%d)", r);
