@@ -127,6 +127,7 @@ static int linux_start_event_monitor(void);
 static int linux_stop_event_monitor(void);
 static int linux_scan_devices(struct libusb_context *ctx);
 static int sysfs_scan_device(struct libusb_context *ctx, const char *devname);
+static int detach_kernel_driver_and_claim(struct libusb_device_handle *, int);
 
 #if !defined(USE_UDEV)
 static int linux_default_scan_devices (struct libusb_context *ctx);
@@ -1428,11 +1429,18 @@ static int op_reset_device(struct libusb_device_handle *handle)
 	/* And re-claim any interfaces which were claimed before the reset */
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
 		if (handle->claimed_interfaces & (1L << i)) {
-			r = claim_interface(handle, i);
+			/*
+			 * A driver may have completed modprobing during
+			 * IOCTL_USBFS_RESET, and bound itself as soon as
+			 * IOCTL_USBFS_RESET released the device lock
+			 */
+			r = detach_kernel_driver_and_claim(handle, i);
 			if (r) {
 				usbi_warn(HANDLE_CTX(handle),
-					"failed to re-claim interface %d after reset", i);
+					"failed to re-claim interface %d after reset: %s",
+					i, libusb_error_name(r));
 				handle->claimed_interfaces &= ~(1L << i);
+				ret = LIBUSB_ERROR_NOT_FOUND;
 			}
 		}
 	}
