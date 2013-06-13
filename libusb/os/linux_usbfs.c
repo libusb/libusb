@@ -1317,7 +1317,7 @@ static int op_set_configuration(struct libusb_device_handle *handle, int config)
 	return LIBUSB_SUCCESS;
 }
 
-static int op_claim_interface(struct libusb_device_handle *handle, int iface)
+static int claim_interface(struct libusb_device_handle *handle, int iface)
 {
 	int fd = _device_handle_priv(handle)->fd;
 	int r = ioctl(fd, IOCTL_USBFS_CLAIMINTF, &iface);
@@ -1336,7 +1336,7 @@ static int op_claim_interface(struct libusb_device_handle *handle, int iface)
 	return 0;
 }
 
-static int op_release_interface(struct libusb_device_handle *handle, int iface)
+static int release_interface(struct libusb_device_handle *handle, int iface)
 {
 	int fd = _device_handle_priv(handle)->fd;
 	int r = ioctl(fd, IOCTL_USBFS_RELEASEINTF, &iface);
@@ -1407,7 +1407,7 @@ static int op_reset_device(struct libusb_device_handle *handle)
 	   getting bound to the in kernel driver if any). */
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
 		if (handle->claimed_interfaces & (1L << i)) {
-			op_release_interface(handle, i);
+			release_interface(handle, i);
 		}
 	}
 
@@ -1428,7 +1428,7 @@ static int op_reset_device(struct libusb_device_handle *handle)
 	/* And re-claim any interfaces which were claimed before the reset */
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
 		if (handle->claimed_interfaces & (1L << i)) {
-			r = op_claim_interface(handle, i);
+			r = claim_interface(handle, i);
 			if (r) {
 				usbi_warn(HANDLE_CTX(handle),
 					"failed to re-claim interface %d after reset", i);
@@ -1526,6 +1526,40 @@ static int op_attach_kernel_driver(struct libusb_device_handle *handle,
 	} else if (r == 0) {
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
+
+	return 0;
+}
+
+static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
+	int interface)
+{
+	int r;
+
+	r = op_detach_kernel_driver(handle, interface);
+	if (r != 0 && r != LIBUSB_ERROR_NOT_FOUND)
+		return r;
+
+	return claim_interface(handle, interface);
+}
+
+static int op_claim_interface(struct libusb_device_handle *handle, int iface)
+{
+	if (handle->auto_detach_kernel_driver)
+		return detach_kernel_driver_and_claim(handle, iface);
+	else
+		return claim_interface(handle, iface);
+}
+
+static int op_release_interface(struct libusb_device_handle *handle, int iface)
+{
+	int r;
+
+	r = release_interface(handle, iface);
+	if (r)
+		return r;
+
+	if (handle->auto_detach_kernel_driver)
+		op_attach_kernel_driver(handle, iface);
 
 	return 0;
 }

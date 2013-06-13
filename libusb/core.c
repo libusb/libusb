@@ -1361,7 +1361,14 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev,
  * endpoint halts cleared, toggles reset).
  *
  * You cannot change/reset configuration if your application has claimed
- * interfaces - you should free them with libusb_release_interface() first.
+ * interfaces. It is advised to set the desired configuration before claiming
+ * interfaces.
+ *
+ * Alternatively you can call libusb_release_interface() first. Note if you
+ * do things this way you must ensure that auto_detach_kernel_driver for
+ * <tt>dev</tt> is 0, otherwise the kernel driver will be re-attached when you
+ * release the interface(s).
+ *
  * You cannot change/reset configuration if other applications or drivers have
  * claimed interfaces.
  *
@@ -1383,6 +1390,7 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev,
  * \returns LIBUSB_ERROR_BUSY if interfaces are currently claimed
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
+ * \see libusb_set_auto_detach_kernel_driver()
  */
 int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev,
 	int configuration)
@@ -1397,6 +1405,9 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev,
  *
  * It is legal to attempt to claim an already-claimed interface, in which
  * case libusbx just returns 0 without doing anything.
+ *
+ * If auto_detach_kernel_driver is set to 1 for <tt>dev</tt>, the kernel driver
+ * will be detached if necessary, on failure the detach error is returned.
  *
  * Claiming of interfaces is a purely logical operation; it does not cause
  * any requests to be sent over the bus. Interface claiming is used to
@@ -1414,6 +1425,7 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev,
  * interface
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns a LIBUSB_ERROR code on other failure
+ * \see libusb_set_auto_detach_kernel_driver()
  */
 int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev,
 	int interface_number)
@@ -1447,6 +1459,9 @@ out:
  * This is a blocking function. A SET_INTERFACE control request will be sent
  * to the device, resetting interface state to the first alternate setting.
  *
+ * If auto_detach_kernel_driver is set to 1 for <tt>dev</tt>, the kernel
+ * driver will be re-attached after releasing the interface.
+ *
  * \param dev a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the
  * previously-claimed interface
@@ -1454,6 +1469,7 @@ out:
  * \returns LIBUSB_ERROR_NOT_FOUND if the interface was not claimed
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
+ * \see libusb_set_auto_detach_kernel_driver()
  */
 int API_EXPORTED libusb_release_interface(libusb_device_handle *dev,
 	int interface_number)
@@ -1676,6 +1692,38 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
 		return usbi_backend->attach_kernel_driver(dev, interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+/** \ingroup dev
+ * Enable/disable libusbx's automatic kernel driver detachment. When this is
+ * enabled libusbx will automatically detach the kernel driver on an interface
+ * when claiming the interface, and attach it when releasing the interface.
+ *
+ * Automatic kernel driver detachment is disabled on newly opened device
+ * handles by default.
+ *
+ * On platforms which do not have LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER
+ * this function will return LIBUSB_ERROR_NOT_SUPPORTED, and libusbx will
+ * continue as if this function was never called.
+ *
+ * \param dev a device handle
+ * \param enable whether to enable or disable auto kernel driver detachment
+ *
+ * \returns LIBUSB_SUCCESS on success
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED on platforms where the functionality
+ * is not available
+ * \see libusb_claim_interface()
+ * \see libusb_release_interface()
+ * \see libusb_set_configuration()
+ */
+int API_EXPORTED libusb_set_auto_detach_kernel_driver(
+	libusb_device_handle *dev, int enable)
+{
+	if (!(usbi_backend->caps & USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER))
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	dev->auto_detach_kernel_driver = enable;
+	return LIBUSB_SUCCESS;
 }
 
 /** \ingroup lib

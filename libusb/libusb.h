@@ -1390,6 +1390,8 @@ int LIBUSB_CALL libusb_detach_kernel_driver(libusb_device_handle *dev,
 	int interface_number);
 int LIBUSB_CALL libusb_attach_kernel_driver(libusb_device_handle *dev,
 	int interface_number);
+int LIBUSB_CALL libusb_set_auto_detach_kernel_driver(
+	libusb_device_handle *dev, int enable);
 
 /* async I/O */
 
