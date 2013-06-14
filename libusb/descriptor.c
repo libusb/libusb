@@ -908,7 +908,8 @@ int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *handle,
 	r = libusb_get_descriptor(handle, LIBUSB_DT_BOS, 0, bos_header,
 				  LIBUSB_DT_BOS_SIZE);
 	if (r < 0) {
-		usbi_err(handle->dev->ctx, "failed to read BOS (%d)", r);
+		if (r != LIBUSB_ERROR_PIPE)
+			usbi_err(handle->dev->ctx, "failed to read BOS (%d)", r);
 		return r;
 	}
 	if (r < LIBUSB_DT_BOS_SIZE) {
