@@ -84,7 +84,7 @@ int linux_udev_start_event_monitor(void)
 
 	r = pthread_create(&linux_event_thread, NULL, linux_udev_event_thread_main, NULL);
 	if (r) {
-		usbi_err(NULL, "could not create linux hotplug event thread");
+		usbi_err(NULL, "creating hotplug event thread (%d)", r);
 		goto err_free_monitor;
 	}
 
