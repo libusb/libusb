@@ -71,6 +71,7 @@ static int process_new_device (struct libusb_context *ctx, io_service_t service)
 
 #if defined(ENABLE_LOGGING)
 static const char *darwin_error_str (int result) {
+  static char string_buffer[50];
   switch (result) {
   case kIOReturnSuccess:
     return "no error";
@@ -103,7 +104,8 @@ static const char *darwin_error_str (int result) {
   case kIOUSBHighSpeedSplitError:
     return "high speed split error";
   default:
-    return "unknown error";
+    snprintf(string_buffer, sizeof(string_buffer), "unknown error (0x%x)", result);
+    return string_buffer;
   }
 }
 #endif
