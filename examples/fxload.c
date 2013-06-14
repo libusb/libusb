@@ -242,14 +242,8 @@ int main(int argc, char*argv[])
 	}
 
 	/* We need to claim the first interface */
+	libusb_set_auto_detach_kernel_driver(device, 1);
 	status = libusb_claim_interface(device, 0);
-#if defined(__linux__)
-	if (status != LIBUSB_SUCCESS) {
-		/* Maybe we need to detach the driver */
-		libusb_detach_kernel_driver(device, 0);
-		status = libusb_claim_interface(device, 0);
-	}
-#endif
 	if (status != LIBUSB_SUCCESS) {
 		logerror("libusb_claim_interface failed: %s\n", libusb_error_name(status));
 		goto err;

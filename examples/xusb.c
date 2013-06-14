@@ -785,8 +785,6 @@ static int test_device(uint16_t vid, uint16_t pid)
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
 	int iface, nb_ifaces, first_iface = -1;
-	// For attaching/detaching the kernel driver, if needed
-	int iface_detached = -1;
 	struct libusb_device_descriptor dev_desc;
 	const char* speed_name[5] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
 		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)"};
@@ -894,21 +892,11 @@ static int test_device(uint16_t vid, uint16_t pid)
 	}
 	libusb_free_config_descriptor(conf_desc);
 
+	libusb_set_auto_detach_kernel_driver(handle, 1);
 	for (iface = 0; iface < nb_ifaces; iface++)
 	{
 		printf("\nClaiming interface %d...\n", iface);
 		r = libusb_claim_interface(handle, iface);
-		if ((r != LIBUSB_SUCCESS) && libusb_has_capability(LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER)
-			&& (libusb_kernel_driver_active(handle, iface) > 0)) {
-			// Try to detach the kernel driver
-			perr("   A kernel driver is active, trying to detach it...\n");
-			r = libusb_detach_kernel_driver(handle, iface);
-			if (r == LIBUSB_SUCCESS) {
-				iface_detached = iface;
-				printf("   Claiming interface again...\n");
-				r = libusb_claim_interface(handle, iface);
-			}
-		}
 		if (r != LIBUSB_SUCCESS) {
 			perr("   Failed.\n");
 		}
@@ -955,11 +943,6 @@ static int test_device(uint16_t vid, uint16_t pid)
 	for (iface = 0; iface<nb_ifaces; iface++) {
 		printf("Releasing interface %d...\n", iface);
 		libusb_release_interface(handle, iface);
-	}
-
-	if (iface_detached >= 0) {
-		printf("Re-attaching kernel driver...\n");
-		libusb_attach_kernel_driver(handle, iface_detached);
 	}
 
 	printf("Closing device...\n");
