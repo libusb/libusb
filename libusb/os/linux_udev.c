@@ -119,16 +119,16 @@ int linux_udev_stop_event_monitor(void)
 	assert(udev_monitor != NULL);
 	assert(udev_monitor_fd != -1);
 
-	/* Release the udev monitor */
-	udev_monitor_unref(udev_monitor);
-	udev_monitor = NULL;
-	udev_monitor_fd = -1;
-
 	/* Cancel the event thread. This is the only way to garauntee the
 	   thread exits since closing the monitor fd won't necessarily cause
 	   poll to return. */
 	pthread_cancel(linux_event_thread);
 	pthread_join(linux_event_thread, NULL);
+
+	/* Release the udev monitor */
+	udev_monitor_unref(udev_monitor);
+	udev_monitor = NULL;
+	udev_monitor_fd = -1;
 
 	/* Clean up the udev context */
 	udev_unref(udev_ctx);
