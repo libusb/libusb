@@ -164,8 +164,8 @@ static inline uint16_t libusb_cpu_to_le16(const uint16_t x)
 		uint8_t  b8[2];
 		uint16_t b16;
 	} _tmp;
-	_tmp.b8[1] = x >> 8;
-	_tmp.b8[0] = x & 0xff;
+	_tmp.b8[1] = (uint8_t) (x >> 8);
+	_tmp.b8[0] = (uint8_t) (x & 0xff);
 	return _tmp.b16;
 }
 
@@ -1509,8 +1509,8 @@ static inline void libusb_fill_control_transfer(
 	transfer->timeout = timeout;
 	transfer->buffer = buffer;
 	if (setup)
-		transfer->length = LIBUSB_CONTROL_SETUP_SIZE
-			+ libusb_le16_to_cpu(setup->wLength);
+		transfer->length = (int) (LIBUSB_CONTROL_SETUP_SIZE
+			+ libusb_le16_to_cpu(setup->wLength));
 	transfer->user_data = user_data;
 	transfer->callback = callback;
 }
@@ -1645,7 +1645,7 @@ static inline unsigned char *libusb_get_iso_packet_buffer(
 	 * signed to avoid compiler warnings. FIXME for libusb-2. */
 	if (packet > INT_MAX)
 		return NULL;
-	_packet = packet;
+	_packet = (int) packet;
 
 	if (_packet >= transfer->num_iso_packets)
 		return NULL;
@@ -1685,12 +1685,12 @@ static inline unsigned char *libusb_get_iso_packet_buffer_simple(
 	 * signed to avoid compiler warnings. FIXME for libusb-2. */
 	if (packet > INT_MAX)
 		return NULL;
-	_packet = packet;
+	_packet = (int) packet;
 
 	if (_packet >= transfer->num_iso_packets)
 		return NULL;
 
-	return transfer->buffer + (transfer->iso_packet_desc[0].length * _packet);
+	return transfer->buffer + ((int) transfer->iso_packet_desc[0].length * _packet);
 }
 
 /* sync I/O */
@@ -1723,8 +1723,8 @@ static inline int libusb_get_descriptor(libusb_device_handle *dev,
 	uint8_t desc_type, uint8_t desc_index, unsigned char *data, int length)
 {
 	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
-		LIBUSB_REQUEST_GET_DESCRIPTOR, (desc_type << 8) | desc_index, 0, data,
-		(uint16_t) length, 1000);
+		LIBUSB_REQUEST_GET_DESCRIPTOR, (uint16_t) ((desc_type << 8) | desc_index),
+		0, data, (uint16_t) length, 1000);
 }
 
 /** \ingroup desc
