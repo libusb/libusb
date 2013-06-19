@@ -139,7 +139,7 @@ static const char* usbi_localized_errors[ARRAYSIZE(usbi_locale_supported)][LIBUS
 
 int API_EXPORTED libusb_setlocale(const char *locale)
 {
-	int i;
+	size_t i;
 
 	if ( (locale == NULL) || (strlen(locale) < 2)
 	  || ((strlen(locale) > 2) && (locale[2] != '-') && (locale[2] != '_') && (locale[2] != '.')) )
