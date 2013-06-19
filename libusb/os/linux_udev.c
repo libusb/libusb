@@ -119,7 +119,7 @@ int linux_udev_stop_event_monitor(void)
 	assert(udev_monitor != NULL);
 	assert(udev_monitor_fd != -1);
 
-	/* Cancel the event thread. This is the only way to garauntee the
+	/* Cancel the event thread. This is the only way to guarantee the
 	   thread exits since closing the monitor fd won't necessarily cause
 	   poll to return. */
 	pthread_cancel(linux_event_thread);
