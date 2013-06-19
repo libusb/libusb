@@ -29,7 +29,7 @@
 #define strncasecmp _strnicmp
 #endif
 
-static int usbi_locale = 0;
+static size_t usbi_locale = 0;
 
 /** \ingroup misc
  * How to add a new \ref libusb_strerror() translation:
