@@ -106,12 +106,11 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 		if (r < 0) {
 			if (r == LIBUSB_ERROR_INTERRUPTED)
 				continue;
+			usbi_err(HANDLE_CTX(dev_handle),
+				 "libusb_handle_events failed: %s, cancelling transfer and retrying",
+				 libusb_error_name(r));
 			libusb_cancel_transfer(transfer);
-			while (!completed)
-				if (libusb_handle_events_completed(HANDLE_CTX(dev_handle), &completed) < 0)
-					break;
-			libusb_free_transfer(transfer);
-			return r;
+			continue;
 		}
 	}
 
@@ -183,12 +182,11 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 		if (r < 0) {
 			if (r == LIBUSB_ERROR_INTERRUPTED)
 				continue;
+			usbi_err(HANDLE_CTX(dev_handle),
+				 "libusb_handle_events failed: %s, cancelling transfer and retrying",
+				 libusb_error_name(r));
 			libusb_cancel_transfer(transfer);
-			while (!completed)
-				if (libusb_handle_events_completed(HANDLE_CTX(dev_handle), &completed) < 0)
-					break;
-			libusb_free_transfer(transfer);
-			return r;
+			continue;
 		}
 	}
 
