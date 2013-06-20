@@ -1469,7 +1469,7 @@ static int op_kernel_driver_active(struct libusb_device_handle *handle,
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	return 1;
+	return (strcmp(getdrv.driver, "usbfs") == 0) ? 0 : 1;
 }
 
 static int op_detach_kernel_driver(struct libusb_device_handle *handle,
