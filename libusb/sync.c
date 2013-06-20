@@ -33,12 +33,30 @@
  * may wish to consider using the \ref asyncio "asynchronous I/O API" instead.
  */
 
-static void LIBUSB_CALL ctrl_transfer_cb(struct libusb_transfer *transfer)
+static void LIBUSB_CALL sync_transfer_cb(struct libusb_transfer *transfer)
 {
 	int *completed = transfer->user_data;
 	*completed = 1;
 	usbi_dbg("actual_length=%d", transfer->actual_length);
 	/* caller interprets result and frees transfer */
+}
+
+static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
+{
+	int r, *completed = transfer->user_data;
+	struct libusb_context *ctx = HANDLE_CTX(transfer->dev_handle);
+
+	while (!*completed) {
+		r = libusb_handle_events_completed(ctx, completed);
+		if (r < 0) {
+			if (r == LIBUSB_ERROR_INTERRUPTED)
+				continue;
+			usbi_err(ctx, "libusb_handle_events failed: %s, cancelling transfer and retrying",
+				 libusb_error_name(r));
+			libusb_cancel_transfer(transfer);
+			continue;
+		}
+	}
 }
 
 /** \ingroup syncio
@@ -93,7 +111,7 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 		memcpy(buffer + LIBUSB_CONTROL_SETUP_SIZE, data, wLength);
 
 	libusb_fill_control_transfer(transfer, dev_handle, buffer,
-		ctrl_transfer_cb, &completed, timeout);
+		sync_transfer_cb, &completed, timeout);
 	transfer->flags = LIBUSB_TRANSFER_FREE_BUFFER;
 	r = libusb_submit_transfer(transfer);
 	if (r < 0) {
@@ -101,18 +119,7 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 		return r;
 	}
 
-	while (!completed) {
-		r = libusb_handle_events_completed(HANDLE_CTX(dev_handle), &completed);
-		if (r < 0) {
-			if (r == LIBUSB_ERROR_INTERRUPTED)
-				continue;
-			usbi_err(HANDLE_CTX(dev_handle),
-				 "libusb_handle_events failed: %s, cancelling transfer and retrying",
-				 libusb_error_name(r));
-			libusb_cancel_transfer(transfer);
-			continue;
-		}
-	}
+	sync_transfer_wait_for_completion(transfer);
 
 	if ((bmRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN)
 		memcpy(data, libusb_control_transfer_get_data(transfer),
@@ -148,14 +155,6 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 	return r;
 }
 
-static void LIBUSB_CALL bulk_transfer_cb(struct libusb_transfer *transfer)
-{
-	int *completed = transfer->user_data;
-	*completed = 1;
-	usbi_dbg("actual_length=%d", transfer->actual_length);
-	/* caller interprets results and frees transfer */
-}
-
 static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *buffer, int length,
 	int *transferred, unsigned int timeout, unsigned char type)
@@ -168,7 +167,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 		return LIBUSB_ERROR_NO_MEM;
 
 	libusb_fill_bulk_transfer(transfer, dev_handle, endpoint, buffer, length,
-		bulk_transfer_cb, &completed, timeout);
+		sync_transfer_cb, &completed, timeout);
 	transfer->type = type;
 
 	r = libusb_submit_transfer(transfer);
@@ -177,18 +176,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 		return r;
 	}
 
-	while (!completed) {
-		r = libusb_handle_events_completed(HANDLE_CTX(dev_handle), &completed);
-		if (r < 0) {
-			if (r == LIBUSB_ERROR_INTERRUPTED)
-				continue;
-			usbi_err(HANDLE_CTX(dev_handle),
-				 "libusb_handle_events failed: %s, cancelling transfer and retrying",
-				 libusb_error_name(r));
-			libusb_cancel_transfer(transfer);
-			continue;
-		}
-	}
+	sync_transfer_wait_for_completion(transfer);
 
 	*transferred = transfer->actual_length;
 	switch (transfer->status) {
