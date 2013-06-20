@@ -34,6 +34,10 @@
 #include <sys/time.h>
 #endif
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #include "libusbi.h"
 #include "hotplug.h"
 
@@ -2033,6 +2037,28 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 		return;
 #endif
 
+#ifdef __ANDROID__
+	int prio;
+	switch (level) {
+	case LOG_LEVEL_INFO:
+		prio = ANDROID_LOG_INFO;
+		break;
+	case LOG_LEVEL_WARNING:
+		prio = ANDROID_LOG_WARN;
+		break;
+	case LOG_LEVEL_ERROR:
+		prio = ANDROID_LOG_ERROR;
+		break;
+	case LOG_LEVEL_DEBUG:
+		prio = ANDROID_LOG_DEBUG;
+		break;
+	default:
+		prio = ANDROID_LOG_UNKNOWN;
+		break;
+	}
+
+	__android_log_vprint(prio, "LibUsb", format, args);
+#else
 	usbi_gettimeofday(&now, NULL);
 	if ((global_debug) && (!has_debug_header_been_displayed)) {
 		has_debug_header_been_displayed = 1;
@@ -2076,6 +2102,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	vfprintf(stderr, format, args);
 
 	fprintf(stderr, "\n");
+#endif
 }
 
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
