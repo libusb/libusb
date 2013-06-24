@@ -341,10 +341,10 @@ static int wince_get_device_list(
 	UKW_DEVICE devices[MAX_DEVICE_COUNT];
 	struct discovered_devs * new_devices = *discdevs;
 	DWORD count = 0, i;
-	struct libusb_device *dev;
+	struct libusb_device *dev = NULL;
 	unsigned char bus_addr, dev_addr;
 	unsigned long session_id;
-	BOOL success, need_unref = FALSE;
+	BOOL success;
 	DWORD release_list_offset = 0;
 	int r = LIBUSB_SUCCESS;
 
@@ -378,7 +378,6 @@ static int wince_get_device_list(
 				r = LIBUSB_ERROR_NO_MEM;
 				goto err_out;
 			}
-			need_unref = TRUE;
 			r = init_device(dev, devices[i], bus_addr, dev_addr);
 			if (r < 0)
 				goto err_out;
@@ -391,14 +390,13 @@ static int wince_get_device_list(
 			r = LIBUSB_ERROR_NO_MEM;
 			goto err_out;
 		}
-		need_unref = FALSE;
+		safe_unref_device(dev);
 	}
 	*discdevs = new_devices;
 	return r;
 err_out:
 	*discdevs = new_devices;
-	if (need_unref)
-		libusb_unref_device(dev);
+	safe_unref_device(dev);
 	// Release the remainder of the unprocessed device list.
 	// The devices added to new_devices already will still be passed up to libusb, 
 	// which can dispose of them at its leisure.
