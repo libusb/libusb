@@ -1083,6 +1083,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	}
 
 	_handle->dev = libusb_ref_device(dev);
+	_handle->auto_detach_kernel_driver = 0;
 	_handle->claimed_interfaces = 0;
 	memset(&_handle->os_priv, 0, priv_size);
 
