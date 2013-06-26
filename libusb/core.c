@@ -1912,14 +1912,16 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	list_del (&ctx->list);
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
-	usbi_hotplug_deregister_all(ctx);
-
-	usbi_mutex_lock(&ctx->usb_devs_lock);
-	list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
-		list_del(&dev->list);
-		libusb_unref_device(dev);
-	}
-	usbi_mutex_unlock(&ctx->usb_devs_lock);
+	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+		usbi_hotplug_deregister_all(ctx);
+		usbi_mutex_lock(&ctx->usb_devs_lock);
+		list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
+			list_del(&dev->list);
+			libusb_unref_device(dev);
+		}
+		usbi_mutex_unlock(&ctx->usb_devs_lock);
+	} else if (!list_empty(&ctx->usb_devs))
+		usbi_warn(ctx, "some libusb_devices were leaked");
 
 	/* a little sanity check. doesn't bother with open_devs locking because
 	 * unless there is an application bug, nobody will be accessing this. */
