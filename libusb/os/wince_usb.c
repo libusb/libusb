@@ -366,6 +366,7 @@ static int wince_get_device_list(
 		if (dev) {
 			usbi_dbg("using existing device for %d/%d (session %ld)",
 					bus_addr, dev_addr, session_id);
+			libusb_ref_device(dev);
 			// Release just this element in the device list (as we already hold a 
 			// reference to it).
 			UkwReleaseDeviceList(driver_handle, &devices[i], 1);
