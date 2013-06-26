@@ -531,6 +531,7 @@ void usbi_connect_device(struct libusb_device *dev)
 	libusb_hotplug_message message;
 	ssize_t ret;
 
+	memset(&message, 0, sizeof(message));
 	message.event = LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED;
 	message.device = dev;
 	dev->attached = 1;
@@ -556,6 +557,7 @@ void usbi_disconnect_device(struct libusb_device *dev)
 	struct libusb_context *ctx = dev->ctx;
 	ssize_t ret;
 
+	memset(&message, 0, sizeof(message));
 	message.event = LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT;
 	message.device = dev;
 	usbi_mutex_lock(&dev->lock);
