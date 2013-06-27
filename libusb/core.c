@@ -2017,12 +2017,19 @@ int usbi_gettimeofday(struct timeval *tp, void *tzp)
 }
 #endif
 
+static void usbi_log_str(struct libusb_context *ctx, const char * str)
+{
+	UNUSED(ctx);
+	fprintf(stderr, str);
+}
+
 void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, va_list args)
 {
 	const char *prefix = "";
+	char buf[USBI_MAX_LOG_LEN];
 	struct timeval now;
-	int global_debug;
+	int global_debug, header_len, text_len;
 	static int has_debug_header_been_displayed = 0;
 
 #ifdef ENABLE_DEBUG_LOGGING
@@ -2068,8 +2075,8 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	usbi_gettimeofday(&now, NULL);
 	if ((global_debug) && (!has_debug_header_been_displayed)) {
 		has_debug_header_been_displayed = 1;
-		fprintf(stderr, "[timestamp] [threadID] facility level [function call] <message>\n");
-		fprintf(stderr, "--------------------------------------------------------------------------------\n");
+		usbi_log_str(ctx, "[timestamp] [threadID] facility level [function call] <message>\n");
+		usbi_log_str(ctx, "--------------------------------------------------------------------------------\n");
 	}
 	if (now.tv_usec < timestamp_origin.tv_usec) {
 		now.tv_sec--;
@@ -2099,15 +2106,35 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	}
 
 	if (global_debug) {
-		fprintf(stderr, "[%2d.%06d] [%08x] libusbx: %s [%s] ",
+		header_len = snprintf(buf, sizeof(buf),
+			"[%2d.%06d] [%08x] libusbx: %s [%s] ",
 			(int)now.tv_sec, (int)now.tv_usec, usbi_get_tid(), prefix, function);
 	} else {
-		fprintf(stderr, "libusbx: %s [%s] ", prefix, function);
+		header_len = snprintf(buf, sizeof(buf),
+			"libusbx: %s [%s] ", prefix, function);
 	}
 
-	vfprintf(stderr, format, args);
+	if (header_len < 0 || header_len >= sizeof(buf)) {
+		/* Somehow snprintf failed to write to the buffer,
+		 * remove the header so something useful is output. */
+		header_len = 0;
+	}
+	/* Make sure buffer is NUL terminated */
+	buf[header_len] = '\0';
+	text_len = vsnprintf(buf + header_len, sizeof(buf) - header_len,
+		format, args);
+	if (text_len < 0 || text_len + header_len >= sizeof(buf)) {
+		/* Truncated log output. On some platforms a -1 return value means
+		 * that the output was truncated. */
+		text_len = sizeof(buf) - header_len;
+	}
+	if (header_len + text_len + sizeof(USBI_LOG_LINE_END) >= sizeof(buf)) {
+		/* Need to truncate the text slightly to fit on the terminator. */
+		text_len -= (header_len + text_len + sizeof(USBI_LOG_LINE_END)) - sizeof(buf);
+	}
+	strcpy(buf + header_len + text_len, USBI_LOG_LINE_END);
 
-	fprintf(stderr, "\n");
+	usbi_log_str(ctx, buf);
 #endif
 }
 

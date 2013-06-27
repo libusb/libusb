@@ -56,6 +56,11 @@
 #define USBI_CAP_HAS_HID_ACCESS					0x00010000
 #define USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER	0x00020000
 
+/* Maximum number of bytes in a log line */
+#define USBI_MAX_LOG_LEN 256
+/* Terminator for log lines */
+#define USBI_LOG_LINE_END "\n"
+
 /* The following is used to silence warnings for unused variables */
 #define UNUSED(var)			do { (void)(var); } while(0)
 
@@ -445,6 +450,11 @@ int usbi_gettimeofday(struct timeval *tp, void *tzp);
 #define usbi_gettimeofday(tv, tz) gettimeofday((tv), (tz))
 #define HAVE_USBI_GETTIMEOFDAY
 #endif
+#endif
+
+#if (defined(OS_WINDOWS) || defined(OS_WINCE)) && !defined(__GCC__)
+#define snprintf _snprintf
+#define vsnprintf _vsnprintf
 #endif
 
 struct usbi_pollfd {
