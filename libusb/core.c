@@ -1923,11 +1923,12 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 			libusb_unref_device(dev);
 		}
 		usbi_mutex_unlock(&ctx->usb_devs_lock);
-	} else if (!list_empty(&ctx->usb_devs))
-		usbi_warn(ctx, "some libusb_devices were leaked");
+	}
 
-	/* a little sanity check. doesn't bother with open_devs locking because
-	 * unless there is an application bug, nobody will be accessing this. */
+	/* a few sanity checks. don't bother with locking because unless
+	 * there is an application bug, nobody will be accessing these. */
+	if (!list_empty(&ctx->usb_devs))
+		usbi_warn(ctx, "some libusb_devices were leaked");
 	if (!list_empty(&ctx->open_devs))
 		usbi_warn(ctx, "application left some devices open");
 
