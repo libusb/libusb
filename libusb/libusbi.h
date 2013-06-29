@@ -57,9 +57,9 @@
 #define USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER	0x00020000
 
 /* Maximum number of bytes in a log line */
-#define USBI_MAX_LOG_LEN 256
+#define USBI_MAX_LOG_LEN	1024
 /* Terminator for log lines */
-#define USBI_LOG_LINE_END "\n"
+#define USBI_LOG_LINE_END	"\n"
 
 /* The following is used to silence warnings for unused variables */
 #define UNUSED(var)			do { (void)(var); } while(0)
@@ -73,18 +73,18 @@ struct list_head {
 };
 
 /* Get an entry from the list
- * 	ptr - the address of this list_head element in "type"
- * 	type - the data type that contains "member"
- * 	member - the list_head element in "type"
+ *  ptr - the address of this list_head element in "type"
+ *  type - the data type that contains "member"
+ *  member - the list_head element in "type"
  */
 #define list_entry(ptr, type, member) \
 	((type *)((uintptr_t)(ptr) - (uintptr_t)offsetof(type, member)))
 
 /* Get each entry from a list
- *	pos - A structure pointer has a "member" element
- *	head - list head
- *	member - the list_head element in "pos"
- *	type - the type of the first parameter
+ *  pos - A structure pointer has a "member" element
+ *  head - list head
+ *  member - the list_head element in "pos"
+ *  type - the type of the first parameter
  */
 #define list_for_each_entry(pos, head, member, type)			\
 	for (pos = list_entry((head)->next, type, member);			\
@@ -437,11 +437,12 @@ void usbi_disconnect_device (struct libusb_device *dev);
 #include <unistd.h>
 #include "os/poll_posix.h"
 #elif defined(OS_WINDOWS) || defined(OS_WINCE)
-#include <os/poll_windows.h>
+#include "os/poll_windows.h"
 #endif
 
-#if (defined(OS_WINDOWS) || defined(OS_WINCE)) && !defined(__GCC__)
-#undef HAVE_GETTIMEOFDAY
+#if (defined(OS_WINDOWS) || defined(OS_WINCE)) && !defined(__GNUC__)
+#define snprintf _snprintf
+#define vsnprintf _vsnprintf
 int usbi_gettimeofday(struct timeval *tp, void *tzp);
 #define LIBUSB_GETTIMEOFDAY_WIN32
 #define HAVE_USBI_GETTIMEOFDAY
@@ -450,11 +451,6 @@ int usbi_gettimeofday(struct timeval *tp, void *tzp);
 #define usbi_gettimeofday(tv, tz) gettimeofday((tv), (tz))
 #define HAVE_USBI_GETTIMEOFDAY
 #endif
-#endif
-
-#if (defined(OS_WINDOWS) || defined(OS_WINCE)) && !defined(__GCC__)
-#define snprintf _snprintf
-#define vsnprintf _vsnprintf
 #endif
 
 struct usbi_pollfd {
