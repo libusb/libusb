@@ -2020,7 +2020,7 @@ int usbi_gettimeofday(struct timeval *tp, void *tzp)
 static void usbi_log_str(struct libusb_context *ctx, const char * str)
 {
 	UNUSED(ctx);
-	fprintf(stderr, "%s", str);
+	fputs(str, stderr);
 }
 
 void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
