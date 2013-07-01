@@ -1428,7 +1428,7 @@ static inline unsigned char *libusb_control_transfer_get_data(
 static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
 	struct libusb_transfer *transfer)
 {
-	return (struct libusb_control_setup *) transfer->buffer;
+	return (struct libusb_control_setup *)(void *) transfer->buffer;
 }
 
 /** \ingroup asyncio
@@ -1437,6 +1437,7 @@ static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
  * be given in host-endian byte order.
  *
  * \param buffer buffer to output the setup packet into
+ * This pointer must be aligned to at least 2 bytes boundary.
  * \param bmRequestType see the
  * \ref libusb_control_setup::bmRequestType "bmRequestType" field of
  * \ref libusb_control_setup
@@ -1457,7 +1458,7 @@ static inline void libusb_fill_control_setup(unsigned char *buffer,
 	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	uint16_t wLength)
 {
-	struct libusb_control_setup *setup = (struct libusb_control_setup *) buffer;
+	struct libusb_control_setup *setup = (struct libusb_control_setup *)(void *) buffer;
 	setup->bmRequestType = bmRequestType;
 	setup->bRequest = bRequest;
 	setup->wValue = libusb_cpu_to_le16(wValue);
@@ -1493,6 +1494,7 @@ void LIBUSB_CALL libusb_free_transfer(struct libusb_transfer *transfer);
  * \param dev_handle handle of the device that will handle the transfer
  * \param buffer data buffer. If provided, this function will interpret the
  * first 8 bytes as a setup packet and infer the transfer length from that.
+ * This pointer must be aligned to at least 2 bytes boundary.
  * \param callback callback function to be invoked on transfer completion
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
@@ -1502,7 +1504,7 @@ static inline void libusb_fill_control_transfer(
 	unsigned char *buffer, libusb_transfer_cb_fn callback, void *user_data,
 	unsigned int timeout)
 {
-	struct libusb_control_setup *setup = (struct libusb_control_setup *) buffer;
+	struct libusb_control_setup *setup = (struct libusb_control_setup *)(void *) buffer;
 	transfer->dev_handle = dev_handle;
 	transfer->endpoint = 0;
 	transfer->type = LIBUSB_TRANSFER_TYPE_CONTROL;

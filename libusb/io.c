@@ -787,7 +787,7 @@ void cb(struct libusb_transfer *transfer)
 
 void myfunc() {
 	struct libusb_transfer *transfer;
-	unsigned char buffer[LIBUSB_CONTROL_SETUP_SIZE];
+	unsigned char buffer[LIBUSB_CONTROL_SETUP_SIZE] __attribute__ ((aligned (2)));
 	int completed = 0;
 
 	transfer = libusb_alloc_transfer(0);
