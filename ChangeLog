@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusbx.org
 
-2013-06-20: v1.0.16-rc1
+2013-07-01: v1.0.16-rc2
 * Add hotplug support for Darwin and Linux (#9)
 * Add superspeed endpoint companion descriptor support (#15)
 * Add BOS descriptor support (#15)
@@ -10,6 +10,8 @@ visit: http://log.libusbx.org
   the unnecessary context parameter, libusb_get_port_path is now deprecated
 * New libusb_strerror API (#14)
 * New libusb_set_auto_detach_kernel_driver API (#17)
+* Logging now use a single write call per log-message, avoiding log-message
+  "interlacing" when using multiple threads.
 * Android: use Android logging when building on Android (#101)
 * Darwin: make libusb_reset reenumerate device on descriptors change (#89)
 * Darwin: add support for the LIBUSB_TRANSFER_ADD_ZERO_PACKET flag (#91)
