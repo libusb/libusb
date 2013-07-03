@@ -35,25 +35,33 @@
 
 /**
  * @defgroup hotplug  Device hotplug event notification
- * This page details how to use the libusb hotplug interface.
+ * This page details how to use the libusb hotplug interface, where available.
+ *
+ * Be mindful that not all platforms currently implement hotplug notification and
+ * that you should first call on \ref libusb_has_capability() with parameter
+ * \ref LIBUSB_CAP_HAS_HOTPLUG to confirm that hotplug support is available.
  *
  * \page hotplug Device hotplug event notification
  *
  * \section intro Introduction
  *
  * Version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102, has added support
- * for hotplug events. This interface allows you to request notification for
- * the arrival and departure of matching USB devices.
+ * for hotplug events on <b>some</b> platforms (you should test if your platform
+ * supports hotplug notification by calling \ref libusb_has_capability() with
+ * parameter \ref LIBUSB_CAP_HAS_HOTPLUG). 
+ *
+ * This interface allows you to request notification for the arrival and departure
+ * of matching USB devices.
  *
  * To receive hotplug notification you register a callback by calling
- * libusb_hotplug_register_callback(). This function will optionally return
- * a handle that can be passed to libusb_hotplug_deregister_callback().
+ * \ref libusb_hotplug_register_callback(). This function will optionally return
+ * a handle that can be passed to \ref libusb_hotplug_deregister_callback().
  *
  * A callback function must return an int (0 or 1) indicating whether the callback is
  * expecting additional events. Returning 0 will rearm the callback and 1 will cause
  * the callback to be deregistered.
  *
- * Callbacks for a particulat context are automatically deregistered by libusb_exit().
+ * Callbacks for a particular context are automatically deregistered by libusb_exit().
  *
  * As of 1.0.16 there are two supported hotplug events:
  *  - LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED: A device has arrived and is ready to use

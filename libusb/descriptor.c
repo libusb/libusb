@@ -541,6 +541,9 @@ int usbi_device_cache_descriptor(libusb_device *dev)
  *
  * This is a non-blocking function; the device descriptor is cached in memory.
  *
+ * Note since libusbx-1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102, this
+ * function always succeeds.
+ *
  * \param dev the device
  * \param desc output location for the descriptor data
  * \returns 0 on success or a LIBUSB_ERROR code on failure

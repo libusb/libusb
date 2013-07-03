@@ -97,7 +97,7 @@ struct list_head active_contexts_list;
  *   usually won't need to thread)
  * - Lightweight with lean API
  * - Compatible with libusb-0.1 through the libusb-compat-0.1 translation layer
- * - Hotplug support (see \ref hotplug)
+ * - Hotplug support (on some platforms). See \ref hotplug.
  *
  * \section gettingstarted Getting Started
  *
@@ -737,7 +737,16 @@ uint8_t API_EXPORTED libusb_get_bus_number(libusb_device *dev)
 }
 
 /** \ingroup dev
- * Get the number of the port that a device is connected to
+ * Get the number of the port that a device is connected to.
+ * Unless the OS does something funky, or you are hot-plugging USB extension cards,
+ * the port number returned by this call is usually guaranteed to be uniquely tied
+ * to a physical port, meaning that different devices plugged on the same physical
+ * port should return the same port number.
+ *
+ * But outside of this, there is no guarantee that the port number returned by this
+ * call will remain the same, or even match the order in which ports have been
+ * numbered by the HUB/HCD manufacturer.
+ *
  * \param dev a device
  * \returns the port number (0 if not available)
  */
@@ -792,12 +801,12 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
 }
 
 /** \ingroup dev
- * Get the the parent from the specified device [EXPERIMENTAL]
+ * Get the the parent from the specified device.
  * \param dev a device
  * \returns the device parent or NULL if not available
- * You should issue a libusb_get_device_list() before calling this
+ * You should issue a \ref libusb_get_device_list() before calling this
  * function and make sure that you only access the parent before issuing
- * libusb_free_device_list(). The reason is that libusbx currently does
+ * \ref libusb_free_device_list(). The reason is that libusbx currently does
  * not maintain a permanent list of device instances, and therefore can
  * only guarantee that parents are fully instantiated within a 
  * libusb_get_device_list() - libusb_free_device_list() block.
@@ -897,7 +906,7 @@ int API_EXPORTED libusb_get_max_packet_size(libusb_device *dev,
  * Calculate the maximum packet size which a specific endpoint is capable is
  * sending or receiving in the duration of 1 microframe
  *
- * Only the active configution is examined. The calculation is based on the
+ * Only the active configuration is examined. The calculation is based on the
  * wMaxPacketSize field in the endpoint descriptor as described in section
  * 9.6.6 in the USB 2.0 specifications.
  *

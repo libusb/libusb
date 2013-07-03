@@ -1260,14 +1260,14 @@ struct libusb_transfer {
 };
 
 /** \ingroup misc
- * Capabilities supported by this instance of libusb. Test if the loaded
- * library supports a given capability by calling
+ * Capabilities supported by an instance of libusb on the current running
+ * platform. Test if the loaded library supports a given capability by calling
  * \ref libusb_has_capability().
  */
 enum libusb_capability {
 	/** The libusb_has_capability() API is available. */
 	LIBUSB_CAP_HAS_CAPABILITY = 0x0000,
-	/** Hotplug support is available. */
+	/** Hotplug support is available on this platform. */
 	LIBUSB_CAP_HAS_HOTPLUG = 0x0001,
 	/** The library can access HID devices without requiring user intervention.
 	 * Note that before being able to actually access an HID device, you may
