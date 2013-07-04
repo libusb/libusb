@@ -278,6 +278,8 @@ void API_EXPORTED libusb_hotplug_deregister_callback (struct libusb_context *ctx
 	libusb_hotplug_callback_handle handle)
 {
 	struct libusb_hotplug_callback *hotplug_cb;
+	libusb_hotplug_message message;
+	ssize_t ret;
 
 	/* check for hotplug support */
 	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
@@ -295,6 +297,13 @@ void API_EXPORTED libusb_hotplug_deregister_callback (struct libusb_context *ctx
 		}
 	}
 	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
+
+	/* wakeup handle_events to do the actual free */
+	memset(&message, 0, sizeof(message));
+	ret = usbi_write(ctx->hotplug_pipe[1], &message, sizeof(message));
+	if (sizeof(message) != ret) {
+		usbi_err(ctx, "error writing hotplug message");
+	}
 }
 
 void usbi_hotplug_deregister_all(struct libusb_context *ctx) {
