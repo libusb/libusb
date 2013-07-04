@@ -138,11 +138,10 @@ int main (void) {
 \endcode
  */
 
-static int usbi_hotplug_match_cb (struct libusb_device *dev, libusb_hotplug_event event,
-				   struct libusb_hotplug_callback *hotplug_cb)
+static int usbi_hotplug_match_cb (struct libusb_context *ctx,
+	struct libusb_device *dev, libusb_hotplug_event event,
+	struct libusb_hotplug_callback *hotplug_cb)
 {
-	struct libusb_context *ctx = dev->ctx;
-
 	/* Handle lazy deregistration of callback */
 	if (hotplug_cb->needs_free) {
 		/* Free callback */
@@ -172,17 +171,17 @@ static int usbi_hotplug_match_cb (struct libusb_device *dev, libusb_hotplug_even
 			       dev, event, hotplug_cb->user_data);
 }
 
-void usbi_hotplug_match(struct libusb_device *dev, libusb_hotplug_event event)
+void usbi_hotplug_match(struct libusb_context *ctx, struct libusb_device *dev,
+	libusb_hotplug_event event)
 {
 	struct libusb_hotplug_callback *hotplug_cb, *next;
-	struct libusb_context *ctx = dev->ctx;
 	int ret;
 
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 
 	list_for_each_entry_safe(hotplug_cb, next, &ctx->hotplug_cbs, list, struct libusb_hotplug_callback) {
 		usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
-		ret = usbi_hotplug_match_cb (dev, event, hotplug_cb);
+		ret = usbi_hotplug_match_cb (ctx, dev, event, hotplug_cb);
 		usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 
 		if (ret) {
@@ -260,7 +259,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 		usbi_mutex_lock(&ctx->usb_devs_lock);
 
 		list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device) {
-			(void) usbi_hotplug_match_cb (dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, new_callback);
+			(void) usbi_hotplug_match_cb (ctx, dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, new_callback);
 		}
 
 		usbi_mutex_unlock(&ctx->usb_devs_lock);

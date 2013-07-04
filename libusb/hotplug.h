@@ -76,6 +76,7 @@ struct libusb_hotplug_message {
 typedef struct libusb_hotplug_message libusb_hotplug_message;
 
 void usbi_hotplug_deregister_all(struct libusb_context *ctx);
-void usbi_hotplug_match(struct libusb_device *dev, libusb_hotplug_event event);
+void usbi_hotplug_match(struct libusb_context *ctx, struct libusb_device *dev,
+			libusb_hotplug_event event);
 
 #endif

@@ -1947,7 +1947,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 			goto handled;
 		}
 
-		usbi_hotplug_match(message.device, message.event);
+		usbi_hotplug_match(ctx, message.device, message.event);
 
 		/* the device left. dereference the device */
 		if (LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT == message.event)
