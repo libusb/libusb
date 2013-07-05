@@ -496,10 +496,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  *
  * \section asyncevent Event handling
  *
- * In accordance of the aim of being a lightweight library, libusbx does not
- * create threads internally. This means that libusbx code does not execute
- * at any time other than when your application is calling a libusbx function.
- * However, an asynchronous model requires that libusbx perform work at various
+ * An asynchronous model requires that libusbx perform work at various
  * points in time - namely processing the results of previously-submitted
  * transfers and invoking the user-supplied callback function.
  *
@@ -507,39 +504,21 @@ if (r == 0 && actual_length == sizeof(data)) {
  * application must call into when libusbx has work do to. This gives libusbx
  * the opportunity to reap pending transfers, invoke callbacks, etc.
  *
- * The first issue to discuss here is how your application can figure out
- * when libusbx has work to do. In fact, there are two naive options which
- * do not actually require your application to know this:
- * -# Periodically call libusb_handle_events() in non-blocking mode at fixed
- *    short intervals from your main loop
+ * There are 2 different approaches to dealing with libusb_handle_events:
+ *
  * -# Repeatedly call libusb_handle_events() in blocking mode from a dedicated
  *    thread.
+ * -# Integrate libusbx with your application's main event loop. libusbx
+ *    exposes a set of file descriptors which allow you to do this.
  *
- * The first option is plainly not very nice, and will cause unnecessary
- * CPU wakeups leading to increased power usage and decreased battery life.
- * The second option is not very nice either, but may be the nicest option
- * available to you if the "proper" approach can not be applied to your
- * application (read on...).
+ * The first approach has the big advantage that it will also work on Windows
+ * were libusbx' poll API for select / poll integration is not available. So
+ * if you want to support Windows and use the async API, you must use this
+ * approach.
  *
- * The recommended option is to integrate libusbx with your application main
- * event loop. libusbx exposes a set of file descriptors which allow you to do
- * this. Your main loop is probably already calling poll() or select() or a
- * variant on a set of file descriptors for other event sources (e.g. keyboard
- * button presses, mouse movements, network sockets, etc). You then add
- * libusbx's file descriptors to your poll()/select() calls, and when activity
- * is detected on such descriptors you know it is time to call
- * libusb_handle_events().
- *
- * There is one final event handling complication. libusbx supports
- * asynchronous transfers which time out after a specified time period, and
- * this requires that libusbx is called into at or after the timeout so that
- * the timeout can be handled. So, in addition to considering libusbx's file
- * descriptors in your main event loop, you must also consider that libusbx
- * sometimes needs to be called into at fixed points in time even when there
- * is no file descriptor activity.
- *
- * For the details on retrieving the set of file descriptors and determining
- * the next timeout, see the \ref poll "polling and timing" API documentation.
+ * If you prefer a single threaded approach with a single central event loop,
+ * see the \ref poll "polling and timing" section for how to integrate libusbx
+ * into your application's main event loop.
  */
 
 /**
@@ -556,6 +535,24 @@ if (r == 0 && actual_length == sizeof(data)) {
  * asynchronous API documentation. In summary, libusbx does not create internal
  * threads for event processing and hence relies on your application calling
  * into libusbx at certain points in time so that pending events can be handled.
+ *
+ * Your main loop is probably already calling poll() or select() or a
+ * variant on a set of file descriptors for other event sources (e.g. keyboard
+ * button presses, mouse movements, network sockets, etc). You then add
+ * libusbx's file descriptors to your poll()/select() calls, and when activity
+ * is detected on such descriptors you know it is time to call
+ * libusb_handle_events().
+ *
+ * There is one final event handling complication. libusbx supports
+ * asynchronous transfers which time out after a specified time period.
+ *
+ * On some platforms a timerfd is used, so the timeout handling is just another
+ * fd, on other platforms this requires that libusbx is called into at or after
+ * the timeout to handle it. So, in addition to considering libusbx's file
+ * descriptors in your main event loop, you must also consider that libusbx
+ * sometimes needs to be called into at fixed points in time even when there
+ * is no file descriptor activity, see \ref polltime details.
+ * 
  * In order to know precisely when libusbx needs to be called into, libusbx
  * offers you a set of pollable file descriptors and information about when
  * the next timeout expires.
