@@ -514,11 +514,69 @@ if (r == 0 && actual_length == sizeof(data)) {
  * The first approach has the big advantage that it will also work on Windows
  * were libusbx' poll API for select / poll integration is not available. So
  * if you want to support Windows and use the async API, you must use this
- * approach.
+ * approach, see the \ref eventthread "Using an event handling thread" section
+ * below for details.
  *
  * If you prefer a single threaded approach with a single central event loop,
  * see the \ref poll "polling and timing" section for how to integrate libusbx
  * into your application's main event loop.
+ *
+ * \section eventthread Using an event handling thread
+ *
+ * Lets begin with stating the obvious: If you're going to use a separate
+ * thread for libusbx event handling, your callback functions MUST be
+ * threadsafe.
+ *
+ * Other then that doing event handling from a separate thread, is mostly
+ * simple. You can use an event thread function as follows:
+\code
+void *event_thread_func(void *ctx)
+{
+    while (event_thread_run)
+        libusb_handle_events(ctx);
+
+    return NULL;
+}
+\endcode
+ *
+ * There is one caveat though, stopping this thread requires setting the
+ * event_thread_run variable to 0, and after that libusb_handle_events() needs
+ * to return control to event_thread_func. But unless some event happens,
+ * libusb_handle_events() will not return.
+ *
+ * There are 2 different ways of dealing with this, depending on if your
+ * application uses libusbx' \ref hotplug "hotplug" support or not.
+ *
+ * Applications which do not use hotplug support, should not start the event
+ * thread until after their first call to libusb_open(), and should stop the
+ * thread when closing the last open device as follows:
+\code
+void my_close_handle(libusb_device_handle *handle)
+{
+    if (open_devs == 1)
+        event_thread_run = 0;
+
+    libusb_close(handle); // This wakes up libusb_handle_events()
+
+    if (open_devs == 1)
+        pthread_join(event_thread);
+
+    open_devs--;
+}
+\endcode
+ *
+ * Applications using hotplug support should start the thread at program init,
+ * after having successfully called libusb_hotplug_register_callback(), and
+ * should stop the thread at program exit as follows:
+\code
+void my_libusb_exit(void)
+{ 
+    event_thread_run = 0;
+    libusb_hotplug_deregister_callback(ctx, hotplug_cb_handle); // This wakes up libusb_handle_events()
+    pthread_join(event_thread);
+    libusb_exit(ctx);
+}
+\endcode
  */
 
 /**
@@ -582,8 +640,9 @@ while (user_has_not_requested_exit)
  * \section pollmain The more advanced option
  *
  * \note This functionality is currently only available on Unix-like platforms.
- * On Windows, libusb_get_pollfds() simply returns NULL. Exposing event sources
- * on Windows will require some further thought and design.
+ * On Windows, libusb_get_pollfds() simply returns NULL. Applications which
+ * want to support Windows are advised to use an \ref eventthread
+ * "event handling thread" instead.
  *
  * In more advanced applications, you will already have a main loop which
  * is monitoring other event sources: network sockets, X11 events, mouse
