@@ -1618,7 +1618,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
     return darwin_to_libusb (ret);
   }
 
-  if (0 != (transfer->length % maxPacketSize)) {
+  if (0 != maxPacketSize && 0 != (transfer->length % maxPacketSize)) {
     /* do not need a zero packet */
     transfer->flags &= ~LIBUSB_TRANSFER_ADD_ZERO_PACKET;
   }
