@@ -25,6 +25,9 @@
 /* Uncomment to start with debug message logging enabled */
 // #define ENABLE_DEBUG_LOGGING 1
 
+/* Uncomment to enabling logging to system log */
+// #define USE_SYSTEM_LOGGING_FACILITY
+
 /* type of second poll() argument */
 #define POLL_NFDS_TYPE unsigned int
 

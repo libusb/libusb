@@ -89,7 +89,7 @@ linux)
 	AC_SUBST(OS_LINUX)
 	AC_SEARCH_LIBS(clock_gettime, rt, [], [], -pthread)
 	AC_ARG_ENABLE([udev],
-		[AC_HELP_STRING([--enable-udev], [use udev for device enumeration and hotplug support (recommended, default: yes)])],
+		[AC_HELP_STRING([--enable-udev], [use udev for device enumeration and hotplug support (recommended) [default=yes]])],
 		[], [enable_udev="yes"])
 		if test "x$enable_udev" = "xyes" ; then
 			# system has udev. use it or fail!
@@ -158,7 +158,7 @@ fi
 AC_CHECK_HEADER([sys/timerfd.h], [timerfd_h=1], [timerfd_h=0])
 AC_ARG_ENABLE([timerfd],
 	[AS_HELP_STRING([--enable-timerfd],
-		[use timerfd for timing (default auto)])],
+		[use timerfd for timing [default=auto]])],
 	[use_timerfd=$enableval], [use_timerfd='auto'])
 
 if test "x$use_timerfd" = "xyes" -a "x$timerfd_h" = "x0"; then
@@ -193,23 +193,38 @@ if test "x$log_enabled" != "xno"; then
 fi
 
 AC_ARG_ENABLE([debug-log], [AS_HELP_STRING([--enable-debug-log],
-	[start with debug message logging enabled (default n)])],
+	[start with debug message logging enabled [default=no]])],
 	[debug_log_enabled=$enableval],
 	[debug_log_enabled='no'])
 if test "x$debug_log_enabled" != "xno"; then
 	AC_DEFINE([ENABLE_DEBUG_LOGGING], 1, [Start with debug message logging enabled])
 fi
 
+AC_ARG_ENABLE([system-log], [AS_HELP_STRING([--enable-system-log],
+	[output logging messages to system wide log, if supported by the OS [default=no]])],
+	[system_log_enabled=$enableval],
+	[system_log_enabled='no'])
+if test "x$system_log_enabled" != "xno"; then
+	AC_DEFINE([USE_SYSTEM_LOGGING_FACILITY], 1, [Enable output to system log])
+fi
+
+# Check if syslog is available in standard C library
+AC_CHECK_HEADERS(syslog.h)
+AC_CHECK_FUNC([syslog], [have_syslog=yes], [have_syslog=no])
+if test "x$have_syslog" != "xno"; then
+	AC_DEFINE([HAVE_SYSLOG_FUNC], 1, [syslog() function available])
+fi
+
 # Examples build
 AC_ARG_ENABLE([examples-build], [AS_HELP_STRING([--enable-examples-build],
-	[build example applications (default n)])],
+	[build example applications [default=no]])],
 	[build_examples=$enableval],
 	[build_examples='no'])
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != "xno"])
 
 # Tests build
 AC_ARG_ENABLE([tests-build], [AS_HELP_STRING([--enable-tests-build],
-	[build test applications (default n)])],
+	[build test applications [default=no]])],
 	[build_tests=$enableval],
 	[build_tests='no'])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != "xno"])
