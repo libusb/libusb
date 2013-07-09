@@ -2038,6 +2038,15 @@ static void usbi_log_str(struct libusb_context *ctx,
 	WCHAR wbuf[USBI_MAX_LOG_LEN];
 	MultiByteToWideChar(CP_UTF8, 0, str, -1, wbuf, sizeof(wbuf));
 	OutputDebugStringW(wbuf);
+#elif defined(__ANDROID__)
+	int priority = ANDROID_LOG_UNKNOWN;
+	switch (level) {
+	case LIBUSB_LOG_LEVEL_INFO: priority = ANDROID_LOG_INFO; break;
+	case LIBUSB_LOG_LEVEL_WARNING: priority = ANDROID_LOG_WARN; break;
+	case LIBUSB_LOG_LEVEL_ERROR: priority = ANDROID_LOG_ERROR; break;
+	case LIBUSB_LOG_LEVEL_DEBUG: priority = ANDROID_LOG_DEBUG; break;
+	}
+	__android_log_write(priority, "libusb", str);
 #elif defined(HAVE_SYSLOG_FUNC)
 	int syslog_level = LOG_INFO;
 	switch (level) {
@@ -2045,7 +2054,6 @@ static void usbi_log_str(struct libusb_context *ctx,
 	case LIBUSB_LOG_LEVEL_WARNING: syslog_level = LOG_WARNING; break;
 	case LIBUSB_LOG_LEVEL_ERROR: syslog_level = LOG_ERR; break;
 	case LIBUSB_LOG_LEVEL_DEBUG: syslog_level = LOG_DEBUG; break;
-	case LIBUSB_LOG_LEVEL_NONE: break;
 	}
 	syslog(syslog_level, "%s", str);
 #else /* All of gcc, Clang, XCode seem to use #warning */
@@ -2086,28 +2094,6 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 		return;
 #endif
 
-#ifdef __ANDROID__
-	int prio;
-	switch (level) {
-	case LOG_LEVEL_INFO:
-		prio = ANDROID_LOG_INFO;
-		break;
-	case LOG_LEVEL_WARNING:
-		prio = ANDROID_LOG_WARN;
-		break;
-	case LOG_LEVEL_ERROR:
-		prio = ANDROID_LOG_ERROR;
-		break;
-	case LOG_LEVEL_DEBUG:
-		prio = ANDROID_LOG_DEBUG;
-		break;
-	default:
-		prio = ANDROID_LOG_UNKNOWN;
-		break;
-	}
-
-	__android_log_vprint(prio, "LibUsb", format, args);
-#else
 	usbi_gettimeofday(&now, NULL);
 	if ((global_debug) && (!has_debug_header_been_displayed)) {
 		has_debug_header_been_displayed = 1;
@@ -2135,7 +2121,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 		prefix = "debug";
 		break;
 	case LIBUSB_LOG_LEVEL_NONE:
-		break;
+		return;
 	default:
 		prefix = "unknown";
 		break;
@@ -2171,7 +2157,6 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	strcpy(buf + header_len + text_len, USBI_LOG_LINE_END);
 
 	usbi_log_str(ctx, level, buf);
-#endif
 }
 
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,

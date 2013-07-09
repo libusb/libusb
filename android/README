@@ -1,0 +1,24 @@
+libusb for Android
+==================
+
+To build libusb for Android do the following:
+
+ 1. Download the latest NDK from:
+    http://developer.android.com/tools/sdk/ndk/index.html
+
+ 2. Extract the NDK.
+
+ 3. Open a shell and make sure there exist an NDK global variable
+    set to the directory where you extracted the NDK.
+
+ 4. Change directory to libusb's "android/jni"
+
+ 5. Run "$NDK/ndk-build".
+
+The libusb library, examples and tests can then be found in:
+    "android/libs/$ARCH"
+
+Where $ARCH is one of:
+    armeabi
+    armeabi-v7a
+    x86
