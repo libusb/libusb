@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusbx.org
 
-2013-07-05: v1.0.16-rc3
+2013-07-11: v1.0.16
 * Add hotplug support for Darwin and Linux (#9)
 * Add superspeed endpoint companion descriptor support (#15)
 * Add BOS descriptor support (#15)
