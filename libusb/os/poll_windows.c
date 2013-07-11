@@ -428,7 +428,7 @@ struct winfd fd_to_winfd(int fd)
 
 	CHECK_INIT_POLLING;
 
-	if (fd <= 0)
+	if (fd < 0)
 		return INVALID_WINFD;
 
 	for (i=0; i<MAX_FDS; i++) {
