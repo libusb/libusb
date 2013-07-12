@@ -167,8 +167,7 @@ static int usbi_hotplug_match_cb (struct libusb_context *ctx,
 		return 0;
 	}
 
-	return hotplug_cb->cb (ctx == usbi_default_context ? NULL : ctx,
-			       dev, event, hotplug_cb->user_data);
+	return hotplug_cb->cb (ctx, dev, event, hotplug_cb->user_data);
 }
 
 void usbi_hotplug_match(struct libusb_context *ctx, struct libusb_device *dev,
