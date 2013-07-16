@@ -1,5 +1,5 @@
 /*
- * Copyright © 2011 Martin Pieuchot <mpi@openbsd.org>
+ * Copyright © 2011-2013 Martin Pieuchot <mpi@openbsd.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -32,8 +32,8 @@
 #include "libusbi.h"
 
 struct device_priv {
-	char devnode[16];
-	int fd;
+	char *devname;				/* name of the ugen(4) node */
+	int fd;					/* device file descriptor */
 
 	unsigned char *cdesc;			/* active config descriptor */
 	usb_device_descriptor_t ddesc;		/* usb device descriptor */
@@ -82,10 +82,13 @@ static int obsd_clock_gettime(int, struct timespec *);
  * Private functions
  */
 static int _errno_to_libusb(int);
-static int _cache_active_config_descriptor(struct libusb_device *, int);
+static int _cache_active_config_descriptor(struct libusb_device *);
 static int _sync_control_transfer(struct usbi_transfer *);
 static int _sync_gen_transfer(struct usbi_transfer *);
 static int _access_endpoint(struct libusb_transfer *);
+
+static int _bus_open(int);
+
 
 const struct usbi_os_backend openbsd_backend = {
 	"Synchronous OpenBSD backend",
@@ -131,79 +134,105 @@ const struct usbi_os_backend openbsd_backend = {
 	0,				/* add_iso_packet_size */
 };
 
+#define DEVPATH	"/dev/"
+#define USBDEV	DEVPATH "usb"
+
 int
 obsd_get_device_list(struct libusb_context * ctx,
 	struct discovered_devs **discdevs)
 {
+	struct discovered_devs *ddd;
 	struct libusb_device *dev;
 	struct device_priv *dpriv;
 	struct usb_device_info di;
+	struct usb_device_ddesc dd;
 	unsigned long session_id;
-	char devnode[16];
-	int fd, err, i;
+	char devices[USB_MAX_DEVICES];
+	char busnode[16];
+	char *udevname;
+	int fd, addr, i, j;
 
 	usbi_dbg("");
 
-	/* Only ugen(4) is supported */
-	for (i = 0; i < USB_MAX_DEVICES; i++) {
-		/* Control endpoint is always .00 */
-		snprintf(devnode, sizeof(devnode), "/dev/ugen%d.00", i);
+	for (i = 0; i < 8; i++) {
+		snprintf(busnode, sizeof(busnode), USBDEV "%d", i);
 
-		if ((fd = open(devnode, O_RDONLY)) < 0) {
+		if ((fd = open(busnode, O_RDWR)) < 0) {
 			if (errno != ENOENT && errno != ENXIO)
-				usbi_err(ctx, "could not open %s", devnode);
+				usbi_err(ctx, "could not open %s", busnode);
 			continue;
 		}
 
-		if (ioctl(fd, USB_GET_DEVICEINFO, &di) < 0)
-			continue;
+		bzero(devices, sizeof(devices));
+		for (addr = 1; addr < USB_MAX_DEVICES; addr++) {
+			if (devices[addr])
+				continue;
 
-		session_id = (di.udi_bus << 8 | di.udi_addr);
-		dev = usbi_get_device_by_session_id(ctx, session_id);
+			di.udi_addr = addr;
+			if (ioctl(fd, USB_DEVICEINFO, &di) < 0)
+				continue;
 
-		if (dev) {
-			dev = libusb_ref_device(dev);
-		} else {
-			dev = usbi_alloc_device(ctx, session_id);
-			if (dev == NULL)
+			/*
+			 * XXX If ugen(4) is attached to the USB device
+			 * it will be used.
+			 */
+			udevname = NULL;
+			for (j = 0; j < USB_MAX_DEVNAMES; j++)
+				if (!strncmp("ugen", di.udi_devnames[j], 4)) {
+					udevname = strdup(di.udi_devnames[j]);
+					break;
+				}
+
+			session_id = (di.udi_bus << 8 | di.udi_addr);
+			dev = usbi_get_device_by_session_id(ctx, session_id);
+
+			if (dev == NULL) {
+				dev = usbi_alloc_device(ctx, session_id);
+				if (dev == NULL) {
+					close(fd);
+					return (LIBUSB_ERROR_NO_MEM);
+				}
+
+				dev->bus_number = di.udi_bus;
+				dev->device_address = di.udi_addr;
+				dev->speed = di.udi_speed;
+
+				dpriv = (struct device_priv *)dev->os_priv;
+				dpriv->fd = -1;
+				dpriv->cdesc = NULL;
+				dpriv->devname = udevname;
+
+				dd.udd_bus = di.udi_bus;
+				dd.udd_addr = di.udi_addr;
+				if (ioctl(fd, USB_DEVICE_GET_DDESC, &dd) < 0) {
+					libusb_unref_device(dev);
+					continue;
+				}
+				dpriv->ddesc = dd.udd_desc;
+
+				if (_cache_active_config_descriptor(dev)) {
+					libusb_unref_device(dev);
+					continue;
+				}
+
+				if (usbi_sanitize_device(dev))
+					libusb_unref_device(dev);
+			}
+
+			ddd = discovered_devs_append(*discdevs, dev);
+			if (ddd == NULL) {
+				close(fd);
 				return (LIBUSB_ERROR_NO_MEM);
-
-			dev->bus_number = di.udi_bus;
-			dev->device_address = di.udi_addr;
-			dev->speed = di.udi_speed;
-
-			dpriv = (struct device_priv *)dev->os_priv;
-			strlcpy(dpriv->devnode, devnode, sizeof(devnode));
-			dpriv->fd = -1;
-
-			if (ioctl(fd, USB_GET_DEVICE_DESC, &dpriv->ddesc) < 0) {
-				err = errno;
-				goto error;
 			}
 
-			dpriv->cdesc = NULL;
-			if (_cache_active_config_descriptor(dev, fd)) {
-				err = errno;
-				goto error;
-			}
-
-			if ((err = usbi_sanitize_device(dev)))
-				goto error;
+			*discdevs = ddd;
+			devices[addr] = 1;
 		}
+
 		close(fd);
-
-		if (discovered_devs_append(*discdevs, dev) == NULL)
-			return (LIBUSB_ERROR_NO_MEM);
-
-		libusb_unref_device(dev);
 	}
 
 	return (LIBUSB_SUCCESS);
-
-error:
-	close(fd);
-	libusb_unref_device(dev);
-	return _errno_to_libusb(err);
 }
 
 int
@@ -211,15 +240,21 @@ obsd_open(struct libusb_device_handle *handle)
 {
 	struct handle_priv *hpriv = (struct handle_priv *)handle->os_priv;
 	struct device_priv *dpriv = (struct device_priv *)handle->dev->os_priv;
+	char devnode[16];
 
-	dpriv->fd = open(dpriv->devnode, O_RDWR);
-	if (dpriv->fd < 0) {
-		dpriv->fd = open(dpriv->devnode, O_RDONLY);
+	if (dpriv->devname) {
+		/*
+		 * Only open ugen(4) attached devices read-write, all
+		 * read-only operations are done through the bus node.
+		 */
+		snprintf(devnode, sizeof(devnode), DEVPATH "%s.00",
+		    dpriv->devname);
+		dpriv->fd = open(devnode, O_RDWR);
 		if (dpriv->fd < 0)
 			return _errno_to_libusb(errno);
-	}
 
-	usbi_dbg("open %s: fd %d", dpriv->devnode, dpriv->fd);
+		usbi_dbg("open %s: fd %d", devnode, dpriv->fd);
+	}
 
 	if (pipe(hpriv->pipe) < 0)
 		return _errno_to_libusb(errno);
@@ -233,10 +268,12 @@ obsd_close(struct libusb_device_handle *handle)
 	struct handle_priv *hpriv = (struct handle_priv *)handle->os_priv;
 	struct device_priv *dpriv = (struct device_priv *)handle->dev->os_priv;
 
-	usbi_dbg("close: fd %d", dpriv->fd);
+	if (dpriv->devname) {
+		usbi_dbg("close: fd %d", dpriv->fd);
 
-	close(dpriv->fd);
-	dpriv->fd = -1;
+		close(dpriv->fd);
+		dpriv->fd = -1;
+	}
 
 	usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->pipe[0]);
 
@@ -264,9 +301,8 @@ obsd_get_active_config_descriptor(struct libusb_device *dev,
     unsigned char *buf, size_t len, int *host_endian)
 {
 	struct device_priv *dpriv = (struct device_priv *)dev->os_priv;
-	usb_config_descriptor_t *ucd;
+	usb_config_descriptor_t *ucd = (usb_config_descriptor_t *)dpriv->cdesc;
 
-	ucd = (usb_config_descriptor_t *) dpriv->cdesc;
 	len = MIN(len, UGETW(ucd->wTotalLength));
 
 	usbi_dbg("len %d", len);
@@ -275,58 +311,48 @@ obsd_get_active_config_descriptor(struct libusb_device *dev,
 
 	*host_endian = 0;
 
-	return len;
+	return (len);
 }
 
 int
 obsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
     unsigned char *buf, size_t len, int *host_endian)
 {
-	struct device_priv *dpriv = (struct device_priv *)dev->os_priv;
-	struct usb_full_desc ufd;
+	struct usb_device_fdesc udf;
 	int fd, err;
 
-	usbi_dbg("index %d, len %d", idx, len);
+	if ((fd = _bus_open(dev->bus_number)) < 0)
+		return _errno_to_libusb(errno);
 
-	/* A config descriptor may be requested before opening the device */
-	if (dpriv->fd >= 0) {
-		fd = dpriv->fd;
-	} else {
-		fd = open(dpriv->devnode, O_RDONLY);
-		if (fd < 0)
-			return _errno_to_libusb(errno);
-	}
+	udf.udf_bus = dev->bus_number;
+	udf.udf_addr = dev->device_address;
+	udf.udf_config_index = idx;
+	udf.udf_size = len;
+	udf.udf_data = buf;
 
-	ufd.ufd_config_index = idx;
-	ufd.ufd_size = len;
-	ufd.ufd_data = buf;
+	usbi_dbg("index %d, len %d", udf.udf_config_index, len);
 
-	if ((ioctl(fd, USB_GET_FULL_DESC, &ufd)) < 0) {
+	if (ioctl(fd, USB_DEVICE_GET_FDESC, &udf) < 0) {
 		err = errno;
-		if (dpriv->fd < 0)
-			close(fd);
+		close(fd);
 		return _errno_to_libusb(err);
 	}
-
-	if (dpriv->fd < 0)
-		close(fd);
+	close(fd);
 
 	*host_endian = 0;
 
-	return len;
+	return (len);
 }
 
 int
 obsd_get_configuration(struct libusb_device_handle *handle, int *config)
 {
 	struct device_priv *dpriv = (struct device_priv *)handle->dev->os_priv;
+	usb_config_descriptor_t *ucd = (usb_config_descriptor_t *)dpriv->cdesc;
 
-	usbi_dbg("");
+	*config = ucd->bConfigurationValue;
 
-	if (ioctl(dpriv->fd, USB_GET_CONFIG, config) < 0)
-		return _errno_to_libusb(errno);
-
-	usbi_dbg("configuration %d", *config);
+	usbi_dbg("bConfigurationValue %d", *config);
 
 	return (LIBUSB_SUCCESS);
 }
@@ -336,12 +362,15 @@ obsd_set_configuration(struct libusb_device_handle *handle, int config)
 {
 	struct device_priv *dpriv = (struct device_priv *)handle->dev->os_priv;
 
-	usbi_dbg("configuration %d", config);
+	if (dpriv->devname == NULL)
+		return (LIBUSB_ERROR_NOT_SUPPORTED);
+
+	usbi_dbg("bConfigurationValue %d", config);
 
 	if (ioctl(dpriv->fd, USB_SET_CONFIG, &config) < 0)
 		return _errno_to_libusb(errno);
 
-	return _cache_active_config_descriptor(handle->dev, dpriv->fd);
+	return _cache_active_config_descriptor(handle->dev);
 }
 
 int
@@ -376,6 +405,9 @@ obsd_set_interface_altsetting(struct libusb_device_handle *handle, int iface,
 	struct device_priv *dpriv = (struct device_priv *)handle->dev->os_priv;
 	struct usb_alt_interface intf;
 
+	if (dpriv->devname == NULL)
+		return (LIBUSB_ERROR_NOT_SUPPORTED);
+
 	usbi_dbg("iface %d, setting %d", iface, altsetting);
 
 	memset(&intf, 0, sizeof(intf));
@@ -392,19 +424,27 @@ obsd_set_interface_altsetting(struct libusb_device_handle *handle, int iface,
 int
 obsd_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 {
-	struct device_priv *dpriv = (struct device_priv *)handle->dev->os_priv;
 	struct usb_ctl_request req;
+	int fd, err;
+
+	if ((fd = _bus_open(handle->dev->bus_number)) < 0)
+		return _errno_to_libusb(errno);
 
 	usbi_dbg("");
 
+	req.ucr_addr = handle->dev->device_address;
 	req.ucr_request.bmRequestType = UT_WRITE_ENDPOINT;
 	req.ucr_request.bRequest = UR_CLEAR_FEATURE;
 	USETW(req.ucr_request.wValue, UF_ENDPOINT_HALT);
 	USETW(req.ucr_request.wIndex, endpoint);
 	USETW(req.ucr_request.wLength, 0);
 
-	if (ioctl(dpriv->fd, USB_DO_REQUEST, &req) < 0)
-		return _errno_to_libusb(errno);
+	if (ioctl(fd, USB_REQUEST, &req) < 0) {
+		err = errno;
+		close(fd);
+		return _errno_to_libusb(err);
+	}
+	close(fd);
 
 	return (LIBUSB_SUCCESS);
 }
@@ -425,6 +465,7 @@ obsd_destroy_device(struct libusb_device *dev)
 	usbi_dbg("");
 
 	free(dpriv->cdesc);
+	free(dpriv->devname);
 }
 
 int
@@ -564,6 +605,8 @@ obsd_clock_gettime(int clkid, struct timespec *tp)
 int
 _errno_to_libusb(int err)
 {
+	usbi_dbg("error: %s (%d)", strerror(err), err);
+
 	switch (err) {
 	case EIO:
 		return (LIBUSB_ERROR_IO);
@@ -573,52 +616,64 @@ _errno_to_libusb(int err)
 		return (LIBUSB_ERROR_NO_DEVICE);
 	case ENOMEM:
 		return (LIBUSB_ERROR_NO_MEM);
+	case ETIMEDOUT:
+		return (LIBUSB_ERROR_TIMEOUT);
 	}
-
-	usbi_dbg("error: %s", strerror(err));
 
 	return (LIBUSB_ERROR_OTHER);
 }
 
 int
-_cache_active_config_descriptor(struct libusb_device *dev, int fd)
+_cache_active_config_descriptor(struct libusb_device *dev)
 {
 	struct device_priv *dpriv = (struct device_priv *)dev->os_priv;
-	struct usb_config_desc ucd;
-	struct usb_full_desc ufd;
+	struct usb_device_cdesc udc;
+	struct usb_device_fdesc udf;
 	unsigned char* buf;
-	int len;
+	int fd, len, err;
 
-	usbi_dbg("fd %d", fd);
-
-	ucd.ucd_config_index = USB_CURRENT_CONFIG_INDEX;
-
-	if ((ioctl(fd, USB_GET_CONFIG_DESC, &ucd)) < 0)
+	if ((fd = _bus_open(dev->bus_number)) < 0)
 		return _errno_to_libusb(errno);
 
-	usbi_dbg("active bLength %d", ucd.ucd_desc.bLength);
+	usbi_dbg("fd %d, addr %d", fd, dev->device_address);
 
-	len = UGETW(ucd.ucd_desc.wTotalLength);
+	udc.udc_bus = dev->bus_number;
+	udc.udc_addr = dev->device_address;
+	udc.udc_config_index = USB_CURRENT_CONFIG_INDEX;
+	if (ioctl(fd, USB_DEVICE_GET_CDESC, &udc) < 0) {
+		err = errno;
+		close(fd);
+		return _errno_to_libusb(errno);
+	}
+
+	usbi_dbg("active bLength %d", udc.udc_desc.bLength);
+
+	len = UGETW(udc.udc_desc.wTotalLength);
 	buf = malloc(len);
 	if (buf == NULL)
 		return (LIBUSB_ERROR_NO_MEM);
 
-	ufd.ufd_config_index = ucd.ucd_config_index;
-	ufd.ufd_size = len;
-	ufd.ufd_data = buf;
+	udf.udf_bus = dev->bus_number;
+	udf.udf_addr = dev->device_address;
+	udf.udf_config_index = udc.udc_config_index;
+	udf.udf_size = len;
+	udf.udf_data = buf;
 
-	usbi_dbg("index %d, len %d", ufd.ufd_config_index, len);
+	usbi_dbg("index %d, len %d", udf.udf_config_index, len);
 
-	if ((ioctl(fd, USB_GET_FULL_DESC, &ufd)) < 0) {
+	if (ioctl(fd, USB_DEVICE_GET_FDESC, &udf) < 0) {
+		err = errno;
+		close(fd);
 		free(buf);
-		return _errno_to_libusb(errno);
+		return _errno_to_libusb(err);
 	}
+	close(fd);
 
 	if (dpriv->cdesc)
 		free(dpriv->cdesc);
 	dpriv->cdesc = buf;
 
-	return (0);
+	return (LIBUSB_SUCCESS);
 }
 
 int
@@ -633,12 +688,13 @@ _sync_control_transfer(struct usbi_transfer *itransfer)
 	dpriv = (struct device_priv *)transfer->dev_handle->dev->os_priv;
 	setup = (struct libusb_control_setup *)transfer->buffer;
 
-	usbi_dbg("type %d request %d value %d index %d length %d timeout %d",
+	usbi_dbg("type %x request %x value %x index %d length %d timeout %d",
 	    setup->bmRequestType, setup->bRequest,
 	    libusb_le16_to_cpu(setup->wValue),
 	    libusb_le16_to_cpu(setup->wIndex),
 	    libusb_le16_to_cpu(setup->wLength), transfer->timeout);
 
+	req.ucr_addr = transfer->dev_handle->dev->device_address;
 	req.ucr_request.bmRequestType = setup->bmRequestType;
 	req.ucr_request.bRequest = setup->bRequest;
 	/* Don't use USETW, libusbx already deals with the endianness */
@@ -650,11 +706,30 @@ _sync_control_transfer(struct usbi_transfer *itransfer)
 	if ((transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) == 0)
 		req.ucr_flags = USBD_SHORT_XFER_OK;
 
-	if ((ioctl(dpriv->fd, USB_SET_TIMEOUT, &transfer->timeout)) < 0)
-		return _errno_to_libusb(errno);
+	if (dpriv->devname == NULL) {
+		/*
+		 * XXX If the device is not attached to ugen(4) it is
+		 * XXX still possible to submit a control transfer but
+		 * XXX with the default timeout only.
+		 */
+		int fd, err;
 
-	if ((ioctl(dpriv->fd, USB_DO_REQUEST, &req)) < 0)
-		return _errno_to_libusb(errno);
+		if ((fd = _bus_open(transfer->dev_handle->dev->bus_number)) < 0)
+			return _errno_to_libusb(errno);
+
+		if ((ioctl(fd, USB_REQUEST, &req)) < 0) {
+			err = errno;
+			close(fd);
+			return _errno_to_libusb(err);
+		}
+		close(fd);
+	} else {
+		if ((ioctl(dpriv->fd, USB_SET_TIMEOUT, &transfer->timeout)) < 0)
+			return _errno_to_libusb(errno);
+
+		if ((ioctl(dpriv->fd, USB_DO_REQUEST, &req)) < 0)
+			return _errno_to_libusb(errno);
+	}
 
 	itransfer->transferred = req.ucr_actlen;
 
@@ -668,7 +743,7 @@ _access_endpoint(struct libusb_transfer *transfer)
 {
 	struct handle_priv *hpriv;
 	struct device_priv *dpriv;
-	char *s, devnode[16];
+	char devnode[16];
 	int fd, endpt;
 	mode_t mode;
 
@@ -681,10 +756,9 @@ _access_endpoint(struct libusb_transfer *transfer)
 	usbi_dbg("endpoint %d mode %d", endpt, mode);
 
 	if (hpriv->endpoints[endpt] < 0) {
-		/* Pick the right node given the control one */
-		strlcpy(devnode, dpriv->devnode, sizeof(devnode));
-		s = strchr(devnode, '.');
-		snprintf(s, 4, ".%02d", endpt);
+		/* Pick the right endpoint node */
+		snprintf(devnode, sizeof(devnode), DEVPATH "%s.%02d",
+		    dpriv->devname, endpt);
 
 		/* We may need to read/write to the same endpoint later. */
 		if (((fd = open(devnode, O_RDWR)) < 0) && (errno == ENXIO))
@@ -701,9 +775,14 @@ int
 _sync_gen_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer;
+	struct device_priv *dpriv;
 	int fd, nr = 1;
 
 	transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	dpriv = (struct device_priv *)transfer->dev_handle->dev->os_priv;
+
+	if (dpriv->devname == NULL)
+		return (LIBUSB_ERROR_NOT_SUPPORTED);
 
 	/*
 	 * Bulk, Interrupt or Isochronous transfer depends on the
@@ -731,4 +810,14 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 	itransfer->transferred = nr;
 
 	return (0);
+}
+
+int
+_bus_open(int number)
+{
+	char busnode[16];
+
+	snprintf(busnode, sizeof(busnode), USBDEV "%d", number);
+
+	return open(busnode, O_RDWR);
 }
