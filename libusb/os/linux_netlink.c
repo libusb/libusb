@@ -56,6 +56,7 @@
 #define KERNEL 1
 
 static int linux_netlink_socket = -1;
+static int netlink_control_pipe[2] = { -1, -1 };
 static pthread_t libusb_linux_event_thread;
 
 static void *linux_netlink_event_thread_main(void *arg);
@@ -97,8 +98,17 @@ int linux_netlink_start_event_monitor(void)
 	/* TODO -- add authentication */
 	/* setsockopt(linux_netlink_socket, SOL_SOCKET, SO_PASSCRED, &one, sizeof(one)); */
 
+	ret = usbi_pipe(netlink_control_pipe);
+	if (ret) {
+		usbi_err(NULL, "could not create netlink control pipe");
+	        close(linux_netlink_socket);
+		return LIBUSB_ERROR_OTHER;
+	}
+
 	ret = pthread_create(&libusb_linux_event_thread, NULL, linux_netlink_event_thread_main, NULL);
 	if (0 != ret) {
+        	close(netlink_control_pipe[0]);
+        	close(netlink_control_pipe[1]);
 	        close(linux_netlink_socket);
 		return LIBUSB_ERROR_OTHER;
 	}
@@ -109,21 +119,29 @@ int linux_netlink_start_event_monitor(void)
 int linux_netlink_stop_event_monitor(void)
 {
 	int r;
+	char dummy = 1;
 
 	if (-1 == linux_netlink_socket) {
 		/* already closed. nothing to do */
 		return LIBUSB_SUCCESS;
 	}
 
-	r = close(linux_netlink_socket);
-	if (0 > r) {
-		usbi_err(NULL, "error closing netlink socket. %s", strerror(errno));
-		return LIBUSB_ERROR_OTHER;
+	/* Write some dummy data to the control pipe and
+	 * wait for the thread to exit */
+	r = usbi_write(netlink_control_pipe[1], &dummy, sizeof(dummy));
+	if (r <= 0) {
+		usbi_warn(NULL, "netlink control pipe signal failed");
 	}
+	pthread_join(libusb_linux_event_thread, NULL);
 
-	pthread_cancel(libusb_linux_event_thread);
-
+	close(linux_netlink_socket);
 	linux_netlink_socket = -1;
+
+	/* close and reset control pipe */
+	close(netlink_control_pipe[0]);
+	close(netlink_control_pipe[1]);
+	netlink_control_pipe[0] = -1;
+	netlink_control_pipe[1] = -1;
 
 	return LIBUSB_SUCCESS;
 }
@@ -253,20 +271,32 @@ static int linux_netlink_read_message(void)
 
 static void *linux_netlink_event_thread_main(void *arg)
 {
-	struct pollfd fds = {.fd = linux_netlink_socket,
-			     .events = POLLIN};
+	char dummy;
+	int r;
+	struct pollfd fds[] = {
+		{ .fd = netlink_control_pipe[0],
+		  .events = POLLIN },
+		{ .fd = linux_netlink_socket,
+		  .events = POLLIN },
+	};
 
 	/* silence compiler warning */
 	(void) arg;
 
-	while (1 == poll(&fds, 1, -1)) {
-		if (POLLIN != fds.revents) {
+	while (poll(fds, 2, -1) >= 0) {
+		if (fds[0].revents & POLLIN) {
+			/* activity on control pipe, read the byte and exit */
+			r = usbi_read(netlink_control_pipe[0], &dummy, sizeof(dummy));
+			if (r <= 0) {
+				usbi_warn(NULL, "netlink control pipe read failed");
+			}
 			break;
 		}
-
-		usbi_mutex_static_lock(&linux_hotplug_lock);
-		linux_netlink_read_message();
-		usbi_mutex_static_unlock(&linux_hotplug_lock);
+		if (fds[1].revents & POLLIN) {
+        		usbi_mutex_static_lock(&linux_hotplug_lock);
+	        	linux_netlink_read_message();
+	        	usbi_mutex_static_unlock(&linux_hotplug_lock);
+		}
 	}
 
 	return NULL;
