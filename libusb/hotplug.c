@@ -191,18 +191,7 @@ void usbi_hotplug_match(struct libusb_context *ctx, struct libusb_device *dev,
 
 	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
 
-	/* loop through and disconnect all open handles for this device */
-	if (LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT == event) {
-		struct libusb_device_handle *handle;
-
-		usbi_mutex_lock(&ctx->open_devs_lock);
-		list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
-			if (dev == handle->dev) {
-				usbi_handle_disconnect (handle);
-			}
-		}
-		usbi_mutex_unlock(&ctx->open_devs_lock);
-	}
+	/* the backend is expected to call the callback for each active transfer */
 }
 
 int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,

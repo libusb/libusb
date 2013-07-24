@@ -1459,6 +1459,8 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	}
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
+	/* keep a reference to this device */
+	libusb_ref_device(transfer->dev_handle->dev);
 out:
 	updated_fds = (itransfer->flags & USBI_TRANSFER_UPDATED_FDS);
 	usbi_mutex_unlock(&itransfer->lock);
@@ -1562,6 +1564,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	usbi_mutex_lock(&ctx->event_waiters_lock);
 	usbi_cond_broadcast(&ctx->event_waiters_cond);
 	usbi_mutex_unlock(&ctx->event_waiters_lock);
+	libusb_unref_device(transfer->dev_handle->dev);
 	return 0;
 }
 
