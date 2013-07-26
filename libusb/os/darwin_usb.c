@@ -210,6 +210,7 @@ static int usb_setup_device_iterator (io_iterator_t *deviceIterator, UInt32 loca
   return IOServiceGetMatchingServices(kIOMasterPortDefault, matchingDict, deviceIterator);
 }
 
+/* Returns 1 on success, 0 on failure. */
 static int get_ioregistry_value_number (io_service_t service, CFStringRef property, CFNumberType type, void *p) {
   CFTypeRef cfNumber = IORegistryEntryCreateCFProperty (service, property, kCFAllocatorDefault, 0);
   int ret = 0;
@@ -735,7 +736,7 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct da
 static int darwin_get_cached_device(struct libusb_context *ctx, io_service_t service,
                                     struct darwin_cached_device **cached_out) {
   struct darwin_cached_device *new_device;
-  UInt64 sessionID, parent_sessionID;
+  UInt64 sessionID = 0, parent_sessionID = 0;
   int ret = LIBUSB_SUCCESS;
   usb_device_t **device;
   io_service_t parent;
