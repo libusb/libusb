@@ -53,7 +53,7 @@ static size_t usbi_locale = 0;
  *     }
  * };\endcode </li>
  * <li> Translate each of the English messages from the section you copied into your language </li>
- * <li> Save the file (in UTF-8 format) and send it to \c libusbx-devel@lists.sourceforge.net </li>
+ * <li> Save the file (in UTF-8 format) and send it to \c libusbx-devel\@lists.sourceforge.net </li>
  * </ol>
  */
 

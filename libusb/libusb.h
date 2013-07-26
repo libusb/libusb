@@ -150,7 +150,7 @@ typedef unsigned __int32  uint32_t;
 extern "C" {
 #endif
 
-/** \def libusb_cpu_to_le16
+/** \fn libusb_cpu_to_le16
  * \ingroup misc
  * Convert a 16-bit value from host-endian to little-endian format. On
  * little endian systems, this function does nothing. On big endian systems,
@@ -1877,7 +1877,7 @@ typedef enum {
  *
  * Since version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102
  *
- * \param libusb_context context of this notification
+ * \param ctx            context of this notification
  * \param device         libusb_device this event occurred on
  * \param event          event that occurred
  * \param user_data      user data provided when this callback was registered
