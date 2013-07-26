@@ -56,7 +56,7 @@ const struct usbi_os_backend * const usbi_backend = &wince_backend;
 #endif
 
 struct libusb_context *usbi_default_context = NULL;
-const struct libusb_version libusb_version_internal =
+static const struct libusb_version libusb_version_internal =
 	{ LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO,
 	  LIBUSB_RC, "http://libusbx.org" };
 static int default_context_refcnt = 0;

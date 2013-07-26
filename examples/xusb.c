@@ -48,9 +48,9 @@
 #define usb_interface interface
 
 // Global variables
-bool binary_dump = false;
-bool extra_info = false;
-const char* binary_name = NULL;
+static bool binary_dump = false;
+static bool extra_info = false;
+static const char* binary_name = NULL;
 
 static int perr(char const *format, ...)
 {
@@ -128,14 +128,14 @@ static uint8_t cdb_length[256] = {
 	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  F
 };
 
-enum test_type {
+static enum test_type {
 	USE_GENERIC,
 	USE_PS3,
 	USE_XBOX,
 	USE_SCSI,
 	USE_HID,
 } test_mode;
-uint16_t VID, PID;
+static uint16_t VID, PID;
 
 static void display_buffer_hex(unsigned char *buffer, unsigned size)
 {

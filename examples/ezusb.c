@@ -471,9 +471,9 @@ static int parse_iic(FILE *image, void *context,
 }
 
 /* the parse call will be selected according to the image type */
-int (*parse[IMG_TYPE_MAX])(FILE *image, void *context, bool (*is_external)(uint32_t addr, size_t len),
-	int (*poke)(void *context, uint32_t addr, bool external, const unsigned char *data, size_t len))
-	= { parse_ihex, parse_iic, parse_bin };
+static int (*parse[IMG_TYPE_MAX])(FILE *image, void *context, bool (*is_external)(uint32_t addr, size_t len),
+           int (*poke)(void *context, uint32_t addr, bool external, const unsigned char *data, size_t len))
+           = { parse_ihex, parse_iic, parse_bin };
 
 /*****************************************************************************/
 
