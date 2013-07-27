@@ -1,5 +1,7 @@
 all: libusb-1.0.la libusb-1.0.dll
 
+AUTOMAKE_OPTIONS = subdir-objects
+
 lib_LTLIBRARIES = libusb-1.0.la
 
 POSIX_POLL_SRC = os/poll_posix.c
