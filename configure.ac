@@ -97,7 +97,15 @@ linux)
 			AC_CHECK_LIB([udev], [udev_new], [], [AC_ERROR(["udev support requested but libudev not installed"])])
 			AC_DEFINE(USE_UDEV, 1, [Use udev for device enumeration/hotplug])
 		else
-			AC_CHECK_HEADERS([linux/netlink.h linux/filter.h], [], [AC_ERROR(["Linux netlink headers not found"])])
+			AC_CHECK_HEADERS([asm/types.h sys/socket.h], [], [])
+			AC_CHECK_HEADERS([linux/netlink.h linux/filter.h], [], [AC_ERROR(["Linux netlink headers not found"])], [
+#ifdef HAVE_ASM_TYPES_H
+#include <asm/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+])
 		fi
 		AC_SUBST(USE_UDEV)
 	THREAD_CFLAGS="-pthread"
