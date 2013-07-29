@@ -64,14 +64,29 @@ struct sockaddr_nl snl = { .nl_family=AF_NETLINK, .nl_groups=KERNEL };
 
 int linux_netlink_start_event_monitor(void)
 {
+	int socktype = SOCK_RAW;
 	int ret;
 
 	snl.nl_groups = KERNEL;
 
-	linux_netlink_socket = socket(PF_NETLINK, SOCK_RAW|SOCK_CLOEXEC|SOCK_NONBLOCK, NETLINK_KOBJECT_UEVENT);
+#if defined(SOCK_CLOEXEC)
+	socktype |= SOCK_CLOEXEC;
+#endif
+#if defined(SOCK_NONBLOCK)
+	socktype |= SOCK_NONBLOCK;
+#endif
+
+	linux_netlink_socket = socket(PF_NETLINK, socktype, NETLINK_KOBJECT_UEVENT);
 	if (-1 == linux_netlink_socket) {
 		return LIBUSB_ERROR_OTHER;
 	}
+
+#if !defined(SOCK_CLOEXEC) && defined(FD_CLOEXEC)
+	fcntl (linux_netlink_socket, F_SETFD, FD_CLOEXEC);
+#endif
+#if !defined(SOCK_NONBLOCK)
+	fcntl (linux_netlink_socket, F_SETFL, O_NONBLOCK);
+#endif
 
 	ret = bind(linux_netlink_socket, (struct sockaddr *) &snl, sizeof(snl));
 	if (0 != ret) {
