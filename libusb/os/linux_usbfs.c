@@ -1,3 +1,4 @@
+/* -*- Mode: C; c-basic-offset:8 ; indent-tabs-mode:t -*- */
 /*
  * Linux usbfs backend for libusbx
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
@@ -596,6 +597,8 @@ int linux_get_device_address (struct libusb_context *ctx, int detached,
 	uint8_t *busnum, uint8_t *devaddr,const char *dev_node,
 	const char *sys_name)
 {
+	int sysfs_attr;
+
 	usbi_dbg("getting address for device: %s detached: %d", sys_name, detached);
 	/* can't use sysfs to read the bus and device number if the
 	 * device has been detached */
@@ -616,17 +619,22 @@ int linux_get_device_address (struct libusb_context *ctx, int detached,
 
 	usbi_dbg("scan %s", sys_name);
 
-	*busnum = __read_sysfs_attr(ctx, sys_name, "busnum");
-	if (0 > *busnum)
-		return *busnum;
+	sysfs_attr = __read_sysfs_attr(ctx, sys_name, "busnum");
+	if (0 > sysfs_attr)
+		return sysfs_attr;
+	if (sysfs_attr > 255)
+		return LIBUSB_ERROR_INVALID_PARAM;
+	*busnum = (uint8_t) sysfs_attr;
 
-	*devaddr = __read_sysfs_attr(ctx, sys_name, "devnum");
-	if (0 > *devaddr)
-		return *devaddr;
+	sysfs_attr = __read_sysfs_attr(ctx, sys_name, "devnum");
+	if (0 > sysfs_attr)
+		return sysfs_attr;
+	if (sysfs_attr > 255)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	*devaddr = (uint8_t) sysfs_attr;
 
 	usbi_dbg("bus=%d dev=%d", *busnum, *devaddr);
-	if (*busnum > 255 || *devaddr > 255)
-		return LIBUSB_ERROR_INVALID_PARAM;
 
 	return LIBUSB_SUCCESS;
 }
