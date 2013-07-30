@@ -121,7 +121,9 @@ static int sysfs_has_descriptors = -1;
 /* how many times have we initted (and not exited) ? */
 static volatile int init_count = 0;
 
-/* Serialize hotplug start/stop, scan-devices, event-thread, and poll */
+/* Serialize hotplug start/stop */
+usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
+/* Serialize scan-devices, event-thread, and poll */
 usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 
 static int linux_start_event_monitor(void);
@@ -420,7 +422,7 @@ static int op_init(struct libusb_context *ctx)
 	if (sysfs_has_descriptors)
 		usbi_dbg("sysfs has complete descriptors");
 
-	usbi_mutex_static_lock(&linux_hotplug_lock);
+	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	r = LIBUSB_SUCCESS;
 	if (init_count == 0) {
 		/* start up hotplug event handler */
@@ -434,20 +436,20 @@ static int op_init(struct libusb_context *ctx)
 			linux_stop_event_monitor();
 	} else
 		usbi_err(ctx, "error starting hotplug event monitor");
-	usbi_mutex_static_unlock(&linux_hotplug_lock);
+	usbi_mutex_static_unlock(&linux_hotplug_startstop_lock);
 
 	return r;
 }
 
 static void op_exit(void)
 {
-	usbi_mutex_static_lock(&linux_hotplug_lock);
+	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	assert(init_count != 0);
 	if (!--init_count) {
 		/* tear down event handler */
 		(void)linux_stop_event_monitor();
 	}
-	usbi_mutex_static_unlock(&linux_hotplug_lock);
+	usbi_mutex_static_unlock(&linux_hotplug_startstop_lock);
 }
 
 static int linux_start_event_monitor(void)
@@ -470,11 +472,19 @@ static int linux_stop_event_monitor(void)
 
 static int linux_scan_devices(struct libusb_context *ctx)
 {
+	int ret;
+
+	usbi_mutex_static_lock(&linux_hotplug_lock);
+
 #if defined(USE_UDEV)
-	return linux_udev_scan_devices(ctx);
+	ret = linux_udev_scan_devices(ctx);
 #else
-	return linux_default_scan_devices(ctx);
+	ret = linux_default_scan_devices(ctx);
 #endif
+
+	usbi_mutex_static_unlock(&linux_hotplug_lock);
+
+	return ret;
 }
 
 static void op_hotplug_poll(void)
