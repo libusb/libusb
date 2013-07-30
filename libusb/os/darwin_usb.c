@@ -288,7 +288,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
     list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
       usbi_dbg ("notifying context %p of device disconnect", ctx);
 
-      dev = usbi_get_device_by_session_id(ctx, session);
+      dev = usbi_get_device_by_session_id(ctx, (unsigned long) session);
       if (dev) {
         /* signal the core that this device has been disconnected. the core will tear down this device
            when the reference count reaches 0 */
@@ -847,7 +847,7 @@ static int process_new_device (struct libusb_context *ctx, io_service_t service)
     usbi_dbg ("allocating new device in context %p for with session 0x%08x",
               ctx, cached_device->session);
 
-    dev = usbi_alloc_device(ctx, cached_device->session);
+    dev = usbi_alloc_device(ctx, (unsigned long) cached_device->session);
     if (!dev) {
       return LIBUSB_ERROR_NO_MEM;
     }
@@ -858,7 +858,7 @@ static int process_new_device (struct libusb_context *ctx, io_service_t service)
     darwin_ref_cached_device (priv->dev);
 
     if (cached_device->parent_session > 0) {
-      dev->parent_dev = usbi_get_device_by_session_id (ctx, cached_device->parent_session);
+      dev->parent_dev = usbi_get_device_by_session_id (ctx, (unsigned long) cached_device->parent_session);
     } else {
       dev->parent_dev = NULL;
     }
