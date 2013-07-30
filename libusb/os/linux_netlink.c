@@ -90,6 +90,7 @@ int linux_netlink_start_event_monitor(void)
 
 	ret = bind(linux_netlink_socket, (struct sockaddr *) &snl, sizeof(snl));
 	if (0 != ret) {
+	        close(linux_netlink_socket);
 		return LIBUSB_ERROR_OTHER;
 	}
 
@@ -98,6 +99,7 @@ int linux_netlink_start_event_monitor(void)
 
 	ret = pthread_create(&libusb_linux_event_thread, NULL, linux_netlink_event_thread_main, NULL);
 	if (0 != ret) {
+	        close(linux_netlink_socket);
 		return LIBUSB_ERROR_OTHER;
 	}
 
