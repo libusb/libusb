@@ -1524,6 +1524,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	struct libusb_transfer *transfer =
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = TRANSFER_CTX(transfer);
+	struct libusb_device_handle *handle = transfer->dev_handle;
 	uint8_t flags;
 	int r = 0;
 
@@ -1564,7 +1565,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	usbi_mutex_lock(&ctx->event_waiters_lock);
 	usbi_cond_broadcast(&ctx->event_waiters_cond);
 	usbi_mutex_unlock(&ctx->event_waiters_lock);
-	libusb_unref_device(transfer->dev_handle->dev);
+	libusb_unref_device(handle->dev);
 	return 0;
 }
 
