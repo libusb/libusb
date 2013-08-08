@@ -1,4 +1,4 @@
-# Android build config for libusb, examples and tests
+# Android build config for libusb tests
 # Copyright © 2012-2013 RealVNC Ltd. <toby.gray@realvnc.com>
 #
 # This library is free software; you can redistribute it and/or
@@ -17,7 +17,40 @@
 #
 
 LOCAL_PATH:= $(call my-dir)
+LIBUSB_ROOT_REL:= ../..
+LIBUSB_ROOT_ABS:= $(LOCAL_PATH)/../..
 
-include $(LOCAL_PATH)/libusb.mk
-include $(LOCAL_PATH)/examples.mk
-include $(LOCAL_PATH)/tests.mk
+# testlib
+
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
+  $(LIBUSB_ROOT_REL)/tests/testlib.c
+
+LOCAL_C_INCLUDES += \
+  $(LIBUSB_ROOT_ABS)/tests
+
+LOCAL_EXPORT_C_INCLUDES := \
+  $(LIBUSB_ROOT_ABS)/tests
+
+LOCAL_MODULE := testlib
+
+include $(BUILD_STATIC_LIBRARY)
+
+
+# stress
+
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
+  $(LIBUSB_ROOT_REL)/tests/stress.c
+
+LOCAL_C_INCLUDES += \
+  $(LIBUSB_ROOT_ABS)
+
+LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_STATIC_LIBRARIES += testlib
+
+LOCAL_MODULE:= stress
+
+include $(BUILD_EXECUTABLE)
