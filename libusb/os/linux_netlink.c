@@ -63,6 +63,26 @@ static void *linux_netlink_event_thread_main(void *arg);
 
 struct sockaddr_nl snl = { .nl_family=AF_NETLINK, .nl_groups=KERNEL };
 
+static int set_fd_cloexec_nb (int fd)
+{
+	int flags;
+
+#if defined(FD_CLOEXEC)
+	fcntl (linux_netlink_socket, F_GETFD, &flags);
+
+	if (!(flags & FD_CLOEXEC)) {
+		fcntl (linux_netlink_socket, F_SETFD, flags | FD_CLOEXEC);
+	}
+#endif
+
+	fcntl (linux_netlink_socket, F_GETFL, &flags);
+	if (!(flags & O_NONBLOCK)) {
+		fcntl (linux_netlink_socket, F_SETFL, flags | O_NONBLOCK);
+	}
+
+	return 0;
+}
+
 int linux_netlink_start_event_monitor(void)
 {
 	int socktype = SOCK_RAW;
@@ -78,16 +98,20 @@ int linux_netlink_start_event_monitor(void)
 #endif
 
 	linux_netlink_socket = socket(PF_NETLINK, socktype, NETLINK_KOBJECT_UEVENT);
+	if (-1 == linux_netlink_socket && EINVAL == errno) {
+		linux_netlink_socket = socket(PF_NETLINK, SOCK_RAW, NETLINK_KOBJECT_UEVENT);
+	}
+
 	if (-1 == linux_netlink_socket) {
 		return LIBUSB_ERROR_OTHER;
 	}
 
-#if !defined(SOCK_CLOEXEC) && defined(FD_CLOEXEC)
-	fcntl (linux_netlink_socket, F_SETFD, FD_CLOEXEC);
-#endif
-#if !defined(SOCK_NONBLOCK)
-	fcntl (linux_netlink_socket, F_SETFL, O_NONBLOCK);
-#endif
+	ret = set_fd_cloexec_nb (linux_netlink_socket);
+	if (0 != ret) {
+		close (linux_netlink_socket);
+		linux_netlink_socket = -1;
+		return LIBUSB_ERROR_OTHER;
+	}
 
 	ret = bind(linux_netlink_socket, (struct sockaddr *) &snl, sizeof(snl));
 	if (0 != ret) {
