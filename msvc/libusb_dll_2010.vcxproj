@@ -150,7 +150,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include=".\config.h" />
-    <ClCompile Include="..\libusb\hotplug.h" />
+    <ClInclude Include="..\libusb\hotplug.h" />
     <ClInclude Include="..\libusb\libusb.h" />
     <ClInclude Include="..\libusb\libusbi.h" />
     <ClInclude Include="..\libusb\os\poll_windows.h" />
