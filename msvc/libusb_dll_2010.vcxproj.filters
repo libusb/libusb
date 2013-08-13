@@ -46,9 +46,9 @@
     <ClInclude Include=".\config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClCompile Include="..\libusb\hotplug.h">
+    <ClInclude Include="..\libusb\hotplug.h">
       <Filter>Header Files</Filter>
-    </ClCompile>
+    </ClInclude>
     <ClInclude Include="..\libusb\libusb.h">
       <Filter>Header Files</Filter>
     </ClInclude>
