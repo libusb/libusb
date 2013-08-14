@@ -68,14 +68,21 @@ static int set_fd_cloexec_nb (int fd)
 	int flags;
 
 #if defined(FD_CLOEXEC)
-	fcntl (linux_netlink_socket, F_GETFD, &flags);
+	flags = fcntl (linux_netlink_socket, F_GETFD);
+	if (0 > flags) {
+		return -1;
+	}
 
 	if (!(flags & FD_CLOEXEC)) {
 		fcntl (linux_netlink_socket, F_SETFD, flags | FD_CLOEXEC);
 	}
 #endif
 
-	fcntl (linux_netlink_socket, F_GETFL, &flags);
+	flags = fcntl (linux_netlink_socket, F_GETFL);
+	if (0 > flags) {
+		return -1;
+	}
+
 	if (!(flags & O_NONBLOCK)) {
 		fcntl (linux_netlink_socket, F_SETFL, flags | O_NONBLOCK);
 	}
