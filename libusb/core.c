@@ -1876,10 +1876,6 @@ err_free_ctx:
 	if (ctx == usbi_default_context)
 		usbi_default_context = NULL;
 
-	usbi_mutex_destroy(&ctx->open_devs_lock);
-	usbi_mutex_destroy(&ctx->usb_devs_lock);
-	usbi_mutex_destroy(&ctx->hotplug_cbs_lock);
-
 	usbi_mutex_static_lock(&active_contexts_lock);
 	list_del (&ctx->list);
 	usbi_mutex_static_unlock(&active_contexts_lock);
@@ -1890,6 +1886,10 @@ err_free_ctx:
 		libusb_unref_device(dev);
 	}
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
+
+	usbi_mutex_destroy(&ctx->open_devs_lock);
+	usbi_mutex_destroy(&ctx->usb_devs_lock);
+	usbi_mutex_destroy(&ctx->hotplug_cbs_lock);
 
 	free(ctx);
 err_unlock:
