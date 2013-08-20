@@ -567,6 +567,10 @@ void usbi_disconnect_device(struct libusb_device *dev)
 	dev->attached = 0;
 	usbi_mutex_unlock(&dev->lock);
 
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_del(&dev->list);
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
+
 	/* Signal that an event has occurred for this device if we support hotplug AND
 	 * the hotplug pipe is ready. This prevents an event from getting raised during
 	 * initial enumeration. libusb_handle_events will take care of dereferencing the
@@ -577,10 +581,6 @@ void usbi_disconnect_device(struct libusb_device *dev)
 			usbi_err(DEVICE_CTX(dev), "error writing hotplug message");
 		}
 	}
-
-	usbi_mutex_lock(&ctx->usb_devs_lock);
-	list_del(&dev->list);
-	usbi_mutex_unlock(&ctx->usb_devs_lock);
 }
 
 /* Perform some final sanity checks on a newly discovered device. If this
