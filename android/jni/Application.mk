@@ -16,4 +16,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 #
 
-APP_ABI := armeabi armeabi-v7a x86
+APP_ABI := all
+
+# Workaround for MIPS toolchain linker being unable to find liblog dependency
+# of shared object in NDK versions at least up to r9.
+#
+APP_LDFLAGS := -llog
