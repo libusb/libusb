@@ -241,19 +241,29 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 
 	list_add(&new_callback->list, &ctx->hotplug_cbs);
 
+	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
+
+
 	if (flags & LIBUSB_HOTPLUG_ENUMERATE) {
-		struct libusb_device *dev;
+		int i, len;
+		struct libusb_device **devs;
 
-		usbi_mutex_lock(&ctx->usb_devs_lock);
-
-		list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device) {
-			(void) usbi_hotplug_match_cb (ctx, dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, new_callback);
+		len = libusb_get_device_list(ctx, &devs);
+		if (len < 0) {
+			libusb_hotplug_deregister_callback(ctx,
+							new_callback->handle);
+			return len;
 		}
 
-		usbi_mutex_unlock(&ctx->usb_devs_lock);
+		for (i = 0; i < len; i++) {
+			usbi_hotplug_match_cb(ctx, devs[i],
+					LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
+					new_callback);
+		}
+
+		libusb_free_device_list(devs, 1);
 	}
 
-	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
 
 	if (handle) {
 		*handle = new_callback->handle;
