@@ -1897,6 +1897,18 @@ typedef int (LIBUSB_CALL *libusb_hotplug_callback_fn)(libusb_context *ctx,
  * armed until either it is deregistered with libusb_hotplug_deregister_callback()
  * or the supplied callback returns 1 to indicate it is finished processing events.
  *
+ * If the \ref LIBUSB_HOTPLUG_ENUMERATE is passed the callback will be
+ * called with a \ref LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED for all devices
+ * already plugged into the machine. Note that libusbx modifies its internal
+ * device list from a separate thread, while calling hotplug callbacks from
+ * libusb_handle_events(), so it is possible for a device to already be present
+ * on, or removed from, its internal device list, while the hotplug callbacks
+ * still need to be dispatched. This means that when using \ref
+ * LIBUSB_HOTPLUG_ENUMERATE, your callback may be called twice for the arrival
+ * of the same device, once from libusb_hotplug_register_callback() and once
+ * from libusb_handle_events(); and/or your callback may be called for the
+ * removal of a device for which an arrived call was never made.
+ *
  * Since version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102
  *
  * \param[in] ctx context to register this callback with
