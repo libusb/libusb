@@ -59,12 +59,12 @@ case $host in
 	;;
 *-openbsd*)
 	AC_MSG_RESULT([OpenBSD])
-	backend="bsd"
+	backend="openbsd"
 	threads="posix"
 	;;
 *-netbsd*)
-	AC_MSG_RESULT([NetBSD (using OpenBSD backend)])
-	backend="bsd"
+	AC_MSG_RESULT([NetBSD])
+	backend="netbsd"
 	threads="posix"
 	;;
 *-mingw*)
@@ -124,9 +124,17 @@ darwin)
 		[AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])],
 		[#include <poll.h>])
 	;;
-bsd)
-	AC_DEFINE(OS_OPENBSD, 1, [OpenBSD/NetBSD backend])
+openbsd)
+	AC_DEFINE(OS_OPENBSD, 1, [OpenBSD backend])
 	AC_SUBST(OS_OPENBSD)
+	THREAD_CFLAGS="-pthread"
+	LIBS="-pthread"
+	AC_CHECK_HEADERS([poll.h])
+	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
+	;;
+netbsd)
+	AC_DEFINE(OS_NETBSD, 1, [NetBSD backend])
+	AC_SUBST(OS_NETBSD)
 	THREAD_CFLAGS="-pthread"
 	LIBS="-pthread"
 	AC_CHECK_HEADERS([poll.h])
@@ -145,7 +153,8 @@ AC_SUBST(LIBS)
 
 AM_CONDITIONAL(OS_LINUX, test "x$backend" = xlinux)
 AM_CONDITIONAL(OS_DARWIN, test "x$backend" = xdarwin)
-AM_CONDITIONAL(OS_OPENBSD, test "x$backend" = xbsd)
+AM_CONDITIONAL(OS_OPENBSD, test "x$backend" = xopenbsd)
+AM_CONDITIONAL(OS_NETBSD, test "x$backend" = xnetbsd)
 AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
 AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = "xyes")
