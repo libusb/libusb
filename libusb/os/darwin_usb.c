@@ -1445,8 +1445,14 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
 
   cInterface = &priv->interfaces[iface];
 
-  (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
-                                                 &transferType, &maxPacketSize, &interval);
+  ret = (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
+                                                       &transferType, &maxPacketSize, &interval);
+
+  if (ret) {
+    usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
+              darwin_error_str(ret), ret);
+    return darwin_to_libusb (ret);
+  }
 
   if (0 != (transfer->length % maxPacketSize)) {
     /* do not need a zero packet */
