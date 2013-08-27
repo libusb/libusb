@@ -743,8 +743,6 @@ static int darwin_get_cached_device(struct libusb_context *ctx, io_service_t ser
   kern_return_t result;
   UInt8 port = 0;
 
-  *cached_out = NULL;
-
   /* get some info from the io registry */
   (void) get_ioregistry_value_number (service, CFSTR("sessionID"), kCFNumberSInt64Type, &sessionID);
   (void) get_ioregistry_value_number (service, CFSTR("PortNum"), kCFNumberSInt8Type, &port);
@@ -774,17 +772,15 @@ static int darwin_get_cached_device(struct libusb_context *ctx, io_service_t ser
 
     usbi_dbg("caching new device with sessionID 0x%x\n", sessionID);
 
-    new_device = calloc (1, sizeof (*new_device));
-    if (!new_device) {
-      ret = LIBUSB_ERROR_NO_MEM;
-      break;
-    }
-
     device = darwin_device_from_service (service);
     if (!device) {
       ret = LIBUSB_ERROR_NO_DEVICE;
-      free (new_device);
-      new_device = NULL;
+      break;
+    }
+
+    new_device = calloc (1, sizeof (*new_device));
+    if (!new_device) {
+      ret = LIBUSB_ERROR_NO_MEM;
       break;
     }
 
@@ -834,7 +830,7 @@ static int process_new_device (struct libusb_context *ctx, io_service_t service)
   do {
     ret = darwin_get_cached_device (ctx, service, &cached_device);
 
-    if (ret < 0 || (cached_device && !cached_device->can_enumerate)) {
+    if (ret < 0 || !cached_device->can_enumerate) {
       return ret;
     }
 
