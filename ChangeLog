@@ -1,6 +1,28 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusbx.org
 
+2013-08-28: v1.0.17-rc1
+* Hotplug callbacks now always get passed a libusb_context, even if it is
+  the default context. Previously NULL would be passed for the default context,
+  but since the first context created is the default context, and most apps
+  use only 1 context, this meant that apps explicitly creating a context would
+  still get passed NULL
+* Android: Add .mk files to build with the Android NDK
+* Darwin: Add Xcode project
+* Darwin: Fix crash on unplug (#121)
+* Linux: Fix hang (deadlock) on libusb_exit
+* Linux: Fix libusbx build failure with --disable-udev (#124)
+* Linux: Fix libusb_get_device_list() hang with --disable-udev (#130)
+* OpenBSD: Update OpenBSD backend with support for control transfers to
+  non-ugen(4) devices and make get_configuration() no longer generate I/O.
+  Note that using this libusbx version on OpenBSD requires using
+  OpenBSD 5.3-current or later. Users of older OpenBSD versions are advised
+  to stay with the libusb shipped with OpenBSD (mpi)
+* Windows: fix libusb_dll_2010.vcxproj link errors (#129)
+* Various other bug fixes and improvements
+The (#xx) numbers are libusbx issue numbers, see ie:
+https://github.com/libusbx/libusbx/issues/121
+
 2013-07-11: v1.0.16
 * Add hotplug support for Darwin and Linux (#9)
 * Add superspeed endpoint companion descriptor support (#15)

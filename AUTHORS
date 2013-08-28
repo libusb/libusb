@@ -1,12 +1,12 @@
 Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
 Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
 Copyright © 2010-2012 Peter Stuge <peter@stuge.se>
-Copyright © 2008-2011 Nathan Hjelm <hjelmn@users.sourceforge.net>
-Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
-Copyright © 2009-2012 Ludovic Rousseau <ludovic.rousseau@gmail.com>
+Copyright © 2008-2013 Nathan Hjelm <hjelmn@users.sourceforge.net>
+Copyright © 2009-2013 Pete Batard <pete@akeo.ie>
+Copyright © 2009-2013 Ludovic Rousseau <ludovic.rousseau@gmail.com>
 Copyright © 2010-2012 Michael Plante <michael.plante@gmail.com>
-Copyright © 2011-2012 Hans de Goede <hdegoede@redhat.com>
-Copyright © 2012 Martin Pieuchot <mpi@openbsd.org>
+Copyright © 2011-2013 Hans de Goede <hdegoede@redhat.com>
+Copyright © 2012-2013 Martin Pieuchot <mpi@openbsd.org>
 Copyright © 2012-2013 Toby Gray <toby.gray@realvnc.com>
 
 Other contributors:
@@ -26,6 +26,7 @@ David Moore
 Davidlohr Bueso
 Federico Manzan
 Felipe Balbi
+Florian Albrechtskirchinger
 Francesco Montorsi
 Graeme Gill
 Hans Ulrich Niedermann
@@ -42,6 +43,7 @@ Mike Frysinger
 Mikhail Gusarov
 Nicholas Corgan
 Orin Eman
+Paul Fertser
 Pekka Nikander
 Rob Walker
 Sean McBride
