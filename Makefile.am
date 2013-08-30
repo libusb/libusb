@@ -3,7 +3,7 @@ ACLOCAL_AMFLAGS = -I m4
 DISTCLEANFILES = libusb-1.0.pc
 EXTRA_DIST = TODO PORTING msvc libusb/libusb-1.0.def libusb/version_nano.h \
   examples/getopt/getopt.c examples/getopt/getopt1.c examples/getopt/getopt.h \
-  android
+  android Xcode
 SUBDIRS = libusb doc
 
 if BUILD_EXAMPLES
