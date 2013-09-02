@@ -252,7 +252,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 		int i, len;
 		struct libusb_device **devs;
 
-		len = libusb_get_device_list(ctx, &devs);
+		len = (int) libusb_get_device_list(ctx, &devs);
 		if (len < 0) {
 			libusb_hotplug_deregister_callback(ctx,
 							new_callback->handle);
