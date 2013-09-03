@@ -47,7 +47,7 @@ LTLDFLAGS="${LTLDFLAGS} -no-undefined"
 AC_MSG_CHECKING([operating system])
 
 case $host in
-*-linux*)
+*-linux* | *-uclinux*)
 	AC_MSG_RESULT([Linux])
 	backend="linux"
 	threads="posix"
