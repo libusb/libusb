@@ -215,8 +215,10 @@ obsd_get_device_list(struct libusb_context * ctx,
 					continue;
 				}
 
-				if (usbi_sanitize_device(dev))
+				if (usbi_sanitize_device(dev)) {
 					libusb_unref_device(dev);
+					continue;
+				}
 			}
 
 			ddd = discovered_devs_append(*discdevs, dev);
