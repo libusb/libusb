@@ -186,7 +186,9 @@ obsd_get_device_list(struct libusb_context * ctx,
 			session_id = (di.udi_bus << 8 | di.udi_addr);
 			dev = usbi_get_device_by_session_id(ctx, session_id);
 
-			if (dev == NULL) {
+			if (dev) {
+				dev = libusb_ref_device(dev);
+			} else {
 				dev = usbi_alloc_device(ctx, session_id);
 				if (dev == NULL) {
 					close(fd);
@@ -226,6 +228,7 @@ obsd_get_device_list(struct libusb_context * ctx,
 				close(fd);
 				return (LIBUSB_ERROR_NO_MEM);
 			}
+			libusb_unref_device(dev);
 
 			*discdevs = ddd;
 			devices[addr] = 1;
