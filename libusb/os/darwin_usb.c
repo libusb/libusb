@@ -293,6 +293,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
         /* signal the core that this device has been disconnected. the core will tear down this device
            when the reference count reaches 0 */
         usbi_disconnect_device(dev);
+        usb_unref_device(dev);
       }
     }
 
@@ -863,11 +864,6 @@ static int process_new_device (struct libusb_context *ctx, io_service_t service)
     dev->port_number    = cached_device->port;
     dev->bus_number     = cached_device->location >> 24;
     dev->device_address = cached_device->address;
-
-    /* need to add a reference to the parent device */
-    if (dev->parent_dev) {
-      libusb_ref_device(dev->parent_dev);
-    }
 
     (*(priv->dev->device))->GetDeviceSpeed (priv->dev->device, &devSpeed);
 

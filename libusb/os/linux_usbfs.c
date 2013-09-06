@@ -1048,9 +1048,11 @@ int linux_enumerate_device(struct libusb_context *ctx,
 	usbi_dbg("busnum %d devaddr %d session_id %ld", busnum, devaddr,
 		session_id);
 
-	if (usbi_get_device_by_session_id(ctx, session_id)) {
+	dev = usbi_get_device_by_session_id(ctx, session_id);
+	if (dev) {
 		/* device already exists in the context */
 		usbi_dbg("session_id %ld already exists", session_id);
+		libusb_unref_device(dev);
 		return LIBUSB_SUCCESS;
 	}
 
@@ -1101,6 +1103,7 @@ void linux_device_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys_
 		dev = usbi_get_device_by_session_id (ctx, session_id);
 		if (NULL != dev) {
 			usbi_disconnect_device (dev);
+			libusb_unref_device(dev);
 		} else {
 			usbi_dbg("device not found for session %x", session_id);
 		}

@@ -1103,8 +1103,10 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			if (tmp_dev->bus_number != 0) {
 				usbi_dbg("got bus number from ancestor #%d", i);
 				parent_dev->bus_number = tmp_dev->bus_number;
+				libusb_unref_device(tmp_dev);
 				break;
 			}
+			libusb_unref_device(tmp_dev);
 		}
 	}
 	if (parent_dev->bus_number == 0) {
@@ -1116,7 +1118,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	dev->port_number = port_number;
 	priv->depth = parent_priv->depth + 1;
 	priv->parent_dev = parent_dev;
-	dev->parent_dev = libusb_ref_device(parent_dev);
+	dev->parent_dev = parent_dev;
 
 	// If the device address is already set, we can stop here
 	if (dev->device_address != 0) {
@@ -1537,6 +1539,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				parent_priv = _device_priv(parent_dev);
 				// virtual USB devices are also listed during GEN - don't process these yet
 				if ( (pass == GEN_PASS) && (parent_priv->apib->id != USB_API_HUB) ) {
+				        libusb_unref_device(parent_dev);
 					continue;
 				}
 				break;
@@ -1559,20 +1562,20 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 					}
 					windows_device_priv_init(dev);
-					// Keep track of devices that need unref
-					unref_list[unref_cur++] = dev;
-					if (unref_cur >= unref_size) {
-						unref_size += 64;
-						unref_list = usbi_reallocf(unref_list, unref_size*sizeof(libusb_device*));
-						if (unref_list == NULL) {
-							usbi_err(ctx, "could not realloc list for unref - aborting.");
-							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-						}
-					}
 				} else {
 					usbi_dbg("found existing device for session [%X] (%d.%d)",
 						session_id, dev->bus_number, dev->device_address);
 				}
+                                // Keep track of devices that need unref
+                                unref_list[unref_cur++] = dev;
+                                if (unref_cur >= unref_size) {
+                                        unref_size += 64;
+                                        unref_list = usbi_reallocf(unref_list, unref_size*sizeof(libusb_device*));
+                                        if (unref_list == NULL) {
+                                                usbi_err(ctx, "could not realloc list for unref - aborting.");
+                                                LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+                                        }
+                                }
 				priv = _device_priv(dev);
 			}
 
@@ -1658,6 +1661,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						break;
 					}
 				}
+			        libusb_unref_device(parent_dev);
 				break;
 			}
 		}

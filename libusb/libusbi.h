@@ -534,8 +534,8 @@ struct usbi_os_backend {
 	 *
 	 * After computing a session ID for a device, call
 	 * usbi_get_device_by_session_id(). This function checks if libusbx already
-	 * knows about the device, and if so, it provides you with a libusb_device
-	 * structure for it.
+	 * knows about the device, and if so, it provides you with a reference
+	 * to a libusb_device structure for it.
 	 *
 	 * If usbi_get_device_by_session_id() returns NULL, it is time to allocate
 	 * a new device structure for the device. Call usbi_alloc_device() to
