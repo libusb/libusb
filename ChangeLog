@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusbx.org
 
-2013-08-28: v1.0.17-rc1
+2013-09-06: v1.0.17
 * Hotplug callbacks now always get passed a libusb_context, even if it is
   the default context. Previously NULL would be passed for the default context,
   but since the first context created is the default context, and most apps
