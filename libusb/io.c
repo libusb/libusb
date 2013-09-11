@@ -1510,6 +1510,43 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 	return r;
 }
 
+/** \ingroup asyncio
+ * Set a transfers bulk stream id. Note users are advised to use
+ * libusb_fill_bulk_stream_transfer() instead of calling this function
+ * directly.
+ *
+ * Since version 1.0.19, \ref LIBUSB_API_VERSION >= 0x01000103
+ *
+ * \param transfer the transfer to set the stream id for
+ * \param stream_id the stream id to set
+ * \see libusb_alloc_streams()
+ */
+void API_EXPORTED libusb_transfer_set_stream_id(
+	struct libusb_transfer *transfer, uint32_t stream_id)
+{
+	struct usbi_transfer *itransfer =
+		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+
+	itransfer->stream_id = stream_id;
+}
+
+/** \ingroup asyncio
+ * Get a transfers bulk stream id.
+ *
+ * Since version 1.0.19, \ref LIBUSB_API_VERSION >= 0x01000103
+ *
+ * \param transfer the transfer to get the stream id for
+ * \returns the stream id for the transfer
+ */
+uint32_t API_EXPORTED libusb_transfer_get_stream_id(
+	struct libusb_transfer *transfer)
+{
+	struct usbi_transfer *itransfer =
+		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+
+	return itransfer->stream_id;
+}
+
 /* Handle completion of a transfer (completion might be an error condition).
  * This will invoke the user-supplied callback function, which may end up
  * freeing the transfer. Therefore you cannot use the transfer structure

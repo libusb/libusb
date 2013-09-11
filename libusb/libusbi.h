@@ -366,6 +366,7 @@ struct usbi_transfer {
 	struct list_head list;
 	struct timeval timeout;
 	int transferred;
+	uint32_t stream_id;
 	uint8_t flags;
 
 	/* this lock is held during libusb_submit_transfer() and

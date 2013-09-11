@@ -507,6 +507,9 @@ obsd_submit_transfer(struct usbi_transfer *itransfer)
 		}
 		err = _sync_gen_transfer(itransfer);
 		break;
+	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+		err = LIBUSB_ERROR_NOT_SUPPORTED;
+		break;
 	}
 
 	if (err)
