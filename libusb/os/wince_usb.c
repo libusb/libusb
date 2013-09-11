@@ -1005,6 +1005,9 @@ const struct usbi_os_backend wince_backend = {
         wince_clear_halt,
         wince_reset_device,
 
+	NULL,				/* alloc_streams */
+	NULL,				/* free_streams */
+
         wince_kernel_driver_active,
         wince_detach_kernel_driver,
         wince_attach_kernel_driver,

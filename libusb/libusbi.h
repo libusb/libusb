@@ -843,6 +843,14 @@ struct usbi_os_backend {
 	 */
 	int (*reset_device)(struct libusb_device_handle *handle);
 
+	/* Alloc num_streams usb3 bulk streams on the passed in endpoints */
+	int (*alloc_streams)(struct libusb_device_handle *handle,
+		uint32_t num_streams, unsigned char *endpoints, int num_endpoints);
+
+	/* Free usb3 bulk streams allocated with alloc_streams */
+	int (*free_streams)(struct libusb_device_handle *handle,
+		unsigned char *endpoints, int num_endpoints);
+
 	/* Determine if a kernel driver is active on an interface. Optional.
 	 *
 	 * The presence of a kernel driver on an interface indicates that any

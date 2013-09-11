@@ -112,6 +112,9 @@ const struct usbi_os_backend netbsd_backend = {
 	netbsd_clear_halt,
 	netbsd_reset_device,
 
+	NULL,				/* alloc_streams */
+	NULL,				/* free_streams */
+
 	NULL,				/* kernel_driver_active() */
 	NULL,				/* detach_kernel_driver() */
 	NULL,				/* attach_kernel_driver() */

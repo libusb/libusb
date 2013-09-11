@@ -2317,6 +2317,9 @@ const struct usbi_os_backend windows_backend = {
 	windows_clear_halt,
 	windows_reset_device,
 
+	NULL,				/* alloc_streams */
+	NULL,				/* free_streams */
+
 	windows_kernel_driver_active,
 	windows_detach_kernel_driver,
 	windows_attach_kernel_driver,

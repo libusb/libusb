@@ -1387,6 +1387,11 @@ int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev,
 	unsigned char endpoint);
 int LIBUSB_CALL libusb_reset_device(libusb_device_handle *dev);
 
+int LIBUSB_CALL libusb_alloc_streams(libusb_device_handle *dev,
+	uint32_t num_streams, unsigned char *endpoints, int num_endpoints);
+int LIBUSB_CALL libusb_free_streams(libusb_device_handle *dev,
+	unsigned char *endpoints, int num_endpoints);
+
 int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *dev,
 	int interface_number);
 int LIBUSB_CALL libusb_detach_kernel_driver(libusb_device_handle *dev,

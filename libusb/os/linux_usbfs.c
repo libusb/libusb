@@ -1495,6 +1495,56 @@ out:
 	return ret;
 }
 
+static int do_streams_ioctl(struct libusb_device_handle *handle, long req,
+	uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
+{
+	int r, fd = _device_handle_priv(handle)->fd;
+	struct usbfs_streams *streams;
+
+	if (num_endpoints > 30) /* Max 15 in + 15 out eps */
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	streams = malloc(sizeof(struct usbfs_streams) + num_endpoints);
+	if (!streams)
+		return LIBUSB_ERROR_NO_MEM;
+
+	streams->num_streams = num_streams;
+	streams->num_eps = num_endpoints;
+	memcpy(streams->eps, endpoints, num_endpoints);
+
+	r = ioctl(fd, req, streams);
+
+	free(streams);
+
+	if (r < 0) {
+		if (errno == ENOTTY)
+			return LIBUSB_ERROR_NOT_SUPPORTED;
+		else if (errno == EINVAL)
+			return LIBUSB_ERROR_INVALID_PARAM;
+		else if (errno == ENODEV)
+			return LIBUSB_ERROR_NO_DEVICE;
+
+		usbi_err(HANDLE_CTX(handle),
+			"streams-ioctl failed error %d errno %d", r, errno);
+		return LIBUSB_ERROR_OTHER;
+	}
+	return r;
+}
+
+static int op_alloc_streams(struct libusb_device_handle *handle,
+	uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
+{
+	return do_streams_ioctl(handle, IOCTL_USBFS_ALLOC_STREAMS,
+				num_streams, endpoints, num_endpoints);
+}
+
+static int op_free_streams(struct libusb_device_handle *handle,
+		unsigned char *endpoints, int num_endpoints)
+{
+	return do_streams_ioctl(handle, IOCTL_USBFS_FREE_STREAMS, 0,
+				endpoints, num_endpoints);
+}
+
 static int op_kernel_driver_active(struct libusb_device_handle *handle,
 	int interface)
 {
@@ -2595,6 +2645,9 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.set_interface_altsetting = op_set_interface,
 	.clear_halt = op_clear_halt,
 	.reset_device = op_reset_device,
+
+	.alloc_streams = op_alloc_streams,
+	.free_streams = op_free_streams,
 
 	.kernel_driver_active = op_kernel_driver_active,
 	.detach_kernel_driver = op_detach_kernel_driver,
