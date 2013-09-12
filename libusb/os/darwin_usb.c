@@ -1483,6 +1483,41 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   return darwin_to_libusb (ret);
 }
 
+#if InterfaceVersion >= 550
+static int submit_stream_transfer(struct usbi_transfer *itransfer) {
+  struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
+  struct darwin_interface *cInterface;
+  uint8_t pipeRef, iface;
+  IOReturn ret;
+
+  if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
+    usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
+
+    return LIBUSB_ERROR_NOT_FOUND;
+  }
+
+  cInterface = &priv->interfaces[iface];
+
+  itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
+  if (IS_XFERIN(transfer))
+    ret = (*(cInterface->interface))->ReadStreamsPipeAsyncTO(cInterface->interface, pipeRef, itransfer->stream_id,
+                                                             transfer->buffer, transfer->length, transfer->timeout,
+                                                             transfer->timeout, darwin_async_io_callback, (void *)itransfer);
+  else
+    ret = (*(cInterface->interface))->WriteStreamsPipeAsyncTO(cInterface->interface, pipeRef, itransfer->stream_id,
+                                                              transfer->buffer, transfer->length, transfer->timeout,
+                                                              transfer->timeout, darwin_async_io_callback, (void *)itransfer);
+
+  if (ret)
+    usbi_err (TRANSFER_CTX (transfer), "bulk stream transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
+               darwin_error_str(ret), ret);
+
+  return darwin_to_libusb (ret);
+}
+#endif
+
 static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
@@ -1634,6 +1669,13 @@ static int darwin_submit_transfer(struct usbi_transfer *itransfer) {
     return submit_bulk_transfer(itransfer);
   case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
     return submit_iso_transfer(itransfer);
+  case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+#if InterfaceVersion >= 550
+    return submit_stream_transfer(itransfer);
+#else
+    usbi_err (TRANSFER_CTX(transfer), "IOUSBFamily version does not support bulk stream transfers");
+    return LIBUSB_ERROR_NOT_SUPPORTED;
+#endif
   default:
     usbi_err (TRANSFER_CTX(transfer), "unknown endpoint type %d", transfer->type);
     return LIBUSB_ERROR_INVALID_PARAM;
@@ -1677,7 +1719,12 @@ static int darwin_abort_transfers (struct usbi_transfer *itransfer) {
   usbi_warn (ITRANSFER_CTX (itransfer), "aborting all transactions on interface %d pipe %d", iface, pipeRef);
 
   /* abort transactions */
-  (*(cInterface->interface))->AbortPipe (cInterface->interface, pipeRef);
+#if InterfaceVersion >= 550
+  if (LIBUSB_TRANSFER_TYPE_BULK_STREAM == transfer->type)
+    (*(cInterface->interface))->AbortStreamsPipe (cInterface->interface, pipeRef, itransfer->stream_id);
+  else
+#endif
+    (*(cInterface->interface))->AbortPipe (cInterface->interface, pipeRef);
 
   usbi_dbg ("calling clear pipe stall to clear the data toggle bit");
 
@@ -1859,6 +1906,72 @@ static int darwin_clock_gettime(int clk_id, struct timespec *tp) {
   return 0;
 }
 
+#if InterfaceVersion >= 550
+static int darwin_alloc_streams (struct libusb_device_handle *dev_handle, uint32_t num_streams, unsigned char *endpoints,
+                                 int num_endpoints) {
+  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *) dev_handle->os_priv;
+  struct darwin_interface *cInterface;
+  uint8_t pipeRef, iface;
+  UInt32 supportsStreams;
+  int rc, i;
+
+  /* find the mimimum number of supported streams on the endpoint list */
+  for (i = 0 ; i < num_endpoints ; ++i) {
+    if (0 != (rc = ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, &iface))) {
+      return rc;
+    }
+
+    cInterface = &priv->interfaces[iface];
+
+    (*(cInterface->interface))->SupportsStreams (cInterface->interface, pipeRef, &supportsStreams);
+    if (num_streams > supportsStreams)
+      num_streams = supportsStreams;
+  }
+
+  /* it is an error if any endpoint in endpoints does not support streams */
+  if (0 == num_streams)
+    return LIBUSB_ERROR_INVALID_PARAM;
+
+  /* create the streams */
+  for (i = 0 ; i < num_endpoints ; ++i) {
+    (void) ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, &iface);
+
+    cInterface = &priv->interfaces[iface];
+
+    rc = (*(cInterface->interface))->CreateStreams (cInterface->interface, pipeRef, num_streams);
+    if (kIOReturnSuccess != rc)
+      return darwin_to_libusb(rc);
+  }
+
+  return num_streams;
+}
+
+static int darwin_free_streams (struct libusb_device_handle *dev_handle, unsigned char *endpoints, int num_endpoints) {
+  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *) dev_handle->os_priv;
+  struct darwin_interface *cInterface;
+  uint8_t pipeRef, iface;
+  UInt32 supportsStreams;
+  int rc;
+
+  for (int i = 0 ; i < num_endpoints ; ++i) {
+    if (0 != (rc = ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, &iface)))
+      return rc;
+
+    cInterface = &priv->interfaces[iface];
+
+    (*(cInterface->interface))->SupportsStreams (cInterface->interface, pipeRef, &supportsStreams);
+    if (0 == supportsStreams)
+      return LIBUSB_ERROR_INVALID_PARAM;
+
+    rc = (*(cInterface->interface))->CreateStreams (cInterface->interface, pipeRef, 0);
+    if (kIOReturnSuccess != rc)
+      return darwin_to_libusb(rc);
+  }
+
+  return LIBUSB_SUCCESS;;
+}
+#endif
+
 const struct usbi_os_backend darwin_backend = {
         .name = "Darwin",
         .caps = 0,
@@ -1879,6 +1992,11 @@ const struct usbi_os_backend darwin_backend = {
         .set_interface_altsetting = darwin_set_interface_altsetting,
         .clear_halt = darwin_clear_halt,
         .reset_device = darwin_reset_device,
+
+#if InterfaceVersion >= 550
+        .alloc_streams = darwin_alloc_streams,
+        .free_streams = darwin_free_streams,
+#endif
 
         .kernel_driver_active = darwin_kernel_driver_active,
         .detach_kernel_driver = darwin_detach_kernel_driver,
