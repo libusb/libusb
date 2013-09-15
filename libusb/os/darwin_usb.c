@@ -293,7 +293,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
         /* signal the core that this device has been disconnected. the core will tear down this device
            when the reference count reaches 0 */
         usbi_disconnect_device(dev);
-        usb_unref_device(dev);
+        libusb_unref_device(dev);
       }
     }
 
