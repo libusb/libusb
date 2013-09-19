@@ -716,6 +716,7 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 	struct ram_poke_context ctx;
 	int status;
 	uint8_t iic_header[8] = { 0 };
+	int ret;
 
 	if (fx_type == FX_TYPE_FX3)
 		return fx3_load_ram(device, path);
@@ -733,7 +734,8 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 		  || ((fx_type == FX_TYPE_AN21) && (iic_header[0] != 0xB2))
 		  || ((fx_type == FX_TYPE_FX1) && (iic_header[0] != 0xB6)) ) {
 			logerror("IIC image does not contain executable code - cannot load to RAM.\n");
-			return -1;
+			ret = -1;
+			goto exit;
 		}
 	}
 
@@ -759,7 +761,10 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 
 		/* if required, halt the CPU while we overwrite its code/data */
 		if (cpucs_addr && !ezusb_cpucs(device, cpucs_addr, false))
-			return -1;
+		{
+			ret = -1;
+			goto exit;
+		}
 
 		/* 2nd stage, first part? loader was already uploaded */
 	} else {
@@ -776,7 +781,8 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 	status = parse[img_type](image, &ctx, is_external, ram_poke);
 	if (status < 0) {
 		logerror("unable to upload %s\n", path);
-		return status;
+		ret = status;
+		goto exit;
 	}
 
 	/* second part of 2nd stage: rescan */
@@ -786,7 +792,10 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 
 		/* if needed, halt the CPU while we overwrite the 1st stage loader */
 		if (cpucs_addr && !ezusb_cpucs(device, cpucs_addr, false))
-			return -1;
+		{
+			ret = -1;
+			goto exit;
+		}
 
 		/* at least write the interrupt vectors (at 0x0000) for reset! */
 		rewind(image);
@@ -795,7 +804,8 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 		status = parse_ihex(image, &ctx, is_external, ram_poke);
 		if (status < 0) {
 			logerror("unable to completely upload %s\n", path);
-			return status;
+			ret = status;
+			goto exit;
 		}
 	}
 
@@ -805,7 +815,9 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 
 	/* if required, reset the CPU so it runs what we just uploaded */
 	if (cpucs_addr && !ezusb_cpucs(device, cpucs_addr, true))
-		return -1;
+		ret = -1;
 
-	return 0;
+exit:
+	fclose(image);
+	return ret;
 }
