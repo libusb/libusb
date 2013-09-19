@@ -563,6 +563,7 @@ static int fx3_load_ram(libusb_device_handle *device, const char *path)
 	uint32_t* dImageBuf;
 	unsigned char *bBuf, hBuf[4], blBuf[4], rBuf[4096];
 	FILE *image;
+	int ret = 0;
 
 	image = fopen(path, "rb");
 	if (image == NULL) {
@@ -574,13 +575,15 @@ static int fx3_load_ram(libusb_device_handle *device, const char *path)
 	// Read header
 	if (fread(hBuf, sizeof(char), sizeof(hBuf), image) != sizeof(hBuf)) {
 		logerror("could not read image header");
-		return -3;
+		ret = -3;
+		goto exit;
 	}
 
 	// check "CY" signature byte and format
 	if ((hBuf[0] != 'C') || (hBuf[1] != 'Y')) {
 		logerror("image doesn't have a CYpress signature\n");
-		return -3;
+		ret = -3;
+		goto exit;
 	}
 
 	// Check bImageType
@@ -591,20 +594,24 @@ static int fx3_load_ram(libusb_device_handle *device, const char *path)
 		break;
 	case 0xB1:
 		logerror("security binary image is not currently supported\n");
-		return -3;
+		ret = -3;
+		goto exit;
 	case 0xB2:
 		logerror("VID:PID image is not currently supported\n");
-		return -3;
+		ret = -3;
+		goto exit;
 	default:
 		logerror("invalid image type 0x%02X\n", hBuf[3]);
-		return -3;
+		ret = -3;
+		goto exit;
 	}
 
 	// Read the bootloader version
 	if (verbose) {
 		if ((ezusb_read(device, "read bootloader version", RW_INTERNAL, 0xFFFF0020, blBuf, 4) < 0)) {
 			logerror("Could not read bootloader version\n");
-			return -8;
+			ret = -8;
+			goto exit;
 		}
 		logerror("FX3 bootloader version: 0x%02X%02X%02X%02X\n", blBuf[3], blBuf[2], blBuf[1], blBuf[0]);
 	}
@@ -616,7 +623,8 @@ static int fx3_load_ram(libusb_device_handle *device, const char *path)
 		if ((fread(&dLength, sizeof(uint32_t), 1, image) != 1) ||  // read dLength
 			(fread(&dAddress, sizeof(uint32_t), 1, image) != 1)) { // read dAddress
 			logerror("could not read image");
-			return -3;
+			ret = -3;
+			goto exit;
 		}
 		if (dLength == 0)
 			break; // done
@@ -624,14 +632,16 @@ static int fx3_load_ram(libusb_device_handle *device, const char *path)
 		dImageBuf = calloc(dLength, sizeof(uint32_t));
 		if (dImageBuf == NULL) {
 			logerror("could not allocate buffer for image chunk\n");
-			return -4;
+			ret = -4;
+			goto exit;
 		}
 
 		// read sections
 		if (fread(dImageBuf, sizeof(uint32_t), dLength, image) != dLength) {
 			logerror("could not read image");
 			free(dImageBuf);
-			return -3;
+			ret = -3;
+			goto exit;
 		}
 		for (i = 0; i < dLength; i++)
 			dCheckSum += dImageBuf[i];
@@ -646,14 +656,16 @@ static int fx3_load_ram(libusb_device_handle *device, const char *path)
 				(ezusb_read(device, "read firmware", RW_INTERNAL, dAddress, rBuf, dLen) < 0)) {
 				logerror("R/W error\n");
 				free(dImageBuf);
-				return -5;
+				ret = -5;
+				goto exit;
 			}
 			// Verify data: rBuf with bBuf
 			for (i = 0; i < dLen; i++) {
 				if (rBuf[i] != bBuf[i]) {
 					logerror("verify error");
 					free(dImageBuf);
-					return -6;
+					ret = -6;
+					goto exit;
 				}
 			}
 
@@ -668,15 +680,18 @@ static int fx3_load_ram(libusb_device_handle *device, const char *path)
 	if ((fread(&dExpectedCheckSum, sizeof(uint32_t), 1, image) != 1) ||
 		(dCheckSum != dExpectedCheckSum)) {
 		logerror("checksum error\n");
-		return -7;
+		ret = -7;
+		goto exit;
 	}
 
 	// transfer execution to Program Entry
 	if (!ezusb_fx3_jump(device, dAddress)) {
-		return -6;
+		ret = -6;
 	}
 
-	return 0;
+exit:
+	fclose(image);
+	return ret;
 }
 
 /*
