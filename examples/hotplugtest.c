@@ -95,7 +95,9 @@ int main(int argc, char *argv[])
 	}
 
 	while (done < 2) {
-		libusb_handle_events (NULL);
+		rc = libusb_handle_events (NULL);
+		if (rc < 0)
+			printf("libusb_handle_events() failed: %s\n", libusb_error_name(rc));
 	}
 
 	libusb_exit (NULL);
