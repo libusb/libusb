@@ -139,6 +139,7 @@ static int setup_test_output(libusbx_testlib_ctx * ctx)
 		}
 		ctx->output_file = fdopen(ctx->old_stdout, "w");
 		if (!ctx->output_file) {
+			ctx->output_file = stdout;
 			cleanup_test_output(ctx);
 			printf("Failed to open FILE for output handle: %d\n", errno);
 			return 1;
