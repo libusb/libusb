@@ -415,6 +415,7 @@ static void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	uint8_t sense[18];
 	uint32_t expected_tag;
 	int size;
+	int rc;
 
 	// Request Sense
 	printf("Request Sense:\n");
@@ -424,7 +425,12 @@ static void get_sense(libusb_device_handle *handle, uint8_t endpoint_in, uint8_t
 	cdb[4] = REQUEST_SENSE_LENGTH;
 
 	send_mass_storage_command(handle, endpoint_out, 0, cdb, LIBUSB_ENDPOINT_IN, REQUEST_SENSE_LENGTH, &expected_tag);
-	libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&sense, REQUEST_SENSE_LENGTH, &size, 1000);
+	rc = libusb_bulk_transfer(handle, endpoint_in, (unsigned char*)&sense, REQUEST_SENSE_LENGTH, &size, 1000);
+	if (rc < 0)
+	{
+		printf("libusb_bulk_transfer failed: %s\n", libusb_error_name(rc));
+		return;
+	}
 	printf("   received %d bytes\n", size);
 
 	if ((sense[0] != 0x70) && (sense[0] != 0x71)) {
