@@ -65,7 +65,12 @@ int main(int argc, char *argv[])
 	product_id = (argc > 2) ? strtol (argv[2], NULL, 0) : 0x5005;
 	class_id   = (argc > 3) ? strtol (argv[3], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
 
-	libusb_init (NULL);
+	rc = libusb_init (NULL);
+	if (rc < 0)
+	{
+		printf("failed to initialise libusb: %s\n", libusb_error_name(rc));
+		return EXIT_FAILURE;
+	}
 
 	if (!libusb_has_capability (LIBUSB_CAP_HAS_HOTPLUG)) {
 		printf ("Hotplug capabilites are not supported on this platform\n");
