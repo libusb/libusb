@@ -564,7 +564,7 @@ static int op_get_device_descriptor(struct libusb_device *dev,
 static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 {
 	char *endptr;
-	char tmp[4] = {0, 0, 0, 0};
+	char tmp[5] = {0, 0, 0, 0, 0};
 	long num;
 	int fd;
 	ssize_t r;
