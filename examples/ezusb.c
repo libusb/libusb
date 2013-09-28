@@ -716,7 +716,7 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 	struct ram_poke_context ctx;
 	int status;
 	uint8_t iic_header[8] = { 0 };
-	int ret;
+	int ret = 0;
 
 	if (fx_type == FX_TYPE_FX3)
 		return fx3_load_ram(device, path);
