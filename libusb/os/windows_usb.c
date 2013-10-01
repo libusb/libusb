@@ -2078,7 +2078,7 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 		}
 		break;
 	default:
-		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %d: %s", io_result, windows_error_str(0));
+		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %d: %s", io_result, windows_error_str(io_result));
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	}
