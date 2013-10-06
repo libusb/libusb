@@ -436,7 +436,11 @@ static int parse_iic(FILE *image, void *context,
 	uint8_t block_header[4];
 	int rc;
 	bool external = false;
-	long file_size, initial_pos = ftell(image);
+	long file_size, initial_pos;
+
+	initial_pos = ftell(image);
+	if (initial_pos < 0)
+		return -1;
 
 	fseek(image, 0L, SEEK_END);
 	file_size = ftell(image);
