@@ -1930,6 +1930,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	struct pollfd *fds = NULL;
 	int i = -1;
 	int timeout_ms;
+	int special_event;
 
 	usbi_mutex_lock(&ctx->pollfds_lock);
 	list_for_each_entry(ipollfd, &ctx->pollfds, list, struct usbi_pollfd)
@@ -1959,6 +1960,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	if (tv->tv_usec % 1000)
 		timeout_ms++;
 
+redo_poll:
 	usbi_dbg("poll() %d fds with timeout in %dms", nfds, timeout_ms);
 	r = usbi_poll(fds, nfds, timeout_ms);
 	usbi_dbg("poll() returned %d", r);
@@ -1973,6 +1975,8 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		usbi_err(ctx, "poll failed %d err=%d\n", r, errno);
 		return LIBUSB_ERROR_IO;
 	}
+
+	special_event = 0;
 
 	/* fd[0] is always the ctrl pipe */
 	if (fds[0].revents) {
@@ -1997,6 +2001,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		ssize_t ret;
 
 		usbi_dbg("caught a fish on the hotplug pipe");
+		special_event = 1;
 
 		/* read the message from the hotplug thread */
 		ret = usbi_read(ctx->hotplug_pipe[0], &message, sizeof (message));
@@ -2024,6 +2029,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		/* timerfd indicates that a timeout has expired */
 		int ret;
 		usbi_dbg("timerfd triggered");
+		special_event = 1;
 
 		ret = handle_timerfd_trigger(ctx);
 		if (ret < 0) {
@@ -2048,6 +2054,11 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		usbi_err(ctx, "backend handle_events failed with error %d", r);
 
 handled:
+        if (r == 0 && special_event) {
+                timeout_ms = 0;
+                goto redo_poll;
+        }
+
 	free(fds);
 	return r;
 }
