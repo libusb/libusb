@@ -2096,17 +2096,24 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	global_debug = 1;
 	UNUSED(ctx);
 #else
+	int ctx_level = 0;
+
 	USBI_GET_CONTEXT(ctx);
-	if (ctx == NULL)
+	if (ctx) {
+		ctx_level = ctx->debug;
+	} else {
+		char *dbg = getenv("LIBUSB_DEBUG");
+		if (dbg)
+			ctx_level = atoi(dbg);
+	}
+	global_debug = (ctx_level == LIBUSB_LOG_LEVEL_DEBUG);
+	if (!ctx_level)
 		return;
-	global_debug = (ctx->debug == LIBUSB_LOG_LEVEL_DEBUG);
-	if (!ctx->debug)
+	if (level == LIBUSB_LOG_LEVEL_WARNING && ctx_level < LIBUSB_LOG_LEVEL_WARNING)
 		return;
-	if (level == LIBUSB_LOG_LEVEL_WARNING && ctx->debug < LIBUSB_LOG_LEVEL_WARNING)
+	if (level == LIBUSB_LOG_LEVEL_INFO && ctx_level < LIBUSB_LOG_LEVEL_INFO)
 		return;
-	if (level == LIBUSB_LOG_LEVEL_INFO && ctx->debug < LIBUSB_LOG_LEVEL_INFO)
-		return;
-	if (level == LIBUSB_LOG_LEVEL_DEBUG && ctx->debug < LIBUSB_LOG_LEVEL_DEBUG)
+	if (level == LIBUSB_LOG_LEVEL_DEBUG && ctx_level < LIBUSB_LOG_LEVEL_DEBUG)
 		return;
 #endif
 
