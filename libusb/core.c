@@ -1907,6 +1907,7 @@ err_unlock:
 void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 {
 	struct libusb_device *dev, *next;
+	struct timeval tv = { 0, };
 
 	usbi_dbg("");
 	USBI_GET_CONTEXT(ctx);
@@ -1931,6 +1932,19 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 
 	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
 		usbi_hotplug_deregister_all(ctx);
+
+		/*
+		 * Ensure any pending unplug events are read from the hotplug
+		 * pipe. The usb_device-s hold in the events are no longer part
+		 * of usb_devs, but the events still hold a reference!
+		 *
+		 * Note we don't do this if the application has left devices
+		 * open (which implies a buggy app) to avoid packet completion
+		 * handlers running when the app does not expect them to run.
+		 */
+		if (list_empty(&ctx->open_devs))
+			libusb_handle_events_timeout(ctx, &tv);
+
 		usbi_mutex_lock(&ctx->usb_devs_lock);
 		list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
 			list_del(&dev->list);
