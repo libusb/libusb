@@ -79,12 +79,3 @@
 
 /* Define to 1 if you have the <sys/socket.h> header file. */
 #define HAVE_SYS_SOCKET_H 1
-
-/* Add defines which Android is missing */
-#ifndef TIMESPEC_TO_TIMEVAL
-#define TIMESPEC_TO_TIMEVAL(tv, ts)                                     \
-        do {                                                            \
-                (tv)->tv_sec = (ts)->tv_sec;                            \
-                (tv)->tv_usec = (ts)->tv_nsec / 1000;                   \
-        } while (0)
-#endif

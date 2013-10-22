@@ -46,6 +46,16 @@ LTLDFLAGS="${LTLDFLAGS} -no-undefined"
 
 AC_MSG_CHECKING([operating system])
 
+dnl on linux-android platform, some functions are in different places
+case $host in
+*-linux-android*)
+	AC_MSG_RESULT([This is a Linux-Android system])
+	is_backend_android="yes"
+	;;
+*)
+	is_backend_android="no"
+esac
+
 case $host in
 *-linux* | *-uclinux*)
 	AC_MSG_RESULT([Linux])
@@ -108,8 +118,20 @@ linux)
 ])
 		fi
 		AC_SUBST(USE_UDEV)
+
+case $is_backend_android in
+yes)
+	dnl some pthread functions is in libc
+	THREAD_CFLAGS="-c"
+	LIBS="${LIBS} -c"
+	dnl there are gettimeofday function but configure doesn't seem to be able to find it.
+	AC_DEFINE([HAVE_GETTIMEOFDAY], [1], [Define if you have gettimeofday])
+	;;
+*)
 	THREAD_CFLAGS="-pthread"
 	LIBS="${LIBS} -pthread"
+esac
+
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
