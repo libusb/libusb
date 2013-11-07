@@ -49,7 +49,7 @@
  * sysfs allows us to read the kernel's in-memory copies of device descriptors
  * and so forth, avoiding the need to open the device:
  *  - The binary "descriptors" file contains all config descriptors since
- *    2.6.26, commit 217a9081d8e69026186067711131b77f0ce219ed 
+ *    2.6.26, commit 217a9081d8e69026186067711131b77f0ce219ed
  *  - The binary "descriptors" file was added in 2.6.23, commit
  *    69d42a78f935d19384d1f6e4f94b65bb162b36df, but it only contains the
  *    active config descriptors
@@ -576,7 +576,7 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 	r = read(fd, tmp, sizeof(tmp));
 	close(fd);
 	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev), 
+		usbi_err(DEVICE_CTX(dev),
 			"read bConfigurationValue failed ret=%d errno=%d", r, errno);
 		return LIBUSB_ERROR_IO;
 	} else if (r == 0) {
@@ -913,7 +913,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		}
 		priv->descriptors_len += r;
 	} while (priv->descriptors_len == descriptors_size);
-	
+
 	close(fd);
 
 	if (priv->descriptors_len < DEVICE_DESC_LENGTH) {
@@ -1808,7 +1808,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 					"submiturb failed error %d errno=%d", r, errno);
 				r = LIBUSB_ERROR_IO;
 			}
-	
+
 			/* if the first URB submission fails, we can simply free up and
 			 * return failure immediately. */
 			if (i == 0) {
