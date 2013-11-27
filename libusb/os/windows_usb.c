@@ -4161,19 +4161,21 @@ static int hid_copy_transfer_data(int sub_api, struct usbi_transfer *itransfer, 
 	if (transfer_priv->hid_buffer != NULL) {
 		// If we have a valid hid_buffer, it means the transfer was async
 		if (transfer_priv->hid_dest != NULL) {	// Data readout
-			// First, check for overflow
-			if (corrected_size > transfer_priv->hid_expected_size) {
-				usbi_err(ctx, "OVERFLOW!");
-				corrected_size = (uint32_t)transfer_priv->hid_expected_size;
-				r = LIBUSB_TRANSFER_OVERFLOW;
-			}
+			if (corrected_size > 0) {
+				// First, check for overflow
+				if (corrected_size > transfer_priv->hid_expected_size) {
+					usbi_err(ctx, "OVERFLOW!");
+					corrected_size = (uint32_t)transfer_priv->hid_expected_size;
+					r = LIBUSB_TRANSFER_OVERFLOW;
+				}
 
-			if (transfer_priv->hid_buffer[0] == 0) {
-				// Discard the 1 byte report ID prefix
-				corrected_size--;
-				memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer+1, corrected_size);
-			} else {
-				memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer, corrected_size);
+				if (transfer_priv->hid_buffer[0] == 0) {
+					// Discard the 1 byte report ID prefix
+					corrected_size--;
+					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer+1, corrected_size);
+				} else {
+					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer, corrected_size);
+				}
 			}
 			transfer_priv->hid_dest = NULL;
 		}
