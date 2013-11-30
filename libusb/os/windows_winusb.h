@@ -554,6 +554,46 @@ typedef VOID (WINAPI *LibK_GetVersion_t)(
 	PKLIB_VERSION Version
 );
 
+//KISO_PACKET is equivalent of libusb_iso_packet_descriptor except uses absolute "offset" field instead of sequential Lengths
+typedef struct _KISO_PACKET {
+	UINT offset;
+	USHORT actual_length; //changed from libusbk_shared.h "Length" for clarity
+	USHORT status;
+} KISO_PACKET, *PKISO_PACKET;
+
+typedef enum _KISO_FLAG {
+	KISO_FLAG_NONE = 0,
+	KISO_FLAG_SET_START_FRAME = 0x00000001,
+} KISO_FLAG;
+
+//KISO_CONTEXT is the conceptual equivalent of libusb_transfer except is isochronous-specific and must match libusbk's version
+typedef struct _KISO_CONTEXT {
+	KISO_FLAG Flags;
+	UINT StartFrame;
+	SHORT ErrorCount;
+	SHORT NumberOfPackets;
+	UINT UrbHdrStatus;
+	KISO_PACKET IsoPackets[0];
+} KISO_CONTEXT, *PKISO_CONTEXT;
+
+typedef BOOL(WINAPI *WinUsb_IsoReadPipe_t)(
+	WINUSB_INTERFACE_HANDLE InterfaceHandle,
+	UCHAR PipeID,
+	PUCHAR Buffer,
+	ULONG BufferLength,
+	LPOVERLAPPED Overlapped,
+	PKISO_CONTEXT IsoContext
+);
+
+typedef BOOL(WINAPI *WinUsb_IsoWritePipe_t)(
+	WINUSB_INTERFACE_HANDLE InterfaceHandle,
+	UCHAR PipeID,
+	PUCHAR Buffer,
+	ULONG BufferLength,
+	LPOVERLAPPED Overlapped,
+	PKISO_CONTEXT IsoContext
+);
+
 struct winusb_interface {
 	bool initialized;
 	WinUsb_AbortPipe_t AbortPipe;
@@ -568,6 +608,8 @@ struct winusb_interface {
 	WinUsb_SetCurrentAlternateSetting_t SetCurrentAlternateSetting;
 	WinUsb_SetPipePolicy_t SetPipePolicy;
 	WinUsb_WritePipe_t WritePipe;
+	WinUsb_IsoReadPipe_t IsoReadPipe;
+	WinUsb_IsoWritePipe_t IsoWritePipe;
 };
 
 /* hid.dll interface */
