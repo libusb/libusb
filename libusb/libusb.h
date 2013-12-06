@@ -150,7 +150,7 @@ typedef unsigned __int32  uint32_t;
 extern "C" {
 #endif
 
-/** \fn libusb_cpu_to_le16
+/**
  * \ingroup misc
  * Convert a 16-bit value from host-endian to little-endian format. On
  * little endian systems, this function does nothing. On big endian systems,
