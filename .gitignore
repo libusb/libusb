@@ -42,6 +42,8 @@ Debug
 Release
 *.user
 *.suo
+*.sdf
+*.opensdf
 *.patch
 *~
 *.orig
