@@ -1246,7 +1246,7 @@ static void get_api_type(struct libusb_context *ctx, HDEVINFO *dev_info,
 		for (k=0; k<3; k++) {
 			j = get_sub_api(lookup[k].list, i);
 			if (j >= 0) {
-				usbi_dbg("matched %s name against %s API", 
+				usbi_dbg("matched %s name against %s",
 					lookup[k].designation, (i!=USB_API_WINUSBX)?usb_api_backend[i].designation:sub_api_name[j]);
 				*api = i;
 				*sub_api = j;
