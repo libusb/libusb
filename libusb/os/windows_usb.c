@@ -1246,7 +1246,7 @@ static void get_api_type(struct libusb_context *ctx, HDEVINFO *dev_info,
 		for (k=0; k<3; k++) {
 			j = get_sub_api(lookup[k].list, i);
 			if (j >= 0) {
-				usbi_dbg("matched %s name against %s API", 
+				usbi_dbg("matched %s name against %s",
 					lookup[k].designation, (i!=USB_API_WINUSBX)?usb_api_backend[i].designation:sub_api_name[j]);
 				*api = i;
 				*sub_api = j;
@@ -2395,7 +2395,7 @@ static int common_configure_endpoints(int sub_api, struct libusb_device_handle *
 	return LIBUSB_SUCCESS;
 }
 // These names must be uppercase
-const char* hub_driver_names[] = {"USBHUB", "USBHUB3", "USB3HUB", "NUSB3HUB", "RUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3", "IUSB3HUB", "VUSB3HUB"};
+const char* hub_driver_names[] = {"USBHUB", "USBHUB3", "USB3HUB", "NUSB3HUB", "RUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3", "IUSB3HUB", "VUSB3HUB", "AMDHUB30"};
 const char* composite_driver_names[] = {"USBCCGP"};
 const char* winusbx_driver_names[] = WINUSBX_DRV_NAMES;
 const char* hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
