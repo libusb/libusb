@@ -27,6 +27,8 @@ unix {
 }
 
 win32 {
+    INCLUDEPATH += $${PWD}/msvc
+
     SOURCES += \
         $${SRC_DIR}/os/threads_windows.c \
         $${SRC_DIR}/os/poll_windows.c \
