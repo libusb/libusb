@@ -49,6 +49,23 @@ linux {
 
     HEADERS += \
         $${SRC_DIR}/os/linux_usbfs.h
+
+    # Make all source files depend on config.h to ensure that it exists
+    libusb_sources.target = $(SOURCES)
+    libusb_sources.depends = config_header
+    QMAKE_EXTRA_TARGETS += libusb_sources
+
+    # Add a target to generate the config.h file using configure
+    config_header.target = $${PWD}/config.h
+    config_header.depends = bootstrap
+    config_header.commands = cd $${PWD} && ./configure
+    QMAKE_EXTRA_TARGETS += config_header
+
+    # Add a target to generate the configure command using bootstrap.sh
+    bootstrap.target = $${PWD}/configure
+    bootstrap.depends = $${PWD}/bootstrap.sh $${PWD}/configure.ac
+    bootstrap.commands = cd $${PWD} && ./bootstrap.sh
+    QMAKE_EXTRA_TARGETS += bootstrap
 }
 
 macx {
