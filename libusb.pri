@@ -43,6 +43,8 @@ win32 {
 }
 
 linux {
+    LIBS += -ludev
+
     SOURCES += \
         $${SRC_DIR}/os/linux_usbfs.c \
         $${SRC_DIR}/os/linux_udev.c
