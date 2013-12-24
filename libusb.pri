@@ -27,12 +27,12 @@ unix {
 }
 
 win32 {
+    DEFINES += _CRT_SECURE_NO_WARNINGS
     INCLUDEPATH += $${PWD}/msvc
 
     SOURCES += \
         $${SRC_DIR}/os/threads_windows.c \
         $${SRC_DIR}/os/poll_windows.c \
-        $${SRC_DIR}/os/threads_windows.c \
         $${SRC_DIR}/os/windows_usb.c
         #libusb-1.0.rc libusb-1.0.def
 
