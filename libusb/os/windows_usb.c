@@ -158,6 +158,20 @@ static char err_string[ERR_BUFFER_SIZE];
 
 	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%u] ", error_code);
 
+	// Translate codes returned by SetupAPI. The ones we are dealing with are either
+	// in 0x0000xxxx or 0xE000xxxx and can be distinguished from standard error codes.
+	// See http://msdn.microsoft.com/en-us/library/windows/hardware/ff545011.aspx
+	switch (error_code & 0xE0000000) {
+	case 0:
+		error_code = HRESULT_FROM_WIN32(error_code);	// Still leaves ERROR_SUCCESS unmodified
+		break;
+	case 0xE0000000:
+		error_code =  0x80000000 | (FACILITY_SETUPAPI << 16) | (error_code & 0x0000FFFF);
+		break;
+	default:
+		break;
+	}
+
 	size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
 		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &err_string[safe_strlen(err_string)],
 		ERR_BUFFER_SIZE - (DWORD)safe_strlen(err_string), NULL);
