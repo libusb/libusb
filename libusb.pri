@@ -63,6 +63,11 @@ linux {
     config_header.commands = cd $${PWD} && ./configure
     QMAKE_EXTRA_TARGETS += config_header
 
+    # Add a target for map the relative path to config.h to the absolute path to config.h
+    config_header_rel.target = $$relative_path($${PWD}/config.h, $${OUT_PWD})
+    config_header_rel.depends = config_header
+    QMAKE_EXTRA_TARGETS += config_header_rel
+
     # Add a target to generate the configure command using bootstrap.sh
     bootstrap.target = $${PWD}/configure
     bootstrap.depends = $${PWD}/bootstrap.sh $${PWD}/configure.ac
