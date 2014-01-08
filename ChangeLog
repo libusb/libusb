@@ -1,6 +1,14 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
+2014-01-08: v1.0.18-rc1
+* Fix multiple memory leaks
+* Fix a crash when HID transfers return no data on Windows
+* Ensure all pending events are consumed
+* Improve Android and ucLinux support
+* Multiple Windows improvements (error logging, VS2013, VIA xHCI support)
+* Multiple OS X improvements (broken compilation, SIGFPE, 64bit support)
+
 2013-09-06: v1.0.17
 * Hotplug callbacks now always get passed a libusb_context, even if it is
   the default context. Previously NULL would be passed for the default context,
