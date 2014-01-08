@@ -1,5 +1,5 @@
 /*
- * libusbx synchronization using POSIX Threads
+ * libusb synchronization using POSIX Threads
  *
  * Copyright © 2010 Peter Stuge <peter@stuge.se>
  *

@@ -10,7 +10,7 @@
 # fi
 #
 # NOTE: These versioning hooks are intended to be used *INTERNALLY* by the
-# libusbx development team and are NOT intended to solve versioning for any
+# libusb development team and are NOT intended to solve versioning for any
 # derivative branch, such as one you would create for private development.
 #
 

@@ -1,5 +1,5 @@
 /*
- * Windows CE backend for libusbx 1.0
+ * Windows CE backend for libusb 1.0
  * Copyright © 2011-2013 RealVNC Ltd.
  * Portions taken from Windows backend, which is
  * Copyright © 2009-2010 Pete Batard <pbatard@gmail.com>
@@ -36,7 +36,7 @@
 // This backend dynamically loads ceusbkwrapper.dll and doesn't include
 // ceusbkwrapper.h directly to simplify the build process. The kernel
 // side wrapper driver is built using the platform image build tools,
-// which makes it difficult to reference directly from the libusbx build
+// which makes it difficult to reference directly from the libusb build
 // system.
 struct UKW_DEVICE_PRIV;
 typedef struct UKW_DEVICE_PRIV *UKW_DEVICE;

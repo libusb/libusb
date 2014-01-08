@@ -1,6 +1,6 @@
 /* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
- * USB descriptor handling functions for libusbx
+ * USB descriptor handling functions for libusb
  * Copyright © 2007 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
@@ -541,7 +541,7 @@ int usbi_device_cache_descriptor(libusb_device *dev)
  *
  * This is a non-blocking function; the device descriptor is cached in memory.
  *
- * Note since libusbx-1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102, this
+ * Note since libusb-1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102, this
  * function always succeeds.
  *
  * \param dev the device

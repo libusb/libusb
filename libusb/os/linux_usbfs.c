@@ -1,6 +1,6 @@
 /* -*- Mode: C; c-basic-offset:8 ; indent-tabs-mode:t -*- */
 /*
- * Linux usbfs backend for libusbx
+ * Linux usbfs backend for libusb
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  * Copyright © 2013 Nathan Hjelm <hjelmn@mac.com>
@@ -197,10 +197,10 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 		return fd; /* Success */
 
 	if (!silent) {
-		usbi_err(ctx, "libusbx couldn't open USB device %s: %s",
+		usbi_err(ctx, "libusb couldn't open USB device %s: %s",
 			 path, strerror(errno));
 		if (errno == EACCES && mode == O_RDWR)
-			usbi_err(ctx, "libusbx requires write access to USB "
+			usbi_err(ctx, "libusb requires write access to USB "
 				      "device nodes.");
 	}
 
@@ -1823,7 +1823,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 			 * complications:
 			 *  - discarding is asynchronous - discarded urbs will be reaped
 			 *    later. the user must not have freed the transfer when the
-			 *    discarded URBs are reaped, otherwise libusbx will be using
+			 *    discarded URBs are reaped, otherwise libusb will be using
 			 *    freed memory.
 			 *  - the earlier URBs may have completed successfully and we do
 			 *    not want to throw away any data.
@@ -1985,7 +1985,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 			 * complications:
 			 *  - discarding is asynchronous - discarded urbs will be reaped
 			 *    later. the user must not have freed the transfer when the
-			 *    discarded URBs are reaped, otherwise libusbx will be using
+			 *    discarded URBs are reaped, otherwise libusb will be using
 			 *    freed memory.
 			 *  - the earlier URBs may have completed successfully and we do
 			 *    not want to throw away any data.
@@ -2160,7 +2160,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		 *
 		 * When this happens, our objectives are not to lose any "surplus" data,
 		 * and also to stick it at the end of the previously-received data
-		 * (closing any holes), so that libusbx reports the total amount of
+		 * (closing any holes), so that libusb reports the total amount of
 		 * transferred data and presents it in a contiguous chunk.
 		 */
 		if (urb->actual_length > 0) {

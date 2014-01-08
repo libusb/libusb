@@ -1,5 +1,5 @@
 /*
- * libusbx test library helper functions
+ * libusb test library helper functions
  * Copyright © 2012 Toby Gray <toby.gray@realvnc.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef LIBUSBX_TESTLIB_H
-#define LIBUSBX_TESTLIB_H
+#ifndef LIBUSB_TESTLIB_H
+#define LIBUSB_TESTLIB_H
 
 #include <stdio.h>
 
@@ -43,7 +43,7 @@ typedef enum {
 	/** Indicates that the test can't be run. For example this may be
 	* due to no suitable device being connected to perform the tests.*/
 	TEST_STATUS_SKIP
-} libusbx_testlib_result;
+} libusb_testlib_result;
 
 /**
  * Context for test library functions
@@ -57,21 +57,21 @@ typedef struct {
 	int old_stderr;
 	FILE* output_file;
 	int null_fd;
-} libusbx_testlib_ctx;
+} libusb_testlib_ctx;
 
 /**
  * Logs some test information or state
  */
-void libusbx_testlib_logf(libusbx_testlib_ctx * ctx, 
+void libusb_testlib_logf(libusb_testlib_ctx * ctx, 
                           const char* fmt, ...);
 
 /**
- * Function pointer for a libusbx test function.
+ * Function pointer for a libusb test function.
  *
  * Should return TEST_STATUS_SUCCESS on success or another TEST_STATUS value.
  */
-typedef libusbx_testlib_result
-(*libusbx_testlib_test_function)(libusbx_testlib_ctx * ctx);
+typedef libusb_testlib_result
+(*libusb_testlib_test_function)(libusb_testlib_ctx * ctx);
 
 /**
  * Structure holding a test description.
@@ -80,14 +80,14 @@ typedef struct {
 	/** Human readable name of the test. */
 	const char * name;
 	/** The test library will call this function to run the test. */
-	libusbx_testlib_test_function function;
-} libusbx_testlib_test;
+	libusb_testlib_test_function function;
+} libusb_testlib_test;
 
 /**
  * Value to use at the end of a test array to indicate the last
  * element.
  */
-#define LIBUSBX_NULL_TEST {NULL, NULL}
+#define LIBUSB_NULL_TEST {NULL, NULL}
 
 /**
  * Runs the tests provided.
@@ -100,8 +100,8 @@ typedef struct {
  * \param tests A NULL_TEST terminated array of tests
  * \return 0 on success, non-zero on failure
  */
-int libusbx_testlib_run_tests(int argc,
+int libusb_testlib_run_tests(int argc,
                               char ** argv,
-                              const libusbx_testlib_test * tests);
+                              const libusb_testlib_test * tests);
 
-#endif //LIBUSBX_TESTLIB_H
+#endif //LIBUSB_TESTLIB_H

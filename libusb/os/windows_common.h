@@ -1,5 +1,5 @@
 /*
- * Windows backend common header for libusbx 1.0
+ * Windows backend common header for libusb 1.0
  *
  * This file brings together header code common between
  * the desktop Windows and Windows CE backends.

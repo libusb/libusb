@@ -35,7 +35,7 @@ static size_t usbi_locale = 0;
  * How to add a new \ref libusb_strerror() translation:
  * <ol>
  * <li> Download the latest \c strerror.c from:<br>
- *      https://raw.github.com/libusbx/libusbx/master/libusb/sterror.c </li>
+ *      https://raw.github.com/libusb/libusb/master/libusb/sterror.c </li>
  * <li> Open the file in an UTF-8 capable editor </li>
  * <li> Add the 2 letter <a href="http://en.wikipedia.org/wiki/List_of_ISO_639-1_codes">ISO 639-1</a>
  *      code for your locale at the end of \c usbi_locale_supported[]<br>
@@ -53,7 +53,7 @@ static size_t usbi_locale = 0;
  *     }
  * };\endcode </li>
  * <li> Translate each of the English messages from the section you copied into your language </li>
- * <li> Save the file (in UTF-8 format) and send it to \c libusbx-devel\@lists.sourceforge.net </li>
+ * <li> Save the file (in UTF-8 format) and send it to \c libusb-devel\@lists.sourceforge.net </li>
  * </ol>
  */
 

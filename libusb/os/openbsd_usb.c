@@ -700,7 +700,7 @@ _sync_control_transfer(struct usbi_transfer *itransfer)
 	req.ucr_addr = transfer->dev_handle->dev->device_address;
 	req.ucr_request.bmRequestType = setup->bmRequestType;
 	req.ucr_request.bRequest = setup->bRequest;
-	/* Don't use USETW, libusbx already deals with the endianness */
+	/* Don't use USETW, libusb already deals with the endianness */
 	(*(uint16_t *)req.ucr_request.wValue) = setup->wValue;
 	(*(uint16_t *)req.ucr_request.wIndex) = setup->wIndex;
 	(*(uint16_t *)req.ucr_request.wLength) = setup->wLength;

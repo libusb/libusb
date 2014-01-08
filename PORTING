@@ -1,15 +1,15 @@
-PORTING LIBUSBX TO OTHER PLATFORMS
+PORTING LIBUSB TO OTHER PLATFORMS
 
 Introduction
 ============
 
-This document is aimed at developers wishing to port libusbx to unsupported
-platforms. I believe the libusbx API is OS-independent, so by supporting
+This document is aimed at developers wishing to port libusb to unsupported
+platforms. I believe the libusb API is OS-independent, so by supporting
 multiple operating systems we pave the way for cross-platform USB device
 drivers.
 
 Implementation-wise, the basic idea is that you provide an interface to
-libusbx's internal "backend" API, which performs the appropriate operations on
+libusb's internal "backend" API, which performs the appropriate operations on
 your target platform.
 
 In terms of USB I/O, your backend provides functionality to submit
@@ -27,16 +27,16 @@ e.g. setting configuration, obtaining descriptors, etc.
 File descriptors for I/O polling
 ================================
 
-For libusbx to work, your event handling function obviously needs to be called
+For libusb to work, your event handling function obviously needs to be called
 at various points in time. Your backend must provide a set of file descriptors
-which libusbx and its users can pass to poll() or select() to determine when
+which libusb and its users can pass to poll() or select() to determine when
 it is time to call the event handling function.
 
 On Linux, this is easy: the usbfs kernel interface exposes a file descriptor
 which can be passed to poll(). If something similar is not true for your
 platform, you can emulate this using an internal library thread to reap I/O as
 necessary, and a pipe() with the main library to raise events. The file
-descriptor of the pipe can then be provided to libusbx as an event source.
+descriptor of the pipe can then be provided to libusb as an event source.
 
 
 Interface semantics and documentation
@@ -46,7 +46,7 @@ Documentation of the backend interface can be found in libusbi.h inside the
 usbi_os_backend structure definition.
 
 Your implementations of these functions will need to call various internal
-libusbx functions, prefixed with "usbi_". Documentation for these functions
+libusb functions, prefixed with "usbi_". Documentation for these functions
 can be found in the .c files where they are implemented.
 
 You probably want to skim over *all* the documentation before starting your
@@ -72,18 +72,18 @@ right usbi_backend for your platform.
 
 4. Produce and test your implementation.
 
-5. Send your implementation to libusbx-devel mailing list.
+5. Send your implementation to libusb-devel mailing list.
 
 
 Implementation difficulties? Questions?
 =======================================
 
-If you encounter difficulties porting libusbx to your platform, please raise
-these issues on the libusbx-devel mailing list. Where possible and sensible, I
-am interested in solving problems preventing libusbx from operating on other
+If you encounter difficulties porting libusb to your platform, please raise
+these issues on the libusb-devel mailing list. Where possible and sensible, I
+am interested in solving problems preventing libusb from operating on other
 platforms.
 
-The libusbx-devel mailing list is also a good place to ask questions and
+The libusb-devel mailing list is also a good place to ask questions and
 make suggestions about the internal API. Hopefully we can produce some
 better documentation based on your questions and other input.
 

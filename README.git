@@ -1,7 +1,7 @@
 Notes related to git compilation:
 --------------------------------
 
-If you retrieved the libusbx repository from git and are using a gcc based
+If you retrieved the libusb repository from git and are using a gcc based
 toolchain, be mindful that you should have the autotools installed (autoconf,
 automake) and will need to run either ./autogen.sh or ./bootstrap.sh to produce
 the configure file.
@@ -22,20 +22,20 @@ libtoolize or glibtoolize was not found! Please install libtool.
 
 To proceed, you must find and install it from somewhere.
 
-Alternatively, you can use the Xcode project at Xcode/libusbx.xcodeproj.
+Alternatively, you can use the Xcode project at Xcode/libusb.xcodeproj.
 
 Notes related to submitting new developments:
 --------------------------------------------
 
-If you submit a new development to libusbx (eg: new backend), that is unlikely
+If you submit a new development to libusb (eg: new backend), that is unlikely
 to fit in a couple of small patches, we would kindly suggest that you create a
 public account on github, if you don't have one already, and then fork a new
-libusbx repository under this account from https://github.com/libusbx/libusbx.
+libusb repository under this account from https://github.com/libusb/libusb.
 
 Then you can create a git branch for your work, that we will be able to better
 reference and test. 
 
 We also suggest that, if you are planning to bring in a large development, you
-try to involve the libusbx community early by letting the mailing list know, as
+try to involve the libusb community early by letting the mailing list know, as
 you may find that other people might be eager to help you out. 
-See http://mailing-list.libusbx.org for details on how to join the mailing list.
+See http://mailing-list.libusb.info for details on how to join the mailing list.

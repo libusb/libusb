@@ -1,5 +1,5 @@
 /*
- * windows backend for libusbx 1.0
+ * windows backend for libusb 1.0
  * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
@@ -805,10 +805,10 @@ static void auto_release(struct usbi_transfer *itransfer)
 }
 
 /*
- * init: libusbx backend init function
+ * init: libusb backend init function
  *
  * This function enumerates the HCDs (Host Controller Drivers) and populates our private HCD list
- * In our implementation, we equate Windows' "HCD" to libusbx's "bus". Note that bus is zero indexed.
+ * In our implementation, we equate Windows' "HCD" to libusb's "bus". Note that bus is zero indexed.
  * HCDs are not expected to change after init (might not hold true for hot pluggable USB PCI card?)
  */
 static int windows_init(struct libusb_context *ctx)
@@ -1085,7 +1085,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 }
 
 /*
- * Populate a libusbx device structure
+ * Populate a libusb device structure
  */
 static int init_device(struct libusb_device* dev, struct libusb_device* parent_dev,
 					   uint8_t port_number, char* device_id, DWORD devinst)
@@ -1339,7 +1339,7 @@ static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* d
 }
 
 /*
- * get_device_list: libusbx backend device enumeration function
+ * get_device_list: libusb backend device enumeration function
  */
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs)
 {
@@ -1489,7 +1489,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				if (!pSetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_DRIVER,
 					&reg_type, (BYTE*)strbuf, size, &size)) {
 						usbi_info(ctx, "The following device has no driver: '%s'", dev_id_path);
-						usbi_info(ctx, "libusbx will not be able to access it.");
+						usbi_info(ctx, "libusb will not be able to access it.");
 				}
 				// ...and to add the additional device interface GUIDs
 				key = pSetupDiOpenDevRegKey(dev_info, &dev_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
@@ -1696,7 +1696,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 }
 
 /*
- * exit: libusbx backend deinitialization function
+ * exit: libusb backend deinitialization function
  */
 static void windows_exit(void)
 {
@@ -4317,7 +4317,7 @@ static int composite_submit_control_transfer(int sub_api, struct usbi_transfer *
 		}
 	}
 
-	usbi_err(ctx, "no libusbx supported interfaces to complete request");
+	usbi_err(ctx, "no libusb supported interfaces to complete request");
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 

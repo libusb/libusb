@@ -43,7 +43,7 @@
 #define false (!true)
 #endif
 
-// Future versions of libusbx will use usb_interface instead of interface
+// Future versions of libusb will use usb_interface instead of interface
 // in libusb_config_descriptor => catter for that
 #define usb_interface interface
 
@@ -1089,7 +1089,7 @@ int main(int argc, char** argv)
 	}
 
 	version = libusb_get_version();
-	printf("Using libusbx v%d.%d.%d.%d\n\n", version->major, version->minor, version->micro, version->nano);
+	printf("Using libusb v%d.%d.%d.%d\n\n", version->major, version->minor, version->micro, version->nano);
 	r = libusb_init(NULL);
 	if (r < 0)
 		return r;

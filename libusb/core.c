@@ -1,6 +1,6 @@
 /* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
- * Core functions for libusbx
+ * Core functions for libusb
  * Copyright © 2012-2013 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
@@ -63,7 +63,7 @@ const struct usbi_os_backend * const usbi_backend = &wince_backend;
 struct libusb_context *usbi_default_context = NULL;
 static const struct libusb_version libusb_version_internal =
 	{ LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO,
-	  LIBUSB_RC, "http://libusbx.org" };
+	  LIBUSB_RC, "http://libusb.info" };
 static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 static struct timeval timestamp_origin = { 0, 0 };
@@ -72,18 +72,18 @@ usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
 struct list_head active_contexts_list;
 
 /**
- * \mainpage libusbx-1.0 API Reference
+ * \mainpage libusb-1.0 API Reference
  *
  * \section intro Introduction
  *
- * libusbx is an open source library that allows you to communicate with USB
+ * libusb is an open source library that allows you to communicate with USB
  * devices from userspace. For more info, see the
- * <a href="http://libusbx.org">libusbx homepage</a>.
+ * <a href="http://libusb.info">libusb homepage</a>.
  *
  * This documentation is aimed at application developers wishing to
  * communicate with USB peripherals from their own software. After reviewing
  * this documentation, feedback and questions can be sent to the
- * <a href="http://mailing-list.libusbx.org">libusbx-devel mailing list</a>.
+ * <a href="http://mailing-list.libusb.info">libusb-devel mailing list</a>.
  *
  * This documentation assumes knowledge of how to operate USB devices from
  * a software standpoint (descriptors, configurations, interfaces, endpoints,
@@ -107,25 +107,25 @@ struct list_head active_contexts_list;
  * \section gettingstarted Getting Started
  *
  * To begin reading the API documentation, start with the Modules page which
- * links to the different categories of libusbx's functionality.
+ * links to the different categories of libusb's functionality.
  *
  * One decision you will have to make is whether to use the synchronous
  * or the asynchronous data transfer interface. The \ref io documentation
  * provides some insight into this topic.
  *
- * Some example programs can be found in the libusbx source distribution under
- * the "examples" subdirectory. The libusbx homepage includes a list of
- * real-life project examples which use libusbx.
+ * Some example programs can be found in the libusb source distribution under
+ * the "examples" subdirectory. The libusb homepage includes a list of
+ * real-life project examples which use libusb.
  *
  * \section errorhandling Error handling
  *
- * libusbx functions typically return 0 on success or a negative error code
+ * libusb functions typically return 0 on success or a negative error code
  * on failure. These negative error codes relate to LIBUSB_ERROR constants
  * which are listed on the \ref misc "miscellaneous" documentation page.
  *
  * \section msglog Debug message logging
  *
- * libusbx uses stderr for all logging. By default, logging is set to NONE,
+ * libusb uses stderr for all logging. By default, logging is set to NONE,
  * which means that no output will be produced. However, unless the library
  * has been compiled with logging disabled, then any application calls to
  * libusb_set_debug(), or the setting of the environmental variable
@@ -134,19 +134,19 @@ struct list_head active_contexts_list;
  * direct it to the null device if its output is undesireable.
  *
  * The libusb_set_debug() function can be used to enable logging of certain
- * messages. Under standard configuration, libusbx doesn't really log much
+ * messages. Under standard configuration, libusb doesn't really log much
  * so you are advised to use this function to enable all error/warning/
  * informational messages. It will help debug problems with your software.
  *
  * The logged messages are unstructured. There is no one-to-one correspondence
  * between messages being logged and success or failure return codes from
- * libusbx functions. There is no format to the messages, so you should not
+ * libusb functions. There is no format to the messages, so you should not
  * try to capture or parse them. They are not and will not be localized.
  * These messages are not intended to being passed to your application user;
- * instead, you should interpret the error codes returned from libusbx functions
+ * instead, you should interpret the error codes returned from libusb functions
  * and provide appropriate notification to the user. The messages are simply
  * there to aid you as a programmer, and if you're confused because you're
- * getting a strange error code from a libusbx function, enabling message
+ * getting a strange error code from a libusb function, enabling message
  * logging may give you a suitable explanation.
  *
  * The LIBUSB_DEBUG environment variable can be used to enable message logging
@@ -155,18 +155,18 @@ struct list_head active_contexts_list;
  * environment variable is set, the message logging verbosity level is fixed
  * and libusb_set_debug() effectively does nothing.
  *
- * libusbx can be compiled without any logging functions, useful for embedded
+ * libusb can be compiled without any logging functions, useful for embedded
  * systems. In this case, libusb_set_debug() and the LIBUSB_DEBUG environment
  * variable have no effects.
  *
- * libusbx can also be compiled with verbose debugging messages always. When
+ * libusb can also be compiled with verbose debugging messages always. When
  * the library is compiled in this way, all messages of all verbosities are
  * always logged. libusb_set_debug() and the LIBUSB_DEBUG environment variable
  * have no effects.
  *
  * \section remarks Other remarks
  *
- * libusbx does have imperfections. The \ref caveats "caveats" page attempts
+ * libusb does have imperfections. The \ref caveats "caveats" page attempts
  * to document these.
  */
 
@@ -181,7 +181,7 @@ struct list_head active_contexts_list;
  * reset).
  *
  * The problem is that any other program could reset the device your program
- * is working with, at any time. libusbx does not offer a mechanism to inform
+ * is working with, at any time. libusb does not offer a mechanism to inform
  * you when this has happened, so if someone else resets your device it will
  * not be clear to your own program why the device state has changed.
  *
@@ -206,7 +206,7 @@ struct list_head active_contexts_list;
  *
  * \section configsel Configuration selection and handling
  *
- * When libusbx presents a device handle to an application, there is a chance
+ * When libusb presents a device handle to an application, there is a chance
  * that the corresponding device may be in unconfigured state. For devices
  * with multiple configurations, there is also a chance that the configuration
  * currently selected is not the one that the application wants to use.
@@ -217,13 +217,13 @@ struct list_head active_contexts_list;
  * -# If the device is already in the desired configuration, calling
  *    libusb_set_configuration() using the same configuration value will cause
  *    a lightweight device reset. This may not be desirable behaviour.
- * -# libusbx will be unable to change configuration if the device is in
+ * -# libusb will be unable to change configuration if the device is in
  *    another configuration and other programs or drivers have claimed
  *    interfaces under that configuration.
- * -# In the case where the desired configuration is already active, libusbx
+ * -# In the case where the desired configuration is already active, libusb
  *    may not even be able to perform a lightweight device reset. For example,
  *    take my USB keyboard with fingerprint reader: I'm interested in driving
- *    the fingerprint reader interface through libusbx, but the kernel's
+ *    the fingerprint reader interface through libusb, but the kernel's
  *    USB-HID driver will almost always have claimed the keyboard interface.
  *    Because the kernel has claimed an interface, it is not even possible to
  *    perform the lightweight device reset, so libusb_set_configuration() will
@@ -263,13 +263,13 @@ if (cfg != desired)
  * considerations apply to Darwin or other platforms.
  *
  * When a transfer completes early (i.e. when less data is received/sent in
- * any one packet than the transfer buffer allows for) then libusbx is designed
+ * any one packet than the transfer buffer allows for) then libusb is designed
  * to terminate the transfer immediately, not transferring or receiving any
  * more data unless other transfers have been queued by the user.
  *
- * On legacy platforms, libusbx is unable to do this in all situations. After
+ * On legacy platforms, libusb is unable to do this in all situations. After
  * the incomplete packet occurs, "surplus" data may be transferred. For recent
- * versions of libusbx, this information is kept (the data length of the
+ * versions of libusb, this information is kept (the data length of the
  * transfer is updated) and, for device-to-host transfers, any surplus data was
  * added to the buffer. Still, this is not a nice solution because it loses the
  * information about the end of the short packet, and the user probably wanted
@@ -278,7 +278,7 @@ if (cfg != desired)
  *
  * \section zlp Zero length packets
  *
- * - libusbx is able to send a packet of zero length to an endpoint simply by
+ * - libusb is able to send a packet of zero length to an endpoint simply by
  * submitting a transfer of zero length.
  * - The \ref libusb_transfer_flags::LIBUSB_TRANSFER_ADD_ZERO_PACKET
  * "LIBUSB_TRANSFER_ADD_ZERO_PACKET" flag is currently only supported on Linux.
@@ -287,24 +287,24 @@ if (cfg != desired)
 /**
  * \page contexts Contexts
  *
- * It is possible that libusbx may be used simultaneously from two independent
+ * It is possible that libusb may be used simultaneously from two independent
  * libraries linked into the same executable. For example, if your application
  * has a plugin-like system which allows the user to dynamically load a range
  * of modules into your program, it is feasible that two independently
- * developed modules may both use libusbx.
+ * developed modules may both use libusb.
  *
- * libusbx is written to allow for these multiple user scenarios. The two
- * "instances" of libusbx will not interfere: libusb_set_debug() calls
+ * libusb is written to allow for these multiple user scenarios. The two
+ * "instances" of libusb will not interfere: libusb_set_debug() calls
  * from one user will not affect the same settings for other users, other
- * users can continue using libusbx after one of them calls libusb_exit(), etc.
+ * users can continue using libusb after one of them calls libusb_exit(), etc.
  *
- * This is made possible through libusbx's <em>context</em> concept. When you
+ * This is made possible through libusb's <em>context</em> concept. When you
  * call libusb_init(), you are (optionally) given a context. You can then pass
- * this context pointer back into future libusbx functions.
+ * this context pointer back into future libusb functions.
  *
  * In order to keep things simple for more simplistic applications, it is
  * legal to pass NULL to all functions requiring a context pointer (as long as
- * you're sure no other code will attempt to use libusbx from the same process).
+ * you're sure no other code will attempt to use libusb from the same process).
  * When you pass NULL, the default context will be used. The default context
  * is created the first time a process calls libusb_init() when no other
  * context is alive. Contexts are destroyed during libusb_exit().
@@ -317,17 +317,17 @@ if (cfg != desired)
  * reference count goes from 0 to 1, and is deinitialized and destroyed when
  * its reference count goes from 1 to 0.
  *
- * You may be wondering why only a subset of libusbx functions require a
- * context pointer in their function definition. Internally, libusbx stores
+ * You may be wondering why only a subset of libusb functions require a
+ * context pointer in their function definition. Internally, libusb stores
  * context pointers in other objects (e.g. libusb_device instances) and hence
  * can infer the context from those objects.
  */
 
 /**
  * @defgroup lib Library initialization/deinitialization
- * This page details how to initialize and deinitialize libusbx. Initialization
- * must be performed before using any libusbx functionality, and similarly you
- * must not call any libusbx functions after deinitialization.
+ * This page details how to initialize and deinitialize libusb. Initialization
+ * must be performed before using any libusb functionality, and similarly you
+ * must not call any libusb functions after deinitialization.
  */
 
 /**
@@ -384,7 +384,7 @@ libusb_free_device_list(list, 1);
  * device.
  *
  * \section devshandles Devices and device handles
- * libusbx has a concept of a USB device, represented by the
+ * libusb has a concept of a USB device, represented by the
  * \ref libusb_device opaque type. A device represents a USB device that
  * is currently or was previously connected to the system. Using a reference
  * to a device, you can determine certain information about the device (e.g.
@@ -400,8 +400,8 @@ libusb_free_device_list(list, 1);
  * using the device.
  *
  * When you've found a device that you'd like to operate, you must ask
- * libusbx to open the device using the libusb_open() function. Assuming
- * success, libusbx then returns you a <em>device handle</em>
+ * libusb to open the device using the libusb_open() function. Assuming
+ * success, libusb then returns you a <em>device handle</em>
  * (a \ref libusb_device_handle pointer). All "real" I/O operations then
  * operate on the handle rather than the original device pointer.
  *
@@ -409,10 +409,10 @@ libusb_free_device_list(list, 1);
  *
  * Device discovery (i.e. calling libusb_get_device_list()) returns a
  * freshly-allocated list of devices. The list itself must be freed when
- * you are done with it. libusbx also needs to know when it is OK to free
+ * you are done with it. libusb also needs to know when it is OK to free
  * the contents of the list - the devices themselves.
  *
- * To handle these issues, libusbx provides you with two separate items:
+ * To handle these issues, libusb provides you with two separate items:
  * - A function to free the list itself
  * - A reference counting system for the devices inside
  *
@@ -608,7 +608,7 @@ int usbi_sanitize_device(struct libusb_device *dev)
 	return 0;
 }
 
-/* Examine libusbx's internal list of known devices, looking for one with
+/* Examine libusb's internal list of known devices, looking for one with
  * a specific session ID. Returns the matching device if it was found, and
  * NULL otherwise. */
 struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
@@ -763,7 +763,7 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
 /** \ingroup dev
  * Get the list of all port numbers from root for the specified device
  *
- * Since version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102
+ * Since version 1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102
  * \param dev a device
  * \param port_numbers the array that should contain the port numbers
  * \param port_numbers_len the maximum length of the array. As per the USB 3.0
@@ -811,7 +811,7 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
  * \returns the device parent or NULL if not available
  * You should issue a \ref libusb_get_device_list() before calling this
  * function and make sure that you only access the parent before issuing
- * \ref libusb_free_device_list(). The reason is that libusbx currently does
+ * \ref libusb_free_device_list(). The reason is that libusb currently does
  * not maintain a permanent list of device instances, and therefore can
  * only guarantee that parents are fully instantiated within a 
  * libusb_get_device_list() - libusb_free_device_list() block.
@@ -1120,7 +1120,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	/* At this point, we want to interrupt any existing event handlers so
 	 * that they realise the addition of the new device's poll fd. One
 	 * example when this is desirable is if the user is running a separate
-	 * dedicated libusbx events handling thread, which is running with a long
+	 * dedicated libusb events handling thread, which is running with a long
 	 * or infinite timeout. We want to interrupt that iteration of the loop,
 	 * so that it picks up the new fd, and then continues. */
 	usbi_fd_notification(ctx);
@@ -1131,7 +1131,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 /** \ingroup dev
  * Convenience function for finding a device with a particular
  * <tt>idVendor</tt>/<tt>idProduct</tt> combination. This function is intended
- * for those scenarios where you are using libusbx to knock up a quick test
+ * for those scenarios where you are using libusb to knock up a quick test
  * application - it allows you to avoid calling libusb_get_device_list() and
  * worrying about traversing/freeing the list.
  *
@@ -1425,7 +1425,7 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev,
  * you wish to use before you can perform I/O on any of its endpoints.
  *
  * It is legal to attempt to claim an already-claimed interface, in which
- * case libusbx just returns 0 without doing anything.
+ * case libusb just returns 0 without doing anything.
  *
  * If auto_detach_kernel_driver is set to 1 for <tt>dev</tt>, the kernel driver
  * will be detached if necessary, on failure the detach error is returned.
@@ -1617,7 +1617,7 @@ int API_EXPORTED libusb_reset_device(libusb_device_handle *dev)
 
 /** \ingroup dev
  * Determine if a kernel driver is active on an interface. If a kernel driver
- * is active, you cannot claim the interface, and libusbx will be unable to
+ * is active, you cannot claim the interface, and libusb will be unable to
  * perform I/O.
  *
  * This functionality is not available on Windows.
@@ -1652,7 +1652,7 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev,
  *
  * This functionality is not available on Darwin or Windows.
  *
- * Note that libusbx itself also talks to the device through a special kernel
+ * Note that libusb itself also talks to the device through a special kernel
  * driver, if this driver is already attached to the device, this call will
  * not detach it and return LIBUSB_ERROR_NOT_FOUND.
  *
@@ -1716,15 +1716,15 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
 }
 
 /** \ingroup dev
- * Enable/disable libusbx's automatic kernel driver detachment. When this is
- * enabled libusbx will automatically detach the kernel driver on an interface
+ * Enable/disable libusb's automatic kernel driver detachment. When this is
+ * enabled libusb will automatically detach the kernel driver on an interface
  * when claiming the interface, and attach it when releasing the interface.
  *
  * Automatic kernel driver detachment is disabled on newly opened device
  * handles by default.
  *
  * On platforms which do not have LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER
- * this function will return LIBUSB_ERROR_NOT_SUPPORTED, and libusbx will
+ * this function will return LIBUSB_ERROR_NOT_SUPPORTED, and libusb will
  * continue as if this function was never called.
  *
  * \param dev a device handle
@@ -1754,19 +1754,19 @@ int API_EXPORTED libusb_set_auto_detach_kernel_driver(
  * printed. If you choose to increase the message verbosity level, ensure
  * that your application does not close the stdout/stderr file descriptors.
  *
- * You are advised to use level LIBUSB_LOG_LEVEL_WARNING. libusbx is conservative
+ * You are advised to use level LIBUSB_LOG_LEVEL_WARNING. libusb is conservative
  * with its message logging and most of the time, will only log messages that
  * explain error conditions and other oddities. This will help you debug
  * your software.
  *
- * If the LIBUSB_DEBUG environment variable was set when libusbx was
+ * If the LIBUSB_DEBUG environment variable was set when libusb was
  * initialized, this function does nothing: the message verbosity is fixed
  * to the value in the environment variable.
  *
- * If libusbx was compiled without any message logging, this function does
+ * If libusb was compiled without any message logging, this function does
  * nothing: you'll never get any messages.
  *
- * If libusbx was compiled with verbose debug message logging, this function
+ * If libusb was compiled with verbose debug message logging, this function
  * does nothing: you'll always get messages from all levels.
  *
  * \param ctx the context to operate on, or NULL for the default context
@@ -1781,7 +1781,7 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 
 /** \ingroup lib
  * Initialize libusb. This function must be called before calling any other
- * libusbx function.
+ * libusb function.
  *
  * If you do not provide an output location for a context pointer, a default
  * context will be created. If there was already a default context, it will
@@ -1836,7 +1836,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 		usbi_dbg("created default context");
 	}
 
-	usbi_dbg("libusbx v%d.%d.%d.%d", libusb_version_internal.major, libusb_version_internal.minor,
+	usbi_dbg("libusb v%d.%d.%d.%d", libusb_version_internal.major, libusb_version_internal.minor,
 		libusb_version_internal.micro, libusb_version_internal.nano);
 
 	usbi_mutex_init(&ctx->usb_devs_lock, NULL);
@@ -2152,11 +2152,11 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 
 	if (global_debug) {
 		header_len = snprintf(buf, sizeof(buf),
-			"[%2d.%06d] [%08x] libusbx: %s [%s] ",
+			"[%2d.%06d] [%08x] libusb: %s [%s] ",
 			(int)now.tv_sec, (int)now.tv_usec, usbi_get_tid(), prefix, function);
 	} else {
 		header_len = snprintf(buf, sizeof(buf),
-			"libusbx: %s [%s] ", prefix, function);
+			"libusb: %s [%s] ", prefix, function);
 	}
 
 	if (header_len < 0 || header_len >= sizeof(buf)) {
@@ -2193,7 +2193,7 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 }
 
 /** \ingroup misc
- * Returns a constant NULL-terminated string with the ASCII name of a libusbx
+ * Returns a constant NULL-terminated string with the ASCII name of a libusb
  * error or transfer status code. The caller must not free() the returned
  * string.
  *

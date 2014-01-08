@@ -1,5 +1,5 @@
 /*
- * libusbx synchronization on Microsoft Windows
+ * libusb synchronization on Microsoft Windows
  *
  * Copyright © 2010 Michael Plante <michael.plante@gmail.com>
  *

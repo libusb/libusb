@@ -5,10 +5,10 @@ If you are compiling for MinGW or cygwin, please refer to the INSTALL file.
 
 If you are using Microsoft Visual Studio:
 - Open the relevant solution file in /msvc:
-  libusb.dsw for MSVC6, libusbx_2005.sln for Visual Studio 2005 or 2008,
-  libusbx_2010.sln for Visual Studio 2010,
-  libusbx_2012.sln for Visual Studio 2012 or later,
-  libusbx_wince.sln for Windows CE support in Visual Studio 2005.
+  libusb.dsw for MSVC6, libusb_2005.sln for Visual Studio 2005 or 2008,
+  libusb_2010.sln for Visual Studio 2010,
+  libusb_2012.sln for Visual Studio 2012 or later,
+  libusb_wince.sln for Windows CE support in Visual Studio 2005.
 - If you want to debug the library, uncomment the ENABLE_DEBUG_LOGGING define
   in msvc\config.h
 - Select your configuration and compile the project
@@ -51,13 +51,13 @@ If needed, these libraries can be obtained by installing either the latest
 Windows SDK or the DDK (Links provided at the end of this file).
 
 For Windows CE it is necessary to install the CE USB Kernel Wrapper driver for
-libusbx to function on a device.
+libusb to function on a device.
 
 Links
 *****
 
 Additional information related to the Windows backend:
-  http://windows.libusbx.org
+  http://windows.libusb.info
 
 Latest Windows Driver (Development) Kit (WDK):
   http://www.microsoft.com/downloads/details.aspx?displaylang=en&FamilyID=36a2630f-5d56-43b5-b996-7633f2ec14ff

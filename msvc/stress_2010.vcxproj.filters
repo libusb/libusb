@@ -18,7 +18,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\tests\libusbx_testlib.h">
+    <ClInclude Include="..\tests\libusb_testlib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

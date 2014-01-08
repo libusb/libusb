@@ -1,5 +1,5 @@
 /*
- * libusbx example program to list devices on the bus
+ * libusb example program to list devices on the bus
  * Copyright © 2007 Daniel Drake <dsd@gentoo.org>
  *
  * This library is free software; you can redistribute it and/or

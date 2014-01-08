@@ -1,5 +1,5 @@
 /*
- * Android build config for libusbx
+ * Android build config for libusb
  * Copyright © 2012-2013 RealVNC Ltd. <toby.gray@realvnc.com>
  *
  * This library is free software; you can redistribute it and/or

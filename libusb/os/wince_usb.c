@@ -1,5 +1,5 @@
 /*
- * Windows CE backend for libusbx 1.0
+ * Windows CE backend for libusb 1.0
  * Copyright © 2011-2013 RealVNC Ltd.
  * Large portions taken from Windows backend, which is
  * Copyright © 2009-2010 Pete Batard <pbatard@gmail.com>

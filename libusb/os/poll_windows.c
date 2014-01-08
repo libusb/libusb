@@ -22,7 +22,7 @@
  */
 
 /*
- * poll() and pipe() Windows compatibility layer for libusbx 1.0
+ * poll() and pipe() Windows compatibility layer for libusb 1.0
  *
  * The way this layer works is by using OVERLAPPED with async I/O transfers, as
  * OVERLAPPED have an associated event which is flagged for I/O completion.
@@ -252,7 +252,7 @@ void exit_polling(void)
 
 /*
  * Create a fake pipe.
- * As libusbx only uses pipes for signaling, all we need from a pipe is an
+ * As libusb only uses pipes for signaling, all we need from a pipe is an
  * event. To that extent, we create a single wfd and overlapped as a means
  * to access that event.
  */

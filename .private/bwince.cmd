@@ -12,7 +12,7 @@ set WINCE_TARGET_DIR=%WINCE_TARGET_DIR_BASE%\%DATE:/=-%
 set MSBUILD_CMD=msbuild.exe
 set MSBUILD_TARGET=Rebuild
 set MSBUILD_CONFIGURATION=Release
-set WINCE_SLN=msvc\libusbx_wince.sln
+set WINCE_SLN=msvc\libusb_wince.sln
 set PLATFORM_PREFIX=STANDARDSDK_500 (
 set PLATFORM_POSTFIX=)
 
@@ -21,9 +21,9 @@ set PWD=%~dp0
 cd ..
 
 mkdir %WINCE_TARGET_DIR%
-mkdir %WINCE_TARGET_DIR%\include\libusbx-1.0
+mkdir %WINCE_TARGET_DIR%\include\libusb-1.0
 copy libusb\libusb-1.0.def %WINCE_TARGET_DIR%
-copy libusb\libusb.h %WINCE_TARGET_DIR%\include\libusbx-1.0
+copy libusb\libusb.h %WINCE_TARGET_DIR%\include\libusb-1.0
 for %%A in (%WINCE_TARGET_ARCHES%) do mkdir %WINCE_TARGET_DIR%\%%A
 for %%A in (%WINCE_TARGET_ARCHES%) do mkdir %WINCE_TARGET_DIR%\%%A\static
 for %%A in (%WINCE_TARGET_ARCHES%) do mkdir %WINCE_TARGET_DIR%\%%A\dll

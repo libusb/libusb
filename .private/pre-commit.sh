@@ -12,12 +12,12 @@
 # fi
 #
 # NOTE: These versioning hooks are intended to be used *INTERNALLY* by the
-# libusbx development team and are NOT intended to solve versioning for any
+# libusb development team and are NOT intended to solve versioning for any
 # derivative branch, such as one you would create for private development.
 #
 # Should you wish to reuse these scripts for your own versioning, in your own
 # private branch, we kindly ask you to first set BRANCH_OFFSET to 60000, or
-# higher, as any offset below below 60000 is *RESERVED* for libusbx official
+# higher, as any offset below below 60000 is *RESERVED* for libusb official
 # usage.
 
 ################################################################################

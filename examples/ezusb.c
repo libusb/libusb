@@ -181,7 +181,7 @@ static bool ezusb_cpucs(libusb_device_handle *device, uint32_t addr, bool doRun)
 		RW_INTERNAL, addr & 0xFFFF, addr >> 16,
 		&data, 1, 1000);
 	if ((status != 1) &&
-		/* We may get an I/O error from libusbx as the device disappears */
+		/* We may get an I/O error from libusb as the device disappears */
 		((!doRun) || (status != LIBUSB_ERROR_IO)))
 	{
 		const char *mesg = "can't modify CPUCS";
@@ -208,7 +208,7 @@ static bool ezusb_fx3_jump(libusb_device_handle *device, uint32_t addr)
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
 		RW_INTERNAL, addr & 0xFFFF, addr >> 16,
 		NULL, 0, 1000);
-	/* We may get an I/O error from libusbx as the device disappears */
+	/* We may get an I/O error from libusb as the device disappears */
 	if ((status != 0) && (status != LIBUSB_ERROR_IO))
 	{
 		const char *mesg = "failed to send jump command";
@@ -457,7 +457,7 @@ static int parse_iic(FILE *image, void *context,
 		data_addr = (block_header[2] << 8) + block_header[3];
 		if (data_len > sizeof(data)) {
 			/* If this is ever reported as an error, switch to using malloc/realloc */
-			logerror("IIC data block too small - please report this error to libusbx.org\n");
+			logerror("IIC data block too small - please report this error to libusb.info\n");
 			return -1;
 		}
 		read_len = fread(data, 1, data_len, image);
@@ -699,7 +699,7 @@ exit:
 }
 
 /*
- * Load a firmware file into target RAM. device is the open libusbx
+ * Load a firmware file into target RAM. device is the open libusb
  * device, and the path is the name of the source file. Open the file,
  * parse the bytes, and write them in one or two phases.
  *

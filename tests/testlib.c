@@ -1,5 +1,5 @@
 /*
- * libusbx test library helper functions
+ * libusb test library helper functions
  * Copyright © 2012 Toby Gray <toby.gray@realvnc.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "libusbx_testlib.h"
+#include "libusb_testlib.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -53,7 +53,7 @@
 /**
  * Converts a test result code into a human readable string.
  */
-static const char* test_result_to_str(libusbx_testlib_result result)
+static const char* test_result_to_str(libusb_testlib_result result)
 {
 	switch (result) {
 	case TEST_STATUS_SUCCESS:
@@ -77,7 +77,7 @@ static void print_usage(int argc, char ** argv)
 	printf("   -v   Don't redirect STDERR/STDOUT during tests\n");
 }
 
-static void cleanup_test_output(libusbx_testlib_ctx * ctx)
+static void cleanup_test_output(libusb_testlib_ctx * ctx)
 {
 #ifndef DISABLE_STDOUT_REDIRECTION
 	if (!ctx->verbose) {
@@ -105,7 +105,7 @@ static void cleanup_test_output(libusbx_testlib_ctx * ctx)
  * Setup test output handles
  * \return zero on success, non-zero on failure
  */
-static int setup_test_output(libusbx_testlib_ctx * ctx)
+static int setup_test_output(libusb_testlib_ctx * ctx)
 {
 #ifndef DISABLE_STDOUT_REDIRECTION
 	/* Stop output to stdout and stderr from being displayed if using non-verbose output */
@@ -149,7 +149,7 @@ static int setup_test_output(libusbx_testlib_ctx * ctx)
 	return 0;
 }
 
-void libusbx_testlib_logf(libusbx_testlib_ctx * ctx,
+void libusb_testlib_logf(libusb_testlib_ctx * ctx,
 	const char* fmt, ...)
 {
 	va_list va;
@@ -160,9 +160,9 @@ void libusbx_testlib_logf(libusbx_testlib_ctx * ctx,
 	fflush(ctx->output_file);
 }
 
-int libusbx_testlib_run_tests(int argc,
+int libusb_testlib_run_tests(int argc,
 	char ** argv,
-	const libusbx_testlib_test * tests)
+	const libusb_testlib_test * tests)
 {
 	int run_count = 0;
 	int idx = 0;
@@ -172,8 +172,8 @@ int libusbx_testlib_run_tests(int argc,
 	int skip_count = 0;
 	int r, j;
 	size_t arglen;
-	libusbx_testlib_result test_result;
-	libusbx_testlib_ctx ctx;
+	libusb_testlib_result test_result;
+	libusb_testlib_ctx ctx;
 
 	/* Setup default mode of operation */
 	ctx.test_names = NULL;
@@ -227,7 +227,7 @@ int libusbx_testlib_run_tests(int argc,
 	/* Act on any options not related to running tests */
 	if (ctx.list_tests) {
 		while (tests[idx].function != NULL) {
-			libusbx_testlib_logf(&ctx, tests[idx].name);
+			libusb_testlib_logf(&ctx, tests[idx].name);
 			++idx;
 		}
 		cleanup_test_output(&ctx);
@@ -236,7 +236,7 @@ int libusbx_testlib_run_tests(int argc,
 
 	/* Run any requested tests */
 	while (tests[idx].function != NULL) {
-		const libusbx_testlib_test * test = &tests[idx];
+		const libusb_testlib_test * test = &tests[idx];
 		++idx;
 		if (ctx.test_count > 0) {
 			/* Filtering tests to run, check if this is one of them */
@@ -251,10 +251,10 @@ int libusbx_testlib_run_tests(int argc,
 				continue;
 			}
 		}
-		libusbx_testlib_logf(&ctx,
+		libusb_testlib_logf(&ctx,
 			"Starting test run: %s...", test->name);
 		test_result = test->function(&ctx);
-		libusbx_testlib_logf(&ctx,
+		libusb_testlib_logf(&ctx,
 			"%s (%d)",
 			test_result_to_str(test_result), test_result);
 		switch (test_result) {
@@ -265,12 +265,12 @@ int libusbx_testlib_run_tests(int argc,
 		}
 		++run_count;
 	}
-	libusbx_testlib_logf(&ctx, "---");
-	libusbx_testlib_logf(&ctx, "Ran %d tests", run_count);
-	libusbx_testlib_logf(&ctx, "Passed %d tests", pass_count);
-	libusbx_testlib_logf(&ctx, "Failed %d tests", fail_count);
-	libusbx_testlib_logf(&ctx, "Error in %d tests", error_count);
-	libusbx_testlib_logf(&ctx, "Skipped %d tests", skip_count);
+	libusb_testlib_logf(&ctx, "---");
+	libusb_testlib_logf(&ctx, "Ran %d tests", run_count);
+	libusb_testlib_logf(&ctx, "Passed %d tests", pass_count);
+	libusb_testlib_logf(&ctx, "Failed %d tests", fail_count);
+	libusb_testlib_logf(&ctx, "Error in %d tests", error_count);
+	libusb_testlib_logf(&ctx, "Skipped %d tests", skip_count);
 
 	cleanup_test_output(&ctx);
 	return pass_count != run_count;

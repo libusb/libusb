@@ -6,9 +6,9 @@ PWD=`pwd`
 cd ..
 date=`date +%Y.%m.%d`
 target=e:/dailies/$date
-mkdir -p $target/include/libusbx-1.0
+mkdir -p $target/include/libusb-1.0
 cp -v libusb/libusb-1.0.def $target
-cp -v libusb/libusb.h $target/include/libusbx-1.0
+cp -v libusb/libusb.h $target/include/libusb-1.0
 
 #
 # 32 bit binaries
