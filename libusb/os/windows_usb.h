@@ -40,6 +40,11 @@
 #define SPDRP_INSTALL_STATE	34
 #endif
 
+// Missing from MinGW
+#if !defined(FACILITY_SETUPAPI)
+#define FACILITY_SETUPAPI	15
+#endif
+
 #if defined(__CYGWIN__ )
 #define _stricmp stricmp
 // cygwin produces a warning unless these prototypes are defined
