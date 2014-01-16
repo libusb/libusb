@@ -43,36 +43,45 @@ win32 {
 }
 
 linux {
-    LIBS += -ludev
-
     SOURCES += \
-        $${SRC_DIR}/os/linux_usbfs.c \
-        $${SRC_DIR}/os/linux_udev.c
+        $${SRC_DIR}/os/linux_usbfs.c
 
     HEADERS += \
         $${SRC_DIR}/os/linux_usbfs.h
 
-    # Make all source files depend on config.h to ensure that it exists
-    libusb_sources.target = $(SOURCES)
-    libusb_sources.depends = config_header
-    QMAKE_EXTRA_TARGETS += libusb_sources
+    android {
+        INCLUDEPATH += $${PWD}/android
 
-    # Add a target to generate the config.h file using configure
-    config_header.target = $${PWD}/config.h
-    config_header.depends = bootstrap
-    config_header.commands = cd $${PWD} && ./configure
-    QMAKE_EXTRA_TARGETS += config_header
+        SOURCES += \
+            $${SRC_DIR}/os/linux_netlink.c
+    } else {
+        LIBS += -ludev
 
-    # Add a target for map the relative path to config.h to the absolute path to config.h
-    config_header_rel.target = $$relative_path($${PWD}/config.h, $${OUT_PWD})
-    config_header_rel.depends = config_header
-    QMAKE_EXTRA_TARGETS += config_header_rel
+        SOURCES += \
+            $${SRC_DIR}/os/linux_udev.c
 
-    # Add a target to generate the configure command using bootstrap.sh
-    bootstrap.target = $${PWD}/configure
-    bootstrap.depends = $${PWD}/bootstrap.sh $${PWD}/configure.ac
-    bootstrap.commands = cd $${PWD} && ./bootstrap.sh
-    QMAKE_EXTRA_TARGETS += bootstrap
+        # Make all source files depend on config.h to ensure that it exists
+        libusb_sources.target = $(SOURCES)
+        libusb_sources.depends = config_header
+        QMAKE_EXTRA_TARGETS += libusb_sources
+
+        # Add a target to generate the config.h file using configure
+        config_header.target = $${PWD}/config.h
+        config_header.depends = bootstrap
+        config_header.commands = cd $${PWD} && ./configure
+        QMAKE_EXTRA_TARGETS += config_header
+
+        # Add a target for map the relative path to config.h to the absolute path to config.h
+        config_header_rel.target = $$relative_path($${PWD}/config.h, $${OUT_PWD})
+        config_header_rel.depends = config_header
+        QMAKE_EXTRA_TARGETS += config_header_rel
+
+        # Add a target to generate the configure command using bootstrap.sh
+        bootstrap.target = $${PWD}/configure
+        bootstrap.depends = $${PWD}/bootstrap.sh $${PWD}/configure.ac
+        bootstrap.commands = cd $${PWD} && ./bootstrap.sh
+        QMAKE_EXTRA_TARGETS += bootstrap
+    }
 }
 
 macx {
