@@ -966,7 +966,7 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
  * function and make sure that you only access the parent before issuing
  * \ref libusb_free_device_list(). The reason is that libusb currently does
  * not maintain a permanent list of device instances, and therefore can
- * only guarantee that parents are fully instantiated within a 
+ * only guarantee that parents are fully instantiated within a
  * libusb_get_device_list() - libusb_free_device_list() block.
  */
 DEFAULT_VISIBILITY
@@ -1275,7 +1275,60 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	return 0;
 }
 
-/** \ingroup libusb_dev
+int API_EXPORTED libusb_open_fd(libusb_device *dev,
+    libusb_device_handle **handle, int fd)
+{
+    struct libusb_context *ctx = DEVICE_CTX(dev);
+    struct libusb_device_handle *_handle;
+    size_t priv_size = usbi_backend->device_handle_priv_size;
+    int r;
+    usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
+
+    if (!dev->attached) {
+        return LIBUSB_ERROR_NO_DEVICE;
+    }
+
+    _handle = malloc(sizeof(*_handle) + priv_size);
+    if (!_handle)
+        return LIBUSB_ERROR_NO_MEM;
+
+    r = usbi_mutex_init(&_handle->lock, NULL);
+    if (r) {
+        free(_handle);
+        return LIBUSB_ERROR_OTHER;
+    }
+
+    _handle->dev = libusb_ref_device(dev);
+    _handle->auto_detach_kernel_driver = 0;
+    _handle->claimed_interfaces = 0;
+    memset(&_handle->os_priv, 0, priv_size);
+
+    r = usbi_backend->open_fd(_handle, fd);
+    if (r < 0) {
+        usbi_dbg("open %d.%d returns %d", dev->bus_number, dev->device_address, r);
+        libusb_unref_device(dev);
+        usbi_mutex_destroy(&_handle->lock);
+        free(_handle);
+        return r;
+    }
+
+    usbi_mutex_lock(&ctx->open_devs_lock);
+    list_add(&_handle->list, &ctx->open_devs);
+    usbi_mutex_unlock(&ctx->open_devs_lock);
+    *handle = _handle;
+
+    /* At this point, we want to interrupt any existing event handlers so
+     * that they realise the addition of the new device's poll fd. One
+     * example when this is desirable is if the user is running a separate
+     * dedicated libusbx events handling thread, which is running with a long
+     * or infinite timeout. We want to interrupt that iteration of the loop,
+     * so that it picks up the new fd, and then continues. */
+    usbi_fd_notification(ctx);
+
+    return 0;
+}
+
+/** \ingroup dev
  * Convenience function for finding a device with a particular
  * <tt>idVendor</tt>/<tt>idProduct</tt> combination. This function is intended
  * for those scenarios where you are using libusb to knock up a quick test
