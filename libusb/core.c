@@ -1907,7 +1907,7 @@ err_unlock:
 void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 {
 	struct libusb_device *dev, *next;
-	struct timeval tv = { 0, };
+	struct timeval tv = { 0, 0 };
 
 	usbi_dbg("");
 	USBI_GET_CONTEXT(ctx);
