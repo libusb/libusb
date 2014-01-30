@@ -38,6 +38,10 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <time.h>
+#ifdef __ANDROID__
+#include <dirent.h>
+#include <sys/resource.h>
+#endif
 
 #include "libusbi.h"
 #include "linux_usbfs.h"
@@ -209,6 +213,73 @@ static int _open(const char *path, int flags)
 		return open(path, flags);
 }
 
+#ifdef __ANDROID__
+#define PROC_SELF_FD "/proc/self/fd"
+
+/* Android will likely require elevated permissions to open a USB device.
+ * If possible, duplicate an already opened file descriptor for the device. */
+static int _dup_open_fd(const char *path)
+{
+	struct stat status;
+	DIR *dir;
+	struct dirent *entry;
+	int fd = -1;
+
+	/* if file doesn't exist, don't bother trying to find an open file descriptor for it */
+	if (stat(path, &status) != 0)
+		return -1;
+
+	dir = opendir(PROC_SELF_FD);
+	if (dir) {
+		while ((entry = readdir(dir)) != NULL) {
+			char fullpath[PATH_MAX];
+			char filepath[PATH_MAX];
+			ssize_t len;
+
+			if (entry->d_type != DT_LNK)
+				continue;
+
+			if ((len = (ssize_t)snprintf(fullpath, sizeof(fullpath), "%s/%s", PROC_SELF_FD, entry->d_name)) < 0 ||
+			     len == sizeof(fullpath))
+				continue;
+
+			if (lstat(fullpath, &status) != 0 || status.st_size >= sizeof(filepath))
+				continue;
+
+			if ((len = readlink(fullpath, filepath, sizeof(filepath))) < 0 ||
+			     len == sizeof(filepath))
+				continue;
+			filepath[len] = '\0';
+
+			if (strcmp(path, filepath) != 0)
+				continue;
+
+			fd = atoi(entry->d_name);
+			if (fd >= 0)
+				fd = dup(fd);
+			break;
+		}
+		closedir(dir);
+	} else {
+		/* we don't have access to the directory holding a list of the open file descriptors, use brute force */
+		struct rlimit rlim = {0};
+		const ino_t device_inode = status.st_ino;
+		const int max_fd = (getrlimit(RLIMIT_NOFILE, &rlim) == 0) ? (int)rlim.rlim_cur : 1024;
+		int i;
+
+		/* loop through the possible file descriptors for this process and look for a matching inode */
+		for (i = 0; i < max_fd; i++) {
+			if (fstat(i, &status) == 0 && status.st_ino == device_inode) {
+				fd = dup(i);
+				break;
+			}
+		}
+	}
+
+	return fd;
+}
+#endif
+
 static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
@@ -224,6 +295,10 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 			usbfs_path, dev->bus_number, dev->device_address);
 
 	fd = _open(path, mode);
+#ifdef __ANDROID__
+	if (fd == -1)
+		fd = _dup_open_fd(path);
+#endif
 	if (fd != -1)
 		return fd; /* Success */
 
