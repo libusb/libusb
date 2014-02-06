@@ -785,7 +785,14 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct da
       ret = kIOUSBPipeStalled;
     }
 
-    if (kIOReturnSuccess != ret && try_unsuspend) {
+    if (kIOReturnSuccess != ret && !is_open) {
+      /* if the device descriptor request failed on the unopened device, try again with the device opened */
+      is_open = ((*device)->USBDeviceOpenSeize(device) == kIOReturnSuccess);
+      if (is_open)
+        continue;
+    }
+
+    if (kIOReturnSuccess != ret && is_open && try_unsuspend) {
       /* device may be suspended. unsuspend it and try again */
 #if DeviceVersion >= 320
       UInt32 info = 0;
@@ -799,9 +806,6 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct da
 #endif
 
       if (try_unsuspend) {
-        /* if the device descriptor request failed on the unopened device, try again with the device opened */
-        is_open = ((*device)->USBDeviceOpenSeize(device) == kIOReturnSuccess);
-
         /* try to unsuspend the device */
         ret2 = (*device)->USBDeviceSuspend (device, 0);
         if (kIOReturnSuccess != ret2) {
