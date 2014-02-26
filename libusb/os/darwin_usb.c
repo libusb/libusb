@@ -401,7 +401,8 @@ static void *darwin_event_thread_main (void *arg0) {
   pthread_exit (NULL);
 }
 
-static void _darwin_finalize(void) {
+/* cleanup function to destroy cached devices */
+static void __attribute__((destructor)) _darwin_finalize(void) {
   struct darwin_cached_device *dev, *next;
 
   usbi_mutex_lock(&darwin_cached_devices_lock);
@@ -413,7 +414,6 @@ static void _darwin_finalize(void) {
 
 static int darwin_init(struct libusb_context *ctx) {
   host_name_port_t host_self;
-  static int initted = 0;
   int rc;
 
   rc = darwin_scan_devices (ctx);
@@ -423,11 +423,6 @@ static int darwin_init(struct libusb_context *ctx) {
 
   if (OSAtomicIncrement32Barrier(&initCount) == 1) {
     /* create the clocks that will be used */
-
-    if (!initted) {
-      initted = 1;
-      atexit(_darwin_finalize);
-    }
 
     host_self = mach_host_self();
     host_get_clock_service(host_self, CALENDAR_CLOCK, &clock_realtime);
