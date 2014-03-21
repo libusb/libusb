@@ -24,6 +24,7 @@ DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
 
 // Optimizations in release.
 GCC_OPTIMIZATION_LEVEL = s
+LLVM_LTO = YES
 
 // Define NDEBUG so asserts go away in release.
 GCC_PREPROCESSOR_DEFINITIONS = $(inherited) NDEBUG=1
