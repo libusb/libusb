@@ -1604,7 +1604,7 @@ int usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
  * \param ctx the context to operate on, or NULL for the default context
  * \returns 0 if the lock was obtained successfully
  * \returns 1 if the lock was not obtained (i.e. another thread holds the lock)
- * \see \ref mtasync
+ * \ref mtasync
  */
 int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
 {
@@ -1646,7 +1646,7 @@ int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
  * as soon as possible.
  *
  * \param ctx the context to operate on, or NULL for the default context
- * \see \ref mtasync
+ * \ref mtasync
  */
 void API_EXPORTED libusb_lock_events(libusb_context *ctx)
 {
@@ -1661,7 +1661,7 @@ void API_EXPORTED libusb_lock_events(libusb_context *ctx)
  * on libusb_wait_for_event().
  *
  * \param ctx the context to operate on, or NULL for the default context
- * \see \ref mtasync
+ * \ref mtasync
  */
 void API_EXPORTED libusb_unlock_events(libusb_context *ctx)
 {
@@ -1696,7 +1696,7 @@ void API_EXPORTED libusb_unlock_events(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \returns 1 if event handling can start or continue
  * \returns 0 if this thread must give up the events lock
- * \see \ref fullstory "Multi-threaded I/O: the full story"
+ * \ref fullstory "Multi-threaded I/O: the full story"
  */
 int API_EXPORTED libusb_event_handling_ok(libusb_context *ctx)
 {
@@ -1724,7 +1724,7 @@ int API_EXPORTED libusb_event_handling_ok(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \returns 1 if a thread is handling events
  * \returns 0 if there are no threads currently handling events
- * \see \ref mtasync
+ * \ref mtasync
  */
 int API_EXPORTED libusb_event_handler_active(libusb_context *ctx)
 {
@@ -1761,7 +1761,7 @@ int API_EXPORTED libusb_event_handler_active(libusb_context *ctx)
  * locking.
  *
  * \param ctx the context to operate on, or NULL for the default context
- * \see \ref mtasync
+ * \ref mtasync
  */
 void API_EXPORTED libusb_lock_event_waiters(libusb_context *ctx)
 {
@@ -1772,7 +1772,7 @@ void API_EXPORTED libusb_lock_event_waiters(libusb_context *ctx)
 /** \ingroup poll
  * Release the event waiters lock.
  * \param ctx the context to operate on, or NULL for the default context
- * \see \ref mtasync
+ * \ref mtasync
  */
 void API_EXPORTED libusb_unlock_event_waiters(libusb_context *ctx)
 {
@@ -1803,7 +1803,7 @@ void API_EXPORTED libusb_unlock_event_waiters(libusb_context *ctx)
  * indicates unlimited timeout.
  * \returns 0 after a transfer completes or another thread stops event handling
  * \returns 1 if the timeout expired
- * \see \ref mtasync
+ * \ref mtasync
  */
 int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 {
@@ -2114,7 +2114,7 @@ static int get_next_timeout(libusb_context *ctx, struct timeval *tv,
  * timeval struct for non-blocking mode
  * \param completed pointer to completion integer to check, or NULL
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
- * \see \ref mtasync
+ * \ref mtasync
  */
 int API_EXPORTED libusb_handle_events_timeout_completed(libusb_context *ctx,
 	struct timeval *tv, int *completed)
@@ -2225,7 +2225,7 @@ int API_EXPORTED libusb_handle_events(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \param completed pointer to completion integer to check, or NULL
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
- * \see \ref mtasync
+ * \ref mtasync
  */
 int API_EXPORTED libusb_handle_events_completed(libusb_context *ctx,
 	int *completed)
@@ -2251,7 +2251,7 @@ int API_EXPORTED libusb_handle_events_completed(libusb_context *ctx,
  * \param tv the maximum time to block waiting for events, or zero for
  * non-blocking mode
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
- * \see \ref mtasync
+ * \ref mtasync
  */
 int API_EXPORTED libusb_handle_events_locked(libusb_context *ctx,
 	struct timeval *tv)
@@ -2295,7 +2295,7 @@ int API_EXPORTED libusb_handle_events_locked(libusb_context *ctx,
  * \returns 0 if you must call into libusb at times determined by
  * libusb_get_next_timeout(), or 1 if all timeout events are handled internally
  * or through regular activity on the file descriptors.
- * \see \ref pollmain "Polling libusb file descriptors for event handling"
+ * \ref pollmain "Polling libusb file descriptors for event handling"
  */
 int API_EXPORTED libusb_pollfds_handle_timeouts(libusb_context *ctx)
 {
