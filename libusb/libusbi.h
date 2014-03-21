@@ -700,7 +700,7 @@ struct usbi_os_backend {
 	 * (LE). If it returns the multi-byte values in host-endian format,
 	 * set the host_endian output parameter to "1".
 	 *
-	 * Return 0 on success or a LIBUSB_ERROR code on failure.
+	 * Return the length read on success or a LIBUSB_ERROR code on failure.
 	 */
 	int (*get_config_descriptor)(struct libusb_device *device,
 		uint8_t config_index, unsigned char *buffer, size_t len,

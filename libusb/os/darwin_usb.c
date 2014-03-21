@@ -523,7 +523,7 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
   if (ret != LIBUSB_SUCCESS)
     return ret;
 
-  return len;
+  return (int) len;
 }
 
 /* check whether the os has configured the device */
