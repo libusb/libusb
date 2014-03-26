@@ -184,6 +184,7 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	char path[PATH_MAX];
 	int fd;
+	int delay = 10000;
 
 	if (usbdev_names)
 		snprintf(path, PATH_MAX, "%s/usbdev%d.%d",
@@ -196,6 +197,18 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 	if (fd != -1)
 		return fd; /* Success */
 
+	if (errno == ENOENT) {
+		if (!silent) 
+			usbi_err(ctx, "File doesn't exist, wait %d ms and try again\n", delay/1000);
+   
+		/* Wait 10ms for USB device path creation.*/
+		usleep(delay);
+
+		fd = open(path, mode);
+		if (fd != -1)
+			return fd; /* Success */
+	}
+	
 	if (!silent) {
 		usbi_err(ctx, "libusb couldn't open USB device %s: %s",
 			 path, strerror(errno));

@@ -224,8 +224,32 @@ static int linux_netlink_parse(char *buffer, size_t len, int *detached, const ch
 
 	tmp = netlink_message_parse(buffer, len, "BUSNUM");
 	if (NULL == tmp) {
-		/* no bus number (likely a usb interface). ignore*/
-		return -1;
+		/* no bus number. try "DEVICE" */
+		tmp = netlink_message_parse(buffer, len, "DEVICE");
+		if (NULL == tmp) {
+			/* not usb. ignore */
+			return -1;
+		}
+		
+		/* Parse a device path such as /dev/bus/usb/003/004 */
+		char *pLastSlash = (char*)strrchr(tmp,'/');
+		if(NULL == pLastSlash) {
+			return -1;
+		}
+
+		*devaddr = strtoul(pLastSlash + 1, NULL, 10);
+		if (errno) {
+			errno = 0;
+			return -1;
+		}
+		
+		*busnum = strtoul(pLastSlash - 3, NULL, 10);
+		if (errno) {
+			errno = 0;
+			return -1;
+		}
+		
+		return 0;
 	}
 
 	*busnum = (uint8_t)(strtoul(tmp, NULL, 10) & 0xff);
