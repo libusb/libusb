@@ -147,7 +147,7 @@ int main(int argc, char*argv[])
 		return print_usage(-1);
 	}
 	if ((device_id != NULL) && (device_path != NULL)) {
-		logerror("only one of -d or -a can be specified\n");
+		logerror("only one of -d or -p can be specified\n");
 		return print_usage(-1);
 	}
 
