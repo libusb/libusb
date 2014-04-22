@@ -18,3 +18,4 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 PRODUCT_NAME = libusb-1.0.0
+LD_DYLIB_INSTALL_NAME = @rpath/libusb-1.0.0.dylib
