@@ -346,8 +346,8 @@ static void *darwin_event_thread_main (void *arg0) {
   /* create notifications for removed devices */
   kresult = IOServiceAddMatchingNotification (libusb_notification_port, kIOTerminatedNotification,
                                               IOServiceMatching(kIOUSBDeviceClassName),
-                                              (IOServiceMatchingCallback)darwin_devices_detached,
-                                              (void *)ctx, &libusb_rem_device_iterator);
+                                              darwin_devices_detached,
+                                              ctx, &libusb_rem_device_iterator);
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "could not add hotplug event source: %s", darwin_error_str (kresult));
@@ -358,8 +358,8 @@ static void *darwin_event_thread_main (void *arg0) {
   /* create notifications for attached devices */
   kresult = IOServiceAddMatchingNotification(libusb_notification_port, kIOFirstMatchNotification,
                                               IOServiceMatching(kIOUSBDeviceClassName),
-                                              (IOServiceMatchingCallback)darwin_devices_attached,
-                                              (void *)ctx, &libusb_add_device_iterator);
+                                              darwin_devices_attached,
+                                              ctx, &libusb_add_device_iterator);
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "could not add hotplug event source: %s", darwin_error_str (kresult));
@@ -429,7 +429,7 @@ static int darwin_init(struct libusb_context *ctx) {
     host_get_clock_service(host_self, SYSTEM_CLOCK, &clock_monotonic);
     mach_port_deallocate(mach_task_self(), host_self);
 
-    pthread_create (&libusb_darwin_at, NULL, darwin_event_thread_main, (void *)ctx);
+    pthread_create (&libusb_darwin_at, NULL, darwin_event_thread_main, ctx);
 
     pthread_mutex_lock (&libusb_darwin_at_mutex);
     while (!libusb_darwin_acfl)
