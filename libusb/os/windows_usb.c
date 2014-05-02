@@ -2019,6 +2019,8 @@ static int windows_submit_transfer(struct usbi_transfer *itransfer)
 		return submit_bulk_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		return submit_iso_transfer(itransfer);
+	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+		return LIBUSB_ERROR_NOT_SUPPORTED;
 	default:
 		usbi_err(TRANSFER_CTX(transfer), "unknown endpoint type %d", transfer->type);
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -2052,6 +2054,8 @@ static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		return windows_abort_transfers(itransfer);
+	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+		return LIBUSB_ERROR_NOT_SUPPORTED;
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "unknown endpoint type %d", transfer->type);
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -2111,6 +2115,8 @@ static void windows_handle_callback (struct usbi_transfer *itransfer, uint32_t i
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		windows_transfer_callback (itransfer, io_result, io_size);
 		break;
+	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+		return LIBUSB_ERROR_NOT_SUPPORTED;
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "unknown endpoint type %d", transfer->type);
 	}
@@ -2316,6 +2322,9 @@ const struct usbi_os_backend windows_backend = {
 	windows_set_interface_altsetting,
 	windows_clear_halt,
 	windows_reset_device,
+
+	NULL,				/* alloc_streams */
+	NULL,				/* free_streams */
 
 	windows_kernel_driver_active,
 	windows_detach_kernel_driver,

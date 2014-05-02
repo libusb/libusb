@@ -94,7 +94,10 @@ struct usbfs_urb {
 	int buffer_length;
 	int actual_length;
 	int start_frame;
-	int number_of_packets;
+	union {
+		int number_of_packets;	/* Only used for isoc urbs */
+		unsigned int stream_id;	/* Only used with bulk streams */
+	};
 	int error_count;
 	unsigned int signr;
 	void *usercontext;
@@ -132,6 +135,12 @@ struct usbfs_disconnect_claim {
 	char driver[USBFS_MAXDRIVERNAME + 1];
 };
 
+struct usbfs_streams {
+	unsigned int num_streams; /* Not used by USBDEVFS_FREE_STREAMS */
+	unsigned int num_eps;
+	unsigned char eps[0];
+};
+
 #define IOCTL_USBFS_CONTROL	_IOWR('U', 0, struct usbfs_ctrltransfer)
 #define IOCTL_USBFS_BULK		_IOWR('U', 2, struct usbfs_bulktransfer)
 #define IOCTL_USBFS_RESETEP	_IOR('U', 3, unsigned int)
@@ -155,6 +164,8 @@ struct usbfs_disconnect_claim {
 #define IOCTL_USBFS_RELEASE_PORT	_IOR('U', 25, unsigned int)
 #define IOCTL_USBFS_GET_CAPABILITIES	_IOR('U', 26, __u32)
 #define IOCTL_USBFS_DISCONNECT_CLAIM	_IOR('U', 27, struct usbfs_disconnect_claim)
+#define IOCTL_USBFS_ALLOC_STREAMS	_IOR('U', 28, struct usbfs_streams)
+#define IOCTL_USBFS_FREE_STREAMS	_IOR('U', 29, struct usbfs_streams)
 
 extern usbi_mutex_static_t linux_hotplug_lock;
 

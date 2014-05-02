@@ -1495,6 +1495,56 @@ out:
 	return ret;
 }
 
+static int do_streams_ioctl(struct libusb_device_handle *handle, long req,
+	uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
+{
+	int r, fd = _device_handle_priv(handle)->fd;
+	struct usbfs_streams *streams;
+
+	if (num_endpoints > 30) /* Max 15 in + 15 out eps */
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	streams = malloc(sizeof(struct usbfs_streams) + num_endpoints);
+	if (!streams)
+		return LIBUSB_ERROR_NO_MEM;
+
+	streams->num_streams = num_streams;
+	streams->num_eps = num_endpoints;
+	memcpy(streams->eps, endpoints, num_endpoints);
+
+	r = ioctl(fd, req, streams);
+
+	free(streams);
+
+	if (r < 0) {
+		if (errno == ENOTTY)
+			return LIBUSB_ERROR_NOT_SUPPORTED;
+		else if (errno == EINVAL)
+			return LIBUSB_ERROR_INVALID_PARAM;
+		else if (errno == ENODEV)
+			return LIBUSB_ERROR_NO_DEVICE;
+
+		usbi_err(HANDLE_CTX(handle),
+			"streams-ioctl failed error %d errno %d", r, errno);
+		return LIBUSB_ERROR_OTHER;
+	}
+	return r;
+}
+
+static int op_alloc_streams(struct libusb_device_handle *handle,
+	uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
+{
+	return do_streams_ioctl(handle, IOCTL_USBFS_ALLOC_STREAMS,
+				num_streams, endpoints, num_endpoints);
+}
+
+static int op_free_streams(struct libusb_device_handle *handle,
+		unsigned char *endpoints, int num_endpoints)
+{
+	return do_streams_ioctl(handle, IOCTL_USBFS_FREE_STREAMS, 0,
+				endpoints, num_endpoints);
+}
+
 static int op_kernel_driver_active(struct libusb_device_handle *handle,
 	int interface)
 {
@@ -1702,8 +1752,7 @@ static void free_iso_urbs(struct linux_transfer_priv *tpriv)
 	tpriv->iso_urbs = NULL;
 }
 
-static int submit_bulk_transfer(struct usbi_transfer *itransfer,
-	unsigned char urb_type)
+static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer =
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
@@ -1791,7 +1840,19 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer,
 	for (i = 0; i < num_urbs; i++) {
 		struct usbfs_urb *urb = &urbs[i];
 		urb->usercontext = itransfer;
-		urb->type = urb_type;
+		switch (transfer->type) {
+		case LIBUSB_TRANSFER_TYPE_BULK:
+			urb->type = USBFS_URB_TYPE_BULK;
+			urb->stream_id = 0;
+			break;
+		case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+			urb->type = USBFS_URB_TYPE_BULK;
+			urb->stream_id = itransfer->stream_id;
+			break;
+		case LIBUSB_TRANSFER_TYPE_INTERRUPT:
+			urb->type = USBFS_URB_TYPE_INTERRUPT;
+			break;
+		}
 		urb->endpoint = transfer->endpoint;
 		urb->buffer = transfer->buffer + (i * bulk_buffer_len);
 		/* don't set the short not ok flag for the last URB */
@@ -2074,9 +2135,10 @@ static int op_submit_transfer(struct usbi_transfer *itransfer)
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
 		return submit_control_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_BULK:
-		return submit_bulk_transfer(itransfer, USBFS_URB_TYPE_BULK);
+	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+		return submit_bulk_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-		return submit_bulk_transfer(itransfer, USBFS_URB_TYPE_INTERRUPT);
+		return submit_bulk_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		return submit_iso_transfer(itransfer);
 	default:
@@ -2094,6 +2156,7 @@ static int op_cancel_transfer(struct usbi_transfer *itransfer)
 
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_BULK:
+	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
 		if (tpriv->reap_action == ERROR)
 			break;
 		/* else, fall through */
@@ -2124,6 +2187,7 @@ static void op_clear_transfer_priv(struct usbi_transfer *itransfer)
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
 	case LIBUSB_TRANSFER_TYPE_BULK:
+	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 		usbi_mutex_lock(&itransfer->lock);
 		if (tpriv->urbs)
@@ -2492,6 +2556,7 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		return handle_iso_completion(itransfer, urb);
 	case LIBUSB_TRANSFER_TYPE_BULK:
+	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 		return handle_bulk_completion(itransfer, urb);
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
@@ -2595,6 +2660,9 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.set_interface_altsetting = op_set_interface,
 	.clear_halt = op_clear_halt,
 	.reset_device = op_reset_device,
+
+	.alloc_streams = op_alloc_streams,
+	.free_streams = op_free_streams,
 
 	.kernel_driver_active = op_kernel_driver_active,
 	.detach_kernel_driver = op_detach_kernel_driver,

@@ -1615,6 +1615,68 @@ int API_EXPORTED libusb_reset_device(libusb_device_handle *dev)
 	return usbi_backend->reset_device(dev);
 }
 
+/** \ingroup asyncio
+ * Allocate up to num_streams usb bulk streams on the specified endpoints. This
+ * function takes an array of endpoints rather then a single endpoint because
+ * some protocols require that endpoints are setup with similar stream ids.
+ * All endpoints passed in must belong to the same interface.
+ *
+ * Note this function may return less streams then requested.
+ *
+ * Stream id 0 is reserved, and should not be used to communicate with devices.
+ * If libusb_alloc_streams() returns with a value of N, you may use stream ids
+ * 1 to N.
+ *
+ * Since version 1.0.19, \ref LIBUSB_API_VERSION >= 0x01000103
+ *
+ * \param dev a device handle
+ * \param num_streams number of streams to try to allocate
+ * \param endpoints array of endpoints to allocate streams on
+ * \param num_endpoints length of the endpoints array
+ * \returns number of streams allocated, or a LIBUSB_ERROR code on failure
+ */
+int API_EXPORTED libusb_alloc_streams(libusb_device_handle *dev,
+	uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
+{
+	usbi_dbg("streams %u eps %d", (unsigned) num_streams, num_endpoints);
+
+	if (!dev->dev->attached)
+		return LIBUSB_ERROR_NO_DEVICE;
+
+	if (usbi_backend->alloc_streams)
+		return usbi_backend->alloc_streams(dev, num_streams, endpoints,
+						   num_endpoints);
+	else
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+/** \ingroup asyncio
+ * Free usb bulk streams allocated with libusb_alloc_streams().
+ *
+ * Note streams are automatically free-ed when releasing an interface.
+ *
+ * Since version 1.0.19, \ref LIBUSB_API_VERSION >= 0x01000103
+ *
+ * \param dev a device handle
+ * \param endpoints array of endpoints to allocate streams on
+ * \param num_endpoints length of the endpoints array
+ * \returns LIBUSB_SUCCESS, or a LIBUSB_ERROR code on failure
+ */
+int API_EXPORTED libusb_free_streams(libusb_device_handle *dev,
+	unsigned char *endpoints, int num_endpoints)
+{
+	usbi_dbg("eps %d", num_endpoints);
+
+	if (!dev->dev->attached)
+		return LIBUSB_ERROR_NO_DEVICE;
+
+	if (usbi_backend->free_streams)
+		return usbi_backend->free_streams(dev, endpoints,
+						  num_endpoints);
+	else
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 /** \ingroup dev
  * Determine if a kernel driver is active on an interface. If a kernel driver
  * is active, you cannot claim the interface, and libusb will be unable to
