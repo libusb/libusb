@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2013 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2008-2014 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -1127,7 +1127,7 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
 
     usbi_dbg ("interface: %i pipe %i: dir: %i number: %i", iface, i, direction, number);
 
-    cInterface->endpoint_addrs[i - 1] = ((direction << 7 & LIBUSB_ENDPOINT_DIR_MASK) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
+    cInterface->endpoint_addrs[i - 1] = (((kUSBIn == direction) << kUSBRqDirnShift) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
   }
 
   cInterface->num_endpoints = numep;
