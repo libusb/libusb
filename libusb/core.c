@@ -1621,7 +1621,8 @@ int API_EXPORTED libusb_reset_device(libusb_device_handle *dev)
  * some protocols require that endpoints are setup with similar stream ids.
  * All endpoints passed in must belong to the same interface.
  *
- * Note this function may return less streams then requested.
+ * Note this function may return less streams then requested. Also note that the
+ * same number of streams are allocated for each endpoint in the endpoint array.
  *
  * Stream id 0 is reserved, and should not be used to communicate with devices.
  * If libusb_alloc_streams() returns with a value of N, you may use stream ids

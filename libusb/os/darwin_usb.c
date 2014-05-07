@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2013 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2008-2014 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -151,7 +151,7 @@ static void darwin_ref_cached_device(struct darwin_cached_device *cached_dev) {
   cached_dev->refcount++;
 }
 
-static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, uint8_t *pipep, uint8_t *ifcp) {
+static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, uint8_t *pipep, uint8_t *ifcp, struct darwin_interface **interface_out) {
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)dev_handle->os_priv;
 
   /* current interface */
@@ -168,7 +168,13 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
       for (i = 0 ; i < cInterface->num_endpoints ; i++) {
         if (cInterface->endpoint_addrs[i] == ep) {
           *pipep = i + 1;
-          *ifcp = iface;
+
+          if (ifcp)
+            *ifcp = iface;
+
+          if (interface_out)
+            *interface_out = cInterface;
+
           usbi_dbg ("pipe %d on interface %d matches", *pipep, *ifcp);
           return 0;
         }
@@ -179,7 +185,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
   /* No pipe found with the correct endpoint address */
   usbi_warn (HANDLE_CTX(dev_handle), "no pipeRef found with endpoint address 0x%02x.", ep);
 
-  return -1;
+  return LIBUSB_ERROR_NOT_FOUND;
 }
 
 static int usb_setup_device_iterator (io_iterator_t *deviceIterator, UInt32 location) {
@@ -1121,7 +1127,7 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
 
     usbi_dbg ("interface: %i pipe %i: dir: %i number: %i", iface, i, direction, number);
 
-    cInterface->endpoint_addrs[i - 1] = ((direction << 7 & LIBUSB_ENDPOINT_DIR_MASK) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
+    cInterface->endpoint_addrs[i - 1] = (((kUSBIn == direction) << kUSBRqDirnShift) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
   }
 
   cInterface->num_endpoints = numep;
@@ -1293,21 +1299,17 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
 }
 
 static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint) {
-  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)dev_handle->os_priv;
-
   /* current interface */
   struct darwin_interface *cInterface;
-  uint8_t pipeRef, iface;
   IOReturn kresult;
+  uint8_t pipeRef;
 
   /* determine the interface/endpoint to use */
-  if (ep_to_pipeRef (dev_handle, endpoint, &pipeRef, &iface) != 0) {
+  if (ep_to_pipeRef (dev_handle, endpoint, &pipeRef, NULL, &cInterface) != 0) {
     usbi_err (HANDLE_CTX (dev_handle), "endpoint not found on any open interface");
 
     return LIBUSB_ERROR_NOT_FOUND;
   }
-
-  cInterface = &priv->interfaces[iface];
 
   /* newer versions of darwin support clearing additional bits on the device's endpoint */
   kresult = (*(cInterface->interface))->ClearPipeStallBothEnds(cInterface->interface, pipeRef);
@@ -1422,23 +1424,20 @@ static void darwin_destroy_device(struct libusb_device *dev) {
 
 static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
 
   IOReturn               ret;
   uint8_t                transferType;
-  /* None of the values below are used in libusb for bulk transfers */
-  uint8_t                direction, number, interval, pipeRef, iface;
+  /* None of the values below are used in libusbx for bulk transfers */
+  uint8_t                direction, number, interval, pipeRef;
   uint16_t               maxPacketSize;
 
   struct darwin_interface *cInterface;
 
-  if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
+  if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface) != 0) {
     usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
 
     return LIBUSB_ERROR_NOT_FOUND;
   }
-
-  cInterface = &priv->interfaces[iface];
 
   ret = (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
                                                        &transferType, &maxPacketSize, &interval);
@@ -1483,13 +1482,44 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   return darwin_to_libusb (ret);
 }
 
+#if InterfaceVersion >= 550
+static int submit_stream_transfer(struct usbi_transfer *itransfer) {
+  struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+  struct darwin_interface *cInterface;
+  uint8_t pipeRef;
+  IOReturn ret;
+
+  if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface) != 0) {
+    usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
+
+    return LIBUSB_ERROR_NOT_FOUND;
+  }
+
+  itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
+  if (IS_XFERIN(transfer))
+    ret = (*(cInterface->interface))->ReadStreamsPipeAsyncTO(cInterface->interface, pipeRef, itransfer->stream_id,
+                                                             transfer->buffer, transfer->length, transfer->timeout,
+                                                             transfer->timeout, darwin_async_io_callback, (void *)itransfer);
+  else
+    ret = (*(cInterface->interface))->WriteStreamsPipeAsyncTO(cInterface->interface, pipeRef, itransfer->stream_id,
+                                                              transfer->buffer, transfer->length, transfer->timeout,
+                                                              transfer->timeout, darwin_async_io_callback, (void *)itransfer);
+
+  if (ret)
+    usbi_err (TRANSFER_CTX (transfer), "bulk stream transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
+               darwin_error_str(ret), ret);
+
+  return darwin_to_libusb (ret);
+}
+#endif
+
 static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
-  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
 
   IOReturn kresult;
-  uint8_t direction, number, interval, pipeRef, iface, transferType;
+  uint8_t direction, number, interval, pipeRef, transferType;
   uint16_t maxPacketSize;
   UInt64 frame;
   AbsoluteTime atTime;
@@ -1515,13 +1545,11 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
     tpriv->isoc_framelist[i].frReqCount = transfer->iso_packet_desc[i].length;
 
   /* determine the interface/endpoint to use */
-  if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
+  if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface) != 0) {
     usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
 
     return LIBUSB_ERROR_NOT_FOUND;
   }
-
-  cInterface = &priv->interfaces[iface];
 
   /* determine the properties of this endpoint and the speed of the device */
   (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
@@ -1577,7 +1605,6 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct libusb_control_setup *setup = (struct libusb_control_setup *) transfer->buffer;
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(transfer->dev_handle->dev);
-  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
   struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 
   IOReturn               kresult;
@@ -1602,15 +1629,13 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
 
   if (transfer->endpoint) {
     struct darwin_interface *cInterface;
-    uint8_t                 pipeRef, iface;
+    uint8_t                 pipeRef;
 
-    if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
+    if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface) != 0) {
       usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
 
       return LIBUSB_ERROR_NOT_FOUND;
     }
-
-    cInterface = &priv->interfaces[iface];
 
     kresult = (*(cInterface->interface))->ControlRequestAsyncTO (cInterface->interface, pipeRef, &(tpriv->req), darwin_async_io_callback, itransfer);
   } else
@@ -1634,6 +1659,13 @@ static int darwin_submit_transfer(struct usbi_transfer *itransfer) {
     return submit_bulk_transfer(itransfer);
   case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
     return submit_iso_transfer(itransfer);
+  case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+#if InterfaceVersion >= 550
+    return submit_stream_transfer(itransfer);
+#else
+    usbi_err (TRANSFER_CTX(transfer), "IOUSBFamily version does not support bulk stream transfers");
+    return LIBUSB_ERROR_NOT_SUPPORTED;
+#endif
   default:
     usbi_err (TRANSFER_CTX(transfer), "unknown endpoint type %d", transfer->type);
     return LIBUSB_ERROR_INVALID_PARAM;
@@ -1658,18 +1690,15 @@ static int cancel_control_transfer(struct usbi_transfer *itransfer) {
 static int darwin_abort_transfers (struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(transfer->dev_handle->dev);
-  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
   struct darwin_interface *cInterface;
   uint8_t pipeRef, iface;
   IOReturn kresult;
 
-  if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface) != 0) {
+  if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface, &cInterface) != 0) {
     usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
 
     return LIBUSB_ERROR_NOT_FOUND;
   }
-
-  cInterface = &priv->interfaces[iface];
 
   if (!dpriv->device)
     return LIBUSB_ERROR_NO_DEVICE;
@@ -1677,7 +1706,12 @@ static int darwin_abort_transfers (struct usbi_transfer *itransfer) {
   usbi_warn (ITRANSFER_CTX (itransfer), "aborting all transactions on interface %d pipe %d", iface, pipeRef);
 
   /* abort transactions */
-  (*(cInterface->interface))->AbortPipe (cInterface->interface, pipeRef);
+#if InterfaceVersion >= 550
+  if (LIBUSB_TRANSFER_TYPE_BULK_STREAM == transfer->type)
+    (*(cInterface->interface))->AbortStreamsPipe (cInterface->interface, pipeRef, itransfer->stream_id);
+  else
+#endif
+    (*(cInterface->interface))->AbortPipe (cInterface->interface, pipeRef);
 
   usbi_dbg ("calling clear pipe stall to clear the data toggle bit");
 
@@ -1725,10 +1759,9 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
   /* if requested write a zero packet */
   if (kIOReturnSuccess == result && IS_XFEROUT(transfer) && transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET) {
     struct darwin_interface *cInterface;
-    uint8_t iface, pipeRef;
+    uint8_t pipeRef;
 
-    (void) ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, &iface);
-    cInterface = &priv->interfaces[iface];
+    (void) ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface);
 
     (*(cInterface->interface))->WritePipe (cInterface->interface, pipeRef, transfer->buffer, 0);
   }
@@ -1859,6 +1892,64 @@ static int darwin_clock_gettime(int clk_id, struct timespec *tp) {
   return 0;
 }
 
+#if InterfaceVersion >= 550
+static int darwin_alloc_streams (struct libusb_device_handle *dev_handle, uint32_t num_streams, unsigned char *endpoints,
+                                 int num_endpoints) {
+  struct darwin_interface *cInterface;
+  UInt32 supportsStreams;
+  uint8_t pipeRef;
+  int rc, i;
+
+  /* find the mimimum number of supported streams on the endpoint list */
+  for (i = 0 ; i < num_endpoints ; ++i) {
+    if (0 != (rc = ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, NULL, &cInterface))) {
+      return rc;
+    }
+
+    (*(cInterface->interface))->SupportsStreams (cInterface->interface, pipeRef, &supportsStreams);
+    if (num_streams > supportsStreams)
+      num_streams = supportsStreams;
+  }
+
+  /* it is an error if any endpoint in endpoints does not support streams */
+  if (0 == num_streams)
+    return LIBUSB_ERROR_INVALID_PARAM;
+
+  /* create the streams */
+  for (i = 0 ; i < num_endpoints ; ++i) {
+    (void) ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, NULL, &cInterface);
+
+    rc = (*(cInterface->interface))->CreateStreams (cInterface->interface, pipeRef, num_streams);
+    if (kIOReturnSuccess != rc)
+      return darwin_to_libusb(rc);
+  }
+
+  return num_streams;
+}
+
+static int darwin_free_streams (struct libusb_device_handle *dev_handle, unsigned char *endpoints, int num_endpoints) {
+  struct darwin_interface *cInterface;
+  UInt32 supportsStreams;
+  uint8_t pipeRef;
+  int rc;
+
+  for (int i = 0 ; i < num_endpoints ; ++i) {
+    if (0 != (rc = ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, NULL, &cInterface)))
+      return rc;
+
+    (*(cInterface->interface))->SupportsStreams (cInterface->interface, pipeRef, &supportsStreams);
+    if (0 == supportsStreams)
+      return LIBUSB_ERROR_INVALID_PARAM;
+
+    rc = (*(cInterface->interface))->CreateStreams (cInterface->interface, pipeRef, 0);
+    if (kIOReturnSuccess != rc)
+      return darwin_to_libusb(rc);
+  }
+
+  return LIBUSB_SUCCESS;
+}
+#endif
+
 const struct usbi_os_backend darwin_backend = {
         .name = "Darwin",
         .caps = 0,
@@ -1879,6 +1970,11 @@ const struct usbi_os_backend darwin_backend = {
         .set_interface_altsetting = darwin_set_interface_altsetting,
         .clear_halt = darwin_clear_halt,
         .reset_device = darwin_reset_device,
+
+#if InterfaceVersion >= 550
+        .alloc_streams = darwin_alloc_streams,
+        .free_streams = darwin_free_streams,
+#endif
 
         .kernel_driver_active = darwin_kernel_driver_active,
         .detach_kernel_driver = darwin_detach_kernel_driver,
