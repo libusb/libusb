@@ -1553,7 +1553,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				parent_priv = _device_priv(parent_dev);
 				// virtual USB devices are also listed during GEN - don't process these yet
 				if ( (pass == GEN_PASS) && (parent_priv->apib->id != USB_API_HUB) ) {
-				        libusb_unref_device(parent_dev);
+					libusb_unref_device(parent_dev);
 					continue;
 				}
 				break;
@@ -1580,16 +1580,16 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					usbi_dbg("found existing device for session [%X] (%d.%d)",
 						session_id, dev->bus_number, dev->device_address);
 				}
-                                // Keep track of devices that need unref
-                                unref_list[unref_cur++] = dev;
-                                if (unref_cur >= unref_size) {
-                                        unref_size += 64;
-                                        unref_list = usbi_reallocf(unref_list, unref_size*sizeof(libusb_device*));
-                                        if (unref_list == NULL) {
-                                                usbi_err(ctx, "could not realloc list for unref - aborting.");
-                                                LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-                                        }
-                                }
+				// Keep track of devices that need unref
+				unref_list[unref_cur++] = dev;
+				if (unref_cur >= unref_size) {
+					unref_size += 64;
+					unref_list = usbi_reallocf(unref_list, unref_size*sizeof(libusb_device*));
+					if (unref_list == NULL) {
+						usbi_err(ctx, "could not realloc list for unref - aborting.");
+						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+					}
+				}
 				priv = _device_priv(dev);
 			}
 
@@ -1675,7 +1675,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						break;
 					}
 				}
-			        libusb_unref_device(parent_dev);
+				libusb_unref_device(parent_dev);
 				break;
 			}
 		}
@@ -2116,7 +2116,8 @@ static void windows_handle_callback (struct usbi_transfer *itransfer, uint32_t i
 		windows_transfer_callback (itransfer, io_result, io_size);
 		break;
 	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
-		return LIBUSB_ERROR_NOT_SUPPORTED;
+		usbi_warn(ITRANSFER_CTX(itransfer), "bulk stream transfers are not yet supported on this platform");
+		break;
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "unknown endpoint type %d", transfer->type);
 	}
