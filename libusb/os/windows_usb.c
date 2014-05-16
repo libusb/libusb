@@ -209,7 +209,7 @@ static char* sanitize_path(const char* path)
 	size = safe_strlen(path)+1;
 	root_size = sizeof(root_prefix)-1;
 
-	// Microsoft indiscriminatly uses '\\?\', '\\.\', '##?#" or "##.#" for root prefixes.
+	// Microsoft indiscriminately uses '\\?\', '\\.\', '##?#" or "##.#" for root prefixes.
 	if (!((size > 3) && (((path[0] == '\\') && (path[1] == '\\') && (path[3] == '\\')) ||
 		((path[0] == '#') && (path[1] == '#') && (path[3] == '#'))))) {
 		add_root = root_size;
@@ -221,7 +221,7 @@ static char* sanitize_path(const char* path)
 
 	safe_strcpy(&ret_path[add_root], size-add_root, path);
 
-	// Ensure consistancy with root prefix
+	// Ensure consistency with root prefix
 	for (j=0; j<root_size; j++)
 		ret_path[j] = root_prefix[j];
 
@@ -1028,6 +1028,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 
 		// Dummy call to get the required data size. Initial failures are reported as info rather
 		// than error as they can occur for non-penalizing situations, such as with some hubs.
+		// coverity[tainted_data_argument]
 		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
 			&cd_buf_short, size, &ret_size, NULL)) {
 			usbi_info(ctx, "could not access configuration descriptor (dummy) for '%s': %s", device_id, windows_error_str(0));
@@ -1078,7 +1079,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		// Cache the descriptor
 		priv->config_descriptor[i] = (unsigned char*) malloc(cd_data->wTotalLength);
 		if (priv->config_descriptor[i] == NULL)
-			return LIBUSB_ERROR_NO_MEM;
+			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 		memcpy(priv->config_descriptor[i], cd_data, cd_data->wTotalLength);
 	}
 	return LIBUSB_SUCCESS;
@@ -1094,13 +1095,14 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	DWORD size;
 	USB_NODE_CONNECTION_INFORMATION_EX conn_info;
 	struct windows_device_priv *priv, *parent_priv;
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx;
 	struct libusb_device* tmp_dev;
 	unsigned i;
 
 	if ((dev == NULL) || (parent_dev == NULL)) {
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
+	ctx = DEVICE_CTX(dev);
 	priv = _device_priv(dev);
 	parent_priv = _device_priv(parent_dev);
 	if (parent_priv->apib->id != USB_API_HUB) {
@@ -1148,6 +1150,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		}
 		size = sizeof(conn_info);
 		conn_info.ConnectionIndex = (ULONG)port_number;
+		// coverity[tainted_data_argument]
 		if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, size,
 			&conn_info, size, &size, NULL)) {
 			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
@@ -1687,10 +1690,12 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	}
 
 	// Unref newly allocated devs
-	for (i=0; i<unref_cur; i++) {
-		safe_unref_device(unref_list[i]);
+	if (unref_list != NULL) {
+		for (i=0; i<unref_cur; i++) {
+			safe_unref_device(unref_list[i]);
+		}
+		free(unref_list);
 	}
-	safe_free(unref_list);
 
 	return r;
 }
@@ -2229,7 +2234,7 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 		case 0:
 			WaitForSingleObject(timer_mutex, INFINITE);
 			// Requests to this thread are for hires always
-			if (QueryPerformanceCounter(&hires_counter) != 0) {
+			if ((QueryPerformanceCounter(&hires_counter) != 0) && (hires_frequency != 0)) {
 				timer_tp.tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
 				timer_tp.tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency)/1000) * hires_ticks_to_ps);
 			} else {
@@ -2765,11 +2770,10 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 							usbi_err(ctx, "could not open device %s: %s", filter_path, windows_error_str(0));
 						} else {
 							WinUSBX[sub_api].Free(winusb_handle);
-							if (!WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
-								continue;
-							}
-							found_filter = true;
-							break;
+							if (WinUSBX[sub_api].Initialize(file_handle, &winusb_handle))
+								found_filter = true;
+							else
+								usbi_err(ctx, "could not initialize filter driver for %s", filter_path);
 						}
 					}
 				}

@@ -512,6 +512,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 		get_sense(handle, endpoint_in, endpoint_out);
 	}
 
+	// coverity[tainted_data]
 	data = (unsigned char*) calloc(1, block_size);
 	if (data == NULL) {
 		perr("   unable to allocate data buffer\n");
