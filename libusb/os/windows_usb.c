@@ -100,7 +100,8 @@ static int composite_copy_transfer_data(int sub_api, struct usbi_transfer *itran
 // Global variables
 uint64_t hires_frequency, hires_ticks_to_ps;
 const uint64_t epoch_time = UINT64_C(116444736000000000);	// 1970.01.01 00:00:000 in MS Filetime
-enum windows_version windows_version = WINDOWS_UNSUPPORTED;
+int windows_version = WINDOWS_UNDEFINED;
+static char windows_version_str[128] = "Windows Undefined";
 // Concurrency
 static int concurrent_usage = -1;
 usbi_mutex_t autoclaim_lock;
@@ -804,6 +805,118 @@ static void auto_release(struct usbi_transfer *itransfer)
 	usbi_mutex_unlock(&autoclaim_lock);
 }
 
+/* Windows version dtection */
+static BOOL is_x64(void)
+{
+	BOOL ret = FALSE;
+	// Detect if we're running a 32 or 64 bit system
+	if (sizeof(uintptr_t) < 8) {
+		DLL_LOAD_PREFIXED(Kernel32.dll, p, IsWow64Process, FALSE);
+		if (pIsWow64Process != NULL) {
+			(*pIsWow64Process)(GetCurrentProcess(), &ret);
+		}
+	} else {
+		ret = TRUE;
+	}
+	return ret;
+}
+
+static void get_windows_version(void)
+{
+	OSVERSIONINFOEXA vi, vi2;
+	const char* w = 0;
+	const char* w64 = "32 bit";
+	char* vptr;
+	size_t vlen;
+	unsigned major, minor;
+	ULONGLONG major_equal, minor_equal;
+	BOOL ws;
+
+	memset(&vi, 0, sizeof(vi));
+	vi.dwOSVersionInfoSize = sizeof(vi);
+	if (!GetVersionExA((OSVERSIONINFOA *)&vi)) {
+		memset(&vi, 0, sizeof(vi));
+		vi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOA);
+		if (!GetVersionExA((OSVERSIONINFOA *)&vi))
+			return;
+	}
+
+	if (vi.dwPlatformId == VER_PLATFORM_WIN32_NT) {
+
+		if (vi.dwMajorVersion > 6 || (vi.dwMajorVersion == 6 && vi.dwMinorVersion >= 2)) {
+			// Starting with Windows 8.1 Preview, GetVersionEx() does no longer report the actual OS version
+			// See: http://msdn.microsoft.com/en-us/library/windows/desktop/dn302074.aspx
+
+			major_equal = VerSetConditionMask(0, VER_MAJORVERSION, VER_EQUAL);
+			for (major = vi.dwMajorVersion; major <= 9; major++) {
+				memset(&vi2, 0, sizeof(vi2));
+				vi2.dwOSVersionInfoSize = sizeof(vi2); vi2.dwMajorVersion = major;
+				if (!VerifyVersionInfoA(&vi2, VER_MAJORVERSION, major_equal))
+					continue;
+				if (vi.dwMajorVersion < major) {
+					vi.dwMajorVersion = major; vi.dwMinorVersion = 0;
+				}
+
+				minor_equal = VerSetConditionMask(0, VER_MINORVERSION, VER_EQUAL);
+				for (minor = vi.dwMinorVersion; minor <= 9; minor++) {
+					memset(&vi2, 0, sizeof(vi2)); vi2.dwOSVersionInfoSize = sizeof(vi2);
+					vi2.dwMinorVersion = minor;
+					if (!VerifyVersionInfoA(&vi2, VER_MINORVERSION, minor_equal))
+						continue;
+					vi.dwMinorVersion = minor;
+					break;
+				}
+
+				break;
+			}
+		}
+
+		if (vi.dwMajorVersion <= 0xf && vi.dwMinorVersion <= 0xf) {
+			ws = (vi.wProductType <= VER_NT_WORKSTATION);
+			windows_version = vi.dwMajorVersion << 4 | vi.dwMinorVersion;
+			switch (windows_version) {
+			case 0x50: w = "2000";
+				break;
+			case 0x51: w = "XP";
+				break;
+			case 0x52: w = (!GetSystemMetrics(89)?"2003":"2003_R2");
+				break;
+			case 0x60: w = (ws?"Vista":"2008");
+				break;
+			case 0x61: w = (ws?"7":"2008_R2");
+				break;
+			case 0x62: w = (ws?"8":"2012");
+				break;
+			case 0x63: w = (ws?"8.1":"2012_R2");
+				break;
+			case 0x64: w = (ws?"8.2":"2012_R3");
+				break;
+			default:
+				if (windows_version < 0x50)
+					windows_version = WINDOWS_UNSUPPORTED;
+				else
+					w = "9 or later";
+				break;
+			}
+		}
+	}
+
+	if (is_x64())
+		w64 = "64-bit";
+
+	vptr = &windows_version_str[sizeof("Windows ") - 1];
+	vlen = sizeof(windows_version_str) - sizeof("Windows ") - 1;
+	if (!w)
+		safe_sprintf(vptr, vlen, "%s %u.%u %s", (vi.dwPlatformId==VER_PLATFORM_WIN32_NT?"NT":"??"),
+			(unsigned)vi.dwMajorVersion, (unsigned)vi.dwMinorVersion, w64);
+	else if (vi.wServicePackMinor)
+		safe_sprintf(vptr, vlen, "%s SP%u.%u %s", w, vi.wServicePackMajor, vi.wServicePackMinor, w64);
+	else if (vi.wServicePackMajor)
+		safe_sprintf(vptr, vlen, "%s SP%u %s", w, vi.wServicePackMajor, w64);
+	else
+		safe_sprintf(vptr, vlen, "%s %s", w, w64);
+}
+
 /*
  * init: libusb backend init function
  *
@@ -814,7 +927,6 @@ static void auto_release(struct usbi_transfer *itransfer)
 static int windows_init(struct libusb_context *ctx)
 {
 	int i, r = LIBUSB_ERROR_OTHER;
-	OSVERSIONINFO os_version;
 	HANDLE semaphore;
 	char sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
@@ -836,19 +948,8 @@ static int windows_init(struct libusb_context *ctx)
 	// NB: concurrent usage supposes that init calls are equally balanced with
 	// exit calls. If init is called more than exit, we will not exit properly
 	if ( ++concurrent_usage == 0 ) {	// First init?
-		// Detect OS version
-		memset(&os_version, 0, sizeof(OSVERSIONINFO));
-		os_version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-		windows_version = WINDOWS_UNSUPPORTED;
-		if ((GetVersionEx(&os_version) != 0) && (os_version.dwPlatformId == VER_PLATFORM_WIN32_NT)) {
-			if ((os_version.dwMajorVersion == 5) && (os_version.dwMinorVersion == 1)) {
-				windows_version = WINDOWS_XP;
-			} else if ((os_version.dwMajorVersion == 5) && (os_version.dwMinorVersion == 2)) {
-				windows_version = WINDOWS_2003;	// also includes XP 64
-			} else if (os_version.dwMajorVersion >= 6) {
-				windows_version = WINDOWS_VISTA_AND_LATER;
-			}
-		}
+		get_windows_version();
+		usbi_dbg(windows_version_str);
 		if (windows_version == WINDOWS_UNSUPPORTED) {
 			usbi_err(ctx, "This version of Windows is NOT supported");
 			r = LIBUSB_ERROR_NOT_SUPPORTED;
@@ -1094,6 +1195,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	HANDLE handle;
 	DWORD size;
 	USB_NODE_CONNECTION_INFORMATION_EX conn_info;
+	USB_NODE_CONNECTION_INFORMATION_EX_V2 conn_info_v2;
 	struct windows_device_priv *priv, *parent_priv;
 	struct libusb_context *ctx;
 	struct libusb_device* tmp_dev;
@@ -1172,6 +1274,23 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			dev->num_configurations = 0;
 			priv->dev_descriptor.bNumConfigurations = 0;
 		}
+
+		// In their great wisdom, Microsoft decided to BREAK the USB speed report between Windows 7 and Windows 8
+		if (windows_version >= WINDOWS_8) {
+			memset(&conn_info_v2, 0, sizeof(conn_info_v2));
+			size = sizeof(conn_info_v2);
+			conn_info_v2.ConnectionIndex = (ULONG)port_number;
+			conn_info_v2.Length = size;
+			conn_info_v2.SupportedUsbProtocols.Usb300 = 1;
+			if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
+				&conn_info_v2, size, &conn_info_v2, size, &size, NULL)) {
+				usbi_warn(ctx, "could not get node connection information (V2) for device '%s': %s",
+					device_id,  windows_error_str(0));
+			} else if (conn_info_v2.Flags.DeviceIsOperatingAtSuperSpeedOrHigher) {
+				conn_info.Speed = 3;
+			}
+		}
+
 		safe_closehandle(handle);
 
 		if (conn_info.DeviceAddress > UINT8_MAX) {

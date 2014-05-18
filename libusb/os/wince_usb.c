@@ -38,7 +38,7 @@ unsigned __stdcall wince_clock_gettime_threaded(void* param);
 uint64_t hires_frequency, hires_ticks_to_ps;
 int errno;
 const uint64_t epoch_time = UINT64_C(116444736000000000);       // 1970.01.01 00:00:000 in MS Filetime
-enum windows_version windows_version = WINDOWS_CE;
+int windows_version = WINDOWS_CE;
 static int concurrent_usage = -1;
 // Timer thread
 // NB: index 0 is for monotonic and 1 is for the thread exit event
