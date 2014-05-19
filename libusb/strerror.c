@@ -57,7 +57,7 @@ static size_t usbi_locale = 0;
  * </ol>
  */
 
-static const char* usbi_locale_supported[] = { "en", "nl", "fr" };
+static const char* usbi_locale_supported[] = { "en", "nl", "fr", "ru" };
 static const char* usbi_localized_errors[ARRAYSIZE(usbi_locale_supported)][LIBUSB_ERROR_COUNT] = {
 	{ /* English (en) */
 		"Success",
@@ -103,7 +103,22 @@ static const char* usbi_localized_errors[ARRAYSIZE(usbi_locale_supported)][LIBUS
 		"Appel système abandonné (peut-être à cause d’un signal)",
 		"Mémoire insuffisante",
 		"Opération non supportée or non implémentée sur cette plateforme",
-		"Autre erreur"
+		"Autre erreur",
+	}, { /* Russian (ru) */
+		"Успех",
+		"Ошибка ввода/вывода",
+		"Неверный параметр",
+		"Доступ запрещён (не хватает прав)",
+		"Устройство отсутствует (возможно, оно было отсоединено)",
+		"Элемент не найден",
+		"Ресурс занят",
+		"Истекло время ожидания операции",
+		"Переполнение",
+		"Ошибка канала",
+		"Системный вызов прерван (возможно, сигналом)",
+		"Память исчерпана",
+		"Операция не поддерживается данной платформой",
+		"Неизвестная ошибка"
 	}
 };
 
