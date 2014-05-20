@@ -879,7 +879,7 @@ static void get_windows_version(void)
 				break;
 			case 0x51: w = "XP";
 				break;
-			case 0x52: w = (!GetSystemMetrics(89)?"2003":"2003_R2");
+			case 0x52: w = ("2003");
 				break;
 			case 0x60: w = (ws?"Vista":"2008");
 				break;
