@@ -309,7 +309,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
   usbi_mutex_unlock(&active_contexts_lock);
 }
 
-void darwin_hotplug_poll (void)
+static void darwin_hotplug_poll (void)
 {
   /* not sure if 5 seconds will be too long/short but it should work ok */
   mach_timespec_t timeout = {.tv_sec = 5, .tv_nsec = 0};
