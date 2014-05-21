@@ -175,7 +175,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
           if (interface_out)
             *interface_out = cInterface;
 
-          usbi_dbg ("pipe %d on interface %d matches", *pipep, *ifcp);
+          usbi_dbg ("pipe %d on interface %d matches", *pipep, iface);
           return 0;
         }
       }
