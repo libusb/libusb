@@ -33,6 +33,11 @@
 #define msleep(msecs) usleep(1000*msecs)
 #endif
 
+#if defined(_MSC_VER)
+#define snprintf _snprintf
+#define putenv _putenv
+#endif
+
 #if !defined(bool)
 #define bool int
 #endif
@@ -512,6 +517,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 		get_sense(handle, endpoint_in, endpoint_out);
 	}
 
+	// coverity[tainted_data]
 	data = (unsigned char*) calloc(1, block_size);
 	if (data == NULL) {
 		perr("   unable to allocate data buffer\n");
@@ -972,7 +978,7 @@ int main(int argc, char** argv)
 	size_t i, arglen;
 	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
-	char* error_lang = NULL;
+	char *error_lang = NULL, *old_dbg_str = NULL, str[256];
 
 	// Default to generic, expecting VID:PID
 	VID = 0;
@@ -1088,13 +1094,22 @@ int main(int argc, char** argv)
 		return 0;
 	}
 
+	// xusb is commonly used as a debug tool, so it's convenient to have debug output during libusb_init(),
+	// but since we can't call on libusb_set_debug() before libusb_init(), we use the env variable method
+	old_dbg_str = getenv("LIBUSB_DEBUG");
+	if (debug_mode) {
+		putenv("LIBUSB_DEBUG=4");	// LIBUSB_LOG_LEVEL_DEBUG
+	}
+
 	version = libusb_get_version();
 	printf("Using libusb v%d.%d.%d.%d\n\n", version->major, version->minor, version->micro, version->nano);
 	r = libusb_init(NULL);
 	if (r < 0)
 		return r;
 
-	libusb_set_debug(NULL, debug_mode?LIBUSB_LOG_LEVEL_DEBUG:LIBUSB_LOG_LEVEL_INFO);
+	// If not set externally, and no debug option was given, use info log level
+	if ((old_dbg_str == NULL) && (!debug_mode))
+		libusb_set_debug(NULL, LIBUSB_LOG_LEVEL_INFO);
 	if (error_lang != NULL) {
 		r = libusb_setlocale(error_lang);
 		if (r < 0)
@@ -1104,6 +1119,11 @@ int main(int argc, char** argv)
 	test_device(VID, PID);
 
 	libusb_exit(NULL);
+
+	if (debug_mode) {
+		snprintf(str, sizeof(str), "LIBUSB_DEBUG=%s", (old_dbg_str == NULL)?"":old_dbg_str);
+		str[sizeof(str) - 1] = 0;	// Windows may not NUL terminate the string
+	}
 
 	return 0;
 }

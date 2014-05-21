@@ -775,22 +775,22 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 	uint8_t* port_numbers, int port_numbers_len)
 {
 	int i = port_numbers_len;
+	struct libusb_context *ctx = DEVICE_CTX(dev);
 
-	while(dev) {
-		// HCDs can be listed as devices and would have port #0
-		// TODO: see how the other backends want to implement HCDs as parents
-		if (dev->port_number == 0)
-			break;
-		i--;
-		if (i < 0) {
-			usbi_warn(DEVICE_CTX(dev),
-				"port numbers array too small");
+	if (port_numbers_len <= 0)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	// HCDs can be listed as devices with port #0
+	while((dev) && (dev->port_number != 0)) {
+		if (--i < 0) {
+			usbi_warn(ctx, "port numbers array is too small");
 			return LIBUSB_ERROR_OVERFLOW;
 		}
 		port_numbers[i] = dev->port_number;
 		dev = dev->parent_dev;
 	}
-	memmove(port_numbers, &port_numbers[i], port_numbers_len - i);
+	if (i < port_numbers_len)
+		memmove(port_numbers, &port_numbers[i], port_numbers_len - i);
 	return port_numbers_len - i;
 }
 

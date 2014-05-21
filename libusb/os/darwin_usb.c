@@ -284,14 +284,14 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
   UInt64 session;
   int ret;
 
+  usbi_mutex_lock(&active_contexts_lock);
+
   while ((device = IOIteratorNext (rem_devices)) != 0) {
     /* get the location from the i/o registry */
     ret = get_ioregistry_value_number (device, CFSTR("sessionID"), kCFNumberSInt64Type, &session);
     IOObjectRelease (device);
     if (!ret)
       continue;
-
-    usbi_mutex_lock(&active_contexts_lock);
 
     list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
       usbi_dbg ("notifying context %p of device disconnect", ctx);
@@ -304,9 +304,20 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
         libusb_unref_device(dev);
       }
     }
-
-    usbi_mutex_unlock(&active_contexts_lock);
   }
+
+  usbi_mutex_unlock(&active_contexts_lock);
+}
+
+void darwin_hotplug_poll (void)
+{
+  /* not sure if 5 seconds will be too long/short but it should work ok */
+  mach_timespec_t timeout = {.tv_sec = 5, .tv_nsec = 0};
+
+  /* since a kernel thread may nodify the IOInterators used for
+   * hotplug notidication we can't just clear the iterators.
+   * instead just wait until all IOService providers are quiet */
+  (void) IOKitWaitQuiet (kIOMasterPortDefault, &timeout);
 }
 
 static void darwin_clear_iterator (io_iterator_t iter) {
@@ -1959,6 +1970,7 @@ const struct usbi_os_backend darwin_backend = {
         .get_device_descriptor = darwin_get_device_descriptor,
         .get_active_config_descriptor = darwin_get_active_config_descriptor,
         .get_config_descriptor = darwin_get_config_descriptor,
+        .hotplug_poll = darwin_hotplug_poll,
 
         .open = darwin_open,
         .close = darwin_close,

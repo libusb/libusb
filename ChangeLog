@@ -1,6 +1,15 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
+2014-05-19: v1.0.19
+* Add support for USB bulk streams on Linux and Mac OS X (#11)
+* Windows: Add AMD and Intel USB-3.0 root hub support
+* Windows: Fix USB 3.0 speed detection on Windows 8 or later (#10)
+* Added Russian translation for libusb_strerror strings
+* All: Various small fixes and cleanups
+The (#xx) numbers are libusb issue numbers, see ie:
+https://github.com/libusb/libusb/issues/11
+
 2014-01-25: v1.0.18
 * Fix multiple memory leaks
 * Fix a crash when HID transfers return no data on Windows
@@ -28,8 +37,6 @@ visit: http://log.libusb.info
   to stay with the libusb shipped with OpenBSD (mpi)
 * Windows: fix libusb_dll_2010.vcxproj link errors (#129)
 * Various other bug fixes and improvements
-The (#xx) numbers are libusbx issue numbers, see ie:
-https://github.com/libusbx/libusbx/issues/121
 
 2013-07-11: v1.0.16
 * Add hotplug support for Darwin and Linux (#9)
