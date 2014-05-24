@@ -1659,7 +1659,7 @@ int API_EXPORTED libusb_alloc_streams(libusb_device_handle *dev,
  * Since version 1.0.19, \ref LIBUSB_API_VERSION >= 0x01000103
  *
  * \param dev a device handle
- * \param endpoints array of endpoints to allocate streams on
+ * \param endpoints array of endpoints to free streams on
  * \param num_endpoints length of the endpoints array
  * \returns LIBUSB_SUCCESS, or a LIBUSB_ERROR code on failure
  */
