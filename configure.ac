@@ -36,6 +36,7 @@ m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AC_PREREQ([2.50])
 AC_PROG_CC
+AC_PROG_CXX
 LT_INIT
 LT_LANG([Windows Resource])
 AC_C_INLINE
@@ -87,6 +88,11 @@ case $host in
 *-cygwin*)
 	AC_MSG_RESULT([Cygwin (using Windows backend)])
 	backend="windows"
+	threads="posix"
+	;;
+*-haiku*)
+	AC_MSG_RESULT([Haiku])
+	backend="haiku"
 	threads="posix"
 	;;
 *)
@@ -169,6 +175,13 @@ windows)
 	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	;;
+haiku)
+	AC_DEFINE(OS_HAIKU, 1, [Haiku backend])
+	AC_SUBST(OS_HAIKU)
+	LIBS="${LIBS} -ldevice"
+	AC_CHECK_HEADERS([poll.h])
+	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
+	;;
 esac
 
 AC_SUBST(LIBS)
@@ -178,6 +191,7 @@ AM_CONDITIONAL(OS_DARWIN, test "x$backend" = xdarwin)
 AM_CONDITIONAL(OS_OPENBSD, test "x$backend" = xopenbsd)
 AM_CONDITIONAL(OS_NETBSD, test "x$backend" = xnetbsd)
 AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
+AM_CONDITIONAL(OS_HAIKU, test "x$backend" = xhaiku)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
 AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = "xyes")
 AM_CONDITIONAL(USE_UDEV, test "x$enable_udev" = xyes)
@@ -288,7 +302,18 @@ AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_FUNCS(gettimeofday)
 AC_CHECK_HEADERS([signal.h])
 
-AM_CFLAGS="${AM_CFLAGS} -std=gnu99 -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow ${THREAD_CFLAGS} ${VISIBILITY_CFLAGS}"
+# check for -std=gnu99 compiler support
+saved_cflags="$CFLAGS"
+CFLAGS="-std=gnu99"
+AC_MSG_CHECKING([whether CC supports -std=gnu99])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
+    [AC_MSG_RESULT([yes])]
+    [AM_CFLAGS="${AM_CFLAGS} -std=gnu99"],
+    [AC_MSG_RESULT([no])]
+)
+CFLAGS="$saved_cflags"
+
+AM_CFLAGS="${AM_CFLAGS} -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow ${THREAD_CFLAGS} ${VISIBILITY_CFLAGS}"
 
 AC_SUBST(AM_CFLAGS)
 AC_SUBST(LTLDFLAGS)
