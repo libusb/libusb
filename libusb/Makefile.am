@@ -11,7 +11,7 @@ OPENBSD_USB_SRC = os/openbsd_usb.c
 NETBSD_USB_SRC = os/netbsd_usb.c
 WINDOWS_USB_SRC = os/poll_windows.c os/windows_usb.c libusb-1.0.rc libusb-1.0.def
 WINCE_USB_SRC = os/wince_usb.c os/wince_usb.h
-HAIKU_USB_SRC = os/haiku_usb_raw.cpp
+HAIKU_USB_SRC = os/haiku_usb_raw.cpp os/haiku_usb_backend.cpp os/haiku_pollfs.cpp
 
 EXTRA_DIST = $(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) $(OPENBSD_USB_SRC) \
 	$(NETBSD_USB_SRC) $(WINDOWS_USB_SRC) $(WINCE_USB_SRC) \

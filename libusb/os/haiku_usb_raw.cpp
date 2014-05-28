@@ -1,400 +1,11 @@
-#include "usb_raw.h"
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
-#include <USBKit.h>
 #include <stdlib.h>
-#include <Locker.h>
-#include <Autolock.h>
-#include <List.h>
 #include <new>
-#include "libusbi.h"
+#include <vector>
 
-//#define TRACE_USB 1
-#ifdef TRACE_USB
-#define TRACE(x) printf(x);
-#endif
-
-class USBDevice{
-public:
-	USBDevice(const char *);
-	virtual ~USBDevice();
-	const char* Location() const;
-	uint32 CountConfigurations() const;
-	const usb_device_descriptor* Descriptor() const;
-	const usb_configuration_descriptor* ConfigurationDescriptor(uint32) const;
-	const usb_configuration_descriptor* ActiveConfiguration() const;
-	int SetConfiguration(int);
-	int SetAltSetting(int,int);
-	int								fRawFD;
-private:
-	int								Initialise();
-	usb_device_descriptor			fDeviceDescriptor;
-	unsigned char**							fConfigurationDescriptors;
-	int								fActiveConfiguration;
-	char*							fPath;
-	
-};
-
-class USBDeviceHandle{
-public:
-	USBDeviceHandle(USBDevice* dev);
-	virtual ~USBDeviceHandle();
-	int EventPipe(int) const;
-	int SetInterface(int);
-	status_t SubmitTransfer(struct usbi_transfer*);
-private:
-	static status_t TransfersThread(void *);
-	void TransfersWorker();
-	USBDevice * fUSBDevice;
-	int fInterface;
-	int fEventPipes[2];
-	BList fTransfers;
-	BLocker fTransfersLock;
-	sem_id fTransfersSem;
-	thread_id fTransfersThread;
-};
-
-status_t
-USBDeviceHandle::TransfersThread(void* self)
-{
-	USBDeviceHandle * handle = (USBDeviceHandle*)self;
-	handle->TransfersWorker();
-	
-}
-
-void
-USBDeviceHandle::TransfersWorker()
-{
-	while(true)
-	{
-		status_t status = acquire_sem(fTransfersSem);
-		fTransfersLock.Lock();
-		struct usbi_transfer* fPendingTransfer= (struct usbi_transfer*)fTransfers.RemoveItem((int32)0);
-		fTransfersLock.Unlock();
-		struct libusb_transfer* fLibusbTransfer= USBI_TRANSFER_TO_LIBUSB_TRANSFER(fPendingTransfer);
-		switch(fLibusbTransfer->type)
-		{
-			case LIBUSB_TRANSFER_TYPE_CONTROL:
-			{
-				struct libusb_control_setup* setup=(struct libusb_control_setup*)fLibusbTransfer->buffer;
-				usb_raw_command command;
-				command.control.request_type=setup->bmRequestType;
-				command.control.request=setup->bRequest;
-				command.control.value=setup->wValue;
-				command.control.index=setup->wIndex;
-				command.control.length=setup->wLength;
-				command.control.data=fLibusbTransfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
-				if(ioctl(fUSBDevice->fRawFD,B_USB_RAW_COMMAND_CONTROL_TRANSFER,&command,
-					sizeof(command)) || command.control.status!=B_USB_RAW_STATUS_SUCCESS)	{
-					fPendingTransfer->transferred=-1;
-					printf("failed control transfer :(");
-					break;
-				}
-			
-				fPendingTransfer->transferred=command.control.length;
-				printf("transfer succeeded with length : %d\n",command.control.length);
-			}
-				break;
-			default:
-				printf("Type other\n");
-		}
-		write(fEventPipes[1],&fPendingTransfer,sizeof(fPendingTransfer));
-	}
-}
-
-status_t
-USBDeviceHandle::SubmitTransfer(struct usbi_transfer* itransfer)
-{
-	BAutolock locker(fTransfersLock);
-	fTransfers.AddItem(itransfer);
-	release_sem(fTransfersSem);
-}
-
-USBDeviceHandle::USBDeviceHandle(USBDevice* dev)
-	:
-	fUSBDevice(dev),
-	fInterface(0)
-{
-	pipe(fEventPipes);
-	fcntl(fEventPipes[1], F_SETFD, O_NONBLOCK);	//Why need??
-	fTransfersSem = create_sem(0, "Transfers Queue Sem");
-	fTransfersThread = spawn_thread(TransfersThread,"Transfer Worker",B_NORMAL_PRIORITY, this);
-	resume_thread(fTransfersThread);
-}
-
-USBDeviceHandle::~USBDeviceHandle()
-{
-	close(fEventPipes[1]);
-	close(fEventPipes[0]);
-}
-
-int
-USBDeviceHandle::EventPipe(int index) const
-{
-	return fEventPipes[index];
-}
-
-int
-USBDeviceHandle::SetInterface(int inumber)
-{
-	fInterface=inumber;
-	return 0;
-}
-
-USBDevice::USBDevice(const char * path) 
-	:
-	fPath(NULL),
-	fRawFD(-1),
-	fActiveConfiguration(0),	//0?
-	fConfigurationDescriptors(NULL)
-{
-	fPath=strdup(path);
-	Initialise();
-}
-
-USBDevice::~USBDevice()
-{
-	if(fRawFD>=0)
-		close(fRawFD);
-	free(fPath);
-	for(int i=0;i<fDeviceDescriptor.num_configurations;i++)
-	{
-		delete fConfigurationDescriptors[i];
-	}
-	delete[] fConfigurationDescriptors;
-}
-
-inline const char*
-USBDevice::Location() const
-{
-	return fPath;
-}
-
-inline uint32
-USBDevice::CountConfigurations() const
-{
-	return fDeviceDescriptor.num_configurations;
-}
-
-inline const usb_device_descriptor*
-USBDevice::Descriptor() const
-{
-	return &fDeviceDescriptor;
-}
-
-const usb_configuration_descriptor*
-USBDevice::ConfigurationDescriptor(uint32 index) const
-{
-	if(index>CountConfigurations())
-		return NULL;
-	return (usb_configuration_descriptor*) fConfigurationDescriptors[index];
-}
-
-const usb_configuration_descriptor*
-USBDevice::ActiveConfiguration() const
-{
-	return (usb_configuration_descriptor*) fConfigurationDescriptors[fActiveConfiguration];
-}
-
-int
-USBDevice::SetConfiguration(int config)
-{
-	usb_raw_command command;
-	command.config.config_index=config;
-	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_CONFIGURATION,&command,
-		sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS)
-	{
-		return -1;	//REPAIR
-	}
-	fActiveConfiguration=config;
-	return 0;
-}
-
-int
-USBDevice::SetAltSetting(int inumber, int alt)
-{
-	usb_raw_command command;
-	command.alternate.alternate_info = alt;
-	command.alternate.config_index=fActiveConfiguration;
-	command.alternate.interface_index=inumber;
-	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_ALT_INTERFACE,&command, 
-		sizeof(command)) || command.alternate.status!=B_USB_RAW_STATUS_SUCCESS)
-		return B_ERROR;
-	return LIBUSB_SUCCESS;
-}
-
-int 
-USBDevice::Initialise()		//Do we need more error checking, etc?
-{
-	fRawFD=open(fPath, O_RDWR | O_CLOEXEC);
-	if(fRawFD < 0)
-		return B_ERROR;
-		
-	usb_raw_command command;
-	command.device.descriptor = &fDeviceDescriptor;
-	if(ioctl(fRawFD, B_USB_RAW_COMMAND_GET_DEVICE_DESCRIPTOR, &command,
-		sizeof(command)) || command.device.status != B_USB_RAW_STATUS_SUCCESS) {
-		return B_ERROR;
-	}
-	
-	size_t size;
-	fConfigurationDescriptors = new(std::nothrow) unsigned char*[fDeviceDescriptor.num_configurations];
-	for( int i=0; i<fDeviceDescriptor.num_configurations; i++)
-	{
-		size=0;
-		usb_configuration_descriptor tmp_config;
-		command.config.descriptor = &tmp_config;
-		command.config.config_index = i;
-		if(ioctl(fRawFD, B_USB_RAW_COMMAND_GET_CONFIGURATION_DESCRIPTOR, &command,
-			sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
-			return B_ERROR;		
-		}
-		fConfigurationDescriptors[i]=new(std::nothrow) unsigned char[tmp_config.total_length];
-		memcpy(fConfigurationDescriptors[i],&tmp_config,tmp_config.length);
-		size+=tmp_config.length;
-		for( int j=0;j<tmp_config.number_interfaces;j++)
-		{
-			usb_interface_descriptor tmp_interface;
-			command.interface.config_index=i;
-			command.interface.interface_index=j;	//CHECK IF WE NEED ACTIVE ALT INTERFACE OR 0
-			command.interface.descriptor=&tmp_interface;
-			if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_INTERFACE_DESCRIPTOR, &command,
-				sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
-				return B_ERROR;
-			}
-			memcpy(fConfigurationDescriptors[i]+size, &tmp_interface, tmp_interface.length);
-			size+=tmp_interface.length;
-			for( int k=0;k<tmp_interface.num_endpoints;k++)
-			{
-				usb_endpoint_descriptor tmp_endpoint;
-				command.endpoint.config_index=i;
-				command.endpoint.interface_index=j;
-				command.endpoint.endpoint_index=k;
-				command.endpoint.descriptor=&tmp_endpoint;
-				if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_ENDPOINT_DESCRIPTOR, &command,
-					sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
-					return B_ERROR;
-				}
-				memcpy(fConfigurationDescriptors[i]+size, &tmp_endpoint, tmp_endpoint.length);
-				size+=tmp_endpoint.length;
-			}
-		}
-	}
-}
-
-
-//  #pragma mark - UsbRoster class
-
-class UsbRoster : public BUSBRoster {
-public:
-                   UsbRoster()  {}
-
-	virtual status_t    DeviceAdded(BUSBDevice* device);
-	virtual void        DeviceRemoved(BUSBDevice* device);
-
-private:
-	status_t			_AddNewDevice(struct libusb_context* ctx, USBDevice* info);
-	
-	BLocker	fDevicesLock;
-	BList	fDevices;
-};
-
-
-status_t
-UsbRoster::_AddNewDevice(struct libusb_context* ctx, USBDevice* deviceInfo)
-{
-	struct libusb_device* dev = usbi_get_device_by_session_id(ctx, (unsigned long)deviceInfo);
-	if (dev) {
-		usbi_info (ctx, "using existing device for location ID 0x%08x", deviceInfo);
-	} else {
-		usbi_info (ctx, "allocating new device for session ID 0x%08x", deviceInfo);
-		dev = usbi_alloc_device(ctx, (unsigned long)deviceInfo);
-		if (!dev) {
-			return B_NO_MEMORY;
-		}
-		*((USBDevice**)dev->os_priv) = deviceInfo;
-
-		// TODO: handle device address mapping for devices in non-root hub(s)
-		sscanf(deviceInfo->Location(), "/dev/bus/usb/%d/%d", &dev->bus_number, &dev->device_address);
-		dev->num_configurations = (uint8_t) deviceInfo->CountConfigurations();
-
-		// printf("bus %d, address %d, # of configs %d\n", dev->bus_number,
-		//	dev->device_address, dev->num_configurations);
-
-    	if(usbi_sanitize_device(dev) < 0) {
-			libusb_unref_device(dev);
-			return B_ERROR;	
-		}
-	}
-
-    usbi_connect_device (dev);
-   	return B_OK;
-}
-
-
-status_t
-UsbRoster::DeviceAdded(BUSBDevice* device)
-{
- 	if (device->IsHub())
- 		return B_ERROR;
- 
- 	char tmp[200];
- 	strcpy(tmp,"/dev/bus/usb");
- 	strcat(tmp,device->Location());
-	USBDevice* deviceInfo = new USBDevice(tmp);
-	//deviceInfo->Get();
-	
-	// Add this new device to each active context's device list
-	struct libusb_context *ctx;
-	usbi_mutex_lock(&active_contexts_lock);
-	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) { 
-		_AddNewDevice(ctx, deviceInfo);
-	}
-	usbi_mutex_unlock(&active_contexts_lock);
-
-	BAutolock locker(fDevicesLock);
-	fDevices.AddItem(deviceInfo);
-	
-	return B_OK;
-}
-
-
-void
-UsbRoster::DeviceRemoved(BUSBDevice* device)
-{
-	BAutolock locker(fDevicesLock);
-	USBDevice* deviceInfo;
-	int i = 0;
-	while (deviceInfo = (USBDevice*)fDevices.ItemAt(i++)) {
-		if (!deviceInfo)
-			continue;
-		char tmp[200];
-		strcpy(tmp,"/dev/bus/usb");
-		strcat(tmp,device->Location());
-		if (strcmp(deviceInfo->Location(), tmp) == 0)
-			break;
-	}
-
-	if (!deviceInfo)
-		return;
-
-	// Remove this device from each active context's device list 
-	struct libusb_context *ctx;
-	struct libusb_device *dev;
-	
-	usbi_mutex_lock(&active_contexts_lock);
-	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
-		dev = usbi_get_device_by_session_id (ctx, (unsigned long)deviceInfo);
-		if (dev != NULL) {
-			usbi_disconnect_device (dev);
-		}
-	}
-	usbi_mutex_static_unlock(&active_contexts_lock);
-
-	fDevices.RemoveItem(deviceInfo);
-}
-
+#include "haiku_usb_raw.h"
 
 UsbRoster 		gUsbRoster;
 int32			gInitCount = 0;
@@ -502,7 +113,7 @@ haiku_set_configuration(struct libusb_device_handle *dev_handle, int config)
 	TRACE("haiku_set_configuration\n");
 #endif
 	USBDevice * dev= *((USBDevice**)dev_handle->dev->os_priv);
-	return dev->SetConfiguration(config);
+	return dev->SetConfiguration(config);		//IS THIS SET CONF by BConfigValue?? or Config Index???
 }
 
 static int
@@ -512,7 +123,7 @@ haiku_claim_interface(struct libusb_device_handle *dev_handle, int interface_num
 	TRACE("haiku_claim_interface\n");
 #endif
 	USBDeviceHandle * handle=*((USBDeviceHandle**)dev_handle->os_priv);
-	handle->SetInterface(interface_number);		//ALLOWS CLAIMING JUST 1 interface :(
+	handle->SetInterface(interface_number);		//ALLOWS CLAIMING JUST 1 interface :( Is it a problem?
 	return LIBUSB_SUCCESS;
 }
 
@@ -534,7 +145,7 @@ haiku_release_interface(struct libusb_device_handle *dev_handle, int interface_n
 #endif
 	USBDeviceHandle * handle=*((USBDeviceHandle**)dev_handle->os_priv);
 	//SET ALT SETTING TO 0
-	haiku_set_altsetting(dev_handle,interface_number,0);
+	//haiku_set_altsetting(dev_handle,interface_number,0);
 	handle->SetInterface(-1);
 	return LIBUSB_SUCCESS;
 }
@@ -585,6 +196,13 @@ haiku_handle_events(struct libusb_context* ctx, struct pollfd* fds, nfds_t nfds,
 	return LIBUSB_SUCCESS;
 }
 
+void haiku_destroy_device(struct libusb_device * device)
+{
+	USBDevice* dev=*((USBDevice**)device->os_priv);
+	delete dev;
+	*((USBDevice**)device->os_priv)=NULL;
+}
+
 static int
 haiku_clock_gettime(int clkid, struct timespec *tp)
 {
@@ -629,7 +247,7 @@ const struct usbi_os_backend haiku_usb_raw_backend = {
 	/*.detach_kernel_driver =*/ NULL,
 	/*.attach_kernel_driver =*/ NULL,
 
-	/*.destroy_device =*/ NULL,
+	/*.destroy_device =*/ haiku_destroy_device,
 
 	/*.submit_transfer =*/ haiku_submit_transfer,
 	/*.cancel_transfer =*/ haiku_cancel_transfer,
