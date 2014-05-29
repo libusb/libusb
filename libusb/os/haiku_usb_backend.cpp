@@ -50,7 +50,7 @@ USBDeviceHandle::TransfersWorker()
 			
 				fPendingTransfer->transferred=command.control.length;
 			}
-				break;
+			break;
 			case LIBUSB_TRANSFER_TYPE_BULK:
 			case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 			{
@@ -79,7 +79,52 @@ USBDeviceHandle::TransfersWorker()
 				}
 				fPendingTransfer->transferred=command.transfer.length;
 			}
-				break;
+			break;
+			case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
+			{
+				usb_raw_command command;
+				command.isochronous.interface=fInterface;
+				command.isochronous.endpoint=fUSBDevice->fEndpointAddress[fLibusbTransfer->endpoint];
+				command.isochronous.data=fLibusbTransfer->buffer;
+				command.isochronous.length=fLibusbTransfer->length;
+				command.isochronous.packet_count=fLibusbTransfer->num_iso_packets;
+				int i=0;
+				usb_iso_packet_descriptor *packetDescriptors = new usb_iso_packet_descriptor[fLibusbTransfer->num_iso_packets];
+				for (i=0; i<fLibusbTransfer->num_iso_packets; i++)
+				{
+					if((int16)(fLibusbTransfer->iso_packet_desc[i]).length!=(fLibusbTransfer->iso_packet_desc[i]).length)
+					{
+						fPendingTransfer->transferred=-1;
+						printf("failed isochronous transfer :(");
+						break;
+					}
+					packetDescriptors[i].request_length=(int16)(fLibusbTransfer->iso_packet_desc[i]).length;
+				}
+				if(i<fLibusbTransfer->num_iso_packets)
+				{
+					break;
+				}
+				command.isochronous.packet_descriptors=packetDescriptors;
+				if(ioctl(fUSBDevice->fRawFD,B_USB_RAW_COMMAND_ISOCHRONOUS_TRANSFER,&command,
+					sizeof(command)) || command.isochronous.status!=B_USB_RAW_STATUS_SUCCESS)	{
+					fPendingTransfer->transferred=-1;
+					printf("failed isochronous transfer :(");
+					break;
+				}
+				for (i=0; i<fLibusbTransfer->num_iso_packets; i++)
+				{
+					(fLibusbTransfer->iso_packet_desc[i]).actual_length=packetDescriptors[i].actual_length;
+					switch(packetDescriptors[i].status)
+					{
+						case B_OK: (fLibusbTransfer->iso_packet_desc[i]).status=LIBUSB_TRANSFER_COMPLETED;
+							break;
+						default: (fLibusbTransfer->iso_packet_desc[i]).status=LIBUSB_TRANSFER_ERROR;
+							break;
+					}
+				}
+				fPendingTransfer->transferred=command.transfer.length;
+			}
+			break;
 			default:
 				printf("Type other\n");
 		}
