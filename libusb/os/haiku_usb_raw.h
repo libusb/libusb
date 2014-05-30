@@ -2,6 +2,7 @@
 #include <Locker.h>
 #include <Autolock.h>
 #include <USBKit.h>
+#include <map>
 #include "libusbi.h"
 #include "usb_raw.h"
 
@@ -10,31 +11,33 @@
 #define TRACE(x) printf(x);
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 class USBDevice{
 public:
 	USBDevice(const char *);
 	virtual ~USBDevice();
 	const char* Location() const;
-	uint32 CountConfigurations() const;
+	uint8 CountConfigurations() const;
 	const usb_device_descriptor* Descriptor() const;
 	const usb_configuration_descriptor* ConfigurationDescriptor(uint32) const;
 	const usb_configuration_descriptor* ActiveConfiguration() const;
-	int SetConfiguration(int);
-	int SetAltSetting(int,int);
-	int								fRawFD;
-	int 							fEndpointAddress[255];
+	uint8 EndpointToIndex(uint8) const;
+	uint8 EndpointToInterface(uint8) const;
+	int ClaimInterface(int);
+	int ReleaseInterface(int);
+	int CheckInterfacesFree(int config);
+	int SetActiveConfiguration(int);
+	//int SetAltSetting(int,int);
 private:
 	int								Initialise();
+	unsigned int								fClaimedInterfaces;		//Linux has an arbitrary defined max_interfaces set to 32 
 	usb_device_descriptor			fDeviceDescriptor;
-	unsigned char**							fConfigurationDescriptors;
+	unsigned char**					fConfigurationDescriptors;
 	int								fActiveConfiguration;
 	char*							fPath;
-
-	
+	map<uint8,uint8>				fConfigToIndex;
+	map<uint8,uint8>*				fEndpointToIndex;
+	map<uint8,uint8>*				fEndpointToInterface;
+	//Probably one more for Alternate Interface to Index :P
 };
 
 class USBDeviceHandle{
@@ -42,13 +45,16 @@ public:
 	USBDeviceHandle(USBDevice* dev);
 	virtual ~USBDeviceHandle();
 	int EventPipe(int) const;
-	int SetInterface(int);
+	int ClaimInterface(int);
+	int ReleaseInterface(int);
+	int SetConfiguration(int);
 	status_t SubmitTransfer(struct usbi_transfer*);
 private:
+	int fRawFD;
 	static status_t TransfersThread(void *);
 	void TransfersWorker();
 	USBDevice * fUSBDevice;
-	int fInterface;
+	unsigned int fClaimedInterfaces;
 	int fEventPipes[2];
 	BList fTransfers;
 	BLocker fTransfersLock;
@@ -70,6 +76,3 @@ private:
 	BList	fDevices;
 };
 
-#ifdef __cplusplus
-}
-#endif

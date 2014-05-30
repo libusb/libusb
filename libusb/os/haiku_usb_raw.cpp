@@ -53,7 +53,6 @@ haiku_close(struct libusb_device_handle *dev_handle)
 	USBDeviceHandle * handle=*((USBDeviceHandle**)dev_handle->os_priv);
 	if(handle==NULL)
 		return;
-	//Release Interface??
 	usbi_remove_pollfd(HANDLE_CTX(dev_handle),handle->EventPipe(0));
 	delete handle;
 	*((USBDeviceHandle**)dev_handle->os_priv)=NULL;
@@ -112,8 +111,8 @@ haiku_set_configuration(struct libusb_device_handle *dev_handle, int config)
 #ifdef TRACE_USB
 	TRACE("haiku_set_configuration\n");
 #endif
-	USBDevice * dev= *((USBDevice**)dev_handle->dev->os_priv);
-	return dev->SetConfiguration(config);		//IS THIS SET CONF by BConfigValue?? or Config Index???
+	USBDeviceHandle * handle= *((USBDeviceHandle**)dev_handle->os_priv);
+	return handle->SetConfiguration(config);
 }
 
 static int
@@ -123,8 +122,7 @@ haiku_claim_interface(struct libusb_device_handle *dev_handle, int interface_num
 	TRACE("haiku_claim_interface\n");
 #endif
 	USBDeviceHandle * handle=*((USBDeviceHandle**)dev_handle->os_priv);
-	handle->SetInterface(interface_number);		//ALLOWS CLAIMING JUST 1 interface :( Is it a problem?
-	return LIBUSB_SUCCESS;
+	return handle->ClaimInterface(interface_number);
 }
 
 static int
@@ -134,7 +132,7 @@ haiku_set_altsetting(struct libusb_device_handle* dev_handle, int interface_numb
 	TRACE("haiku_set_altsetting\n");
 #endif
 	USBDevice * dev = *((USBDevice**)dev_handle->dev->os_priv);
-	return dev->SetAltSetting(interface_number, altsetting);
+	//return dev->SetAltSetting(interface_number, altsetting);
 }
 
 static int
@@ -146,8 +144,7 @@ haiku_release_interface(struct libusb_device_handle *dev_handle, int interface_n
 	USBDeviceHandle * handle=*((USBDeviceHandle**)dev_handle->os_priv);
 	//SET ALT SETTING TO 0
 	//haiku_set_altsetting(dev_handle,interface_number,0);
-	handle->SetInterface(-1);
-	return LIBUSB_SUCCESS;
+	return handle->ReleaseInterface(interface_number);
 }
 
 static int

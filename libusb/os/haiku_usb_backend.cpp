@@ -7,6 +7,11 @@
 
 #include "haiku_usb_raw.h"
 
+int _errno_to_libusb(int status)
+{
+	return status;
+}
+
 status_t
 USBDeviceHandle::TransfersThread(void* self)
 {
@@ -41,7 +46,7 @@ USBDeviceHandle::TransfersWorker()
 				command.control.index=setup->wIndex;
 				command.control.length=setup->wLength;
 				command.control.data=fLibusbTransfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
-				if(ioctl(fUSBDevice->fRawFD,B_USB_RAW_COMMAND_CONTROL_TRANSFER,&command,
+				if(ioctl(fRawFD,B_USB_RAW_COMMAND_CONTROL_TRANSFER,&command,
 					sizeof(command)) || command.control.status!=B_USB_RAW_STATUS_SUCCESS)	{
 					fPendingTransfer->transferred=-1;
 					printf("failed control transfer :(");
@@ -55,13 +60,13 @@ USBDeviceHandle::TransfersWorker()
 			case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 			{
 				usb_raw_command command;
-				command.transfer.interface=fInterface;
-				command.transfer.endpoint=fUSBDevice->fEndpointAddress[fLibusbTransfer->endpoint];
+				command.transfer.interface=fUSBDevice->EndpointToInterface(fLibusbTransfer->endpoint);
+				command.transfer.endpoint=fUSBDevice->EndpointToIndex(fLibusbTransfer->endpoint);
 				command.transfer.data=fLibusbTransfer->buffer;
 				command.transfer.length=fLibusbTransfer->length;
 				if(fLibusbTransfer->type==LIBUSB_TRANSFER_TYPE_BULK)
 				{
-					if(ioctl(fUSBDevice->fRawFD,B_USB_RAW_COMMAND_BULK_TRANSFER,&command,
+					if(ioctl(fRawFD,B_USB_RAW_COMMAND_BULK_TRANSFER,&command,
 						sizeof(command)) || command.transfer.status!=B_USB_RAW_STATUS_SUCCESS)	{
 						fPendingTransfer->transferred=-1;
 						printf("failed bulk transfer :(");
@@ -70,7 +75,7 @@ USBDeviceHandle::TransfersWorker()
 				}
 				else
 				{
-					if(ioctl(fUSBDevice->fRawFD,B_USB_RAW_COMMAND_INTERRUPT_TRANSFER,&command,
+					if(ioctl(fRawFD,B_USB_RAW_COMMAND_INTERRUPT_TRANSFER,&command,
 						sizeof(command)) || command.transfer.status!=B_USB_RAW_STATUS_SUCCESS)	{
 						fPendingTransfer->transferred=-1;
 						printf("failed interrupt transfer :(");
@@ -83,8 +88,8 @@ USBDeviceHandle::TransfersWorker()
 			case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 			{
 				usb_raw_command command;
-				command.isochronous.interface=fInterface;
-				command.isochronous.endpoint=fUSBDevice->fEndpointAddress[fLibusbTransfer->endpoint];
+				command.isochronous.interface=fUSBDevice->EndpointToInterface(fLibusbTransfer->endpoint);
+				command.isochronous.endpoint=fUSBDevice->EndpointToIndex(fLibusbTransfer->endpoint);
 				command.isochronous.data=fLibusbTransfer->buffer;
 				command.isochronous.length=fLibusbTransfer->length;
 				command.isochronous.packet_count=fLibusbTransfer->num_iso_packets;
@@ -105,7 +110,7 @@ USBDeviceHandle::TransfersWorker()
 					break;
 				}
 				command.isochronous.packet_descriptors=packetDescriptors;
-				if(ioctl(fUSBDevice->fRawFD,B_USB_RAW_COMMAND_ISOCHRONOUS_TRANSFER,&command,
+				if(ioctl(fRawFD,B_USB_RAW_COMMAND_ISOCHRONOUS_TRANSFER,&command,
 					sizeof(command)) || command.isochronous.status!=B_USB_RAW_STATUS_SUCCESS)	{
 					fPendingTransfer->transferred=-1;
 					printf("failed isochronous transfer :(");
@@ -143,8 +148,13 @@ USBDeviceHandle::SubmitTransfer(struct usbi_transfer* itransfer)
 USBDeviceHandle::USBDeviceHandle(USBDevice* dev)
 	:
 	fUSBDevice(dev),
-	fInterface(0)
+	fClaimedInterfaces(0)
 {
+	fRawFD=open(dev->Location(), O_RDWR | O_CLOEXEC);
+	if(fRawFD < 0)
+	{
+		//See how to report
+	}
 	pipe(fEventPipes);
 	fcntl(fEventPipes[1], F_SETFD, O_NONBLOCK);	//Why need??
 	fTransfersSem = create_sem(0, "Transfers Queue Sem");
@@ -154,7 +164,14 @@ USBDeviceHandle::USBDeviceHandle(USBDevice* dev)
 
 USBDeviceHandle::~USBDeviceHandle()
 {
-	close(fEventPipes[1]);
+	if(fRawFD>0)
+		close(fRawFD);
+	for(int i=0; i<32; i++)	//as max 32 interfaces, do better
+	{
+		if(fClaimedInterfaces&(1<<i)==1)
+			ReleaseInterface(i);
+	}
+	close(fEventPipes[1]);	//Close if >0 ... (as class destroyed anyways...)
 	close(fEventPipes[0]);
 	delete_sem(fTransfersSem);
 	if(fTransfersThread>0)
@@ -168,16 +185,44 @@ USBDeviceHandle::EventPipe(int index) const
 }
 
 int
-USBDeviceHandle::SetInterface(int inumber)
+USBDeviceHandle::ClaimInterface(int inumber)
 {
-	fInterface=inumber;
-	return 0;
+	int status=fUSBDevice->ClaimInterface(inumber);
+	if(status==LIBUSB_SUCCESS)
+	{
+		fClaimedInterfaces|=(1<<inumber);
+	}
+	return status;
+}
+
+int
+USBDeviceHandle::ReleaseInterface(int inumber)
+{
+	fUSBDevice->ReleaseInterface(inumber);
+	fClaimedInterfaces&=(!(1<<inumber));
+	return LIBUSB_SUCCESS;
+}
+
+int
+USBDeviceHandle::SetConfiguration(int config)
+{
+	int config_index=fUSBDevice->CheckInterfacesFree(config);
+	if(config_index==LIBUSB_ERROR_BUSY || config_index==LIBUSB_ERROR_NOT_FOUND)
+		return config_index;
+		
+	usb_raw_command command;
+	command.config.config_index=config_index;
+	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_CONFIGURATION,&command,
+		sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
+		return _errno_to_libusb(command.config.status);
+	}
+	fUSBDevice->SetActiveConfiguration(config);
+	return LIBUSB_SUCCESS;
 }
 
 USBDevice::USBDevice(const char * path) 
 	:
 	fPath(NULL),
-	fRawFD(-1),
 	fActiveConfiguration(0),	//0?
 	fConfigurationDescriptors(NULL)
 {
@@ -187,8 +232,6 @@ USBDevice::USBDevice(const char * path)
 
 USBDevice::~USBDevice()
 {
-	if(fRawFD>=0)
-		close(fRawFD);
 	free(fPath);
 	for(int i=0;i<fDeviceDescriptor.num_configurations;i++)
 	{
@@ -203,7 +246,7 @@ USBDevice::Location() const
 	return fPath;
 }
 
-inline uint32
+inline uint8
 USBDevice::CountConfigurations() const
 {
 	return fDeviceDescriptor.num_configurations;
@@ -229,37 +272,81 @@ USBDevice::ActiveConfiguration() const
 	return (usb_configuration_descriptor*) fConfigurationDescriptors[fActiveConfiguration];
 }
 
-int
-USBDevice::SetConfiguration(int config)
+int USBDevice::ClaimInterface(int interface)
 {
-	usb_raw_command command;
-	command.config.config_index=config;
-	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_CONFIGURATION,&command,
-		sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS)
-	{
-		return -1;	//REPAIR
-	}
-	fActiveConfiguration=config;
-	return 0;
+	if(interface>ActiveConfiguration()->number_interfaces)
+		return LIBUSB_ERROR_NOT_FOUND;
+	if(fClaimedInterfaces & (1<<interface) !=0 )
+		return LIBUSB_ERROR_BUSY;
+	fClaimedInterfaces|=(1<<interface);
+	return LIBUSB_SUCCESS;
+}
+
+int USBDevice::ReleaseInterface(int interface)
+{
+	fClaimedInterfaces&=(!(1<<interface));
+	return LIBUSB_SUCCESS;
 }
 
 int
+USBDevice::CheckInterfacesFree(int config)
+{
+	if(fConfigToIndex.count(config)==0)
+		return LIBUSB_ERROR_NOT_FOUND;
+	if(fClaimedInterfaces==0)
+		return fConfigToIndex[(uint8)config];
+	return LIBUSB_ERROR_BUSY;
+}
+
+int
+USBDevice::SetActiveConfiguration(int config)
+{
+	fActiveConfiguration=config;
+}
+
+uint8
+USBDevice::EndpointToIndex(uint8 address) const
+{
+	return fEndpointToIndex[fActiveConfiguration][address];
+}
+
+uint8
+USBDevice::EndpointToInterface(uint8 address) const
+{
+	return fEndpointToInterface[fActiveConfiguration][address];
+}
+
+/*int
+USBDevice::SetConfiguration(int config)
+{
+	usb_raw_command command;
+	command.config.config_index=config;	//probably this is sending bConfigValue
+//	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_CONFIGURATION,&command,
+//		sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS)
+//	{
+//		return -1;	//REPAIR
+//	}
+	fActiveConfiguration=config;
+	return 0;
+}*/
+
+/*int
 USBDevice::SetAltSetting(int inumber, int alt)
 {
 	usb_raw_command command;
 	command.alternate.alternate_info = alt;
 	command.alternate.config_index=fActiveConfiguration;
 	command.alternate.interface_index=inumber;
-	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_ALT_INTERFACE,&command, 
-		sizeof(command)) || command.alternate.status!=B_USB_RAW_STATUS_SUCCESS)
-		return B_ERROR;
+//	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_ALT_INTERFACE,&command, 
+//		sizeof(command)) || command.alternate.status!=B_USB_RAW_STATUS_SUCCESS)
+//		return B_ERROR;
 	return LIBUSB_SUCCESS;
-}
+}*/
 
 int 
-USBDevice::Initialise()		//Do we need more error checking, etc?
+USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 {
-	fRawFD=open(fPath, O_RDWR | O_CLOEXEC);
+	int fRawFD=open(fPath, O_RDWR | O_CLOEXEC);
 	if(fRawFD < 0)
 		return B_ERROR;
 		
@@ -272,6 +359,8 @@ USBDevice::Initialise()		//Do we need more error checking, etc?
 	
 	size_t size;
 	fConfigurationDescriptors = new(std::nothrow) unsigned char*[fDeviceDescriptor.num_configurations];
+	fEndpointToIndex = new(std::nothrow) map<uint8,uint8> [fDeviceDescriptor.num_configurations];
+	fEndpointToInterface = new(std::nothrow) map<uint8,uint8> [fDeviceDescriptor.num_configurations];
 	for( int i=0; i<fDeviceDescriptor.num_configurations; i++)
 	{
 		size=0;
@@ -282,6 +371,7 @@ USBDevice::Initialise()		//Do we need more error checking, etc?
 			sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
 			return B_ERROR;		
 		}
+		fConfigToIndex[tmp_config.configuration_value]=i;
 		fConfigurationDescriptors[i]=new(std::nothrow) unsigned char[tmp_config.total_length];
 		memcpy(fConfigurationDescriptors[i],&tmp_config,tmp_config.length);
 		size+=tmp_config.length;
@@ -289,7 +379,7 @@ USBDevice::Initialise()		//Do we need more error checking, etc?
 		{
 			usb_interface_descriptor tmp_interface;
 			command.interface.config_index=i;
-			command.interface.interface_index=j;	//CHECK IF WE NEED ACTIVE ALT INTERFACE OR 0
+			command.interface.interface_index=j;	//CHECK IF WE NEED ACTIVE ALT INTERFACE OR 0?????? We need all alt interfaces also here...
 			command.interface.descriptor=&tmp_interface;
 			if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_INTERFACE_DESCRIPTOR, &command,
 				sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
@@ -308,10 +398,12 @@ USBDevice::Initialise()		//Do we need more error checking, etc?
 					sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
 					return B_ERROR;
 				}
+				fEndpointToIndex[i][tmp_endpoint.endpoint_address]=k;
+				fEndpointToInterface[i][tmp_endpoint.endpoint_address]=j;
 				memcpy(fConfigurationDescriptors[i]+size, &tmp_endpoint, tmp_endpoint.length);
-				fEndpointAddress[tmp_endpoint.endpoint_address]=k;
 				size+=tmp_endpoint.length;
 			}
 		}
 	}
+	close(fRawFD);
 }
