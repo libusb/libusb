@@ -119,7 +119,7 @@ static int sysfs_can_relate_devices = -1;
 static int sysfs_has_descriptors = -1;
 
 /* how many times have we initted (and not exited) ? */
-static volatile int init_count = 0;
+static int init_count = 0;
 
 /* Serialize hotplug start/stop */
 usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
