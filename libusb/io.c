@@ -1456,10 +1456,10 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	if (r != LIBUSB_SUCCESS) {
 		list_del(&itransfer->list);
 		arm_timerfd_for_next_timeout(ctx);
+	} else {
+		/* keep a reference to this device */
+		libusb_ref_device(transfer->dev_handle->dev);
 	}
-
-	/* keep a reference to this device */
-	libusb_ref_device(transfer->dev_handle->dev);
 out:
 	updated_fds = (itransfer->flags & USBI_TRANSFER_UPDATED_FDS);
 	usbi_mutex_unlock(&itransfer->lock);
