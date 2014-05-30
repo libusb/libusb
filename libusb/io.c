@@ -1439,6 +1439,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	int r;
 	int updated_fds;
 
+	usbi_mutex_lock(&ctx->flying_transfers_lock);
 	usbi_mutex_lock(&itransfer->lock);
 	itransfer->transferred = 0;
 	itransfer->flags = 0;
@@ -1448,7 +1449,6 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		goto out;
 	}
 
-	usbi_mutex_lock(&ctx->flying_transfers_lock);
 	r = add_to_flying_list(itransfer);
 	if (r == LIBUSB_SUCCESS) {
 		r = usbi_backend->submit_transfer(itransfer);
@@ -1457,13 +1457,13 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		list_del(&itransfer->list);
 		arm_timerfd_for_next_timeout(ctx);
 	}
-	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
 	/* keep a reference to this device */
 	libusb_ref_device(transfer->dev_handle->dev);
 out:
 	updated_fds = (itransfer->flags & USBI_TRANSFER_UPDATED_FDS);
 	usbi_mutex_unlock(&itransfer->lock);
+	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 	if (updated_fds)
 		usbi_fd_notification(ctx);
 	return r;
