@@ -2590,6 +2590,12 @@ static int op_handle_events(struct libusb_context *ctx,
 				break;
 		}
 
+		if (!hpriv || hpriv->fd != pollfd->fd) {
+			usbi_err(ctx, "cannot find handle for fd %d\n",
+				 pollfd->fd);
+			continue;
+		}
+
 		if (pollfd->revents & POLLERR) {
 			usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->fd);
 			usbi_handle_disconnect(handle);
