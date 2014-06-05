@@ -15,7 +15,7 @@ int _errno_to_libusb(int status)
 status_t
 USBDeviceHandle::TransfersThread(void* self)
 {
-	USBDeviceHandle * handle = (USBDeviceHandle*)self;
+	USBDeviceHandle* handle = (USBDeviceHandle*)self;
 	handle->TransfersWorker();
 	
 }
@@ -107,7 +107,7 @@ USBDeviceHandle::TransfersWorker()
 				}
 				if(i<fLibusbTransfer->num_iso_packets)
 				{
-					break;
+					break;	//Handle this error
 				}
 				command.isochronous.packet_descriptors=packetDescriptors;
 				if(ioctl(fRawFD,B_USB_RAW_COMMAND_ISOCHRONOUS_TRANSFER,&command,
@@ -127,6 +127,7 @@ USBDeviceHandle::TransfersWorker()
 							break;
 					}
 				}
+				delete[] packetDescriptors;
 				fPendingTransfer->transferred=command.transfer.length;
 			}
 			break;
@@ -147,6 +148,7 @@ USBDeviceHandle::SubmitTransfer(struct usbi_transfer* itransfer)
 
 USBDeviceHandle::USBDeviceHandle(USBDevice* dev)
 	:
+	fTransfersThread(-1),
 	fUSBDevice(dev),
 	fClaimedInterfaces(0)
 {
@@ -168,11 +170,13 @@ USBDeviceHandle::~USBDeviceHandle()
 		close(fRawFD);
 	for(int i=0; i<32; i++)	//as max 32 interfaces, do better
 	{
-		if(fClaimedInterfaces&(1<<i)==1)
+		if(fClaimedInterfaces&(1<<i))
 			ReleaseInterface(i);
 	}
-	close(fEventPipes[1]);	//Close if >0 ... (as class destroyed anyways...)
-	close(fEventPipes[0]);
+	if(fEventPipes[1]>0)
+		close(fEventPipes[1]);
+	if(fEventPipes[0]>0)
+		close(fEventPipes[0]);
 	delete_sem(fTransfersSem);
 	if(fTransfersThread>0)
 		wait_for_thread(fTransfersThread, NULL);
@@ -216,15 +220,34 @@ USBDeviceHandle::SetConfiguration(int config)
 		sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
 		return _errno_to_libusb(command.config.status);
 	}
-	fUSBDevice->SetActiveConfiguration(config);
+	fUSBDevice->SetActiveConfiguration(config_index);
 	return LIBUSB_SUCCESS;
 }
+
+int
+USBDeviceHandle::SetAltSetting(int inumber, int alt)
+{
+	usb_raw_command command;
+	command.alternate.alternate_info = alt;
+	command.alternate.config_index=fUSBDevice->ActiveConfigurationIndex();
+	command.alternate.interface_index=inumber;
+	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_ALT_INTERFACE,&command, 	//IF IOCTL FAILS DEVICE DISONNECTED PROBABLY
+		sizeof(command)) || command.alternate.status!=B_USB_RAW_STATUS_SUCCESS)	{
+		printf("Error set alt setting : %d\n",command.alternate.status);
+		return _errno_to_libusb(command.alternate.status);
+	}
+	printf("Set alt succeeded %d\n",command.alternate.status);
+}
+
 
 USBDevice::USBDevice(const char * path) 
 	:
 	fPath(NULL),
 	fActiveConfiguration(0),	//0?
-	fConfigurationDescriptors(NULL)
+	fConfigurationDescriptors(NULL),
+	fClaimedInterfaces(0),
+	fEndpointToIndex(NULL),
+	fEndpointToInterface(NULL)
 {
 	fPath=strdup(path);
 	Initialise();
@@ -238,6 +261,8 @@ USBDevice::~USBDevice()
 		delete fConfigurationDescriptors[i];
 	}
 	delete[] fConfigurationDescriptors;
+	delete[] fEndpointToIndex;
+	delete[] fEndpointToInterface;
 }
 
 inline const char*
@@ -272,11 +297,19 @@ USBDevice::ActiveConfiguration() const
 	return (usb_configuration_descriptor*) fConfigurationDescriptors[fActiveConfiguration];
 }
 
+int
+USBDevice::ActiveConfigurationIndex() const
+{
+	return fActiveConfiguration;
+}
+
 int USBDevice::ClaimInterface(int interface)
 {
 	if(interface>ActiveConfiguration()->number_interfaces)
+	{
 		return LIBUSB_ERROR_NOT_FOUND;
-	if(fClaimedInterfaces & (1<<interface) !=0 )
+	}
+	if((fClaimedInterfaces & (1<<interface)) !=0 )
 		return LIBUSB_ERROR_BUSY;
 	fClaimedInterfaces|=(1<<interface);
 	return LIBUSB_SUCCESS;
@@ -299,9 +332,9 @@ USBDevice::CheckInterfacesFree(int config)
 }
 
 int
-USBDevice::SetActiveConfiguration(int config)
+USBDevice::SetActiveConfiguration(int config_index)
 {
-	fActiveConfiguration=config;
+	fActiveConfiguration=config_index;
 }
 
 uint8
@@ -315,33 +348,6 @@ USBDevice::EndpointToInterface(uint8 address) const
 {
 	return fEndpointToInterface[fActiveConfiguration][address];
 }
-
-/*int
-USBDevice::SetConfiguration(int config)
-{
-	usb_raw_command command;
-	command.config.config_index=config;	//probably this is sending bConfigValue
-//	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_CONFIGURATION,&command,
-//		sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS)
-//	{
-//		return -1;	//REPAIR
-//	}
-	fActiveConfiguration=config;
-	return 0;
-}*/
-
-/*int
-USBDevice::SetAltSetting(int inumber, int alt)
-{
-	usb_raw_command command;
-	command.alternate.alternate_info = alt;
-	command.alternate.config_index=fActiveConfiguration;
-	command.alternate.interface_index=inumber;
-//	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_ALT_INTERFACE,&command, 
-//		sizeof(command)) || command.alternate.status!=B_USB_RAW_STATUS_SUCCESS)
-//		return B_ERROR;
-	return LIBUSB_SUCCESS;
-}*/
 
 int 
 USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
@@ -373,35 +379,52 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 		}
 		fConfigToIndex[tmp_config.configuration_value]=i;
 		fConfigurationDescriptors[i]=new(std::nothrow) unsigned char[tmp_config.total_length];
-		memcpy(fConfigurationDescriptors[i],&tmp_config,tmp_config.length);
-		size+=tmp_config.length;
+		command.control.request_type=128;
+		command.control.request=6;
+		command.control.value=(2<<8)|i;
+		command.control.index=0;
+		command.control.length=tmp_config.total_length;
+		command.control.data=fConfigurationDescriptors[i];
+		if(ioctl(fRawFD,B_USB_RAW_COMMAND_CONTROL_TRANSFER,&command,
+			sizeof(command)) || command.control.status!=B_USB_RAW_STATUS_SUCCESS)	{
+			printf("failed descriptor transfer :(");
+			break;
+		}
 		for( int j=0;j<tmp_config.number_interfaces;j++)
 		{
-			usb_interface_descriptor tmp_interface;
-			command.interface.config_index=i;
-			command.interface.interface_index=j;	//CHECK IF WE NEED ACTIVE ALT INTERFACE OR 0?????? We need all alt interfaces also here...
-			command.interface.descriptor=&tmp_interface;
-			if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_INTERFACE_DESCRIPTOR, &command,
+			command.alternate.config_index=i;
+			command.alternate.interface_index=j;
+			if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_ALT_INTERFACE_COUNT, &command,
 				sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
 				return B_ERROR;
 			}
-			memcpy(fConfigurationDescriptors[i]+size, &tmp_interface, tmp_interface.length);
-			size+=tmp_interface.length;
-			for( int k=0;k<tmp_interface.num_endpoints;k++)
+			int num_alternate=command.alternate.alternate_info;
+			for( int k=0;k<num_alternate;k++)
 			{
-				usb_endpoint_descriptor tmp_endpoint;
-				command.endpoint.config_index=i;
-				command.endpoint.interface_index=j;
-				command.endpoint.endpoint_index=k;
-				command.endpoint.descriptor=&tmp_endpoint;
-				if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_ENDPOINT_DESCRIPTOR, &command,
+				usb_interface_descriptor tmp_interface;
+				command.interface_etc.config_index=i;
+				command.interface_etc.interface_index=j;
+				command.interface_etc.alternate_index=k;
+				command.interface_etc.descriptor=&tmp_interface;
+				if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_INTERFACE_DESCRIPTOR_ETC, &command,
 					sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
 					return B_ERROR;
 				}
-				fEndpointToIndex[i][tmp_endpoint.endpoint_address]=k;
-				fEndpointToInterface[i][tmp_endpoint.endpoint_address]=j;
-				memcpy(fConfigurationDescriptors[i]+size, &tmp_endpoint, tmp_endpoint.length);
-				size+=tmp_endpoint.length;
+				for( int l=0;l<tmp_interface.num_endpoints;l++)
+				{
+					usb_endpoint_descriptor tmp_endpoint;
+					command.endpoint_etc.config_index=i;
+					command.endpoint_etc.interface_index=j;
+					command.endpoint_etc.alternate_index=k;
+					command.endpoint_etc.endpoint_index=l;
+					command.endpoint_etc.descriptor=&tmp_endpoint;
+					if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_ENDPOINT_DESCRIPTOR_ETC, &command,
+						sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
+						return B_ERROR;
+					}
+					fEndpointToIndex[i][tmp_endpoint.endpoint_address]=l;
+					fEndpointToInterface[i][tmp_endpoint.endpoint_address]=j;
+				}
 			}
 		}
 	}

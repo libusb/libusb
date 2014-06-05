@@ -131,8 +131,8 @@ haiku_set_altsetting(struct libusb_device_handle* dev_handle, int interface_numb
 #ifdef TRACE_USB
 	TRACE("haiku_set_altsetting\n");
 #endif
-	USBDevice * dev = *((USBDevice**)dev_handle->dev->os_priv);
-	//return dev->SetAltSetting(interface_number, altsetting);
+	USBDeviceHandle* handle = *((USBDeviceHandle**)dev_handle->os_priv);
+	return handle->SetAltSetting(interface_number, altsetting);
 }
 
 static int
@@ -164,6 +164,7 @@ haiku_cancel_transfer(struct usbi_transfer * itransfer)
 #ifdef TRACE_USB
 	TRACE("haiku_cancel_transfer\n");
 #endif
+//TODO
 }
 
 static int
