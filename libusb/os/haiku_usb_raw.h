@@ -27,7 +27,6 @@ public:
 	int 									CheckInterfacesFree(int);
 	int 									SetActiveConfiguration(int);
 	int										ActiveConfigurationIndex() const;
-	//int SetAltSetting(int,int);
 private:
 	int										Initialise();
 	unsigned int							fClaimedInterfaces;		//Linux has an arbitrary defined max_interfaces set to 32 
@@ -63,10 +62,24 @@ private:
 	thread_id 			fTransfersThread;
 };
 
+class USBTransfer{
+public:
+							USBTransfer(struct usbi_transfer*,USBDevice*);
+	virtual					~USBTransfer();
+	void					Do(int);
+	struct usbi_transfer*	itransfer();	//Do better
+private:
+	struct usbi_transfer*	fUsbiTransfer;
+	struct libusb_transfer*	fLibusbTransfer;
+//	USBDeviceHandle*		fUSBDeviceHandle;
+	USBDevice*				fUSBDevice;
+	BLocker					fStatusLock;
+	int						fStatus;
+};
+
 class UsbRoster : public BUSBRoster {
 public:
-                   UsbRoster()  {}
-
+                   		UsbRoster()  {}
 	virtual status_t    DeviceAdded(BUSBDevice* device);
 	virtual void        DeviceRemoved(BUSBDevice* device);
 

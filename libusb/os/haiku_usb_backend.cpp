@@ -12,12 +12,133 @@ int _errno_to_libusb(int status)
 	return status;
 }
 
+USBTransfer::USBTransfer(struct usbi_transfer* itransfer, USBDevice* device)
+{
+	fUsbiTransfer=itransfer;
+	fLibusbTransfer=USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	fUSBDevice=device;
+//	fStatus=USBTRANSFER_QUEUED;
+}
+
+USBTransfer::~USBTransfer()
+{
+}
+
+struct usbi_transfer*
+USBTransfer::itransfer()
+{
+	return fUsbiTransfer;
+}
+
+void
+USBTransfer::Do(int fRawFD)
+{
+	switch(fLibusbTransfer->type)
+	{
+		case LIBUSB_TRANSFER_TYPE_CONTROL:
+		{
+			struct libusb_control_setup* setup=(struct libusb_control_setup*)fLibusbTransfer->buffer;
+			usb_raw_command command;
+			command.control.request_type=setup->bmRequestType;
+			command.control.request=setup->bRequest;
+			command.control.value=setup->wValue;
+			command.control.index=setup->wIndex;
+			command.control.length=setup->wLength;
+			command.control.data=fLibusbTransfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
+			if(ioctl(fRawFD,B_USB_RAW_COMMAND_CONTROL_TRANSFER,&command,
+				sizeof(command)) || command.control.status!=B_USB_RAW_STATUS_SUCCESS)	{
+				fUsbiTransfer->transferred=-1;
+				printf("failed control transfer %d :(",command.transfer.status);
+				break;
+			}		
+			fUsbiTransfer->transferred=command.control.length;
+		}
+		break;
+		case LIBUSB_TRANSFER_TYPE_BULK:
+		case LIBUSB_TRANSFER_TYPE_INTERRUPT:
+		{
+			usb_raw_command command;
+			command.transfer.interface=fUSBDevice->EndpointToInterface(fLibusbTransfer->endpoint);
+			command.transfer.endpoint=fUSBDevice->EndpointToIndex(fLibusbTransfer->endpoint);
+			command.transfer.data=fLibusbTransfer->buffer;
+			command.transfer.length=fLibusbTransfer->length;
+			if(fLibusbTransfer->type==LIBUSB_TRANSFER_TYPE_BULK)
+			{
+				if(ioctl(fRawFD,B_USB_RAW_COMMAND_BULK_TRANSFER,&command,
+					sizeof(command)) || command.transfer.status!=B_USB_RAW_STATUS_SUCCESS)	{
+					fUsbiTransfer->transferred=-1;
+					printf("failed bulk transfer %d :(",command.transfer.status);
+					break;
+				}
+			}
+			else
+			{
+				if(ioctl(fRawFD,B_USB_RAW_COMMAND_INTERRUPT_TRANSFER,&command,
+					sizeof(command)) || command.transfer.status!=B_USB_RAW_STATUS_SUCCESS)	{
+					fUsbiTransfer->transferred=-1;
+					printf("failed interrupt transfer :(");
+					break;
+				}
+			}
+			fUsbiTransfer->transferred=command.transfer.length;
+		}
+		break;
+		case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
+		{
+			usb_raw_command command;
+			command.isochronous.interface=fUSBDevice->EndpointToInterface(fLibusbTransfer->endpoint);
+			command.isochronous.endpoint=fUSBDevice->EndpointToIndex(fLibusbTransfer->endpoint);
+			command.isochronous.data=fLibusbTransfer->buffer;
+			command.isochronous.length=fLibusbTransfer->length;
+			command.isochronous.packet_count=fLibusbTransfer->num_iso_packets;
+			int i=0;
+			usb_iso_packet_descriptor *packetDescriptors = new usb_iso_packet_descriptor[fLibusbTransfer->num_iso_packets];
+			for (i=0; i<fLibusbTransfer->num_iso_packets; i++)
+			{
+				if((int16)(fLibusbTransfer->iso_packet_desc[i]).length!=(fLibusbTransfer->iso_packet_desc[i]).length)
+				{
+					fUsbiTransfer->transferred=-1;
+					printf("failed isochronous transfer :(");
+					break;
+				}
+				packetDescriptors[i].request_length=(int16)(fLibusbTransfer->iso_packet_desc[i]).length;
+			}
+			if(i<fLibusbTransfer->num_iso_packets)
+			{
+				break;	//Handle this error
+			}
+			command.isochronous.packet_descriptors=packetDescriptors;
+			if(ioctl(fRawFD,B_USB_RAW_COMMAND_ISOCHRONOUS_TRANSFER,&command,
+				sizeof(command)) || command.isochronous.status!=B_USB_RAW_STATUS_SUCCESS)	{
+				fUsbiTransfer->transferred=-1;
+				printf("failed isochronous transfer :(");
+				break;
+			}
+			for (i=0; i<fLibusbTransfer->num_iso_packets; i++)
+			{
+				(fLibusbTransfer->iso_packet_desc[i]).actual_length=packetDescriptors[i].actual_length;
+				switch(packetDescriptors[i].status)
+				{
+					case B_OK: (fLibusbTransfer->iso_packet_desc[i]).status=LIBUSB_TRANSFER_COMPLETED;
+						break;
+					default: (fLibusbTransfer->iso_packet_desc[i]).status=LIBUSB_TRANSFER_ERROR;
+						break;
+				}
+			}
+			delete[] packetDescriptors;
+			fUsbiTransfer->transferred=command.transfer.length; //????
+		}
+		break;
+		default:
+			printf("Type other\n");
+	}
+}
+
 status_t
 USBDeviceHandle::TransfersThread(void* self)
 {
 	USBDeviceHandle* handle = (USBDeviceHandle*)self;
 	handle->TransfersWorker();
-	
 }
 
 void
@@ -31,109 +152,9 @@ USBDeviceHandle::TransfersWorker()
 		if(status == B_INTERRUPTED)
 			continue;
 		fTransfersLock.Lock();
-		struct usbi_transfer* fPendingTransfer= (struct usbi_transfer*)fTransfers.RemoveItem((int32)0);
+		USBTransfer* fPendingTransfer= (USBTransfer*) fTransfers.RemoveItem((int32)0);
 		fTransfersLock.Unlock();
-		struct libusb_transfer* fLibusbTransfer= USBI_TRANSFER_TO_LIBUSB_TRANSFER(fPendingTransfer);
-		switch(fLibusbTransfer->type)
-		{
-			case LIBUSB_TRANSFER_TYPE_CONTROL:
-			{
-				struct libusb_control_setup* setup=(struct libusb_control_setup*)fLibusbTransfer->buffer;
-				usb_raw_command command;
-				command.control.request_type=setup->bmRequestType;
-				command.control.request=setup->bRequest;
-				command.control.value=setup->wValue;
-				command.control.index=setup->wIndex;
-				command.control.length=setup->wLength;
-				command.control.data=fLibusbTransfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
-				if(ioctl(fRawFD,B_USB_RAW_COMMAND_CONTROL_TRANSFER,&command,
-					sizeof(command)) || command.control.status!=B_USB_RAW_STATUS_SUCCESS)	{
-					fPendingTransfer->transferred=-1;
-					printf("failed control transfer :(");
-					break;
-				}
-			
-				fPendingTransfer->transferred=command.control.length;
-			}
-			break;
-			case LIBUSB_TRANSFER_TYPE_BULK:
-			case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-			{
-				usb_raw_command command;
-				command.transfer.interface=fUSBDevice->EndpointToInterface(fLibusbTransfer->endpoint);
-				command.transfer.endpoint=fUSBDevice->EndpointToIndex(fLibusbTransfer->endpoint);
-				command.transfer.data=fLibusbTransfer->buffer;
-				command.transfer.length=fLibusbTransfer->length;
-				if(fLibusbTransfer->type==LIBUSB_TRANSFER_TYPE_BULK)
-				{
-					if(ioctl(fRawFD,B_USB_RAW_COMMAND_BULK_TRANSFER,&command,
-						sizeof(command)) || command.transfer.status!=B_USB_RAW_STATUS_SUCCESS)	{
-						fPendingTransfer->transferred=-1;
-						printf("failed bulk transfer :(");
-						break;
-					}
-				}
-				else
-				{
-					if(ioctl(fRawFD,B_USB_RAW_COMMAND_INTERRUPT_TRANSFER,&command,
-						sizeof(command)) || command.transfer.status!=B_USB_RAW_STATUS_SUCCESS)	{
-						fPendingTransfer->transferred=-1;
-						printf("failed interrupt transfer :(");
-						break;
-					}
-				}
-				fPendingTransfer->transferred=command.transfer.length;
-			}
-			break;
-			case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-			{
-				usb_raw_command command;
-				command.isochronous.interface=fUSBDevice->EndpointToInterface(fLibusbTransfer->endpoint);
-				command.isochronous.endpoint=fUSBDevice->EndpointToIndex(fLibusbTransfer->endpoint);
-				command.isochronous.data=fLibusbTransfer->buffer;
-				command.isochronous.length=fLibusbTransfer->length;
-				command.isochronous.packet_count=fLibusbTransfer->num_iso_packets;
-				int i=0;
-				usb_iso_packet_descriptor *packetDescriptors = new usb_iso_packet_descriptor[fLibusbTransfer->num_iso_packets];
-				for (i=0; i<fLibusbTransfer->num_iso_packets; i++)
-				{
-					if((int16)(fLibusbTransfer->iso_packet_desc[i]).length!=(fLibusbTransfer->iso_packet_desc[i]).length)
-					{
-						fPendingTransfer->transferred=-1;
-						printf("failed isochronous transfer :(");
-						break;
-					}
-					packetDescriptors[i].request_length=(int16)(fLibusbTransfer->iso_packet_desc[i]).length;
-				}
-				if(i<fLibusbTransfer->num_iso_packets)
-				{
-					break;	//Handle this error
-				}
-				command.isochronous.packet_descriptors=packetDescriptors;
-				if(ioctl(fRawFD,B_USB_RAW_COMMAND_ISOCHRONOUS_TRANSFER,&command,
-					sizeof(command)) || command.isochronous.status!=B_USB_RAW_STATUS_SUCCESS)	{
-					fPendingTransfer->transferred=-1;
-					printf("failed isochronous transfer :(");
-					break;
-				}
-				for (i=0; i<fLibusbTransfer->num_iso_packets; i++)
-				{
-					(fLibusbTransfer->iso_packet_desc[i]).actual_length=packetDescriptors[i].actual_length;
-					switch(packetDescriptors[i].status)
-					{
-						case B_OK: (fLibusbTransfer->iso_packet_desc[i]).status=LIBUSB_TRANSFER_COMPLETED;
-							break;
-						default: (fLibusbTransfer->iso_packet_desc[i]).status=LIBUSB_TRANSFER_ERROR;
-							break;
-					}
-				}
-				delete[] packetDescriptors;
-				fPendingTransfer->transferred=command.transfer.length;
-			}
-			break;
-			default:
-				printf("Type other\n");
-		}
+		fPendingTransfer->Do(fRawFD);
 		write(fEventPipes[1],&fPendingTransfer,sizeof(fPendingTransfer));
 	}
 }
@@ -141,8 +162,9 @@ USBDeviceHandle::TransfersWorker()
 status_t
 USBDeviceHandle::SubmitTransfer(struct usbi_transfer* itransfer)
 {
+	USBTransfer* transfer = new USBTransfer(itransfer,fUSBDevice);
 	BAutolock locker(fTransfersLock);
-	fTransfers.AddItem(itransfer);
+	fTransfers.AddItem(transfer);
 	release_sem(fTransfersSem);
 }
 

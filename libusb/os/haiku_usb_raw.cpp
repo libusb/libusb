@@ -173,7 +173,7 @@ haiku_handle_events(struct libusb_context* ctx, struct pollfd* fds, nfds_t nfds,
 #ifdef TRACE_USB
 	TRACE("haiku_handle_events\n");
 #endif
-	struct usbi_transfer *itransfer;
+	struct USBTransfer *transfer;
 	for(int i=0;i<nfds && num_ready>0;i++)
 	{
 		struct pollfd *pollfd = &fds[i];
@@ -181,15 +181,17 @@ haiku_handle_events(struct libusb_context* ctx, struct pollfd* fds, nfds_t nfds,
 			continue;
 			
 		num_ready--;
-		read(pollfd->fd, &itransfer, sizeof(itransfer));
+		read(pollfd->fd, &transfer, sizeof(transfer));
 		libusb_transfer_status status = LIBUSB_TRANSFER_COMPLETED;
-		if(itransfer->transferred < 0)
+		if(transfer->itransfer()->transferred < 0)
 		{
 			printf("transfer error :(\n");
 			status = LIBUSB_TRANSFER_ERROR;
-			itransfer->transferred=0;
+			transfer->itransfer()->transferred=0;
 		}
-		usbi_handle_transfer_completion(itransfer,status);
+
+		usbi_handle_transfer_completion(transfer->itransfer(),status);
+
 	}
 	return LIBUSB_SUCCESS;
 }
@@ -261,6 +263,6 @@ const struct usbi_os_backend haiku_usb_raw_backend = {
 
 	/*.device_priv_size =*/ sizeof(USBDevice*),
 	/*.device_handle_priv_size =*/ sizeof(USBDeviceHandle*),
-	/*.transfer_priv_size =*/ 0,
+	/*.transfer_priv_size =*/ sizeof(USBTransfer*),
 	/*.add_iso_packet_size =*/ 0,
 };
