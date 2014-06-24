@@ -17,7 +17,7 @@ USBTransfer::USBTransfer(struct usbi_transfer* itransfer, USBDevice* device)
 	fUsbiTransfer=itransfer;
 	fLibusbTransfer=USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	fUSBDevice=device;
-//	fStatus=USBTRANSFER_QUEUED;
+	fCancelled=false;
 }
 
 USBTransfer::~USBTransfer()
@@ -28,6 +28,18 @@ struct usbi_transfer*
 USBTransfer::itransfer()
 {
 	return fUsbiTransfer;
+}
+
+void
+USBTransfer::SetCancelled()
+{
+	fCancelled=true;
+}
+
+bool
+USBTransfer::IsCancelled()
+{
+	return fCancelled;
 }
 
 void
@@ -45,6 +57,10 @@ USBTransfer::Do(int fRawFD)
 			command.control.index=setup->wIndex;
 			command.control.length=setup->wLength;
 			command.control.data=fLibusbTransfer->buffer + LIBUSB_CONTROL_SETUP_SIZE;
+			if(fCancelled)
+			{
+				break;
+			}
 			if(ioctl(fRawFD,B_USB_RAW_COMMAND_CONTROL_TRANSFER,&command,
 				sizeof(command)) || command.control.status!=B_USB_RAW_STATUS_SUCCESS)	{
 				fUsbiTransfer->transferred=-1;
@@ -62,6 +78,10 @@ USBTransfer::Do(int fRawFD)
 			command.transfer.endpoint=fUSBDevice->EndpointToIndex(fLibusbTransfer->endpoint);
 			command.transfer.data=fLibusbTransfer->buffer;
 			command.transfer.length=fLibusbTransfer->length;
+			if(fCancelled)
+			{
+				break;
+			}
 			if(fLibusbTransfer->type==LIBUSB_TRANSFER_TYPE_BULK)
 			{
 				if(ioctl(fRawFD,B_USB_RAW_COMMAND_BULK_TRANSFER,&command,
@@ -108,6 +128,10 @@ USBTransfer::Do(int fRawFD)
 				break;	//Handle this error
 			}
 			command.isochronous.packet_descriptors=packetDescriptors;
+			if(fCancelled)
+			{
+				break;
+			}
 			if(ioctl(fRawFD,B_USB_RAW_COMMAND_ISOCHRONOUS_TRANSFER,&command,
 				sizeof(command)) || command.isochronous.status!=B_USB_RAW_STATUS_SUCCESS)	{
 				fUsbiTransfer->transferred=-1;
@@ -163,9 +187,24 @@ status_t
 USBDeviceHandle::SubmitTransfer(struct usbi_transfer* itransfer)
 {
 	USBTransfer* transfer = new USBTransfer(itransfer,fUSBDevice);
+	*((USBTransfer**)usbi_transfer_get_os_priv(itransfer))=transfer;
 	BAutolock locker(fTransfersLock);
 	fTransfers.AddItem(transfer);
 	release_sem(fTransfersSem);
+}
+
+status_t
+USBDeviceHandle::CancelTransfer(USBTransfer* transfer)
+{
+	transfer->SetCancelled();
+	fTransfersLock.Lock();
+	bool removed = fTransfers.RemoveItem(transfer);
+	fTransfersLock.Unlock();
+	if(removed)
+	{
+		write(fEventPipes[1],&transfer,sizeof(transfer));
+	}
+	return B_OK;
 }
 
 USBDeviceHandle::USBDeviceHandle(USBDevice* dev)
@@ -180,7 +219,7 @@ USBDeviceHandle::USBDeviceHandle(USBDevice* dev)
 		//See how to report
 	}
 	pipe(fEventPipes);
-	fcntl(fEventPipes[1], F_SETFD, O_NONBLOCK);	//Why need??
+	fcntl(fEventPipes[1], F_SETFD, O_NONBLOCK);
 	fTransfersSem = create_sem(0, "Transfers Queue Sem");
 	fTransfersThread = spawn_thread(TransfersThread,"Transfer Worker",B_NORMAL_PRIORITY, this);
 	resume_thread(fTransfersThread);

@@ -11,6 +11,10 @@
 #define TRACE(x) printf(x);
 #endif
 
+class USBDevice;
+class USBDeviceHandle;
+class USBTransfer;
+
 class USBDevice{
 public:
 											USBDevice(const char *);
@@ -49,6 +53,7 @@ public:
 	int 				SetConfiguration(int);
 	int					SetAltSetting(int,int);
 	status_t 			SubmitTransfer(struct usbi_transfer*);
+	status_t 			CancelTransfer(USBTransfer*);
 private:
 	int 				fRawFD;
 	static status_t 	TransfersThread(void *);
@@ -68,13 +73,15 @@ public:
 	virtual					~USBTransfer();
 	void					Do(int);
 	struct usbi_transfer*	itransfer();	//Do better
+	void					SetCancelled();
+	bool					IsCancelled();
 private:
 	struct usbi_transfer*	fUsbiTransfer;
 	struct libusb_transfer*	fLibusbTransfer;
 //	USBDeviceHandle*		fUSBDeviceHandle;
 	USBDevice*				fUSBDevice;
 	BLocker					fStatusLock;
-	int						fStatus;
+	bool					fCancelled;
 };
 
 class UsbRoster : public BUSBRoster {
@@ -82,10 +89,8 @@ public:
                    		UsbRoster()  {}
 	virtual status_t    DeviceAdded(BUSBDevice* device);
 	virtual void        DeviceRemoved(BUSBDevice* device);
-
 private:
 	status_t			_AddNewDevice(struct libusb_context* ctx, USBDevice* info);
-	
 	BLocker	fDevicesLock;
 	BList	fDevices;
 };
