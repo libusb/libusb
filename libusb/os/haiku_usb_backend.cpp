@@ -289,9 +289,19 @@ int
 USBDeviceHandle::SetAltSetting(int inumber, int alt)
 {
 	usb_raw_command command;
-	command.alternate.alternate_info = alt;
 	command.alternate.config_index=fUSBDevice->ActiveConfigurationIndex();
 	command.alternate.interface_index=inumber;
+	if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_ACTIVE_ALT_INTERFACE_INDEX,&command,
+		sizeof(command)) || command.alternate.status!=B_USB_RAW_STATUS_SUCCESS)	{
+		printf("Error get alt setting : %d\n",command.alternate.status);
+		return _errno_to_libusb(command.alternate.status);
+	}
+	if(command.alternate.alternate_info == alt)
+	{
+		printf("Set alt succeeded, already set\n");
+		return B_OK;
+	}
+	command.alternate.alternate_info = alt;
 	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_ALT_INTERFACE,&command, 	//IF IOCTL FAILS DEVICE DISONNECTED PROBABLY
 		sizeof(command)) || command.alternate.status!=B_USB_RAW_STATUS_SUCCESS)	{
 		printf("Error set alt setting : %d\n",command.alternate.status);

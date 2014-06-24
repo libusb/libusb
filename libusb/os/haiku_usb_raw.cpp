@@ -142,8 +142,7 @@ haiku_release_interface(struct libusb_device_handle *dev_handle, int interface_n
 	TRACE("haiku_release_interface\n");
 #endif
 	USBDeviceHandle * handle=*((USBDeviceHandle**)dev_handle->os_priv);
-	//SET ALT SETTING TO 0
-	//haiku_set_altsetting(dev_handle,interface_number,0);
+	haiku_set_altsetting(dev_handle,interface_number,0);
 	return handle->ReleaseInterface(interface_number);
 }
 
