@@ -336,19 +336,19 @@ USBDevice::~USBDevice()
 	delete[] fEndpointToInterface;
 }
 
-inline const char*
+const char*
 USBDevice::Location() const
 {
 	return fPath;
 }
 
-inline uint8
+uint8
 USBDevice::CountConfigurations() const
 {
 	return fDeviceDescriptor.num_configurations;
 }
 
-inline const usb_device_descriptor*
+const usb_device_descriptor*
 USBDevice::Descriptor() const
 {
 	return &fDeviceDescriptor;

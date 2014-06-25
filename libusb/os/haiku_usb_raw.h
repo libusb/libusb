@@ -6,6 +6,8 @@
 #include "libusbi.h"
 #include "usb_raw.h"
 
+using namespace std;
+
 //#define TRACE_USB 1
 #ifdef TRACE_USB
 #define TRACE(x) printf(x);
