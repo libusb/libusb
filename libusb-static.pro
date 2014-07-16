@@ -1,6 +1,6 @@
-# Copyright 2013 (C) Butterfly Network, Inc.
+# Copyright 2013-2014 (C) Butterfly Network, Inc.
 
-TARGET = libusbx
+TARGET = libusb
 
 TEMPLATE = lib
 CONFIG += staticlib
