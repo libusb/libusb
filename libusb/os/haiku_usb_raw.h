@@ -80,21 +80,9 @@ public:
 private:
 	struct usbi_transfer*		fUsbiTransfer;
 	struct libusb_transfer*		fLibusbTransfer;
-//	USBDeviceHandle*		fUSBDeviceHandle;
 	USBDevice*			fUSBDevice;
 	BLocker				fStatusLock;
 	bool				fCancelled;
-};
-
-class UsbRoster : public BUSBRoster {
-public:
-				UsbRoster()  {}
-	virtual status_t	DeviceAdded(BUSBDevice* device);
-	virtual void		DeviceRemoved(BUSBDevice* device);
-private:
-	status_t		_AddNewDevice(struct libusb_context* ctx, USBDevice* info);
-	BLocker			fDevicesLock;
-	BList			fDevices;
 };
 
 class USBRoster {

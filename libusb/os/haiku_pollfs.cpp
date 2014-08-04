@@ -1,4 +1,12 @@
 #include "haiku_usb_raw.h"
+#include <Directory.h>
+#include <Entry.h>
+#include <Looper.h>
+#include <Messenger.h>
+#include <Node.h>
+#include <NodeMonitor.h>
+#include <Path.h>
+#include <cstring>
 
 class WatchedEntry {
 public:
@@ -60,7 +68,7 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 		watch_node(&fNode, B_WATCH_DIRECTORY, *fMessenger);
 	
 	} else {
-		if (strncmp(ref->name, "raw", 3) == 0)
+		if (strncmp(ref->name, "raw", 3) == 0 || strncmp(ref->name, "hub", 3) == 0)
 			return;
 
 		BPath path;
@@ -69,7 +77,7 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 		if (fDevice != NULL) {
 			// Add this new device to each active context's device list
 			struct libusb_context *ctx;
-			unsigned long session_id = &fDevice;
+			unsigned long session_id = (unsigned long)&fDevice;
 
 			usbi_mutex_lock(&active_contexts_lock);
 			list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) { 
@@ -84,12 +92,13 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 				if (!dev) {
 					continue;
 				}
-				*((USBDevice**)dev->os_priv) = deviceInfo;
-				//TODO Assign bus and device no.
-				sscanf(path.Path(), "/dev/bus/usb/%d/%d", &dev->bus_number, &dev->device_address);
+				*((USBDevice**)dev->os_priv) = fDevice;
+				// TODO Repair
+				sscanf(path.Leaf(), "%d", &dev->device_address);
+				sscanf(path.Path(), "/dev/bus/usb/%d", &dev->bus_number);
 				(dev->device_address)++;
 
-				int fRawFD = open(fPath, O_RDWR | O_CLOEXEC);
+				int fRawFD = open(path.Path(), O_RDWR | O_CLOEXEC);
 				if (fRawFD < 0)
 				{
 					libusb_unref_device(dev);
@@ -126,7 +135,7 @@ WatchedEntry::~WatchedEntry()
 		// Remove this device from each active context's device list 
 		struct libusb_context *ctx;
 		struct libusb_device *dev;
-		unsigned long session_id = &fDevice;
+		unsigned long session_id = (unsigned long)&fDevice;
 
 		usbi_mutex_lock(&active_contexts_lock);
 		list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
@@ -147,7 +156,7 @@ WatchedEntry::~WatchedEntry()
 bool
 WatchedEntry::EntryCreated(entry_ref *ref)
 {
-	if (!fIsDirectory) {
+	if (!fIsDirectory) 
 		return false;
 
 	if (ref->directory != fNode.node) {
@@ -155,7 +164,7 @@ WatchedEntry::EntryCreated(entry_ref *ref)
 		while (child) {
 			if (child->EntryCreated(ref))
 				return true;
-			child = child->link;
+			child = child->fLink;
 		}
 		return false;
 	}
@@ -235,7 +244,7 @@ RosterLooper::Stop()
 void
 RosterLooper::MessageReceived(BMessage *message)
 {
-	int opcode;
+	int32 opcode;
 	if (message->FindInt32("opcode", &opcode) < B_OK)
 		return;
 
@@ -297,96 +306,3 @@ USBRoster::Stop()
 }
 
 
-status_t
-UsbRoster::_AddNewDevice(struct libusb_context* ctx, USBDevice* deviceInfo)
-{
-	struct libusb_device* dev = usbi_get_device_by_session_id(ctx, (unsigned long)deviceInfo);
-	if (dev) {
-		usbi_info (ctx, "using existing device for location ID 0x%08x", deviceInfo);
-	} else {
-		usbi_info (ctx, "allocating new device for session ID 0x%08x", deviceInfo);
-		dev = usbi_alloc_device(ctx, (unsigned long)deviceInfo);
-		if (!dev) {
-			return B_NO_MEMORY;
-		}
-		*((USBDevice**)dev->os_priv) = deviceInfo;
-
-		// TODO: handle device address mapping for devices in non-root hub(s)
-		sscanf(deviceInfo->Location(), "/dev/bus/usb/%d/%d", &dev->bus_number, &dev->device_address);
-		dev->num_configurations = (uint8_t) deviceInfo->CountConfigurations();
-
-		// printf("bus %d, address %d, # of configs %d\n", dev->bus_number,
-		//	dev->device_address, dev->num_configurations);
-
-    	if(usbi_sanitize_device(dev) < 0) {
-			libusb_unref_device(dev);
-			return B_ERROR;	
-		}
-	}
-
-    usbi_connect_device (dev);
-   	return B_OK;
-}
-
-
-status_t
-UsbRoster::DeviceAdded(BUSBDevice* device)
-{
- 	if (device->IsHub())
- 		return B_ERROR;
- 
- 	char tmp[200];
- 	strcpy(tmp,"/dev/bus/usb");
- 	strcat(tmp,device->Location());
-	USBDevice* deviceInfo = new USBDevice(tmp);
-	//deviceInfo->Get();
-	
-	// Add this new device to each active context's device list
-	struct libusb_context *ctx;
-	usbi_mutex_lock(&active_contexts_lock);
-	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) { 
-		_AddNewDevice(ctx, deviceInfo);
-	}
-	usbi_mutex_unlock(&active_contexts_lock);
-
-	BAutolock locker(fDevicesLock);
-	fDevices.AddItem(deviceInfo);
-	
-	return B_OK;
-}
-
-
-void
-UsbRoster::DeviceRemoved(BUSBDevice* device)
-{
-	BAutolock locker(fDevicesLock);
-	USBDevice* deviceInfo;
-	int i = 0;
-	while (deviceInfo = (USBDevice*)fDevices.ItemAt(i++)) {
-		if (!deviceInfo)
-			continue;
-		char tmp[200];
-		strcpy(tmp,"/dev/bus/usb");
-		strcat(tmp,device->Location());
-		if (strcmp(deviceInfo->Location(), tmp) == 0)
-			break;
-	}
-
-	if (!deviceInfo)
-		return;
-
-	// Remove this device from each active context's device list 
-	struct libusb_context *ctx;
-	struct libusb_device *dev;
-	
-	usbi_mutex_lock(&active_contexts_lock);
-	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
-		dev = usbi_get_device_by_session_id (ctx, (unsigned long)deviceInfo);
-		if (dev != NULL) {
-			usbi_disconnect_device (dev);
-		}
-	}
-	usbi_mutex_static_unlock(&active_contexts_lock);
-
-	fDevices.RemoveItem(deviceInfo);
-}

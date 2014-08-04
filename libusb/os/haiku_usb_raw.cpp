@@ -7,7 +7,7 @@
 
 #include "haiku_usb_raw.h"
 
-UsbRoster 		gUsbRoster;
+USBRoster 		gUsbRoster;
 int32			gInitCount = 0;
 
 static int
@@ -154,7 +154,8 @@ haiku_submit_transfer(struct usbi_transfer * itransfer)
 #endif
 	struct libusb_transfer* fLibusbTransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	USBDeviceHandle * fDeviceHandle = *((USBDeviceHandle**)fLibusbTransfer->dev_handle->os_priv);
-	fDeviceHandle->SubmitTransfer(itransfer); 
+	fDeviceHandle->SubmitTransfer(itransfer);
+	return LIBUSB_SUCCESS; 
 }
 
 static int
@@ -166,6 +167,7 @@ haiku_cancel_transfer(struct usbi_transfer * itransfer)
 	struct libusb_transfer* fLibusbTransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	USBDeviceHandle * fDeviceHandle = *((USBDeviceHandle**)fLibusbTransfer->dev_handle->os_priv);
 	fDeviceHandle->CancelTransfer(*((USBTransfer**)usbi_transfer_get_os_priv(itransfer)));
+	return LIBUSB_SUCCESS; 
 }
 
 static void
@@ -219,12 +221,6 @@ haiku_handle_events(struct libusb_context* ctx, struct pollfd* fds, nfds_t nfds,
 	return LIBUSB_SUCCESS;
 }
 
-void haiku_destroy_device(struct libusb_device * device)
-{
-	USBDevice* dev=*((USBDevice**)device->os_priv);
-	delete dev;
-	*((USBDevice**)device->os_priv)=NULL;
-}
 
 static int
 haiku_clock_gettime(int clkid, struct timespec *tp)
@@ -270,7 +266,7 @@ const struct usbi_os_backend haiku_usb_raw_backend = {
 	/*.detach_kernel_driver =*/ NULL,
 	/*.attach_kernel_driver =*/ NULL,
 
-	/*.destroy_device =*/ haiku_destroy_device,
+	/*.destroy_device =*/ NULL,
 
 	/*.submit_transfer =*/ haiku_submit_transfer,
 	/*.cancel_transfer =*/ haiku_cancel_transfer,
