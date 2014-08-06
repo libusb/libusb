@@ -8,11 +8,6 @@
 
 using namespace std;
 
-//#define TRACE_USB 1
-#ifdef TRACE_USB
-#define TRACE(x) printf(x);
-#endif
-
 class USBDevice;
 class USBDeviceHandle;
 class USBTransfer;
@@ -33,6 +28,7 @@ public:
 	int 					CheckInterfacesFree(int);
 	int 					SetActiveConfiguration(int);
 	int					ActiveConfigurationIndex() const;
+	bool					InitCheck();
 private:
 	int					Initialise();
 	unsigned int				fClaimedInterfaces;	// Max Interfaces can be 32. Using a bitmask
@@ -43,6 +39,7 @@ private:
 	map<uint8,uint8>			fConfigToIndex;
 	map<uint8,uint8>*			fEndpointToIndex;
 	map<uint8,uint8>*			fEndpointToInterface;
+	bool					fInitCheck;
 };
 
 class USBDeviceHandle {
@@ -56,6 +53,7 @@ public:
 	int			SetAltSetting(int,int);
 	status_t 		SubmitTransfer(struct usbi_transfer*);
 	status_t		CancelTransfer(USBTransfer*);
+	bool			InitCheck();
 private:
 	int 			fRawFD;
 	static status_t		TransfersThread(void *);
@@ -67,6 +65,7 @@ private:
 	BLocker 		fTransfersLock;
 	sem_id 			fTransfersSem;
 	thread_id 		fTransfersThread;
+	bool			fInitCheck;
 };
 
 class USBTransfer {
@@ -74,7 +73,7 @@ public:
 					USBTransfer(struct usbi_transfer*,USBDevice*);
 	virtual				~USBTransfer();
 	void				Do(int);
-	struct usbi_transfer*		itransfer();	// Do better
+	struct usbi_transfer*		UsbiTransfer();
 	void				SetCancelled();
 	bool				IsCancelled();
 private:
@@ -89,7 +88,7 @@ class USBRoster {
 public:
 			USBRoster();
 	virtual		~USBRoster();
-	void		Start();
+	int		Start();
 	void		Stop();
 private:
 	void*		fLooper;

@@ -1,6 +1,5 @@
 #include <unistd.h>
 #include <string.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <new>
 #include <vector>
@@ -25,7 +24,7 @@ USBTransfer::~USBTransfer()
 }
 
 struct usbi_transfer*
-USBTransfer::itransfer()
+USBTransfer::UsbiTransfer()
 {
 	return fUsbiTransfer;
 }
@@ -64,7 +63,7 @@ USBTransfer::Do(int fRawFD)
 			if(ioctl(fRawFD,B_USB_RAW_COMMAND_CONTROL_TRANSFER,&command,
 				sizeof(command)) || command.control.status!=B_USB_RAW_STATUS_SUCCESS)	{
 				fUsbiTransfer->transferred=-1;
-				printf("failed control transfer %d :(",command.transfer.status);
+				usbi_err(TRANSFER_CTX(fLibusbTransfer),"failed control transfer");
 				break;
 			}		
 			fUsbiTransfer->transferred=command.control.length;
@@ -87,7 +86,7 @@ USBTransfer::Do(int fRawFD)
 				if(ioctl(fRawFD,B_USB_RAW_COMMAND_BULK_TRANSFER,&command,
 					sizeof(command)) || command.transfer.status!=B_USB_RAW_STATUS_SUCCESS)	{
 					fUsbiTransfer->transferred=-1;
-					printf("failed bulk transfer %d :(",command.transfer.status);
+					usbi_err(TRANSFER_CTX(fLibusbTransfer),"failed bulk transfer");
 					break;
 				}
 			}
@@ -96,13 +95,14 @@ USBTransfer::Do(int fRawFD)
 				if(ioctl(fRawFD,B_USB_RAW_COMMAND_INTERRUPT_TRANSFER,&command,
 					sizeof(command)) || command.transfer.status!=B_USB_RAW_STATUS_SUCCESS)	{
 					fUsbiTransfer->transferred=-1;
-					printf("failed interrupt transfer :(");
+					usbi_err(TRANSFER_CTX(fLibusbTransfer),"failed interrupt transfer");
 					break;
 				}
 			}
 			fUsbiTransfer->transferred=command.transfer.length;
 		}
 		break;
+		// IsochronousTransfers not tested
 		case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		{
 			usb_raw_command command;
@@ -118,14 +118,14 @@ USBTransfer::Do(int fRawFD)
 				if((int16)(fLibusbTransfer->iso_packet_desc[i]).length!=(fLibusbTransfer->iso_packet_desc[i]).length)
 				{
 					fUsbiTransfer->transferred=-1;
-					printf("failed isochronous transfer :(");
+					usbi_err(TRANSFER_CTX(fLibusbTransfer),"failed isochronous transfer");
 					break;
 				}
 				packetDescriptors[i].request_length=(int16)(fLibusbTransfer->iso_packet_desc[i]).length;
 			}
 			if(i<fLibusbTransfer->num_iso_packets)
 			{
-				break;	//Handle this error
+				break;	// TODO Handle this error
 			}
 			command.isochronous.packet_descriptors=packetDescriptors;
 			if(fCancelled)
@@ -135,7 +135,7 @@ USBTransfer::Do(int fRawFD)
 			if(ioctl(fRawFD,B_USB_RAW_COMMAND_ISOCHRONOUS_TRANSFER,&command,
 				sizeof(command)) || command.isochronous.status!=B_USB_RAW_STATUS_SUCCESS)	{
 				fUsbiTransfer->transferred=-1;
-				printf("failed isochronous transfer :(");
+				usbi_err(TRANSFER_CTX(fLibusbTransfer),"failed isochronous transfer");
 				break;
 			}
 			for (i=0; i<fLibusbTransfer->num_iso_packets; i++)
@@ -150,12 +150,19 @@ USBTransfer::Do(int fRawFD)
 				}
 			}
 			delete[] packetDescriptors;
-			fUsbiTransfer->transferred=command.transfer.length; //????
+			// Do we put the length of transfer here, for isochronous transfers?
+			fUsbiTransfer->transferred=command.transfer.length; 
 		}
 		break;
 		default:
-			printf("Type other\n");
+			usbi_err(TRANSFER_CTX(fLibusbTransfer),"Unknown type of transfer");
 	}
+}
+
+bool
+USBDeviceHandle::InitCheck()
+{
+	return fInitCheck;
 }
 
 status_t
@@ -163,6 +170,7 @@ USBDeviceHandle::TransfersThread(void* self)
 {
 	USBDeviceHandle* handle = (USBDeviceHandle*)self;
 	handle->TransfersWorker();
+	return B_OK;
 }
 
 void
@@ -191,6 +199,7 @@ USBDeviceHandle::SubmitTransfer(struct usbi_transfer* itransfer)
 	BAutolock locker(fTransfersLock);
 	fTransfers.AddItem(transfer);
 	release_sem(fTransfersSem);
+	return LIBUSB_SUCCESS;
 }
 
 status_t
@@ -204,32 +213,35 @@ USBDeviceHandle::CancelTransfer(USBTransfer* transfer)
 	{
 		write(fEventPipes[1],&transfer,sizeof(transfer));
 	}
-	return B_OK;
+	return LIBUSB_SUCCESS;
 }
 
 USBDeviceHandle::USBDeviceHandle(USBDevice* dev)
 	:
 	fTransfersThread(-1),
 	fUSBDevice(dev),
-	fClaimedInterfaces(0)
+	fClaimedInterfaces(0),
+	fInitCheck(false)
 {
 	fRawFD=open(dev->Location(), O_RDWR | O_CLOEXEC);
 	if(fRawFD < 0)
 	{
-		//See how to report
+		usbi_err(NULL,"failed to open device");
+		return;
 	}
 	pipe(fEventPipes);
 	fcntl(fEventPipes[1], F_SETFD, O_NONBLOCK);
 	fTransfersSem = create_sem(0, "Transfers Queue Sem");
 	fTransfersThread = spawn_thread(TransfersThread,"Transfer Worker",B_NORMAL_PRIORITY, this);
 	resume_thread(fTransfersThread);
+	fInitCheck = true;
 }
 
 USBDeviceHandle::~USBDeviceHandle()
 {
 	if(fRawFD>0)
 		close(fRawFD);
-	for(int i=0; i<32; i++)	//as max 32 interfaces, do better
+	for(int i=0; i<32; i++)
 	{
 		if(fClaimedInterfaces&(1<<i))
 			ReleaseInterface(i);
@@ -293,21 +305,22 @@ USBDeviceHandle::SetAltSetting(int inumber, int alt)
 	command.alternate.interface_index=inumber;
 	if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_ACTIVE_ALT_INTERFACE_INDEX,&command,
 		sizeof(command)) || command.alternate.status!=B_USB_RAW_STATUS_SUCCESS)	{
-		printf("Error get alt setting : %d\n",command.alternate.status);
+		usbi_err(NULL,"Error retrieving active alternate interface");
 		return _errno_to_libusb(command.alternate.status);
 	}
 	if(command.alternate.alternate_info == alt)
 	{
-		printf("Set alt succeeded, already set\n");
-		return B_OK;
+		usbi_dbg("Setting alternate interface successful");
+		return LIBUSB_SUCCESS;
 	}
 	command.alternate.alternate_info = alt;
 	if(ioctl(fRawFD,B_USB_RAW_COMMAND_SET_ALT_INTERFACE,&command, 	//IF IOCTL FAILS DEVICE DISONNECTED PROBABLY
 		sizeof(command)) || command.alternate.status!=B_USB_RAW_STATUS_SUCCESS)	{
-		printf("Error set alt setting : %d\n",command.alternate.status);
+		usbi_err(NULL,"Error setting alternate interface");
 		return _errno_to_libusb(command.alternate.status);
 	}
-	printf("Set alt succeeded %d\n",command.alternate.status);
+	usbi_dbg("Setting alternate interface successful");
+	return LIBUSB_SUCCESS;
 }
 
 
@@ -318,7 +331,8 @@ USBDevice::USBDevice(const char * path)
 	fConfigurationDescriptors(NULL),
 	fClaimedInterfaces(0),
 	fEndpointToIndex(NULL),
-	fEndpointToInterface(NULL)
+	fEndpointToInterface(NULL),
+	fInitCheck(false)
 {
 	fPath=strdup(path);
 	Initialise();
@@ -327,13 +341,25 @@ USBDevice::USBDevice(const char * path)
 USBDevice::~USBDevice()
 {
 	free(fPath);
-	for(int i=0;i<fDeviceDescriptor.num_configurations;i++)
+	if (fConfigurationDescriptors)
 	{
-		delete fConfigurationDescriptors[i];
+		for(int i=0;i<fDeviceDescriptor.num_configurations;i++)
+		{
+			if (fConfigurationDescriptors[i])
+				delete fConfigurationDescriptors[i];
+		}
+		delete[] fConfigurationDescriptors;
 	}
-	delete[] fConfigurationDescriptors;
-	delete[] fEndpointToIndex;
-	delete[] fEndpointToInterface;
+	if (fEndpointToIndex)
+		delete[] fEndpointToIndex;
+	if (fEndpointToInterface)
+		delete[] fEndpointToInterface;
+}
+
+bool
+USBDevice::InitCheck()
+{
+	return fInitCheck;
 }
 
 const char*
@@ -406,6 +432,7 @@ int
 USBDevice::SetActiveConfiguration(int config_index)
 {
 	fActiveConfiguration=config_index;
+	return LIBUSB_SUCCESS;
 }
 
 uint8
@@ -431,6 +458,7 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 	command.device.descriptor = &fDeviceDescriptor;
 	if(ioctl(fRawFD, B_USB_RAW_COMMAND_GET_DEVICE_DESCRIPTOR, &command,
 		sizeof(command)) || command.device.status != B_USB_RAW_STATUS_SUCCESS) {
+		close(fRawFD);
 		return B_ERROR;
 	}
 	
@@ -446,6 +474,8 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 		command.config.config_index = i;
 		if(ioctl(fRawFD, B_USB_RAW_COMMAND_GET_CONFIGURATION_DESCRIPTOR, &command,
 			sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
+			usbi_err(NULL,"failed retrieving configuration descriptor");
+			close(fRawFD);
 			return B_ERROR;		
 		}
 		fConfigToIndex[tmp_config.configuration_value]=i;
@@ -458,8 +488,9 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 		command.control.data=fConfigurationDescriptors[i];
 		if(ioctl(fRawFD,B_USB_RAW_COMMAND_CONTROL_TRANSFER,&command,
 			sizeof(command)) || command.control.status!=B_USB_RAW_STATUS_SUCCESS)	{
-			printf("failed descriptor transfer :(");
-			break;
+			usbi_err(NULL,"failed retrieving full configuration descriptor");
+			close(fRawFD);
+			return B_ERROR;
 		}
 		for( int j=0;j<tmp_config.number_interfaces;j++)
 		{
@@ -467,6 +498,8 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 			command.alternate.interface_index=j;
 			if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_ALT_INTERFACE_COUNT, &command,
 				sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
+				usbi_err(NULL,"failed retrieving number of alternate interfaces");
+				close(fRawFD);
 				return B_ERROR;
 			}
 			int num_alternate=command.alternate.alternate_info;
@@ -479,6 +512,8 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 				command.interface_etc.descriptor=&tmp_interface;
 				if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_INTERFACE_DESCRIPTOR_ETC, &command,
 					sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
+					usbi_err(NULL,"failed retrieving interface descriptor");
+					close(fRawFD);
 					return B_ERROR;
 				}
 				for( int l=0;l<tmp_interface.num_endpoints;l++)
@@ -491,6 +526,8 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 					command.endpoint_etc.descriptor=&tmp_endpoint;
 					if(ioctl(fRawFD,B_USB_RAW_COMMAND_GET_ENDPOINT_DESCRIPTOR_ETC, &command,
 						sizeof(command)) || command.config.status != B_USB_RAW_STATUS_SUCCESS) {
+						usbi_err(NULL,"failed retrieving endpoint descriptor");
+						close(fRawFD);
 						return B_ERROR;
 					}
 					fEndpointToIndex[i][tmp_endpoint.endpoint_address]=l;
@@ -500,4 +537,6 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 		}
 	}
 	close(fRawFD);
+	fInitCheck = true;
+	return B_OK;
 }

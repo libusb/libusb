@@ -1,6 +1,5 @@
 #include <unistd.h>
 #include <string.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <new>
 #include <vector>
@@ -13,21 +12,16 @@ int32			gInitCount = 0;
 static int
 haiku_init(struct libusb_context* ctx)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_init\n");
-#endif	
-
 	if (atomic_add(&gInitCount, 1) == 0)
-		gUsbRoster.Start();
-	return 0;
+	{
+		return gUsbRoster.Start();
+	}
+	return LIBUSB_SUCCESS;
 }
 
 static void
 haiku_exit(void)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_exit\n");
-#endif
 	if (atomic_add(&gInitCount, -1) == 1)
 		gUsbRoster.Stop();
 }
@@ -35,11 +29,15 @@ haiku_exit(void)
 static int 
 haiku_open(struct libusb_device_handle *dev_handle)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_open\n");
-#endif
 	USBDevice* dev=*((USBDevice**)dev_handle->dev->os_priv);
-	USBDeviceHandle *handle=new USBDeviceHandle(dev);
+	USBDeviceHandle *handle=new(std::nothrow) USBDeviceHandle(dev);
+	if (handle == NULL)
+		return LIBUSB_ERROR_NO_MEM;
+	if (handle->InitCheck() == false)
+	{
+		delete handle;
+		return LIBUSB_ERROR_NO_DEVICE;
+	}
 	*((USBDeviceHandle**)dev_handle->os_priv)=handle;
 	return usbi_add_pollfd(HANDLE_CTX(dev_handle),handle->EventPipe(0), POLLIN);
 }
@@ -47,9 +45,6 @@ haiku_open(struct libusb_device_handle *dev_handle)
 static void 
 haiku_close(struct libusb_device_handle *dev_handle)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_close\n");
-#endif
 	USBDeviceHandle * handle=*((USBDeviceHandle**)dev_handle->os_priv);
 	if(handle==NULL)
 		return;
@@ -61,9 +56,6 @@ haiku_close(struct libusb_device_handle *dev_handle)
 static int 
 haiku_get_device_descriptor(struct libusb_device *device, unsigned char* buffer, int *host_endian)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_get_device_descriptor\n");
-#endif
 	USBDevice *dev = *((USBDevice**)(device->os_priv));
 	memcpy(buffer,dev->Descriptor(),DEVICE_DESC_LENGTH);
 	*host_endian=0;
@@ -73,29 +65,25 @@ haiku_get_device_descriptor(struct libusb_device *device, unsigned char* buffer,
 static int
 haiku_get_active_config_descriptor(struct libusb_device *device, unsigned char *buffer, size_t len, int *host_endian)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_get_active_config_descriptor\n");
-#endif
 	USBDevice *dev = *((USBDevice**)(device->os_priv));
 	const usb_configuration_descriptor* act_config = dev->ActiveConfiguration();
 	if(len>act_config->total_length)
-		len=act_config->total_length;
+	{
+		return LIBUSB_ERROR_OVERFLOW;
+	}
 	memcpy(buffer,act_config,len);
 	*host_endian=0;
-	return len;
+	return LIBUSB_SUCCESS;
 }
 
 static int
 haiku_get_config_descriptor(struct libusb_device *device, uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
 {
-#ifdef TRACE_USB
-	printf("haiku_get_config_descriptor (len:%d,index:%d)\n",len,(int)config_index);
-#endif
 	USBDevice *dev = *((USBDevice**)(device->os_priv));
 	const usb_configuration_descriptor* config = dev->ConfigurationDescriptor(config_index);
 	if(config==NULL)
 	{
-		printf("returning error\n");
+		usbi_err(DEVICE_CTX(device),"failed getting configuration descriptor");
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 	if(len>config->total_length)
@@ -108,9 +96,6 @@ haiku_get_config_descriptor(struct libusb_device *device, uint8_t config_index, 
 static int
 haiku_set_configuration(struct libusb_device_handle *dev_handle, int config)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_set_configuration\n");
-#endif
 	USBDeviceHandle * handle= *((USBDeviceHandle**)dev_handle->os_priv);
 	return handle->SetConfiguration(config);
 }
@@ -118,9 +103,6 @@ haiku_set_configuration(struct libusb_device_handle *dev_handle, int config)
 static int
 haiku_claim_interface(struct libusb_device_handle *dev_handle, int interface_number)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_claim_interface\n");
-#endif
 	USBDeviceHandle * handle=*((USBDeviceHandle**)dev_handle->os_priv);
 	return handle->ClaimInterface(interface_number);
 }
@@ -128,9 +110,6 @@ haiku_claim_interface(struct libusb_device_handle *dev_handle, int interface_num
 static int
 haiku_set_altsetting(struct libusb_device_handle* dev_handle, int interface_number, int altsetting)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_set_altsetting\n");
-#endif
 	USBDeviceHandle* handle = *((USBDeviceHandle**)dev_handle->os_priv);
 	return handle->SetAltSetting(interface_number, altsetting);
 }
@@ -138,9 +117,6 @@ haiku_set_altsetting(struct libusb_device_handle* dev_handle, int interface_numb
 static int
 haiku_release_interface(struct libusb_device_handle *dev_handle, int interface_number)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_release_interface\n");
-#endif
 	USBDeviceHandle * handle=*((USBDeviceHandle**)dev_handle->os_priv);
 	haiku_set_altsetting(dev_handle,interface_number,0);
 	return handle->ReleaseInterface(interface_number);
@@ -149,33 +125,22 @@ haiku_release_interface(struct libusb_device_handle *dev_handle, int interface_n
 static int
 haiku_submit_transfer(struct usbi_transfer * itransfer)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_submit_transfer\n");
-#endif
 	struct libusb_transfer* fLibusbTransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	USBDeviceHandle * fDeviceHandle = *((USBDeviceHandle**)fLibusbTransfer->dev_handle->os_priv);
-	fDeviceHandle->SubmitTransfer(itransfer);
-	return LIBUSB_SUCCESS; 
+	return fDeviceHandle->SubmitTransfer(itransfer);
 }
 
 static int
 haiku_cancel_transfer(struct usbi_transfer * itransfer)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_cancel_transfer\n");
-#endif
 	struct libusb_transfer* fLibusbTransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	USBDeviceHandle * fDeviceHandle = *((USBDeviceHandle**)fLibusbTransfer->dev_handle->os_priv);
-	fDeviceHandle->CancelTransfer(*((USBTransfer**)usbi_transfer_get_os_priv(itransfer)));
-	return LIBUSB_SUCCESS; 
+	return fDeviceHandle->CancelTransfer(*((USBTransfer**)usbi_transfer_get_os_priv(itransfer)));
 }
 
 static void
 haiku_clear_transfer_priv(struct usbi_transfer * itransfer)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_clear_transfer_priv\n");
-#endif
 	USBTransfer* transfer=*((USBTransfer**)usbi_transfer_get_os_priv(itransfer));
 	delete transfer;
 	*((USBTransfer**)usbi_transfer_get_os_priv(itransfer))=NULL;
@@ -184,9 +149,6 @@ haiku_clear_transfer_priv(struct usbi_transfer * itransfer)
 static int
 haiku_handle_events(struct libusb_context* ctx, struct pollfd* fds, nfds_t nfds, int num_ready)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_handle_events\n");
-#endif
 	USBTransfer *transfer;
 	for(int i=0;i<nfds && num_ready>0;i++)
 	{
@@ -196,20 +158,20 @@ haiku_handle_events(struct libusb_context* ctx, struct pollfd* fds, nfds_t nfds,
 			
 		num_ready--;
 		read(pollfd->fd, &transfer, sizeof(transfer));
-		struct usbi_transfer* itransfer=transfer->itransfer();
+		struct usbi_transfer* itransfer=transfer->UsbiTransfer();
 		usbi_mutex_lock(&itransfer->lock);
 		if(transfer->IsCancelled())
 		{
 			delete transfer;
 			*((USBTransfer**)usbi_transfer_get_os_priv(itransfer))=NULL;
 			usbi_mutex_unlock(&itransfer->lock);
-			usbi_handle_transfer_cancellation(transfer->itransfer());
+			usbi_handle_transfer_cancellation(transfer->UsbiTransfer());
 			continue;
 		}
 		libusb_transfer_status status = LIBUSB_TRANSFER_COMPLETED;
 		if(itransfer->transferred < 0)
 		{
-			printf("transfer error :(\n");
+			usbi_err(ITRANSFER_CTX(itransfer),"error in transfer");
 			status = LIBUSB_TRANSFER_ERROR;
 			itransfer->transferred=0;
 		}
@@ -225,9 +187,6 @@ haiku_handle_events(struct libusb_context* ctx, struct pollfd* fds, nfds_t nfds,
 static int
 haiku_clock_gettime(int clkid, struct timespec *tp)
 {
-#ifdef TRACE_USB
-	TRACE("haiku_clock_gettime\n");
-#endif
 	if(clkid == USBI_CLOCK_REALTIME)
 		return clock_gettime(CLOCK_REALTIME, tp);
 	if(clkid == USBI_CLOCK_MONOTONIC)

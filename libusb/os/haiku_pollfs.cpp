@@ -14,6 +14,7 @@ public:
 			~WatchedEntry();
 	bool		EntryCreated(entry_ref* ref);
 	bool		EntryRemoved(ino_t node);
+	bool		InitCheck();
 
 private:
 	BMessenger*	fMessenger;
@@ -22,6 +23,7 @@ private:
 	USBDevice*	fDevice;
 	WatchedEntry*	fEntries;
 	WatchedEntry*	fLink;
+	bool		fInitCheck;
 };
 
 
@@ -30,11 +32,13 @@ public:
 			RosterLooper(USBRoster*);
 	void		Stop();
 	virtual void	MessageReceived(BMessage*);
+	bool		InitCheck();
 
 private:
 	USBRoster*	fRoster;
 	WatchedEntry*	fRoot;
 	BMessenger*	fMessenger;
+	bool		fInitCheck;
 };
 
 
@@ -43,7 +47,8 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 		fIsDirectory(false),
 		fDevice(NULL),
 		fEntries(NULL),
-		fLink(NULL)
+		fLink(NULL),
+		fInitCheck(false)
 {
 	BEntry entry(ref);
 	entry.GetNodeRef(&fNode);
@@ -60,6 +65,12 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 			WatchedEntry* child = new(std::nothrow) WatchedEntry(fMessenger, ref);
 			if (child == NULL)
 				continue;
+			if (child->InitCheck() == false)
+			{
+				delete child;
+				continue;
+			}
+
 			
 			child->fLink = fEntries;
 			fEntries = child;
@@ -68,13 +79,13 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 		watch_node(&fNode, B_WATCH_DIRECTORY, *fMessenger);
 	
 	} else {
-		if (strncmp(ref->name, "raw", 3) == 0 || strncmp(ref->name, "hub", 3) == 0)
+		if (strncmp(ref->name, "raw", 3) == 0)
 			return;
 
 		BPath path;
 		entry.GetPath(&path);
 		fDevice = new(std::nothrow) USBDevice(path.Path());
-		if (fDevice != NULL) {
+		if (fDevice != NULL && fDevice->InitCheck() == true) {
 			// Add this new device to each active context's device list
 			struct libusb_context *ctx;
 			unsigned long session_id = (unsigned long)&fDevice;
@@ -84,12 +95,14 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 
 				struct libusb_device* dev = usbi_get_device_by_session_id(ctx, session_id);
 				if (dev) {
-					//TODO print info
+					usbi_dbg("using previously allocated device with location %lu", session_id);
 					libusb_unref_device(dev);
 					continue;
 				}
+				usbi_dbg("allocating new device with location %lu" ,session_id);
 				dev = usbi_alloc_device(ctx, session_id);
 				if (!dev) {
+					usbi_dbg("device allocation failed");
 					continue;
 				}
 				*((USBDevice**)dev->os_priv) = fDevice;
@@ -98,23 +111,21 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 				sscanf(path.Path(), "/dev/bus/usb/%d", &dev->bus_number);
 				(dev->device_address)++;
 
-				int fRawFD = open(path.Path(), O_RDWR | O_CLOEXEC);
-				if (fRawFD < 0)
-				{
-					libusb_unref_device(dev);
-					continue;
-				}
-				close(fRawFD);
 				if(usbi_sanitize_device(dev) < 0)
 				{
+					usbi_dbg("device sanitization failed");
 					libusb_unref_device(dev);
 					continue;
 				}
 				usbi_connect_device(dev);
 			}
 			usbi_mutex_unlock(&active_contexts_lock);
+		} else if (fDevice) {
+			delete fDevice;
+			return;
 		}
 	}
+	fInitCheck = true;
 }
 
 
@@ -144,7 +155,7 @@ WatchedEntry::~WatchedEntry()
 				usbi_disconnect_device (dev);
 				libusb_unref_device(dev);
 			} else {
-				//TODO print not found
+				usbi_dbg("device with location %lu not found", session_id);
 			}
 		}
 		usbi_mutex_static_unlock(&active_contexts_lock);
@@ -206,29 +217,50 @@ WatchedEntry::EntryRemoved(ino_t node)
 }
 
 
+bool
+WatchedEntry::InitCheck()
+{
+	return fInitCheck;
+}
+
+
 RosterLooper::RosterLooper(USBRoster* roster)
 	:	BLooper("LibusbRoster Looper"),
 		fRoster(roster),
 		fRoot(NULL),
-		fMessenger(NULL)
+		fMessenger(NULL),
+		fInitCheck(false)
 {
 	BEntry entry("/dev/bus/usb");
 	if (!entry.Exists()) {
-		fprintf(stderr,"Libusb: usb_raw not published\n");
+		usbi_err(NULL,"usb_raw not published");
 		return;
 	}
 
 	Run();
 	fMessenger = new(std::nothrow) BMessenger(this);
 	if (fMessenger == NULL)
+	{
+		usbi_err(NULL,"error creating BMessenger object");
 		return;
+	}
 
 	if(Lock()) {
 		entry_ref ref;
 		entry.GetRef(&ref);
 		fRoot = new(std::nothrow) WatchedEntry(fMessenger, &ref);
 		Unlock();
+		if (fRoot == NULL)
+		{
+			return;
+		}
+		if (fRoot->InitCheck() == false)
+		{
+			delete fRoot;
+			return;
+		}
 	}
+	fInitCheck = true;
 }
 
 
@@ -237,6 +269,7 @@ RosterLooper::Stop()
 {
 	Lock();
 	delete fRoot;
+	delete fMessenger;
 	Quit();
 }
 
@@ -273,6 +306,13 @@ RosterLooper::MessageReceived(BMessage *message)
 }
 
 
+bool
+RosterLooper::InitCheck()
+{
+	return fInitCheck;
+}
+
+
 USBRoster::USBRoster()
 	:	fLooper(NULL)
 {
@@ -285,13 +325,16 @@ USBRoster::~USBRoster()
 }
 
 
-void
+int
 USBRoster::Start()
 {
 	if(fLooper)
-		return;
+		return LIBUSB_SUCCESS;
 
 	fLooper = new(std::nothrow) RosterLooper(this);
+	if (fLooper == NULL || ((RosterLooper*)fLooper)->InitCheck() == false)
+		return LIBUSB_ERROR_OTHER;
+	return LIBUSB_SUCCESS;
 }
 
 
