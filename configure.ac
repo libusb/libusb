@@ -36,7 +36,6 @@ m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AC_PREREQ([2.50])
 AC_PROG_CC
-AC_PROG_CXX
 LT_INIT
 LT_LANG([Windows Resource])
 AC_C_INLINE
@@ -92,6 +91,7 @@ case $host in
 	;;
 *-haiku*)
 	AC_MSG_RESULT([Haiku])
+	AC_CONFIG_SUBDIRS([libusb/os/haiku])
 	backend="haiku"
 	threads="posix"
 	;;
@@ -178,7 +178,7 @@ windows)
 haiku)
 	AC_DEFINE(OS_HAIKU, 1, [Haiku backend])
 	AC_SUBST(OS_HAIKU)
-	LIBS="${LIBS} -ldevice"
+	LIBS="${LIBS} -lbe"
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;

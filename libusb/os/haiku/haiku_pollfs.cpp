@@ -1,4 +1,13 @@
-#include "haiku_usb_raw.h"
+/*
+ * Copyright 2007-2008, Haiku Inc. All rights reserved.
+ * Distributed under the terms of the MIT License.
+ *
+ * Authors:
+ *		Michael Lotz <mmlr@mlotz.ch>
+ */
+
+#include "haiku_usb.h"
+#include <cstdio>
 #include <Directory.h>
 #include <Entry.h>
 #include <Looper.h>
