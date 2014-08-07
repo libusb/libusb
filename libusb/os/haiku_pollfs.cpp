@@ -82,7 +82,7 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 		if (strncmp(ref->name, "raw", 3) == 0)
 			return;
 
-		BPath path;
+		BPath path, parent_path;
 		entry.GetPath(&path);
 		fDevice = new(std::nothrow) USBDevice(path.Path());
 		if (fDevice != NULL && fDevice->InitCheck() == true) {
@@ -106,10 +106,27 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 					continue;
 				}
 				*((USBDevice**)dev->os_priv) = fDevice;
-				// TODO Repair
-				sscanf(path.Leaf(), "%d", &dev->device_address);
+
+				// Calculate pseudo-device-address
+				int addr,tmp;
+				if (strcmp(path.Leaf(), "hub") == 0)
+				{
+					tmp=100;	//Random Number
+				}
+				else
+				{
+					sscanf(path.Leaf(), "%d", &tmp);
+				}
+				addr = tmp + 1;
+				path.GetParent(&parent_path);
+				while(strcmp(parent_path.Leaf(),"usb") != 0)
+				{
+					sscanf(parent_path.Leaf(), "%d", &tmp);
+					addr += tmp + 1;
+					parent_path.GetParent(&parent_path);
+				}
 				sscanf(path.Path(), "/dev/bus/usb/%d", &dev->bus_number);
-				(dev->device_address)++;
+				(dev->device_address) = addr - (dev->bus_number + 1);
 
 				if(usbi_sanitize_device(dev) < 0)
 				{
@@ -122,6 +139,7 @@ WatchedEntry::WatchedEntry(BMessenger* messenger, entry_ref* ref)
 			usbi_mutex_unlock(&active_contexts_lock);
 		} else if (fDevice) {
 			delete fDevice;
+			fDevice = NULL;
 			return;
 		}
 	}
