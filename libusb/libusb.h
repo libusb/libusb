@@ -1991,6 +1991,11 @@ int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
 void LIBUSB_CALL libusb_hotplug_deregister_callback(libusb_context *ctx,
 						libusb_hotplug_callback_handle handle);
 
+#ifdef _WIN32
+struct libusb_device *LIBUSB_CALL libusb_get_device_by_dbcc_name(libusb_context *cts,
+                                                                 const char *dbcc_name);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
