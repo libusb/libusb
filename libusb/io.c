@@ -1961,10 +1961,26 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	int r;
 	struct usbi_pollfd *ipollfd;
 	POLL_NFDS_TYPE nfds = 0;
+	POLL_NFDS_TYPE internal_nfds;
 	struct pollfd *fds = NULL;
 	int i = -1;
 	int timeout_ms;
 	int special_event;
+
+	/* there are certain fds that libusb uses internally, currently:
+	 *
+	 *   1) control pipe
+	 *   2) hotplug pipe
+	 *   3) timerfd
+	 *
+	 * the backend will never need to attempt to handle events on these fds, so
+	 * we determine how many fds are in use internally for this context and when
+	 * handle_events() is called in the backend, the pollfd list and count will
+	 * be adjusted to skip over these internal fds */
+	if (usbi_using_timerfd(ctx))
+		internal_nfds = 3;
+	else
+		internal_nfds = 2;
 
 	usbi_mutex_lock(&ctx->pollfds_lock);
 	list_for_each_entry(ipollfd, &ctx->pollfds, list, struct usbi_pollfd)
@@ -2019,14 +2035,8 @@ redo_poll:
 		 * simply return */
 		usbi_dbg("caught a fish on the control pipe");
 
-		if (r == 1) {
-			r = 0;
+		if (0 == --r)
 			goto handled;
-		} else {
-			/* prevent OS backend from trying to handle events on ctrl pipe */
-			fds[0].revents = 0;
-			r--;
-		}
 	}
 
 	/* fd[1] is always the hotplug pipe */
@@ -2052,8 +2062,7 @@ redo_poll:
 		if (LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT == message.event)
 			libusb_unref_device(message.device);
 
-		fds[1].revents = 0;
-		if (1 == r--)
+		if (0 == --r)
 			goto handled;
 	} /* else there shouldn't be anything on this pipe */
 
@@ -2070,28 +2079,22 @@ redo_poll:
 			/* return error code */
 			r = ret;
 			goto handled;
-		} else if (r == 1) {
-			/* no more active file descriptors, nothing more to do */
-			r = 0;
-			goto handled;
-		} else {
-			/* more events pending...
-			 * prevent OS backend from trying to handle events on timerfd */
-			fds[2].revents = 0;
-			r--;
 		}
+
+		if (0 == --r)
+			goto handled;
 	}
 #endif
 
-	r = usbi_backend->handle_events(ctx, fds, nfds, r);
+	r = usbi_backend->handle_events(ctx, fds + internal_nfds, nfds - internal_nfds, r);
 	if (r)
 		usbi_err(ctx, "backend handle_events failed with error %d", r);
 
 handled:
-        if (r == 0 && special_event) {
-                timeout_ms = 0;
-                goto redo_poll;
-        }
+	if (r == 0 && special_event) {
+		timeout_ms = 0;
+		goto redo_poll;
+	}
 
 	free(fds);
 	return r;
