@@ -1599,9 +1599,6 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	 * this point. */
 	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER)
 		libusb_free_transfer(transfer);
-	usbi_mutex_lock(&ctx->event_waiters_lock);
-	usbi_cond_broadcast(&ctx->event_waiters_cond);
-	usbi_mutex_unlock(&ctx->event_waiters_lock);
 	libusb_unref_device(handle->dev);
 	return 0;
 }
