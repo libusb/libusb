@@ -92,7 +92,7 @@ static int _bus_open(int);
 
 const struct usbi_os_backend openbsd_backend = {
 	"Synchronous OpenBSD backend",
-	0,
+	USBI_CAP_HAS_POLLABLE_DEVICE_FD,
 	NULL,				/* init() */
 	NULL,				/* exit() */
 	obsd_get_device_list,

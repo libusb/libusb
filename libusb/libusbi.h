@@ -57,6 +57,7 @@
 /* Backend specific capabilities */
 #define USBI_CAP_HAS_HID_ACCESS					0x00010000
 #define USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER	0x00020000
+#define USBI_CAP_HAS_POLLABLE_DEVICE_FD		0x00040000
 
 /* Maximum number of bytes in a log line */
 #define USBI_MAX_LOG_LEN	1024

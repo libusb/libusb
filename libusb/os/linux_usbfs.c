@@ -2646,7 +2646,7 @@ static clockid_t op_get_timerfd_clockid(void)
 
 const struct usbi_os_backend linux_usbfs_backend = {
 	.name = "Linux usbfs",
-	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
+	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER|USBI_CAP_HAS_POLLABLE_DEVICE_FD,
 	.init = op_init,
 	.exit = op_exit,
 	.get_device_list = NULL,
