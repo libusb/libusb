@@ -218,7 +218,7 @@ haiku_clock_gettime(int clkid, struct timespec *tp)
 
 const struct usbi_os_backend haiku_usb_raw_backend = {
 	/*.name =*/ "Haiku usbfs",
-	/*.caps =*/ 0,
+	/*.caps =*/ USBI_CAP_HAS_POLLABLE_DEVICE_FD,
 	/*.init =*/ haiku_init,
 	/*.exit =*/ haiku_exit,
 	/*.get_device_list =*/ NULL,
