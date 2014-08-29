@@ -1998,9 +1998,9 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 		/* sanity check - it is invalid for a context to have fewer than the
 		 * required internal fds (memory corruption?) */
-		assert(ctx->num_pollfds >= internal_nfds);
+		assert(ctx->pollfds_cnt >= internal_nfds);
 
-		ctx->pollfds = calloc(ctx->num_pollfds, sizeof(*ctx->pollfds));
+		ctx->pollfds = calloc(ctx->pollfds_cnt, sizeof(*ctx->pollfds));
 		if (!ctx->pollfds) {
 			usbi_mutex_unlock(&ctx->pollfds_lock);
 			return LIBUSB_ERROR_NO_MEM;
@@ -2017,7 +2017,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		ctx->pollfds_modified = 0;
 	}
 	fds = ctx->pollfds;
-	nfds = ctx->num_pollfds;
+	nfds = ctx->pollfds_cnt;
 	usbi_mutex_unlock(&ctx->pollfds_lock);
 
 	timeout_ms = (int)(tv->tv_sec * 1000) + (tv->tv_usec / 1000);
@@ -2490,7 +2490,7 @@ int usbi_add_pollfd(struct libusb_context *ctx, int fd, short events)
 	ipollfd->pollfd.events = events;
 	usbi_mutex_lock(&ctx->pollfds_lock);
 	list_add_tail(&ipollfd->list, &ctx->ipollfds);
-	ctx->num_pollfds++;
+	ctx->pollfds_cnt++;
 	ctx->pollfds_modified = 1;
 	usbi_mutex_unlock(&ctx->pollfds_lock);
 
@@ -2520,7 +2520,7 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
 	}
 
 	list_del(&ipollfd->list);
-	ctx->num_pollfds--;
+	ctx->pollfds_cnt--;
 	ctx->pollfds_modified = 1;
 	usbi_mutex_unlock(&ctx->pollfds_lock);
 	free(ipollfd);
@@ -2555,13 +2555,13 @@ const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 
 	usbi_mutex_lock(&ctx->pollfds_lock);
 
-	ret = calloc(ctx->num_pollfds + 1, sizeof(struct libusb_pollfd *));
+	ret = calloc(ctx->pollfds_cnt + 1, sizeof(struct libusb_pollfd *));
 	if (!ret)
 		goto out;
 
 	list_for_each_entry(ipollfd, &ctx->ipollfds, list, struct usbi_pollfd)
 		ret[i++] = (struct libusb_pollfd *) ipollfd;
-	ret[ctx->num_pollfds] = NULL;
+	ret[ctx->pollfds_cnt] = NULL;
 
 out:
 	usbi_mutex_unlock(&ctx->pollfds_lock);

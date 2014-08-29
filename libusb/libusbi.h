@@ -269,8 +269,8 @@ struct libusb_context {
 	 * (re)allocated as necessary prior to polling, and a flag to indicate
 	 * when the list of poll fds has changed since the last poll. */
 	struct list_head ipollfds;
-	POLL_NFDS_TYPE num_pollfds;
 	struct pollfd *pollfds;
+	POLL_NFDS_TYPE pollfds_cnt;
 	unsigned int pollfds_modified;
 	usbi_mutex_t pollfds_lock;
 
