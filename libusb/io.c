@@ -1147,10 +1147,8 @@ int usbi_io_init(struct libusb_context *ctx)
 	if (ctx->timerfd >= 0) {
 		usbi_dbg("using timerfd for timeouts");
 		r = usbi_add_pollfd(ctx, ctx->timerfd, POLLIN);
-		if (r < 0) {
-			close(ctx->timerfd);
-			goto err_remove_hp_pipe;
-		}
+		if (r < 0)
+			goto err_close_timerfd;
 	} else {
 		usbi_dbg("timerfd not available (code %d error %d)", ctx->timerfd, errno);
 		ctx->timerfd = -1;
@@ -1160,7 +1158,8 @@ int usbi_io_init(struct libusb_context *ctx)
 	return 0;
 
 #ifdef USBI_TIMERFD_AVAILABLE
-err_remove_hp_pipe:
+err_close_timerfd:
+	close(ctx->timerfd);
 	usbi_remove_pollfd(ctx, ctx->hotplug_pipe[0]);
 #endif
 err_close_hp_pipe:
