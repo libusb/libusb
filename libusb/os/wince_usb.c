@@ -22,12 +22,13 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <libusbi.h>
+#include <config.h>
 
 #include <stdint.h>
 #include <errno.h>
 #include <inttypes.h>
 
+#include "libusbi.h"
 #include "wince_usb.h"
 
 // Forward declares

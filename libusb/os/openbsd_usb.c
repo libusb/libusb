@@ -16,6 +16,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include <config.h>
+
 #include <sys/time.h>
 #include <sys/types.h>
 
@@ -28,7 +30,6 @@
 
 #include <dev/usb/usb.h>
 
-#include "libusb.h"
 #include "libusbi.h"
 
 struct device_priv {

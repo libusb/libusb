@@ -19,6 +19,7 @@
  */
 
 #include <config.h>
+
 #include <objbase.h>
 #include <errno.h>
 #include <stdarg.h>

@@ -23,6 +23,7 @@
  */
 
 #include <config.h>
+
 #include <windows.h>
 #include <setupapi.h>
 #include <ctype.h>

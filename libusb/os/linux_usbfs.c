@@ -38,7 +38,6 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
-#include "libusb.h"
 #include "libusbi.h"
 #include "linux_usbfs.h"
 

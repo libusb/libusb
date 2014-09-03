@@ -21,7 +21,7 @@
 #ifndef LIBUSBI_H
 #define LIBUSBI_H
 
-#include "config.h"
+#include <config.h>
 
 #include <stdlib.h>
 
@@ -32,10 +32,10 @@
 #ifdef HAVE_POLL_H
 #include <poll.h>
 #endif
-
 #ifdef HAVE_MISSING_H
-#include "missing.h"
+#include <missing.h>
 #endif
+
 #include "libusb.h"
 #include "version.h"
 
