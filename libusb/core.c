@@ -1950,8 +1950,10 @@ err_backend_exit:
 	if (usbi_backend->exit)
 		usbi_backend->exit();
 err_free_ctx:
-	if (ctx == usbi_default_context)
+	if (ctx == usbi_default_context) {
 		usbi_default_context = NULL;
+		default_context_refcnt--;
+	}
 
 	usbi_mutex_static_lock(&active_contexts_lock);
 	list_del (&ctx->list);

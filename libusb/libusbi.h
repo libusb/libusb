@@ -228,14 +228,6 @@ static inline void usbi_dbg(const char *format, ...)
 #define IS_XFERIN(xfer) (0 != ((xfer)->endpoint & LIBUSB_ENDPOINT_IN))
 #define IS_XFEROUT(xfer) (!IS_XFERIN(xfer))
 
-/* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
-#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) || defined(OS_HAIKU)
-#include <unistd.h>
-#include "os/poll_posix.h"
-#elif defined(OS_WINDOWS) || defined(OS_WINCE)
-#include "os/poll_windows.h"
-#endif
-
 /* Internal abstraction for thread synchronization */
 #if defined(THREADS_POSIX)
 #include "os/threads_posix.h"
@@ -244,6 +236,9 @@ static inline void usbi_dbg(const char *format, ...)
 #endif
 
 extern struct libusb_context *usbi_default_context;
+
+/* Forward declaration for use in context (fully defined inside poll abstraction) */
+struct pollfd;
 
 struct libusb_context {
 	int debug;
@@ -277,8 +272,8 @@ struct libusb_context {
 	 * (re)allocated as necessary prior to polling, and a flag to indicate
 	 * when the list of poll fds has changed since the last poll. */
 	struct list_head ipollfds;
-	POLL_NFDS_TYPE num_pollfds;
 	struct pollfd *pollfds;
+	POLL_NFDS_TYPE pollfds_cnt;
 	unsigned int pollfds_modified;
 	usbi_mutex_t pollfds_lock;
 
@@ -465,6 +460,14 @@ int usbi_get_config_index_by_value(struct libusb_device *dev,
 
 void usbi_connect_device (struct libusb_device *dev);
 void usbi_disconnect_device (struct libusb_device *dev);
+
+/* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
+#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) || defined(OS_HAIKU)
+#include <unistd.h>
+#include "os/poll_posix.h"
+#elif defined(OS_WINDOWS) || defined(OS_WINCE)
+#include "os/poll_windows.h"
+#endif
 
 #if (defined(OS_WINDOWS) || defined(OS_WINCE)) && !defined(__GNUC__)
 #define snprintf _snprintf
