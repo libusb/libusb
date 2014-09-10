@@ -27,6 +27,8 @@
 
 #if defined(_MSC_VER)
 #define strncasecmp _strnicmp
+#elif defined(__HAIKU__)
+#include <strings.h>
 #endif
 
 static size_t usbi_locale = 0;

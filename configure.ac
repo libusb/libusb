@@ -89,6 +89,12 @@ case $host in
 	backend="windows"
 	threads="posix"
 	;;
+*-haiku*)
+	AC_MSG_RESULT([Haiku])
+	AC_CONFIG_SUBDIRS([libusb/os/haiku])
+	backend="haiku"
+	threads="posix"
+	;;
 *)
 	AC_MSG_ERROR([unsupported operating system])
 esac
@@ -170,6 +176,13 @@ windows)
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	AC_DEFINE([WINVER], 0x0501, [Oldest Windows version supported])
 	;;
+haiku)
+	AC_DEFINE(OS_HAIKU, 1, [Haiku backend])
+	AC_SUBST(OS_HAIKU)
+	LIBS="${LIBS} -lbe"
+	AC_CHECK_HEADERS([poll.h])
+	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
+	;;
 esac
 
 AC_SUBST(LIBS)
@@ -179,6 +192,7 @@ AM_CONDITIONAL(OS_DARWIN, test "x$backend" = xdarwin)
 AM_CONDITIONAL(OS_OPENBSD, test "x$backend" = xopenbsd)
 AM_CONDITIONAL(OS_NETBSD, test "x$backend" = xnetbsd)
 AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
+AM_CONDITIONAL(OS_HAIKU, test "x$backend" = xhaiku)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
 AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = "xyes")
 AM_CONDITIONAL(USE_UDEV, test "x$enable_udev" = xyes)
@@ -289,7 +303,18 @@ AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_FUNCS(gettimeofday)
 AC_CHECK_HEADERS([signal.h])
 
-AM_CFLAGS="${AM_CFLAGS} -std=gnu99 -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow ${THREAD_CFLAGS} ${VISIBILITY_CFLAGS}"
+# check for -std=gnu99 compiler support
+saved_cflags="$CFLAGS"
+CFLAGS="-std=gnu99"
+AC_MSG_CHECKING([whether CC supports -std=gnu99])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
+    [AC_MSG_RESULT([yes])]
+    [AM_CFLAGS="${AM_CFLAGS} -std=gnu99"],
+    [AC_MSG_RESULT([no])]
+)
+CFLAGS="$saved_cflags"
+
+AM_CFLAGS="${AM_CFLAGS} -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-implicit-function-declaration $nopointersign_cflags -Wshadow ${THREAD_CFLAGS} ${VISIBILITY_CFLAGS}"
 
 AC_SUBST(AM_CFLAGS)
 AC_SUBST(LTLDFLAGS)
