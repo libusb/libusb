@@ -48,6 +48,10 @@
  */
 #define API_EXPORTED LIBUSB_CALL DEFAULT_VISIBILITY
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define DEVICE_DESC_LENGTH		18
 
 #define USB_MAXENDPOINTS	32
@@ -145,8 +149,12 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
         const typeof( ((type *)0)->member ) *mptr = (ptr);    \
         (type *)( (char *)mptr - offsetof(type,member) );})
 
+#ifndef MIN
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
+#endif
+#ifndef MAX
 #define MAX(a, b)	((a) > (b) ? (a) : (b))
+#endif
 
 #define TIMESPEC_IS_SET(ts) ((ts)->tv_sec != 0 || (ts)->tv_nsec != 0)
 
@@ -454,7 +462,7 @@ void usbi_connect_device (struct libusb_device *dev);
 void usbi_disconnect_device (struct libusb_device *dev);
 
 /* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
-#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD)
+#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) || defined(OS_HAIKU)
 #include <unistd.h>
 #include "os/poll_posix.h"
 #elif defined(OS_WINDOWS) || defined(OS_WINCE)
@@ -1027,8 +1035,13 @@ extern const struct usbi_os_backend openbsd_backend;
 extern const struct usbi_os_backend netbsd_backend;
 extern const struct usbi_os_backend windows_backend;
 extern const struct usbi_os_backend wince_backend;
+extern const struct usbi_os_backend haiku_usb_raw_backend;
 
 extern struct list_head active_contexts_list;
 extern usbi_mutex_static_t active_contexts_lock;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
