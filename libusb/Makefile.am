@@ -12,7 +12,6 @@ NETBSD_USB_SRC = os/netbsd_usb.c
 WINDOWS_USB_SRC = os/poll_windows.c os/windows_usb.c libusb-1.0.rc libusb-1.0.def
 WINCE_USB_SRC = os/wince_usb.c os/wince_usb.h
 
-dist_data_DATA = os/haiku
 DIST_SUBDIRS = 
 
 EXTRA_DIST = $(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) $(OPENBSD_USB_SRC) \
@@ -20,6 +19,9 @@ EXTRA_DIST = $(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) $(OPENBSD_USB_SRC) \
 	$(POSIX_POLL_SRC) \
 	os/threads_posix.c os/threads_windows.c \
 	os/linux_udev.c os/linux_netlink.c
+
+dist-hook:
+	-cp -r os/haiku $(distdir)/os/haiku
 
 if OS_LINUX
 
