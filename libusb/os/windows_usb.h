@@ -47,9 +47,8 @@
 
 #if defined(__CYGWIN__ )
 #define _stricmp stricmp
-// cygwin produces a warning unless these prototypes are defined
-extern int _snprintf(char *buffer, size_t count, const char *format, ...);
-extern char *_strdup(const char *strSource);
+#define _snprintf snprintf
+#define _strdup strdup
 // _beginthreadex is MSVCRT => unavailable for cygwin. Fallback to using CreateThread
 #define _beginthreadex(a, b, c, d, e, f) CreateThread(a, b, (LPTHREAD_START_ROUTINE)c, d, e, f)
 #endif
