@@ -2029,7 +2029,6 @@ redo_poll:
 
 	/* fds[0] is always the event pipe */
 	if (fds[0].revents) {
-		unsigned int ru;
 		libusb_hotplug_message *message = NULL;
 
 		usbi_dbg("caught a fish on the event pipe");
@@ -2037,8 +2036,15 @@ redo_poll:
 		/* take the the event data lock while processing events */
 		usbi_mutex_lock(&ctx->event_data_lock);
 
+		/* check if someone added a new poll fd */
+		if (ctx->fd_notify) {
+			usbi_dbg("someone updated the poll fds");
+			ctx->fd_notify = 0;
+		}
+
 		/* check if someone is closing a device */
-		ru = ctx->device_close;
+		if (ctx->device_close)
+			usbi_dbg("someone is closing a device");
 
 		/* check for any pending hotplug messages */
 		if (!list_empty(&ctx->hotplug_msgs)) {
@@ -2047,6 +2053,10 @@ redo_poll:
 			message = list_first_entry(&ctx->hotplug_msgs, libusb_hotplug_message, list);
 			list_del(&message->list);
 		}
+
+		/* if no further pending events, clear the event pipe */
+		if (!usbi_pending_events(ctx))
+			usbi_clear_event(ctx);
 
 		usbi_mutex_unlock(&ctx->event_data_lock);
 
@@ -2059,13 +2069,6 @@ redo_poll:
 				libusb_unref_device(message->device);
 
 			free(message);
-		}
-
-		/* clear the event pipe if this was an fd or hotplug notification */
-		if (!ru || message) {
-			r = usbi_clear_event(ctx);
-			if (r)
-				goto handled;
 		}
 
 		if (0 == --r)

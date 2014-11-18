@@ -317,6 +317,10 @@ struct libusb_context {
 	struct list_head list;
 };
 
+/* Update the following macro if new event sources are added */
+#define usbi_pending_events(ctx) \
+	((ctx)->device_close || (ctx)->fd_notify || !list_empty(&(ctx)->hotplug_msgs))
+
 #ifdef USBI_TIMERFD_AVAILABLE
 #define usbi_using_timerfd(ctx) ((ctx)->timerfd >= 0)
 #else

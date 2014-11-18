@@ -1200,13 +1200,16 @@ int usbi_clear_event(struct libusb_context *ctx)
  */
 void usbi_fd_notification(struct libusb_context *ctx)
 {
-	/* record that there is a new poll fd */
-	usbi_mutex_lock(&ctx->event_data_lock);
-	ctx->fd_notify = 1;
-	usbi_mutex_unlock(&ctx->event_data_lock);
+	int pending_events;
 
-	/* signal the event pipe to interrupt event handlers */
-	usbi_signal_event(ctx);
+	/* Record that there is a new poll fd.
+	 * Only signal an event if there are no prior pending events. */
+	usbi_mutex_lock(&ctx->event_data_lock);
+	pending_events = usbi_pending_events(ctx);
+	ctx->fd_notify = 1;
+	if (!pending_events)
+		usbi_signal_event(ctx);
+	usbi_mutex_unlock(&ctx->event_data_lock);
 }
 
 /** \ingroup dev
@@ -1407,6 +1410,7 @@ static void do_close(struct libusb_context *ctx,
 void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 {
 	struct libusb_context *ctx;
+	int pending_events;
 
 	if (!dev_handle)
 		return;
@@ -1420,26 +1424,28 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 	 * thread from doing event handling) because we will be removing a file
 	 * descriptor from the polling loop. */
 
-	/* record that we are closing a device */
+	/* Record that we are closing a device.
+	 * Only signal an event if there are no prior pending events. */
 	usbi_mutex_lock(&ctx->event_data_lock);
+	pending_events = usbi_pending_events(ctx);
 	ctx->device_close++;
+	if (!pending_events)
+		usbi_signal_event(ctx);
 	usbi_mutex_unlock(&ctx->event_data_lock);
-
-	/* signal the event pipe to interrupt event handlers */
-	usbi_signal_event(ctx);
 
 	/* take event handling lock */
 	libusb_lock_events(ctx);
 
-	/* clear the event pipe */
-	usbi_clear_event(ctx);
-
 	/* Close the device */
 	do_close(ctx, dev_handle);
 
-	/* we're done with closing this device */
+	/* We're done with closing this device.
+	 * Clear the event pipe if there are no further pending events. */
 	usbi_mutex_lock(&ctx->event_data_lock);
 	ctx->device_close--;
+	pending_events = usbi_pending_events(ctx);
+	if (!pending_events)
+		usbi_clear_event(ctx);
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
 	/* Release event handling lock and wake up event waiters */

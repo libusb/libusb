@@ -206,6 +206,7 @@ void usbi_hotplug_match(struct libusb_context *ctx, struct libusb_device *dev,
 void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device *dev,
 	libusb_hotplug_event event)
 {
+	int pending_events;;
 	libusb_hotplug_message *message = calloc(1, sizeof(*message));
 
 	if (!message) {
@@ -216,12 +217,14 @@ void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device 
 	message->event = event;
 	message->device = dev;
 
-	/* Take the event data lock and add this message to the list. */
+	/* Take the event data lock and add this message to the list.
+	 * Only signal an event if there are no prior pending events. */
 	usbi_mutex_lock(&ctx->event_data_lock);
+	pending_events = usbi_pending_events(ctx);
 	list_add_tail(&message->list, &ctx->hotplug_msgs);
+	if (!pending_events)
+		usbi_signal_event(ctx);
 	usbi_mutex_unlock(&ctx->event_data_lock);
-
-	usbi_signal_event(ctx);
 }
 
 int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
