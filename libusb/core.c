@@ -1215,6 +1215,12 @@ int usbi_clear_event(struct libusb_context *ctx)
  */
 void usbi_fd_notification(struct libusb_context *ctx)
 {
+	/* record that there is a new poll fd */
+	usbi_mutex_lock(&ctx->event_data_lock);
+	ctx->fd_notify = 1;
+	usbi_mutex_unlock(&ctx->event_data_lock);
+
+	/* signal the event pipe to interrupt event handlers */
 	usbi_signal_event(ctx);
 }
 

@@ -294,6 +294,10 @@ struct libusb_context {
 	 * in order to safely close a device. Protected by event_data_lock. */
 	unsigned int device_close;
 
+	/* A flag that is set when we want to interrupt event handling, in order to
+	 * pick up a new fd for polling. Protected by event_data_lock. */
+	unsigned int fd_notify;
+
 	/* used to wait for event completion in threads other than the one that is
 	 * event handling */
 	usbi_mutex_t event_waiters_lock;
