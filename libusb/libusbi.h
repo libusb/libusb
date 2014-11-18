@@ -462,6 +462,9 @@ int usbi_get_config_index_by_value(struct libusb_device *dev,
 void usbi_connect_device (struct libusb_device *dev);
 void usbi_disconnect_device (struct libusb_device *dev);
 
+int usbi_signal_event(struct libusb_context *ctx);
+int usbi_clear_event(struct libusb_context *ctx);
+
 /* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
 #if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) || defined(OS_HAIKU)
 #include <unistd.h>

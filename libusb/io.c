@@ -2051,8 +2051,6 @@ redo_poll:
 		/* another thread wanted to interrupt event handling, and it succeeded!
 		 * handle any other events that cropped up at the same time, and
 		 * simply return */
-		ssize_t ret;
-		unsigned char dummy;
 		unsigned int ru;
 
 		usbi_dbg("caught a fish on the event pipe");
@@ -2063,13 +2061,9 @@ redo_poll:
 		ru = ctx->device_close;
 		usbi_mutex_unlock(&ctx->event_data_lock);
 		if (!ru) {
-			ret = usbi_read(ctx->event_pipe[0], &dummy, sizeof(dummy));
-			if (ret != sizeof(dummy)) {
-				usbi_err(ctx, "event pipe read error %d err=%d",
-					 ret, errno);
-				r = LIBUSB_ERROR_OTHER;
+			r = usbi_clear_event(ctx);
+			if (r)
 				goto handled;
-			}
 		}
 
 		if (0 == --r)
