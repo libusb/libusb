@@ -1112,7 +1112,6 @@ int usbi_io_init(struct libusb_context *ctx)
 
 	usbi_mutex_init(&ctx->flying_transfers_lock, NULL);
 	usbi_mutex_init(&ctx->pollfds_lock, NULL);
-	usbi_mutex_init(&ctx->device_close_lock, NULL);
 	usbi_mutex_init_recursive(&ctx->events_lock, NULL);
 	usbi_mutex_init(&ctx->event_data_lock, NULL);
 	usbi_mutex_init(&ctx->event_waiters_lock, NULL);
@@ -1174,7 +1173,6 @@ err_close_pipe:
 err:
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
 	usbi_mutex_destroy(&ctx->pollfds_lock);
-	usbi_mutex_destroy(&ctx->device_close_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
 	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
@@ -1198,7 +1196,6 @@ void usbi_io_exit(struct libusb_context *ctx)
 #endif
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
 	usbi_mutex_destroy(&ctx->pollfds_lock);
-	usbi_mutex_destroy(&ctx->device_close_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
 	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
@@ -1659,9 +1656,9 @@ int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
 
 	/* is someone else waiting to close a device? if so, don't let this thread
 	 * start event handling */
-	usbi_mutex_lock(&ctx->device_close_lock);
+	usbi_mutex_lock(&ctx->event_data_lock);
 	ru = ctx->device_close;
-	usbi_mutex_unlock(&ctx->device_close_lock);
+	usbi_mutex_unlock(&ctx->event_data_lock);
 	if (ru) {
 		usbi_dbg("someone else is closing a device");
 		return 1;
@@ -1750,9 +1747,9 @@ int API_EXPORTED libusb_event_handling_ok(libusb_context *ctx)
 
 	/* is someone else waiting to close a device? if so, don't let this thread
 	 * continue event handling */
-	usbi_mutex_lock(&ctx->device_close_lock);
+	usbi_mutex_lock(&ctx->event_data_lock);
 	r = ctx->device_close;
-	usbi_mutex_unlock(&ctx->device_close_lock);
+	usbi_mutex_unlock(&ctx->event_data_lock);
 	if (r) {
 		usbi_dbg("someone else is closing a device");
 		return 0;
@@ -1778,9 +1775,9 @@ int API_EXPORTED libusb_event_handler_active(libusb_context *ctx)
 
 	/* is someone else waiting to close a device? if so, don't let this thread
 	 * start event handling -- indicate that event handling is happening */
-	usbi_mutex_lock(&ctx->device_close_lock);
+	usbi_mutex_lock(&ctx->event_data_lock);
 	r = ctx->device_close;
-	usbi_mutex_unlock(&ctx->device_close_lock);
+	usbi_mutex_unlock(&ctx->event_data_lock);
 	if (r) {
 		usbi_dbg("someone else is closing a device");
 		return 1;
@@ -2062,9 +2059,9 @@ redo_poll:
 
 		/* read the dummy data from the control pipe unless someone is closing
 		 * a device */
-		usbi_mutex_lock(&ctx->device_close_lock);
+		usbi_mutex_lock(&ctx->event_data_lock);
 		ru = ctx->device_close;
-		usbi_mutex_unlock(&ctx->device_close_lock);
+		usbi_mutex_unlock(&ctx->event_data_lock);
 		if (!ru) {
 			ret = usbi_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
 			if (ret != sizeof(dummy)) {

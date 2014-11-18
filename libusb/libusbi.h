@@ -245,7 +245,7 @@ struct libusb_context {
 	int debug_fixed;
 
 	/* internal control pipe, used for interrupting event handling when
-	 * something needs to modify poll fds. */
+	 * an internal event occurs. */
 	int ctrl_pipe[2];
 
 	struct list_head usb_devs;
@@ -277,11 +277,6 @@ struct libusb_context {
 	unsigned int pollfds_modified;
 	usbi_mutex_t pollfds_lock;
 
-	/* a counter that is set when we want to interrupt event handling, in order
-	 * to safely close a device, and a lock to protect it. */
-	unsigned int device_close;
-	usbi_mutex_t device_close_lock;
-
 	/* user callbacks for pollfd changes */
 	libusb_pollfd_added_cb fd_added_cb;
 	libusb_pollfd_removed_cb fd_removed_cb;
@@ -295,6 +290,10 @@ struct libusb_context {
 
 	/* A lock to protect internal context event data. */
 	usbi_mutex_t event_data_lock;
+
+	/* A counter that is set when we want to interrupt and prevent event handling,
+	 * in order to safely close a device. Protected by event_data_lock. */
+	unsigned int device_close;
 
 	/* used to wait for event completion in threads other than the one that is
 	 * event handling */
