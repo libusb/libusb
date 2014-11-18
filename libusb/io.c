@@ -2051,7 +2051,26 @@ redo_poll:
 		/* another thread wanted to interrupt event handling, and it succeeded!
 		 * handle any other events that cropped up at the same time, and
 		 * simply return */
+		ssize_t ret;
+		unsigned char dummy;
+		unsigned int ru;
+
 		usbi_dbg("caught a fish on the control pipe");
+
+		/* read the dummy data from the control pipe unless someone is closing
+		 * a device */
+		usbi_mutex_lock(&ctx->pollfd_modify_lock);
+		ru = ctx->pollfd_modify;
+		usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+		if (!ru) {
+			ret = usbi_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+			if (ret != sizeof(dummy)) {
+				usbi_err(ctx, "control pipe read error %d err=%d",
+					 ret, errno);
+				r = LIBUSB_ERROR_OTHER;
+				goto handled;
+			}
+		}
 
 		if (0 == --r)
 			goto handled;
