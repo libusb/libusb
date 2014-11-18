@@ -87,6 +87,9 @@ struct list_head {
 #define list_entry(ptr, type, member) \
 	((type *)((uintptr_t)(ptr) - (uintptr_t)offsetof(type, member)))
 
+#define list_first_entry(ptr, type, member) \
+	list_entry((ptr)->next, type, member)
+
 /* Get each entry from a list
  *  pos - A structure pointer has a "member" element
  *  head - list head
@@ -258,7 +261,6 @@ struct libusb_context {
 	/* A list of registered hotplug callbacks */
 	struct list_head hotplug_cbs;
 	usbi_mutex_t hotplug_cbs_lock;
-	int hotplug_pipe[2];
 
 	/* this is a list of in-flight transfer handles, sorted by timeout
 	 * expiration. URBs to timeout the soonest are placed at the beginning of
@@ -297,6 +299,9 @@ struct libusb_context {
 	/* A flag that is set when we want to interrupt event handling, in order to
 	 * pick up a new fd for polling. Protected by event_data_lock. */
 	unsigned int fd_notify;
+
+	/* A list of pending hotplug messages. Protected by event_data_lock. */
+	struct list_head hotplug_msgs;
 
 	/* used to wait for event completion in threads other than the one that is
 	 * event handling */

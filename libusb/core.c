@@ -684,12 +684,8 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 
 void usbi_connect_device(struct libusb_device *dev)
 {
-	libusb_hotplug_message message;
-	ssize_t ret;
+	struct libusb_context *ctx = DEVICE_CTX(dev);
 
-	memset(&message, 0, sizeof(message));
-	message.event = LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED;
-	message.device = dev;
 	dev->attached = 1;
 
 	usbi_mutex_lock(&dev->ctx->usb_devs_lock);
@@ -697,25 +693,17 @@ void usbi_connect_device(struct libusb_device *dev)
 	usbi_mutex_unlock(&dev->ctx->usb_devs_lock);
 
 	/* Signal that an event has occurred for this device if we support hotplug AND
-	 * the hotplug pipe is ready. This prevents an event from getting raised during
-	 * initial enumeration. */
-	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG) && dev->ctx->hotplug_pipe[1] > 0) {
-		ret = usbi_write(dev->ctx->hotplug_pipe[1], &message, sizeof(message));
-		if (sizeof (message) != ret) {
-			usbi_err(DEVICE_CTX(dev), "error writing hotplug message");
-		}
+	 * the hotplug message list is ready. This prevents an event from getting raised
+	 * during initial enumeration. */
+	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG) && dev->ctx->hotplug_msgs.next) {
+		usbi_hotplug_notification(ctx, dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
 	}
 }
 
 void usbi_disconnect_device(struct libusb_device *dev)
 {
-	libusb_hotplug_message message;
-	struct libusb_context *ctx = dev->ctx;
-	ssize_t ret;
+	struct libusb_context *ctx = DEVICE_CTX(dev);
 
-	memset(&message, 0, sizeof(message));
-	message.event = LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT;
-	message.device = dev;
 	usbi_mutex_lock(&dev->lock);
 	dev->attached = 0;
 	usbi_mutex_unlock(&dev->lock);
@@ -725,14 +713,11 @@ void usbi_disconnect_device(struct libusb_device *dev)
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
 
 	/* Signal that an event has occurred for this device if we support hotplug AND
-	 * the hotplug pipe is ready. This prevents an event from getting raised during
-	 * initial enumeration. libusb_handle_events will take care of dereferencing the
-	 * device. */
-	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG) && dev->ctx->hotplug_pipe[1] > 0) {
-		ret = usbi_write(dev->ctx->hotplug_pipe[1], &message, sizeof(message));
-		if (sizeof(message) != ret) {
-			usbi_err(DEVICE_CTX(dev), "error writing hotplug message");
-		}
+	 * the hotplug message list is ready. This prevents an event from getting raised
+	 * during initial enumeration. libusb_handle_events will take care of dereferencing
+	 * the device. */
+	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG) && dev->ctx->hotplug_msgs.next) {
+		usbi_hotplug_notification(ctx, dev, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT);
 	}
 }
 

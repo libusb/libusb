@@ -1118,6 +1118,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	usbi_cond_init(&ctx->event_waiters_cond, NULL);
 	list_init(&ctx->flying_transfers);
 	list_init(&ctx->ipollfds);
+	list_init(&ctx->hotplug_msgs);
 
 	/* FIXME should use an eventfd on kernels that support it */
 	r = usbi_pipe(ctx->event_pipe);
@@ -1129,17 +1130,6 @@ int usbi_io_init(struct libusb_context *ctx)
 	r = usbi_add_pollfd(ctx, ctx->event_pipe[0], POLLIN);
 	if (r < 0)
 		goto err_close_pipe;
-
-	/* create hotplug pipe */
-	r = usbi_pipe(ctx->hotplug_pipe);
-	if (r < 0) {
-		r = LIBUSB_ERROR_OTHER;
-		goto err_remove_pipe;
-	}
-
-	r = usbi_add_pollfd(ctx, ctx->hotplug_pipe[0], POLLIN);
-	if (r < 0)
-		goto err_close_hp_pipe;
 
 #ifdef USBI_TIMERFD_AVAILABLE
 	ctx->timerfd = timerfd_create(usbi_backend->get_timerfd_clockid(),
@@ -1160,13 +1150,8 @@ int usbi_io_init(struct libusb_context *ctx)
 #ifdef USBI_TIMERFD_AVAILABLE
 err_close_timerfd:
 	close(ctx->timerfd);
-	usbi_remove_pollfd(ctx, ctx->hotplug_pipe[0]);
-#endif
-err_close_hp_pipe:
-	usbi_close(ctx->hotplug_pipe[0]);
-	usbi_close(ctx->hotplug_pipe[1]);
-err_remove_pipe:
 	usbi_remove_pollfd(ctx, ctx->event_pipe[0]);
+#endif
 err_close_pipe:
 	usbi_close(ctx->event_pipe[0]);
 	usbi_close(ctx->event_pipe[1]);
@@ -1185,9 +1170,6 @@ void usbi_io_exit(struct libusb_context *ctx)
 	usbi_remove_pollfd(ctx, ctx->event_pipe[0]);
 	usbi_close(ctx->event_pipe[0]);
 	usbi_close(ctx->event_pipe[1]);
-	usbi_remove_pollfd(ctx, ctx->hotplug_pipe[0]);
-	usbi_close(ctx->hotplug_pipe[0]);
-	usbi_close(ctx->hotplug_pipe[1]);
 #ifdef USBI_TIMERFD_AVAILABLE
 	if (usbi_using_timerfd(ctx)) {
 		usbi_remove_pollfd(ctx, ctx->timerfd);
@@ -1978,17 +1960,16 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	/* there are certain fds that libusb uses internally, currently:
 	 *
 	 *   1) event pipe
-	 *   2) hotplug pipe
-	 *   3) timerfd
+	 *   2) timerfd
 	 *
 	 * the backend will never need to attempt to handle events on these fds, so
 	 * we determine how many fds are in use internally for this context and when
 	 * handle_events() is called in the backend, the pollfd list and count will
 	 * be adjusted to skip over these internal fds */
 	if (usbi_using_timerfd(ctx))
-		internal_nfds = 3;
-	else
 		internal_nfds = 2;
+	else
+		internal_nfds = 1;
 
 	/* only reallocate the poll fds when the list of poll fds has been modified
 	 * since the last poll, otherwise reuse them to save the additional overhead */
@@ -2048,19 +2029,40 @@ redo_poll:
 
 	/* fds[0] is always the event pipe */
 	if (fds[0].revents) {
-		/* another thread wanted to interrupt event handling, and it succeeded!
-		 * handle any other events that cropped up at the same time, and
-		 * simply return */
 		unsigned int ru;
+		libusb_hotplug_message *message = NULL;
 
 		usbi_dbg("caught a fish on the event pipe");
 
-		/* read the dummy data from the event pipe unless someone is closing
-		 * a device */
+		/* take the the event data lock while processing events */
 		usbi_mutex_lock(&ctx->event_data_lock);
+
+		/* check if someone is closing a device */
 		ru = ctx->device_close;
+
+		/* check for any pending hotplug messages */
+		if (!list_empty(&ctx->hotplug_msgs)) {
+			usbi_dbg("hotplug message received");
+			special_event = 1;
+			message = list_first_entry(&ctx->hotplug_msgs, libusb_hotplug_message, list);
+			list_del(&message->list);
+		}
+
 		usbi_mutex_unlock(&ctx->event_data_lock);
-		if (!ru) {
+
+		/* process the hotplug message, if any */
+		if (message) {
+			usbi_hotplug_match(ctx, message->device, message->event);
+
+			/* the device left, dereference the device */
+			if (LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT == message->event)
+				libusb_unref_device(message->device);
+
+			free(message);
+		}
+
+		/* clear the event pipe if this was an fd or hotplug notification */
+		if (!ru || message) {
 			r = usbi_clear_event(ctx);
 			if (r)
 				goto handled;
@@ -2070,36 +2072,9 @@ redo_poll:
 			goto handled;
 	}
 
-	/* fd[1] is always the hotplug pipe */
-	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG) && fds[1].revents) {
-		libusb_hotplug_message message;
-		ssize_t ret;
-
-		usbi_dbg("caught a fish on the hotplug pipe");
-		special_event = 1;
-
-		/* read the message from the hotplug thread */
-		ret = usbi_read(ctx->hotplug_pipe[0], &message, sizeof (message));
-		if (ret != sizeof(message)) {
-			usbi_err(ctx, "hotplug pipe read error %d != %u",
-				 ret, sizeof(message));
-			r = LIBUSB_ERROR_OTHER;
-			goto handled;
-		}
-
-		usbi_hotplug_match(ctx, message.device, message.event);
-
-		/* the device left. dereference the device */
-		if (LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT == message.event)
-			libusb_unref_device(message.device);
-
-		if (0 == --r)
-			goto handled;
-	} /* else there shouldn't be anything on this pipe */
-
 #ifdef USBI_TIMERFD_AVAILABLE
-	/* on timerfd configurations, fds[2] is the timerfd */
-	if (usbi_using_timerfd(ctx) && fds[2].revents) {
+	/* on timerfd configurations, fds[1] is the timerfd */
+	if (usbi_using_timerfd(ctx) && fds[1].revents) {
 		/* timerfd indicates that a timeout has expired */
 		int ret;
 		usbi_dbg("timerfd triggered");
