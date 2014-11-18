@@ -278,9 +278,9 @@ struct libusb_context {
 	usbi_mutex_t pollfds_lock;
 
 	/* a counter that is set when we want to interrupt event handling, in order
-	 * to modify the poll fd set. and a lock to protect it. */
-	unsigned int pollfd_modify;
-	usbi_mutex_t pollfd_modify_lock;
+	 * to safely close a device, and a lock to protect it. */
+	unsigned int device_close;
+	usbi_mutex_t device_close_lock;
 
 	/* user callbacks for pollfd changes */
 	libusb_pollfd_added_cb fd_added_cb;

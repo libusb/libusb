@@ -1399,19 +1399,19 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 	 * thread from doing event handling) because we will be removing a file
 	 * descriptor from the polling loop. */
 
-	/* record that we are messing with poll fds */
-	usbi_mutex_lock(&ctx->pollfd_modify_lock);
-	ctx->pollfd_modify++;
-	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+	/* record that we are closing a device */
+	usbi_mutex_lock(&ctx->device_close_lock);
+	ctx->device_close++;
+	usbi_mutex_unlock(&ctx->device_close_lock);
 
 	/* write some data on control pipe to interrupt event handlers */
 	r = usbi_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
 	if (r <= 0) {
 		usbi_warn(ctx, "internal signalling write failed, closing anyway");
 		do_close(ctx, dev_handle);
-		usbi_mutex_lock(&ctx->pollfd_modify_lock);
-		ctx->pollfd_modify--;
-		usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+		usbi_mutex_lock(&ctx->device_close_lock);
+		ctx->device_close--;
+		usbi_mutex_unlock(&ctx->device_close_lock);
 		return;
 	}
 
@@ -1426,10 +1426,10 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 	/* Close the device */
 	do_close(ctx, dev_handle);
 
-	/* we're done with modifying poll fds */
-	usbi_mutex_lock(&ctx->pollfd_modify_lock);
-	ctx->pollfd_modify--;
-	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+	/* we're done with closing this device */
+	usbi_mutex_lock(&ctx->device_close_lock);
+	ctx->device_close--;
+	usbi_mutex_unlock(&ctx->device_close_lock);
 
 	/* Release event handling lock and wake up event waiters */
 	libusb_unlock_events(ctx);

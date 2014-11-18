@@ -1112,7 +1112,7 @@ int usbi_io_init(struct libusb_context *ctx)
 
 	usbi_mutex_init(&ctx->flying_transfers_lock, NULL);
 	usbi_mutex_init(&ctx->pollfds_lock, NULL);
-	usbi_mutex_init(&ctx->pollfd_modify_lock, NULL);
+	usbi_mutex_init(&ctx->device_close_lock, NULL);
 	usbi_mutex_init_recursive(&ctx->events_lock, NULL);
 	usbi_mutex_init(&ctx->event_waiters_lock, NULL);
 	usbi_cond_init(&ctx->event_waiters_cond, NULL);
@@ -1173,7 +1173,7 @@ err_close_pipe:
 err:
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
 	usbi_mutex_destroy(&ctx->pollfds_lock);
-	usbi_mutex_destroy(&ctx->pollfd_modify_lock);
+	usbi_mutex_destroy(&ctx->device_close_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
 	usbi_cond_destroy(&ctx->event_waiters_cond);
@@ -1196,7 +1196,7 @@ void usbi_io_exit(struct libusb_context *ctx)
 #endif
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
 	usbi_mutex_destroy(&ctx->pollfds_lock);
-	usbi_mutex_destroy(&ctx->pollfd_modify_lock);
+	usbi_mutex_destroy(&ctx->device_close_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
 	usbi_cond_destroy(&ctx->event_waiters_cond);
@@ -1654,13 +1654,13 @@ int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
 	unsigned int ru;
 	USBI_GET_CONTEXT(ctx);
 
-	/* is someone else waiting to modify poll fds? if so, don't let this thread
+	/* is someone else waiting to close a device? if so, don't let this thread
 	 * start event handling */
-	usbi_mutex_lock(&ctx->pollfd_modify_lock);
-	ru = ctx->pollfd_modify;
-	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+	usbi_mutex_lock(&ctx->device_close_lock);
+	ru = ctx->device_close;
+	usbi_mutex_unlock(&ctx->device_close_lock);
 	if (ru) {
-		usbi_dbg("someone else is modifying poll fds");
+		usbi_dbg("someone else is closing a device");
 		return 1;
 	}
 
@@ -1713,7 +1713,7 @@ void API_EXPORTED libusb_unlock_events(libusb_context *ctx)
 
 	/* FIXME: perhaps we should be a bit more efficient by not broadcasting
 	 * the availability of the events lock when we are modifying pollfds
-	 * (check ctx->pollfd_modify)? */
+	 * (check ctx->device_close)? */
 	usbi_mutex_lock(&ctx->event_waiters_lock);
 	usbi_cond_broadcast(&ctx->event_waiters_cond);
 	usbi_mutex_unlock(&ctx->event_waiters_lock);
@@ -1745,13 +1745,13 @@ int API_EXPORTED libusb_event_handling_ok(libusb_context *ctx)
 	unsigned int r;
 	USBI_GET_CONTEXT(ctx);
 
-	/* is someone else waiting to modify poll fds? if so, don't let this thread
+	/* is someone else waiting to close a device? if so, don't let this thread
 	 * continue event handling */
-	usbi_mutex_lock(&ctx->pollfd_modify_lock);
-	r = ctx->pollfd_modify;
-	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+	usbi_mutex_lock(&ctx->device_close_lock);
+	r = ctx->device_close;
+	usbi_mutex_unlock(&ctx->device_close_lock);
 	if (r) {
-		usbi_dbg("someone else is modifying poll fds");
+		usbi_dbg("someone else is closing a device");
 		return 0;
 	}
 
@@ -1773,13 +1773,13 @@ int API_EXPORTED libusb_event_handler_active(libusb_context *ctx)
 	unsigned int r;
 	USBI_GET_CONTEXT(ctx);
 
-	/* is someone else waiting to modify poll fds? if so, don't let this thread
+	/* is someone else waiting to close a device? if so, don't let this thread
 	 * start event handling -- indicate that event handling is happening */
-	usbi_mutex_lock(&ctx->pollfd_modify_lock);
-	r = ctx->pollfd_modify;
-	usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+	usbi_mutex_lock(&ctx->device_close_lock);
+	r = ctx->device_close;
+	usbi_mutex_unlock(&ctx->device_close_lock);
 	if (r) {
-		usbi_dbg("someone else is modifying poll fds");
+		usbi_dbg("someone else is closing a device");
 		return 1;
 	}
 
@@ -2059,9 +2059,9 @@ redo_poll:
 
 		/* read the dummy data from the control pipe unless someone is closing
 		 * a device */
-		usbi_mutex_lock(&ctx->pollfd_modify_lock);
-		ru = ctx->pollfd_modify;
-		usbi_mutex_unlock(&ctx->pollfd_modify_lock);
+		usbi_mutex_lock(&ctx->device_close_lock);
+		ru = ctx->device_close;
+		usbi_mutex_unlock(&ctx->device_close_lock);
 		if (!ru) {
 			ret = usbi_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
 			if (ret != sizeof(dummy)) {
