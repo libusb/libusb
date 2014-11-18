@@ -244,9 +244,8 @@ struct libusb_context {
 	int debug;
 	int debug_fixed;
 
-	/* internal control pipe, used for interrupting event handling when
-	 * an internal event occurs. */
-	int ctrl_pipe[2];
+	/* internal event pipe, used for signalling occurrence of an internal event. */
+	int event_pipe[2];
 
 	struct list_head usb_devs;
 	usbi_mutex_t usb_devs_lock;

@@ -1180,8 +1180,8 @@ void usbi_fd_notification(struct libusb_context *ctx)
 	unsigned char dummy = 1;
 	ssize_t r;
 
-	/* write some data on control pipe to interrupt event handlers */
-	r = usbi_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
+	/* write some data on event pipe to interrupt event handlers */
+	r = usbi_write(ctx->event_pipe[1], &dummy, sizeof(dummy));
 	if (r != sizeof(dummy))
 		usbi_warn(ctx, "internal signalling write failed");
 }
@@ -1404,8 +1404,8 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 	ctx->device_close++;
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
-	/* write some data on control pipe to interrupt event handlers */
-	r = usbi_write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
+	/* write some data on event pipe to interrupt event handlers */
+	r = usbi_write(ctx->event_pipe[1], &dummy, sizeof(dummy));
 	if (r <= 0) {
 		usbi_warn(ctx, "internal signalling write failed, closing anyway");
 		do_close(ctx, dev_handle);
@@ -1419,7 +1419,7 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 	libusb_lock_events(ctx);
 
 	/* read the dummy data */
-	r = usbi_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+	r = usbi_read(ctx->event_pipe[0], &dummy, sizeof(dummy));
 	if (r <= 0)
 		usbi_warn(ctx, "internal signalling read failed, closing anyway");
 

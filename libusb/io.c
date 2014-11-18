@@ -1032,7 +1032,7 @@ printf("completed!\n");
  *
  * -# During initialization, libusb opens an internal pipe, and it adds the read
  *    end of this pipe to the set of file descriptors to be polled.
- * -# During libusb_close(), libusb writes some dummy data on this control pipe.
+ * -# During libusb_close(), libusb writes some dummy data on this event pipe.
  *    This immediately interrupts the event handler. libusb also records
  *    internally that it is trying to interrupt event handlers for this
  *    high-priority event.
@@ -1065,7 +1065,7 @@ printf("completed!\n");
  * call to libusb_open():
  *
  * -# The device is opened and a file descriptor is added to the poll set.
- * -# libusb sends some dummy data on the control pipe, and records that it
+ * -# libusb sends some dummy data on the event pipe, and records that it
  *    is trying to modify the poll descriptor set.
  * -# The event handler is interrupted, and the same behaviour change as for
  *    libusb_close() takes effect, causing all event handling threads to become
@@ -1120,13 +1120,13 @@ int usbi_io_init(struct libusb_context *ctx)
 	list_init(&ctx->ipollfds);
 
 	/* FIXME should use an eventfd on kernels that support it */
-	r = usbi_pipe(ctx->ctrl_pipe);
+	r = usbi_pipe(ctx->event_pipe);
 	if (r < 0) {
 		r = LIBUSB_ERROR_OTHER;
 		goto err;
 	}
 
-	r = usbi_add_pollfd(ctx, ctx->ctrl_pipe[0], POLLIN);
+	r = usbi_add_pollfd(ctx, ctx->event_pipe[0], POLLIN);
 	if (r < 0)
 		goto err_close_pipe;
 
@@ -1166,10 +1166,10 @@ err_close_hp_pipe:
 	usbi_close(ctx->hotplug_pipe[0]);
 	usbi_close(ctx->hotplug_pipe[1]);
 err_remove_pipe:
-	usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
+	usbi_remove_pollfd(ctx, ctx->event_pipe[0]);
 err_close_pipe:
-	usbi_close(ctx->ctrl_pipe[0]);
-	usbi_close(ctx->ctrl_pipe[1]);
+	usbi_close(ctx->event_pipe[0]);
+	usbi_close(ctx->event_pipe[1]);
 err:
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
 	usbi_mutex_destroy(&ctx->pollfds_lock);
@@ -1182,9 +1182,9 @@ err:
 
 void usbi_io_exit(struct libusb_context *ctx)
 {
-	usbi_remove_pollfd(ctx, ctx->ctrl_pipe[0]);
-	usbi_close(ctx->ctrl_pipe[0]);
-	usbi_close(ctx->ctrl_pipe[1]);
+	usbi_remove_pollfd(ctx, ctx->event_pipe[0]);
+	usbi_close(ctx->event_pipe[0]);
+	usbi_close(ctx->event_pipe[1]);
 	usbi_remove_pollfd(ctx, ctx->hotplug_pipe[0]);
 	usbi_close(ctx->hotplug_pipe[0]);
 	usbi_close(ctx->hotplug_pipe[1]);
@@ -1977,7 +1977,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 	/* there are certain fds that libusb uses internally, currently:
 	 *
-	 *   1) control pipe
+	 *   1) event pipe
 	 *   2) hotplug pipe
 	 *   3) timerfd
 	 *
@@ -2046,7 +2046,7 @@ redo_poll:
 
 	special_event = 0;
 
-	/* fd[0] is always the ctrl pipe */
+	/* fds[0] is always the event pipe */
 	if (fds[0].revents) {
 		/* another thread wanted to interrupt event handling, and it succeeded!
 		 * handle any other events that cropped up at the same time, and
@@ -2055,17 +2055,17 @@ redo_poll:
 		unsigned char dummy;
 		unsigned int ru;
 
-		usbi_dbg("caught a fish on the control pipe");
+		usbi_dbg("caught a fish on the event pipe");
 
-		/* read the dummy data from the control pipe unless someone is closing
+		/* read the dummy data from the event pipe unless someone is closing
 		 * a device */
 		usbi_mutex_lock(&ctx->event_data_lock);
 		ru = ctx->device_close;
 		usbi_mutex_unlock(&ctx->event_data_lock);
 		if (!ru) {
-			ret = usbi_read(ctx->ctrl_pipe[0], &dummy, sizeof(dummy));
+			ret = usbi_read(ctx->event_pipe[0], &dummy, sizeof(dummy));
 			if (ret != sizeof(dummy)) {
-				usbi_err(ctx, "control pipe read error %d err=%d",
+				usbi_err(ctx, "event pipe read error %d err=%d",
 					 ret, errno);
 				r = LIBUSB_ERROR_OTHER;
 				goto handled;
