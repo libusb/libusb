@@ -21,6 +21,7 @@
 #ifndef LIBUSB_USBFS_H
 #define LIBUSB_USBFS_H
 
+#include <linux/version.h>
 #include <linux/types.h>
 
 #define SYSFS_DEVICE_PATH "/sys/bus/usb/devices"
@@ -81,7 +82,12 @@ struct usbfs_iso_packet_desc {
 	unsigned int status;
 };
 
-#define MAX_ISO_BUFFER_LENGTH		32768
+#if (defined(KERNEL_VERSION)) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+	#define MAX_ISO_BUFFER_LENGTH	49152 * 128
+#else
+	#define MAX_ISO_BUFFER_LENGTH	32768
+#endif
+
 #define MAX_BULK_BUFFER_LENGTH		16384
 #define MAX_CTRL_BUFFER_LENGTH		4096
 
