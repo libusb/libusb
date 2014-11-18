@@ -293,6 +293,9 @@ struct libusb_context {
 	/* used to see if there is an active thread doing event handling */
 	int event_handler_active;
 
+	/* A lock to protect internal context event data. */
+	usbi_mutex_t event_data_lock;
+
 	/* used to wait for event completion in threads other than the one that is
 	 * event handling */
 	usbi_mutex_t event_waiters_lock;

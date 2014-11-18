@@ -1114,6 +1114,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	usbi_mutex_init(&ctx->pollfds_lock, NULL);
 	usbi_mutex_init(&ctx->device_close_lock, NULL);
 	usbi_mutex_init_recursive(&ctx->events_lock, NULL);
+	usbi_mutex_init(&ctx->event_data_lock, NULL);
 	usbi_mutex_init(&ctx->event_waiters_lock, NULL);
 	usbi_cond_init(&ctx->event_waiters_cond, NULL);
 	list_init(&ctx->flying_transfers);
@@ -1175,6 +1176,7 @@ err:
 	usbi_mutex_destroy(&ctx->pollfds_lock);
 	usbi_mutex_destroy(&ctx->device_close_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
+	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
 	usbi_cond_destroy(&ctx->event_waiters_cond);
 	return r;
@@ -1198,6 +1200,7 @@ void usbi_io_exit(struct libusb_context *ctx)
 	usbi_mutex_destroy(&ctx->pollfds_lock);
 	usbi_mutex_destroy(&ctx->device_close_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
+	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
 	usbi_cond_destroy(&ctx->event_waiters_cond);
 	if (ctx->pollfds)
