@@ -1417,7 +1417,8 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev,
  *
  * \param dev a device handle
  * \param configuration the bConfigurationValue of the configuration you
- * wish to activate, or -1 if you wish to put the device in unconfigured state
+ * wish to activate, or -1 if you wish to put the device in an unconfigured
+ * state
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the requested configuration does not exist
  * \returns LIBUSB_ERROR_BUSY if interfaces are currently claimed
