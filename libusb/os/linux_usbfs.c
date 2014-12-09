@@ -213,6 +213,29 @@ static int _open(const char *path, int flags)
 		return open(path, flags);
 }
 
+static struct linux_device_priv *_device_priv(struct libusb_device *dev)
+{
+	return (struct linux_device_priv *) dev->os_priv;
+}
+
+static int _open_sysfs_attr(struct libusb_device *dev, const char *attr)
+{
+	struct linux_device_priv *priv = _device_priv(dev);
+	char filename[PATH_MAX];
+	int fd;
+
+	snprintf(filename, PATH_MAX, "%s/%s/%s",
+		SYSFS_DEVICE_PATH, priv->sysfs_dir, attr);
+	fd = _open(filename, O_RDONLY);
+	if (fd < 0) {
+		usbi_err(DEVICE_CTX(dev),
+			"open %s failed ret=%d errno=%d", filename, fd, errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	return fd;
+}
+
 #ifdef __ANDROID__
 #define PROC_SELF_FD "/proc/self/fd"
 
@@ -278,6 +301,45 @@ static int _dup_open_fd(const char *path)
 
 	return fd;
 }
+
+/* The major and minor device numbers for the devie are stored in the "dev"
+ * attributes of the sysfs. Due to limited permissions on Android, we will
+ * loop through our open file descriptors and obtain the major and minor
+ * device numbers (using fstat), looking for a match to the device we are
+ * attempting to open. If they match, we dup the file descriptor.
+ */
+static int _dup_sysfs_fd(struct libusb_device *dev)
+{
+	char tmp[64];
+	int fd = _open_sysfs_attr(dev, "dev");
+	int r = read(fd, tmp, sizeof(tmp) - 1);
+	close(fd);
+	if (r < 0)
+		return -1;
+
+	tmp[r] = '\0';
+	int devMajor = 0, devMinor = 0;
+	if (sscanf(tmp, "%d:%d", &devMajor, &devMinor) != 2 || (devMajor <= 0 && devMinor <= 0))
+		return -1;
+
+	struct stat status = {0};
+	struct rlimit rlim = {0};
+	const int max_fd = (getrlimit(RLIMIT_NOFILE, &rlim) == 0) ? (int)rlim.rlim_cur : 1024;
+	int i;
+
+	fd = -1;
+
+	/* loop through the possible file descriptors for this process and look for a matching device */
+	for (i = 0; i < max_fd; i++) {
+		if (fstat(i, &status) == 0 &&
+		    major(status.st_rdev) == devMajor &&
+		    minor(status.st_rdev) == devMinor) {
+			fd = dup(i);
+			break;
+		}
+	}
+	return fd;
+}
 #endif
 
 static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
@@ -290,9 +352,15 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 	if (usbdev_names)
 		snprintf(path, PATH_MAX, "%s/usbdev%d.%d",
 			usbfs_path, dev->bus_number, dev->device_address);
-	else
+	else if (usbfs_path)
 		snprintf(path, PATH_MAX, "%s/%03d/%03d",
 			usbfs_path, dev->bus_number, dev->device_address);
+	else
+#ifdef __ANDROID__
+		return _dup_sysfs_fd(dev);
+#else
+		return LIBUSB_ERROR_ACCESS;
+#endif
 
 	fd = _open(path, mode);
 #ifdef __ANDROID__
@@ -303,9 +371,9 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 		return fd; /* Success */
 
 	if (errno == ENOENT) {
-		if (!silent) 
+		if (!silent)
 			usbi_err(ctx, "File doesn't exist, wait %d ms and try again", delay/1000);
-   
+
 		/* Wait 10ms for USB device path creation.*/
 		nanosleep(&(struct timespec){delay / 1000000, (delay * 1000) % 1000000000UL}, NULL);
 
@@ -313,7 +381,7 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 		if (fd != -1)
 			return fd; /* Success */
 	}
-	
+
 	if (!silent) {
 		usbi_err(ctx, "libusb couldn't open USB device %s: %s",
 			 path, strerror(errno));
@@ -327,11 +395,6 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 	if (errno == ENOENT)
 		return LIBUSB_ERROR_NO_DEVICE;
 	return LIBUSB_ERROR_IO;
-}
-
-static struct linux_device_priv *_device_priv(struct libusb_device *dev)
-{
-	return (struct linux_device_priv *) dev->os_priv;
 }
 
 static struct linux_device_handle_priv *_device_handle_priv(
@@ -502,12 +565,6 @@ static int op_init(struct libusb_context *ctx)
 	struct stat statbuf;
 	int r;
 
-	usbfs_path = find_usbfs_path();
-	if (!usbfs_path) {
-		usbi_err(ctx, "could not find usbfs");
-		return LIBUSB_ERROR_OTHER;
-	}
-
 	if (monotonic_clkid == -1)
 		monotonic_clkid = find_monotonic_clock();
 
@@ -571,11 +628,26 @@ static int op_init(struct libusb_context *ctx)
 	if (sysfs_has_descriptors)
 		usbi_dbg("sysfs has complete descriptors");
 
+	usbfs_path = find_usbfs_path();
+	if (!usbfs_path) {
+#if defined(__ANDROID__)
+		if (!sysfs_can_relate_devices)
+#endif
+		{
+			usbi_err(ctx, "could not find usbfs");
+			return LIBUSB_ERROR_OTHER;
+		}
+	}
+
 	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	r = LIBUSB_SUCCESS;
 	if (init_count == 0) {
 		/* start up hotplug event handler */
 		r = linux_start_event_monitor();
+#if defined(__ANDROID__)
+		if (r != LIBUSB_SUCCESS && !usbfs_path && sysfs_can_relate_devices)
+			r = LIBUSB_SUCCESS;
+#endif
 	}
 	if (r == LIBUSB_SUCCESS) {
 		r = linux_scan_devices(ctx);
@@ -639,29 +711,23 @@ static int linux_scan_devices(struct libusb_context *ctx)
 
 static void op_hotplug_poll(void)
 {
+#if defined(__ANDROID__)
+  if (!usbfs_path && sysfs_can_relate_devices) {
+		struct libusb_context *ctx;
+
+		usbi_mutex_static_lock(&active_contexts_lock);
+		list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
+			linux_default_scan_devices(ctx);
+		}
+		usbi_mutex_static_unlock(&active_contexts_lock);
+		return;
+	}
+#endif
 #if defined(USE_UDEV)
 	linux_udev_hotplug_poll();
 #else
 	linux_netlink_hotplug_poll();
 #endif
-}
-
-static int _open_sysfs_attr(struct libusb_device *dev, const char *attr)
-{
-	struct linux_device_priv *priv = _device_priv(dev);
-	char filename[PATH_MAX];
-	int fd;
-
-	snprintf(filename, PATH_MAX, "%s/%s/%s",
-		SYSFS_DEVICE_PATH, priv->sysfs_dir, attr);
-	fd = _open(filename, O_RDONLY);
-	if (fd < 0) {
-		usbi_err(DEVICE_CTX(dev),
-			"open %s failed ret=%d errno=%d", filename, fd, errno);
-		return LIBUSB_ERROR_IO;
-	}
-
-	return fd;
 }
 
 /* Note only suitable for attributes which always read >= 0, < 0 is error */
