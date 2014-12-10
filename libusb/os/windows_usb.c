@@ -2945,18 +2945,35 @@ static int winusbx_release_interface(int sub_api, struct libusb_device_handle *d
 {
 	struct windows_device_handle_priv *handle_priv = _device_handle_priv(dev_handle);
 	struct windows_device_priv *priv = _device_priv(dev_handle->dev);
+	bool is_using_usbccgp = (priv->apib->id == USB_API_COMPOSITE);
 	HANDLE winusb_handle;
 
 	CHECK_WINUSBX_AVAILABLE(sub_api);
 
 	winusb_handle = handle_priv->interface_handle[iface].api_handle;
 	if ((winusb_handle == 0) || (winusb_handle == INVALID_HANDLE_VALUE)) {
+                usbi_dbg("could not release invalid interface %d", iface);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
 	WinUSBX[sub_api].Free(winusb_handle);
 	handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
 
+
+        //It is a requirement for multiple interface devices on Windows that you
+        // must first claim the 0th interface before you claim the others
+        // if this is some other interface, then we would've auto-claimed
+        // interface 0 when we claimed this one -- so release interface 0
+        // as well
+	if (!(is_using_usbccgp) && (iface > 0)) {
+            winusb_handle = handle_priv->interface_handle[0].api_handle;
+            if ((winusb_handle != 0) && (winusb_handle != INVALID_HANDLE_VALUE)) {
+                WinUSBX[sub_api].Free(winusb_handle);
+                handle_priv->interface_handle[0].api_handle = INVALID_HANDLE_VALUE;
+            }
+        }
+
+	usbi_dbg("released interface %d", iface);
 	return LIBUSB_SUCCESS;
 }
 
