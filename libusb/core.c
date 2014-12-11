@@ -56,6 +56,8 @@ const struct usbi_os_backend * const usbi_backend = &netbsd_backend;
 const struct usbi_os_backend * const usbi_backend = &windows_backend;
 #elif defined(OS_WINCE)
 const struct usbi_os_backend * const usbi_backend = &wince_backend;
+#elif defined(OS_HAIKU)
+const struct usbi_os_backend * const usbi_backend = &haiku_usb_raw_backend;
 #else
 #error "Unsupported OS"
 #endif
@@ -899,10 +901,14 @@ int API_EXPORTED libusb_get_max_packet_size(libusb_device *dev,
 	}
 
 	ep = find_endpoint(config, endpoint);
-	if (!ep)
-		return LIBUSB_ERROR_NOT_FOUND;
+	if (!ep) {
+		r = LIBUSB_ERROR_NOT_FOUND;
+		goto out;
+	}
 
 	r = ep->wMaxPacketSize;
+
+out:
 	libusb_free_config_descriptor(config);
 	return r;
 }
@@ -950,17 +956,21 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 	}
 
 	ep = find_endpoint(config, endpoint);
-	if (!ep)
-		return LIBUSB_ERROR_NOT_FOUND;
+	if (!ep) {
+		r = LIBUSB_ERROR_NOT_FOUND;
+		goto out;
+	}
 
 	val = ep->wMaxPacketSize;
 	ep_type = (enum libusb_transfer_type) (ep->bmAttributes & 0x3);
-	libusb_free_config_descriptor(config);
 
 	r = val & 0x07ff;
 	if (ep_type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS
 			|| ep_type == LIBUSB_TRANSFER_TYPE_INTERRUPT)
 		r *= (1 + ((val >> 11) & 3));
+
+out:
+	libusb_free_config_descriptor(config);
 	return r;
 }
 
@@ -1117,13 +1127,15 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	usbi_mutex_unlock(&ctx->open_devs_lock);
 	*handle = _handle;
 
-	/* At this point, we want to interrupt any existing event handlers so
-	 * that they realise the addition of the new device's poll fd. One
-	 * example when this is desirable is if the user is running a separate
-	 * dedicated libusb events handling thread, which is running with a long
-	 * or infinite timeout. We want to interrupt that iteration of the loop,
-	 * so that it picks up the new fd, and then continues. */
-	usbi_fd_notification(ctx);
+	if (usbi_backend->caps & USBI_CAP_HAS_POLLABLE_DEVICE_FD) {
+		/* At this point, we want to interrupt any existing event handlers so
+		 * that they realise the addition of the new device's poll fd. One
+		 * example when this is desirable is if the user is running a separate
+		 * dedicated libusb events handling thread, which is running with a long
+		 * or infinite timeout. We want to interrupt that iteration of the loop,
+		 * so that it picks up the new fd, and then continues. */
+		usbi_fd_notification(ctx);
+	}
 
 	return 0;
 }
@@ -1405,7 +1417,8 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev,
  *
  * \param dev a device handle
  * \param configuration the bConfigurationValue of the configuration you
- * wish to activate, or -1 if you wish to put the device in unconfigured state
+ * wish to activate, or -1 if you wish to put the device in an unconfigured
+ * state
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the requested configuration does not exist
  * \returns LIBUSB_ERROR_BUSY if interfaces are currently claimed
@@ -1659,7 +1672,7 @@ int API_EXPORTED libusb_alloc_streams(libusb_device_handle *dev,
  * Since version 1.0.19, \ref LIBUSB_API_VERSION >= 0x01000103
  *
  * \param dev a device handle
- * \param endpoints array of endpoints to allocate streams on
+ * \param endpoints array of endpoints to free streams on
  * \param num_endpoints length of the endpoints array
  * \returns LIBUSB_SUCCESS, or a LIBUSB_ERROR code on failure
  */
@@ -1938,8 +1951,10 @@ err_backend_exit:
 	if (usbi_backend->exit)
 		usbi_backend->exit();
 err_free_ctx:
-	if (ctx == usbi_default_context)
+	if (ctx == usbi_default_context) {
 		usbi_default_context = NULL;
+		default_context_refcnt--;
+	}
 
 	usbi_mutex_static_lock(&active_contexts_lock);
 	list_del (&ctx->list);

@@ -38,7 +38,6 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
-#include "libusb.h"
 #include "libusbi.h"
 #include "linux_usbfs.h"
 
@@ -119,7 +118,7 @@ static int sysfs_can_relate_devices = -1;
 static int sysfs_has_descriptors = -1;
 
 /* how many times have we initted (and not exited) ? */
-static volatile int init_count = 0;
+static int init_count = 0;
 
 /* Serialize hotplug start/stop */
 usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
@@ -2590,6 +2589,12 @@ static int op_handle_events(struct libusb_context *ctx,
 				break;
 		}
 
+		if (!hpriv || hpriv->fd != pollfd->fd) {
+			usbi_err(ctx, "cannot find handle for fd %d\n",
+				 pollfd->fd);
+			continue;
+		}
+
 		if (pollfd->revents & POLLERR) {
 			usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->fd);
 			usbi_handle_disconnect(handle);
@@ -2640,7 +2645,7 @@ static clockid_t op_get_timerfd_clockid(void)
 
 const struct usbi_os_backend linux_usbfs_backend = {
 	.name = "Linux usbfs",
-	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
+	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER|USBI_CAP_HAS_POLLABLE_DEVICE_FD,
 	.init = op_init,
 	.exit = op_exit,
 	.get_device_list = NULL,

@@ -16,6 +16,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include <config.h>
+
 #include <sys/time.h>
 #include <sys/types.h>
 
@@ -28,7 +30,6 @@
 
 #include <dev/usb/usb.h>
 
-#include "libusb.h"
 #include "libusbi.h"
 
 struct device_priv {
@@ -92,7 +93,7 @@ static int _bus_open(int);
 
 const struct usbi_os_backend openbsd_backend = {
 	"Synchronous OpenBSD backend",
-	0,
+	USBI_CAP_HAS_POLLABLE_DEVICE_FD,
 	NULL,				/* init() */
 	NULL,				/* exit() */
 	obsd_get_device_list,

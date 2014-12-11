@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2014-05-19: v1.0.19
+2014-05-30: v1.0.19
 * Add support for USB bulk streams on Linux and Mac OS X (#11)
 * Windows: Add AMD and Intel USB-3.0 root hub support
 * Windows: Fix USB 3.0 speed detection on Windows 8 or later (#10)

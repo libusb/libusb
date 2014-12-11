@@ -20,7 +20,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "config.h"
+#include <config.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -39,7 +39,6 @@
 #include <unistd.h>
 #include <libudev.h>
 
-#include "libusb.h"
 #include "libusbi.h"
 #include "linux_usbfs.h"
 
@@ -61,7 +60,7 @@ int linux_udev_start_event_monitor(void)
 	udev_ctx = udev_new();
 	if (!udev_ctx) {
 		usbi_err(NULL, "could not create udev context");
-		return LIBUSB_ERROR_OTHER;
+		goto err;
 	}
 
 	udev_monitor = udev_monitor_new_from_netlink(udev_ctx, "udev");
@@ -119,6 +118,7 @@ err_free_monitor:
 	udev_monitor_fd = -1;
 err_free_ctx:
 	udev_unref(udev_ctx);
+err:
 	udev_ctx = NULL;
 	return LIBUSB_ERROR_OTHER;
 }
