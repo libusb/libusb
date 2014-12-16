@@ -43,7 +43,7 @@
  *
  * \page hotplug Device hotplug event notification
  *
- * \section intro Introduction
+ * \section hotplug_intro Introduction
  *
  * Version 1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102, has added support
  * for hotplug events on <b>some</b> platforms (you should test if your platform
