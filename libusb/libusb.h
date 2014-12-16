@@ -900,7 +900,6 @@ struct libusb_control_setup {
 struct libusb_context;
 struct libusb_device;
 struct libusb_device_handle;
-struct libusb_hotplug_callback;
 
 /** \ingroup lib
  * Structure providing the version of the libusb runtime
