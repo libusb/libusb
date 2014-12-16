@@ -43,7 +43,7 @@
 /**
  * \page io Synchronous and asynchronous device I/O
  *
- * \section intro Introduction
+ * \section io_intro Introduction
  *
  * If you're using libusb in your application, you're probably wanting to
  * perform I/O with devices - you want to perform USB data transfers.
