@@ -2252,7 +2252,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 {
 	struct windows_transfer_priv* transfer_priv = NULL;
 	POLL_NFDS_TYPE i = 0;
-	bool found = false;
+	bool found;
 	struct usbi_transfer *transfer;
 	DWORD io_size, io_result;
 
@@ -2270,6 +2270,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 		// Because a Windows OVERLAPPED is used for poll emulation,
 		// a pollable fd is created and stored with each transfer
 		usbi_mutex_lock(&ctx->flying_transfers_lock);
+		found = false;
 		list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
 			transfer_priv = usbi_transfer_get_os_priv(transfer);
 			if (transfer_priv->pollable_fd.fd == fds[i].fd) {
@@ -2297,6 +2298,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 			// newly allocated wfd that took the place of the one from the transfer.
 			windows_handle_callback(transfer, io_result, io_size);
 		} else {
+			usbi_mutex_unlock(&ctx->open_devs_lock);
 			usbi_err(ctx, "could not find a matching transfer for fd %x", fds[i]);
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
