@@ -61,7 +61,6 @@ extern "C" {
 /* Backend specific capabilities */
 #define USBI_CAP_HAS_HID_ACCESS					0x00010000
 #define USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER	0x00020000
-#define USBI_CAP_HAS_POLLABLE_DEVICE_FD		0x00040000
 
 /* Maximum number of bytes in a log line */
 #define USBI_MAX_LOG_LEN	1024
@@ -269,15 +268,6 @@ struct libusb_context {
 	struct list_head flying_transfers;
 	usbi_mutex_t flying_transfers_lock;
 
-	/* list and count of poll fds and an array of poll fd structures that is
-	 * (re)allocated as necessary prior to polling, and a flag to indicate
-	 * when the list of poll fds has changed since the last poll. */
-	struct list_head ipollfds;
-	struct pollfd *pollfds;
-	POLL_NFDS_TYPE pollfds_cnt;
-	unsigned int pollfds_modified;
-	usbi_mutex_t pollfds_lock;
-
 	/* user callbacks for pollfd changes */
 	libusb_pollfd_added_cb fd_added_cb;
 	libusb_pollfd_removed_cb fd_removed_cb;
@@ -289,6 +279,11 @@ struct libusb_context {
 	/* used to see if there is an active thread doing event handling */
 	int event_handler_active;
 
+	/* used to wait for event completion in threads other than the one that is
+	 * event handling */
+	usbi_mutex_t event_waiters_lock;
+	usbi_cond_t event_waiters_cond;
+
 	/* A lock to protect internal context event data. */
 	usbi_mutex_t event_data_lock;
 
@@ -296,17 +291,17 @@ struct libusb_context {
 	 * in order to safely close a device. Protected by event_data_lock. */
 	unsigned int device_close;
 
-	/* A flag that is set when we want to interrupt event handling, in order to
-	 * pick up a new fd for polling. Protected by event_data_lock. */
-	unsigned int fd_notify;
+	/* list and count of poll fds and an array of poll fd structures that is
+	 * (re)allocated as necessary prior to polling, and a flag to indicate
+	 * when the list of poll fds has changed since the last poll.
+	 * Protected by event_data_lock. */
+	struct list_head ipollfds;
+	struct pollfd *pollfds;
+	POLL_NFDS_TYPE pollfds_cnt;
+	unsigned int pollfds_modified;
 
 	/* A list of pending hotplug messages. Protected by event_data_lock. */
 	struct list_head hotplug_msgs;
-
-	/* used to wait for event completion in threads other than the one that is
-	 * event handling */
-	usbi_mutex_t event_waiters_lock;
-	usbi_cond_t event_waiters_cond;
 
 #ifdef USBI_TIMERFD_AVAILABLE
 	/* used for timeout handling, if supported by OS.
@@ -319,7 +314,7 @@ struct libusb_context {
 
 /* Update the following macro if new event sources are added */
 #define usbi_pending_events(ctx) \
-	((ctx)->device_close || (ctx)->fd_notify || !list_empty(&(ctx)->hotplug_msgs))
+	((ctx)->device_close || (ctx)->pollfds_modified || !list_empty(&(ctx)->hotplug_msgs))
 
 #ifdef USBI_TIMERFD_AVAILABLE
 #define usbi_using_timerfd(ctx) ((ctx)->timerfd >= 0)
@@ -422,9 +417,6 @@ enum usbi_transfer_flags {
 
 	/* Operation on the transfer failed because the device disappeared */
 	USBI_TRANSFER_DEVICE_DISAPPEARED = 1 << 3,
-
-	/* Set by backend submit_transfer() if the fds in use have been updated */
-	USBI_TRANSFER_UPDATED_FDS = 1 << 4,
 };
 
 #define USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \

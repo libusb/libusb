@@ -1963,7 +1963,7 @@ static int darwin_free_streams (struct libusb_device_handle *dev_handle, unsigne
 
 const struct usbi_os_backend darwin_backend = {
         .name = "Darwin",
-        .caps = USBI_CAP_HAS_POLLABLE_DEVICE_FD,
+        .caps = 0,
         .init = darwin_init,
         .exit = darwin_exit,
         .get_device_list = NULL, /* not needed */

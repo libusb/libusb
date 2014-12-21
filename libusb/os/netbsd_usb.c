@@ -90,7 +90,7 @@ static int _access_endpoint(struct libusb_transfer *);
 
 const struct usbi_os_backend netbsd_backend = {
 	"Synchronous NetBSD backend",
-	USBI_CAP_HAS_POLLABLE_DEVICE_FD,
+	0,
 	NULL,				/* init() */
 	NULL,				/* exit() */
 	netbsd_get_device_list,

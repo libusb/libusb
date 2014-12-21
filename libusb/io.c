@@ -1111,11 +1111,10 @@ int usbi_io_init(struct libusb_context *ctx)
 	int r;
 
 	usbi_mutex_init(&ctx->flying_transfers_lock, NULL);
-	usbi_mutex_init(&ctx->pollfds_lock, NULL);
 	usbi_mutex_init_recursive(&ctx->events_lock, NULL);
-	usbi_mutex_init(&ctx->event_data_lock, NULL);
 	usbi_mutex_init(&ctx->event_waiters_lock, NULL);
 	usbi_cond_init(&ctx->event_waiters_cond, NULL);
+	usbi_mutex_init_recursive(&ctx->event_data_lock, NULL);
 	list_init(&ctx->flying_transfers);
 	list_init(&ctx->ipollfds);
 	list_init(&ctx->hotplug_msgs);
@@ -1157,11 +1156,10 @@ err_close_pipe:
 	usbi_close(ctx->event_pipe[1]);
 err:
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
-	usbi_mutex_destroy(&ctx->pollfds_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
-	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
 	usbi_cond_destroy(&ctx->event_waiters_cond);
+	usbi_mutex_destroy(&ctx->event_data_lock);
 	return r;
 }
 
@@ -1177,11 +1175,10 @@ void usbi_io_exit(struct libusb_context *ctx)
 	}
 #endif
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
-	usbi_mutex_destroy(&ctx->pollfds_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
-	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
 	usbi_cond_destroy(&ctx->event_waiters_cond);
+	usbi_mutex_destroy(&ctx->event_data_lock);
 	if (ctx->pollfds)
 		free(ctx->pollfds);
 }
@@ -1427,7 +1424,6 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	struct usbi_transfer *itransfer =
 		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
-	int updated_fds;
 
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
 	usbi_mutex_lock(&itransfer->lock);
@@ -1451,11 +1447,8 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		libusb_ref_device(transfer->dev_handle->dev);
 	}
 out:
-	updated_fds = (itransfer->flags & USBI_TRANSFER_UPDATED_FDS);
 	usbi_mutex_unlock(&itransfer->lock);
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
-	if (updated_fds)
-		usbi_fd_notification(ctx);
 	return r;
 }
 
@@ -1973,7 +1966,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 	/* only reallocate the poll fds when the list of poll fds has been modified
 	 * since the last poll, otherwise reuse them to save the additional overhead */
-	usbi_mutex_lock(&ctx->pollfds_lock);
+	usbi_mutex_lock(&ctx->event_data_lock);
 	if (ctx->pollfds_modified) {
 		usbi_dbg("poll fds modified, reallocating");
 
@@ -1988,7 +1981,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 		ctx->pollfds = calloc(ctx->pollfds_cnt, sizeof(*ctx->pollfds));
 		if (!ctx->pollfds) {
-			usbi_mutex_unlock(&ctx->pollfds_lock);
+			usbi_mutex_unlock(&ctx->event_data_lock);
 			return LIBUSB_ERROR_NO_MEM;
 		}
 
@@ -2001,10 +1994,15 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 		/* reset the flag now that we have the updated list */
 		ctx->pollfds_modified = 0;
+
+		/* if no further pending events, clear the event pipe so that we do
+		 * not immediately return from poll */
+		if (!usbi_pending_events(ctx))
+			usbi_clear_event(ctx);
 	}
 	fds = ctx->pollfds;
 	nfds = ctx->pollfds_cnt;
-	usbi_mutex_unlock(&ctx->pollfds_lock);
+	usbi_mutex_unlock(&ctx->event_data_lock);
 
 	timeout_ms = (int)(tv->tv_sec * 1000) + (tv->tv_usec / 1000);
 
@@ -2037,10 +2035,8 @@ redo_poll:
 		usbi_mutex_lock(&ctx->event_data_lock);
 
 		/* check if someone added a new poll fd */
-		if (ctx->fd_notify) {
+		if (ctx->pollfds_modified)
 			usbi_dbg("someone updated the poll fds");
-			ctx->fd_notify = 0;
-		}
 
 		/* check if someone is closing a device */
 		if (ctx->device_close)
@@ -2484,11 +2480,11 @@ int usbi_add_pollfd(struct libusb_context *ctx, int fd, short events)
 	usbi_dbg("add fd %d events %d", fd, events);
 	ipollfd->pollfd.fd = fd;
 	ipollfd->pollfd.events = events;
-	usbi_mutex_lock(&ctx->pollfds_lock);
+	usbi_mutex_lock(&ctx->event_data_lock);
 	list_add_tail(&ipollfd->list, &ctx->ipollfds);
 	ctx->pollfds_cnt++;
-	ctx->pollfds_modified = 1;
-	usbi_mutex_unlock(&ctx->pollfds_lock);
+	usbi_fd_notification(ctx);
+	usbi_mutex_unlock(&ctx->event_data_lock);
 
 	if (ctx->fd_added_cb)
 		ctx->fd_added_cb(fd, events, ctx->fd_cb_user_data);
@@ -2502,7 +2498,7 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
 	int found = 0;
 
 	usbi_dbg("remove fd %d", fd);
-	usbi_mutex_lock(&ctx->pollfds_lock);
+	usbi_mutex_lock(&ctx->event_data_lock);
 	list_for_each_entry(ipollfd, &ctx->ipollfds, list, struct usbi_pollfd)
 		if (ipollfd->pollfd.fd == fd) {
 			found = 1;
@@ -2511,14 +2507,14 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
 
 	if (!found) {
 		usbi_dbg("couldn't find fd %d to remove", fd);
-		usbi_mutex_unlock(&ctx->pollfds_lock);
+		usbi_mutex_unlock(&ctx->event_data_lock);
 		return;
 	}
 
 	list_del(&ipollfd->list);
 	ctx->pollfds_cnt--;
-	ctx->pollfds_modified = 1;
-	usbi_mutex_unlock(&ctx->pollfds_lock);
+	usbi_fd_notification(ctx);
+	usbi_mutex_unlock(&ctx->event_data_lock);
 	free(ipollfd);
 	if (ctx->fd_removed_cb)
 		ctx->fd_removed_cb(fd, ctx->fd_cb_user_data);
@@ -2549,7 +2545,7 @@ const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 	size_t i = 0;
 	USBI_GET_CONTEXT(ctx);
 
-	usbi_mutex_lock(&ctx->pollfds_lock);
+	usbi_mutex_lock(&ctx->event_data_lock);
 
 	ret = calloc(ctx->pollfds_cnt + 1, sizeof(struct libusb_pollfd *));
 	if (!ret)
@@ -2560,7 +2556,7 @@ const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 	ret[ctx->pollfds_cnt] = NULL;
 
 out:
-	usbi_mutex_unlock(&ctx->pollfds_lock);
+	usbi_mutex_unlock(&ctx->event_data_lock);
 	return (const struct libusb_pollfd **) ret;
 #else
 	usbi_err(ctx, "external polling of libusb's internal descriptors "\

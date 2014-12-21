@@ -1196,7 +1196,7 @@ int usbi_clear_event(struct libusb_context *ctx)
 
 /*
  * Interrupt the iteration of the event handling thread, so that it picks
- * up the new fd.
+ * up the fd change.
  */
 void usbi_fd_notification(struct libusb_context *ctx)
 {
@@ -1206,7 +1206,7 @@ void usbi_fd_notification(struct libusb_context *ctx)
 	 * Only signal an event if there are no prior pending events. */
 	usbi_mutex_lock(&ctx->event_data_lock);
 	pending_events = usbi_pending_events(ctx);
-	ctx->fd_notify = 1;
+	ctx->pollfds_modified = 1;
 	if (!pending_events)
 		usbi_signal_event(ctx);
 	usbi_mutex_unlock(&ctx->event_data_lock);
@@ -1272,16 +1272,6 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	list_add(&_handle->list, &ctx->open_devs);
 	usbi_mutex_unlock(&ctx->open_devs_lock);
 	*handle = _handle;
-
-	if (usbi_backend->caps & USBI_CAP_HAS_POLLABLE_DEVICE_FD) {
-		/* At this point, we want to interrupt any existing event handlers so
-		 * that they realise the addition of the new device's poll fd. One
-		 * example when this is desirable is if the user is running a separate
-		 * dedicated libusb events handling thread, which is running with a long
-		 * or infinite timeout. We want to interrupt that iteration of the loop,
-		 * so that it picks up the new fd, and then continues. */
-		usbi_fd_notification(ctx);
-	}
 
 	return 0;
 }
