@@ -1114,7 +1114,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	usbi_mutex_init_recursive(&ctx->events_lock, NULL);
 	usbi_mutex_init(&ctx->event_waiters_lock, NULL);
 	usbi_cond_init(&ctx->event_waiters_cond, NULL);
-	usbi_mutex_init_recursive(&ctx->event_data_lock, NULL);
+	usbi_mutex_init(&ctx->event_data_lock, NULL);
 	list_init(&ctx->flying_transfers);
 	list_init(&ctx->ipollfds);
 	list_init(&ctx->hotplug_msgs);
@@ -2466,6 +2466,22 @@ void API_EXPORTED libusb_set_pollfd_notifiers(libusb_context *ctx,
 	ctx->fd_added_cb = added_cb;
 	ctx->fd_removed_cb = removed_cb;
 	ctx->fd_cb_user_data = user_data;
+}
+
+/*
+ * Interrupt the iteration of the event handling thread, so that it picks
+ * up the fd change. Callers of this function must hold the event_data_lock.
+ */
+static void usbi_fd_notification(struct libusb_context *ctx)
+{
+	int pending_events;
+
+	/* Record that there is a new poll fd.
+	 * Only signal an event if there are no prior pending events. */
+	pending_events = usbi_pending_events(ctx);
+	ctx->pollfds_modified = 1;
+	if (!pending_events)
+		usbi_signal_event(ctx);
 }
 
 /* Add a file descriptor to the list of file descriptors to be monitored.

@@ -1194,24 +1194,6 @@ int usbi_clear_event(struct libusb_context *ctx)
 	return 0;
 }
 
-/*
- * Interrupt the iteration of the event handling thread, so that it picks
- * up the fd change.
- */
-void usbi_fd_notification(struct libusb_context *ctx)
-{
-	int pending_events;
-
-	/* Record that there is a new poll fd.
-	 * Only signal an event if there are no prior pending events. */
-	usbi_mutex_lock(&ctx->event_data_lock);
-	pending_events = usbi_pending_events(ctx);
-	ctx->pollfds_modified = 1;
-	if (!pending_events)
-		usbi_signal_event(ctx);
-	usbi_mutex_unlock(&ctx->event_data_lock);
-}
-
 /** \ingroup dev
  * Open a device and obtain a device handle. A handle allows you to perform
  * I/O on the device in question.
