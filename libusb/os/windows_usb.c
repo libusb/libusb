@@ -663,6 +663,32 @@ static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 }
 
 /*
+ * Determine which interface the given endpoint address belongs to
+ */
+static int get_interface_by_endpoint(struct libusb_config_descriptor *conf_desc, uint8_t ep)
+{
+	const struct libusb_interface *intf;
+	const struct libusb_interface_descriptor *intf_desc;
+	int i, j, k;
+
+	for (i = 0; i < conf_desc->bNumInterfaces; i++) {
+		intf = &conf_desc->interface[i];
+		for (j = 0; j < intf->num_altsetting; j++) {
+			intf_desc = &intf->altsetting[j];
+			for (k = 0; k < intf_desc->bNumEndpoints; k++) {
+				if (intf_desc->endpoint[k].bEndpointAddress == ep) {
+					usbi_dbg("found endpoint %02X on interface %d", intf_desc->bInterfaceNumber);
+					return intf_desc->bInterfaceNumber;
+				}
+			}
+		}
+	}
+
+	usbi_dbg("endpoint %02X not found on any interface", ep);
+	return LIBUSB_ERROR_NOT_FOUND;
+}
+
+/*
  * Populate the endpoints addresses of the device_priv interface helper structs
  */
 static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int iface, int altsetting)
@@ -673,7 +699,7 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int
 	const struct libusb_interface_descriptor *if_desc;
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 
-	r = libusb_get_config_descriptor(dev_handle->dev, 0, &conf_desc);
+	r = libusb_get_config_descriptor(dev_handle->dev, (uint8_t)(priv->active_config-1), &conf_desc);
 	if (r != LIBUSB_SUCCESS) {
 		usbi_warn(ctx, "could not read config descriptor: error %d", r);
 		return r;
@@ -3579,7 +3605,7 @@ static int _hid_get_descriptor(struct hid_device_priv* dev, HANDLE hid_handle, i
 		return LIBUSB_ERROR_OTHER;
 	}
 	usbi_dbg("unsupported");
-	return LIBUSB_ERROR_INVALID_PARAM;
+	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int id, void *data,
@@ -4086,7 +4112,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 				r = LIBUSB_COMPLETED;
 			} else {
 				usbi_warn(ctx, "cannot set configuration other than the default one");
-				r = LIBUSB_ERROR_INVALID_PARAM;
+				r = LIBUSB_ERROR_NOT_SUPPORTED;
 			}
 			break;
 		case LIBUSB_REQUEST_GET_INTERFACE:
@@ -4102,7 +4128,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 			break;
 		default:
 			usbi_warn(ctx, "unsupported HID control request");
-			r = LIBUSB_ERROR_INVALID_PARAM;
+			r = LIBUSB_ERROR_NOT_SUPPORTED;
 			break;
 		}
 		break;
@@ -4113,7 +4139,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 		break;
 	default:
 		usbi_warn(ctx, "unsupported HID control request");
-		r = LIBUSB_ERROR_INVALID_PARAM;
+		r = LIBUSB_ERROR_NOT_SUPPORTED;
 		break;
 	}
 
@@ -4433,19 +4459,57 @@ static int composite_submit_control_transfer(int sub_api, struct usbi_transfer *
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
 	struct windows_device_priv *priv = _device_priv(transfer->dev_handle->dev);
-	int i, pass;
+	struct libusb_config_descriptor *conf_desc;
+	WINUSB_SETUP_PACKET *setup = (WINUSB_SETUP_PACKET *) transfer->buffer;
+	int iface, pass, r;
 
 	// Interface shouldn't matter for control, but it does in practice, with Windows'
-	// restrictions with regards to accessing HID keyboards and mice. Try a 2 pass approach
+	// restrictions with regards to accessing HID keyboards and mice. Try to target
+	// a specific interface first, if possible.
+	switch (LIBUSB_REQ_RECIPIENT(setup->request_type)) {
+	case LIBUSB_RECIPIENT_INTERFACE:
+		iface = setup->index & 0xFF;
+		break;
+	case LIBUSB_RECIPIENT_ENDPOINT:
+		r = libusb_get_config_descriptor(transfer->dev_handle->dev, (uint8_t)(priv->active_config-1), &conf_desc);
+		if (r == LIBUSB_SUCCESS) {
+			iface = get_interface_by_endpoint(conf_desc, (setup->index & 0xFF));
+			libusb_free_config_descriptor(conf_desc);
+			break;
+		}
+		// Fall through if not able to determine interface
+	default:
+		iface = -1;
+		break;
+	}
+
+	// Try and target a specific interface if the control setup indicates such
+	if ((iface >= 0) && (iface < USB_MAXINTERFACES)) {
+		usbi_dbg("attempting control transfer targeted to interface %d", iface);
+		if (priv->usb_interface[iface].path != NULL) {
+			r = priv->usb_interface[iface].apib->submit_control_transfer(priv->usb_interface[iface].sub_api, itransfer);
+			if (r == LIBUSB_SUCCESS) {
+				return r;
+			}
+		}
+	}
+
+	// Either not targeted to a specific interface or no luck in doing so.
+	// Try a 2 pass approach with all interfaces.
 	for (pass = 0; pass < 2; pass++) {
-		for (i=0; i<USB_MAXINTERFACES; i++) {
-			if (priv->usb_interface[i].path != NULL) {
-				if ((pass == 0) && (priv->usb_interface[i].restricted_functionality)) {
-					usbi_dbg("trying to skip restricted interface #%d (HID keyboard or mouse?)", i);
+		for (iface = 0; iface < USB_MAXINTERFACES; iface++) {
+			if (priv->usb_interface[iface].path != NULL) {
+				if ((pass == 0) && (priv->usb_interface[iface].restricted_functionality)) {
+					usbi_dbg("trying to skip restricted interface #%d (HID keyboard or mouse?)", iface);
 					continue;
 				}
-				usbi_dbg("using interface %d", i);
-				return priv->usb_interface[i].apib->submit_control_transfer(priv->usb_interface[i].sub_api, itransfer);
+				usbi_dbg("using interface %d", iface);
+				r = priv->usb_interface[iface].apib->submit_control_transfer(priv->usb_interface[iface].sub_api, itransfer);
+				// If not supported on this API, it may be supported on another, so don't give up yet!!
+				if (r == LIBUSB_ERROR_NOT_SUPPORTED) {
+					continue;
+				}
+				return r;
 			}
 		}
 	}
