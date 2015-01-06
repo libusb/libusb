@@ -206,7 +206,7 @@ void usbi_hotplug_match(struct libusb_context *ctx, struct libusb_device *dev,
 void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device *dev,
 	libusb_hotplug_event event)
 {
-	int pending_events;;
+	int pending_events;
 	libusb_hotplug_message *message = calloc(1, sizeof(*message));
 
 	if (!message) {
