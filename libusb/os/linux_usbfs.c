@@ -1766,9 +1766,6 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	int i;
 	size_t alloc_size;
 
-	if (tpriv->urbs)
-		return LIBUSB_ERROR_BUSY;
-
 	if (is_out && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET) &&
 			!(dpriv->caps & USBFS_CAP_ZERO_PACKET))
 		return LIBUSB_ERROR_NOT_SUPPORTED;
@@ -1945,9 +1942,6 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	unsigned int packet_len;
 	unsigned char *urb_buffer = transfer->buffer;
 
-	if (tpriv->iso_urbs)
-		return LIBUSB_ERROR_BUSY;
-
 	/* usbfs places a 32kb limit on iso URBs. we divide up larger requests
 	 * into smaller units to meet such restriction, then fire off all the
 	 * units at once. it would be simpler if we just fired one unit at a time,
@@ -2091,9 +2085,6 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 		_device_handle_priv(transfer->dev_handle);
 	struct usbfs_urb *urb;
 	int r;
-
-	if (tpriv->urbs)
-		return LIBUSB_ERROR_BUSY;
 
 	if (transfer->length - LIBUSB_CONTROL_SETUP_SIZE > MAX_CTRL_BUFFER_LENGTH)
 		return LIBUSB_ERROR_INVALID_PARAM;

@@ -1432,6 +1432,10 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	usbi_dbg("transfer %p", transfer);
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
 	usbi_mutex_lock(&itransfer->lock);
+	if (itransfer->flags & USBI_TRANSFER_IN_FLIGHT) {
+		r = LIBUSB_ERROR_BUSY;
+		goto out;
+	}
 	itransfer->transferred = 0;
 	itransfer->flags = 0;
 	r = calculate_timeout(itransfer);
@@ -1448,6 +1452,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		list_del(&itransfer->list);
 		arm_timerfd_for_next_timeout(ctx);
 	} else {
+		itransfer->flags |= USBI_TRANSFER_IN_FLIGHT;
 		/* keep a reference to this device */
 		libusb_ref_device(transfer->dev_handle->dev);
 	}
@@ -1467,8 +1472,8 @@ out:
  *
  * \param transfer the transfer to cancel
  * \returns 0 on success
- * \returns LIBUSB_ERROR_NOT_FOUND if the transfer is already complete or
- * cancelled.
+ * \returns LIBUSB_ERROR_NOT_FOUND if the transfer is not in progress,
+ * already complete, or already cancelled.
  * \returns a LIBUSB_ERROR code on failure
  */
 int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
@@ -1479,6 +1484,11 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 
 	usbi_dbg("transfer %p", transfer );
 	usbi_mutex_lock(&itransfer->lock);
+	if (!(itransfer->flags & USBI_TRANSFER_IN_FLIGHT)
+			|| (itransfer->flags & USBI_TRANSFER_CANCELLING)) {
+		r = LIBUSB_ERROR_NOT_FOUND;
+		goto out;
+	}
 	r = usbi_backend->cancel_transfer(itransfer);
 	if (r < 0) {
 		if (r != LIBUSB_ERROR_NOT_FOUND &&
@@ -1494,6 +1504,7 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 
 	itransfer->flags |= USBI_TRANSFER_CANCELLING;
 
+out:
 	usbi_mutex_unlock(&itransfer->lock);
 	return r;
 }
@@ -1565,6 +1576,10 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 	if (usbi_using_timerfd(ctx) && (r < 0))
 		return r;
+
+	usbi_mutex_lock(&itransfer->lock);
+	itransfer->flags &= ~USBI_TRANSFER_IN_FLIGHT;
+	usbi_mutex_unlock(&itransfer->lock);
 
 	if (status == LIBUSB_TRANSFER_COMPLETED
 			&& transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) {
