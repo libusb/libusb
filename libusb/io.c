@@ -1304,6 +1304,7 @@ DEFAULT_VISIBILITY
 struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	int iso_packets)
 {
+	struct libusb_transfer *transfer;
 	size_t os_alloc_size = usbi_backend->transfer_priv_size
 		+ (usbi_backend->add_iso_packet_size * iso_packets);
 	size_t alloc_size = sizeof(struct usbi_transfer)
@@ -1316,7 +1317,9 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 
 	itransfer->num_iso_packets = iso_packets;
 	usbi_mutex_init(&itransfer->lock, NULL);
-	return USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	usbi_dbg("transfer %p", transfer);
+	return transfer;
 }
 
 /** \ingroup asyncio
@@ -1342,6 +1345,7 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 	if (!transfer)
 		return;
 
+	usbi_dbg("transfer %p", transfer);
 	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER && transfer->buffer)
 		free(transfer->buffer);
 
@@ -1425,6 +1429,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
 
+	usbi_dbg("transfer %p", transfer);
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
 	usbi_mutex_lock(&itransfer->lock);
 	itransfer->transferred = 0;
@@ -1472,7 +1477,7 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
 
-	usbi_dbg("");
+	usbi_dbg("transfer %p", transfer );
 	usbi_mutex_lock(&itransfer->lock);
 	r = usbi_backend->cancel_transfer(itransfer);
 	if (r < 0) {
