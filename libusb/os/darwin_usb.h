@@ -28,7 +28,7 @@
 #include <IOKit/IOCFPlugIn.h>
 
 /* IOUSBInterfaceInferface */
-#if defined (kIOUSBInterfaceInterfaceID550)
+#if defined (kIOUSBInterfaceInterfaceID550) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_9
 
 #define usb_interface_t IOUSBInterfaceInterface550
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID550
@@ -65,7 +65,7 @@
 #endif
 
 /* IOUSBDeviceInterface */
-#if defined (kIOUSBDeviceInterfaceID500)
+#if defined (kIOUSBDeviceInterfaceID500) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_9
 
 #define usb_device_t    IOUSBDeviceInterface500
 #define DeviceInterfaceID kIOUSBDeviceInterfaceID500
