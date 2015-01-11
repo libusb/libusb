@@ -2803,12 +2803,38 @@ static void winusbx_close(int sub_api, struct libusb_device_handle *dev_handle)
 	if (!WinUSBX[sub_api].initialized)
 		return;
 
-	for (i = 0; i < USB_MAXINTERFACES; i++) {
-		if (priv->usb_interface[i].apib->id == USB_API_WINUSBX) {
-			file_handle = handle_priv->interface_handle[i].dev_handle;
-			if ( (file_handle != 0) && (file_handle != INVALID_HANDLE_VALUE)) {
-				CloseHandle(file_handle);
+	if (priv->apib->id == USB_API_COMPOSITE) {
+		// If this is a composite device, just free and close all WinUSB-like
+		// interfaces directly (each is independent and not associated with another)
+		for (i = 0; i < USB_MAXINTERFACES; i++) {
+			if (priv->usb_interface[i].apib->id == USB_API_WINUSBX) {
+				handle = handle_priv->interface_handle[i].api_handle;
+				if ((handle != 0) && (handle != INVALID_HANDLE_VALUE)) {
+					WinUSBX[sub_api].Free(handle);
+				}
+				handle = handle_priv->interface_handle[i].dev_handle;
+				if ((handle != 0) && (handle != INVALID_HANDLE_VALUE)) {
+					CloseHandle(handle);
+				}
 			}
+		}
+	}
+	else {
+		// If this is a WinUSB device, free all interfaces above interface 0,
+		// then free and close interface 0 last
+		for (i = 1; i < USB_MAXINTERFACES; i++) {
+			handle = handle_priv->interface_handle[i].api_handle;
+			if ((handle != 0) && (handle != INVALID_HANDLE_VALUE)) {
+				WinUSBX[sub_api].Free(handle);
+			}
+		}
+		handle = handle_priv->interface_handle[0].api_handle;
+		if ((handle != 0) && (handle != INVALID_HANDLE_VALUE)) {
+			WinUSBX[sub_api].Free(handle);
+		}
+		handle = handle_priv->interface_handle[0].dev_handle;
+		if ((handle != 0) && (handle != INVALID_HANDLE_VALUE)) {
+			CloseHandle(handle);
 		}
 	}
 }
