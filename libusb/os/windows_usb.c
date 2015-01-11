@@ -2795,7 +2795,7 @@ static void winusbx_close(int sub_api, struct libusb_device_handle *dev_handle)
 {
 	struct windows_device_handle_priv *handle_priv = _device_handle_priv(dev_handle);
 	struct windows_device_priv *priv = _device_priv(dev_handle->dev);
-	HANDLE file_handle;
+	HANDLE handle;
 	int i;
 
 	if (sub_api == SUB_API_NOTSET)
