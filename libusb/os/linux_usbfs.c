@@ -2182,17 +2182,16 @@ static void op_clear_transfer_priv(struct usbi_transfer *itransfer)
 	case LIBUSB_TRANSFER_TYPE_BULK:
 	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-		usbi_mutex_lock(&itransfer->lock);
-		if (tpriv->urbs)
+		if (tpriv->urbs) {
 			free(tpriv->urbs);
-		tpriv->urbs = NULL;
-		usbi_mutex_unlock(&itransfer->lock);
+			tpriv->urbs = NULL;
+		}
 		break;
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		usbi_mutex_lock(&itransfer->lock);
-		if (tpriv->iso_urbs)
+		if (tpriv->iso_urbs) {
 			free_iso_urbs(tpriv);
-		usbi_mutex_unlock(&itransfer->lock);
+			tpriv->iso_urbs = NULL;
+		}
 		break;
 	default:
 		usbi_err(TRANSFER_CTX(transfer),

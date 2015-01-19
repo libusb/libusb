@@ -408,6 +408,10 @@ struct usbi_transfer {
 	 * its completion (presumably there would be races within your OS backend
 	 * if this were possible). */
 	usbi_mutex_t lock;
+
+	/* this lock should be held whenever viewing or modifying flags
+	 * relating to the transfer state */
+	usbi_mutex_t flags_lock;
 };
 
 enum usbi_transfer_flags {
@@ -423,8 +427,14 @@ enum usbi_transfer_flags {
 	/* Operation on the transfer failed because the device disappeared */
 	USBI_TRANSFER_DEVICE_DISAPPEARED = 1 << 3,
 
-	/* Transfer is currently active */
-	USBI_TRANSFER_IN_FLIGHT = 1 << 4,
+	/* Transfer is currently being submitted */
+	USBI_TRANSFER_SUBMITTING = 1 << 4,
+
+	/* Transfer successfully submitted by backend */
+	USBI_TRANSFER_IN_FLIGHT = 1 << 5,
+
+	/* Completion handler has run */
+	USBI_TRANSFER_COMPLETED = 1 << 6,
 };
 
 #define USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
