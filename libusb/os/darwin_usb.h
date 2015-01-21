@@ -130,7 +130,6 @@ struct darwin_device_priv {
 struct darwin_device_handle_priv {
   int                  is_open;
   CFRunLoopSourceRef   cfSource;
-  int                  fds[2];
 
   struct darwin_interface {
     usb_interface_t    **interface;
@@ -150,11 +149,8 @@ struct darwin_transfer_priv {
   IOUSBDevRequestTO req;
 
   /* Bulk */
-};
 
-/* structure for signaling io completion */
-struct darwin_msg_async_io_complete {
-  struct usbi_transfer *itransfer;
+  /* Completion status */
   IOReturn result;
   UInt32 size;
 };
