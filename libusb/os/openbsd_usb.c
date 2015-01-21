@@ -130,6 +130,7 @@ const struct usbi_os_backend openbsd_backend = {
 	obsd_clear_transfer_priv,
 
 	obsd_handle_events,
+	NULL,				/* handle_transfer_completion() */
 
 	obsd_clock_gettime,
 	sizeof(struct device_priv),

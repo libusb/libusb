@@ -254,6 +254,7 @@ const struct usbi_os_backend haiku_usb_raw_backend = {
 	/*.clear_transfer_priv =*/ haiku_clear_transfer_priv,
 
 	/*.handle_events =*/ haiku_handle_events,
+	/*.handle_transfer_completion =*/ NULL,
 
 	/*.clock_gettime =*/ haiku_clock_gettime,
 

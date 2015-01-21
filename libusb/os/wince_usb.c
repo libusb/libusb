@@ -1023,6 +1023,7 @@ const struct usbi_os_backend wince_backend = {
         wince_clear_transfer_priv,
 
         wince_handle_events,
+        NULL,                           /* handle_transfer_completion() */
 
         wince_clock_gettime,
         sizeof(struct wince_device_priv),

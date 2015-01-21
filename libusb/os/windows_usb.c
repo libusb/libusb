@@ -2488,6 +2488,7 @@ const struct usbi_os_backend windows_backend = {
 	windows_clear_transfer_priv,
 
 	windows_handle_events,
+	NULL,				/* handle_transfer_completion() */
 
 	windows_clock_gettime,
 #if defined(USBI_TIMERFD_AVAILABLE)

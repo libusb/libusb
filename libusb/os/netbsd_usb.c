@@ -127,6 +127,7 @@ const struct usbi_os_backend netbsd_backend = {
 	netbsd_clear_transfer_priv,
 
 	netbsd_handle_events,
+	NULL,				/* handle_transfer_completion() */
 
 	netbsd_clock_gettime,
 	sizeof(struct device_priv),
