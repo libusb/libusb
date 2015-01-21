@@ -59,7 +59,7 @@ haiku_open(struct libusb_device_handle *dev_handle)
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
 	*((USBDeviceHandle**)dev_handle->os_priv)=handle;
-	return usbi_add_pollfd(HANDLE_CTX(dev_handle),handle->EventPipe(0), POLLIN);
+	return LIBUSB_SUCCESS;
 }
 
 static void 
@@ -68,7 +68,6 @@ haiku_close(struct libusb_device_handle *dev_handle)
 	USBDeviceHandle * handle=*((USBDeviceHandle**)dev_handle->os_priv);
 	if(handle==NULL)
 		return;
-	usbi_remove_pollfd(HANDLE_CTX(dev_handle),handle->EventPipe(0));
 	delete handle;
 	*((USBDeviceHandle**)dev_handle->os_priv)=NULL;
 }
@@ -167,44 +166,32 @@ haiku_clear_transfer_priv(struct usbi_transfer * itransfer)
 }
 
 static int
-haiku_handle_events(struct libusb_context* ctx, struct pollfd* fds, nfds_t nfds, int num_ready)
+haiku_handle_transfer_completion(struct usbi_transfer * itransfer)
 {
-	USBTransfer *transfer;
-	for(int i=0;i<nfds && num_ready>0;i++)
+	USBTransfer* transfer=*((USBTransfer**)usbi_transfer_get_os_priv(itransfer));
+
+	usbi_mutex_lock(&itransfer->lock);
+	if(transfer->IsCancelled())
 	{
-		struct pollfd *pollfd = &fds[i];
-		if(!pollfd->revents)
-			continue;
-			
-		num_ready--;
-		read(pollfd->fd, &transfer, sizeof(transfer));
-		struct usbi_transfer* itransfer=transfer->UsbiTransfer();
-		usbi_mutex_lock(&itransfer->lock);
-		if(transfer->IsCancelled())
-		{
-			delete transfer;
-			*((USBTransfer**)usbi_transfer_get_os_priv(itransfer))=NULL;
-			usbi_mutex_unlock(&itransfer->lock);
-			if (itransfer->transferred < 0)
-				itransfer->transferred = 0;
-			usbi_handle_transfer_cancellation(transfer->UsbiTransfer());
-			continue;
-		}
-		libusb_transfer_status status = LIBUSB_TRANSFER_COMPLETED;
-		if(itransfer->transferred < 0)
-		{
-			usbi_err(ITRANSFER_CTX(itransfer),"error in transfer");
-			status = LIBUSB_TRANSFER_ERROR;
-			itransfer->transferred=0;
-		}
 		delete transfer;
 		*((USBTransfer**)usbi_transfer_get_os_priv(itransfer))=NULL;
 		usbi_mutex_unlock(&itransfer->lock);
-		usbi_handle_transfer_completion(itransfer,status);
+		if (itransfer->transferred < 0)
+			itransfer->transferred = 0;
+		return usbi_handle_transfer_cancellation(itransfer);
 	}
-	return LIBUSB_SUCCESS;
+	libusb_transfer_status status = LIBUSB_TRANSFER_COMPLETED;
+	if(itransfer->transferred < 0)
+	{
+		usbi_err(ITRANSFER_CTX(itransfer), "error in transfer");
+		status = LIBUSB_TRANSFER_ERROR;
+		itransfer->transferred=0;
+	}
+	delete transfer;
+	*((USBTransfer**)usbi_transfer_get_os_priv(itransfer))=NULL;
+	usbi_mutex_unlock(&itransfer->lock);
+	return usbi_handle_transfer_completion(itransfer, status);
 }
-
 
 static int
 haiku_clock_gettime(int clkid, struct timespec *tp)
@@ -253,8 +240,8 @@ const struct usbi_os_backend haiku_usb_raw_backend = {
 	/*.cancel_transfer =*/ haiku_cancel_transfer,
 	/*.clear_transfer_priv =*/ haiku_clear_transfer_priv,
 
-	/*.handle_events =*/ haiku_handle_events,
-	/*.handle_transfer_completion =*/ NULL,
+	/*.handle_events =*/ NULL,
+	/*.handle_transfer_completion =*/ haiku_handle_transfer_completion,
 
 	/*.clock_gettime =*/ haiku_clock_gettime,
 

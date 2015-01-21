@@ -65,7 +65,6 @@ class USBDeviceHandle {
 public:
 				USBDeviceHandle(USBDevice* dev);
 	virtual			~USBDeviceHandle();
-	int 			EventPipe(int) const;
 	int 			ClaimInterface(int);
 	int 			ReleaseInterface(int);
 	int 			SetConfiguration(int);
@@ -79,7 +78,6 @@ private:
 	void 			TransfersWorker();
 	USBDevice*		fUSBDevice;
 	unsigned int		fClaimedInterfaces;
-	int 			fEventPipes[2];
 	BList 			fTransfers;
 	BLocker 		fTransfersLock;
 	sem_id 			fTransfersSem;
