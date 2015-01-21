@@ -1126,6 +1126,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	list_init(&ctx->flying_transfers);
 	list_init(&ctx->ipollfds);
 	list_init(&ctx->hotplug_msgs);
+	list_init(&ctx->completed_transfers);
 
 	/* FIXME should use an eventfd on kernels that support it */
 	r = usbi_pipe(ctx->event_pipe);
@@ -1632,6 +1633,22 @@ int usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
 	return usbi_handle_transfer_completion(transfer, LIBUSB_TRANSFER_CANCELLED);
 }
 
+/* Add a completed transfer to the completed_transfers list of the
+ * context and signal the event. The backend's handle_transfer_completion()
+ * function will be called the next time an event handler runs. */
+void usbi_signal_transfer_completion(struct usbi_transfer *transfer)
+{
+	struct libusb_context *ctx = ITRANSFER_CTX(transfer);
+	int pending_events;
+
+	usbi_mutex_lock(&ctx->event_data_lock);
+	pending_events = usbi_pending_events(ctx);
+	list_add_tail(&transfer->completed_list, &ctx->completed_transfers);
+	if (!pending_events)
+		usbi_signal_event(ctx);
+	usbi_mutex_unlock(&ctx->event_data_lock);
+}
+
 /** \ingroup poll
  * Attempt to acquire the event handling lock. This lock is used to ensure that
  * only one thread is monitoring libusb event sources at any one time.
@@ -2056,6 +2073,8 @@ redo_poll:
 	/* fds[0] is always the event pipe */
 	if (fds[0].revents) {
 		libusb_hotplug_message *message = NULL;
+		struct usbi_transfer *itransfer;
+		int ret = 0;
 
 		usbi_dbg("caught a fish on the event pipe");
 
@@ -2078,6 +2097,17 @@ redo_poll:
 			list_del(&message->list);
 		}
 
+		/* complete any pending transfers */
+		while (ret == 0 && !list_empty(&ctx->completed_transfers)) {
+			itransfer = list_first_entry(&ctx->completed_transfers, struct usbi_transfer, completed_list);
+			list_del(&itransfer->completed_list);
+			usbi_mutex_unlock(&ctx->event_data_lock);
+			ret = usbi_backend->handle_transfer_completion(itransfer);
+			if (ret)
+				usbi_err(ctx, "backend handle_transfer_completion failed with error %d", ret);
+			usbi_mutex_lock(&ctx->event_data_lock);
+		}
+
 		/* if no further pending events, clear the event pipe */
 		if (!usbi_pending_events(ctx))
 			usbi_clear_event(ctx);
@@ -2093,6 +2123,12 @@ redo_poll:
 				libusb_unref_device(message->device);
 
 			free(message);
+		}
+
+		if (ret) {
+			/* return error code */
+			r = ret;
+			goto handled;
 		}
 
 		if (0 == --r)

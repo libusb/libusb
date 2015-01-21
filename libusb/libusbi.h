@@ -394,6 +394,7 @@ enum {
 struct usbi_transfer {
 	int num_iso_packets;
 	struct list_head list;
+	struct list_head completed_list;
 	struct timeval timeout;
 	int transferred;
 	uint32_t stream_id;
