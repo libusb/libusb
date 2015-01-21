@@ -303,6 +303,9 @@ struct libusb_context {
 	/* A list of pending hotplug messages. Protected by event_data_lock. */
 	struct list_head hotplug_msgs;
 
+	/* A list of pending completed transfers. Protected by event_data_lock. */
+	struct list_head completed_transfers;
+
 #ifdef USBI_TIMERFD_AVAILABLE
 	/* used for timeout handling, if supported by OS.
 	 * this timerfd is maintained to trigger on the next pending timeout */
@@ -314,7 +317,8 @@ struct libusb_context {
 
 /* Update the following macro if new event sources are added */
 #define usbi_pending_events(ctx) \
-	((ctx)->device_close || (ctx)->pollfds_modified || !list_empty(&(ctx)->hotplug_msgs))
+	((ctx)->device_close || (ctx)->pollfds_modified \
+	 || !list_empty(&(ctx)->hotplug_msgs) || !list_empty(&(ctx)->completed_transfers))
 
 #ifdef USBI_TIMERFD_AVAILABLE
 #define usbi_using_timerfd(ctx) ((ctx)->timerfd >= 0)
@@ -460,6 +464,7 @@ void usbi_handle_disconnect(struct libusb_device_handle *handle);
 int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
 int usbi_handle_transfer_cancellation(struct usbi_transfer *transfer);
+void usbi_signal_transfer_completion(struct usbi_transfer *transfer);
 
 int usbi_parse_descriptor(const unsigned char *source, const char *descriptor,
 	void *dest, int host_endian);
@@ -971,8 +976,14 @@ struct usbi_os_backend {
 	 */
 	void (*clear_transfer_priv)(struct usbi_transfer *itransfer);
 
-	/* Handle any pending events. This involves monitoring any active
-	 * transfers and processing their completion or cancellation.
+	/* Handle any pending events on file descriptors. Optional.
+	 *
+	 * Provide this function when file descriptors directly indicate device
+	 * or transfer activity. If your backend does not have such file descriptors,
+	 * implement the handle_transfer_completion function below.
+	 *
+	 * This involves monitoring any active transfers and processing their
+	 * completion or cancellation.
 	 *
 	 * The function is passed an array of pollfd structures (size nfds)
 	 * as a result of the poll() system call. The num_ready parameter
@@ -999,6 +1010,31 @@ struct usbi_os_backend {
 	 */
 	int (*handle_events)(struct libusb_context *ctx,
 		struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready);
+
+	/* Handle transfer completion. Optional.
+	 *
+	 * Provide this function when there are no file descriptors available
+	 * that directly indicate device or transfer activity. If your backend does
+	 * have such file descriptors, implement the handle_events function above.
+	 *
+	 * Your backend must tell the library when a transfer has completed by
+	 * calling usbi_signal_transfer_completion(). You should store any private
+	 * information about the transfer and its completion status in the transfer's
+	 * private backend data.
+	 *
+	 * During event handling, this function will be called on each transfer for
+	 * which usbi_signal_transfer_completion() was called.
+	 *
+	 * For any cancelled transfers, call usbi_handle_transfer_cancellation().
+	 * For completed transfers, call usbi_handle_transfer_completion().
+	 * For control/bulk/interrupt transfers, populate the "transferred"
+	 * element of the appropriate usbi_transfer structure before calling the
+	 * above functions. For isochronous transfers, populate the status and
+	 * transferred fields of the iso packet descriptors of the transfer.
+	 *
+	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
+	 */
+	int (*handle_transfer_completion)(struct usbi_transfer *itransfer);
 
 	/* Get time from specified clock. At least two clocks must be implemented
 	   by the backend: USBI_CLOCK_REALTIME, and USBI_CLOCK_MONOTONIC.
