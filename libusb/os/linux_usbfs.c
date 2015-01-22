@@ -1942,15 +1942,11 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	unsigned int packet_len;
 	unsigned char *urb_buffer = transfer->buffer;
 
-	/* usbfs places a 32kb limit on iso URBs. we divide up larger requests
-	 * into smaller units to meet such restriction, then fire off all the
-	 * units at once. it would be simpler if we just fired one unit at a time,
-	 * but there is a big performance gain through doing it this way.
-	 *
-	 * Newer kernels lift the 32k limit (USBFS_CAP_NO_PACKET_SIZE_LIM),
-	 * using arbritary large transfers is still be a bad idea though, as
-	 * the kernel needs to allocate physical contiguous memory for this,
-	 * which may fail for large buffers.
+	/* usbfs places arbitrary limits on iso URBs. this limit has changed
+	 * at least three times, and it's difficult to accurately detect which
+	 * limit this running kernel might impose. so we attempt to submit
+	 * whatever the user has provided. if the kernel rejects the request
+	 * due to its size, we return an error indicating such to the user.
 	 */
 
 	/* calculate how many URBs we need */
@@ -1961,11 +1957,14 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		if (packet_len > space_remaining) {
 			num_urbs++;
 			this_urb_len = packet_len;
+			/* check that we can actually support this packet length */
+			if (this_urb_len > MAX_ISO_BUFFER_LENGTH)
+				return LIBUSB_ERROR_INVALID_PARAM;
 		} else {
 			this_urb_len += packet_len;
 		}
 	}
-	usbi_dbg("need %d 32k URBs for transfer", num_urbs);
+	usbi_dbg("need %d %dk URBs for transfer", num_urbs, MAX_ISO_BUFFER_LENGTH / 1024);
 
 	alloc_size = num_urbs * sizeof(*urbs);
 	urbs = calloc(1, alloc_size);
@@ -2033,6 +2032,10 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		if (r < 0) {
 			if (errno == ENODEV) {
 				r = LIBUSB_ERROR_NO_DEVICE;
+			} else if (errno == EINVAL) {
+				usbi_warn(TRANSFER_CTX(transfer),
+					"submiturb failed, transfer too large");
+				r = LIBUSB_ERROR_INVALID_PARAM;
 			} else {
 				usbi_err(TRANSFER_CTX(transfer),
 					"submiturb failed error %d errno=%d", r, errno);

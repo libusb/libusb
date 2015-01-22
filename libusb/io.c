@@ -466,6 +466,14 @@ if (r == 0 && actual_length == sizeof(data)) {
  * libusb_get_iso_packet_buffer() and libusb_get_iso_packet_buffer_simple()
  * functions may help you here.
  *
+ * <b>Note</b>: Some operating systems (e.g. Linux) may impose limits on the
+ * length of individual isochronous packets and/or the total length of the
+ * isochronous transfer. Such limits can be difficult for libusb to detect,
+ * so the library will simply try and submit the transfer as set up by you.
+ * If the transfer fails to submit because it is too large,
+ * libusb_submit_transfer() will return
+ * \ref libusb_error::LIBUSB_ERROR_INVALID_PARAM "LIBUSB_ERROR_INVALID_PARAM".
+ *
  * \section asyncmem Memory caveats
  *
  * In most circumstances, it is not safe to use stack memory for transfer
