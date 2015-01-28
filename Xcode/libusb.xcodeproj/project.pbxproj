@@ -44,16 +44,16 @@
 		008FBFA91628B88000BC5BE2 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBFA81628B88000BC5BE2 /* IOKit.framework */; };
 		008FBFAB1628B8CB00BC5BE2 /* libobjc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBFAA1628B8CB00BC5BE2 /* libobjc.dylib */; };
 		008FBFEF1628BA3500BC5BE2 /* xusb.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBFED1628BA0E00BC5BE2 /* xusb.c */; };
-		008FBFF01628BA3A00BC5BE2 /* libusb-1.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */; };
+		008FBFF01628BA3A00BC5BE2 /* libusb-1.0.0.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.a */; };
 		008FBFFF1628BB9600BC5BE2 /* dpfp.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBFD71628BA0E00BC5BE2 /* dpfp.c */; };
-		008FC0001628BBCD00BC5BE2 /* libusb-1.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */; };
+		008FC0001628BBCD00BC5BE2 /* libusb-1.0.0.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.a */; };
 		008FC00F1628BBE400BC5BE2 /* dpfp_threaded.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBFDB1628BA0E00BC5BE2 /* dpfp_threaded.c */; };
-		008FC0101628BBE900BC5BE2 /* libusb-1.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */; };
+		008FC0101628BBE900BC5BE2 /* libusb-1.0.0.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.a */; };
 		008FC01F1628BC1500BC5BE2 /* fxload.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBFE11628BA0E00BC5BE2 /* fxload.c */; };
-		008FC0201628BC1B00BC5BE2 /* libusb-1.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */; };
+		008FC0201628BC1B00BC5BE2 /* libusb-1.0.0.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.a */; };
 		008FC0211628BC5200BC5BE2 /* ezusb.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBFDC1628BA0E00BC5BE2 /* ezusb.c */; };
 		008FC0301628BC7400BC5BE2 /* listdevs.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBFE71628BA0E00BC5BE2 /* listdevs.c */; };
-		008FC0311628BC7800BC5BE2 /* libusb-1.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */; };
+		008FC0311628BC7800BC5BE2 /* libusb-1.0.0.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.a */; };
 		1438D77A17A2ED9F00166101 /* hotplug.c in Sources */ = {isa = PBXBuildFile; fileRef = 1438D77817A2ED9F00166101 /* hotplug.c */; };
 		1438D77B17A2ED9F00166101 /* hotplug.h in Headers */ = {isa = PBXBuildFile; fileRef = 1438D77917A2ED9F00166101 /* hotplug.h */; };
 		1438D77D17A2EDCD00166101 /* poll_posix.c in Sources */ = {isa = PBXBuildFile; fileRef = 1438D77C17A2EDCD00166101 /* poll_posix.c */; };
@@ -189,7 +189,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = "libusb-1.0.0.dylib"; sourceTree = BUILT_PRODUCTS_DIR; };
+		008FBF311628B79300BC5BE2 /* libusb-1.0.0.a */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = "libusb-1.0.0.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		008FBF541628B7E800BC5BE2 /* core.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = core.c; sourceTree = "<group>"; };
 		008FBF551628B7E800BC5BE2 /* descriptor.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = descriptor.c; sourceTree = "<group>"; };
 		008FBF561628B7E800BC5BE2 /* io.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = io.c; sourceTree = "<group>"; };
@@ -246,7 +246,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				008FBFF01628BA3A00BC5BE2 /* libusb-1.0.0.dylib in Frameworks */,
+				008FBFF01628BA3A00BC5BE2 /* libusb-1.0.0.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -254,7 +254,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				008FC0001628BBCD00BC5BE2 /* libusb-1.0.0.dylib in Frameworks */,
+				008FC0001628BBCD00BC5BE2 /* libusb-1.0.0.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -262,7 +262,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				008FC0101628BBE900BC5BE2 /* libusb-1.0.0.dylib in Frameworks */,
+				008FC0101628BBE900BC5BE2 /* libusb-1.0.0.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -270,7 +270,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				008FC0201628BC1B00BC5BE2 /* libusb-1.0.0.dylib in Frameworks */,
+				008FC0201628BC1B00BC5BE2 /* libusb-1.0.0.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -278,7 +278,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				008FC0311628BC7800BC5BE2 /* libusb-1.0.0.dylib in Frameworks */,
+				008FC0311628BC7800BC5BE2 /* libusb-1.0.0.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -300,7 +300,7 @@
 		008FBF321628B79300BC5BE2 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */,
+				008FBF311628B79300BC5BE2 /* libusb-1.0.0.a */,
 				008FBFBD1628B9FE00BC5BE2 /* xusb */,
 				008FBFF51628BB8B00BC5BE2 /* dpfp */,
 				008FC0051628BBDB00BC5BE2 /* dpfp_threaded */,
@@ -419,7 +419,7 @@
 			);
 			name = libusb;
 			productName = libusb;
-			productReference = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */;
+			productReference = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.a */;
 			productType = "com.apple.product-type.library.dynamic";
 		};
 		008FBFBC1628B9FE00BC5BE2 /* xusb */ = {
@@ -681,9 +681,12 @@
 			baseConfigurationReference = 1443EE8616417E63007E0579 /* libusb_debug.xcconfig */;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				DYLIB_INSTALL_NAME_BASE = "@executable_path";
-				INSTALL_PATH = "@executable_path";
-				LD_DYLIB_INSTALL_NAME = "@executable_path/libusb-1.0.0.dylib";
+				DYLIB_INSTALL_NAME_BASE = "$(DYLIB_INSTALL_NAME_BASE:standardizepath)";
+				EXECUTABLE_EXTENSION = a;
+				GCC_C_LANGUAGE_STANDARD = c99;
+				INSTALL_PATH = "@executable_path/../Frameworks";
+				LD_DYLIB_INSTALL_NAME = "$(DYLIB_INSTALL_NAME_BASE:standardizepath)/$(EXECUTABLE_PATH)";
+				MACH_O_TYPE = staticlib;
 			};
 			name = Debug;
 		};
@@ -692,9 +695,12 @@
 			baseConfigurationReference = 1443EE8916417EA6007E0579 /* libusb_release.xcconfig */;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				DYLIB_INSTALL_NAME_BASE = "@executable_path";
-				INSTALL_PATH = "@executable_path";
-				LD_DYLIB_INSTALL_NAME = "@executable_path/libusb-1.0.0.dylib";
+				DYLIB_INSTALL_NAME_BASE = "$(DYLIB_INSTALL_NAME_BASE:standardizepath)";
+				EXECUTABLE_EXTENSION = a;
+				GCC_C_LANGUAGE_STANDARD = c99;
+				INSTALL_PATH = "@executable_path/../Frameworks";
+				LD_DYLIB_INSTALL_NAME = "$(DYLIB_INSTALL_NAME_BASE:standardizepath)/$(EXECUTABLE_PATH)";
+				MACH_O_TYPE = staticlib;
 			};
 			name = Release;
 		};
