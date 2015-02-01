@@ -1746,7 +1746,6 @@ static void darwin_clear_transfer_priv (struct usbi_transfer *itransfer) {
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0) {
   struct usbi_transfer *itransfer = (struct usbi_transfer *)refcon;
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-  struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)transfer->dev_handle->os_priv;
   struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 
   usbi_dbg ("an async io operation has completed");
@@ -1821,7 +1820,7 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
         lib_desc->actual_length = tpriv->isoc_framelist[i].frActCount;
       }
     } else if (!isIsoc)
-      itransfer->transferred += tpriv->io_size;
+      itransfer->transferred += tpriv->size;
   }
 
   /* it is ok to handle cancelled transfers without calling usbi_handle_transfer_cancellation (we catch timeout transfers) */
