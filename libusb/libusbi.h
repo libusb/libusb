@@ -39,6 +39,17 @@
 #include "libusb.h"
 #include "version.h"
 
+/* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
+#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) || defined(OS_HAIKU)
+#	include <unistd.h>
+#elif defined(OS_WINDOWS) || defined(OS_WINCE)
+#	if (HAVE_UNISTD_H)
+#		include <unistd.h>
+#	endif
+#endif
+
+
+
 /* Inside the libusb code, mark all public functions as follows:
  *   return_type API_EXPORTED function_name(params) { ... }
  * But if the function returns a pointer, mark it as follows:
@@ -481,10 +492,9 @@ int usbi_clear_event(struct libusb_context *ctx);
 
 /* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
 #if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) || defined(OS_HAIKU)
-#include <unistd.h>
-#include "os/poll_posix.h"
+#	include "os/poll_posix.h"
 #elif defined(OS_WINDOWS) || defined(OS_WINCE)
-#include "os/poll_windows.h"
+#	include "os/poll_windows.h"
 #endif
 
 #if (defined(OS_WINDOWS) || defined(OS_WINCE)) && !defined(__GNUC__)
