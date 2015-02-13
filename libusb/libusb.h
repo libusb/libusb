@@ -90,7 +90,7 @@ typedef unsigned __int32  uint32_t;
  * Under Windows, the selection of available compilers and configurations
  * means that, unlike other platforms, there is not <em>one true calling
  * convention</em> (calling convention: the manner in which parameters are
- * passed to funcions in the generated assembly code).
+ * passed to functions in the generated assembly code).
  *
  * Matching the Windows API itself, libusb uses the WINAPI convention (which
  * translates to the <tt>stdcall</tt> convention) and guarantees that the
@@ -668,7 +668,7 @@ struct libusb_config_descriptor {
 	uint8_t  bmAttributes;
 
 	/** Maximum power consumption of the USB device from this bus in this
-	 * configuration when the device is fully opreation. Expressed in units
+	 * configuration when the device is fully operation. Expressed in units
 	 * of 2 mA. */
 	uint8_t  MaxPower;
 
