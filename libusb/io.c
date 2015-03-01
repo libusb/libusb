@@ -2643,8 +2643,8 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
  * Retrieve a list of file descriptors that should be polled by your main loop
  * as libusb event sources.
  *
- * The returned list is NULL-terminated and should be freed with free() when
- * done. The actual list contents must not be touched.
+ * The returned list is NULL-terminated and should be freed with libusb_free_pollfds()
+ * when done. The actual list contents must not be touched.
  *
  * As file descriptors are a Unix-specific concept, this function is not
  * available on Windows and will always return NULL.
@@ -2682,6 +2682,25 @@ out:
 		"is not yet supported on Windows platforms");
 	return NULL;
 #endif
+}
+
+/** \ingroup poll
+ * Free a list of libusb_pollfd structures. This should be called for all
+ * pollfd lists allocated with libusb_get_pollfds().
+ *
+ * Since version 1.0.20, \ref LIBUSB_API_VERSION >= 0x01000104
+ *
+ * It is legal to call this function with a NULL pollfd list. In this case,
+ * the function will simply return safely.
+ *
+ * \param pollfds the list of libusb_pollfd structures to free
+ */
+void API_EXPORTED libusb_free_pollfds(const struct libusb_pollfd **pollfds)
+{
+	if (!pollfds)
+		return;
+
+	free((void *)pollfds);
 }
 
 /* Backends may call this from handle_events to report disconnection of a
