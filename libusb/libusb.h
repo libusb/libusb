@@ -138,9 +138,6 @@ typedef unsigned __int32  uint32_t;
  * #endif
  * \endcode
  *
- * Another feature of LIBUSB_API_VERSION is that it can be used to detect
- * whether you are compiling against the libusb or the libusb library.
- *
  * Internally, LIBUSB_API_VERSION is defined as follows:
  * (libusb major << 24) | (libusb minor << 16) | (16 bit incremental)
  */
