@@ -631,9 +631,9 @@ int linux_get_device_address (struct libusb_context *ctx, int detached,
 
 		/* will this work with all supported kernel versions? */
 		if (!strncmp(dev_node, "/dev/bus/usb", 12)) {
-			sscanf (dev_node, "/dev/bus/usb/%hhd/%hhd", busnum, devaddr);
+			sscanf (dev_node, "/dev/bus/usb/%hhu/%hhu", busnum, devaddr);
 		} else if (!strncmp(dev_node, "/proc/bus/usb", 13)) {
-			sscanf (dev_node, "/proc/bus/usb/%hhd/%hhd", busnum, devaddr);
+			sscanf (dev_node, "/proc/bus/usb/%hhu/%hhu", busnum, devaddr);
 		}
 
 		return LIBUSB_SUCCESS;
