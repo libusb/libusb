@@ -1226,6 +1226,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	struct windows_device_priv *priv, *parent_priv;
 	struct libusb_context *ctx;
 	struct libusb_device* tmp_dev;
+	unsigned long tmp_id;
 	unsigned i;
 
 	if ((dev == NULL) || (parent_dev == NULL)) {
@@ -1243,8 +1244,10 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 	// If that's the case, lookup the ancestors to set the bus number
 	if (parent_dev->bus_number == 0) {
 		for (i=2; ; i++) {
-			tmp_dev = usbi_get_device_by_session_id(ctx, get_ancestor_session_id(devinst, i));
-			if (tmp_dev == NULL) break;
+			tmp_id = get_ancestor_session_id(devinst, i);
+			if (tmp_id == 0) break;
+			tmp_dev = usbi_get_device_by_session_id(ctx, tmp_id);
+			if (tmp_dev == NULL) continue;
 			if (tmp_dev->bus_number != 0) {
 				usbi_dbg("got bus number from ancestor #%d", i);
 				parent_dev->bus_number = tmp_dev->bus_number;
