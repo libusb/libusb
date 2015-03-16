@@ -246,7 +246,7 @@ static usb_device_t **darwin_device_from_service (io_service_t service)
                                              &score);
 
   if (kIOReturnSuccess != result || !plugInInterface) {
-    usbi_dbg ("could not set up plugin for service: %s\n", darwin_error_str (result));
+    usbi_dbg ("could not set up plugin for service: %s", darwin_error_str (result));
     return NULL;
   }
 
@@ -998,7 +998,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
 
   if (dpriv->open_count == 0) {
     /* something is probably very wrong if this is the case */
-    usbi_err (HANDLE_CTX (dev_handle), "Close called on a device that was not open!\n");
+    usbi_err (HANDLE_CTX (dev_handle), "Close called on a device that was not open!");
     return;
   }
 

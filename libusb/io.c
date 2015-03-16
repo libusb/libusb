@@ -2109,7 +2109,7 @@ redo_poll:
 	else if (r == -1 && errno == EINTR)
 		return LIBUSB_ERROR_INTERRUPTED;
 	else if (r < 0) {
-		usbi_err(ctx, "poll failed %d err=%d\n", r, errno);
+		usbi_err(ctx, "poll failed %d err=%d", r, errno);
 		return LIBUSB_ERROR_IO;
 	}
 

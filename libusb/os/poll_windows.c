@@ -333,7 +333,7 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode, struct usbi_transfer
 	wfd.cancel_fn = cancel_fn;
 
 	if ((access_mode != RW_READ) && (access_mode != RW_WRITE)) {
-		usbi_warn(NULL, "only one of RW_READ or RW_WRITE are supported.\n"
+		usbi_warn(NULL, "only one of RW_READ or RW_WRITE are supported. "
 			"If you want to poll for R/W simultaneously, create multiple fds from the same handle.");
 		return INVALID_WINFD;
 	}

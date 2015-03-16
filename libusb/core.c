@@ -2309,8 +2309,8 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	usbi_gettimeofday(&now, NULL);
 	if ((global_debug) && (!has_debug_header_been_displayed)) {
 		has_debug_header_been_displayed = 1;
-		usbi_log_str(ctx, LIBUSB_LOG_LEVEL_DEBUG, "[timestamp] [threadID] facility level [function call] <message>\n");
-		usbi_log_str(ctx, LIBUSB_LOG_LEVEL_DEBUG, "--------------------------------------------------------------------------------\n");
+		usbi_log_str(ctx, LIBUSB_LOG_LEVEL_DEBUG, "[timestamp] [threadID] facility level [function call] <message>" USBI_LOG_LINE_END);
+		usbi_log_str(ctx, LIBUSB_LOG_LEVEL_DEBUG, "--------------------------------------------------------------------------------" USBI_LOG_LINE_END);
 	}
 	if (now.tv_usec < timestamp_origin.tv_usec) {
 		now.tv_sec--;

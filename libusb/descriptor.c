@@ -455,7 +455,7 @@ static int parse_configuration(struct libusb_context *ctx,
 					(header.bDescriptorType == LIBUSB_DT_DEVICE))
 				break;
 
-			usbi_dbg("skipping descriptor 0x%x\n", header.bDescriptorType);
+			usbi_dbg("skipping descriptor 0x%x", header.bDescriptorType);
 			buffer += header.bLength;
 			size -= header.bLength;
 		}

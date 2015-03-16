@@ -198,7 +198,7 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 
 	if (errno == ENOENT) {
 		if (!silent) 
-			usbi_err(ctx, "File doesn't exist, wait %d ms and try again\n", delay/1000);
+			usbi_err(ctx, "File doesn't exist, wait %d ms and try again", delay/1000);
    
 		/* Wait 10ms for USB device path creation.*/
 		usleep(delay);
@@ -2583,7 +2583,7 @@ static int op_handle_events(struct libusb_context *ctx,
 		}
 
 		if (!hpriv || hpriv->fd != pollfd->fd) {
-			usbi_err(ctx, "cannot find handle for fd %d\n",
+			usbi_err(ctx, "cannot find handle for fd %d",
 				 pollfd->fd);
 			continue;
 		}
