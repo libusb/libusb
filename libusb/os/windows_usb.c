@@ -1555,7 +1555,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 //#define ENUM_DEBUG
 #ifdef ENUM_DEBUG
 		const char *passname[] = { "HCD", "HUB", "GEN", "DEV", "HID", "EXT" };
-		usbi_dbg("\n#### PROCESSING %ss %s", passname[(pass<=HID_PASS)?pass:HID_PASS+1],
+		usbi_dbg("#### PROCESSING %ss %s", passname[(pass<=HID_PASS)?pass:HID_PASS+1],
 			(pass!=GEN_PASS)?guid_to_string(guid[pass]):"");
 #endif
 		for (i = 0; ; i++) {
@@ -2698,7 +2698,7 @@ static int winusbx_init(int sub_api, struct libusb_context *ctx)
 		if (h == NULL) {
 			h = LoadLibraryA("WinUSB");
 		}		if (h == NULL) {
-			usbi_warn(ctx, "WinUSB DLL is not available either,\n"
+			usbi_warn(ctx, "WinUSB DLL is not available either, "
 				"you will not be able to access devices outside of enumeration");
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
