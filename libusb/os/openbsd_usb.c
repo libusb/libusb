@@ -134,7 +134,6 @@ const struct usbi_os_backend openbsd_backend = {
 	sizeof(struct device_priv),
 	sizeof(struct handle_priv),
 	0,				/* transfer_priv_size */
-	0,				/* add_iso_packet_size */
 };
 
 #define DEVPATH	"/dev/"

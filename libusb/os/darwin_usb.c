@@ -1966,5 +1966,4 @@ const struct usbi_os_backend darwin_backend = {
         .device_priv_size = sizeof(struct darwin_device_priv),
         .device_handle_priv_size = sizeof(struct darwin_device_handle_priv),
         .transfer_priv_size = sizeof(struct darwin_transfer_priv),
-        .add_iso_packet_size = 0,
 };

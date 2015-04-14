@@ -866,5 +866,4 @@ const struct usbi_os_backend wince_backend = {
 	sizeof(struct wince_device_priv),
 	sizeof(struct wince_device_handle_priv),
 	sizeof(struct wince_transfer_priv),
-	0,
 };

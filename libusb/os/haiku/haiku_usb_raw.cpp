@@ -252,5 +252,4 @@ const struct usbi_os_backend haiku_usb_raw_backend = {
 	/*.device_priv_size =*/ sizeof(USBDevice*),
 	/*.device_handle_priv_size =*/ sizeof(USBDeviceHandle*),
 	/*.transfer_priv_size =*/ sizeof(USBTransfer*),
-	/*.add_iso_packet_size =*/ 0,
 };
