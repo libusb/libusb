@@ -335,8 +335,7 @@ static void *linux_netlink_event_thread_main(void *arg)
 		  .events = POLLIN },
 	};
 
-	/* silence compiler warning */
-	(void) arg;
+	UNUSED(arg);
 
 	while (poll(fds, 2, -1) >= 0) {
 		if (fds[0].revents & POLLIN) {
