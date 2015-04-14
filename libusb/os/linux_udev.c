@@ -240,7 +240,7 @@ static void udev_hotplug_event(struct udev_device* udev_dev)
 		if (strncmp(udev_action, "add", 3) == 0) {
 			linux_hotplug_enumerate(busnum, devaddr, sys_name);
 		} else if (detached) {
-			linux_device_disconnected(busnum, devaddr, sys_name);
+			linux_device_disconnected(busnum, devaddr);
 		} else {
 			usbi_err(NULL, "ignoring udev action %s", udev_action);
 		}
