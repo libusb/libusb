@@ -1077,12 +1077,6 @@ struct usbi_os_backend {
 	 * usbi_transfer_get_os_priv() on the appropriate usbi_transfer instance.
 	 */
 	size_t transfer_priv_size;
-
-	/* Mumber of additional bytes for os_priv for each iso packet.
-	 * Can your backend use this? */
-	/* FIXME: linux can't use this any more. if other OS's cannot either,
-	 * then remove this */
-	size_t add_iso_packet_size;
 };
 
 extern const struct usbi_os_backend * const usbi_backend;

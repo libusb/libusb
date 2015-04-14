@@ -2683,5 +2683,4 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.device_priv_size = sizeof(struct linux_device_priv),
 	.device_handle_priv_size = sizeof(struct linux_device_handle_priv),
 	.transfer_priv_size = sizeof(struct linux_transfer_priv),
-	.add_iso_packet_size = 0,
 };
