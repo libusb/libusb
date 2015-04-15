@@ -121,7 +121,7 @@ static int sysfs_has_descriptors = -1;
 static int init_count = 0;
 
 /* Serialize hotplug start/stop */
-usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
+static usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
 /* Serialize scan-devices, event-thread, and poll */
 usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 

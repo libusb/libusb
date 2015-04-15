@@ -61,7 +61,7 @@ static pthread_t libusb_linux_event_thread;
 
 static void *linux_netlink_event_thread_main(void *arg);
 
-struct sockaddr_nl snl = { .nl_family=AF_NETLINK, .nl_groups=KERNEL };
+static struct sockaddr_nl snl = { .nl_family=AF_NETLINK, .nl_groups=KERNEL };
 
 static int set_fd_cloexec_nb (int fd)
 {
