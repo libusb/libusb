@@ -874,10 +874,9 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	dev->device_address = devaddr;
 
 	if (sysfs_dir) {
-		priv->sysfs_dir = malloc(strlen(sysfs_dir) + 1);
+		priv->sysfs_dir = strdup(sysfs_dir);
 		if (!priv->sysfs_dir)
 			return LIBUSB_ERROR_NO_MEM;
-		strcpy(priv->sysfs_dir, sysfs_dir);
 
 		/* Note speed can contain 1.5, in this case __read_sysfs_attr
 		   will stop parsing at the '.' and return 1 */
