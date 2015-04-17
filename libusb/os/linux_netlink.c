@@ -63,28 +63,28 @@ static void *linux_netlink_event_thread_main(void *arg);
 
 static struct sockaddr_nl snl = { .nl_family=AF_NETLINK, .nl_groups=KERNEL };
 
-static int set_fd_cloexec_nb (int fd)
+static int set_fd_cloexec_nb(int fd)
 {
 	int flags;
 
 #if defined(FD_CLOEXEC)
-	flags = fcntl (linux_netlink_socket, F_GETFD);
+	flags = fcntl(fd, F_GETFD);
 	if (0 > flags) {
 		return -1;
 	}
 
 	if (!(flags & FD_CLOEXEC)) {
-		fcntl (linux_netlink_socket, F_SETFD, flags | FD_CLOEXEC);
+		fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
 	}
 #endif
 
-	flags = fcntl (linux_netlink_socket, F_GETFL);
+	flags = fcntl(fd, F_GETFL);
 	if (0 > flags) {
 		return -1;
 	}
 
 	if (!(flags & O_NONBLOCK)) {
-		fcntl (linux_netlink_socket, F_SETFL, flags | O_NONBLOCK);
+		fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 	}
 
 	return 0;
