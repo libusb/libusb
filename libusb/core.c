@@ -223,9 +223,6 @@ struct list_head active_contexts_list;
  * -# If the device is already in the desired configuration, calling
  *    libusb_set_configuration() using the same configuration value will cause
  *    a lightweight device reset. This may not be desirable behaviour.
- * -# libusb will be unable to change configuration if the device is in
- *    another configuration and other programs or drivers have claimed
- *    interfaces under that configuration.
  * -# In the case where the desired configuration is already active, libusb
  *    may not even be able to perform a lightweight device reset. For example,
  *    take my USB keyboard with fingerprint reader: I'm interested in driving
@@ -234,6 +231,10 @@ struct list_head active_contexts_list;
  *    Because the kernel has claimed an interface, it is not even possible to
  *    perform the lightweight device reset, so libusb_set_configuration() will
  *    fail. (Luckily the device in question only has a single configuration.)
+ * -# libusb will be unable to set a configuration if other programs or
+ *    drivers have claimed interfaces. In particular, this means that kernel
+ *    drivers must be detached from all the interfaces before
+ *    libusb_set_configuration() may succeed.
  *
  * One solution to some of the above problems is to consider the currently
  * active configuration. If the configuration we want is already active, then
