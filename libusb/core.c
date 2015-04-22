@@ -239,7 +239,8 @@ struct list_head active_contexts_list;
  * active configuration. If the configuration we want is already active, then
  * we don't have to select any configuration:
 \code
-cfg = libusb_get_configuration(dev);
+cfg = -1;
+libusb_get_configuration(dev, &cfg);
 if (cfg != desired)
 	libusb_set_configuration(dev, desired);
 \endcode
