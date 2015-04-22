@@ -1151,7 +1151,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		cd_buf_short.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
 		cd_buf_short.req.SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
 		cd_buf_short.req.SetupPacket.wValue = (USB_CONFIGURATION_DESCRIPTOR_TYPE << 8) | i;
-		cd_buf_short.req.SetupPacket.wIndex = i;
+		cd_buf_short.req.SetupPacket.wIndex = 0;
 		cd_buf_short.req.SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
 
 		// Dummy call to get the required data size. Initial failures are reported as info rather
@@ -1180,7 +1180,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		cd_buf_actual->SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
 		cd_buf_actual->SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
 		cd_buf_actual->SetupPacket.wValue = (USB_CONFIGURATION_DESCRIPTOR_TYPE << 8) | i;
-		cd_buf_actual->SetupPacket.wIndex = i;
+		cd_buf_actual->SetupPacket.wIndex = 0;
 		cd_buf_actual->SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
 
 		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
