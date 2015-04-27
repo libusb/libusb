@@ -25,7 +25,6 @@
 #include <config.h>
 
 #include <stdint.h>
-#include <errno.h>
 #include <inttypes.h>
 
 #include "libusbi.h"
@@ -37,7 +36,6 @@ unsigned __stdcall wince_clock_gettime_threaded(void* param);
 
 // Global variables
 uint64_t hires_frequency, hires_ticks_to_ps;
-int errno;
 const uint64_t epoch_time = UINT64_C(116444736000000000);       // 1970.01.01 00:00:000 in MS Filetime
 int windows_version = WINDOWS_CE;
 static int concurrent_usage = -1;
