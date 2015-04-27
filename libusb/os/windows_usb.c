@@ -1012,6 +1012,8 @@ static int windows_init(struct libusb_context *ctx)
 				usbi_err(ctx, "could not get process affinity: %s", windows_error_str(0));
 				goto init_exit;
 			}
+			// The process affinity mask is a bitmask where each set bit represents a core on
+			// which this process is allowed to run, so we find the first set bit
 			for (i = 0; !(affinity & (1 << i)); i++);
 			affinity = (1 << i);
 
@@ -1027,7 +1029,6 @@ static int windows_init(struct libusb_context *ctx)
 				0, (unsigned int *)&timer_thread_id);
 			if (timer_thread == NULL) {
 				usbi_err(ctx, "unable to create timer thread - aborting");
-				CloseHandle(event);
 				goto init_exit;
 			}
 			if (!SetThreadAffinityMask(timer_thread, affinity)) {
