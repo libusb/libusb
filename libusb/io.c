@@ -1431,16 +1431,14 @@ out:
 static int remove_from_flying_list(struct usbi_transfer *transfer)
 {
 	struct libusb_context *ctx = ITRANSFER_CTX(transfer);
+	int rearm_timerfd;
 	int r = 0;
 
-	/* FIXME: could be more intelligent with the timerfd here. we don't need
-	 * to disarm the timerfd if there was no timer running, and we only need
-	 * to rearm the timerfd if the transfer that expired was the one with
-	 * the shortest timeout. */
-
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
+	rearm_timerfd = (timerisset(&transfer->timeout) &&
+		list_first_entry(&ctx->flying_transfers, struct usbi_transfer, list) == transfer);
 	list_del(&transfer->list);
-	if (usbi_using_timerfd(ctx))
+	if (usbi_using_timerfd(ctx) && rearm_timerfd)
 		r = arm_timerfd_for_next_timeout(ctx);
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
@@ -2511,9 +2509,9 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 		if (transfer->flags & (USBI_TRANSFER_TIMED_OUT | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
 			continue;
 
-		/* no timeout for this transfer? */
+		/* if we've reached transfers of infinte timeout, we're done looking */
 		if (!timerisset(&transfer->timeout))
-			continue;
+			break;
 
 		found = 1;
 		break;
