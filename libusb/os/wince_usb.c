@@ -32,7 +32,7 @@
 
 // Global variables
 uint64_t hires_frequency, hires_ticks_to_ps;
-const uint64_t epoch_time = UINT64_C(116444736000000000);       // 1970.01.01 00:00:000 in MS Filetime
+const uint64_t epoch_time = UINT64_C(116444736000000000);	// 1970.01.01 00:00:000 in MS Filetime
 int windows_version = WINDOWS_CE;
 static int concurrent_usage = -1;
 HANDLE driver_handle = INVALID_HANDLE_VALUE;
@@ -52,9 +52,9 @@ static char* windows_error_str(uint32_t retval)
 	uint32_t error_code, format_error;
 
 	error_code = retval?retval:GetLastError();
-	
+
 	safe_stprintf(wErr_string, ERR_BUFFER_SIZE, _T("[%d] "), error_code);
-	
+
 	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
 		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &wErr_string[safe_tcslen(wErr_string)],
 		ERR_BUFFER_SIZE - (DWORD)safe_tcslen(wErr_string), NULL);
@@ -81,11 +81,11 @@ static char* windows_error_str(uint32_t retval)
 
 static struct wince_device_priv *_device_priv(struct libusb_device *dev)
 {
-        return (struct wince_device_priv *) dev->os_priv;
+	return (struct wince_device_priv *) dev->os_priv;
 }
 
 // ceusbkwrapper to libusb error code mapping
-static int translate_driver_error(int error) 
+static int translate_driver_error(int error)
 {
 	switch (error) {
 		case ERROR_INVALID_PARAMETER:
@@ -100,7 +100,7 @@ static int translate_driver_error(int error)
 		case ERROR_BUSY:
 			return LIBUSB_ERROR_BUSY;
 
-		// Error codes that are either unexpected, or have 
+		// Error codes that are either unexpected, or have
 		// no suitable LIBUSB_ERROR equivilant.
 		case ERROR_CANCELLED:
 		case ERROR_INTERNAL_ERROR:
@@ -136,8 +136,9 @@ static int init_dllimports()
 	return LIBUSB_SUCCESS;
 }
 
-static int init_device(struct libusb_device *dev, UKW_DEVICE drv_dev,
-					   unsigned char bus_addr, unsigned char dev_addr)
+static int init_device(
+	struct libusb_device *dev, UKW_DEVICE drv_dev,
+	unsigned char bus_addr, unsigned char dev_addr)
 {
 	struct wince_device_priv *priv = _device_priv(dev);
 	int r = LIBUSB_SUCCESS;
@@ -292,7 +293,7 @@ static int wince_get_device_list(
 		if (dev) {
 			usbi_dbg("using existing device for %d/%d (session %ld)",
 					bus_addr, dev_addr, session_id);
-			// Release just this element in the device list (as we already hold a 
+			// Release just this element in the device list (as we already hold a
 			// reference to it).
 			UkwReleaseDeviceList(driver_handle, &devices[i], 1);
 			release_list_offset++;
@@ -324,7 +325,7 @@ err_out:
 	*discdevs = new_devices;
 	safe_unref_device(dev);
 	// Release the remainder of the unprocessed device list.
-	// The devices added to new_devices already will still be passed up to libusb, 
+	// The devices added to new_devices already will still be passed up to libusb,
 	// which can dispose of them at its leisure.
 	UkwReleaseDeviceList(driver_handle, &devices[release_list_offset], count - release_list_offset);
 	return r;
@@ -343,8 +344,8 @@ static void wince_close(struct libusb_device_handle *handle)
 }
 
 static int wince_get_device_descriptor(
-   struct libusb_device *device,
-   unsigned char *buffer, int *host_endian)
+	struct libusb_device *device,
+	unsigned char *buffer, int *host_endian)
 {
 	struct wince_device_priv *priv = _device_priv(device);
 
@@ -381,8 +382,8 @@ static int wince_get_config_descriptor(
 }
 
 static int wince_get_configuration(
-   struct libusb_device_handle *handle,
-   int *config)
+	struct libusb_device_handle *handle,
+	int *config)
 {
 	struct wince_device_priv *priv = _device_priv(handle->dev);
 	UCHAR cv = 0;
@@ -498,19 +499,17 @@ static int wince_attach_kernel_driver(
 	struct wince_device_priv *priv = _device_priv(handle->dev);
 	if (!UkwAttachKernelDriver(priv->dev, interface_number)) {
 		return translate_driver_error(GetLastError());
-	}	
+	}
 	return LIBUSB_SUCCESS;
 }
 
-static void wince_destroy_device(
-	struct libusb_device *dev)
+static void wince_destroy_device(struct libusb_device *dev)
 {
 	struct wince_device_priv *priv = _device_priv(dev);
 	UkwReleaseDeviceList(driver_handle, &priv->dev, 1);
 }
 
-static void wince_clear_transfer_priv(
-	struct usbi_transfer *itransfer)
+static void wince_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 	struct wince_transfer_priv *transfer_priv = (struct wince_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
 	struct winfd wfd = fd_to_winfd(transfer_priv->pollable_fd.fd);
@@ -520,13 +519,12 @@ static void wince_clear_transfer_priv(
 	usbi_free_fd(&transfer_priv->pollable_fd);
 }
 
-static int wince_cancel_transfer(
-	struct usbi_transfer *itransfer)
+static int wince_cancel_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct wince_device_priv *priv = _device_priv(transfer->dev_handle->dev);
 	struct wince_transfer_priv *transfer_priv = (struct wince_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
-	
+
 	if (!UkwCancelTransfer(priv->dev, transfer_priv->pollable_fd.overlapped, UKW_TF_NO_WAIT)) {
 		return translate_driver_error(GetLastError());
 	}
@@ -576,7 +574,7 @@ static int wince_submit_control_or_bulk_transfer(struct usbi_transfer *itransfer
 
 		ret = UkwIssueControlTransfer(priv->dev, flags, setup, buf, bufLen, &transfer->actual_length, wfd.overlapped);
 	} else {
-		ret = UkwIssueBulkTransfer(priv->dev, flags, transfer->endpoint, transfer->buffer, 
+		ret = UkwIssueBulkTransfer(priv->dev, flags, transfer->endpoint, transfer->buffer,
 			transfer->length, &transfer->actual_length, wfd.overlapped);
 	}
 	if (!ret) {
@@ -596,8 +594,7 @@ static int wince_submit_iso_transfer(struct usbi_transfer *itransfer)
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int wince_submit_transfer(
-	struct usbi_transfer *itransfer)
+static int wince_submit_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
@@ -616,7 +613,9 @@ static int wince_submit_transfer(
 	}
 }
 
-static void wince_transfer_callback(struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size)
+static void wince_transfer_callback(
+	struct usbi_transfer *itransfer,
+	uint32_t io_result, uint32_t io_size)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct wince_transfer_priv *transfer_priv = (struct wince_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
@@ -625,10 +624,10 @@ static void wince_transfer_callback(struct usbi_transfer *itransfer, uint32_t io
 
 	usbi_dbg("handling I/O completion with errcode %d", io_result);
 
-	if (io_result == ERROR_NOT_SUPPORTED && 
+	if (io_result == ERROR_NOT_SUPPORTED &&
 		transfer->type != LIBUSB_TRANSFER_TYPE_CONTROL) {
-		/* For functional stalls, the WinCE USB layer (and therefore the USB Kernel Wrapper 
-		 * Driver) will report USB_ERROR_STALL/ERROR_NOT_SUPPORTED in situations where the 
+		/* For functional stalls, the WinCE USB layer (and therefore the USB Kernel Wrapper
+		 * Driver) will report USB_ERROR_STALL/ERROR_NOT_SUPPORTED in situations where the
 		 * endpoint isn't actually stalled.
 		 *
 		 * One example of this is that some devices will occasionally fail to reply to an IN
@@ -642,7 +641,7 @@ static void wince_transfer_callback(struct usbi_transfer *itransfer, uint32_t io
 		usbi_dbg("checking I/O completion with errcode ERROR_NOT_SUPPORTED is really a stall");
 		if (UkwIsPipeHalted(priv->dev, transfer->endpoint, &halted)) {
 			/* Pipe status retrieved, so now request endpoint status by sending a GET_STATUS
-			 * control request to the device. This is done synchronously, which is a bit 
+			 * control request to the device. This is done synchronously, which is a bit
 			 * naughty, but this is a special corner case.
 			 */
 			WORD wStatus = 0;
@@ -711,7 +710,9 @@ static void wince_transfer_callback(struct usbi_transfer *itransfer, uint32_t io
 	}
 }
 
-static void wince_handle_callback (struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size)
+static void wince_handle_callback(
+	struct usbi_transfer *itransfer,
+	uint32_t io_result, uint32_t io_size)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
@@ -819,49 +820,49 @@ static int wince_clock_gettime(int clk_id, struct timespec *tp)
 }
 
 const struct usbi_os_backend wince_backend = {
-        "Windows CE",
-        0,
-        wince_init,
-        wince_exit,
+	"Windows CE",
+	0,
+	wince_init,
+	wince_exit,
 
-        wince_get_device_list,
+	wince_get_device_list,
 	NULL,				/* hotplug_poll */
-        wince_open,
-        wince_close,
+	wince_open,
+	wince_close,
 
-        wince_get_device_descriptor,
-        wince_get_active_config_descriptor,
-        wince_get_config_descriptor,
+	wince_get_device_descriptor,
+	wince_get_active_config_descriptor,
+	wince_get_config_descriptor,
 	NULL,				/* get_config_descriptor_by_value() */
 
-        wince_get_configuration,
-        wince_set_configuration,
-        wince_claim_interface,
-        wince_release_interface,
+	wince_get_configuration,
+	wince_set_configuration,
+	wince_claim_interface,
+	wince_release_interface,
 
-        wince_set_interface_altsetting,
-        wince_clear_halt,
-        wince_reset_device,
+	wince_set_interface_altsetting,
+	wince_clear_halt,
+	wince_reset_device,
 
 	NULL,				/* alloc_streams */
 	NULL,				/* free_streams */
 
-        wince_kernel_driver_active,
-        wince_detach_kernel_driver,
-        wince_attach_kernel_driver,
+	wince_kernel_driver_active,
+	wince_detach_kernel_driver,
+	wince_attach_kernel_driver,
 
-        wince_destroy_device,
+	wince_destroy_device,
 
-        wince_submit_transfer,
-        wince_cancel_transfer,
-        wince_clear_transfer_priv,
+	wince_submit_transfer,
+	wince_cancel_transfer,
+	wince_clear_transfer_priv,
 
-        wince_handle_events,
-        NULL,                           /* handle_transfer_completion() */
+	wince_handle_events,
+	NULL,				/* handle_transfer_completion() */
 
-        wince_clock_gettime,
-        sizeof(struct wince_device_priv),
-        sizeof(struct wince_device_handle_priv),
-        sizeof(struct wince_transfer_priv),
-        0,
+	wince_clock_gettime,
+	sizeof(struct wince_device_priv),
+	sizeof(struct wince_device_handle_priv),
+	sizeof(struct wince_transfer_priv),
+	0,
 };
