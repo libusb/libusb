@@ -773,9 +773,11 @@ static int wince_handle_events(
 			wince_handle_callback(transfer, io_result, io_size);
 		} else if (found) {
 			usbi_err(ctx, "matching transfer for fd %x has not completed", fds[i]);
+			usbi_mutex_unlock(&ctx->open_devs_lock);
 			return LIBUSB_ERROR_OTHER;
 		} else {
 			usbi_err(ctx, "could not find a matching transfer for fd %x", fds[i]);
+			usbi_mutex_unlock(&ctx->open_devs_lock);
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
 	}
