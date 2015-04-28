@@ -724,7 +724,7 @@ static void wince_handle_callback(
 		wince_transfer_callback (itransfer, io_result, io_size);
 		break;
 	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
-		return LIBUSB_ERROR_NOT_SUPPORTED;
+		break;
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "unknown endpoint type %d", transfer->type);
 	}
