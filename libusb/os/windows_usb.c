@@ -265,9 +265,9 @@ static int init_dlls(void)
  * usb_class: the generic USB class for which to retrieve interface details
  * index: zero based index of the interface in the device info list
  *
- * Note: it is the responsibility of the caller to free the DEVICE_INTERFACE_DETAIL_DATA
- * structure returned and call this function repeatedly using the same guid (with an
- * incremented index starting at zero) until all interfaces have been returned.
+ * Note: it is the responsibility of the caller to call this function
+ * repeatedly using the same guid (with an incremented index starting
+ * at zero) until all interfaces have been returned.
  */
 static bool get_devinfo_data(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const char* usb_class, unsigned _index)
@@ -1600,12 +1600,17 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				// being listed under the "NUSB3" PnP Symbolic Name rather than "USB".
 				// The Intel USB 3.0 driver behaves similar, but uses "IUSB3"
 				for (; class_index < ARRAYSIZE(usb_class); class_index++) {
-					if (get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i))
+					if (get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i)) {
 						break;
+					}
 					i = 0;
 				}
-				if (class_index >= ARRAYSIZE(usb_class))
+				if (class_index >= ARRAYSIZE(usb_class)) {
+					/* call get_devinfo_data to ensure handle is closed. i < 100 is a sanity limit. */
+					while(get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[0], i++) && i < 100) { }
+					i = 0;
 					break;
+				}
 			}
 
 			// Read the Device ID path. This is what we'll use as UID
