@@ -1103,7 +1103,7 @@ void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_na
 	usbi_mutex_static_unlock(&active_contexts_lock);
 }
 
-void linux_device_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys_name)
+void linux_device_disconnected(uint8_t busnum, uint8_t devaddr)
 {
 	struct libusb_context *ctx;
 	struct libusb_device *dev;
@@ -1287,7 +1287,7 @@ static int op_open(struct libusb_device_handle *handle)
 			if (handle->dev->attached) {
 				usbi_dbg("open failed with no device, but device still attached");
 				linux_device_disconnected(handle->dev->bus_number,
-						handle->dev->device_address, NULL);
+						handle->dev->device_address);
 			}
 			usbi_mutex_static_unlock(&linux_hotplug_lock);
 		}
@@ -2595,7 +2595,7 @@ static int op_handle_events(struct libusb_context *ctx,
 			usbi_mutex_static_lock(&linux_hotplug_lock);
 			if (handle->dev->attached)
 				linux_device_disconnected(handle->dev->bus_number,
-						handle->dev->device_address, NULL);
+						handle->dev->device_address);
 			usbi_mutex_static_unlock(&linux_hotplug_lock);
 			continue;
 		}

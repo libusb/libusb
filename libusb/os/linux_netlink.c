@@ -317,7 +317,7 @@ static int linux_netlink_read_message(void)
 
 	/* signal device is available (or not) to all contexts */
 	if (detached)
-		linux_device_disconnected(busnum, devaddr, sys_name);
+		linux_device_disconnected(busnum, devaddr);
 	else
 		linux_hotplug_enumerate(busnum, devaddr, sys_name);
 
