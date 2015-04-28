@@ -1523,6 +1523,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				} else {
 					usbi_dbg("found existing device for session [%lX] (%u.%u)",
 						session_id, dev->bus_number, dev->device_address);
+					if (_device_priv(dev)->parent_dev != parent_dev) {
+						usbi_err(ctx,"program assertion failed - existing device should share parent");
+					} else {
+						// We hold a reference to parent_dev instance, but this device already
+						// has a parent_dev reference (only one per child)
+						libusb_unref_device(parent_dev);
+					}
 				}
 
 				// Keep track of devices that need unref
