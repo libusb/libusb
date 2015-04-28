@@ -1483,7 +1483,7 @@ static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* d
 	for (i=0; i<priv->hid->nb_interfaces; i++) {
 		if (safe_strcmp(priv->usb_interface[i].path, dev_interface_path) == 0) {
 			usbi_dbg("interface[%d] already set to %s", i, dev_interface_path);
-			return LIBUSB_SUCCESS;
+			return LIBUSB_ERROR_ACCESS;
 		}
 	}
 
@@ -1585,6 +1585,10 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				if (dev_interface_details == NULL) {
 					break;
 				} else {
+					/* dev_interface_path is allocated here and freed during the "safe loop" cleanup above. In cases
+					   where we wamt to hold onto this string permanently (ie it gets assigned to a device
+					   structure), the variable must be nulled out before the loop restarts.
+					*/
 					dev_interface_path = sanitize_path(dev_interface_details->DevicePath);
 					if (dev_interface_path == NULL) {
 						usbi_warn(ctx, "could not sanitize device interface path for '%s'", dev_interface_details->DevicePath);
@@ -1759,6 +1763,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			// Setup device
 			switch (pass) {
 			case HCD_PASS:
+				// if the hcd has already been setup, don't do it again
+				if (priv->path != NULL)
+					break;
 				dev->bus_number = (uint8_t)(i + 1);	// bus 0 is reserved for disconnected
 				dev->device_address = 0;
 				dev->num_configurations = 0;
@@ -1819,19 +1826,21 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				}
 				break;
 			default:	// HID_PASS and later
-				if (parent_priv->apib->id == USB_API_HID) {
-					usbi_dbg("setting HID interface for [%lX]:", parent_dev->session_data);
-					r = set_hid_interface(ctx, parent_dev, dev_interface_path);
-					if (r != LIBUSB_SUCCESS) LOOP_BREAK(r);
-					dev_interface_path = NULL;
-				} else if (parent_priv->apib->id == USB_API_COMPOSITE) {
-					usbi_dbg("setting composite interface for [%lX]:", parent_dev->session_data);
-					switch (set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api, sub_api)) {
+				if (parent_priv->apib->id == USB_API_HID || parent_priv->apib->id == USB_API_COMPOSITE) {
+					if(parent_priv->apib->id == USB_API_HID) {
+						usbi_dbg("setting HID interface for [%lX]:", parent_dev->session_data);
+						r = set_hid_interface(ctx, parent_dev, dev_interface_path);
+					} else {
+						usbi_dbg("setting composite interface for [%lX]:", parent_dev->session_data);
+						r = set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api, sub_api);
+					}
+					switch (r) {
 					case LIBUSB_SUCCESS:
 						dev_interface_path = NULL;
 						break;
 					case LIBUSB_ERROR_ACCESS:
 						// interface has already been set => make sure dev_interface_path is freed then
+						r = LIBUSB_SUCCESS;
 						break;
 					default:
 						LOOP_BREAK(r);
