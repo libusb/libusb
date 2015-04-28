@@ -23,6 +23,7 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <signal.h>
 #include <string.h>
 #include <stdio.h>
@@ -64,16 +65,15 @@ static unsigned char irqbuf[INTR_LENGTH];
 static struct libusb_transfer *img_transfer = NULL;
 static struct libusb_transfer *irq_transfer = NULL;
 static int img_idx = 0;
-static int do_exit = 0;
+static volatile sig_atomic_t do_exit = 0;
 
 static pthread_t poll_thread;
-static pthread_cond_t exit_cond = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t exit_cond_lock = PTHREAD_MUTEX_INITIALIZER;
+static sem_t exit_sem;
 
-static void request_exit(int code)
+static void request_exit(sig_atomic_t code)
 {
 	do_exit = code;
-	pthread_cond_signal(&exit_cond);
+	sem_post(&exit_sem);
 }
 
 static void *poll_thread_main(void *arg)
@@ -446,9 +446,16 @@ int main(void)
 	struct sigaction sigact;
 	int r = 1;
 
+	r = sem_init(&exit_sem, 0, 0);
+	if (r) {
+		fprintf(stderr, "failed to initialise semaphore error %d", errno);
+		exit(1);
+	}
+
 	r = libusb_init(NULL);
 	if (r < 0) {
 		fprintf(stderr, "failed to initialise libusb\n");
+		sem_destroy(&exit_sem);
 		exit(1);
 	}
 
@@ -500,11 +507,8 @@ int main(void)
 		goto out_deinit;
 	}
 
-	while (!do_exit) {
-		pthread_mutex_lock(&exit_cond_lock);
-		pthread_cond_wait(&exit_cond, &exit_cond_lock);
-		pthread_mutex_unlock(&exit_cond_lock);
-	}
+	while (!do_exit)
+		sem_wait(&exit_sem);
 
 	printf("shutting down...\n");
 	pthread_join(poll_thread, NULL);
@@ -540,5 +544,6 @@ out_release:
 out:
 	libusb_close(devh);
 	libusb_exit(NULL);
+	sem_destroy(&exit_sem);
 	return r >= 0 ? r : -r;
 }
