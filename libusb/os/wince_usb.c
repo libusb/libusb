@@ -30,23 +30,11 @@
 #include "libusbi.h"
 #include "wince_usb.h"
 
-// Forward declares
-static int wince_clock_gettime(int clk_id, struct timespec *tp);
-unsigned __stdcall wince_clock_gettime_threaded(void* param);
-
 // Global variables
 uint64_t hires_frequency, hires_ticks_to_ps;
 const uint64_t epoch_time = UINT64_C(116444736000000000);       // 1970.01.01 00:00:000 in MS Filetime
 int windows_version = WINDOWS_CE;
 static int concurrent_usage = -1;
-// Timer thread
-// NB: index 0 is for monotonic and 1 is for the thread exit event
-HANDLE timer_thread = NULL;
-HANDLE timer_mutex = NULL;
-struct timespec timer_tp;
-volatile LONG request_count[2] = {0, 1};	// last one must be > 0
-HANDLE timer_request[2] = { NULL, NULL };
-HANDLE timer_response = NULL;
 HANDLE driver_handle = INVALID_HANDLE_VALUE;
 
 /*
@@ -167,8 +155,9 @@ static int init_device(struct libusb_device *dev, UKW_DEVICE drv_dev,
 // Internal API functions
 static int wince_init(struct libusb_context *ctx)
 {
-	int i, r = LIBUSB_ERROR_OTHER;
+	int r = LIBUSB_ERROR_OTHER;
 	HANDLE semaphore;
+	LARGE_INTEGER li_frequency;
 	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
 	_stprintf(sem_name, _T("libusb_init%08X"), (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
@@ -207,37 +196,17 @@ static int wince_init(struct libusb_context *ctx)
 			goto init_exit;
 		}
 
-		// Windows CE doesn't have a way of specifying thread affinity, so this code
-		// just has  to hope QueryPerformanceCounter doesn't report different values when
-		// running on different cores.
-		r = LIBUSB_ERROR_NO_MEM;
-		for (i = 0; i < 2; i++) {
-			timer_request[i] = CreateEvent(NULL, TRUE, FALSE, NULL);
-			if (timer_request[i] == NULL) {
-				usbi_err(ctx, "could not create timer request event %d - aborting", i);
-				goto init_exit;
-			}
-		}
-		timer_response = CreateSemaphore(NULL, 0, MAX_TIMER_SEMAPHORES, NULL);
-		if (timer_response == NULL) {
-			usbi_err(ctx, "could not create timer response semaphore - aborting");
-			goto init_exit;
-		}
-		timer_mutex = CreateMutex(NULL, FALSE, NULL);
-		if (timer_mutex == NULL) {
-			usbi_err(ctx, "could not create timer mutex - aborting");
-			goto init_exit;
-		}
-		timer_thread = CreateThread(NULL, 0, wince_clock_gettime_threaded, NULL, 0, NULL);
-		if (timer_thread == NULL) {
-			usbi_err(ctx, "Unable to create timer thread - aborting");
-			goto init_exit;
-		}
-
-		// Wait for timer thread to init before continuing.
-		if (WaitForSingleObject(timer_response, INFINITE) != WAIT_OBJECT_0) {
-			usbi_err(ctx, "Failed to wait for timer thread to become ready - aborting");
-			goto init_exit;
+		// find out if we have access to a monotonic (hires) timer
+		if (QueryPerformanceFrequency(&li_frequency)) {
+			hires_frequency = li_frequency.QuadPart;
+			// The hires frequency can go as high as 4 GHz, so we'll use a conversion
+			// to picoseconds to compute the tv_nsecs part in clock_gettime
+			hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency;
+			usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
+		} else {
+			usbi_dbg("no hires timer available on this platform");
+			hires_frequency = 0;
+			hires_ticks_to_ps = UINT64_C(0);
 		}
 	}
 	// At this stage, either we went through full init successfully, or didn't need to
@@ -248,30 +217,6 @@ init_exit: // Holds semaphore here.
 		if (driver_handle != INVALID_HANDLE_VALUE) {
 			UkwCloseDriver(driver_handle);
 			driver_handle = INVALID_HANDLE_VALUE;
-		}
-		if (timer_thread) {
-			SetEvent(timer_request[1]); // actually the signal to quit the thread.
-			if (WAIT_OBJECT_0 != WaitForSingleObject(timer_thread, INFINITE)) {
-				usbi_warn(ctx, "could not wait for timer thread to quit");
-				TerminateThread(timer_thread, 1); // shouldn't happen, but we're destroying
-												  // all objects it might have held anyway.
-			}
-			CloseHandle(timer_thread);
-			timer_thread = NULL;
-		}
-		for (i = 0; i < 2; i++) {
-			if (timer_request[i]) {
-				CloseHandle(timer_request[i]);
-				timer_request[i] = NULL;
-			}
-		}
-		if (timer_response) {
-			CloseHandle(timer_response);
-			timer_response = NULL;
-		}
-		if (timer_mutex) {
-			CloseHandle(timer_mutex);
-			timer_mutex = NULL;
 		}
 	}
 
@@ -285,7 +230,6 @@ init_exit: // Holds semaphore here.
 
 static void wince_exit(void)
 {
-	int i;
 	HANDLE semaphore;
 	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
@@ -306,29 +250,6 @@ static void wince_exit(void)
 	if (--concurrent_usage < 0) {	// Last exit
 		exit_polling();
 
-		if (timer_thread) {
-			SetEvent(timer_request[1]); // actually the signal to quit the thread.
-			if (WAIT_OBJECT_0 != WaitForSingleObject(timer_thread, INFINITE)) {
-				usbi_dbg("could not wait for timer thread to quit");
-				TerminateThread(timer_thread, 1);
-			}
-			CloseHandle(timer_thread);
-			timer_thread = NULL;
-		}
-		for (i = 0; i < 2; i++) {
-			if (timer_request[i]) {
-				CloseHandle(timer_request[i]);
-				timer_request[i] = NULL;
-			}
-		}
-		if (timer_response) {
-			CloseHandle(timer_response);
-			timer_response = NULL;
-		}
-		if (timer_mutex) {
-			CloseHandle(timer_mutex);
-			timer_mutex = NULL;
-		}
 		if (driver_handle != INVALID_HANDLE_VALUE) {
 			UkwCloseDriver(driver_handle);
 			driver_handle = INVALID_HANDLE_VALUE;
@@ -865,105 +786,20 @@ static int wince_handle_events(
 /*
  * Monotonic and real time functions
  */
-unsigned __stdcall wince_clock_gettime_threaded(void* param)
-{
-	LARGE_INTEGER hires_counter, li_frequency;
-	LONG nb_responses;
-	int timer_index;
-
-	// Init - find out if we have access to a monotonic (hires) timer
-	if (!QueryPerformanceFrequency(&li_frequency)) {
-		usbi_dbg("no hires timer available on this platform");
-		hires_frequency = 0;
-		hires_ticks_to_ps = UINT64_C(0);
-	} else {
-		hires_frequency = li_frequency.QuadPart;
-		// The hires frequency can go as high as 4 GHz, so we'll use a conversion
-		// to picoseconds to compute the tv_nsecs part in clock_gettime
-		hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency;
-		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
-	}
-
-	// Signal wince_init() that we're ready to service requests
-	if (ReleaseSemaphore(timer_response, 1, NULL) == 0) {
-		usbi_dbg("unable to release timer semaphore: %s", windows_error_str(0));
-	}
-
-	// Main loop - wait for requests
-	while (1) {
-		timer_index = WaitForMultipleObjects(2, timer_request, FALSE, INFINITE) - WAIT_OBJECT_0;
-		if ( (timer_index != 0) && (timer_index != 1) ) {
-			usbi_dbg("failure to wait on requests: %s", windows_error_str(0));
-			continue;
-		}
-		if (request_count[timer_index] == 0) {
-			// Request already handled
-			ResetEvent(timer_request[timer_index]);
-			// There's still a possiblity that a thread sends a request between the
-			// time we test request_count[] == 0 and we reset the event, in which case
-			// the request would be ignored. The simple solution to that is to test
-			// request_count again and process requests if non zero.
-			if (request_count[timer_index] == 0)
-				continue;
-		}
-		switch (timer_index) {
-		case 0:
-			WaitForSingleObject(timer_mutex, INFINITE);
-			// Requests to this thread are for hires always
-			if (QueryPerformanceCounter(&hires_counter) != 0) {
-				timer_tp.tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
-				timer_tp.tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency)/1000) * hires_ticks_to_ps);
-			} else {
-				// Fallback to real-time if we can't get monotonic value
-				// Note that real-time clock does not wait on the mutex or this thread.
-				wince_clock_gettime(USBI_CLOCK_REALTIME, &timer_tp);
-			}
-			ReleaseMutex(timer_mutex);
-
-			nb_responses = InterlockedExchange((LONG*)&request_count[0], 0);
-			if ( (nb_responses)
-			  && (ReleaseSemaphore(timer_response, nb_responses, NULL) == 0) ) {
-				usbi_dbg("unable to release timer semaphore: %s", windows_error_str(0));
-			}
-			continue;
-		case 1: // time to quit
-			usbi_dbg("timer thread quitting");
-			return 0;
-		}
-	}
-	usbi_dbg("ERROR: broken timer thread");
-	return 1;
-}
-
 static int wince_clock_gettime(int clk_id, struct timespec *tp)
 {
-	FILETIME filetime;
+	LARGE_INTEGER hires_counter;
 	ULARGE_INTEGER rtime;
-	DWORD r;
+	FILETIME filetime;
 	SYSTEMTIME st;
 	switch(clk_id) {
 	case USBI_CLOCK_MONOTONIC:
-		if (hires_frequency != 0) {
-			while (1) {
-				InterlockedIncrement((LONG*)&request_count[0]);
-				SetEvent(timer_request[0]);
-				r = WaitForSingleObject(timer_response, TIMER_REQUEST_RETRY_MS);
-				switch(r) {
-				case WAIT_OBJECT_0:
-					WaitForSingleObject(timer_mutex, INFINITE);
-					*tp = timer_tp;
-					ReleaseMutex(timer_mutex);
-					return LIBUSB_SUCCESS;
-				case WAIT_TIMEOUT:
-					usbi_dbg("could not obtain a timer value within reasonable timeframe - too much load?");
-					break; // Retry until successful
-				default:
-					usbi_dbg("WaitForSingleObject failed: %s", windows_error_str(0));
-					return LIBUSB_ERROR_OTHER;
-				}
-			}
+		if (hires_frequency != 0 && QueryPerformanceCounter(&hires_counter)) {
+			tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
+			tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency) / 1000) * hires_ticks_to_ps);
+			return LIBUSB_SUCCESS;
 		}
-		// Fall through and return real-time if monotonic was not detected @ timer init
+		// Fall through and return real-time if monotonic read failed or was not detected @ init
 	case USBI_CLOCK_REALTIME:
 		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
 		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
