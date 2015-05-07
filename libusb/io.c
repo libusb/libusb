@@ -2489,9 +2489,8 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	struct usbi_transfer *transfer;
 	struct timespec cur_ts;
 	struct timeval cur_tv;
-	struct timeval *next_timeout;
+	struct timeval next_timeout = { 0, 0 };
 	int r;
-	int found = 0;
 
 	USBI_GET_CONTEXT(ctx);
 	if (usbi_using_timerfd(ctx))
@@ -2513,17 +2512,15 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 		if (!timerisset(&transfer->timeout))
 			break;
 
-		found = 1;
+		next_timeout = transfer->timeout;
 		break;
 	}
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
-	if (!found) {
+	if (!timerisset(&next_timeout)) {
 		usbi_dbg("no URB with timeout or all handled by OS; no timeout!");
 		return 0;
 	}
-
-	next_timeout = &transfer->timeout;
 
 	r = usbi_backend->clock_gettime(USBI_CLOCK_MONOTONIC, &cur_ts);
 	if (r < 0) {
@@ -2532,11 +2529,11 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	}
 	TIMESPEC_TO_TIMEVAL(&cur_tv, &cur_ts);
 
-	if (!timercmp(&cur_tv, next_timeout, <)) {
+	if (!timercmp(&cur_tv, &next_timeout, <)) {
 		usbi_dbg("first timeout already expired");
 		timerclear(tv);
 	} else {
-		timersub(next_timeout, &cur_tv, tv);
+		timersub(&next_timeout, &cur_tv, tv);
 		usbi_dbg("next timeout in %d.%06ds", tv->tv_sec, tv->tv_usec);
 	}
 
