@@ -1661,6 +1661,10 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 							LOOP_BREAK(LIBUSB_ERROR_OVERFLOW);
 						}
 						if_guid = (GUID*) calloc(1, sizeof(GUID));
+						if (if_guid == NULL) {
+							usbi_err(ctx, "could not calloc for if_guid: not enough memory");
+							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+						}
 						pCLSIDFromString(guid_string_w, if_guid);
 						guid[nb_guids++] = if_guid;
 						usbi_dbg("extra GUID: %s", guid_to_string(if_guid));
