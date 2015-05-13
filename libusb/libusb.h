@@ -666,7 +666,8 @@ struct libusb_config_descriptor {
 
 	/** Maximum power consumption of the USB device from this bus in this
 	 * configuration when the device is fully operation. Expressed in units
-	 * of 2 mA. */
+	 * of 2 mA when the device is operating in high-speed mode and in units
+	 * of 8 mA when the device is operating in super-speed mode. */
 	uint8_t  MaxPower;
 
 	/** Array of interfaces supported by this configuration. The length of
