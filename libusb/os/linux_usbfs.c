@@ -997,6 +997,9 @@ static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_di
 	}
 
 	parent_sysfs_dir = strdup(sysfs_dir);
+	if (NULL == parent_sysfs_dir) {
+		return LIBUSB_ERROR_NO_MEM;
+	}
 	if (NULL != (tmp = strrchr(parent_sysfs_dir, '.')) ||
 	    NULL != (tmp = strrchr(parent_sysfs_dir, '-'))) {
 	        dev->port_number = atoi(tmp + 1);
