@@ -1,0 +1,8 @@
+language: c
+compiler: gcc
+os: linux
+
+before_install: sudo apt-get update -qq
+install: sudo apt-get install -qq udev
+
+script: ./autogen.sh && ./configure && make
