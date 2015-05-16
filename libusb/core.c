@@ -1,6 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * Core functions for libusb
+ * Copyright © 2015 Kuldeep Singh Dhaka <kuldeepdhaka9@gmail.com>
  * Copyright © 2012-2013 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
@@ -1437,6 +1438,17 @@ DEFAULT_VISIBILITY
 libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle)
 {
 	return dev_handle->dev;
+}
+
+/** \ingroup dev
+ * Get the underlying context for a device.
+ * \param dev a device handle
+ * \returns the underlying context
+ */
+DEFAULT_VISIBILITY
+libusb_context * LIBUSB_CALL libusb_get_context(libusb_device *dev)
+{
+	return dev->ctx;
 }
 
 /** \ingroup dev
