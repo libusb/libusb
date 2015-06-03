@@ -1929,7 +1929,7 @@ static int windows_get_config_descriptor(struct libusb_device *dev, uint8_t conf
 
 	config_header = (PUSB_CONFIGURATION_DESCRIPTOR)priv->config_descriptor[config_index];
 
-	size = min(config_header->wTotalLength, len);
+	size = MIN(config_header->wTotalLength, len);
 	memcpy(buffer, priv->config_descriptor[config_index], size);
 	*host_endian = 0;
 
