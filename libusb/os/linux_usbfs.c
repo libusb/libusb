@@ -1767,7 +1767,6 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	int bulk_buffer_len, use_bulk_continuation;
 	int r;
 	int i;
-	size_t alloc_size;
 
 	if (is_out && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET) &&
 			!(dpriv->caps & USBFS_CAP_ZERO_PACKET))
@@ -1826,8 +1825,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	}
 	usbi_dbg("need %d urbs for new transfer with length %d", num_urbs,
 		transfer->length);
-	alloc_size = num_urbs * sizeof(struct usbfs_urb);
-	urbs = calloc(1, alloc_size);
+	urbs = calloc(num_urbs, sizeof(struct usbfs_urb));
 	if (!urbs)
 		return LIBUSB_ERROR_NO_MEM;
 	tpriv->urbs = urbs;
@@ -1969,8 +1967,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	}
 	usbi_dbg("need %d %dk URBs for transfer", num_urbs, MAX_ISO_BUFFER_LENGTH / 1024);
 
-	alloc_size = num_urbs * sizeof(*urbs);
-	urbs = calloc(1, alloc_size);
+	urbs = calloc(num_urbs, sizeof(*urbs));
 	if (!urbs)
 		return LIBUSB_ERROR_NO_MEM;
 
