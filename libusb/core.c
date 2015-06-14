@@ -632,6 +632,26 @@ static void discovered_devs_free(struct discovered_devs *discdevs)
 	free(discdevs);
 }
 
+#ifdef OS_WINDOWS
+static int is_usbdk_driver_installed(void)
+{
+	int usbdk_installed = 0;
+
+	SC_HANDLE managerHandle = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+	if (managerHandle)
+	{
+		SC_HANDLE serviceHandle = OpenService(managerHandle, TEXT("UsbDk"), GENERIC_READ);
+		if (serviceHandle)
+		{
+			usbdk_installed = 1;
+			CloseServiceHandle(serviceHandle);
+		}
+		CloseServiceHandle(managerHandle);
+	}
+	return usbdk_installed;
+}
+#endif
+
 /* append a device to the discovered devices collection. may realloc itself,
  * returning new discdevs. returns NULL on realloc failure. */
 struct discovered_devs *discovered_devs_append(
@@ -2121,6 +2141,18 @@ static enum libusb_log_level get_env_debug_level(void)
  */
 int API_EXPORTED libusb_init(libusb_context **context)
 {
+#ifdef OS_WINDOWS
+	if (is_usbdk_driver_installed())
+	{
+		usbi_backend = &usbdk_backend;
+		usbi_info(*context, "libusb will work with UsbDk backend");
+	}
+	else
+	{
+		usbi_info(*context, "libusb will work with windows_backend");
+	}
+#endif
+
 	struct libusb_device *dev, *next;
 	size_t priv_size = usbi_backend.context_priv_size;
 	struct libusb_context *ctx;

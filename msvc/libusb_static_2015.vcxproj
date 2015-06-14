@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -141,6 +141,7 @@
     <ClCompile Include="..\libusb\hotplug.c" />
     <ClCompile Include="..\libusb\io.c" />
     <ClCompile Include="..\libusb\os\poll_windows.c" />
+    <ClCompile Include="..\libusb\os\windows_usbdk.c" />
     <ClCompile Include="..\libusb\strerror.c" />
     <ClCompile Include="..\libusb\sync.c" />
     <ClCompile Include="..\libusb\os\threads_windows.c" />
@@ -148,6 +149,7 @@
     <ClCompile Include="..\libusb\os\windows_winusb.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\libusb\os\windows_usbdk.h" />
     <ClInclude Include=".\config.h" />
     <ClInclude Include="..\libusb\hotplug.h" />
     <ClInclude Include="..\libusb\libusb.h" />
