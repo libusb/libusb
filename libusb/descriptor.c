@@ -94,8 +94,7 @@ int usbi_parse_descriptor(const unsigned char *source, const char *descriptor,
 
 static void clear_endpoint(struct libusb_endpoint_descriptor *endpoint)
 {
-	if (endpoint->extra)
-		free((unsigned char *) endpoint->extra);
+	free((unsigned char *) endpoint->extra);
 }
 
 static int parse_endpoint(struct libusb_context *ctx,
