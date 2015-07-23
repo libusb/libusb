@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Internal header for libusb
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
@@ -164,7 +164,7 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 #ifndef TIMESPEC_TO_TIMEVAL
 #define TIMESPEC_TO_TIMEVAL(tv, ts)                                     \
         do {                                                            \
-                (tv)->tv_sec = (ts)->tv_sec;                            \
+                (tv)->tv_sec = (long) (ts)->tv_sec;                            \
                 (tv)->tv_usec = (ts)->tv_nsec / 1000;                   \
         } while (0)
 #endif
