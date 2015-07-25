@@ -222,7 +222,6 @@ static int parse_interface(libusb_context *ctx,
 	int r;
 	int parsed = 0;
 	int interface_number = -1;
-	size_t tmp;
 	struct usb_descriptor_header header;
 	struct libusb_interface_descriptor *ifp;
 	unsigned char *begin;
@@ -323,15 +322,13 @@ static int parse_interface(libusb_context *ctx,
 
 		if (ifp->bNumEndpoints > 0) {
 			struct libusb_endpoint_descriptor *endpoint;
-			tmp = ifp->bNumEndpoints * sizeof(struct libusb_endpoint_descriptor);
-			endpoint = malloc(tmp);
+			endpoint = calloc(ifp->bNumEndpoints, sizeof(struct libusb_endpoint_descriptor));
 			ifp->endpoint = endpoint;
 			if (!endpoint) {
 				r = LIBUSB_ERROR_NO_MEM;
 				goto err;
 			}
 
-			memset(endpoint, 0, tmp);
 			for (i = 0; i < ifp->bNumEndpoints; i++) {
 				r = parse_endpoint(ctx, endpoint + i, buffer, size,
 					host_endian);
@@ -381,7 +378,6 @@ static int parse_configuration(struct libusb_context *ctx,
 {
 	int i;
 	int r;
-	size_t tmp;
 	struct usb_descriptor_header header;
 	struct libusb_interface *usb_interface;
 
@@ -411,13 +407,11 @@ static int parse_configuration(struct libusb_context *ctx,
 		return LIBUSB_ERROR_IO;
 	}
 
-	tmp = config->bNumInterfaces * sizeof(struct libusb_interface);
-	usb_interface = malloc(tmp);
+	usb_interface = calloc(config->bNumInterfaces, sizeof(struct libusb_interface));
 	config->interface = usb_interface;
-	if (!config->interface)
+	if (!usb_interface)
 		return LIBUSB_ERROR_NO_MEM;
 
-	memset(usb_interface, 0, tmp);
 	buffer += config->bLength;
 	size -= config->bLength;
 
