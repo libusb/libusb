@@ -160,11 +160,17 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 
 #define TIMESPEC_IS_SET(ts) ((ts)->tv_sec != 0 || (ts)->tv_nsec != 0)
 
+#if defined(_WIN32) || defined(__CYGWIN__) || defined(_WIN32_WCE)
+#define TIMEVAL_TV_SEC_TYPE	long
+#else
+#define TIMEVAL_TV_SEC_TYPE	time_t
+#endif
+
 /* Some platforms don't have this define */
 #ifndef TIMESPEC_TO_TIMEVAL
 #define TIMESPEC_TO_TIMEVAL(tv, ts)                                     \
         do {                                                            \
-                (tv)->tv_sec = (ts)->tv_sec;                            \
+                (tv)->tv_sec = (TIMEVAL_TV_SEC_TYPE) (ts)->tv_sec;      \
                 (tv)->tv_usec = (ts)->tv_nsec / 1000;                   \
         } while (0)
 #endif
