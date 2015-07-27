@@ -90,7 +90,7 @@ typedef unsigned __int32  uint32_t;
  * Under Windows, the selection of available compilers and configurations
  * means that, unlike other platforms, there is not <em>one true calling
  * convention</em> (calling convention: the manner in which parameters are
- * passed to funcions in the generated assembly code).
+ * passed to functions in the generated assembly code).
  *
  * Matching the Windows API itself, libusb uses the WINAPI convention (which
  * translates to the <tt>stdcall</tt> convention) and guarantees that the
@@ -137,9 +137,6 @@ typedef unsigned __int32  uint32_t;
  * // Use one of the newer features from the libusb API
  * #endif
  * \endcode
- *
- * Another feature of LIBUSB_API_VERSION is that it can be used to detect
- * whether you are compiling against the libusb or the libusb library.
  *
  * Internally, LIBUSB_API_VERSION is defined as follows:
  * (libusb major << 24) | (libusb minor << 16) | (16 bit incremental)
@@ -668,8 +665,9 @@ struct libusb_config_descriptor {
 	uint8_t  bmAttributes;
 
 	/** Maximum power consumption of the USB device from this bus in this
-	 * configuration when the device is fully opreation. Expressed in units
-	 * of 2 mA. */
+	 * configuration when the device is fully operation. Expressed in units
+	 * of 2 mA when the device is operating in high-speed mode and in units
+	 * of 8 mA when the device is operating in super-speed mode. */
 	uint8_t  MaxPower;
 
 	/** Array of interfaces supported by this configuration. The length of
@@ -900,7 +898,6 @@ struct libusb_control_setup {
 struct libusb_context;
 struct libusb_device;
 struct libusb_device_handle;
-struct libusb_hotplug_callback;
 
 /** \ingroup lib
  * Structure providing the version of the libusb runtime
@@ -1884,8 +1881,11 @@ typedef int libusb_hotplug_callback_handle;
  *
  * Flags for hotplug events */
 typedef enum {
+	/** Default value when not using any flags. */
+	LIBUSB_HOTPLUG_NO_FLAGS = 0,
+
 	/** Arm the callback and fire it for all matching currently attached devices. */
-	LIBUSB_HOTPLUG_ENUMERATE = 1,
+	LIBUSB_HOTPLUG_ENUMERATE = 1<<0,
 } libusb_hotplug_flag;
 
 /** \ingroup hotplug

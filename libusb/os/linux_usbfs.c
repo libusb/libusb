@@ -198,7 +198,7 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 
 	if (errno == ENOENT) {
 		if (!silent) 
-			usbi_err(ctx, "File doesn't exist, wait %d ms and try again\n", delay/1000);
+			usbi_err(ctx, "File doesn't exist, wait %d ms and try again", delay/1000);
    
 		/* Wait 10ms for USB device path creation.*/
 		usleep(delay);
@@ -631,9 +631,9 @@ int linux_get_device_address (struct libusb_context *ctx, int detached,
 
 		/* will this work with all supported kernel versions? */
 		if (!strncmp(dev_node, "/dev/bus/usb", 12)) {
-			sscanf (dev_node, "/dev/bus/usb/%hhd/%hhd", busnum, devaddr);
+			sscanf (dev_node, "/dev/bus/usb/%hhu/%hhu", busnum, devaddr);
 		} else if (!strncmp(dev_node, "/proc/bus/usb", 13)) {
-			sscanf (dev_node, "/proc/bus/usb/%hhd/%hhd", busnum, devaddr);
+			sscanf (dev_node, "/proc/bus/usb/%hhu/%hhu", busnum, devaddr);
 		}
 
 		return LIBUSB_SUCCESS;
@@ -997,6 +997,9 @@ static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_di
 	}
 
 	parent_sysfs_dir = strdup(sysfs_dir);
+	if (NULL == parent_sysfs_dir) {
+		return LIBUSB_ERROR_NO_MEM;
+	}
 	if (NULL != (tmp = strrchr(parent_sysfs_dir, '.')) ||
 	    NULL != (tmp = strrchr(parent_sysfs_dir, '-'))) {
 	        dev->port_number = atoi(tmp + 1);
@@ -1766,9 +1769,6 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	int i;
 	size_t alloc_size;
 
-	if (tpriv->urbs)
-		return LIBUSB_ERROR_BUSY;
-
 	if (is_out && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET) &&
 			!(dpriv->caps & USBFS_CAP_ZERO_PACKET))
 		return LIBUSB_ERROR_NOT_SUPPORTED;
@@ -1945,18 +1945,11 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	unsigned int packet_len;
 	unsigned char *urb_buffer = transfer->buffer;
 
-	if (tpriv->iso_urbs)
-		return LIBUSB_ERROR_BUSY;
-
-	/* usbfs places a 32kb limit on iso URBs. we divide up larger requests
-	 * into smaller units to meet such restriction, then fire off all the
-	 * units at once. it would be simpler if we just fired one unit at a time,
-	 * but there is a big performance gain through doing it this way.
-	 *
-	 * Newer kernels lift the 32k limit (USBFS_CAP_NO_PACKET_SIZE_LIM),
-	 * using arbritary large transfers is still be a bad idea though, as
-	 * the kernel needs to allocate physical contiguous memory for this,
-	 * which may fail for large buffers.
+	/* usbfs places arbitrary limits on iso URBs. this limit has changed
+	 * at least three times, and it's difficult to accurately detect which
+	 * limit this running kernel might impose. so we attempt to submit
+	 * whatever the user has provided. if the kernel rejects the request
+	 * due to its size, we return an error indicating such to the user.
 	 */
 
 	/* calculate how many URBs we need */
@@ -1967,11 +1960,14 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		if (packet_len > space_remaining) {
 			num_urbs++;
 			this_urb_len = packet_len;
+			/* check that we can actually support this packet length */
+			if (this_urb_len > MAX_ISO_BUFFER_LENGTH)
+				return LIBUSB_ERROR_INVALID_PARAM;
 		} else {
 			this_urb_len += packet_len;
 		}
 	}
-	usbi_dbg("need %d 32k URBs for transfer", num_urbs);
+	usbi_dbg("need %d %dk URBs for transfer", num_urbs, MAX_ISO_BUFFER_LENGTH / 1024);
 
 	alloc_size = num_urbs * sizeof(*urbs);
 	urbs = calloc(1, alloc_size);
@@ -2039,6 +2035,10 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		if (r < 0) {
 			if (errno == ENODEV) {
 				r = LIBUSB_ERROR_NO_DEVICE;
+			} else if (errno == EINVAL) {
+				usbi_warn(TRANSFER_CTX(transfer),
+					"submiturb failed, transfer too large");
+				r = LIBUSB_ERROR_INVALID_PARAM;
 			} else {
 				usbi_err(TRANSFER_CTX(transfer),
 					"submiturb failed error %d errno=%d", r, errno);
@@ -2091,9 +2091,6 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 		_device_handle_priv(transfer->dev_handle);
 	struct usbfs_urb *urb;
 	int r;
-
-	if (tpriv->urbs)
-		return LIBUSB_ERROR_BUSY;
 
 	if (transfer->length - LIBUSB_CONTROL_SETUP_SIZE > MAX_CTRL_BUFFER_LENGTH)
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -2188,17 +2185,16 @@ static void op_clear_transfer_priv(struct usbi_transfer *itransfer)
 	case LIBUSB_TRANSFER_TYPE_BULK:
 	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-		usbi_mutex_lock(&itransfer->lock);
-		if (tpriv->urbs)
+		if (tpriv->urbs) {
 			free(tpriv->urbs);
-		tpriv->urbs = NULL;
-		usbi_mutex_unlock(&itransfer->lock);
+			tpriv->urbs = NULL;
+		}
 		break;
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		usbi_mutex_lock(&itransfer->lock);
-		if (tpriv->iso_urbs)
+		if (tpriv->iso_urbs) {
 			free_iso_urbs(tpriv);
-		usbi_mutex_unlock(&itransfer->lock);
+			tpriv->iso_urbs = NULL;
+		}
 		break;
 	default:
 		usbi_err(TRANSFER_CTX(transfer),
@@ -2590,7 +2586,7 @@ static int op_handle_events(struct libusb_context *ctx,
 		}
 
 		if (!hpriv || hpriv->fd != pollfd->fd) {
-			usbi_err(ctx, "cannot find handle for fd %d\n",
+			usbi_err(ctx, "cannot find handle for fd %d",
 				 pollfd->fd);
 			continue;
 		}
@@ -2645,7 +2641,7 @@ static clockid_t op_get_timerfd_clockid(void)
 
 const struct usbi_os_backend linux_usbfs_backend = {
 	.name = "Linux usbfs",
-	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER|USBI_CAP_HAS_POLLABLE_DEVICE_FD,
+	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
 	.init = op_init,
 	.exit = op_exit,
 	.get_device_list = NULL,
@@ -2690,5 +2686,4 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.device_priv_size = sizeof(struct linux_device_priv),
 	.device_handle_priv_size = sizeof(struct linux_device_handle_priv),
 	.transfer_priv_size = sizeof(struct linux_transfer_priv),
-	.add_iso_packet_size = 0,
 };

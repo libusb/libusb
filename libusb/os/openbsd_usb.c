@@ -41,7 +41,6 @@ struct device_priv {
 };
 
 struct handle_priv {
-	int pipe[2];				/* for event notification */
 	int endpoints[USB_MAX_ENDPOINTS];
 };
 
@@ -75,8 +74,7 @@ static void obsd_destroy_device(struct libusb_device *);
 static int obsd_submit_transfer(struct usbi_transfer *);
 static int obsd_cancel_transfer(struct usbi_transfer *);
 static void obsd_clear_transfer_priv(struct usbi_transfer *);
-static int obsd_handle_events(struct libusb_context *ctx, struct pollfd *,
-    nfds_t, int);
+static int obsd_handle_transfer_completion(struct usbi_transfer *);
 static int obsd_clock_gettime(int, struct timespec *);
 
 /*
@@ -93,7 +91,7 @@ static int _bus_open(int);
 
 const struct usbi_os_backend openbsd_backend = {
 	"Synchronous OpenBSD backend",
-	USBI_CAP_HAS_POLLABLE_DEVICE_FD,
+	0,
 	NULL,				/* init() */
 	NULL,				/* exit() */
 	obsd_get_device_list,
@@ -129,13 +127,13 @@ const struct usbi_os_backend openbsd_backend = {
 	obsd_cancel_transfer,
 	obsd_clear_transfer_priv,
 
-	obsd_handle_events,
+	NULL,				/* handle_events() */
+	obsd_handle_transfer_completion,
 
 	obsd_clock_gettime,
 	sizeof(struct device_priv),
 	sizeof(struct handle_priv),
 	0,				/* transfer_priv_size */
-	0,				/* add_iso_packet_size */
 };
 
 #define DEVPATH	"/dev/"
@@ -263,10 +261,7 @@ obsd_open(struct libusb_device_handle *handle)
 		usbi_dbg("open %s: fd %d", devnode, dpriv->fd);
 	}
 
-	if (pipe(hpriv->pipe) < 0)
-		return _errno_to_libusb(errno);
-
-	return usbi_add_pollfd(HANDLE_CTX(handle), hpriv->pipe[0], POLLIN);
+	return (LIBUSB_SUCCESS);
 }
 
 void
@@ -281,11 +276,6 @@ obsd_close(struct libusb_device_handle *handle)
 		close(dpriv->fd);
 		dpriv->fd = -1;
 	}
-
-	usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->pipe[0]);
-
-	close(hpriv->pipe[0]);
-	close(hpriv->pipe[1]);
 }
 
 int
@@ -516,8 +506,7 @@ obsd_submit_transfer(struct usbi_transfer *itransfer)
 	if (err)
 		return (err);
 
-	if (write(hpriv->pipe[1], &itransfer, sizeof(itransfer)) < 0)
-		return _errno_to_libusb(errno);
+	usbi_signal_transfer_completion(itransfer);
 
 	return (LIBUSB_SUCCESS);
 }
@@ -539,63 +528,9 @@ obsd_clear_transfer_priv(struct usbi_transfer *itransfer)
 }
 
 int
-obsd_handle_events(struct libusb_context *ctx, struct pollfd *fds, nfds_t nfds,
-    int num_ready)
+obsd_handle_transfer_completion(struct usbi_transfer *itransfer)
 {
-	struct libusb_device_handle *handle;
-	struct handle_priv *hpriv = NULL;
-	struct usbi_transfer *itransfer;
-	struct pollfd *pollfd;
-	int i, err = 0;
-
-	usbi_dbg("");
-
-	pthread_mutex_lock(&ctx->open_devs_lock);
-	for (i = 0; i < nfds && num_ready > 0; i++) {
-		pollfd = &fds[i];
-
-		if (!pollfd->revents)
-			continue;
-
-		hpriv = NULL;
-		num_ready--;
-		list_for_each_entry(handle, &ctx->open_devs, list,
-		    struct libusb_device_handle) {
-			hpriv = (struct handle_priv *)handle->os_priv;
-
-			if (hpriv->pipe[0] == pollfd->fd)
-				break;
-
-			hpriv = NULL;
-		}
-
-		if (NULL == hpriv) {
-			usbi_dbg("fd %d is not an event pipe!", pollfd->fd);
-			err = ENOENT;
-			break;
-		}
-
-		if (pollfd->revents & POLLERR) {
-			usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->pipe[0]);
-			usbi_handle_disconnect(handle);
-			continue;
-		}
-
-		if (read(hpriv->pipe[0], &itransfer, sizeof(itransfer)) < 0) {
-			err = errno;
-			break;
-		}
-
-		if ((err = usbi_handle_transfer_completion(itransfer,
-		    LIBUSB_TRANSFER_COMPLETED)))
-			break;
-	}
-	pthread_mutex_unlock(&ctx->open_devs_lock);
-
-	if (err)
-		return _errno_to_libusb(err);
-
-	return (LIBUSB_SUCCESS);
+	return usbi_handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
 }
 
 int

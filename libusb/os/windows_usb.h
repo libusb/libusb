@@ -308,6 +308,15 @@ struct driver_lookup {
 	const char* designation;	// internal designation (for debug output)
 };
 
+#define WM_TIMER_REQUEST	(WM_USER + 1)
+#define WM_TIMER_EXIT		(WM_USER + 2)
+
+// used for monotonic clock_gettime()
+struct timer_request {
+	struct timespec *tp;
+	HANDLE event;
+};
+
 /* OLE32 dependency */
 DLL_DECLARE_PREFIXED(WINAPI, HRESULT, p, CLSIDFromString, (LPCOLESTR, LPCLSID));
 

@@ -207,7 +207,7 @@ USBDeviceHandle::TransfersWorker()
 		USBTransfer* fPendingTransfer= (USBTransfer*) fTransfers.RemoveItem((int32)0);
 		fTransfersLock.Unlock();
 		fPendingTransfer->Do(fRawFD);
-		write(fEventPipes[1],&fPendingTransfer,sizeof(fPendingTransfer));
+		usbi_signal_transfer_completion(fPendingTransfer->UsbiTransfer());
 	}
 }
 
@@ -231,7 +231,7 @@ USBDeviceHandle::CancelTransfer(USBTransfer* transfer)
 	fTransfersLock.Unlock();
 	if(removed)
 	{
-		write(fEventPipes[1],&transfer,sizeof(transfer));
+		usbi_signal_transfer_completion(transfer->UsbiTransfer());
 	}
 	return LIBUSB_SUCCESS;
 }
@@ -249,8 +249,6 @@ USBDeviceHandle::USBDeviceHandle(USBDevice* dev)
 		usbi_err(NULL,"failed to open device");
 		return;
 	}
-	pipe(fEventPipes);
-	fcntl(fEventPipes[1], F_SETFD, O_NONBLOCK);
 	fTransfersSem = create_sem(0, "Transfers Queue Sem");
 	fTransfersThread = spawn_thread(TransfersThread,"Transfer Worker",B_NORMAL_PRIORITY, this);
 	resume_thread(fTransfersThread);
@@ -266,19 +264,9 @@ USBDeviceHandle::~USBDeviceHandle()
 		if(fClaimedInterfaces&(1<<i))
 			ReleaseInterface(i);
 	}
-	if(fEventPipes[1]>0)
-		close(fEventPipes[1]);
-	if(fEventPipes[0]>0)
-		close(fEventPipes[0]);
 	delete_sem(fTransfersSem);
 	if(fTransfersThread>0)
 		wait_for_thread(fTransfersThread, NULL);
-}
-
-int
-USBDeviceHandle::EventPipe(int index) const
-{
-	return fEventPipes[index];
 }
 
 int
