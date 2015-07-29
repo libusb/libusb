@@ -21,7 +21,8 @@ EXTRA_DIST = $(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) $(OPENBSD_USB_SRC) \
 	os/linux_udev.c os/linux_netlink.c
 
 dist-hook:
-	-cp -r os/haiku $(distdir)/os/haiku
+	cp -r os/haiku $(distdir)/os/haiku
+	rm -rf $(distdir)/os/haiku/autom4te.cache
 
 if OS_LINUX
 
