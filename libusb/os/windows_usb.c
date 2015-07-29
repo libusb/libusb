@@ -2014,9 +2014,6 @@ static int windows_claim_interface(struct libusb_device_handle *dev_handle, int 
 	int r = LIBUSB_SUCCESS;
 	struct windows_device_priv *priv = _device_priv(dev_handle->dev);
 
-	if (iface >= USB_MAXINTERFACES)
-		return LIBUSB_ERROR_INVALID_PARAM;
-
 	safe_free(priv->usb_interface[iface].endpoint);
 	priv->usb_interface[iface].nb_endpoints= 0;
 
