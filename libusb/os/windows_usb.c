@@ -4425,23 +4425,30 @@ static void composite_close(int sub_api, struct libusb_device_handle *dev_handle
 {
 	struct windows_device_priv *priv = _device_priv(dev_handle->dev);
 	uint8_t i;
-	bool available[SUB_API_MAX];
-
-	for (i = 0; i<SUB_API_MAX; i++) {
-		available[i] = false;
-	}
+	// SUB_API_MAX+1 as the SUB_API_MAX pos is used to indicate availability of HID
+	bool available[SUB_API_MAX+1] = {0};
 
 	for (i=0; i<USB_MAXINTERFACES; i++) {
-		if ( (priv->usb_interface[i].apib->id == USB_API_WINUSBX)
-		  && (priv->usb_interface[i].sub_api != SUB_API_NOTSET) ) {
-			available[priv->usb_interface[i].sub_api] = true;
+		switch (priv->usb_interface[i].apib->id) {
+		case USB_API_WINUSBX:
+			if (priv->usb_interface[i].sub_api != SUB_API_NOTSET)
+				available[priv->usb_interface[i].sub_api] = true;
+			break;
+		case USB_API_HID:
+			available[SUB_API_MAX] = true;
+			break;
+		default:
+			break;
 		}
 	}
 
-	for (i=0; i<SUB_API_MAX; i++) {
+	for (i=0; i<SUB_API_MAX; i++) {	// WinUSB-like drivers
 		if (available[i]) {
 			usb_api_backend[USB_API_WINUSBX].close(i, dev_handle);
 		}
+	}
+	if (available[SUB_API_MAX]) {	// HID driver
+		hid_close(SUB_API_NOTSET, dev_handle);
 	}
 }
 
