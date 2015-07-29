@@ -1069,6 +1069,7 @@ init_exit: // Holds semaphore here.
 			timer_thread_id = 0;
 		}
 		htab_destroy();
+		usbi_mutex_destroy(&autoclaim_lock);
 	}
 
 	if (r != LIBUSB_SUCCESS)
@@ -1898,6 +1899,7 @@ static void windows_exit(void)
 			timer_thread_id = 0;
 		}
 		htab_destroy();
+		usbi_mutex_destroy(&autoclaim_lock);
 	}
 
 	ReleaseSemaphore(semaphore, 1, NULL);	// increase count back to 1
