@@ -307,6 +307,14 @@ static const char *find_usbfs_path(void)
 		}
 	}
 
+/* On udev based systems without any usb-devices /dev/bus/usb will not
+ * exist. So if we've not found anything and we're using udev for hotplug
+ * simply assume /dev/bus/usb rather then making libusb_init fail. */
+#if defined(USE_UDEV)
+	if (ret == NULL)
+		ret = "/dev/bus/usb";
+#endif
+
 	if (ret != NULL)
 		usbi_dbg("found usbfs at %s", ret);
 
