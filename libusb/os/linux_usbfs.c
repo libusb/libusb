@@ -2154,6 +2154,14 @@ static int op_cancel_transfer(struct usbi_transfer *itransfer)
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 	struct libusb_transfer *transfer =
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	int r;
+
+	if (!tpriv->urbs)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	r = discard_urbs(itransfer, 0, tpriv->num_urbs);
+	if (r != 0)
+		return r;
 
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_BULK:
@@ -2161,21 +2169,11 @@ static int op_cancel_transfer(struct usbi_transfer *itransfer)
 		if (tpriv->reap_action == ERROR)
 			break;
 		/* else, fall through */
-	case LIBUSB_TRANSFER_TYPE_CONTROL:
-	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		tpriv->reap_action = CANCELLED;
-		break;
 	default:
-		usbi_err(TRANSFER_CTX(transfer),
-			"unknown endpoint type %d", transfer->type);
-		return LIBUSB_ERROR_INVALID_PARAM;
+		tpriv->reap_action = CANCELLED;
 	}
 
-	if (!tpriv->urbs)
-		return LIBUSB_ERROR_NOT_FOUND;
-
-	return discard_urbs(itransfer, 0, tpriv->num_urbs);
+	return 0;
 }
 
 static void op_clear_transfer_priv(struct usbi_transfer *itransfer)
