@@ -1944,9 +1944,10 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	int r;
 
-	itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
 	r = libusb_cancel_transfer(transfer);
-	if (r < 0)
+	if (r == 0)
+		itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
+	else
 		usbi_warn(TRANSFER_CTX(transfer),
 			"async cancel failed %d errno=%d", r, errno);
 }
