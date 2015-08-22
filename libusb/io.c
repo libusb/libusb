@@ -1332,7 +1332,7 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 			goto disarm;
 
 		/* act on first transfer that is not already cancelled */
-		if (!(transfer->flags & USBI_TRANSFER_TIMED_OUT)) {
+		if (!(transfer->flags & USBI_TRANSFER_TIMEOUT_HANDLED)) {
 			int r;
 			const struct itimerspec it = { {0, 0},
 				{ cur_tv->tv_sec, cur_tv->tv_usec * 1000 } };
@@ -1944,6 +1944,7 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	int r;
 
+	itransfer->flags |= USBI_TRANSFER_TIMEOUT_HANDLED;
 	r = libusb_cancel_transfer(transfer);
 	if (r == 0)
 		itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
@@ -1979,7 +1980,7 @@ static int handle_timeouts_locked(struct libusb_context *ctx)
 			return 0;
 
 		/* ignore timeouts we've already handled */
-		if (transfer->flags & (USBI_TRANSFER_TIMED_OUT | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
+		if (transfer->flags & (USBI_TRANSFER_TIMEOUT_HANDLED | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
 			continue;
 
 		/* if transfer has non-expired timeout, nothing more to do */
@@ -2506,7 +2507,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 
 	/* find next transfer which hasn't already been processed as timed out */
 	list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
-		if (transfer->flags & (USBI_TRANSFER_TIMED_OUT | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
+		if (transfer->flags & (USBI_TRANSFER_TIMEOUT_HANDLED | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
 			continue;
 
 		/* if we've reached transfers of infinte timeout, we're done looking */

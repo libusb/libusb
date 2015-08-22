@@ -435,6 +435,9 @@ enum usbi_transfer_flags {
 
 	/* Completion handler has run */
 	USBI_TRANSFER_COMPLETED = 1 << 6,
+
+	/* The transfer timeout has been handled */
+	USBI_TRANSFER_TIMEOUT_HANDLED = 1 << 7,
 };
 
 #define USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
