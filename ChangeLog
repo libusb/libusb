@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2015-07-29: v1.0.20
+2015-09-02: v1.0.20
 * Add Haiku support
 * Fix multiple memory and resource leaks (#16, #52, #76, #81)
 * Fix possible deadlock when executing transfer callback
@@ -11,6 +11,8 @@ visit: http://log.libusb.info
 * Windows: Fix broken builds Cygwin/MinGW builds and compiler warnings
 * Windows: Fix broken bus number lookup
 * Windows: Improve submission of control requests for composite devices
+* Examples: Add two-stage load support to fxload (#12)
+* Correctly report cancellations due to timeouts
 * Improve efficiency of event handling
 * Improve speed of transfer submission in multi-threaded environments
 * Various other bug fixes and improvements
