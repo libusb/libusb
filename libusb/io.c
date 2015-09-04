@@ -1316,8 +1316,7 @@ static int disarm_timerfd(struct libusb_context *ctx)
 /* iterates through the flying transfers, and rearms the timerfd based on the
  * next upcoming timeout.
  * must be called with flying_list locked.
- * returns 0 if there was no timeout to arm, 1 if the next timeout was armed,
- * or a LIBUSB_ERROR code on failure.
+ * returns 0 on success or a LIBUSB_ERROR code on failure.
  */
 static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 {
@@ -1340,7 +1339,7 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 			r = timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &it, NULL);
 			if (r < 0)
 				return LIBUSB_ERROR_OTHER;
-			return 1;
+			return 0;
 		}
 	}
 
@@ -1426,8 +1425,8 @@ out:
 
 /* remove a transfer from the active transfers list.
  * This function will *always* remove the transfer from the
- * flying_transfers list. It will return non 0 if it fails to
- * update the timer for the next timeout. */
+ * flying_transfers list. It will return a LIBUSB_ERROR code
+ * if it fails to update the timer for the next timeout. */
 static int remove_from_flying_list(struct usbi_transfer *transfer)
 {
 	struct libusb_context *ctx = ITRANSFER_CTX(transfer);
@@ -1624,8 +1623,8 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	int r;
 
 	r = remove_from_flying_list(itransfer);
-	if (r)
-		return r;
+	if (r < 0)
+		usbi_err(ITRANSFER_CTX(itransfer), "failed to set timer for next timeout, errno=%d", errno);
 
 	usbi_mutex_lock(&itransfer->flags_lock);
 	itransfer->flags &= ~USBI_TRANSFER_IN_FLIGHT;
@@ -1654,7 +1653,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER)
 		libusb_free_transfer(transfer);
 	libusb_unref_device(handle->dev);
-	return 0;
+	return r;
 }
 
 /* Similar to usbi_handle_transfer_completion() but exclusively for transfers
