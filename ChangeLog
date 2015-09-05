@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2015-09-02: v1.0.20
+2015-09-05: v1.0.20-rc3
 * Add Haiku support
 * Fix multiple memory and resource leaks (#16, #52, #76, #81)
 * Fix possible deadlock when executing transfer callback
