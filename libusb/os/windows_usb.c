@@ -253,6 +253,9 @@ static int init_dlls(void)
 	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiOpenDeviceInterfaceRegKey, TRUE);
 	DLL_LOAD_PREFIXED(AdvAPI32.dll, p, RegQueryValueExW, TRUE);
 	DLL_LOAD_PREFIXED(AdvAPI32.dll, p, RegCloseKey, TRUE);
+	DLL_LOAD_PREFIXED(User32.dll, p, GetMessageA, TRUE);
+	DLL_LOAD_PREFIXED(User32.dll, p, PeekMessageA, TRUE);
+	DLL_LOAD_PREFIXED(User32.dll, p, PostThreadMessageA, TRUE);
 	return LIBUSB_SUCCESS;
 }
 
@@ -1014,8 +1017,8 @@ static int windows_init(struct libusb_context *ctx)
 			}
 			// The process affinity mask is a bitmask where each set bit represents a core on
 			// which this process is allowed to run, so we find the first set bit
-			for (i = 0; !(affinity & (1 << i)); i++);
-			affinity = (1 << i);
+			for (i = 0; !(affinity & (DWORD_PTR)(1 << i)); i++);
+			affinity = (DWORD_PTR)(1 << i);
 
 			usbi_dbg("timer thread will run on core #%d", i);
 
@@ -1057,7 +1060,7 @@ init_exit: // Holds semaphore here.
 	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
 		if (timer_thread) {
 			// actually the signal to quit the thread.
-			if (!PostThreadMessage(timer_thread_id, WM_TIMER_EXIT, 0, 0) ||
+			if (!pPostThreadMessageA(timer_thread_id, WM_TIMER_EXIT, 0, 0) ||
 				(WaitForSingleObject(timer_thread, INFINITE) != WAIT_OBJECT_0)) {
 				usbi_warn(ctx, "could not wait for timer thread to quit");
 				TerminateThread(timer_thread, 1);
@@ -1889,7 +1892,7 @@ static void windows_exit(void)
 
 		if (timer_thread) {
 			// actually the signal to quit the thread.
-			if (!PostThreadMessage(timer_thread_id, WM_TIMER_EXIT, 0, 0) ||
+			if (!pPostThreadMessageA(timer_thread_id, WM_TIMER_EXIT, 0, 0) ||
 				(WaitForSingleObject(timer_thread, INFINITE) != WAIT_OBJECT_0)) {
 				usbi_dbg("could not wait for timer thread to quit");
 				TerminateThread(timer_thread, 1);
@@ -2340,7 +2343,7 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 
 	// The following call will create this thread's message queue
 	// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms644946.aspx
-	PeekMessage(&msg, NULL, WM_USER, WM_USER, PM_NOREMOVE);
+	pPeekMessageA(&msg, NULL, WM_USER, WM_USER, PM_NOREMOVE);
 
 	// Signal windows_init() that we're ready to service requests
 	if (!SetEvent((HANDLE)param)) {
@@ -2350,7 +2353,7 @@ unsigned __stdcall windows_clock_gettime_threaded(void* param)
 
 	// Main loop - wait for requests
 	while (1) {
-		if (GetMessage(&msg, NULL, WM_TIMER_REQUEST, WM_TIMER_EXIT) == -1) {
+		if (pGetMessageA(&msg, NULL, WM_TIMER_REQUEST, WM_TIMER_EXIT) == -1) {
 			usbi_err(NULL, "GetMessage failed for timer thread: %s", windows_error_str(0));
 			return 1;
 		}
@@ -2391,7 +2394,7 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 				return LIBUSB_ERROR_NO_MEM;
 			}
 
-			if (!PostThreadMessage(timer_thread_id, WM_TIMER_REQUEST, 0, (LPARAM)&request)) {
+			if (!pPostThreadMessageA(timer_thread_id, WM_TIMER_REQUEST, 0, (LPARAM)&request)) {
 				usbi_err(NULL, "PostThreadMessage failed for timer thread: %s", windows_error_str(0));
 				CloseHandle(request.event);
 				return LIBUSB_ERROR_OTHER;
