@@ -2023,8 +2023,8 @@ int API_EXPORTED libusb_init(libusb_context **context)
 		usbi_dbg("created default context");
 	}
 
-	usbi_dbg("libusb v%d.%d.%d.%d", libusb_version_internal.major, libusb_version_internal.minor,
-		libusb_version_internal.micro, libusb_version_internal.nano);
+	usbi_dbg("libusb v%u.%u.%u.%u%s", libusb_version_internal.major, libusb_version_internal.minor,
+		libusb_version_internal.micro, libusb_version_internal.nano, libusb_version_internal.rc);
 
 	usbi_mutex_init(&ctx->usb_devs_lock, NULL);
 	usbi_mutex_init(&ctx->open_devs_lock, NULL);
