@@ -1283,7 +1283,6 @@ int API_EXPORTED libusb_open(libusb_device *dev,
  * This function allows to associate a device handle with the existing file 
  * descriptor.
  *
- *
  * \param dev the device to open
  * \param fd the file descriptor to associate with the device 
  * \param handle output location for the returned device handle pointer. Only
