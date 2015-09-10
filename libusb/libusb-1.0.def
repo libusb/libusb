@@ -126,6 +126,8 @@ EXPORTS
   libusb_lock_events@4 = libusb_lock_events
   libusb_open
   libusb_open@8 = libusb_open
+  libusb_fdopen
+  libusb_fdopen@12 = libusb_fdopen  
   libusb_open_device_with_vid_pid
   libusb_open_device_with_vid_pid@12 = libusb_open_device_with_vid_pid
   libusb_pollfds_handle_timeouts
