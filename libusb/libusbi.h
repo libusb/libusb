@@ -279,6 +279,10 @@ struct libusb_context {
 	/* used to see if there is an active thread doing event handling */
 	int event_handler_active;
 
+	/* A thread-local storage key to track which thread is performing event
+	 * handling */
+	usbi_tls_key_t event_handling_key;
+
 	/* used to wait for event completion in threads other than the one that is
 	 * event handling */
 	usbi_mutex_t event_waiters_lock;
@@ -314,6 +318,16 @@ struct libusb_context {
 
 	struct list_head list;
 };
+
+/* Macros for managing event handling state */
+#define usbi_handling_events(ctx) \
+	(usbi_tls_key_get((ctx)->event_handling_key) != NULL)
+
+#define usbi_start_event_handling(ctx) \
+	usbi_tls_key_set((ctx)->event_handling_key, ctx)
+
+#define usbi_end_event_handling(ctx) \
+	usbi_tls_key_set((ctx)->event_handling_key, NULL)
 
 /* Update the following macro if new event sources are added */
 #define usbi_pending_events(ctx) \

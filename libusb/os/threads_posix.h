@@ -43,6 +43,12 @@
 #define usbi_cond_destroy		pthread_cond_destroy
 #define usbi_cond_signal		pthread_cond_signal
 
+#define usbi_tls_key_t			pthread_key_t
+#define usbi_tls_key_create		pthread_key_create
+#define usbi_tls_key_get		pthread_getspecific
+#define usbi_tls_key_set		pthread_setspecific
+#define usbi_tls_key_delete		pthread_key_delete
+
 extern int usbi_mutex_init_recursive(pthread_mutex_t *mutex, pthread_mutexattr_t *attr);
 
 int usbi_get_tid(void);
