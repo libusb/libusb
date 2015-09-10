@@ -708,11 +708,13 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int
 
 	if (if_desc->bNumEndpoints == 0) {
 		usbi_dbg("no endpoints found for interface %d", iface);
+		libusb_free_config_descriptor(conf_desc);
 		return LIBUSB_SUCCESS;
 	}
 
 	priv->usb_interface[iface].endpoint = (uint8_t*) malloc(if_desc->bNumEndpoints);
 	if (priv->usb_interface[iface].endpoint == NULL) {
+		libusb_free_config_descriptor(conf_desc);
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
