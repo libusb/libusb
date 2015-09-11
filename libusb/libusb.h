@@ -67,12 +67,6 @@ typedef unsigned __int32  uint32_t;
  * As this can be problematic if you include windows.h after libusb.h
  * in your sources, we force windows.h to be included first. */
 #if defined(_WIN32) || defined(__CYGWIN__) || defined(_WIN32_WCE)
-#ifdef _DEBUG
-	#ifndef _CRTDBG_MAP_ALLOC
-		#define _CRTDBG_MAP_ALLOC
-	#endif
-	#include <crtdbg.h>
-#endif
 #include <windows.h>
 #if defined(interface)
 #undef interface
