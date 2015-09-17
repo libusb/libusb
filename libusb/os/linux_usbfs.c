@@ -2894,6 +2894,7 @@ static clockid_t op_get_timerfd_clockid(void)
 }
 #endif
 
+#ifdef __ANDROID__
 static int op_get_device_list(struct libusb_context * ctx,
 	struct discovered_devs **discdevs)
 {
@@ -2954,6 +2955,7 @@ close_out:
 	closedir(devices);
 	return r;
 }
+#endif
 
 const struct usbi_os_backend linux_usbfs_backend = {
 	.name = "Linux usbfs",
