@@ -144,6 +144,7 @@ struct linux_device_priv {
 
 struct linux_device_handle_priv {
 	int fd;
+	int fd_removed;
 	uint32_t caps;
 };
 
@@ -1324,9 +1325,11 @@ static int op_open(struct libusb_device_handle *handle)
 
 static void op_close(struct libusb_device_handle *dev_handle)
 {
-	int fd = _device_handle_priv(dev_handle)->fd;
-	usbi_remove_pollfd(HANDLE_CTX(dev_handle), fd);
-	close(fd);
+	struct linux_device_handle_priv *hpriv = _device_handle_priv(dev_handle);
+	/* fd may have already been removed by POLLERR condition in op_handle_events() */
+	if (!hpriv->fd_removed)
+		usbi_remove_pollfd(HANDLE_CTX(dev_handle), hpriv->fd);
+	close(hpriv->fd);
 }
 
 static int op_get_configuration(struct libusb_device_handle *handle,
@@ -2595,7 +2598,11 @@ static int op_handle_events(struct libusb_context *ctx,
 		}
 
 		if (pollfd->revents & POLLERR) {
+			/* remove the fd from the pollfd set so that it doesn't continuously
+			 * trigger an event, and flag that it has been removed so op_close()
+			 * doesn't try to remove it a second time */
 			usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->fd);
+			hpriv->fd_removed = 1;
 			usbi_handle_disconnect(handle);
 			/* device will still be marked as attached if hotplug monitor thread
 			 * hasn't processed remove event yet */
