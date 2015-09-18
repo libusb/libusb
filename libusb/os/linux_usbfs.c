@@ -2607,7 +2607,7 @@ static int op_handle_events(struct libusb_context *ctx,
 			 * doesn't try to remove it a second time */
 			usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->fd);
 			hpriv->fd_removed = 1;
-			usbi_handle_disconnect(handle);
+
 			/* device will still be marked as attached if hotplug monitor thread
 			 * hasn't processed remove event yet */
 			usbi_mutex_static_lock(&linux_hotplug_lock);
@@ -2615,7 +2615,11 @@ static int op_handle_events(struct libusb_context *ctx,
 				linux_device_disconnected(handle->dev->bus_number,
 						handle->dev->device_address, NULL);
 			usbi_mutex_static_unlock(&linux_hotplug_lock);
-			continue;
+
+			if (!(hpriv->caps & USBFS_CAP_REAP_AFTER_DISCONNECT)) {
+				usbi_handle_disconnect(handle);
+				continue;
+			}
 		}
 
 		do {
