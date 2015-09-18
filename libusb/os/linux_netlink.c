@@ -222,6 +222,13 @@ static int linux_netlink_parse(char *buffer, size_t len, int *detached, const ch
 		return -1;
 	}
 
+	/* check that this is an actual usb device */
+	tmp = netlink_message_parse(buffer, len, "DEVTYPE");
+	if (NULL == tmp || 0 != strcmp(tmp, "usb_device")) {
+		/* not usb. ignore */
+		return -1;
+	}
+
 	tmp = netlink_message_parse(buffer, len, "BUSNUM");
 	if (NULL == tmp) {
 		/* no bus number. try "DEVICE" */
