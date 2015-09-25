@@ -304,7 +304,7 @@ struct windows_transfer_priv {
 // used to match a device driver (including filter drivers) against a supported API
 struct driver_lookup {
 	char list[MAX_KEY_LENGTH+1];// REG_MULTI_SZ list of services (driver) names
-	const DWORD reg_prop;		// SPDRP registry key to use to retreive list
+	const DWORD reg_prop;		// SPDRP registry key to use to retrieve list
 	const char* designation;	// internal designation (for debug output)
 };
 

@@ -101,7 +101,7 @@ static int translate_driver_error(int error)
 			return LIBUSB_ERROR_BUSY;
 
 		// Error codes that are either unexpected, or have
-		// no suitable LIBUSB_ERROR equivilant.
+		// no suitable LIBUSB_ERROR equivalent.
 		case ERROR_CANCELLED:
 		case ERROR_INTERNAL_ERROR:
 		default:

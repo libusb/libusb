@@ -700,7 +700,7 @@ struct libusb_ss_endpoint_companion_descriptor {
 
 
 	/** The maximum number of packets the endpoint can send or
-	 *  recieve as part of a burst. */
+	 *  receive as part of a burst. */
 	uint8_t  bMaxBurst;
 
 	/** In bulk EP:	bits 4:0 represents the	maximum	number of
