@@ -54,7 +54,7 @@
 #define poll_dbg usbi_dbg
 #else
 // MSVC++ < 2005 cannot use a variadic argument and non MSVC
-// compilers produce warnings if parenthesis are ommitted.
+// compilers produce warnings if parenthesis are omitted.
 #if defined(_MSC_VER) && (_MSC_VER < 1400)
 #define poll_dbg
 #else

@@ -1101,7 +1101,7 @@ printf("completed!\n");
  * (without implementing the rules and locking semantics documented above)
  * and another trying to send a synchronous USB transfer, you will end up with
  * two threads monitoring the same descriptors, and the above-described
- * undesirable behaviour occuring. The solution is for your polling thread to
+ * undesirable behaviour occurring. The solution is for your polling thread to
  * play by the rules; the synchronous I/O functions do so, and this will result
  * in them getting along in perfect harmony.
  *

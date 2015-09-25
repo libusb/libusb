@@ -137,7 +137,7 @@ struct list_head active_contexts_list;
  * libusb_set_debug(), or the setting of the environmental variable
  * LIBUSB_DEBUG outside of the application, can result in logging being
  * produced. Your application should therefore not close stderr, but instead
- * direct it to the null device if its output is undesireable.
+ * direct it to the null device if its output is undesirable.
  *
  * The libusb_set_debug() function can be used to enable logging of certain
  * messages. Under standard configuration, libusb doesn't really log much

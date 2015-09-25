@@ -2758,7 +2758,7 @@ static int winusbx_open(int sub_api, struct libusb_device_handle *dev_handle)
 
 	CHECK_WINUSBX_AVAILABLE(sub_api);
 
-	// WinUSB requires a seperate handle for each interface
+	// WinUSB requires a separate handle for each interface
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
 		if ( (priv->usb_interface[i].path != NULL)
 		  && (priv->usb_interface[i].apib->id == USB_API_WINUSBX) ) {

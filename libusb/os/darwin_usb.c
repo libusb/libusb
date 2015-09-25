@@ -1619,7 +1619,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
 
   bzero(&tpriv->req, sizeof(tpriv->req));
 
-  /* IOUSBDeviceInterface expects the request in cpu endianess */
+  /* IOUSBDeviceInterface expects the request in cpu endianness */
   tpriv->req.bmRequestType     = setup->bmRequestType;
   tpriv->req.bRequest          = setup->bRequest;
   /* these values should be in bus order from libusb_fill_control_setup */
