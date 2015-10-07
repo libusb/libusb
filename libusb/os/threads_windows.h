@@ -57,6 +57,7 @@ struct timespec {
 
 #define usbi_mutexattr_t void
 #define usbi_condattr_t  void
+#define usbi_tls_key_t   DWORD
 
 // all Windows mutexes are recursive
 #define usbi_mutex_init_recursive(mutex, attr) usbi_mutex_init((mutex), (attr))
@@ -81,6 +82,11 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 						const struct timespec *abstime);
 int usbi_cond_broadcast(usbi_cond_t *cond);
 int usbi_cond_signal(usbi_cond_t *cond);
+
+int   usbi_tls_key_create(usbi_tls_key_t *key, void (*destructor)(void *));
+void *usbi_tls_key_get(usbi_tls_key_t key);
+int   usbi_tls_key_set(usbi_tls_key_t key, const void *value);
+int   usbi_tls_key_delete(usbi_tls_key_t key);
 
 int usbi_get_tid(void);
 

@@ -293,6 +293,12 @@ if (r == 0 && actual_length == sizeof(data)) {
  * success or failure reason, number of bytes of data transferred, etc. See
  * the libusb_transfer structure documentation for more information.
  *
+ * <b>Important Note</b>: The user-specified callback is called from an event
+ * handling context. It is therefore important that no calls are made into
+ * libusb that will attempt to perform any event handling. Examples of such
+ * functions are any listed in the \ref syncio "synchronous API" and any of
+ * the blocking functions that retrieve \ref desc "USB descriptors".
+ *
  * \subsection Deallocation
  *
  * When a transfer has completed (i.e. the callback function has been invoked),
@@ -1123,6 +1129,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	usbi_mutex_init(&ctx->event_waiters_lock, NULL);
 	usbi_cond_init(&ctx->event_waiters_cond, NULL);
 	usbi_mutex_init(&ctx->event_data_lock, NULL);
+	usbi_tls_key_create(&ctx->event_handling_key, NULL);
 	list_init(&ctx->flying_transfers);
 	list_init(&ctx->ipollfds);
 	list_init(&ctx->hotplug_msgs);
@@ -1169,6 +1176,7 @@ err:
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
 	usbi_cond_destroy(&ctx->event_waiters_cond);
 	usbi_mutex_destroy(&ctx->event_data_lock);
+	usbi_tls_key_delete(ctx->event_handling_key);
 	return r;
 }
 
@@ -1188,6 +1196,7 @@ void usbi_io_exit(struct libusb_context *ctx)
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
 	usbi_cond_destroy(&ctx->event_waiters_cond);
 	usbi_mutex_destroy(&ctx->event_data_lock);
+	usbi_tls_key_delete(ctx->event_handling_key);
 	if (ctx->pollfds)
 		free(ctx->pollfds);
 }
@@ -1349,7 +1358,7 @@ disarm:
 #else
 static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 {
-	(void)ctx;
+	UNUSED(ctx);
 	return 0;
 }
 #endif
@@ -2038,6 +2047,12 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	int timeout_ms;
 	int special_event;
 
+	/* prevent attempts to recursively handle events (e.g. calling into
+	 * libusb_handle_events() from within a hotplug or transfer callback) */
+	if (usbi_handling_events(ctx))
+		return LIBUSB_ERROR_BUSY;
+	usbi_start_event_handling(ctx);
+
 	/* there are certain fds that libusb uses internally, currently:
 	 *
 	 *   1) event pipe
@@ -2070,7 +2085,8 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		ctx->pollfds = calloc(ctx->pollfds_cnt, sizeof(*ctx->pollfds));
 		if (!ctx->pollfds) {
 			usbi_mutex_unlock(&ctx->event_data_lock);
-			return LIBUSB_ERROR_NO_MEM;
+			r = LIBUSB_ERROR_NO_MEM;
+			goto done;
 		}
 
 		list_for_each_entry(ipollfd, &ctx->ipollfds, list, struct usbi_pollfd) {
@@ -2102,13 +2118,18 @@ redo_poll:
 	usbi_dbg("poll() %d fds with timeout in %dms", nfds, timeout_ms);
 	r = usbi_poll(fds, nfds, timeout_ms);
 	usbi_dbg("poll() returned %d", r);
-	if (r == 0)
-		return handle_timeouts(ctx);
-	else if (r == -1 && errno == EINTR)
-		return LIBUSB_ERROR_INTERRUPTED;
+	if (r == 0) {
+		r = handle_timeouts(ctx);
+		goto done;
+	}
+	else if (r == -1 && errno == EINTR) {
+		r = LIBUSB_ERROR_INTERRUPTED;
+		goto done;
+	}
 	else if (r < 0) {
 		usbi_err(ctx, "poll failed %d err=%d", r, errno);
-		return LIBUSB_ERROR_IO;
+		r = LIBUSB_ERROR_IO;
+		goto done;
 	}
 
 	special_event = 0;
@@ -2171,7 +2192,7 @@ redo_poll:
 		if (ret) {
 			/* return error code */
 			r = ret;
-			goto handled;
+			goto done;
 		}
 
 		if (0 == --r)
@@ -2190,7 +2211,7 @@ redo_poll:
 		if (ret < 0) {
 			/* return error code */
 			r = ret;
-			goto handled;
+			goto done;
 		}
 
 		if (0 == --r)
@@ -2208,6 +2229,8 @@ handled:
 		goto redo_poll;
 	}
 
+done:
+	usbi_end_event_handling(ctx);
 	return r;
 }
 
@@ -2451,7 +2474,7 @@ int API_EXPORTED libusb_pollfds_handle_timeouts(libusb_context *ctx)
 	USBI_GET_CONTEXT(ctx);
 	return usbi_using_timerfd(ctx);
 #else
-	(void)ctx;
+	UNUSED(ctx);
 	return 0;
 #endif
 }

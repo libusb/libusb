@@ -209,6 +209,28 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 	return usbi_cond_intwait(cond, mutex, millis);
 }
 
+int usbi_tls_key_create(usbi_tls_key_t *key, void (*destructor)(void *)) {
+	UNUSED(destructor);
+	if(!key) return ((errno=EINVAL));
+	*key = TlsAlloc();
+	if (*key == TLS_OUT_OF_INDEXES) return ((errno=ENOMEM));
+	return 0;
+}
+
+void *usbi_tls_key_get(usbi_tls_key_t key) {
+	return TlsGetValue(key);
+}
+
+int usbi_tls_key_set(usbi_tls_key_t key, const void *value) {
+	if (!TlsSetValue(key, (LPVOID)value)) return ((errno=EINVAL));
+	return 0;
+}
+
+int usbi_tls_key_delete(usbi_tls_key_t key) {
+	if (!TlsFree(key)) return ((errno=EINVAL));
+	return 0;
+}
+
 int usbi_get_tid(void) {
 	return GetCurrentThreadId();
 }

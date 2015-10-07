@@ -80,8 +80,14 @@
  * are invalid and will remain so even if the device comes back.
  *
  * When handling a LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED event it is considered
- * safe to call any libusb function that takes a libusb_device. On the other hand,
- * when handling a LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT event the only safe function
+ * safe to call any libusb function that takes a libusb_device. It also safe to
+ * open a device and submit asynchronous transfers. However, most other functions
+ * that take a libusb_device_handle are <b>not</b> safe to call. Examples of such
+ * functions are any of the \ref syncio "synchronous API" functions or the blocking
+ * functions that retrieve various \ref desc "USB descriptors". These functions must
+ * be used outside of the context of the hotplug callback.
+ *
+ * When handling a LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT event the only safe function
  * is libusb_get_device_descriptor().
  *
  * The following code provides an example of the usage of the hotplug interface:

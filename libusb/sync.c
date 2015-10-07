@@ -86,17 +86,22 @@ static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
  * \returns LIBUSB_ERROR_PIPE if the control request was not supported by the
  * device
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns LIBUSB_ERROR_BUSY if called from event handling context
  * \returns another LIBUSB_ERROR code on other failures
  */
 int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	unsigned char *data, uint16_t wLength, unsigned int timeout)
 {
-	struct libusb_transfer *transfer = libusb_alloc_transfer(0);
+	struct libusb_transfer *transfer;
 	unsigned char *buffer;
 	int completed = 0;
 	int r;
 
+	if (usbi_handling_events(HANDLE_CTX(dev_handle)))
+		return LIBUSB_ERROR_BUSY;
+
+	transfer = libusb_alloc_transfer(0);
 	if (!transfer)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -160,10 +165,14 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *buffer, int length,
 	int *transferred, unsigned int timeout, unsigned char type)
 {
-	struct libusb_transfer *transfer = libusb_alloc_transfer(0);
+	struct libusb_transfer *transfer;
 	int completed = 0;
 	int r;
 
+	if (usbi_handling_events(HANDLE_CTX(dev_handle)))
+		return LIBUSB_ERROR_BUSY;
+
+	transfer = libusb_alloc_transfer(0);
 	if (!transfer)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -248,6 +257,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \returns LIBUSB_ERROR_OVERFLOW if the device offered more data, see
  * \ref packetoverflow
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns LIBUSB_ERROR_BUSY if called from event handling context
  * \returns another LIBUSB_ERROR code on other failures
  */
 int API_EXPORTED libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
@@ -297,6 +307,7 @@ int API_EXPORTED libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \returns LIBUSB_ERROR_OVERFLOW if the device offered more data, see
  * \ref packetoverflow
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns LIBUSB_ERROR_BUSY if called from event handling context
  * \returns another LIBUSB_ERROR code on other error
  */
 int API_EXPORTED libusb_interrupt_transfer(

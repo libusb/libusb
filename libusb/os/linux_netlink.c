@@ -61,30 +61,30 @@ static pthread_t libusb_linux_event_thread;
 
 static void *linux_netlink_event_thread_main(void *arg);
 
-struct sockaddr_nl snl = { .nl_family=AF_NETLINK, .nl_groups=KERNEL };
+static struct sockaddr_nl snl = { .nl_family=AF_NETLINK, .nl_groups=KERNEL };
 
-static int set_fd_cloexec_nb (int fd)
+static int set_fd_cloexec_nb(int fd)
 {
 	int flags;
 
 #if defined(FD_CLOEXEC)
-	flags = fcntl (linux_netlink_socket, F_GETFD);
+	flags = fcntl(fd, F_GETFD);
 	if (0 > flags) {
 		return -1;
 	}
 
 	if (!(flags & FD_CLOEXEC)) {
-		fcntl (linux_netlink_socket, F_SETFD, flags | FD_CLOEXEC);
+		fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
 	}
 #endif
 
-	flags = fcntl (linux_netlink_socket, F_GETFL);
+	flags = fcntl(fd, F_GETFL);
 	if (0 > flags) {
 		return -1;
 	}
 
 	if (!(flags & O_NONBLOCK)) {
-		fcntl (linux_netlink_socket, F_SETFL, flags | O_NONBLOCK);
+		fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 	}
 
 	return 0;
@@ -222,6 +222,13 @@ static int linux_netlink_parse(char *buffer, size_t len, int *detached, const ch
 		return -1;
 	}
 
+	/* check that this is an actual usb device */
+	tmp = netlink_message_parse(buffer, len, "DEVTYPE");
+	if (NULL == tmp || 0 != strcmp(tmp, "usb_device")) {
+		/* not usb. ignore */
+		return -1;
+	}
+
 	tmp = netlink_message_parse(buffer, len, "BUSNUM");
 	if (NULL == tmp) {
 		/* no bus number. try "DEVICE" */
@@ -317,7 +324,7 @@ static int linux_netlink_read_message(void)
 
 	/* signal device is available (or not) to all contexts */
 	if (detached)
-		linux_device_disconnected(busnum, devaddr, sys_name);
+		linux_device_disconnected(busnum, devaddr);
 	else
 		linux_hotplug_enumerate(busnum, devaddr, sys_name);
 
@@ -335,8 +342,7 @@ static void *linux_netlink_event_thread_main(void *arg)
 		  .events = POLLIN },
 	};
 
-	/* silence compiler warning */
-	(void) arg;
+	UNUSED(arg);
 
 	while (poll(fds, 2, -1) >= 0) {
 		if (fds[0].revents & POLLIN) {

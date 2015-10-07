@@ -121,7 +121,7 @@ static int sysfs_has_descriptors = -1;
 static int init_count = 0;
 
 /* Serialize hotplug start/stop */
-usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
+static usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
 /* Serialize scan-devices, event-thread, and poll */
 usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 
@@ -144,6 +144,7 @@ struct linux_device_priv {
 
 struct linux_device_handle_priv {
 	int fd;
+	int fd_removed;
 	uint32_t caps;
 };
 
@@ -882,10 +883,9 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	dev->device_address = devaddr;
 
 	if (sysfs_dir) {
-		priv->sysfs_dir = malloc(strlen(sysfs_dir) + 1);
+		priv->sysfs_dir = strdup(sysfs_dir);
 		if (!priv->sysfs_dir)
 			return LIBUSB_ERROR_NO_MEM;
-		strcpy(priv->sysfs_dir, sysfs_dir);
 
 		/* Note speed can contain 1.5, in this case __read_sysfs_attr
 		   will stop parsing at the '.' and return 1 */
@@ -1115,7 +1115,7 @@ void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_na
 	usbi_mutex_static_unlock(&active_contexts_lock);
 }
 
-void linux_device_disconnected(uint8_t busnum, uint8_t devaddr, const char *sys_name)
+void linux_device_disconnected(uint8_t busnum, uint8_t devaddr)
 {
 	struct libusb_context *ctx;
 	struct libusb_device *dev;
@@ -1299,7 +1299,7 @@ static int op_open(struct libusb_device_handle *handle)
 			if (handle->dev->attached) {
 				usbi_dbg("open failed with no device, but device still attached");
 				linux_device_disconnected(handle->dev->bus_number,
-						handle->dev->device_address, NULL);
+						handle->dev->device_address);
 			}
 			usbi_mutex_static_unlock(&linux_hotplug_lock);
 		}
@@ -1319,14 +1319,20 @@ static int op_open(struct libusb_device_handle *handle)
 			hpriv->caps |= USBFS_CAP_BULK_CONTINUATION;
 	}
 
-	return usbi_add_pollfd(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
+	r = usbi_add_pollfd(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
+	if (r < 0)
+		close(hpriv->fd);
+
+	return r;
 }
 
 static void op_close(struct libusb_device_handle *dev_handle)
 {
-	int fd = _device_handle_priv(dev_handle)->fd;
-	usbi_remove_pollfd(HANDLE_CTX(dev_handle), fd);
-	close(fd);
+	struct linux_device_handle_priv *hpriv = _device_handle_priv(dev_handle);
+	/* fd may have already been removed by POLLERR condition in op_handle_events() */
+	if (!hpriv->fd_removed)
+		usbi_remove_pollfd(HANDLE_CTX(dev_handle), hpriv->fd);
+	close(hpriv->fd);
 }
 
 static int op_get_configuration(struct libusb_device_handle *handle,
@@ -2595,16 +2601,24 @@ static int op_handle_events(struct libusb_context *ctx,
 		}
 
 		if (pollfd->revents & POLLERR) {
+			/* remove the fd from the pollfd set so that it doesn't continuously
+			 * trigger an event, and flag that it has been removed so op_close()
+			 * doesn't try to remove it a second time */
 			usbi_remove_pollfd(HANDLE_CTX(handle), hpriv->fd);
-			usbi_handle_disconnect(handle);
+			hpriv->fd_removed = 1;
+
 			/* device will still be marked as attached if hotplug monitor thread
 			 * hasn't processed remove event yet */
 			usbi_mutex_static_lock(&linux_hotplug_lock);
 			if (handle->dev->attached)
 				linux_device_disconnected(handle->dev->bus_number,
-						handle->dev->device_address, NULL);
+						handle->dev->device_address);
 			usbi_mutex_static_unlock(&linux_hotplug_lock);
-			continue;
+
+			if (!(hpriv->caps & USBFS_CAP_REAP_AFTER_DISCONNECT)) {
+				usbi_handle_disconnect(handle);
+				continue;
+			}
 		}
 
 		do {
