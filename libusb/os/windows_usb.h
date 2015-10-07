@@ -169,16 +169,14 @@ struct libusb_hid_descriptor {
 
 /* start libusbk_shared.h definitions, must match libusbk_shared.h for isochronous support */
 
-//KISO_PACKET is equivalent of libusb_iso_packet_descriptor except uses absolute "offset" field instead of sequential Lengths
+// KISO_PACKET is equivalent of libusb_iso_packet_descriptor except uses absolute "offset" field instead of sequential Lengths
 typedef struct _KISO_PACKET
 {
-	UINT offset;
-	USHORT actual_length; //changed from libusbk_shared.h "Length" for clarity
-	USHORT status;
+	UINT Offset;
+	USHORT Length; // the same meaning as libusb_iso_packet_descriptor::actual_length member
+	USHORT Status;
 
-} KISO_PACKET;
-
-typedef KISO_PACKET* PKISO_PACKET;
+} KISO_PACKET, *PKISO_PACKET;
 
 typedef enum _KISO_FLAG
 {
@@ -186,7 +184,7 @@ typedef enum _KISO_FLAG
 	KISO_FLAG_SET_START_FRAME = 0x00000001,
 } KISO_FLAG;
 
-//KISO_CONTEXT is the conceptual equivalent of libusb_transfer except is isochronous-specific and must match libusbk's version
+// KISO_CONTEXT is the conceptual equivalent of libusb_transfer except is isochronous-specific and must match libusbk's version
 typedef struct _KISO_CONTEXT
 {
 	KISO_FLAG Flags;
@@ -196,9 +194,7 @@ typedef struct _KISO_CONTEXT
 	UINT UrbHdrStatus;
 	KISO_PACKET IsoPackets[0];
 
-} KISO_CONTEXT;
-
-typedef KISO_CONTEXT* PKISO_CONTEXT;
+} KISO_CONTEXT, *PKISO_CONTEXT;
 
 /* end libusbk_shared.h definitions */
 

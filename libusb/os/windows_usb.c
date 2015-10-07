@@ -3170,9 +3170,14 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 
 	CHECK_WINUSBX_AVAILABLE(sub_api);
 
-	if (sub_api != SUB_API_LIBUSBK && sub_api != SUB_API_LIBUSB0)
+	// KISO_CONTEXT::NumberOfPackets is SHORT, make sure that packets count does not change after a conversion
+	if ((int)(SHORT)transfer->num_iso_packets != transfer->num_iso_packets) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	if ((sub_api != SUB_API_LIBUSBK) && (sub_api != SUB_API_LIBUSB0))
 	{
-		//iso only supported on libusbk-based backends
+		// iso only supported on libusbk-based backends
 		return unsupported_submit_iso_transfer(sub_api, itransfer);
 	};
 
@@ -3194,28 +3199,27 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	ctx_size = sizeof(KISO_CONTEXT)+sizeof(KISO_PACKET)* transfer->num_iso_packets;
-	//Init the libusbk iso_context
+	ctx_size = sizeof(KISO_CONTEXT) + sizeof(KISO_PACKET) * transfer->num_iso_packets;
+	// Init the libusbk iso_context
 	if (!transfer_priv->iso_context)
 	{
-		transfer_priv->iso_context = (PKISO_CONTEXT)malloc(ctx_size);
+		transfer_priv->iso_context = (PKISO_CONTEXT)calloc(ctx_size, 1);
 		if (!transfer_priv->iso_context)
 		{
-			//TODO does this return leak mem, or does the transfer get cleaned up?
+			usbi_free_fd(&wfd);
 			return LIBUSB_ERROR_NO_MEM;
 		}
 	}
-	memset(transfer_priv->iso_context, 0, ctx_size);
 
-	//start ASAP
+	// Start ASAP
 	transfer_priv->iso_context->StartFrame = 0;
-	transfer_priv->iso_context->NumberOfPackets = transfer->num_iso_packets;
+	transfer_priv->iso_context->NumberOfPackets = (SHORT)transfer->num_iso_packets;
 
-	/* convert the transfer packet lengths to iso_packet offsets */
+	// Convert the transfer packet lengths to iso_packet offsets
 	offset = 0;
 	for (i = 0; i < transfer->num_iso_packets; i++)
 	{
-		transfer_priv->iso_context->IsoPackets[i].offset = offset;
+		transfer_priv->iso_context->IsoPackets[i].Offset = offset;
 		offset += transfer->iso_packet_desc[i].length;
 	}
 
@@ -3443,23 +3447,47 @@ static int winusbx_copy_transfer_data(int sub_api, struct usbi_transfer *itransf
 
 	if (transfer->type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS)
 	{
-		//for isochronous, need to copy the individual iso packet actual_lengths and statuses
-		if (sub_api == SUB_API_LIBUSBK || sub_api == SUB_API_LIBUSB0)
+		// For isochronous, need to copy the individual iso packet actual_lengths and statuses
+		if ((sub_api == SUB_API_LIBUSBK) || (sub_api == SUB_API_LIBUSB0))
 		{
-			//iso only supported on libusbk-based backends for now
-
+			// iso only supported on libusbk-based backends for now
 			for (i = 0; i < transfer->num_iso_packets; i++)
 			{
-				transfer->iso_packet_desc[i].actual_length = transfer_priv->iso_context->IsoPackets[i].actual_length;
-				if (transfer->iso_packet_desc[i].actual_length == 0)
-					transfer->iso_packet_desc[i].actual_length = transfer->iso_packet_desc[i].length;
-				//TODO translate USDB_STATUS codes http://msdn.microsoft.com/en-us/library/ff539136(VS.85).aspx to libusb_transfer_status
-				//transfer->iso_packet_desc[i].status = transfer_priv->iso_context->IsoPackets[i].status;
+				// KISO_PACKET::Length is valid for IN direction
+				transfer->iso_packet_desc[i].actual_length = IS_XFERIN(transfer) ? 
+					transfer_priv->iso_context->IsoPackets[i].Length : transfer->iso_packet_desc[i].length;
+
+			#define _USBD_TO_KISO(x) ((x) & 0x0000FFFF)
+
+				// Translate USDB_STATUS codes http://msdn.microsoft.com/en-us/library/ff539136(VS.85).aspx to libusb_transfer_status
+				switch (transfer_priv->iso_context->IsoPackets[i].Status)
+				{
+				case _USBD_TO_KISO(0)/*USBD_STATUS_SUCCESS*/:
+					transfer->iso_packet_desc[i].status = LIBUSB_TRANSFER_COMPLETED;
+					break;
+				case _USBD_TO_KISO(0xC0006000)/*USBD_STATUS_TIMEOUT*/:
+					transfer->iso_packet_desc[i].status = LIBUSB_TRANSFER_TIMED_OUT;
+					break;
+				case _USBD_TO_KISO(0xC0000004)/*USBD_STATUS_STALL_PID*/:
+					transfer->iso_packet_desc[i].status = LIBUSB_TRANSFER_STALL;
+					break;
+				case _USBD_TO_KISO(0xC0007000)/*USBD_STATUS_DEVICE_GONE*/:
+					transfer->iso_packet_desc[i].status = LIBUSB_TRANSFER_NO_DEVICE;
+					break;
+				case _USBD_TO_KISO(0xC000000C)/*USBD_STATUS_BUFFER_OVERRUN*/:
+					transfer->iso_packet_desc[i].status = LIBUSB_TRANSFER_OVERFLOW;
+					break;
+				default:
+					transfer->iso_packet_desc[i].status = LIBUSB_TRANSFER_ERROR;
+					break;
+				}
+
+			#undef _USBD_TO_KISO
 			}
 		}
 		else
 		{
-			//This should only occur if backend is not set correctly or other backend isoc is partially implemented
+			// This should only occur if backend is not set correctly or other backend isoc is partially implemented
 			return unsupported_copy_transfer_data(sub_api, itransfer, io_size);
 		}
 	}
