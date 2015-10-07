@@ -2096,7 +2096,7 @@ static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
 	usbi_free_fd(&transfer_priv->pollable_fd);
 	safe_free(transfer_priv->hid_buffer);
 
-	//TODO this should occur during windows_free_transfer instead
+	// TODO: Should occur during windows_free_transfer instead
 	safe_free(transfer_priv->iso_context);
 
 	// When auto claim is in use, attempt to release the auto-claimed interface

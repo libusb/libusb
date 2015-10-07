@@ -166,7 +166,6 @@ struct libusb_hid_descriptor {
 #define LIBUSB_REQ_IN(request_type) ((request_type) & LIBUSB_ENDPOINT_IN)
 #define LIBUSB_REQ_OUT(request_type) (!LIBUSB_REQ_IN(request_type))
 
-
 /* start libusbk_shared.h definitions, must match libusbk_shared.h for isochronous support */
 
 // KISO_PACKET is equivalent of libusb_iso_packet_descriptor except uses absolute "offset" field instead of sequential Lengths
@@ -175,7 +174,6 @@ typedef struct _KISO_PACKET
 	UINT Offset;
 	USHORT Length; // the same meaning as libusb_iso_packet_descriptor::actual_length member
 	USHORT Status;
-
 } KISO_PACKET, *PKISO_PACKET;
 
 typedef enum _KISO_FLAG
@@ -193,7 +191,6 @@ typedef struct _KISO_CONTEXT
 	SHORT NumberOfPackets;
 	UINT UrbHdrStatus;
 	KISO_PACKET IsoPackets[0];
-
 } KISO_CONTEXT, *PKISO_CONTEXT;
 
 /* end libusbk_shared.h definitions */
