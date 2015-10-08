@@ -44,10 +44,12 @@ UsbDevice device ...
 UsbDeviceConnection connection = getSystemService(Context.USB_SERVICE).openDevice(device);
 int fd = connection.getFileDescriptor();
 ...
-pass fd via JINI to libusb_fdopen() to native code in order to open device sucessfully.
+pass fd via JINI to libusb_fdopen() to native code in order to open device 
+sucessfully.
 
 2) Windows OS:
 
-Implemented support for isochronous transfers if libusbK is used as device driver back-end. 
-The implementation is tested (audio output) on Windows 7 using several USB DAC devices with 
-isochronous transfer capability. Device driver can be installed by Zadig tool - http://zadig.akeo.ie.
+Implemented support for isochronous transfers if libusbK is used as device 
+driver back-end. The implementation is tested (audio output) on Windows 7 
+using several USB DAC devices with isochronous transfer capability. Device 
+driver can be installed by Zadig tool - http://zadig.akeo.ie.
