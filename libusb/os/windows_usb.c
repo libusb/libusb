@@ -3175,7 +3175,8 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
-	if ((sub_api != SUB_API_LIBUSBK) && (sub_api != SUB_API_LIBUSB0))
+	// Iso so far supported only on libusbK backend
+	if (sub_api != SUB_API_LIBUSBK)
 	{
 		// iso only supported on libusbk-based backends
 		return unsupported_submit_iso_transfer(sub_api, itransfer);
@@ -3236,6 +3237,7 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 		if (GetLastError() != ERROR_IO_PENDING) {
 			usbi_err(ctx, "IsoReadPipe/IsoWritePipe failed: %s", windows_error_str(0));
 			usbi_free_fd(&wfd);
+			safe_free(transfer_priv->iso_context);
 			return LIBUSB_ERROR_IO;
 		}
 	}
@@ -3448,7 +3450,7 @@ static int winusbx_copy_transfer_data(int sub_api, struct usbi_transfer *itransf
 	if (transfer->type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS)
 	{
 		// For isochronous, need to copy the individual iso packet actual_lengths and statuses
-		if ((sub_api == SUB_API_LIBUSBK) || (sub_api == SUB_API_LIBUSB0))
+		if (sub_api == SUB_API_LIBUSBK)
 		{
 			// iso only supported on libusbk-based backends for now
 			for (i = 0; i < transfer->num_iso_packets; i++)
