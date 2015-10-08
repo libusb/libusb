@@ -3166,23 +3166,20 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 	struct winfd wfd;
 	int i;
 	uint32_t offset;
-	size_t ctx_size;
 
 	CHECK_WINUSBX_AVAILABLE(sub_api);
+	
+	transfer_priv->pollable_fd = INVALID_WINFD;
 
+	// Iso so far supported only on libusbK backend
+	if (sub_api != SUB_API_LIBUSBK) {
+		return unsupported_submit_iso_transfer(sub_api, itransfer);
+	}
+	
 	// KISO_CONTEXT::NumberOfPackets is SHORT, make sure that packets count does not change after a conversion
 	if ((int)(SHORT)transfer->num_iso_packets != transfer->num_iso_packets) {
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-
-	// Iso so far supported only on libusbK backend
-	if (sub_api != SUB_API_LIBUSBK)
-	{
-		// iso only supported on libusbk-based backends
-		return unsupported_submit_iso_transfer(sub_api, itransfer);
-	};
-
-	transfer_priv->pollable_fd = INVALID_WINFD;
 
 	current_interface = interface_by_endpoint(priv, handle_priv, transfer->endpoint);
 	if (current_interface < 0) {
@@ -3195,28 +3192,26 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 
 	wfd = usbi_create_fd(winusb_handle, IS_XFERIN(transfer) ? RW_READ : RW_WRITE, NULL, NULL);
-	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0) {
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	ctx_size = sizeof(KISO_CONTEXT) + sizeof(KISO_PACKET) * transfer->num_iso_packets;
 	// Init the libusbk iso_context
-	if (!transfer_priv->iso_context)
+	if (transfer_priv->iso_context == NULL)
 	{
-		transfer_priv->iso_context = (PKISO_CONTEXT)calloc(ctx_size, 1);
-		if (!transfer_priv->iso_context)
+		transfer_priv->iso_context = (PKISO_CONTEXT)calloc(sizeof(KISO_CONTEXT) + sizeof(KISO_PACKET) * transfer->num_iso_packets, 1);
+		if (transfer_priv->iso_context == NULL)
 		{
 			usbi_free_fd(&wfd);
 			return LIBUSB_ERROR_NO_MEM;
 		}
 	}
 
-	// Start ASAP
+	// Fill context
 	transfer_priv->iso_context->StartFrame = 0;
 	transfer_priv->iso_context->NumberOfPackets = (SHORT)transfer->num_iso_packets;
 
-	// Convert the transfer packet lengths to iso_packet offsets
+	// Fill context packet descriptors: convert the transfer packet lengths to iso_packet offsets
 	offset = 0;
 	for (i = 0; i < transfer->num_iso_packets; i++)
 	{
