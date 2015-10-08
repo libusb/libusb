@@ -1290,7 +1290,7 @@ static int op_open(struct libusb_device_handle *handle)
 	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
 	int r;
 
-	hpriv->fd = ((int)handle->associated_fd < 0 ? _get_usbfs_fd(handle->dev, O_RDWR, 0) : (int)handle->associated_fd);
+	hpriv->fd = _get_usbfs_fd(handle->dev, O_RDWR, 0);
 	if (hpriv->fd < 0) {
 		if (hpriv->fd == LIBUSB_ERROR_NO_DEVICE) {
 			/* device will still be marked as attached if hotplug monitor thread

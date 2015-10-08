@@ -67,12 +67,6 @@ typedef unsigned __int32  uint32_t;
  * As this can be problematic if you include windows.h after libusb.h
  * in your sources, we force windows.h to be included first. */
 #if defined(_WIN32) || defined(__CYGWIN__) || defined(_WIN32_WCE)
-#ifdef _DEBUG
-	#ifndef _CRTDBG_MAP_ALLOC
-		#define _CRTDBG_MAP_ALLOC
-	#endif
-	#include <crtdbg.h>
-#endif
 #include <windows.h>
 #if defined(interface)
 #undef interface
@@ -1374,7 +1368,6 @@ int LIBUSB_CALL libusb_get_max_iso_packet_size(libusb_device *dev,
 	unsigned char endpoint);
 
 int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle **handle);
-int LIBUSB_CALL libusb_fdopen(libusb_device *dev, intptr_t fd, libusb_device_handle **handle);
 void LIBUSB_CALL libusb_close(libusb_device_handle *dev_handle);
 libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle);
 
