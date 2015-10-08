@@ -27,3 +27,27 @@ http://mailing-list.libusb.info
 - Nathan Hjelm <hjelmn@users.sourceforge.net>
 - Chris Dickens <christopher.a.dickens@gmail.com>
 (Please use the mailing list rather than mailing developers directly)
+
+Custom modifications
+====================
+
+This repository contains custom modifications to libusb to provide some 
+additional functionality out of the box on several specific platforms.
+
+1) Android OS:
+
+libusb_fdopen() API is provided which allows to open USB device and supply 
+to the Linux back-end an existing file descriptor which was previously 
+obtained from Android APIs, e.g.:
+
+UsbDevice device ...
+UsbDeviceConnection connection = getSystemService(Context.USB_SERVICE).openDevice(device);
+int fd = connection.getFileDescriptor();
+...
+pass fd via JINI to libusb_fdopen() to native code in order to open device sucessfully.
+
+2) Windows OS:
+
+Implemented support for isochronous transfers if libusbK is used as device driver back-end. 
+The implementation is tested (audio output) on Windows 7 using several USB DAC devices with 
+isochronous transfer capability. Device driver can be installed by Zadig tool - http://zadig.akeo.ie.
