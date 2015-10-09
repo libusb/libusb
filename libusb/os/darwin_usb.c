@@ -570,6 +570,14 @@ static int darwin_check_configuration (struct libusb_context *ctx, struct darwin
     return LIBUSB_ERROR_OTHER; /* no configurations at this speed so we can't use it */
   }
 
+  /* checking the configuration of a root hub simulation takes ~1 s in 10.11. the device is
+     not usable anyway */
+  if (0x05ac == dev->dev_descriptor.idVendor && 0x8005 == dev->dev_descriptor.idProduct) {
+    usbi_dbg ("ignoring configuration on root hub simulation");
+    dev->active_config = 0;
+    return 0;
+  }
+
   /* find the first configuration */
   kresult = (*darwin_device)->GetConfigurationDescriptorPtr (darwin_device, 0, &configDesc);
   dev->first_config = (kIOReturnSuccess == kresult) ? configDesc->bConfigurationValue : 1;
@@ -1275,7 +1283,7 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, int
   if (kresult != kIOReturnSuccess)
     usbi_warn (HANDLE_CTX (dev_handle), "Release: %s", darwin_error_str(kresult));
 
-  cInterface->interface = IO_OBJECT_NULL;
+  cInterface->interface = (usb_interface_t **) IO_OBJECT_NULL;
 
   return darwin_to_libusb (kresult);
 }
