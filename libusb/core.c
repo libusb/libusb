@@ -2180,6 +2180,15 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 		}
 		usbi_mutex_unlock(&ctx->usb_devs_lock);
 	}
+	else {
+		/* if hotplug is disabled the devices must be unrefed to avoid a memory leak */
+		if (!list_empty(&ctx->usb_devs)) {
+			list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
+				usbi_dbg("libusb_exit: unref device %d.%d (%lu) refs = %d", dev->bus_number, dev->device_address, dev->session_data, dev->refcnt);
+				libusb_unref_device(dev);
+			}
+		}
+	}
 
 	/* a few sanity checks. don't bother with locking because unless
 	 * there is an application bug, nobody will be accessing these. */

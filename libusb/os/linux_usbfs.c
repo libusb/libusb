@@ -75,6 +75,15 @@
  * In sysfs all descriptors are bus-endian.
  */
 
+/* Android provides device plug notifications inside the Android's USB related Java APIs
+ * and tus duplicating this functonality with libusb is not needed. Moreover some firmwares
+ * (noticed from 5.0.2) can cause failure of linux_start_event_monitor when
+ * socket(PF_NETLINK, SOCK_RAW, NETLINK_KOBJECT_UEVENT) can not be created thus causing
+ * libusb_init failure. */
+#ifndef __ANDROID__
+	#define USE_NETLINK
+#endif
+
 static const char *usbfs_path = NULL;
 
 /* use usbdev*.* device names in /dev instead of the usbfs bus directories */
@@ -130,6 +139,7 @@ static int linux_stop_event_monitor(void);
 static int linux_scan_devices(struct libusb_context *ctx);
 static int sysfs_scan_device(struct libusb_context *ctx, const char *devname);
 static int detach_kernel_driver_and_claim(struct libusb_device_handle *, int);
+static int _open_sysfs_attr(struct libusb_device *dev, const char *attr);
 
 #if !defined(USE_UDEV)
 static int linux_default_scan_devices (struct libusb_context *ctx);
@@ -316,6 +326,17 @@ static const char *find_usbfs_path(void)
 		ret = "/dev/bus/usb";
 #endif
 
+/* On some Android firmwares (noticed from 5.0.2) opening /dev/bus/usb with opendir API
+ * is not possible due to root permissions and thus check_usb_vfs will fail unless process
+ * is running as root. Due to the fact that on Android (sysfs_can_relate_devices == 1) and
+ * file descriptor is provided via JINI from Android's USB related Java APIs open() API is
+ * not used and we do not really need healthy /dev/bus/usb. Just assume it exists to avoid
+ * libusb_init failure. */
+#ifdef __ANDROID__
+	if ((ret == NULL) && sysfs_can_relate_devices)
+		ret = "/dev/bus/usb";
+#endif
+
 	if (ret != NULL)
 		usbi_dbg("found usbfs at %s", ret);
 
@@ -377,12 +398,6 @@ static int op_init(struct libusb_context *ctx)
 	struct stat statbuf;
 	int r;
 
-	usbfs_path = find_usbfs_path();
-	if (!usbfs_path) {
-		usbi_err(ctx, "could not find usbfs");
-		return LIBUSB_ERROR_OTHER;
-	}
-
 	if (monotonic_clkid == -1)
 		monotonic_clkid = find_monotonic_clock();
 
@@ -443,6 +458,12 @@ static int op_init(struct libusb_context *ctx)
 	if (sysfs_has_descriptors)
 		usbi_dbg("sysfs has complete descriptors");
 
+	usbfs_path = find_usbfs_path();
+	if (!usbfs_path) {
+		usbi_err(ctx, "could not find usbfs");
+		return LIBUSB_ERROR_OTHER;
+	}
+
 	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	r = LIBUSB_SUCCESS;
 	if (init_count == 0) {
@@ -477,8 +498,10 @@ static int linux_start_event_monitor(void)
 {
 #if defined(USE_UDEV)
 	return linux_udev_start_event_monitor();
-#else
+#elif defined(USE_NETLINK)
 	return linux_netlink_start_event_monitor();
+#else
+	return LIBUSB_SUCCESS;
 #endif
 }
 
@@ -486,8 +509,10 @@ static int linux_stop_event_monitor(void)
 {
 #if defined(USE_UDEV)
 	return linux_udev_stop_event_monitor();
-#else
+#elif defined(USE_NETLINK)
 	return linux_netlink_stop_event_monitor();
+#else
+	return LIBUSB_SUCCESS;
 #endif
 }
 
@@ -508,16 +533,70 @@ static int linux_scan_devices(struct libusb_context *ctx)
 	return ret;
 }
 
+#if defined(USE_UDEV) || defined(USE_NETLINK)
 static void op_hotplug_poll(void)
 {
 #if defined(USE_UDEV)
 	linux_udev_hotplug_poll();
-#else
+#elif defined(USE_NETLINK)
 	linux_netlink_hotplug_poll();
 #endif
 }
+#else
+static int op_get_device_list(struct libusb_context *ctx, struct discovered_devs **discdevs)
+{
+	int r = LIBUSB_SUCCESS, alive, config, refcnt;
+	struct libusb_device *dev, *tmp;
 
-static int _open_sysfs_attr(struct libusb_device *dev, const char *attr)
+	usbi_dbg("");
+
+	// clear current device list
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	if (!list_empty(&ctx->usb_devs)) {
+		list_for_each_entry_safe(dev, tmp, &ctx->usb_devs, list, struct libusb_device) {
+
+            usbi_mutex_lock(&dev->lock);
+            refcnt = dev->refcnt;
+            usbi_mutex_unlock(&dev->lock);
+
+			if (refcnt <= 1) {
+                if (sysfs_can_relate_devices) {
+                    alive = _open_sysfs_attr(dev, "descriptors");
+                } else {
+                    alive = _get_usbfs_fd(dev, O_RDONLY, 0);
+                }
+                if (alive < 0) {
+                    usbi_dbg("device %d.%d (%lu) refs = %d gone: remove from usb_devs",
+                        dev->bus_number, dev->device_address, dev->session_data, dev->refcnt);
+                    usbi_mutex_unlock(&ctx->usb_devs_lock);
+                    libusb_unref_device(dev);
+                    usbi_mutex_lock(&ctx->usb_devs_lock);
+                } else {
+                    close(alive);
+                }
+			}
+		}
+	}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
+
+	// scan
+	linux_scan_devices(ctx);
+
+	// fill discovered_devs
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device) {
+		if (((*discdevs) = discovered_devs_append((*discdevs), dev)) == NULL) {
+			r = LIBUSB_ERROR_NO_MEM;
+			break;
+		}
+	}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
+
+	return r;
+}
+#endif
+
+int _open_sysfs_attr(struct libusb_device *dev, const char *attr)
 {
 	struct linux_device_priv *priv = _device_priv(dev);
 	char filename[PATH_MAX];
@@ -1096,10 +1175,13 @@ int linux_enumerate_device(struct libusb_context *ctx,
 	if (r < 0)
 		goto out;
 out:
+
 	if (r < 0)
 		libusb_unref_device(dev);
+#if defined(USE_UDEV) || defined(USE_NETLINK)
 	else
 		usbi_connect_device(dev);
+#endif
 
 	return r;
 }
@@ -1249,6 +1331,8 @@ static int sysfs_get_device_list(struct libusb_context *ctx)
 		return r;
 	}
 
+	r = LIBUSB_SUCCESS;
+
 	while ((entry = readdir(devices))) {
 		if ((!isdigit(entry->d_name[0]) && strncmp(entry->d_name, "usb", 3))
 				|| strchr(entry->d_name, ':'))
@@ -1258,8 +1342,6 @@ static int sysfs_get_device_list(struct libusb_context *ctx)
 			usbi_dbg("failed to enumerate dir entry %s", entry->d_name);
 			continue;
 		}
-
-		r = 0;
 	}
 
 	closedir(devices);
@@ -2661,8 +2743,13 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
 	.init = op_init,
 	.exit = op_exit,
+#if defined(USE_UDEV) || defined(USE_NETLINK)
 	.get_device_list = NULL,
 	.hotplug_poll = op_hotplug_poll,
+#else
+	.get_device_list = op_get_device_list,
+	.hotplug_poll = NULL,
+#endif
 	.get_device_descriptor = op_get_device_descriptor,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,
