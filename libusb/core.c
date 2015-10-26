@@ -1351,10 +1351,10 @@ static void do_close(struct libusb_context *ctx,
 		if (transfer->dev_handle != dev_handle)
 			continue;
 
-		if (!(itransfer->flags & USBI_TRANSFER_DEVICE_DISAPPEARED)) {
+		if (!(itransfer->state_flags & USBI_TRANSFER_DEVICE_DISAPPEARED)) {
 			usbi_err(ctx, "Device handle closed while transfer was still being processed, but the device is still connected as far as we know");
 
-			if (itransfer->flags & USBI_TRANSFER_CANCELLING)
+			if (itransfer->state_flags & USBI_TRANSFER_CANCELLING)
 				usbi_warn(ctx, "A cancellation for an in-flight transfer hasn't completed but closing the device handle");
 			else
 				usbi_err(ctx, "A cancellation hasn't even been scheduled on the transfer for which the device is closing");

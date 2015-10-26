@@ -1561,7 +1561,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
       ret = (*(cInterface->interface))->WritePipeAsync(cInterface->interface, pipeRef, transfer->buffer,
                                                        transfer->length, darwin_async_io_callback, itransfer);
   } else {
-    itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+    itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
     if (IS_XFERIN(transfer))
       ret = (*(cInterface->interface))->ReadPipeAsyncTO(cInterface->interface, pipeRef, transfer->buffer,
@@ -1593,7 +1593,7 @@ static int submit_stream_transfer(struct usbi_transfer *itransfer) {
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
-  itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+  itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
   if (IS_XFERIN(transfer))
     ret = (*(cInterface->interface))->ReadStreamsPipeAsyncTO(cInterface->interface, pipeRef, itransfer->stream_id,
@@ -1721,7 +1721,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   tpriv->req.completionTimeout = transfer->timeout;
   tpriv->req.noDataTimeout     = transfer->timeout;
 
-  itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+  itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
   /* all transfers in libusb-1.0 are async */
 
@@ -1870,7 +1870,7 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 }
 
 static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_t result) {
-  if (itransfer->flags & USBI_TRANSFER_TIMED_OUT)
+  if (itransfer->timeout_flags & USBI_TRANSFER_TIMED_OUT)
     result = kIOUSBTransactionTimeout;
 
   switch (result) {
@@ -1887,7 +1887,7 @@ static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_
     return LIBUSB_TRANSFER_OVERFLOW;
   case kIOUSBTransactionTimeout:
     usbi_warn (ITRANSFER_CTX (itransfer), "transfer error: timed out");
-    itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
+    itransfer->timeout_flags |= USBI_TRANSFER_TIMED_OUT;
     return LIBUSB_TRANSFER_TIMED_OUT;
   default:
     usbi_warn (ITRANSFER_CTX (itransfer), "transfer error: %s (value = 0x%08x)", darwin_error_str (result), result);

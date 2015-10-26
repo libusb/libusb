@@ -277,6 +277,8 @@ struct libusb_context {
 	 * the list, URBs that will time out later are placed after, and urbs with
 	 * infinite timeout are always placed at the very end. */
 	struct list_head flying_transfers;
+	/* Note paths taking both this and usbi_transfer->lock must always
+	 * take this lock first */
 	usbi_mutex_t flying_transfers_lock;
 
 	/* user callbacks for pollfd changes */
@@ -440,7 +442,8 @@ struct usbi_transfer {
 	struct timeval timeout;
 	int transferred;
 	uint32_t stream_id;
-	uint8_t flags;
+	uint8_t state_flags;   /* Protected by usbi_transfer->lock */
+	uint8_t timeout_flags; /* Protected by the flying_stransfers_lock */
 
 	/* this lock is held during libusb_submit_transfer() and
 	 * libusb_cancel_transfer() (allowing the OS backend to prevent duplicate
@@ -448,38 +451,32 @@ struct usbi_transfer {
 	 * should also take this lock in the handle_events path, to prevent the user
 	 * cancelling the transfer from another thread while you are processing
 	 * its completion (presumably there would be races within your OS backend
-	 * if this were possible). */
+	 * if this were possible).
+	 * Note paths taking both this and the flying_transfers_lock must
+	 * always take the flying_transfers_lock first */
 	usbi_mutex_t lock;
-
-	/* this lock should be held whenever viewing or modifying flags
-	 * relating to the transfer state */
-	usbi_mutex_t flags_lock;
 };
 
-enum usbi_transfer_flags {
-	/* The transfer has timed out */
-	USBI_TRANSFER_TIMED_OUT = 1 << 0,
-
-	/* Set by backend submit_transfer() if the OS handles timeout */
-	USBI_TRANSFER_OS_HANDLES_TIMEOUT = 1 << 1,
+enum usbi_transfer_state_flags {
+	/* Transfer successfully submitted by backend */
+	USBI_TRANSFER_IN_FLIGHT = 1 << 0,
 
 	/* Cancellation was requested via libusb_cancel_transfer() */
-	USBI_TRANSFER_CANCELLING = 1 << 2,
+	USBI_TRANSFER_CANCELLING = 1 << 1,
 
 	/* Operation on the transfer failed because the device disappeared */
-	USBI_TRANSFER_DEVICE_DISAPPEARED = 1 << 3,
+	USBI_TRANSFER_DEVICE_DISAPPEARED = 1 << 2,
+};
 
-	/* Transfer is currently being submitted */
-	USBI_TRANSFER_SUBMITTING = 1 << 4,
-
-	/* Transfer successfully submitted by backend */
-	USBI_TRANSFER_IN_FLIGHT = 1 << 5,
-
-	/* Completion handler has run */
-	USBI_TRANSFER_COMPLETED = 1 << 6,
+enum usbi_transfer_timeout_flags {
+	/* Set by backend submit_transfer() if the OS handles timeout */
+	USBI_TRANSFER_OS_HANDLES_TIMEOUT = 1 << 0,
 
 	/* The transfer timeout has been handled */
-	USBI_TRANSFER_TIMEOUT_HANDLED = 1 << 7,
+	USBI_TRANSFER_TIMEOUT_HANDLED = 1 << 1,
+
+	/* The transfer timeout was successfully processed */
+	USBI_TRANSFER_TIMED_OUT = 1 << 2,
 };
 
 #define USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)			\
