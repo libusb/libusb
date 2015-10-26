@@ -1125,7 +1125,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	int r;
 
 	usbi_mutex_init(&ctx->flying_transfers_lock);
-	usbi_mutex_init_recursive(&ctx->events_lock);
+	usbi_mutex_init(&ctx->events_lock);
 	usbi_mutex_init(&ctx->event_waiters_lock);
 	usbi_cond_init(&ctx->event_waiters_cond);
 	usbi_mutex_init(&ctx->event_data_lock);
