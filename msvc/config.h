@@ -30,6 +30,11 @@
 /* Enable global message logging */
 #define ENABLE_LOGGING 1
 
+/* VS 2015 includes timespec */
+#if _MSC_VER >= 1900
+#define HAVE_STRUCT_TIMESPEC 1
+#endif
+
 /* Uncomment to start with debug message logging enabled */
 // #define ENABLE_DEBUG_LOGGING 1
 
