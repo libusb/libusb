@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <libkern/OSAtomic.h>
+#include <sys/sysctl.h>
 
 #include <mach/clock.h>
 #include <mach/clock_types.h>
@@ -46,6 +47,8 @@
 static pthread_mutex_t libusb_darwin_at_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  libusb_darwin_at_cond = PTHREAD_COND_INITIALIZER;
 
+static pthread_once_t darwin_init_once = PTHREAD_ONCE_INIT;
+
 static clock_serv_t clock_realtime;
 static clock_serv_t clock_monotonic;
 
@@ -54,6 +57,7 @@ static volatile int32_t initCount = 0;
 
 static usbi_mutex_t darwin_cached_devices_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct list_head darwin_cached_devices = {&darwin_cached_devices, &darwin_cached_devices};
+static char *darwin_device_class = kIOUSBDeviceClassName;
 
 #define DARWIN_CACHED_DEVICE(a) ((struct darwin_cached_device *) (((struct darwin_device_priv *)((a)->os_priv))->dev))
 
@@ -189,7 +193,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
 }
 
 static int usb_setup_device_iterator (io_iterator_t *deviceIterator, UInt32 location) {
-  CFMutableDictionaryRef matchingDict = IOServiceMatching(kIOUSBDeviceClassName);
+  CFMutableDictionaryRef matchingDict = IOServiceMatching(darwin_device_class);
 
   if (!matchingDict)
     return kIOReturnError;
@@ -229,6 +233,27 @@ static int get_ioregistry_value_number (io_service_t service, CFStringRef proper
     }
 
     CFRelease (cfNumber);
+  }
+
+  return ret;
+}
+
+static int get_ioregistry_value_data (io_service_t service, CFStringRef property, size_t size, void *p) {
+  CFTypeRef cfData = IORegistryEntryCreateCFProperty (service, property, kCFAllocatorDefault, 0);
+  int ret = 0;
+
+  if (cfData) {
+    if (CFGetTypeID (cfData) == CFDataGetTypeID ()) {
+      CFIndex length = CFDataGetLength (cfData);
+      if (length < size) {
+        size = length;
+      }
+
+      CFDataGetBytes (cfData, CFRangeMake(0, size), p);
+      ret = 1;
+    }
+
+    CFRelease (cfData);
   }
 
   return ret;
@@ -374,7 +399,7 @@ static void *darwin_event_thread_main (void *arg0) {
 
   /* create notifications for removed devices */
   kresult = IOServiceAddMatchingNotification (libusb_notification_port, kIOTerminatedNotification,
-                                              IOServiceMatching(kIOUSBDeviceClassName),
+                                              IOServiceMatching(darwin_device_class),
                                               darwin_devices_detached,
                                               ctx, &libusb_rem_device_iterator);
 
@@ -386,7 +411,7 @@ static void *darwin_event_thread_main (void *arg0) {
 
   /* create notifications for attached devices */
   kresult = IOServiceAddMatchingNotification(libusb_notification_port, kIOFirstMatchNotification,
-                                              IOServiceMatching(kIOUSBDeviceClassName),
+                                              IOServiceMatching(darwin_device_class),
                                               darwin_devices_attached,
                                               ctx, &libusb_add_device_iterator);
 
@@ -441,9 +466,30 @@ static void __attribute__((destructor)) _darwin_finalize(void) {
   usbi_mutex_unlock(&darwin_cached_devices_lock);
 }
 
+static void darwin_check_version (void) {
+  /* adjust for changes in the USB stack in xnu 15 */
+  int sysctl_args[] = {CTL_KERN, KERN_OSRELEASE};
+  long version;
+  char version_string[256] = {'\0',};
+  size_t length = 256;
+
+  sysctl(sysctl_args, 2, version_string, &length, NULL, 0);
+
+  errno = 0;
+  version = strtol (version_string, NULL, 10);
+  if (0 == errno && version >= 15) {
+    darwin_device_class = "IOUSBHostDevice";
+  }
+}
+
 static int darwin_init(struct libusb_context *ctx) {
   host_name_port_t host_self;
   int rc;
+
+  rc = pthread_once (&darwin_init_once, darwin_check_version);
+  if (rc) {
+    return LIBUSB_ERROR_OTHER;
+  }
 
   rc = darwin_scan_devices (ctx);
   if (LIBUSB_SUCCESS != rc) {
@@ -768,6 +814,24 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct da
   return LIBUSB_SUCCESS;
 }
 
+static int get_device_port (io_service_t service, UInt8 *port) {
+  kern_return_t result;
+  io_service_t parent;
+  int ret = 0;
+
+  if (get_ioregistry_value_number (service, CFSTR("PortNum"), kCFNumberSInt8Type, port)) {
+    return 1;
+  }
+
+  result = IORegistryEntryGetParentEntry (service, kIOServicePlane, &parent);
+  if (kIOReturnSuccess == result) {
+    ret = get_ioregistry_value_data (parent, CFSTR("port"), 1, port);
+    IOObjectRelease (parent);
+  }
+
+  return ret;
+}
+
 static int darwin_get_cached_device(struct libusb_context *ctx, io_service_t service,
                                     struct darwin_cached_device **cached_out) {
   struct darwin_cached_device *new_device;
@@ -780,7 +844,9 @@ static int darwin_get_cached_device(struct libusb_context *ctx, io_service_t ser
 
   /* get some info from the io registry */
   (void) get_ioregistry_value_number (service, CFSTR("sessionID"), kCFNumberSInt64Type, &sessionID);
-  (void) get_ioregistry_value_number (service, CFSTR("PortNum"), kCFNumberSInt8Type, &port);
+  if (!get_device_port (service, &port)) {
+    usbi_dbg("could not get connected port number");
+  }
 
   usbi_dbg("finding cached device for sessionID 0x%" PRIx64, sessionID);
 
