@@ -1034,9 +1034,11 @@ retry:
 	usbi_mutex_lock(&ctx->usb_devs_lock);
 	list_for_each_entry(it, &ctx->usb_devs, list, struct libusb_device) {
 		struct linux_device_priv *priv = _device_priv(it);
-		if (0 == strcmp (priv->sysfs_dir, parent_sysfs_dir)) {
-			dev->parent_dev = libusb_ref_device(it);
-			break;
+		if (priv->sysfs_dir) {
+			if (0 == strcmp (priv->sysfs_dir, parent_sysfs_dir)) {
+				dev->parent_dev = libusb_ref_device(it);
+				break;
+			}
 		}
 	}
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
