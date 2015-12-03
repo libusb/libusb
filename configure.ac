@@ -36,6 +36,7 @@ m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AC_PREREQ([2.50])
 AC_PROG_CC
+AC_PROG_CXX
 LT_INIT
 LT_LANG([Windows Resource])
 AC_C_INLINE
@@ -91,7 +92,6 @@ case $host in
 	;;
 *-haiku*)
 	AC_MSG_RESULT([Haiku])
-	AC_CONFIG_SUBDIRS([libusb/os/haiku])
 	backend="haiku"
 	threads="posix"
 	;;

@@ -34,18 +34,18 @@ class USBTransfer;
 class USBDevice {
 public:
 						USBDevice(const char *);
-	virtual 				~USBDevice();
-	const char* 				Location() const;
-	uint8 					CountConfigurations() const;
-	const usb_device_descriptor* 		Descriptor() const;
-	const usb_configuration_descriptor* 	ConfigurationDescriptor(uint32) const;
-	const usb_configuration_descriptor* 	ActiveConfiguration() const;
-	uint8 					EndpointToIndex(uint8) const;
-	uint8 					EndpointToInterface(uint8) const;
-	int 					ClaimInterface(int);
-	int 					ReleaseInterface(int);
-	int 					CheckInterfacesFree(int);
-	int 					SetActiveConfiguration(int);
+	virtual					~USBDevice();
+	const char*				Location() const;
+	uint8					CountConfigurations() const;
+	const usb_device_descriptor*		Descriptor() const;
+	const usb_configuration_descriptor*	ConfigurationDescriptor(uint32) const;
+	const usb_configuration_descriptor*	ActiveConfiguration() const;
+	uint8					EndpointToIndex(uint8) const;
+	uint8					EndpointToInterface(uint8) const;
+	int					ClaimInterface(int);
+	int					ReleaseInterface(int);
+	int					CheckInterfacesFree(int);
+	int					SetActiveConfiguration(int);
 	int					ActiveConfigurationIndex() const;
 	bool					InitCheck();
 private:
@@ -63,31 +63,31 @@ private:
 
 class USBDeviceHandle {
 public:
-				USBDeviceHandle(USBDevice* dev);
+				USBDeviceHandle(USBDevice *dev);
 	virtual			~USBDeviceHandle();
-	int 			ClaimInterface(int);
-	int 			ReleaseInterface(int);
-	int 			SetConfiguration(int);
-	int			SetAltSetting(int,int);
-	status_t 		SubmitTransfer(struct usbi_transfer*);
-	status_t		CancelTransfer(USBTransfer*);
+	int			ClaimInterface(int);
+	int			ReleaseInterface(int);
+	int			SetConfiguration(int);
+	int			SetAltSetting(int, int);
+	status_t		SubmitTransfer(struct usbi_transfer *);
+	status_t		CancelTransfer(USBTransfer *);
 	bool			InitCheck();
 private:
-	int 			fRawFD;
+	int			fRawFD;
 	static status_t		TransfersThread(void *);
-	void 			TransfersWorker();
+	void			TransfersWorker();
 	USBDevice*		fUSBDevice;
 	unsigned int		fClaimedInterfaces;
-	BList 			fTransfers;
-	BLocker 		fTransfersLock;
-	sem_id 			fTransfersSem;
-	thread_id 		fTransfersThread;
+	BList			fTransfers;
+	BLocker			fTransfersLock;
+	sem_id			fTransfersSem;
+	thread_id		fTransfersThread;
 	bool			fInitCheck;
 };
 
 class USBTransfer {
 public:
-					USBTransfer(struct usbi_transfer*,USBDevice*);
+					USBTransfer(struct usbi_transfer *, USBDevice *);
 	virtual				~USBTransfer();
 	void				Do(int);
 	struct usbi_transfer*		UsbiTransfer();

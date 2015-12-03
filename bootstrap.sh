@@ -12,14 +12,6 @@ else
   exit 1
 fi
 
-# run autotools on haiku package
-cd libusb/os/haiku || exit 1
-$LIBTOOLIZE --copy --force || exit 1
-aclocal || exit 1
-autoconf || exit 1
-automake -a -c || exit 1
-cd ../../..
-
 $LIBTOOLIZE --copy --force || exit 1
 aclocal || exit 1
 autoheader || exit 1
