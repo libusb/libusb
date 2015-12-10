@@ -323,6 +323,9 @@ struct libusb_context {
 enum usbi_event_flags {
 	/* The list of pollfds has been modified */
 	USBI_EVENT_POLLFDS_MODIFIED = 1 << 0,
+
+	/* The user has interrupted the event handler */
+	USBI_EVENT_USER_INTERRUPT = 1 << 1,
 };
 
 /* Macros for managing event handling state */

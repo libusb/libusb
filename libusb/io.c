@@ -1857,6 +1857,29 @@ int API_EXPORTED libusb_event_handler_active(libusb_context *ctx)
 }
 
 /** \ingroup poll
+ * Interrupt any active thread that is handling events. This is mainly useful
+ * for interrupting a dedicated event handling thread when an application
+ * wishes to call libusb_exit().
+ *
+ * Since version 1.0.21, \ref LIBUSB_API_VERSION >= 0x01000105
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \ref mtasync
+ */
+void API_EXPORTED libusb_interrupt_event_handler(libusb_context *ctx)
+{
+	USBI_GET_CONTEXT(ctx);
+
+	usbi_dbg("");
+	usbi_mutex_lock(&ctx->event_data_lock);
+	if (!usbi_pending_events(ctx)) {
+		ctx->event_flags |= USBI_EVENT_USER_INTERRUPT;
+		usbi_signal_event(ctx);
+	}
+	usbi_mutex_unlock(&ctx->event_data_lock);
+}
+
+/** \ingroup poll
  * Acquire the event waiters lock. This lock is designed to be obtained under
  * the situation where you want to be aware when events are completed, but
  * some other thread is event handling so calling libusb_handle_events() is not
@@ -2148,6 +2171,11 @@ redo_poll:
 		/* check if someone added a new poll fd */
 		if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED)
 			usbi_dbg("someone updated the poll fds");
+
+		if (ctx->event_flags & USBI_EVENT_USER_INTERRUPT) {
+			usbi_dbg("someone purposely interrupted");
+			ctx->event_flags &= ~USBI_EVENT_USER_INTERRUPT;
+		}
 
 		/* check if someone is closing a device */
 		if (ctx->device_close)
