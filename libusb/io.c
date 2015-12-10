@@ -2070,7 +2070,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	/* only reallocate the poll fds when the list of poll fds has been modified
 	 * since the last poll, otherwise reuse them to save the additional overhead */
 	usbi_mutex_lock(&ctx->event_data_lock);
-	if (ctx->pollfds_modified) {
+	if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED) {
 		usbi_dbg("poll fds modified, reallocating");
 
 		if (ctx->pollfds) {
@@ -2097,7 +2097,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		}
 
 		/* reset the flag now that we have the updated list */
-		ctx->pollfds_modified = 0;
+		ctx->event_flags &= ~USBI_EVENT_POLLFDS_MODIFIED;
 
 		/* if no further pending events, clear the event pipe so that we do
 		 * not immediately return from poll */
@@ -2146,7 +2146,7 @@ redo_poll:
 		usbi_mutex_lock(&ctx->event_data_lock);
 
 		/* check if someone added a new poll fd */
-		if (ctx->pollfds_modified)
+		if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED)
 			usbi_dbg("someone updated the poll fds");
 
 		/* check if someone is closing a device */
@@ -2606,7 +2606,7 @@ static void usbi_fd_notification(struct libusb_context *ctx)
 	/* Record that there is a new poll fd.
 	 * Only signal an event if there are no prior pending events. */
 	pending_events = usbi_pending_events(ctx);
-	ctx->pollfds_modified = 1;
+	ctx->event_flags |= USBI_EVENT_POLLFDS_MODIFIED;
 	if (!pending_events)
 		usbi_signal_event(ctx);
 }

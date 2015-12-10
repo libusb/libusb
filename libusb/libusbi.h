@@ -291,18 +291,19 @@ struct libusb_context {
 	/* A lock to protect internal context event data. */
 	usbi_mutex_t event_data_lock;
 
+	/* A bitmask of flags that are set to indicate specific events that need to
+	 * be handled. Protected by event_data_lock. */
+	unsigned int event_flags;
+
 	/* A counter that is set when we want to interrupt and prevent event handling,
 	 * in order to safely close a device. Protected by event_data_lock. */
 	unsigned int device_close;
 
 	/* list and count of poll fds and an array of poll fd structures that is
-	 * (re)allocated as necessary prior to polling, and a flag to indicate
-	 * when the list of poll fds has changed since the last poll.
-	 * Protected by event_data_lock. */
+	 * (re)allocated as necessary prior to polling. Protected by event_data_lock. */
 	struct list_head ipollfds;
 	struct pollfd *pollfds;
 	POLL_NFDS_TYPE pollfds_cnt;
-	unsigned int pollfds_modified;
 
 	/* A list of pending hotplug messages. Protected by event_data_lock. */
 	struct list_head hotplug_msgs;
@@ -319,6 +320,11 @@ struct libusb_context {
 	struct list_head list;
 };
 
+enum usbi_event_flags {
+	/* The list of pollfds has been modified */
+	USBI_EVENT_POLLFDS_MODIFIED = 1 << 0,
+};
+
 /* Macros for managing event handling state */
 #define usbi_handling_events(ctx) \
 	(usbi_tls_key_get((ctx)->event_handling_key) != NULL)
@@ -331,7 +337,7 @@ struct libusb_context {
 
 /* Update the following macro if new event sources are added */
 #define usbi_pending_events(ctx) \
-	((ctx)->device_close || (ctx)->pollfds_modified \
+	((ctx)->event_flags || (ctx)->device_close \
 	 || !list_empty(&(ctx)->hotplug_msgs) || !list_empty(&(ctx)->completed_transfers))
 
 #ifdef USBI_TIMERFD_AVAILABLE
