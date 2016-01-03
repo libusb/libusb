@@ -24,8 +24,10 @@ The libusb library, examples and tests can then be found in:
 Where $ARCH is one of:
     armeabi
     armeabi-v7a
+    mips
+    mips64
     x86
-
+    x86_64
 
 Installing:
 -----------
