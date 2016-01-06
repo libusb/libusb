@@ -843,6 +843,7 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 /* send a control message to retrieve active configuration */
 static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 {
+	struct linux_device_priv *priv = _device_priv(dev);
 	unsigned char active_config = 0;
 	int r;
 
@@ -864,10 +865,23 @@ static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 		/* we hit this error path frequently with buggy devices :( */
 		usbi_warn(DEVICE_CTX(dev),
 			"get_configuration failed ret=%d errno=%d", r, errno);
-		return LIBUSB_ERROR_IO;
+		priv->active_config = -1;
+	} else {
+		if (active_config > 0) {
+			priv->active_config = active_config;
+		} else {
+			/* some buggy devices have a configuration 0, but we're
+			 * reaching into the corner of a corner case here, so let's
+			 * not support buggy devices in these circumstances.
+			 * stick to the specs: a configuration value of 0 means
+			 * unconfigured. */
+			usbi_warn(DEVICE_CTX(dev),
+				"active cfg 0? assuming unconfigured device");
+			priv->active_config = -1;
+		}
 	}
 
-	return active_config;
+	return LIBUSB_SUCCESS;
 }
 
 static int initialize_device(struct libusb_device *dev, uint8_t busnum,
@@ -966,28 +980,8 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	}
 
 	r = usbfs_get_active_config(dev, fd);
-	if (r > 0) {
-		priv->active_config = r;
-		r = LIBUSB_SUCCESS;
-	} else if (r == 0) {
-		/* some buggy devices have a configuration 0, but we're
-		 * reaching into the corner of a corner case here, so let's
-		 * not support buggy devices in these circumstances.
-		 * stick to the specs: a configuration value of 0 means
-		 * unconfigured. */
-		usbi_dbg("active cfg 0? assuming unconfigured device");
-		priv->active_config = -1;
-		r = LIBUSB_SUCCESS;
-	} else if (r == LIBUSB_ERROR_IO) {
-		/* buggy devices sometimes fail to report their active config.
-		 * assume unconfigured and continue the probing */
-		usbi_warn(ctx, "couldn't query active configuration, assuming"
-			       " unconfigured");
-		priv->active_config = -1;
-		r = LIBUSB_SUCCESS;
-	} /* else r < 0, just return the error code */
-
 	close(fd);
+
 	return r;
 }
 
@@ -1345,6 +1339,8 @@ static int op_get_configuration(struct libusb_device_handle *handle,
 	} else {
 		r = usbfs_get_active_config(handle->dev,
 					    _device_handle_priv(handle)->fd);
+		if (r == LIBUSB_SUCCESS)
+			*config = _device_priv(handle->dev)->active_config;
 	}
 	if (r < 0)
 		return r;
