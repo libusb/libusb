@@ -53,7 +53,7 @@ static char* windows_error_str(uint32_t retval)
 
 	error_code = retval?retval:GetLastError();
 
-	safe_stprintf(wErr_string, ERR_BUFFER_SIZE, _T("[%d] "), error_code);
+	safe_stprintf(wErr_string, ERR_BUFFER_SIZE, _T("[%u] "), error_code);
 
 	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
 		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &wErr_string[safe_tcslen(wErr_string)],
@@ -286,19 +286,19 @@ static int wince_get_device_list(
 		success = UkwGetDeviceAddress(devices[i], &bus_addr, &dev_addr, &session_id);
 		if (!success) {
 			r = translate_driver_error(GetLastError());
-			usbi_err(ctx, "could not get device address for %d: %s", i, windows_error_str(0));
+			usbi_err(ctx, "could not get device address for %u: %s", (unsigned int)i, windows_error_str(0));
 			goto err_out;
 		}
 		dev = usbi_get_device_by_session_id(ctx, session_id);
 		if (dev) {
-			usbi_dbg("using existing device for %d/%d (session %ld)",
+			usbi_dbg("using existing device for %u/%u (session %lu)",
 					bus_addr, dev_addr, session_id);
 			// Release just this element in the device list (as we already hold a
 			// reference to it).
 			UkwReleaseDeviceList(driver_handle, &devices[i], 1);
 			release_list_offset++;
 		} else {
-			usbi_dbg("allocating new device for %d/%d (session %ld)",
+			usbi_dbg("allocating new device for %u/%u (session %lu)",
 					bus_addr, dev_addr, session_id);
 			dev = usbi_alloc_device(ctx, session_id);
 			if (!dev) {
@@ -579,8 +579,8 @@ static int wince_submit_control_or_bulk_transfer(struct usbi_transfer *itransfer
 	}
 	if (!ret) {
 		int libusbErr = translate_driver_error(GetLastError());
-		usbi_err(ctx, "UkwIssue%sTransfer failed: error %d",
-			control_transfer ? "Control" : "Bulk", GetLastError());
+		usbi_err(ctx, "UkwIssue%sTransfer failed: error %u",
+			control_transfer ? "Control" : "Bulk", (unsigned int)GetLastError());
 		wince_clear_transfer_priv(itransfer);
 		return libusbErr;
 	}
@@ -622,7 +622,7 @@ static void wince_transfer_callback(
 	struct wince_device_priv *priv = _device_priv(transfer->dev_handle->dev);
 	int status;
 
-	usbi_dbg("handling I/O completion with errcode %d", io_result);
+	usbi_dbg("handling I/O completion with errcode %u", io_result);
 
 	if (io_result == ERROR_NOT_SUPPORTED &&
 		transfer->type != LIBUSB_TRANSFER_TYPE_CONTROL) {
@@ -772,11 +772,11 @@ static int wince_handle_events(
 			// newly allocated wfd that took the place of the one from the transfer.
 			wince_handle_callback(transfer, io_result, io_size);
 		} else if (found) {
-			usbi_err(ctx, "matching transfer for fd %x has not completed", fds[i]);
+			usbi_err(ctx, "matching transfer for fd %d has not completed", fds[i]);
 			usbi_mutex_unlock(&ctx->open_devs_lock);
 			return LIBUSB_ERROR_OTHER;
 		} else {
-			usbi_err(ctx, "could not find a matching transfer for fd %x", fds[i]);
+			usbi_err(ctx, "could not find a matching transfer for fd %d", fds[i]);
 			usbi_mutex_unlock(&ctx->open_devs_lock);
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
