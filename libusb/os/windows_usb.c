@@ -443,7 +443,7 @@ static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details_filter(struct li
 				if (libusb0_symboliclink_index < 256) {
 					// libusb0.sys is connected to this device instance.
 					// If the the device interface guid is {F9F3FF14-AE21-48A0-8A25-8011A7A931D9} then it's a filter.
-					safe_sprintf(filter_path, sizeof("\\\\.\\libusb0-0000"), "\\\\.\\libusb0-%04d", libusb0_symboliclink_index);
+					safe_sprintf(filter_path, sizeof("\\\\.\\libusb0-0000"), "\\\\.\\libusb0-%04u", (unsigned int)libusb0_symboliclink_index);
 					usbi_dbg("assigned libusb0 symbolic link %s", filter_path);
 				} else {
 					// libusb0.sys was connected to this device instance at one time; but not anymore.
@@ -503,7 +503,7 @@ static int htab_create(struct libusb_context *ctx, unsigned long nel)
 		nel += 2;
 
 	htab_size = nel;
-	usbi_dbg("using %d entries hash table", nel);
+	usbi_dbg("using %lu entries hash table", nel);
 	htab_filled = 0;
 
 	// allocate memory and zero out.
@@ -603,7 +603,7 @@ static unsigned long htab_hash(char* str)
 
 	// If the table is full return an error
 	if (htab_filled >= htab_size) {
-		usbi_err(NULL, "hash table is full (%d entries)", htab_size);
+		usbi_err(NULL, "hash table is full (%lu entries)", htab_size);
 		return 0;
 	}
 
@@ -675,7 +675,7 @@ static int get_interface_by_endpoint(struct libusb_config_descriptor *conf_desc,
 			intf_desc = &intf->altsetting[j];
 			for (k = 0; k < intf_desc->bNumEndpoints; k++) {
 				if (intf_desc->endpoint[k].bEndpointAddress == ep) {
-					usbi_dbg("found endpoint %02X on interface %d", intf_desc->bInterfaceNumber);
+					usbi_dbg("found endpoint %02X on interface %d", intf_desc->bInterfaceNumber, i);
 					return intf_desc->bInterfaceNumber;
 				}
 			}
@@ -935,7 +935,7 @@ static void get_windows_version(void)
 	vlen = sizeof(windows_version_str) - sizeof("Windows ") - 1;
 	if (!w)
 		safe_sprintf(vptr, vlen, "%s %u.%u %s", (vi.dwPlatformId==VER_PLATFORM_WIN32_NT?"NT":"??"),
-			(unsigned)vi.dwMajorVersion, (unsigned)vi.dwMinorVersion, w64);
+			(unsigned int)vi.dwMajorVersion, (unsigned int)vi.dwMinorVersion, w64);
 	else if (vi.wServicePackMinor)
 		safe_sprintf(vptr, vlen, "%s SP%u.%u %s", w, vi.wServicePackMajor, vi.wServicePackMinor, w64);
 	else if (vi.wServicePackMajor)
@@ -960,7 +960,7 @@ static int windows_init(struct libusb_context *ctx)
 	LARGE_INTEGER li_frequency;
 	char sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
-	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
+	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId());
 	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		usbi_err(ctx, "could not create semaphore: %s", windows_error_str(0));
@@ -1211,7 +1211,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
-		usbi_dbg("cached config descriptor %d (bConfigurationValue=%d, %d bytes)",
+		usbi_dbg("cached config descriptor %d (bConfigurationValue=%u, %u bytes)",
 			i, cd_data->bConfigurationValue, cd_data->wTotalLength);
 
 		// Cache the descriptor
@@ -1259,7 +1259,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 			tmp_dev = usbi_get_device_by_session_id(ctx, tmp_id);
 			if (tmp_dev == NULL) continue;
 			if (tmp_dev->bus_number != 0) {
-				usbi_dbg("got bus number from ancestor #%d", i);
+				usbi_dbg("got bus number from ancestor #%u", i);
 				parent_dev->bus_number = tmp_dev->bus_number;
 				libusb_unref_device(tmp_dev);
 				break;
@@ -1308,7 +1308,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		memcpy(&priv->dev_descriptor, &(conn_info.DeviceDescriptor), sizeof(USB_DEVICE_DESCRIPTOR));
 		dev->num_configurations = priv->dev_descriptor.bNumConfigurations;
 		priv->active_config = conn_info.CurrentConfigurationValue;
-		usbi_dbg("found %d configurations (active conf: %d)", dev->num_configurations, priv->active_config);
+		usbi_dbg("found %u configurations (active conf: %u)", dev->num_configurations, priv->active_config);
 		// If we can't read the config descriptors, just set the number of confs to zero
 		if (cache_config_descriptors(dev, handle, device_id) != LIBUSB_SUCCESS) {
 			dev->num_configurations = 0;
@@ -1346,7 +1346,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 		case 2: dev->speed = LIBUSB_SPEED_HIGH; break;
 		case 3: dev->speed = LIBUSB_SPEED_SUPER; break;
 		default:
-			usbi_warn(ctx, "Got unknown device speed %d", conn_info.Speed);
+			usbi_warn(ctx, "Got unknown device speed %u", conn_info.Speed);
 			break;
 		}
 	} else {
@@ -1356,7 +1356,7 @@ static int init_device(struct libusb_device* dev, struct libusb_device* parent_d
 
 	usbi_sanitize_device(dev);
 
-	usbi_dbg("(bus: %d, addr: %d, depth: %d, port: %d): '%s'",
+	usbi_dbg("(bus: %u, addr: %u, depth: %u, port: %u): '%s'",
 		dev->bus_number, dev->device_address, priv->depth, priv->port, device_id);
 
 	return LIBUSB_SUCCESS;
@@ -1495,7 +1495,7 @@ static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* d
 
 	priv->usb_interface[priv->hid->nb_interfaces].path = dev_interface_path;
 	priv->usb_interface[priv->hid->nb_interfaces].apib = &usb_api_backend[USB_API_HID];
-	usbi_dbg("interface[%d] = %s", priv->hid->nb_interfaces, dev_interface_path);
+	usbi_dbg("interface[%u] = %s", priv->hid->nb_interfaces, dev_interface_path);
 	priv->hid->nb_interfaces++;
 	return LIBUSB_SUCCESS;
 }
@@ -1614,13 +1614,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			// Note that if the device is plugged in a different port or hub, the Device ID changes
 			if (CM_Get_Device_IDA(dev_info_data.DevInst, path, sizeof(path), 0) != CR_SUCCESS) {
 				usbi_warn(ctx, "could not read the device id path for devinst %X, skipping",
-					dev_info_data.DevInst);
+					(unsigned int)dev_info_data.DevInst);
 				continue;
 			}
 			dev_id_path = sanitize_path(path);
 			if (dev_id_path == NULL) {
 				usbi_warn(ctx, "could not sanitize device id path for devinst %X, skipping",
-					dev_info_data.DevInst);
+					(unsigned int)dev_info_data.DevInst);
 				continue;
 			}
 #ifdef ENUM_DEBUG
@@ -1688,8 +1688,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					usbi_warn(ctx, "could not detect installation state of driver for '%s': %s",
 						dev_id_path, windows_error_str(0));
 				} else if (install_state != 0) {
-					usbi_warn(ctx, "driver for device '%s' is reporting an issue (code: %d) - skipping",
-						dev_id_path, install_state);
+					usbi_warn(ctx, "driver for device '%s' is reporting an issue (code: %u) - skipping",
+						dev_id_path, (unsigned int)install_state);
 					continue;
 				}
 				get_api_type(ctx, &dev_info, &dev_info_data, &api, &sub_api);
@@ -1737,13 +1737,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 							" - ignoring", dev_id_path);
 						continue;
 					}
-					usbi_dbg("allocating new device for session [%X]", session_id);
+					usbi_dbg("allocating new device for session [%lX]", session_id);
 					if ((dev = usbi_alloc_device(ctx, session_id)) == NULL) {
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 					}
 					windows_device_priv_init(dev);
 				} else {
-					usbi_dbg("found existing device for session [%X] (%d.%d)",
+					usbi_dbg("found existing device for session [%lX] (%u.%u)",
 						session_id, dev->bus_number, dev->device_address);
 				}
 				// Keep track of devices that need unref
@@ -1872,7 +1872,7 @@ static void windows_exit(void)
 	HANDLE semaphore;
 	char sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
-	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
+	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId());
 	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		return;
@@ -2219,7 +2219,7 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 	struct windows_device_priv *priv = _device_priv(transfer->dev_handle->dev);
 	int status, istatus;
 
-	usbi_dbg("handling I/O completion with errcode %d, size %d", io_result, io_size);
+	usbi_dbg("handling I/O completion with errcode %u, size %u", io_result, io_size);
 
 	switch(io_result) {
 	case NO_ERROR:
@@ -2247,7 +2247,7 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 		}
 		break;
 	default:
-		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %d: %s", io_result, windows_error_str(io_result));
+		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %u: %s", io_result, windows_error_str(io_result));
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	}
@@ -2325,7 +2325,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 			windows_handle_callback(transfer, io_result, io_size);
 		} else {
 			usbi_mutex_unlock(&ctx->open_devs_lock);
-			usbi_err(ctx, "could not find a matching transfer for fd %x", fds[i]);
+			usbi_err(ctx, "could not find a matching transfer for fd %d", fds[i]);
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
 	}
@@ -3638,7 +3638,7 @@ static int _hid_get_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	}
 
 	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
-		usbi_dbg("invalid size (%d)", *size);
+		usbi_dbg("invalid size (%u)", *size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
@@ -3718,7 +3718,7 @@ static int _hid_set_report(struct hid_device_priv* dev, HANDLE hid_handle, int i
 	}
 
 	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
-		usbi_dbg("invalid size (%d)", *size);
+		usbi_dbg("invalid size (%u)", *size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
@@ -3919,7 +3919,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 		size[1] = capabilities.NumberOutputValueCaps;
 		size[2] = capabilities.NumberFeatureValueCaps;
 		for (j=HidP_Input; j<=HidP_Feature; j++) {
-			usbi_dbg("%d HID %s report value(s) found", size[j], type[j]);
+			usbi_dbg("%u HID %s report value(s) found", (unsigned int)size[j], type[j]);
 			priv->hid->uses_report_ids[j] = false;
 			if (size[j] > 0) {
 				value_caps = (HIDP_VALUE_CAPS*) calloc(size[j], sizeof(HIDP_VALUE_CAPS));
