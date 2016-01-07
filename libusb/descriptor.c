@@ -94,7 +94,7 @@ int usbi_parse_descriptor(const unsigned char *source, const char *descriptor,
 
 static void clear_endpoint(struct libusb_endpoint_descriptor *endpoint)
 {
-	free((unsigned char *) endpoint->extra);
+	free(endpoint->extra);
 }
 
 static int parse_endpoint(struct libusb_context *ctx,
@@ -192,24 +192,18 @@ static void clear_interface(struct libusb_interface *usb_interface)
 	int i;
 	int j;
 
-	if (usb_interface->altsetting) {
-		for (i = 0; i < usb_interface->num_altsetting; i++) {
-			struct libusb_interface_descriptor *ifp =
-				(struct libusb_interface_descriptor *)
-				usb_interface->altsetting + i;
-			if (ifp->extra)
-				free((void *) ifp->extra);
-			if (ifp->endpoint) {
-				for (j = 0; j < ifp->bNumEndpoints; j++)
-					clear_endpoint((struct libusb_endpoint_descriptor *)
-						ifp->endpoint + j);
-				free((void *) ifp->endpoint);
-			}
-		}
-		free((void *) usb_interface->altsetting);
-		usb_interface->altsetting = NULL;
+	for (i = 0; i < usb_interface->num_altsetting; i++) {
+		struct libusb_interface_descriptor *ifp =
+			(struct libusb_interface_descriptor *)
+			usb_interface->altsetting + i;
+		free(ifp->extra);
+		for (j = 0; j < ifp->bNumEndpoints; j++)
+			clear_endpoint((struct libusb_endpoint_descriptor *)
+				ifp->endpoint + j);
+		free(ifp->endpoint);
 	}
-
+	free(usb_interface->altsetting);
+	usb_interface->altsetting = NULL;
 }
 
 static int parse_interface(libusb_context *ctx,
@@ -363,15 +357,12 @@ err:
 
 static void clear_configuration(struct libusb_config_descriptor *config)
 {
-	if (config->interface) {
-		int i;
-		for (i = 0; i < config->bNumInterfaces; i++)
-			clear_interface((struct libusb_interface *)
-				config->interface + i);
-		free((void *) config->interface);
-	}
-	if (config->extra)
-		free((void *) config->extra);
+	int i;
+	for (i = 0; i < config->bNumInterfaces; i++)
+		clear_interface((struct libusb_interface *)
+			config->interface + i);
+	free(config->interface);
+	free(config->extra);
 }
 
 static int parse_configuration(struct libusb_context *ctx,
