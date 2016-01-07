@@ -1470,6 +1470,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	struct usbi_transfer *itransfer =
 		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int remove = 0;
+	int canceled = 0;
 	int r;
 
 	usbi_dbg("transfer %p", transfer);
@@ -1477,6 +1478,11 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	usbi_mutex_lock(&itransfer->flags_lock);
 	if (itransfer->flags & USBI_TRANSFER_IN_FLIGHT) {
 		r = LIBUSB_ERROR_BUSY;
+		goto out;
+	}
+	if (itransfer->flags & USBI_TRANSFER_CANCELLING) {
+		canceled = 1;
+		r = LIBUSB_TRANSFER_CANCELLED;
 		goto out;
 	}
 	itransfer->transferred = 0;
@@ -1525,6 +1531,12 @@ out:
 		remove_from_flying_list(itransfer);
 	}
 	usbi_mutex_unlock(&itransfer->lock);
+	if (canceled) {
+		transfer->status = LIBUSB_TRANSFER_CANCELLED;
+		transfer->actual_length = 0;
+		if (transfer->callback)
+			transfer->callback(transfer);
+	}
 	return r;
 }
 
@@ -1551,8 +1563,12 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 	usbi_dbg("transfer %p", transfer );
 	usbi_mutex_lock(&itransfer->lock);
 	usbi_mutex_lock(&itransfer->flags_lock);
-	if (!(itransfer->flags & USBI_TRANSFER_IN_FLIGHT)
-			|| (itransfer->flags & USBI_TRANSFER_CANCELLING)) {
+	if (itransfer->flags & USBI_TRANSFER_CANCELLING) {
+		r = LIBUSB_ERROR_NOT_FOUND;
+		goto out;
+	}
+	if (!(itransfer->flags & USBI_TRANSFER_IN_FLIGHT)) {
+		itransfer->flags |= USBI_TRANSFER_CANCELLING;
 		r = LIBUSB_ERROR_NOT_FOUND;
 		goto out;
 	}
