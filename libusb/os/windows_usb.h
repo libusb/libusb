@@ -48,7 +48,7 @@
 #endif
 
 #if defined(__CYGWIN__ )
-#define _stricmp stricmp
+#define _stricmp strcasecmp
 #define _snprintf snprintf
 #define _strdup strdup
 // _beginthreadex is MSVCRT => unavailable for cygwin. Fallback to using CreateThread
