@@ -268,9 +268,9 @@ static int init_dlls(void)
  * usb_class: the generic USB class for which to retrieve interface details
  * index: zero based index of the interface in the device info list
  *
- * Note: it is the responsibility of the caller to free the DEVICE_INTERFACE_DETAIL_DATA
- * structure returned and call this function repeatedly using the same guid (with an
- * incremented index starting at zero) until all interfaces have been returned.
+ * Note: it is the responsibility of the caller to call this function
+ * repeatedly using the same guid (with an incremented index starting
+ * at zero) until all interfaces have been returned.
  */
 static bool get_devinfo_data(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const char* usb_class, unsigned _index)
@@ -1489,7 +1489,7 @@ static int set_hid_interface(struct libusb_context* ctx, struct libusb_device* d
 	for (i=0; i<priv->hid->nb_interfaces; i++) {
 		if (safe_strcmp(priv->usb_interface[i].path, dev_interface_path) == 0) {
 			usbi_dbg("interface[%d] already set to %s", i, dev_interface_path);
-			return LIBUSB_SUCCESS;
+			return LIBUSB_ERROR_ACCESS;
 		}
 	}
 
@@ -1591,6 +1591,10 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				if (dev_interface_details == NULL) {
 					break;
 				} else {
+					/* dev_interface_path is allocated here and freed during the "safe loop" cleanup above. In cases
+					   where we wamt to hold onto this string permanently (ie it gets assigned to a device
+					   structure), the variable must be nulled out before the loop restarts.
+					*/
 					dev_interface_path = sanitize_path(dev_interface_details->DevicePath);
 					if (dev_interface_path == NULL) {
 						usbi_warn(ctx, "could not sanitize device interface path for '%s'", dev_interface_details->DevicePath);
@@ -1602,12 +1606,17 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				// being listed under the "NUSB3" PnP Symbolic Name rather than "USB".
 				// The Intel USB 3.0 driver behaves similar, but uses "IUSB3"
 				for (; class_index < ARRAYSIZE(usb_class); class_index++) {
-					if (get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i))
+					if (get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i)) {
 						break;
+					}
 					i = 0;
 				}
-				if (class_index >= ARRAYSIZE(usb_class))
+				if (class_index >= ARRAYSIZE(usb_class)) {
+					/* call get_devinfo_data to ensure handle is closed. i < 100 is a sanity limit. */
+					while(get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[0], i++) && i < 100) { }
+					i = 0;
 					break;
+				}
 			}
 
 			// Read the Device ID path. This is what we'll use as UID
@@ -1745,6 +1754,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				} else {
 					usbi_dbg("found existing device for session [%lX] (%u.%u)",
 						session_id, dev->bus_number, dev->device_address);
+					if(_device_priv(dev)->parent_dev != parent_dev)
+						usbi_err(ctx,"program assertion failed - existing device should share parent");
+					else {
+						/* we hold a reference to parent_dev instance, but this device already
+						   has a parent_dev reference (only one per child) */
+						libusb_unref_device(parent_dev);
+					}
 				}
 				// Keep track of devices that need unref
 				unref_list[unref_cur++] = dev;
@@ -1762,6 +1778,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			// Setup device
 			switch (pass) {
 			case HCD_PASS:
+				// if the hcd has already been setup, don't do it again
+				if (priv->path != NULL)
+					break;
 				dev->bus_number = (uint8_t)(i + 1);	// bus 0 is reserved for disconnected
 				dev->device_address = 0;
 				dev->num_configurations = 0;
@@ -1822,19 +1841,21 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				}
 				break;
 			default:	// HID_PASS and later
-				if (parent_priv->apib->id == USB_API_HID) {
-					usbi_dbg("setting HID interface for [%lX]:", parent_dev->session_data);
-					r = set_hid_interface(ctx, parent_dev, dev_interface_path);
-					if (r != LIBUSB_SUCCESS) LOOP_BREAK(r);
-					dev_interface_path = NULL;
-				} else if (parent_priv->apib->id == USB_API_COMPOSITE) {
-					usbi_dbg("setting composite interface for [%lX]:", parent_dev->session_data);
-					switch (set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api, sub_api)) {
+				if (parent_priv->apib->id == USB_API_HID || parent_priv->apib->id == USB_API_COMPOSITE) {
+					if(parent_priv->apib->id == USB_API_HID) {
+						usbi_dbg("setting HID interface for [%lX]:", parent_dev->session_data);
+						r = set_hid_interface(ctx, parent_dev, dev_interface_path);
+					} else {
+						usbi_dbg("setting composite interface for [%lX]:", parent_dev->session_data);
+						r = set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api, sub_api);
+					}
+					switch (r) {
 					case LIBUSB_SUCCESS:
 						dev_interface_path = NULL;
 						break;
 					case LIBUSB_ERROR_ACCESS:
 						// interface has already been set => make sure dev_interface_path is freed then
+						r = LIBUSB_SUCCESS;
 						break;
 					default:
 						LOOP_BREAK(r);
