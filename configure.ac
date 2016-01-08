@@ -78,7 +78,7 @@ case $host in
 	backend="netbsd"
 	threads="posix"
 	;;
-*-mingw*)
+*-mingw* | *msys*)
 	AC_MSG_RESULT([Windows])
 	backend="windows"
 	threads="windows"
