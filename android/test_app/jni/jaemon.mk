@@ -1,5 +1,5 @@
-# Android application build config for libusb
-# Copyright © 2012-2013 RealVNC Ltd. <toby.gray@realvnc.com>
+# Android build config for jaemon - a helper class for tests_app
+# Copyright © 2016 Eugene Hutorny <eugnene@hutorny.in.ua>
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -16,12 +16,11 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 #
 
-APP_ABI := $(or $(APP_ABI),all)
+include $(CLEAR_VARS)
 
-#If no platform specified, using the most recent one
-APP_PLATFORM := $(or $(APP_PLATFORM),$(shell echo `for i in $(NDK)/platforms/*-?? ; do basename $${i%%}; done | tail -1`))
-# Workaround for MIPS toolchain linker being unable to find liblog dependency
-# of shared object in NDK versions at least up to r9.
-#
-APP_LDFLAGS := -llog
-APP_PIE := 1
+LOCAL_MODULE    := libjaemon
+LOCAL_SRC_FILES := jaemon.c
+LOCAL_CFLAGS := -std=c11 
+LOCAL_LDLIBS    := -ldl
+
+include $(BUILD_SHARED_LIBRARY)

@@ -1,0 +1,17 @@
+#!/bin/bash
+# Android package manager extracts from apk only files matching lib*.so
+# Therefore all executables are renamed to match that pattern and placed
+# in the test_app/libs directory 
+
+for i in libs/* ;
+do
+  mkdir -p test_app/$i
+  for j in $i/* ;
+  do
+    if [[ `basename $j` != lib*.so ]] ;
+    then
+      cp $j test_app/$i/lib_`basename $j`.so 
+    fi  
+  done
+done
+  

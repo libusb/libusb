@@ -51,13 +51,9 @@ dnl on linux-android platform, some functions are in different places
 case $host in
 *-linux-android*)
 	AC_MSG_RESULT([This is a Linux-Android system])
-	is_backend_android="yes"
+	backend="android"
+	threads="posix"
 	;;
-*)
-	is_backend_android="no"
-esac
-
-case $host in
 *-linux* | *-uclinux*)
 	AC_MSG_RESULT([Linux])
 	backend="linux"
@@ -100,6 +96,24 @@ case $host in
 esac
 
 case $backend in
+android)
+	AC_DEFINE(OS_ANDROID, 1, [Android-Linux backend])
+	AC_SUBST(OS_ANDROID)
+	AC_SEARCH_LIBS(clock_gettime, rt, [], [], -pthread)
+	dnl there are gettimeofday function but configure doesn't seem to be able to find it.
+	AC_DEFINE([HAVE_GETTIMEOFDAY], [1], [Define if you have gettimeofday])
+	AC_CHECK_HEADERS([poll.h])
+	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
+	AC_CHECK_HEADERS([asm/types.h sys/socket.h], [], [])
+	AC_CHECK_HEADERS([linux/netlink.h linux/filter.h], [], [AC_ERROR(["Linux netlink headers not found"])], [
+#ifdef HAVE_ASM_TYPES_H
+#include <asm/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+])
+	;;
 linux)
 	AC_DEFINE(OS_LINUX, 1, [Linux backend])
 	AC_SUBST(OS_LINUX)
@@ -124,17 +138,6 @@ linux)
 ])
 		fi
 		AC_SUBST(USE_UDEV)
-
-case $is_backend_android in
-yes)
-	dnl there are gettimeofday function but configure doesn't seem to be able to find it.
-	AC_DEFINE([HAVE_GETTIMEOFDAY], [1], [Define if you have gettimeofday])
-	;;
-*)
-	THREAD_CFLAGS="-pthread"
-	LIBS="${LIBS} -pthread"
-esac
-
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
@@ -184,6 +187,7 @@ esac
 
 AC_SUBST(LIBS)
 
+AM_CONDITIONAL(OS_ANDROID, test "x$backend" = xandroid)
 AM_CONDITIONAL(OS_LINUX, test "x$backend" = xlinux)
 AM_CONDITIONAL(OS_DARWIN, test "x$backend" = xdarwin)
 AM_CONDITIONAL(OS_OPENBSD, test "x$backend" = xopenbsd)

@@ -1,4 +1,4 @@
-# Android build config for libusb
+# Android build config for libusb examples to be run by test_app
 # Copyright © 2012-2013 RealVNC Ltd. <toby.gray@realvnc.com>
 #
 # This library is free software; you can redistribute it and/or
@@ -17,38 +17,38 @@
 #
 
 LOCAL_PATH:= $(call my-dir)
-LIBUSB_ROOT_REL:= ../..
+LIBUSB_ROOT_REL:= ../../..
 LIBUSB_ROOT_ABS:= $(LOCAL_PATH)/../..
 
-# libusb
+# listdevs
 
 include $(CLEAR_VARS)
 
-LIBUSB_ROOT_REL:= ../..
-LIBUSB_ROOT_ABS:= $(LOCAL_PATH)/../..
-
 LOCAL_SRC_FILES := \
-  $(LIBUSB_ROOT_REL)/libusb/core.c \
-  $(LIBUSB_ROOT_REL)/libusb/descriptor.c \
-  $(LIBUSB_ROOT_REL)/libusb/hotplug.c \
-  $(LIBUSB_ROOT_REL)/libusb/io.c \
-  $(LIBUSB_ROOT_REL)/libusb/sync.c \
-  $(LIBUSB_ROOT_REL)/libusb/strerror.c \
-  $(LIBUSB_ROOT_REL)/libusb/os/android_usbfs.c \
-  $(LIBUSB_ROOT_REL)/libusb/os/poll_posix.c \
-  $(LIBUSB_ROOT_REL)/libusb/os/threads_posix.c \
-  $(LIBUSB_ROOT_REL)/libusb/os/linux_netlink.c
+  $(LIBUSB_ROOT_REL)/examples/listdevs.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS) \
-  $(LIBUSB_ROOT_ABS)/libusb \
-  $(LIBUSB_ROOT_ABS)/libusb/os
+  $(LIBUSB_ROOT_ABS)
 
-LOCAL_EXPORT_C_INCLUDES := \
-  $(LIBUSB_ROOT_ABS)/libusb
+LOCAL_SHARED_LIBRARIES += libusb1.0
 
-LOCAL_LDLIBS := -llog
+LOCAL_MODULE:= listdevs
 
-LOCAL_MODULE := libusb1.0
+include $(BUILD_SHARED_LIBRARY)
+
+# xusb
+
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
+  $(LIBUSB_ROOT_REL)/examples/xusb.c
+
+LOCAL_C_INCLUDES += \
+  $(LIBUSB_ROOT_ABS)
+
+LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_LDFLAGS += -Wl,--export-dynamic
+
+LOCAL_MODULE:= xusb
 
 include $(BUILD_SHARED_LIBRARY)

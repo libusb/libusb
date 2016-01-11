@@ -13,10 +13,18 @@ To build libusb for Android do the following:
 
  3. Open a shell and make sure there exist an NDK global variable
     set to the directory where you extracted the NDK.
+    
+ 4. Change directory to libusb's top folder
+ 
+ 5. Run android/autogen.sh
 
  4. Change directory to libusb's "android/jni"
 
- 5. Run "$NDK/ndk-build".
+ 5. Run "$NDK/ndk-build". 
+
+  To build only selected architectures, define APP_ABI environment variable as
+  a comma separated list of architectures, e.g.:
+	$NDK/ndk-build APP_ABI=armeabi,armeabi-v7a
 
 The libusb library, examples and tests can then be found in:
     "android/libs/$ARCH"
@@ -24,7 +32,11 @@ The libusb library, examples and tests can then be found in:
 Where $ARCH is one of:
     armeabi
     armeabi-v7a
+    arm64-v8a
+    mips
+    mips64
     x86
+    x86_64
 
 
 Installing:

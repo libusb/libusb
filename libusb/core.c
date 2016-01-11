@@ -46,6 +46,9 @@
 
 #if defined(OS_LINUX)
 const struct usbi_os_backend * const usbi_backend = &linux_usbfs_backend;
+#elif defined(OS_ANDROID)
+const struct usbi_os_backend * const usbi_backend = &android_usbfs_backend;
+#elif defined(OS_OPENBSD)
 #elif defined(OS_DARWIN)
 const struct usbi_os_backend * const usbi_backend = &darwin_backend;
 #elif defined(OS_OPENBSD)

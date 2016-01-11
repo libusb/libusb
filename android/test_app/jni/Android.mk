@@ -1,4 +1,5 @@
-# Android application build config for libusb
+# Android build config for libusb, examples and tests
+# Copyright © 2016 Eugene Hutorny <eugnene@hutorny.in.ua>
 # Copyright © 2012-2013 RealVNC Ltd. <toby.gray@realvnc.com>
 #
 # This library is free software; you can redistribute it and/or
@@ -16,12 +17,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 #
 
-APP_ABI := $(or $(APP_ABI),all)
-
-#If no platform specified, using the most recent one
-APP_PLATFORM := $(or $(APP_PLATFORM),$(shell echo `for i in $(NDK)/platforms/*-?? ; do basename $${i%%}; done | tail -1`))
-# Workaround for MIPS toolchain linker being unable to find liblog dependency
-# of shared object in NDK versions at least up to r9.
-#
-APP_LDFLAGS := -llog
-APP_PIE := 1
+LOCAL_PATH := $(call my-dir)
+include $(LOCAL_PATH)/jaemon.mk
+include $(LOCAL_PATH)/libusb.mk
+include $(LOCAL_PATH)/examples.mk
+include $(LOCAL_PATH)/tests.mk

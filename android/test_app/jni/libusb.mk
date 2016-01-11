@@ -17,15 +17,15 @@
 #
 
 LOCAL_PATH:= $(call my-dir)
-LIBUSB_ROOT_REL:= ../..
-LIBUSB_ROOT_ABS:= $(LOCAL_PATH)/../..
+LIBUSB_ROOT_REL:= ../../..
+LIBUSB_ROOT_ABS:= $(LOCAL_PATH)/../../..
 
 # libusb
 
 include $(CLEAR_VARS)
 
-LIBUSB_ROOT_REL:= ../..
-LIBUSB_ROOT_ABS:= $(LOCAL_PATH)/../..
+LIBUSB_ROOT_REL:= ../../..
+LIBUSB_ROOT_ABS:= $(LOCAL_PATH)/../../..
 
 LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/libusb/core.c \

@@ -48,3 +48,13 @@ Release
 *~
 *.orig
 .dirstamp
+.project
+android/libs
+android/obj
+android/test_app/libs
+android/test_app/obj
+android/test_app/bin
+android/test_app/gen
+android/test_app/.*
+android/test_app/out
+android/test_app/local.properties
