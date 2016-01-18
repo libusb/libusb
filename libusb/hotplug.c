@@ -94,6 +94,7 @@
 \code
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <libusb.h>
 
 static int count = 0;
@@ -142,7 +143,7 @@ int main (void) {
 
   while (count < 2) {
     libusb_handle_events_completed(NULL, NULL);
-    usleep(10000);
+    nanosleep(&(struct timespec){0, 10000000UL}, NULL);
   }
 
   libusb_hotplug_deregister_callback(NULL, handle);

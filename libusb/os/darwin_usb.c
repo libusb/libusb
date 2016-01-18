@@ -19,6 +19,7 @@
  */
 
 #include "config.h"
+#include <time.h>
 #include <ctype.h>
 #include <errno.h>
 #include <pthread.h>
@@ -764,7 +765,7 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct da
     if (kIOReturnSuccess != ret) {
       usbi_dbg("kernel responded with code: 0x%08x. sleeping for %d ms before trying again", ret, delay/1000);
       /* sleep for a little while before trying again */
-      usleep (delay);
+      nanosleep(&(struct timespec){delay / 1000000, (delay * 1000) % 1000000000UL}, NULL);
     }
   } while (kIOReturnSuccess != ret && retries--);
 
