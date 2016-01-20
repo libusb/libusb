@@ -23,6 +23,7 @@
 #pragma once
 
 #include "windows_common.h"
+#include "windows_nt_common.h"
 
 #if defined(_MSC_VER)
 // disable /W4 MSVC warnings that are benign
@@ -64,7 +65,6 @@
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
 #define LIST_SEPARATOR              ';'
-#define HTAB_SIZE                   1021
 
 // Handle code for HID interface that have been claimed ("dibs")
 #define INTERFACE_CLAIMED           ((HANDLE)(intptr_t)0xD1B5)
@@ -209,7 +209,6 @@ struct hid_device_priv {
 	uint8_t string_index[3];	// man, prod, ser
 };
 
-typedef struct libusb_device_descriptor USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESCRIPTOR;
 struct windows_device_priv {
 	uint8_t depth;						// distance to HCD
 	uint8_t port;						// port number on the hub
@@ -308,15 +307,6 @@ struct driver_lookup {
 	const char* designation;	// internal designation (for debug output)
 };
 
-#define WM_TIMER_REQUEST	(WM_USER + 1)
-#define WM_TIMER_EXIT		(WM_USER + 2)
-
-// used for monotonic clock_gettime()
-struct timer_request {
-	struct timespec *tp;
-	HANDLE event;
-};
-
 /* OLE32 dependency */
 DLL_DECLARE_PREFIXED(WINAPI, HRESULT, p, CLSIDFromString, (LPCOLESTR, LPCLSID));
 
@@ -337,11 +327,6 @@ DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceRegistryPropertyA, (HDEVIN
 DLL_DECLARE_PREFIXED(WINAPI, HKEY, p, SetupDiOpenDeviceInterfaceRegKey, (HDEVINFO, PSP_DEVICE_INTERFACE_DATA, DWORD, DWORD));
 DLL_DECLARE_PREFIXED(WINAPI, LONG, p, RegQueryValueExW, (HKEY, LPCWSTR, LPDWORD, LPDWORD, LPBYTE, LPDWORD));
 DLL_DECLARE_PREFIXED(WINAPI, LONG, p, RegCloseKey, (HKEY));
-
-/* User32 dependencies */
-DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, GetMessageA, (LPMSG, HWND, UINT, UINT));
-DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, PeekMessageA, (LPMSG, HWND, UINT, UINT, UINT));
-DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, PostThreadMessageA, (DWORD, UINT, WPARAM, LPARAM));
 
 /*
  * Windows DDK API definitions. Most of it copied from MinGW's includes
@@ -468,17 +453,6 @@ typedef struct USB_INTERFACE_DESCRIPTOR {
   UCHAR  bInterfaceProtocol;
   UCHAR  iInterface;
 } USB_INTERFACE_DESCRIPTOR, *PUSB_INTERFACE_DESCRIPTOR;
-
-typedef struct USB_CONFIGURATION_DESCRIPTOR {
-  UCHAR  bLength;
-  UCHAR  bDescriptorType;
-  USHORT wTotalLength;
-  UCHAR  bNumInterfaces;
-  UCHAR  bConfigurationValue;
-  UCHAR  iConfiguration;
-  UCHAR  bmAttributes;
-  UCHAR  MaxPower;
-} USB_CONFIGURATION_DESCRIPTOR, *PUSB_CONFIGURATION_DESCRIPTOR;
 
 typedef struct USB_CONFIGURATION_DESCRIPTOR_SHORT {
 	struct {

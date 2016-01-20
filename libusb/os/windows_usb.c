@@ -45,8 +45,6 @@
 
 // Helper prototypes
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
-static int windows_clock_gettime(int clk_id, struct timespec *tp);
-unsigned __stdcall windows_clock_gettime_threaded(void* param);
 // Common calls
 static int common_configure_endpoints(int sub_api, struct libusb_device_handle *dev_handle, int iface);
 
@@ -100,15 +98,11 @@ static int composite_copy_transfer_data(int sub_api, struct usbi_transfer *itran
 
 // Global variables
 uint64_t hires_frequency, hires_ticks_to_ps;
-const uint64_t epoch_time = UINT64_C(116444736000000000);	// 1970.01.01 00:00:000 in MS Filetime
 int windows_version = WINDOWS_UNDEFINED;
 static char windows_version_str[128] = "Windows Undefined";
 // Concurrency
 static int concurrent_usage = -1;
 usbi_mutex_t autoclaim_lock;
-// Timer thread
-HANDLE timer_thread = NULL;
-DWORD timer_thread_id = 0;
 // API globals
 #define CHECK_WINUSBX_AVAILABLE(sub_api) do { if (sub_api == SUB_API_NOTSET) sub_api = priv->sub_api; \
 	if (!WinUSBX[sub_api].initialized) return LIBUSB_ERROR_ACCESS; } while(0)
@@ -135,57 +129,6 @@ static char* guid_to_string(const GUID* guid)
 		guid->Data4[0], guid->Data4[1], guid->Data4[2], guid->Data4[3],
 		guid->Data4[4], guid->Data4[5], guid->Data4[6], guid->Data4[7]);
 	return guid_string;
-}
-#endif
-
-/*
- * Converts a windows error to human readable string
- * uses retval as errorcode, or, if 0, use GetLastError()
- */
-#if defined(ENABLE_LOGGING)
-static char *windows_error_str(uint32_t retval)
-{
-static char err_string[ERR_BUFFER_SIZE];
-
-	DWORD size;
-	ssize_t i;
-	uint32_t error_code, format_error;
-
-	error_code = retval?retval:GetLastError();
-
-	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%u] ", error_code);
-
-	// Translate codes returned by SetupAPI. The ones we are dealing with are either
-	// in 0x0000xxxx or 0xE000xxxx and can be distinguished from standard error codes.
-	// See http://msdn.microsoft.com/en-us/library/windows/hardware/ff545011.aspx
-	switch (error_code & 0xE0000000) {
-	case 0:
-		error_code = HRESULT_FROM_WIN32(error_code);	// Still leaves ERROR_SUCCESS unmodified
-		break;
-	case 0xE0000000:
-		error_code =  0x80000000 | (FACILITY_SETUPAPI << 16) | (error_code & 0x0000FFFF);
-		break;
-	default:
-		break;
-	}
-
-	size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &err_string[safe_strlen(err_string)],
-		ERR_BUFFER_SIZE - (DWORD)safe_strlen(err_string), NULL);
-	if (size == 0) {
-		format_error = GetLastError();
-		if (format_error)
-			safe_sprintf(err_string, ERR_BUFFER_SIZE,
-				"Windows error code %u (FormatMessage error code %u)", error_code, format_error);
-		else
-			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", error_code);
-	} else {
-		// Remove CR/LF terminators
-		for (i=safe_strlen(err_string)-1; (i>=0) && ((err_string[i]==0x0A) || (err_string[i]==0x0D)); i--) {
-			err_string[i] = 0;
-		}
-	}
-	return err_string;
 }
 #endif
 
@@ -253,9 +196,6 @@ static int init_dlls(void)
 	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiOpenDeviceInterfaceRegKey, TRUE);
 	DLL_LOAD_PREFIXED(AdvAPI32.dll, p, RegQueryValueExW, TRUE);
 	DLL_LOAD_PREFIXED(AdvAPI32.dll, p, RegCloseKey, TRUE);
-	DLL_LOAD_PREFIXED(User32.dll, p, GetMessageA, TRUE);
-	DLL_LOAD_PREFIXED(User32.dll, p, PeekMessageA, TRUE);
-	DLL_LOAD_PREFIXED(User32.dll, p, PostThreadMessageA, TRUE);
 	return LIBUSB_SUCCESS;
 }
 
@@ -457,176 +397,6 @@ err_exit:
 	pSetupDiDestroyDeviceInfoList(*dev_info);
 	*dev_info = INVALID_HANDLE_VALUE;
 	return NULL;}
-
-/* Hash table functions - modified From glibc 2.3.2:
-   [Aho,Sethi,Ullman] Compilers: Principles, Techniques and Tools, 1986
-   [Knuth]            The Art of Computer Programming, part 3 (6.4)  */
-typedef struct htab_entry {
-	unsigned long used;
-	char* str;
-} htab_entry;
-htab_entry* htab_table = NULL;
-usbi_mutex_t htab_write_mutex = NULL;
-unsigned long htab_size, htab_filled;
-
-/* For the used double hash method the table size has to be a prime. To
-   correct the user given table size we need a prime test.  This trivial
-   algorithm is adequate because the code is called only during init and
-   the number is likely to be small  */
-static int isprime(unsigned long number)
-{
-	// no even number will be passed
-	unsigned int divider = 3;
-
-	while((divider * divider < number) && (number % divider != 0))
-		divider += 2;
-
-	return (number % divider != 0);
-}
-
-/* Before using the hash table we must allocate memory for it.
-   We allocate one element more as the found prime number says.
-   This is done for more effective indexing as explained in the
-   comment for the hash function.  */
-static int htab_create(struct libusb_context *ctx, unsigned long nel)
-{
-	if (htab_table != NULL) {
-		usbi_err(ctx, "hash table already allocated");
-	}
-
-	// Create a mutex
-	usbi_mutex_init(&htab_write_mutex, NULL);
-
-	// Change nel to the first prime number not smaller as nel.
-	nel |= 1;
-	while(!isprime(nel))
-		nel += 2;
-
-	htab_size = nel;
-	usbi_dbg("using %lu entries hash table", nel);
-	htab_filled = 0;
-
-	// allocate memory and zero out.
-	htab_table = (htab_entry*) calloc(htab_size + 1, sizeof(htab_entry));
-	if (htab_table == NULL) {
-		usbi_err(ctx, "could not allocate space for hash table");
-		return 0;
-	}
-
-	return 1;
-}
-
-/* After using the hash table it has to be destroyed.  */
-static void htab_destroy(void)
-{
-	size_t i;
-	if (htab_table == NULL) {
-		return;
-	}
-
-	for (i=0; i<htab_size; i++) {
-		if (htab_table[i].used) {
-			safe_free(htab_table[i].str);
-		}
-	}
-	usbi_mutex_destroy(&htab_write_mutex);
-	safe_free(htab_table);
-}
-
-/* This is the search function. It uses double hashing with open addressing.
-   We use an trick to speed up the lookup. The table is created with one
-   more element available. This enables us to use the index zero special.
-   This index will never be used because we store the first hash index in
-   the field used where zero means not used. Every other value means used.
-   The used field can be used as a first fast comparison for equality of
-   the stored and the parameter value. This helps to prevent unnecessary
-   expensive calls of strcmp.  */
-static unsigned long htab_hash(char* str)
-{
-	unsigned long hval, hval2;
-	unsigned long idx;
-	unsigned long r = 5381;
-	int c;
-	char* sz = str;
-
-	if (str == NULL)
-		return 0;
-
-	// Compute main hash value (algorithm suggested by Nokia)
-	while ((c = *sz++) != 0)
-		r = ((r << 5) + r) + c;
-	if (r == 0)
-		++r;
-
-	// compute table hash: simply take the modulus
-	hval = r % htab_size;
-	if (hval == 0)
-		++hval;
-
-	// Try the first index
-	idx = hval;
-
-	if (htab_table[idx].used) {
-		if ( (htab_table[idx].used == hval)
-		  && (safe_strcmp(str, htab_table[idx].str) == 0) ) {
-			// existing hash
-			return idx;
-		}
-		usbi_dbg("hash collision ('%s' vs '%s')", str, htab_table[idx].str);
-
-		// Second hash function, as suggested in [Knuth]
-		hval2 = 1 + hval % (htab_size - 2);
-
-		do {
-			// Because size is prime this guarantees to step through all available indexes
-			if (idx <= hval2) {
-				idx = htab_size + idx - hval2;
-			} else {
-				idx -= hval2;
-			}
-
-			// If we visited all entries leave the loop unsuccessfully
-			if (idx == hval) {
-				break;
-			}
-
-			// If entry is found use it.
-			if ( (htab_table[idx].used == hval)
-			  && (safe_strcmp(str, htab_table[idx].str) == 0) ) {
-				return idx;
-			}
-		}
-		while (htab_table[idx].used);
-	}
-
-	// Not found => New entry
-
-	// If the table is full return an error
-	if (htab_filled >= htab_size) {
-		usbi_err(NULL, "hash table is full (%lu entries)", htab_size);
-		return 0;
-	}
-
-	// Concurrent threads might be storing the same entry at the same time
-	// (eg. "simultaneous" enums from different threads) => use a mutex
-	usbi_mutex_lock(&htab_write_mutex);
-	// Just free any previously allocated string (which should be the same as
-	// new one). The possibility of concurrent threads storing a collision
-	// string (same hash, different string) at the same time is extremely low
-	safe_free(htab_table[idx].str);
-	htab_table[idx].used = hval;
-	htab_table[idx].str = (char*) malloc(safe_strlen(str)+1);
-	if (htab_table[idx].str == NULL) {
-		usbi_err(NULL, "could not duplicate string for hash table");
-		usbi_mutex_unlock(&htab_write_mutex);
-		return 0;
-	}
-	memcpy(htab_table[idx].str, str, safe_strlen(str)+1);
-	++htab_filled;
-	usbi_mutex_unlock(&htab_write_mutex);
-
-	return idx;
-}
 
 /*
  * Returns the session ID of a device's nth level ancestor
@@ -954,10 +724,7 @@ static void get_windows_version(void)
 static int windows_init(struct libusb_context *ctx)
 {
 	int i, r = LIBUSB_ERROR_OTHER;
-	DWORD_PTR affinity, dummy;
-	HANDLE event = NULL;
 	HANDLE semaphore;
-	LARGE_INTEGER li_frequency;
 	char sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
 
 	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId());
@@ -1003,85 +770,23 @@ static int windows_init(struct libusb_context *ctx)
 			usb_api_backend[i].init(SUB_API_NOTSET, ctx);
 		}
 
-		if (QueryPerformanceFrequency(&li_frequency)) {
-			// The hires frequency can go as high as 4 GHz, so we'll use a conversion
-			// to picoseconds to compute the tv_nsecs part in clock_gettime
-			hires_frequency = li_frequency.QuadPart;
-			hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency;
-			usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
-
-			// Because QueryPerformanceCounter might report different values when
-			// running on different cores, we create a separate thread for the timer
-			// calls, which we glue to the first available core always to prevent timing discrepancies.
-			if (!GetProcessAffinityMask(GetCurrentProcess(), &affinity, &dummy) || (affinity == 0)) {
-				usbi_err(ctx, "could not get process affinity: %s", windows_error_str(0));
-				goto init_exit;
-			}
-			// The process affinity mask is a bitmask where each set bit represents a core on
-			// which this process is allowed to run, so we find the first set bit
-			for (i = 0; !(affinity & (DWORD_PTR)(1 << i)); i++);
-			affinity = (DWORD_PTR)(1 << i);
-
-			usbi_dbg("timer thread will run on core #%d", i);
-
-			r = LIBUSB_ERROR_NO_MEM;
-			event = CreateEvent(NULL, FALSE, FALSE, NULL);
-			if (event == NULL) {
-				usbi_err(ctx, "could not create event: %s", windows_error_str(0));
-				goto init_exit;
-			}
-			timer_thread = (HANDLE)_beginthreadex(NULL, 0, windows_clock_gettime_threaded, (void *)event,
-				0, (unsigned int *)&timer_thread_id);
-			if (timer_thread == NULL) {
-				usbi_err(ctx, "unable to create timer thread - aborting");
-				goto init_exit;
-			}
-			if (!SetThreadAffinityMask(timer_thread, affinity)) {
-				usbi_warn(ctx, "unable to set timer thread affinity, timer discrepancies may arise");
-			}
-
-			// Wait for timer thread to init before continuing.
-			if (WaitForSingleObject(event, INFINITE) != WAIT_OBJECT_0) {
-				usbi_err(ctx, "failed to wait for timer thread to become ready - aborting");
-				goto init_exit;
-			}
+		r = windows_common_init(ctx);
+		if (r) {
+			goto init_exit;
 		}
-		else {
-			usbi_dbg("no hires timer available on this platform");
-			hires_frequency = 0;
-			hires_ticks_to_ps = UINT64_C(0);
-		}
-
-		// Create a hash table to store session ids. Second parameter is better if prime
-		htab_create(ctx, HTAB_SIZE);
 	}
 	// At this stage, either we went through full init successfully, or didn't need to
 	r = LIBUSB_SUCCESS;
 
 init_exit: // Holds semaphore here.
 	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
-		if (timer_thread) {
-			// actually the signal to quit the thread.
-			if (!pPostThreadMessageA(timer_thread_id, WM_TIMER_EXIT, 0, 0) ||
-				(WaitForSingleObject(timer_thread, INFINITE) != WAIT_OBJECT_0)) {
-				usbi_warn(ctx, "could not wait for timer thread to quit");
-				TerminateThread(timer_thread, 1);
-				// shouldn't happen, but we're destroying
-				// all objects it might have held anyway.
-			}
-			CloseHandle(timer_thread);
-			timer_thread = NULL;
-			timer_thread_id = 0;
-		}
-		htab_destroy();
+		windows_common_exit();
 		usbi_mutex_destroy(&autoclaim_lock);
 	}
 
 	if (r != LIBUSB_SUCCESS)
 		--concurrent_usage; // Not expected to call libusb_exit if we failed.
 
-	if (event)
-		CloseHandle(event);
 	ReleaseSemaphore(semaphore, 1, NULL);	// increase count back to 1
 	CloseHandle(semaphore);
 	return r;
@@ -1891,19 +1596,7 @@ static void windows_exit(void)
 			usb_api_backend[i].exit(SUB_API_NOTSET);
 		}
 		exit_polling();
-
-		if (timer_thread) {
-			// actually the signal to quit the thread.
-			if (!pPostThreadMessageA(timer_thread_id, WM_TIMER_EXIT, 0, 0) ||
-				(WaitForSingleObject(timer_thread, INFINITE) != WAIT_OBJECT_0)) {
-				usbi_dbg("could not wait for timer thread to quit");
-				TerminateThread(timer_thread, 1);
-			}
-			CloseHandle(timer_thread);
-			timer_thread = NULL;
-			timer_thread_id = 0;
-		}
-		htab_destroy();
+		windows_common_exit();
 		usbi_mutex_destroy(&autoclaim_lock);
 	}
 
@@ -2088,7 +1781,7 @@ static void windows_destroy_device(struct libusb_device *dev)
 	windows_device_priv_release(dev);
 }
 
-static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
+void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
 
@@ -2213,231 +1906,33 @@ static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 	}
 }
 
-static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size)
+int windows_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct windows_device_priv *priv = _device_priv(transfer->dev_handle->dev);
-	int status, istatus;
-
-	usbi_dbg("handling I/O completion with errcode %u, size %u", io_result, io_size);
-
-	switch(io_result) {
-	case NO_ERROR:
-		status = priv->apib->copy_transfer_data(SUB_API_NOTSET, itransfer, io_size);
-		break;
-	case ERROR_GEN_FAILURE:
-		usbi_dbg("detected endpoint stall");
-		status = LIBUSB_TRANSFER_STALL;
-		break;
-	case ERROR_SEM_TIMEOUT:
-		usbi_dbg("detected semaphore timeout");
-		status = LIBUSB_TRANSFER_TIMED_OUT;
-		break;
-	case ERROR_OPERATION_ABORTED:
-		istatus = priv->apib->copy_transfer_data(SUB_API_NOTSET, itransfer, io_size);
-		if (istatus != LIBUSB_TRANSFER_COMPLETED) {
-			usbi_dbg("Failed to copy partial data in aborted operation: %d", istatus);
-		}
-		if (itransfer->flags & USBI_TRANSFER_TIMED_OUT) {
-			usbi_dbg("detected timeout");
-			status = LIBUSB_TRANSFER_TIMED_OUT;
-		} else {
-			usbi_dbg("detected operation aborted");
-			status = LIBUSB_TRANSFER_CANCELLED;
-		}
-		break;
-	default:
-		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %u: %s", io_result, windows_error_str(io_result));
-		status = LIBUSB_TRANSFER_ERROR;
-		break;
-	}
-	windows_clear_transfer_priv(itransfer);	// Cancel polling
-	usbi_handle_transfer_completion(itransfer, (enum libusb_transfer_status)status);
+	return priv->apib->copy_transfer_data(SUB_API_NOTSET, itransfer, io_size);
 }
 
-static void windows_handle_callback (struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size)
+struct winfd *windows_get_fd(struct usbi_transfer *transfer)
 {
-	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-
-	switch (transfer->type) {
-	case LIBUSB_TRANSFER_TYPE_CONTROL:
-	case LIBUSB_TRANSFER_TYPE_BULK:
-	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		windows_transfer_callback (itransfer, io_result, io_size);
-		break;
-	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
-		usbi_warn(ITRANSFER_CTX(itransfer), "bulk stream transfers are not yet supported on this platform");
-		break;
-	default:
-		usbi_err(ITRANSFER_CTX(itransfer), "unknown endpoint type %d", transfer->type);
-	}
+	struct windows_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(transfer);
+	return &transfer_priv->pollable_fd;
 }
 
-static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready)
+void windows_get_overlapped_result(struct usbi_transfer *transfer, struct winfd *pollable_fd, DWORD *io_result, DWORD *io_size)
 {
-	struct windows_transfer_priv* transfer_priv = NULL;
-	POLL_NFDS_TYPE i = 0;
-	bool found;
-	struct usbi_transfer *transfer;
-	DWORD io_size, io_result;
-
-	usbi_mutex_lock(&ctx->open_devs_lock);
-	for (i = 0; i < nfds && num_ready > 0; i++) {
-
-		usbi_dbg("checking fd %d with revents = %04x", fds[i].fd, fds[i].revents);
-
-		if (!fds[i].revents) {
-			continue;
-		}
-
-		num_ready--;
-
-		// Because a Windows OVERLAPPED is used for poll emulation,
-		// a pollable fd is created and stored with each transfer
-		usbi_mutex_lock(&ctx->flying_transfers_lock);
-		found = false;
-		list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
-			transfer_priv = usbi_transfer_get_os_priv(transfer);
-			if (transfer_priv->pollable_fd.fd == fds[i].fd) {
-				found = true;
-				break;
-			}
-		}
-		usbi_mutex_unlock(&ctx->flying_transfers_lock);
-
-		if (found) {
-			// Handle async requests that completed synchronously first
-			if (HasOverlappedIoCompletedSync(transfer_priv->pollable_fd.overlapped)) {
-				io_result = NO_ERROR;
-				io_size = (DWORD)transfer_priv->pollable_fd.overlapped->InternalHigh;
-			// Regular async overlapped
-			} else if (GetOverlappedResult(transfer_priv->pollable_fd.handle,
-				transfer_priv->pollable_fd.overlapped, &io_size, false)) {
-				io_result = NO_ERROR;
-			} else {
-				io_result = GetLastError();
-			}
-			usbi_remove_pollfd(ctx, transfer_priv->pollable_fd.fd);
-			// let handle_callback free the event using the transfer wfd
-			// If you don't use the transfer wfd, you run a risk of trying to free a
-			// newly allocated wfd that took the place of the one from the transfer.
-			windows_handle_callback(transfer, io_result, io_size);
-		} else {
-			usbi_mutex_unlock(&ctx->open_devs_lock);
-			usbi_err(ctx, "could not find a matching transfer for fd %d", fds[i]);
-			return LIBUSB_ERROR_NOT_FOUND;
-		}
+	if (HasOverlappedIoCompletedSync(pollable_fd->overlapped)) {
+		*io_result = NO_ERROR;
+		*io_size = (DWORD)pollable_fd->overlapped->InternalHigh;
+		// Regular async overlapped
 	}
-
-	usbi_mutex_unlock(&ctx->open_devs_lock);
-	return LIBUSB_SUCCESS;
-}
-
-/*
- * Monotonic and real time functions
- */
-unsigned __stdcall windows_clock_gettime_threaded(void* param)
-{
-	struct timer_request *request;
-	LARGE_INTEGER hires_counter;
-	MSG msg;
-
-	// The following call will create this thread's message queue
-	// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms644946.aspx
-	pPeekMessageA(&msg, NULL, WM_USER, WM_USER, PM_NOREMOVE);
-
-	// Signal windows_init() that we're ready to service requests
-	if (!SetEvent((HANDLE)param)) {
-		usbi_dbg("SetEvent failed for timer init event: %s", windows_error_str(0));
+	else if (GetOverlappedResult(pollable_fd->handle, pollable_fd->overlapped, io_size, false)) {
+		*io_result = NO_ERROR;
 	}
-	param = NULL;
-
-	// Main loop - wait for requests
-	while (1) {
-		if (pGetMessageA(&msg, NULL, WM_TIMER_REQUEST, WM_TIMER_EXIT) == -1) {
-			usbi_err(NULL, "GetMessage failed for timer thread: %s", windows_error_str(0));
-			return 1;
-		}
-
-		switch (msg.message) {
-		case WM_TIMER_REQUEST:
-			// Requests to this thread are for hires always
-			// Microsoft says that this function always succeeds on XP and later
-			// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms644904.aspx
-			request = (struct timer_request *)msg.lParam;
-			QueryPerformanceCounter(&hires_counter);
-			request->tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
-			request->tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency) / 1000) * hires_ticks_to_ps);
-			if (!SetEvent(request->event)) {
-				usbi_err(NULL, "SetEvent failed for timer request: %s", windows_error_str(0));
-			}
-			break;
-
-		case WM_TIMER_EXIT:
-			usbi_dbg("timer thread quitting");
-			return 0;
-		}
+	else {
+		*io_result = GetLastError();
 	}
 }
-
-static int windows_clock_gettime(int clk_id, struct timespec *tp)
-{
-	struct timer_request request;
-	FILETIME filetime;
-	ULARGE_INTEGER rtime;
-	DWORD r;
-	switch(clk_id) {
-	case USBI_CLOCK_MONOTONIC:
-		if (timer_thread) {
-			request.tp = tp;
-			request.event = CreateEvent(NULL, FALSE, FALSE, NULL);
-			if (request.event == NULL) {
-				return LIBUSB_ERROR_NO_MEM;
-			}
-
-			if (!pPostThreadMessageA(timer_thread_id, WM_TIMER_REQUEST, 0, (LPARAM)&request)) {
-				usbi_err(NULL, "PostThreadMessage failed for timer thread: %s", windows_error_str(0));
-				CloseHandle(request.event);
-				return LIBUSB_ERROR_OTHER;
-			}
-
-			do {
-				r = WaitForSingleObject(request.event, TIMER_REQUEST_RETRY_MS);
-				if (r == WAIT_TIMEOUT) {
-					usbi_dbg("could not obtain a timer value within reasonable timeframe - too much load?");
-				}
-				else if (r == WAIT_FAILED) {
-					usbi_err(NULL, "WaitForSingleObject failed: %s", windows_error_str(0));
-				}
-			} while (r == WAIT_TIMEOUT);
-			CloseHandle(request.event);
-
-			if (r == WAIT_OBJECT_0) {
-				return LIBUSB_SUCCESS;
-			}
-			else {
-				return LIBUSB_ERROR_OTHER;
-			}
-		}
-		// Fall through and return real-time if monotonic was not detected @ timer init
-	case USBI_CLOCK_REALTIME:
-		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
-		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
-		// Note however that our resolution is bounded by the Windows system time
-		// functions and is at best of the order of 1 ms (or, usually, worse)
-		GetSystemTimeAsFileTime(&filetime);
-		rtime.LowPart = filetime.dwLowDateTime;
-		rtime.HighPart = filetime.dwHighDateTime;
-		rtime.QuadPart -= epoch_time;
-		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
-		tp->tv_nsec = (long)((rtime.QuadPart % 10000000)*100);
-		return LIBUSB_SUCCESS;
-	default:
-		return LIBUSB_ERROR_INVALID_PARAM;
-	}
-}
-
 
 // NB: MSVC6 does not support named initializers.
 const struct usbi_os_backend windows_backend = {
@@ -2479,7 +1974,7 @@ const struct usbi_os_backend windows_backend = {
 	windows_clear_transfer_priv,
 
 	windows_handle_events,
-	NULL,				/* handle_transfer_completion() */
+	NULL,
 
 	windows_clock_gettime,
 #if defined(USBI_TIMERFD_AVAILABLE)
