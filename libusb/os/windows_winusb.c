@@ -24,6 +24,8 @@
 
 #include <config.h>
 
+#if !defined(USE_USBDK)
+
 #include <windows.h>
 #include <setupapi.h>
 #include <ctype.h>
@@ -4138,3 +4140,5 @@ static int composite_copy_transfer_data(int sub_api, struct usbi_transfer *itran
 	return priv->usb_interface[transfer_priv->interface_number].apib->
 		copy_transfer_data(priv->usb_interface[transfer_priv->interface_number].sub_api, itransfer, io_size);
 }
+
+#endif /* !USE_USBDK */

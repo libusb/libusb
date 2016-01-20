@@ -53,7 +53,13 @@ const struct usbi_os_backend * const usbi_backend = &openbsd_backend;
 #elif defined(OS_NETBSD)
 const struct usbi_os_backend * const usbi_backend = &netbsd_backend;
 #elif defined(OS_WINDOWS)
+
+#if defined(USE_USBDK)
+const struct usbi_os_backend * const usbi_backend = &usbdk_backend;
+#else
 const struct usbi_os_backend * const usbi_backend = &windows_backend;
+#endif
+
 #elif defined(OS_WINCE)
 const struct usbi_os_backend * const usbi_backend = &wince_backend;
 #elif defined(OS_HAIKU)

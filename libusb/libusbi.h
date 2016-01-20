@@ -1118,6 +1118,7 @@ extern const struct usbi_os_backend darwin_backend;
 extern const struct usbi_os_backend openbsd_backend;
 extern const struct usbi_os_backend netbsd_backend;
 extern const struct usbi_os_backend windows_backend;
+extern const struct usbi_os_backend usbdk_backend;
 extern const struct usbi_os_backend wince_backend;
 extern const struct usbi_os_backend haiku_usb_raw_backend;
 
