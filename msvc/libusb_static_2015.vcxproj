@@ -145,7 +145,7 @@
     <ClCompile Include="..\libusb\strerror.c" />
     <ClCompile Include="..\libusb\sync.c" />
     <ClCompile Include="..\libusb\os\threads_windows.c" />
-    <ClCompile Include="..\libusb\os\windows_usb.c" />
+    <ClCompile Include="..\libusb\os\windows_winusb.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\libusb\hotplug.h" />
@@ -157,7 +157,7 @@
     <ClInclude Include="..\libusb\libusbi.h" />
     <ClInclude Include="..\libusb\os\poll_windows.h" />
     <ClInclude Include="..\libusb\os\threads_windows.h" />
-    <ClInclude Include="..\libusb\os\windows_usb.h" />
+    <ClInclude Include="..\libusb\os\windows_winusb.h" />
     <ClInclude Include="..\libusb\os\windows_common.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

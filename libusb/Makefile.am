@@ -16,7 +16,7 @@ COMMON_WINDOWS_SRC = os/windows_nt_common.h \
                      os/windows_nt_common.c \
                      os/windows_common.h \
                      libusb-1.0.rc libusb-1.0.def
-WINDOWS_USB_SRC = os/windows_usb.h os/windows_usb.c $(COMMON_WINDOWS_SRC)
+WINDOWS_USB_SRC = os/windows_winusb.h os/windows_winusb.c $(COMMON_WINDOWS_SRC)
 WINCE_USB_SRC = os/wince_usb.h os/wince_usb.c
 HAIKU_USB_SRC = os/haiku_usb.h os/haiku_usb_backend.cpp \
 		os/haiku_usb_raw.h os/haiku_usb_raw.cpp os/haiku_pollfs.cpp

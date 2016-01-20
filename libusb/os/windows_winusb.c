@@ -37,7 +37,7 @@
 
 #include "libusbi.h"
 #include "poll_windows.h"
-#include "windows_usb.h"
+#include "windows_winusb.h"
 
 // The 2 macros below are used in conjunction with safe loops.
 #define LOOP_CHECK(fcall) { r=fcall; if (r != LIBUSB_SUCCESS) continue; }
@@ -4107,7 +4107,7 @@ static int composite_reset_device(int sub_api, struct libusb_device_handle *dev_
 {
 	struct windows_device_priv *priv = _device_priv(dev_handle->dev);
 	int r;
-	uint8_t i; 
+	uint8_t i;
 	bool available[SUB_API_MAX];
 	for (i = 0; i<SUB_API_MAX; i++) {
 		available[i] = false;
