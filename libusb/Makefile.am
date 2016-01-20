@@ -17,6 +17,7 @@ COMMON_WINDOWS_SRC = os/windows_nt_common.h \
                      os/windows_common.h \
                      libusb-1.0.rc libusb-1.0.def
 WINDOWS_USB_SRC = os/windows_winusb.h os/windows_winusb.c $(COMMON_WINDOWS_SRC)
+WINDOWS_USBDK_SRC = os/windows_usbdk.h os/windows_usbdk.c $(COMMON_WINDOWS_SRC)
 WINCE_USB_SRC = os/wince_usb.h os/wince_usb.c
 HAIKU_USB_SRC = os/haiku_usb.h os/haiku_usb_backend.cpp \
 		os/haiku_usb_raw.h os/haiku_usb_raw.cpp os/haiku_pollfs.cpp
@@ -25,8 +26,8 @@ EXTRA_DIST = $(POSIX_POLL_SRC) $(POSIX_THREADS_SRC) \
 	$(WINDOWS_POLL_SRC) $(WINDOWS_THREADS_SRC) \
 	$(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) \
 	$(OPENBSD_USB_SRC) $(NETBSD_USB_SRC) \
-	$(WINDOWS_USB_SRC) $(WINCE_USB_SRC) \
-	$(HAIKU_USB_SRC) \
+	$(WINDOWS_USB_SRC) $(WINDOWS_USBDK_SRC) \
+        $(WINCE_USB_SRC) $(HAIKU_USB_SRC) \
 	os/linux_udev.c os/linux_netlink.c
 
 if OS_LINUX
@@ -59,7 +60,12 @@ libusb_1_0_la_LIBADD = libusb_haiku.la
 endif
 
 if OS_WINDOWS
+
+if USE_USBDK
+OS_SRC = $(WINDOWS_USBDK_SRC)
+else
 OS_SRC = $(WINDOWS_USB_SRC)
+endif
 
 .rc.lo:
 	$(AM_V_GEN)$(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=RC --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
