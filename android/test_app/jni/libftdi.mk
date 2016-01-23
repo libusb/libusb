@@ -1,6 +1,5 @@
-# Android build config for libusb, examples and tests
+# Android build config for libftdi tests and examples to be run by test_app
 # Copyright © 2016 Eugene Hutorny <eugnene@hutorny.in.ua>
-# Copyright © 2012-2013 RealVNC Ltd. <toby.gray@realvnc.com>
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -15,12 +14,27 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
-#
 
-LOCAL_PATH := $(call my-dir)
-include $(LOCAL_PATH)/jaemon.mk
-include $(LOCAL_PATH)/libusb.mk
-include $(LOCAL_PATH)/examples.mk
-include $(LOCAL_PATH)/tests.mk
-include $(if $(LIBFTDI_ROOT),$(LOCAL_PATH)/libftdi.mk,)
-include $(if $(LIBFTDI_ROOT),$(LOCAL_PATH)/libftdi_tests.mk,)
+LOCAL_PATH:= $(call my-dir)
+LIBUSB_ROOT_REL:= ../../..
+LIBUSB_ROOT_ABS:= $(abspath $(LOCAL_PATH)/$(LIBUSB_ROOT_REL))
+
+#LIBFTDI_ROOT must be specified by the caller
+LIBFTDI_ROOT_SET := $(if $(LIBFTDI_ROOT),yes,$(error LIBFTDI_ROOT is not set))
+
+# libftdi
+
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
+  $(LIBFTDI_ROOT)/src/ftdi.c												\
+  $(LIBFTDI_ROOT)/src/ftdi_stream.c
+
+LOCAL_C_INCLUDES += \
+  $(LIBFTDI_ROOT)/src
+
+LOCAL_SHARED_LIBRARIES += libusb1.0
+
+LOCAL_MODULE:= libftdi
+
+include $(BUILD_SHARED_LIBRARY)

@@ -58,3 +58,7 @@ android/test_app/gen
 android/test_app/.*
 android/test_app/out
 android/test_app/local.properties
+.autotools
+.cproject
+.externalToolBuilders
+android/test_app/jni/examples

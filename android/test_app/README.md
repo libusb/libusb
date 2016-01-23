@@ -33,18 +33,48 @@ To build libusb test_app for Android do the following:
 
 		cd android/test_app
 
- 9. create `local.properties` file with locations of NDK and SDK:
+ 9. Create `local.properties` file with locations of NDK and SDK:
 
 		echo ndk.dir=<absolute path to the NDK dir> > local.properties
 		echo sdk.dir=<absolute path to the SDK dir> >> local.properties
 
- 10. run the ant build:
+ 10. Run the ant build:
 
 		ant debug
 
  The apk can then be found in:
 
 		android/test_app/bin
+
+libftdi examples:
+-----------------
+
+To build and run libftdi examples, shared by intra2net, do the following:
+
+ 1. Obtain copy of intra2net's libftdi
+
+	git clone git://developer.intra2net.com/libftdi
+
+ 2. export LIBFTDI_ROOT variable
+
+	export LIBFTDI_ROOT=`pwd`/libftdi
+
+ 3. Apply patch
+
+	cd libftdi
+	patch -p1 < <path to libusb dir>/android/test_app/jni/patches/0001-Added-ftdi_transfer_data_cancel.patch
+
+ 4. Configure libftdi for android
+
+	<path to libusb dir>/android/autogen.h
+	
+ 5. Change to android test_app dir
+ 
+	cd 	<path to libusb dir>/android/test_app
+
+ 6. Run the ant build:
+
+		ant debug
 
 Installing:
 -----------

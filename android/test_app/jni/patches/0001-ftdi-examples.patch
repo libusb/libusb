@@ -1,0 +1,601 @@
+From ca23ce946153b749e89bcd5b6f028a133939ed39 Mon Sep 17 00:00:00 2001
+From: Eugene Hutorny <eugene@hutorny.in.ua>
+Date: Thu, 21 Jan 2016 18:20:11 +0200
+Subject: [PATCH 1/4] Examples adjusted
+
+---
+ examples/serial_test.c | 125 +++++++++++++++++++++++++++++++++++++++++--------
+ examples/simple.c      |   5 +-
+ examples/stream_test.c |   6 +--
+ 3 files changed, 112 insertions(+), 24 deletions(-)
+
+diff --git a/examples/serial_test.c b/examples/serial_test.c
+index 289dd97..23010ec 100644
+--- a/examples/serial_test.c
++++ b/examples/serial_test.c
+@@ -10,9 +10,10 @@
+ #include <unistd.h>
+ #include <getopt.h>
+ #include <signal.h>
++#include <libusb.h>
+ #include <ftdi.h>
+ 
+-static int exitRequested = 0;
++static int exitRequested = 16;
+ /*
+  * sigintHandler --
+  *
+@@ -21,13 +22,64 @@ static int exitRequested = 0;
+ static void
+ sigintHandler(int signum)
+ {
+-    exitRequested = 1;
++    exitRequested = 0;
+ }
+ 
++/* non-blocking version of ftdi_transfer_data_done */
++
++static int ftdi_transfer_data_isdone(struct ftdi_transfer_control *tc)
++{
++    int ret;
++
++    if( ! tc->completed ) {
++        ret = libusb_handle_events(tc->ftdi->usb_ctx);
++        if (ret < 0)
++        {
++            if (ret == LIBUSB_ERROR_INTERRUPTED)
++                return 0;
++            libusb_cancel_transfer(tc->transfer);
++            while (!tc->completed)
++                if (libusb_handle_events(tc->ftdi->usb_ctx) < 0)
++                    break;
++            libusb_free_transfer(tc->transfer);
++            free (tc);
++            return ret;
++        }
++    }
++
++    if( ! tc->completed ) return 0;
++
++    ret = tc->offset;
++    /**
++     * tc->transfer could be NULL if "(size <= ftdi->readbuffer_remaining)"
++     * at ftdi_read_data_submit(). Therefore, we need to check it here.
++     **/
++    if (tc->transfer)
++    {
++        if (tc->transfer->status != LIBUSB_TRANSFER_COMPLETED)
++            ret = -1;
++        libusb_free_transfer(tc->transfer);
++    }
++    free(tc);
++    return ret;
++}
++
++static int get_debug_env() {
++	char* env = getenv("LIBUSB_DEBUG");
++	if( ! env ) return 0;
++	return ( *env >= '0' && *env <= '9' ) ? *env - '0' : 0;
++}
++
++
+ int main(int argc, char **argv)
+ {
+     struct ftdi_context *ftdi;
+-    unsigned char buf[1024];
++    unsigned char buf[512];
++    unsigned char ruf[sizeof(buf)];
++    struct ftdi_transfer_control * rtc;
++    int debug = get_debug_env();
++    int read_count = 0;
++    int chunk_size;
+     int f = 0, i;
+     int vid = 0x403;
+     int pid = 0;
+@@ -68,6 +120,8 @@ int main(int argc, char **argv)
+                 exit(-1);
+         }
+     }
++    fprintf(stderr, "interface=%d vid=%04x pid=%04x baudrate=%d pattern=%02x\n",
++    		interface, vid, pid, baudrate, pattern);
+ 
+     // Init
+     if ((ftdi = ftdi_new()) == 0)
+@@ -75,7 +129,14 @@ int main(int argc, char **argv)
+         fprintf(stderr, "ftdi_new failed\n");
+         return EXIT_FAILURE;
+     }
++/* On some (???) chips test hangs in ftdi_usb_close
++ * As per the answer in libusbx mailing list, the issue may
++ * be the fact that the default read buffer size is 4096.
++ * http://developer.intra2net.com/mailarchive/html/libftdi/2013/msg00169.html
++ */
+ 
++    ftdi_read_data_set_chunksize(ftdi, sizeof(buf));
++    ftdi_write_data_set_chunksize(ftdi, sizeof(buf));
+     if (!vid && !pid && (interface == INTERFACE_ANY))
+     {
+         ftdi_set_interface(ftdi, INTERFACE_ANY);
+@@ -146,33 +207,59 @@ int main(int argc, char **argv)
+     }
+     
+     if (do_write)
+-        for(i=0; i<1024; i++)
++        for(i=0; i<sizeof(buf); i++)
+             buf[i] = pattern;
+ 
++	fprintf(stdout, "starting write/read operations,\n"
++					"ensure TX and RX are connected in a loop\n");
++
+     signal(SIGINT, sigintHandler);
+-    while (!exitRequested)
++    chunk_size = (baudrate/512 >sizeof(buf))?sizeof(buf):
++    			 (baudrate/512)?baudrate/512 : 1;
++    rtc = ftdi_read_data_submit(ftdi,ruf,chunk_size);
++    while (exitRequested-- > 0)
+     {
+-        if (do_write)
+-            f = ftdi_write_data(ftdi, buf, 
+-                                (baudrate/512 >sizeof(buf))?sizeof(buf):
+-                                (baudrate/512)?baudrate/512:1);
+-        else
+-            f = ftdi_read_data(ftdi, buf, sizeof(buf));
+-        if (f<0)
+-            usleep(1 * 1000000);
+-        else if(f> 0 && !do_write)
+-        {
+-            fprintf(stderr, "read %d bytes\n", f);
+-            fwrite(buf, f, 1, stdout);
+-            fflush(stderr);
+-            fflush(stdout);
++        if (read_count == 0) {
++            f = ftdi_write_data(ftdi, buf, chunk_size);
++            if( f > 0 ) {
++            	fprintf(stdout, "wrote %d bytes\n", f);
++            	read_count = f;
++            }
++        } else {
++        	if( (f = ftdi_transfer_data_isdone(rtc)) == 0 ) {
++                usleep(100L * 1000L);
++        	} else if ( f < 0 ){
++                fprintf(stdout, "I/O error %d\n", f);
++                break;
++            } else {
++            	if( debug ) {
++            		fwrite(ruf, f, 1, stderr);
++            		fputs("\n",stderr);
++                    fflush(stderr);
++            	}
++                fprintf(stdout, "read  %d bytes\n", f);
++                fflush(stdout);
++                read_count -= f;
++            	if( read_count < 0 ) read_count = 0;
++                rtc = ftdi_read_data_submit(ftdi,ruf,
++                		read_count > 0 ?  read_count : chunk_size);
++            }
+         }
+     }
++    if( rtc ) {
++    	if( debug )
++    		fprintf(stderr, "ftdi_transfer_data_done\n");
++    	ftdi_transfer_data_done(rtc);
++    }
+     signal(SIGINT, SIG_DFL);
+     retval =  EXIT_SUCCESS;
+             
++	if( debug )
++		fprintf(stderr, "ftdi_usb_close\n");
+     ftdi_usb_close(ftdi);
+     do_deinit:
++	if( debug )
++		fprintf(stderr, "ftdi_free\n");
+     ftdi_free(ftdi);
+ 
+     return retval;
+diff --git a/examples/simple.c b/examples/simple.c
+index cfd674b..4f4fee8 100644
+--- a/examples/simple.c
++++ b/examples/simple.c
+@@ -9,7 +9,7 @@
+ #include <stdlib.h>
+ #include <ftdi.h>
+ 
+-int main(void)
++int main(int argc, char** argv)
+ {
+     int ret;
+     struct ftdi_context *ftdi;
+@@ -19,13 +19,14 @@ int main(void)
+         fprintf(stderr, "ftdi_new failed\n");
+         return EXIT_FAILURE;
+     }
++    int pid = ( argc <= 1 ) ? 0x6001 : strtoul(argv[1], NULL, 0);
+ 
+     version = ftdi_get_library_version();
+     printf("Initialized libftdi %s (major: %d, minor: %d, micro: %d, snapshot ver: %s)\n",
+         version.version_str, version.major, version.minor, version.micro,
+         version.snapshot_str);
+ 
+-    if ((ret = ftdi_usb_open(ftdi, 0x0403, 0x6001)) < 0)
++    if ((ret = ftdi_usb_open(ftdi, 0x0403, pid)) < 0)
+     {
+         fprintf(stderr, "unable to open ftdi device: %d (%s)\n", ret, ftdi_get_error_string(ftdi));
+         ftdi_free(ftdi);
+diff --git a/examples/stream_test.c b/examples/stream_test.c
+index 43abea9..796b9fb 100644
+--- a/examples/stream_test.c
++++ b/examples/stream_test.c
+@@ -29,7 +29,7 @@ void check_outfile(char *);
+ static FILE *outputFile;
+ 
+ static int check = 1;
+-static int exitRequested = 0;
++static int exitRequested = 16;
+ /*
+  * sigintHandler --
+  *
+@@ -39,7 +39,7 @@ static int exitRequested = 0;
+ static void
+ sigintHandler(int signum)
+ {
+-   exitRequested = 1;
++   exitRequested = 0;
+ }
+ 
+ static void
+@@ -215,7 +215,7 @@ int main(int argc, char **argv)
+    signal(SIGINT, sigintHandler);
+    
+    err = ftdi_readstream(ftdi, readCallback, NULL, 8, 256);
+-   if (err < 0 && !exitRequested)
++   if (err < 0 && exitRequested-- > 0)
+        exit(1);
+    
+    if (outputFile) {
+-- 
+2.6.2
+
+
+From acd645db1a282168d00dabcd81dafced27afe814 Mon Sep 17 00:00:00 2001
+From: Eugene Hutorny <eugene@hutorny.in.ua>
+Date: Fri, 22 Jan 2016 09:06:32 +0200
+Subject: [PATCH 2/4] Added device reset on start of each test Abandoned use of
+ ftdi_transfer_data_done because test hangs
+
+---
+ examples/serial_test.c | 15 ++++++++++-----
+ examples/simple.c      |  8 +++++---
+ examples/stream_test.c |  6 +++++-
+ 3 files changed, 20 insertions(+), 9 deletions(-)
+
+diff --git a/examples/serial_test.c b/examples/serial_test.c
+index 23010ec..b9ccf01 100644
+--- a/examples/serial_test.c
++++ b/examples/serial_test.c
+@@ -25,7 +25,9 @@ sigintHandler(int signum)
+     exitRequested = 0;
+ }
+ 
+-/* non-blocking version of ftdi_transfer_data_done */
++/* non-blocking version of ftdi_transfer_data_done
++ * original ftdi_transfer_data_done hangs on closing
++ */
+ 
+ static int ftdi_transfer_data_isdone(struct ftdi_transfer_control *tc)
+ {
+@@ -129,6 +131,7 @@ int main(int argc, char **argv)
+         fprintf(stderr, "ftdi_new failed\n");
+         return EXIT_FAILURE;
+     }
++
+ /* On some (???) chips test hangs in ftdi_usb_close
+  * As per the answer in libusbx mailing list, the issue may
+  * be the fact that the default read buffer size is 4096.
+@@ -182,7 +185,7 @@ int main(int argc, char **argv)
+         fprintf(stderr, "unable to open ftdi device: %d (%s)\n", f, ftdi_get_error_string(ftdi));
+         exit(-1);
+     }
+-
++    ftdi_usb_reset(ftdi);
+     // Set baudrate
+     f = ftdi_set_baudrate(ftdi, baudrate);
+     if (f < 0)
+@@ -248,12 +251,14 @@ int main(int argc, char **argv)
+     }
+     if( rtc ) {
+     	if( debug )
+-    		fprintf(stderr, "ftdi_transfer_data_done\n");
+-    	ftdi_transfer_data_done(rtc);
++    		fprintf(stderr, "ftdi_transfer_data_isdone\n");
++    	while( ! ftdi_transfer_data_isdone(rtc) ) usleep(1000);
+     }
+     signal(SIGINT, SIG_DFL);
+     retval =  EXIT_SUCCESS;
+-            
++
++    ftdi_usb_reset(ftdi);
++
+ 	if( debug )
+ 		fprintf(stderr, "ftdi_usb_close\n");
+     ftdi_usb_close(ftdi);
+diff --git a/examples/simple.c b/examples/simple.c
+index 4f4fee8..b04bb2a 100644
+--- a/examples/simple.c
++++ b/examples/simple.c
+@@ -12,6 +12,7 @@
+ int main(int argc, char** argv)
+ {
+     int ret;
++    int pid;
+     struct ftdi_context *ftdi;
+     struct ftdi_version_info version;
+     if ((ftdi = ftdi_new()) == 0)
+@@ -19,8 +20,8 @@ int main(int argc, char** argv)
+         fprintf(stderr, "ftdi_new failed\n");
+         return EXIT_FAILURE;
+     }
+-    int pid = ( argc <= 1 ) ? 0x6001 : strtoul(argv[1], NULL, 0);
+-
++    ftdi_usb_reset(ftdi);
++    pid = ( argc <= 1 ) ? 0x6001 : strtoul(argv[1], NULL, 0);
+     version = ftdi_get_library_version();
+     printf("Initialized libftdi %s (major: %d, minor: %d, micro: %d, snapshot ver: %s)\n",
+         version.version_str, version.major, version.minor, version.micro,
+@@ -41,13 +42,14 @@ int main(int argc, char** argv)
+         printf("FTDI chipid: %X\n", chipid);
+     }
+ 
++    ftdi_usb_reset(ftdi);
++
+     if ((ret = ftdi_usb_close(ftdi)) < 0)
+     {
+         fprintf(stderr, "unable to close ftdi device: %d (%s)\n", ret, ftdi_get_error_string(ftdi));
+         ftdi_free(ftdi);
+         return EXIT_FAILURE;
+     }
+-
+     ftdi_free(ftdi);
+ 
+     return EXIT_SUCCESS;
+diff --git a/examples/stream_test.c b/examples/stream_test.c
+index 796b9fb..5b22670 100644
+--- a/examples/stream_test.c
++++ b/examples/stream_test.c
+@@ -184,7 +184,9 @@ int main(int argc, char **argv)
+        ftdi_free(ftdi);
+        return EXIT_FAILURE;
+    }
+-   
++
++   ftdi_usb_reset(ftdi);
++
+    if (ftdi_usb_open_desc(ftdi, 0x0403, 0x6010, descstring, NULL) < 0)
+    {
+        fprintf(stderr,"Can't open ftdi device: %s\n",ftdi_get_error_string(ftdi));
+@@ -196,6 +198,7 @@ int main(int argc, char **argv)
+    if(ftdi_set_latency_timer(ftdi, 2))
+    {
+        fprintf(stderr,"Can't set latency, Error %s\n",ftdi_get_error_string(ftdi));
++       ftdi_usb_reset(ftdi);
+        ftdi_usb_close(ftdi);
+        ftdi_free(ftdi);
+        return EXIT_FAILURE;
+@@ -231,6 +234,7 @@ int main(int argc, char **argv)
+        ftdi_free(ftdi);
+        return EXIT_FAILURE;
+    }
++//   ftdi_usb_reset(ftdi);
+    ftdi_usb_close(ftdi);
+    ftdi_free(ftdi);
+    signal(SIGINT, SIG_DFL);
+-- 
+2.6.2
+
+From 46c6ca9e7547529a733382bb4ed9a1e511953c1f Mon Sep 17 00:00:00 2001
+From: Eugene Hutorny <eugene@hutorny.in.ua>
+Date: Sat, 23 Jan 2016 07:12:53 +0200
+Subject: [PATCH 4/4] Fixes
+
+---
+ examples/serial_test.c | 56 ++++++++++++++++++++++++++------------------------
+ examples/stream_test.c | 10 ++++-----
+ 2 files changed, 34 insertions(+), 32 deletions(-)
+
+diff --git a/examples/serial_test.c b/examples/serial_test.c
+index b9ccf01..5aa195a 100644
+--- a/examples/serial_test.c
++++ b/examples/serial_test.c
+@@ -29,22 +29,27 @@ sigintHandler(int signum)
+  * original ftdi_transfer_data_done hangs on closing
+  */
+ 
+-static int ftdi_transfer_data_isdone(struct ftdi_transfer_control *tc)
++static int ftdi_transfer_data_isdone(struct ftdi_transfer_control **ptc,
++		struct timeval* to)
+ {
+     int ret;
+-
++    struct ftdi_transfer_control *tc = *ptc;
+     if( ! tc->completed ) {
+-        ret = libusb_handle_events(tc->ftdi->usb_ctx);
++        ret = libusb_handle_events_timeout_completed(tc->ftdi->usb_ctx,
++        		to, &tc->completed);
+         if (ret < 0)
+         {
+             if (ret == LIBUSB_ERROR_INTERRUPTED)
+                 return 0;
+             libusb_cancel_transfer(tc->transfer);
+             while (!tc->completed)
+-                if (libusb_handle_events(tc->ftdi->usb_ctx) < 0)
++                if (libusb_handle_events_timeout_completed(tc->ftdi->usb_ctx,
++                		to, &tc->completed) < 0)
+                     break;
+-            libusb_free_transfer(tc->transfer);
++            if( tc->transfer )
++            	libusb_free_transfer(tc->transfer);
+             free (tc);
++            *ptc = NULL;
+             return ret;
+         }
+     }
+@@ -63,6 +68,7 @@ static int ftdi_transfer_data_isdone(struct ftdi_transfer_control *tc)
+         libusb_free_transfer(tc->transfer);
+     }
+     free(tc);
++    *ptc = NULL;
+     return ret;
+ }
+ 
+@@ -90,8 +96,9 @@ int main(int argc, char **argv)
+     int do_write = 0;
+     unsigned int pattern = 0xffff;
+     int retval = EXIT_FAILURE;
+-
+-    while ((i = getopt(argc, argv, "i:v:p:b:w::")) != -1)
++    struct timeval to = { 5, 0 };
++    optind = 0;
++    while ((i = getopt(argc, argv, "i:v:p:b:d:w::")) != -1)
+     {
+         switch (i)
+         {
+@@ -107,6 +114,9 @@ int main(int argc, char **argv)
+             case 'b':
+                 baudrate = strtoul(optarg, NULL, 0);
+                 break;
++            case 'd':
++                debug = optarg && *optarg=='0' ? 0 : 1;
++                break;
+             case 'w':
+                 do_write = 1;
+                 if (optarg)
+@@ -122,9 +132,6 @@ int main(int argc, char **argv)
+                 exit(-1);
+         }
+     }
+-    fprintf(stderr, "interface=%d vid=%04x pid=%04x baudrate=%d pattern=%02x\n",
+-    		interface, vid, pid, baudrate, pattern);
+-
+     // Init
+     if ((ftdi = ftdi_new()) == 0)
+     {
+@@ -183,7 +190,8 @@ int main(int argc, char **argv)
+     if (f < 0)
+     {
+         fprintf(stderr, "unable to open ftdi device: %d (%s)\n", f, ftdi_get_error_string(ftdi));
+-        exit(-1);
++        retval =  -f;
++        goto do_deinit;
+     }
+     ftdi_usb_reset(ftdi);
+     // Set baudrate
+@@ -191,7 +199,8 @@ int main(int argc, char **argv)
+     if (f < 0)
+     {
+         fprintf(stderr, "unable to set baudrate: %d (%s)\n", f, ftdi_get_error_string(ftdi));
+-        exit(-1);
++        retval =  -f;
++        goto do_deinit;
+     }
+     
+     /* Set line parameters
+@@ -206,7 +215,8 @@ int main(int argc, char **argv)
+     if (f < 0)
+     {
+         fprintf(stderr, "unable to set line parameters: %d (%s)\n", f, ftdi_get_error_string(ftdi));
+-        exit(-1);
++        retval =  -f;
++        goto do_deinit;
+     }
+     
+     if (do_write)
+@@ -220,6 +230,7 @@ int main(int argc, char **argv)
+     chunk_size = (baudrate/512 >sizeof(buf))?sizeof(buf):
+     			 (baudrate/512)?baudrate/512 : 1;
+     rtc = ftdi_read_data_submit(ftdi,ruf,chunk_size);
++    retval =  EXIT_SUCCESS;
+     while (exitRequested-- > 0)
+     {
+         if (read_count == 0) {
+@@ -229,10 +240,11 @@ int main(int argc, char **argv)
+             	read_count = f;
+             }
+         } else {
+-        	if( (f = ftdi_transfer_data_isdone(rtc)) == 0 ) {
++        	if( (f = ftdi_transfer_data_isdone(&rtc, &to)) == 0 ) {
+                 usleep(100L * 1000L);
+         	} else if ( f < 0 ){
+                 fprintf(stdout, "I/O error %d\n", f);
++                retval =  -f;
+                 break;
+             } else {
+             	if( debug ) {
+@@ -249,22 +261,12 @@ int main(int argc, char **argv)
+             }
+         }
+     }
+-    if( rtc ) {
+-    	if( debug )
+-    		fprintf(stderr, "ftdi_transfer_data_isdone\n");
+-    	while( ! ftdi_transfer_data_isdone(rtc) ) usleep(1000);
+-    }
++    if( rtc )
++    	ftdi_transfer_data_cancel(rtc, &to);
+     signal(SIGINT, SIG_DFL);
+-    retval =  EXIT_SUCCESS;
+-
+     ftdi_usb_reset(ftdi);
+-
+-	if( debug )
+-		fprintf(stderr, "ftdi_usb_close\n");
+     ftdi_usb_close(ftdi);
+-    do_deinit:
+-	if( debug )
+-		fprintf(stderr, "ftdi_free\n");
++do_deinit:
+     ftdi_free(ftdi);
+ 
+     return retval;
+diff --git a/examples/stream_test.c b/examples/stream_test.c
+index 5b22670..6099a70 100644
+--- a/examples/stream_test.c
++++ b/examples/stream_test.c
+@@ -144,8 +144,8 @@ int main(int argc, char **argv)
+    exitRequested = 0;
+    char *descstring = NULL;
+    int option_index;
+-   static struct option long_options[] = {{NULL},};
+-
++   struct option long_options[] = {{NULL},};
++   optind = 0;
+    while ((c = getopt_long(argc, argv, "P:n", long_options, &option_index)) !=- 1)
+        switch (c) 
+        {
+@@ -185,14 +185,14 @@ int main(int argc, char **argv)
+        return EXIT_FAILURE;
+    }
+ 
+-   ftdi_usb_reset(ftdi);
+-
+    if (ftdi_usb_open_desc(ftdi, 0x0403, 0x6010, descstring, NULL) < 0)
+    {
+        fprintf(stderr,"Can't open ftdi device: %s\n",ftdi_get_error_string(ftdi));
+        ftdi_free(ftdi);
+        return EXIT_FAILURE;
+    }
++
++   ftdi_usb_reset(ftdi);
+    
+    /* A timeout value of 1 results in may skipped blocks */
+    if(ftdi_set_latency_timer(ftdi, 2))
+@@ -234,7 +234,7 @@ int main(int argc, char **argv)
+        ftdi_free(ftdi);
+        return EXIT_FAILURE;
+    }
+-//   ftdi_usb_reset(ftdi);
++   ftdi_usb_reset(ftdi);
+    ftdi_usb_close(ftdi);
+    ftdi_free(ftdi);
+    signal(SIGINT, SIG_DFL);
+-- 
+2.6.2
+

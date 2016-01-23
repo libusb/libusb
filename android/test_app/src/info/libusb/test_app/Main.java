@@ -30,6 +30,7 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
+import android.system.Os;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.Menu;
@@ -59,7 +60,7 @@ public class Main extends Activity {
         try {
             testLog = getApplicationContext().getFilesDir().getAbsolutePath() + "/tmp.log";
             new FileOutputStream(testLog, append);
-            new File(testLog).deleteOnExit();
+            Os.chmod(testLog,0777);
             pump = new Pump(testLog);
             pump.start();
         } catch (Exception e) {
@@ -173,9 +174,16 @@ public class Main extends Activity {
         test.start();
     }
     private static final List<List<String>> busTests = Arrays.asList(
-            Arrays.asList("liblistdevs.so"), Arrays.asList("libstress.so")
+            Arrays.asList("liblistdevs.so"),
+            Arrays.asList("libstress.so")
     );
-    private static final List<List<String>> devTests = Arrays.asList(Arrays.asList("libxusb.so", "-i", "%1$04x:%2$04x"));
+    private static final List<List<String>> devTests = Arrays.asList(
+            Arrays.asList("libftdi_simple.so", "0x%2$04x"),
+            Arrays.asList("libftdi_stream_test.so") ,
+            Arrays.asList("libftdi_serial_test.so", "-v0x%1$04x", "-p0x%2$04x", "-w0x55", "-b115200"),
+            Arrays.asList("libftdi_find_all.so"), //FIXME order
+            Arrays.asList("libxusb.so", "-i", "%1$04x:%2$04x")
+    );
 
     private void test() {
         for(String id : deviceList.keySet()) {
@@ -189,6 +197,18 @@ public class Main extends Activity {
         return String.format(fmt, device.getVendorId(), device.getProductId(), device.getProductName());
     }
 
+    private void runTest(List<String> exe) {
+        if( ! testExists(exe.get(0))) {
+            if( ! debug )
+                print("\n- missing " + exe.get(0));
+            return;
+        }
+        print("\n> " + TextUtils.join(" ", exe));
+        Jaemon tst = new Jaemon(exe, getEnv(), testLog);
+        tst.run();
+        print("  exit :" + tst.getResult() + "\n");
+    }
+
     private void testDev(UsbDevice device) {
         UsbDeviceConnection connection = usbManager.openDevice(device);
         device.getDeviceName();
@@ -197,11 +217,16 @@ public class Main extends Activity {
             List<String> exe = new ArrayList<>(test);
             for(int i = 1; i < exe.size(); ++i)
                 exe.set(i, formatDevice(exe.get(i), device));
-            print("\n> " + TextUtils.join(" ", exe));
-            Jaemon tst = new Jaemon(exe, getEnv(), testLog);
-            tst.run();
-            print("  exit :" + tst.getResult() + "\n");
+            runTest(exe);
         }
+    }
+
+    private boolean testExists(String name) {
+        if( name == null ) return false;
+        if( ! name.contains("/") ) {
+            name = lib + "/" + name;
+        }
+        return new File(name).exists();
     }
 
     private Map<String,String> getEnv() {
@@ -212,10 +237,7 @@ public class Main extends Activity {
 
     private void testBus() {
         for(List<String> exe : busTests) {
-            print("\n> " + TextUtils.join(" ", exe));
-            Jaemon tst = new Jaemon(exe, getEnv(), testLog);
-            tst.run();
-            print("  exit :" + tst.getResult() + "\n");
+            runTest(exe);
         }
     }
 
@@ -256,6 +278,7 @@ public class Main extends Activity {
                         } else {
                             synchronized (log) {
                                 log.append((char) chr);
+                                //TODO terminate test when log grows too large
                             }
                             done = true;
                         }

@@ -1,0 +1,147 @@
+From b21f09ce333704ac57d57840cd2de22e08f52ba2 Mon Sep 17 00:00:00 2001
+From: Eugene Hutorny <eugene@hutorny.in.ua>
+Date: Sat, 23 Jan 2016 06:41:30 +0200
+Subject: [PATCH] Added ftdi_transfer_data_cancel for cancelation of a
+ submitted transfer, avoided resubmittion of a cancelled transfer in the
+ callbacks, replaced calls to libusb_handle_events with
+ libusb_handle_events_timeout_completed (Eugene Hutorny, eugene@hutorny.in.ua)
+
+---
+ README     |  5 ++++-
+ src/ftdi.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++---------
+ src/ftdi.h |  1 +
+ 3 files changed, 51 insertions(+), 10 deletions(-)
+
+diff --git a/README b/README
+index 165330d..18c0521 100644
+--- a/README
++++ b/README
+@@ -20,6 +20,10 @@ that made libftdi possible what it is today.
+ 
+ Changes
+ -------
++* Added ftdi_transfer_data_cancel for cancelation of a submitted transfer,
++  avoided resubmittion of a cancelled transfer in the callbacks, replaced calls
++  to libusb_handle_events with libusb_handle_events_timeout_completed
++  (Eugene Hutorny, eugene@hutorny.in.ua)
+ * Support for FT230X devices (Uwe Bonnes)
+ * ftdi_usb_get_strings(): Don't try to open an already open device (Denis Sirotkin)
+ * Support for finding devices bricked by the Windows driver (Forest Crossman)
+@@ -27,7 +31,6 @@ Changes
+ * Fix a typo in the MPSSE command CLK_BYTES_OR_LOW (Benjamin Vanheuverzwijn)
+ * Minor fixes for MSVC++ (Andrei Errapart)
+ * Various small code improvements (Florian Preinstorfer, Jochen Sprickerhof, xantares09)
+-
+ You'll find the newest version of libftdi at:
+ http://www.intra2net.com/en/developer/libftdi
+ 
+diff --git a/src/ftdi.c b/src/ftdi.c
+index 1b29468..4cc6b52 100644
+--- a/src/ftdi.c
++++ b/src/ftdi.c
+@@ -1470,9 +1470,13 @@ static void LIBUSB_CALL ftdi_read_data_cb(struct libusb_transfer *transfer)
+             }
+         }
+     }
+-    ret = libusb_submit_transfer (transfer);
+-    if (ret < 0)
+-        tc->completed = 1;
++    if( transfer->status == LIBUSB_TRANSFER_CANCELLED )
++    	tc->completed = LIBUSB_TRANSFER_CANCELLED;
++    else {
++        ret = libusb_submit_transfer (transfer);
++        if (ret < 0)
++            tc->completed = 1;
++    }
+ }
+ 
+ 
+@@ -1497,9 +1501,13 @@ static void LIBUSB_CALL ftdi_write_data_cb(struct libusb_transfer *transfer)
+ 
+         transfer->length = write_size;
+         transfer->buffer = tc->buf + tc->offset;
+-        ret = libusb_submit_transfer (transfer);
+-        if (ret < 0)
+-            tc->completed = 1;
++        if( transfer->status == LIBUSB_TRANSFER_CANCELLED )
++            tc->completed = LIBUSB_TRANSFER_CANCELLED;
++        else {
++            ret = libusb_submit_transfer (transfer);
++            if (ret < 0)
++                tc->completed = 1;
++        }
+     }
+ }
+ 
+@@ -1662,17 +1670,19 @@ struct ftdi_transfer_control *ftdi_read_data_submit(struct ftdi_context *ftdi, u
+ int ftdi_transfer_data_done(struct ftdi_transfer_control *tc)
+ {
+     int ret;
+-
++    struct timeval to = { 0, 0 };
+     while (!tc->completed)
+     {
+-        ret = libusb_handle_events(tc->ftdi->usb_ctx);
++        ret = libusb_handle_events_timeout_completed(tc->ftdi->usb_ctx,
++                &to, &tc->completed);
+         if (ret < 0)
+         {
+             if (ret == LIBUSB_ERROR_INTERRUPTED)
+                 continue;
+             libusb_cancel_transfer(tc->transfer);
+             while (!tc->completed)
+-                if (libusb_handle_events(tc->ftdi->usb_ctx) < 0)
++                if (libusb_handle_events_timeout_completed(tc->ftdi->usb_ctx,
++                        &to, &tc->completed) < 0)
+                     break;
+             libusb_free_transfer(tc->transfer);
+             free (tc);
+@@ -1696,6 +1706,33 @@ int ftdi_transfer_data_done(struct ftdi_transfer_control *tc)
+ }
+ 
+ /**
++    Cancel transfer and wait for completion.
++
++    Use libusb 1.0 asynchronous API.
++
++    \param tc pointer to ftdi_transfer_control
++    \param to pointer to timeout value or NULL for infinite
++*/
++
++void ftdi_transfer_data_cancel(struct ftdi_transfer_control *tc,
++		struct timeval * to)
++{
++	struct timeval tv = { 0, 0 };
++    if ( !tc->completed && tc->transfer != NULL ) {
++		if( to == NULL ) to = &tv;
++		libusb_cancel_transfer(tc->transfer);
++		while (!tc->completed)
++			if ( libusb_handle_events_timeout_completed(
++					tc->ftdi->usb_ctx, to, &tc->completed) < 0)
++				break;
++    }
++    if( tc->transfer )
++    	libusb_free_transfer(tc->transfer);
++    free (tc);
++}
++
++
++/**
+     Configure write buffer chunk size.
+     Default is 4096.
+ 
+diff --git a/src/ftdi.h b/src/ftdi.h
+index 5aaeb6c..829ea37 100644
+--- a/src/ftdi.h
++++ b/src/ftdi.h
+@@ -520,6 +520,7 @@ extern "C"
+ 
+     struct ftdi_transfer_control *ftdi_read_data_submit(struct ftdi_context *ftdi, unsigned char *buf, int size);
+     int ftdi_transfer_data_done(struct ftdi_transfer_control *tc);
++    void ftdi_transfer_data_cancel(struct ftdi_transfer_control *tc, struct timeval * to);
+ 
+     int ftdi_set_bitmode(struct ftdi_context *ftdi, unsigned char bitmask, unsigned char mode);
+     int ftdi_disable_bitbang(struct ftdi_context *ftdi);
+-- 
+2.6.2
+
