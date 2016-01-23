@@ -62,3 +62,5 @@ android/test_app/local.properties
 .cproject
 .externalToolBuilders
 android/test_app/jni/examples
+android/test_app/jni/.dl
+android/test_app/jni/deps

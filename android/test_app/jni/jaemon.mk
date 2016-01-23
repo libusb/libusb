@@ -1,5 +1,5 @@
 # Android build config for jaemon - a helper class for tests_app
-# Copyright © 2016 Eugene Hutorny <eugnene@hutorny.in.ua>
+# Copyright © 2016 Eugene Hutorny <eugene@hutorny.in.ua>
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public

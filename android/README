@@ -18,9 +18,9 @@ To build libusb for Android do the following:
  
  5. Run android/autogen.sh
 
- 4. Change directory to libusb's "android/jni"
+ 6. Change directory to libusb's "android/jni"
 
- 5. Run "$NDK/ndk-build". 
+ 7. Run "$NDK/ndk-build". 
 
   To build only selected architectures, define APP_ABI environment variable as
   a comma separated list of architectures, e.g.:

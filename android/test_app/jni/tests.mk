@@ -1,5 +1,5 @@
 # Android build config for libusb test_app 
-# Copyright © 2016 Eugene Hutorny <eugnene@hutorny.in.ua>
+# Copyright © 2016 Eugene Hutorny <eugene@hutorny.in.ua>
 # Copyright © 2012-2013 RealVNC Ltd. <toby.gray@realvnc.com>
 #
 # This library is free software; you can redistribute it and/or
@@ -49,7 +49,7 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES += \
   $(LIBUSB_ROOT_ABS)
 
-LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_SHARED_LIBRARIES += usb-1.0
 LOCAL_STATIC_LIBRARIES += testlib
 
 LOCAL_MODULE:= stress

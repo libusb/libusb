@@ -59,11 +59,21 @@ void jaemon_abort() {
 	longjmp(saved,2);
 }
 
+void __assert_fail(const char * assertion, const char * file, unsigned int line,
+		const char * function) __attribute__ ((__noreturn__));
+
+void __assert_fail(const char * assertion, const char * file, unsigned int line,
+		const char * function) {
+	dbg("assert(%s) in %s at %s:%d", assertion, function, file, line);
+	longjmp(saved,3);
+}
+
 static int jaemon_run(const struct jaemon* zis) {
 	switch( setjmp(saved) ) {
 	case 0:	return zis->main(zis->argc, zis->argv, environ);
 	case 1:	return result;
 	case 2:	return 201;
+	case 3:	return 203;
 	}
 	return result;
 }

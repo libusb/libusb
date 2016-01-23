@@ -42,6 +42,8 @@ import java.io.*;
 import java.util.*;
 
 public class Main extends Activity {
+    private boolean solo = false; //if true only first test device is run
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -178,10 +180,12 @@ public class Main extends Activity {
             Arrays.asList("libstress.so")
     );
     private static final List<List<String>> devTests = Arrays.asList(
+            Arrays.asList("libftdi_find_all.so"),
             Arrays.asList("libftdi_simple.so", "0x%2$04x"),
             Arrays.asList("libftdi_stream_test.so") ,
             Arrays.asList("libftdi_serial_test.so", "-v0x%1$04x", "-p0x%2$04x", "-w0x55", "-b115200"),
-            Arrays.asList("libftdi_find_all.so"), //FIXME order
+            Arrays.asList("libch340.so", "115200"),
+            Arrays.asList("libftd2xx_simple.so"),
             Arrays.asList("libxusb.so", "-i", "%1$04x:%2$04x")
     );
 
@@ -190,6 +194,7 @@ public class Main extends Activity {
             UsbDevice device = deviceList.get(id);
             testDev(device);
         }
+        if( solo ) return;
         testBus();
     }
 
@@ -199,7 +204,7 @@ public class Main extends Activity {
 
     private void runTest(List<String> exe) {
         if( ! testExists(exe.get(0))) {
-            if( ! debug )
+            if( debug )
                 print("\n- missing " + exe.get(0));
             return;
         }
@@ -218,6 +223,8 @@ public class Main extends Activity {
             for(int i = 1; i < exe.size(); ++i)
                 exe.set(i, formatDevice(exe.get(i), device));
             runTest(exe);
+            if( solo )
+                return;
         }
     }
 

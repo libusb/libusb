@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project name="test_app_jni" default="help">
     <target name="-pre-build" unless="skip-ndk-build">
-        <exec executable="${ndk.dir}/ndk-build" failonerror="true"/>
+        <exec executable="${ndk.dir}/ndk-build" dir="jni" failonerror="true"/>
     </target>
 
     <target name="clean" depends="android_rules.clean">
-        <exec executable="${ndk.dir}/ndk-build" failonerror="false">
+        <exec executable="${ndk.dir}/ndk-build" dir="jni" failonerror="false">
             <arg value="clean"/>
         </exec>
     </target>

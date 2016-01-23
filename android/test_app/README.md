@@ -76,6 +76,22 @@ To build and run libftdi examples, shared by intra2net, do the following:
 
 		ant debug
 
+FTDI D2XX examples:
+-------------------
+
+To build and run FTDI D2XX examples, shared by FTDI, do the following:
+
+ 1. export LIBFTD2XX variable
+ 
+	export LIBFTD2XX=1
+
+ 2. Run the ant build:
+
+		ant debug
+
+Note: FTDI publishes libftd2xx library in binary format, prebuild for certain
+ ABI. Only four of them are suitable for Android: armeabi armeabi-v7a x86 x86_64 
+
 Installing:
 -----------
 

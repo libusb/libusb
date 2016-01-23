@@ -1,5 +1,5 @@
 # Android application build config for libusb test_app
-# Copyright © 2016 Eugene Hutorny <eugnene@hutorny.in.ua>
+# Copyright © 2016 Eugene Hutorny <eugene@hutorny.in.ua>
 # Copyright © 2012-2013 RealVNC Ltd. <toby.gray@realvnc.com>
 #
 # This library is free software; you can redistribute it and/or

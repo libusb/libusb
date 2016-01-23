@@ -1,5 +1,5 @@
 # Android build config for libftdi tests and examples to be run by test_app
-# Copyright © 2016 Eugene Hutorny <eugnene@hutorny.in.ua>
+# Copyright © 2016 Eugene Hutorny <eugene@hutorny.in.ua>
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -33,8 +33,8 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES += \
   $(LIBFTDI_ROOT)/src
 
-LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_SHARED_LIBRARIES += usb-1.0
 
-LOCAL_MODULE:= libftdi
+LOCAL_MODULE:= ftdi
 
 include $(BUILD_SHARED_LIBRARY)
