@@ -11,10 +11,15 @@ if [ "$APP_PLATFORM" = "" ]; then
 	echo "APP_PLATFORM not specified, assuming $APP_PLATFORM"
 fi
 
+SELF=$(readlink -m $0)
+BASE_DIR=`dirname $SELF`
+export LIBUSB_DIR=$(readlink -m $BASE_DIR/..)
+export LIBUSB_INCLUDE_DIR=${LIBUSB_DIR}/libusb
+export LIBUSB_LIBRARIES=$BASE_DIR/libs/armeabi/libusb.1.0.so
 export PREFIX=`pwd`/out
 export CROSS_COMPILE=arm-linux-androideabi
-export ANDROID_PREFIX=${NDK}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86/
-export SYSROOT=${NDK}/platforms/android-21/arch-arm
+export ANDROID_PREFIX=${NDK}/toolchains/${CROSS_COMPILE}-4.9/prebuilt/linux-x86/
+export SYSROOT=${NDK}/platforms/${APP_PLATFORM}/arch-arm
 export CROSS_PATH=${ANDROID_PREFIX}/bin/${CROSS_COMPILE}
 
 # Non-exhaustive lists of compiler + binutils
@@ -32,5 +37,19 @@ export RANLIB=${CROSS_PATH}-ranlib
 export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig
 export CFLAGS="${CFLAGS} -fPIC --sysroot=${SYSROOT} -I${SYSROOT}/usr/include -I${ANDROID_PREFIX}/include"
 export CPPFLAGS="${CFLAGS}"
+export CXXFLAGS="${CFLAGS}"
 export LDFLAGS="${LDFLAGS} -fPIE -L${SYSROOT}/usr/lib -L${ANDROID_PREFIX}/lib"
-./autogen.sh --host=${CROSS_COMPILE} --with-sysroot=${SYSROOT} --prefix=${PREFIX}/lib "$@"
+if [ -f ./autogen.sh ]; then
+	./autogen.sh --host=${CROSS_COMPILE} --with-sysroot=${SYSROOT} --prefix=${PREFIX}/lib "$@"
+elif [ -f ./configure ]; then
+	./configure --host=${CROSS_COMPILE} --with-sysroot=${SYSROOT} --prefix=${PREFIX}/lib "$@"
+elif [ -f ./CMakeLists.txt ]; then
+	cmake \
+		-D LIBC_HAS_DGETTEXT=0												\
+		-D CMAKE_C_FLAGS="${CFLAGS}"										\
+		-D CMAKE_CXX_FLAGS="${CXXFLAGS}"									\
+		-D CMAKE_SYSROOT="${SYSROOT}" 										\
+		-D LIBUSB_INCLUDE_DIR="${LIBUSB_INCLUDE_DIR}"						\
+		-D LIBUSB_LIBRARIES="${LIBUSB_LIBRARIES}"							\
+		"$@"-Bbuild/ .
+fi

@@ -96,14 +96,30 @@ static int android_open_existing(struct libusb_device_handle *handle) {
 	return find_fd_by_name(filename);
 }
 
+struct android_device_handle_priv {
+	struct linux_device_handle_priv base;
+	int fd_reused;
+};
+
 static int android_open(struct libusb_device_handle *handle) {
 	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
 	if( (hpriv->fd = android_open_existing(handle)) > 0 ) {
+		((struct android_device_handle_priv*) hpriv)->fd_reused = 1;
 		return usbi_add_pollfd(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
 		// close(hpriv->fd) is not called because it was open not here
 	} else {
 		return op_open(handle);
 	}
+}
+
+static void android_close(struct libusb_device_handle *dev_handle)
+{
+	struct linux_device_handle_priv *hpriv = _device_handle_priv(dev_handle);
+	/* fd may have already been removed by POLLERR condition in op_handle_events() */
+	if (!hpriv->fd_removed)
+		usbi_remove_pollfd(HANDLE_CTX(dev_handle), hpriv->fd);
+	if( ! ((struct android_device_handle_priv*) hpriv)->fd_reused )
+		close(hpriv->fd);
 }
 
 static int android_init(struct libusb_context *ctx)
@@ -214,7 +230,7 @@ const struct usbi_os_backend android_usbfs_backend = {
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
 
 	.open = android_open,
-	.close = op_close,
+	.close = android_close,
 	.get_configuration = op_get_configuration,
 	.set_configuration = op_set_configuration,
 	.claim_interface = op_claim_interface,
@@ -246,6 +262,6 @@ const struct usbi_os_backend android_usbfs_backend = {
 #endif
 
 	.device_priv_size = sizeof(struct linux_device_priv),
-	.device_handle_priv_size = sizeof(struct linux_device_handle_priv),
+	.device_handle_priv_size = sizeof(struct android_device_handle_priv),
 	.transfer_priv_size = sizeof(struct linux_transfer_priv),
 };
