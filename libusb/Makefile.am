@@ -12,12 +12,10 @@ LINUX_USBFS_SRC = os/linux_usbfs.h os/linux_usbfs.c
 DARWIN_USB_SRC = os/darwin_usb.h os/darwin_usb.c
 OPENBSD_USB_SRC = os/openbsd_usb.c
 NETBSD_USB_SRC = os/netbsd_usb.c
-COMMON_WINDOWS_SRC = os/windows_nt_common.h \
-                     os/windows_nt_common.c \
-                     os/windows_common.h \
-                     libusb-1.0.rc libusb-1.0.def
-WINDOWS_USB_SRC = os/windows_winusb.h os/windows_winusb.c $(COMMON_WINDOWS_SRC)
-WINDOWS_USBDK_SRC = os/windows_usbdk.h os/windows_usbdk.c $(COMMON_WINDOWS_SRC)
+WINDOWS_COMMON_SRC = os/windows_nt_common.h os/windows_nt_common.c \
+                     os/windows_common.h libusb-1.0.rc libusb-1.0.def
+WINDOWS_USB_SRC = os/windows_winusb.h os/windows_winusb.c
+WINDOWS_USBDK_SRC = os/windows_usbdk.h os/windows_usbdk.c
 WINCE_USB_SRC = os/wince_usb.h os/wince_usb.c
 HAIKU_USB_SRC = os/haiku_usb.h os/haiku_usb_backend.cpp \
 		os/haiku_usb_raw.h os/haiku_usb_raw.cpp os/haiku_pollfs.cpp
@@ -26,7 +24,7 @@ EXTRA_DIST = $(POSIX_POLL_SRC) $(POSIX_THREADS_SRC) \
 	$(WINDOWS_POLL_SRC) $(WINDOWS_THREADS_SRC) \
 	$(LINUX_USBFS_SRC) $(DARWIN_USB_SRC) \
 	$(OPENBSD_USB_SRC) $(NETBSD_USB_SRC) \
-	$(WINDOWS_USB_SRC) $(WINDOWS_USBDK_SRC) \
+	$(WINDOWS_COMMON_SRC) $(WINDOWS_USB_SRC) $(WINDOWS_USBDK_SRC) \
         $(WINCE_USB_SRC) $(HAIKU_USB_SRC) \
 	os/linux_udev.c os/linux_netlink.c
 
@@ -62,9 +60,9 @@ endif
 if OS_WINDOWS
 
 if USE_USBDK
-OS_SRC = $(WINDOWS_USBDK_SRC)
+OS_SRC = $(WINDOWS_USBDK_SRC) $(WINDOWS_COMMON_SRC)
 else
-OS_SRC = $(WINDOWS_USB_SRC)
+OS_SRC = $(WINDOWS_USB_SRC) $(WINDOWS_COMMON_SRC)
 endif
 
 .rc.lo:
