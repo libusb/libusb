@@ -138,6 +138,8 @@ linux)
 ])
 		fi
 		AC_SUBST(USE_UDEV)
+	THREAD_CFLAGS="-pthread"
+	LIBS="${LIBS} -pthread"
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
