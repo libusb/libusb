@@ -76,12 +76,6 @@ struct usbdk_device_priv {
 	uint8_t active_configuration;
 };
 
-struct usbdk_device_handle_priv {
-	//This field is to solve compilation error on VS2013:
-	//error C2016: C requires that a struct or union has at least one member
-	int dummy;
-};
-
 struct usbdk_transfer_priv {
 	USB_DK_TRANSFER_REQUEST request;
 	struct winfd pollable_fd;
@@ -896,7 +890,7 @@ const struct usbi_os_backend usbdk_backend = {
 	NULL,
 #endif
 	sizeof(struct usbdk_device_priv),
-	sizeof(struct usbdk_device_handle_priv),
+	0,
 	sizeof(struct usbdk_transfer_priv),
 };
 
