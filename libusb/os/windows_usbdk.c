@@ -115,8 +115,7 @@ static FARPROC get_usbdk_proc_addr(struct libusb_context *ctx, LPCSTR api_name)
 	FARPROC api_ptr = GetProcAddress(usbdk_helper.module, api_name);
 
 	if (api_ptr == NULL) {
-		DWORD err = GetLastError();
-		usbi_err(ctx, "UsbDkHelper API %s not found, error %d", api_name, err);
+		usbi_err(ctx, "UsbDkHelper API %s not found, error %d", api_name, GetLastError());
 	}
 
 	return api_ptr;
@@ -131,8 +130,7 @@ static int load_usbdk_helper_dll(struct libusb_context *ctx)
 {
 	usbdk_helper.module = LoadLibraryA("UsbDkHelper");
 	if (usbdk_helper.module == NULL) {
-		DWORD err = GetLastError();
-		usbi_err(ctx, "Failed to load UsbDkHelper.dll, error %d", err);
+		usbi_err(ctx, "Failed to load UsbDkHelper.dll, error %d", GetLastError());
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 

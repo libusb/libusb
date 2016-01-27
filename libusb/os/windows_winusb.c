@@ -1312,7 +1312,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 
 	for (pass = 0; ((pass < nb_guids) && (r == LIBUSB_SUCCESS)); pass++) {
 //#define ENUM_DEBUG
-#ifdef ENUM_DEBUG
+#if defined(ENABLE_LOGGING) && defined(ENUM_DEBUG)
 		const char *passname[] = { "HCD", "HUB", "GEN", "DEV", "HID", "EXT" };
 		usbi_dbg("#### PROCESSING %ss %s", passname[(pass <= HID_PASS) ? pass : (HID_PASS + 1)],
 			(pass != GEN_PASS) ? guid_to_string(guid[pass]) : "");
@@ -3409,8 +3409,10 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 	int i, j;
 	// report IDs handling
 	ULONG size[3];
-	const char *type[3] = {"input", "output", "feature"};
 	int nb_ids[2]; // zero and nonzero report IDs
+#if defined(ENABLE_LOGGING)
+	const char *type[3] = {"input", "output", "feature"};
+#endif
 
 	CHECK_HID_AVAILABLE;
 
