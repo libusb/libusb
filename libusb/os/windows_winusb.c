@@ -549,11 +549,10 @@ static int get_sub_api(char *driver, int api)
 	if (len == 0)
 		return SUB_API_NOTSET;
 
-	tmp_str = calloc(1, len + 1);
+	tmp_str = _strdup(driver);
 	if (tmp_str == NULL)
 		return SUB_API_NOTSET;
 
-	memcpy(tmp_str, driver, len + 1);
 	tok = strtok(tmp_str, sep_str);
 	while (tok != NULL) {
 		for (i = 0; i < usb_api_backend[api].nb_driver_names; i++) {
@@ -1548,10 +1547,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					break;
 				default:
 					// For other devices, the first interface is the same as the device
-					priv->usb_interface[0].path = calloc(1, safe_strlen(priv->path));
-					if (priv->usb_interface[0].path != NULL)
-						safe_strcpy(priv->usb_interface[0].path, safe_strlen(priv->path) + 1, priv->path);
-					else
+					priv->usb_interface[0].path = _strdup(priv->path);
+					if (priv->usb_interface[0].path == NULL)
 						usbi_warn(ctx, "could not duplicate interface path '%s'", priv->path);
 					// The following is needed if we want API calls to work for both simple
 					// and composite devices.

@@ -267,13 +267,12 @@ unsigned long htab_hash(const char *str)
 	// string (same hash, different string) at the same time is extremely low
 	safe_free(htab_table[idx].str);
 	htab_table[idx].used = hval;
-	htab_table[idx].str = malloc(safe_strlen(str) + 1);
+	htab_table[idx].str = _strdup(str);
 	if (htab_table[idx].str == NULL) {
 		usbi_err(NULL, "could not duplicate string for hash table");
 		usbi_mutex_unlock(&htab_write_mutex);
 		return 0;
 	}
-	memcpy(htab_table[idx].str, str, safe_strlen(str) + 1);
 	++htab_filled;
 	usbi_mutex_unlock(&htab_write_mutex);
 
