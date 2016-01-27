@@ -67,7 +67,6 @@ typedef int32_t USBD_STATUS;
 #endif
 
 static int concurrent_usage = -1;
-static int init_succeeded = 0;
 
 struct usbdk_device_priv {
 	USB_DK_DEVICE_INFO info;
@@ -200,7 +199,7 @@ static int usbdk_init(struct libusb_context *ctx)
 {
 	int r;
 
-	if ((++concurrent_usage == 0) || !init_succeeded) {
+	if (++concurrent_usage == 0) {
 		r = load_usbdk_helper_dll(ctx);
 		if (r)
 			return r;
@@ -210,8 +209,6 @@ static int usbdk_init(struct libusb_context *ctx)
 		r = windows_common_init(ctx);
 		if (r)
 			goto error_roll_back;
-
-		init_succeeded = 1;
 	}
 
 	return LIBUSB_SUCCESS;
@@ -368,11 +365,10 @@ func_exit:
 
 static void usbdk_exit(void)
 {
-	if ((--concurrent_usage < 0) && init_succeeded) {
+	if (--concurrent_usage < 0) {
 		windows_common_exit();
 		exit_polling();
 		unload_usbdk_helper_dll();
-		init_succeeded = 0;
 	}
 }
 
