@@ -58,9 +58,7 @@
 #define ARRAYSIZE(A) (sizeof(A)/sizeof((A)[0]))
 #endif
 
-#define ERR_BUFFER_SIZE             256
-#define TIMER_REQUEST_RETRY_MS      100
-#define MAX_TIMER_SEMAPHORES        128
+#define ERR_BUFFER_SIZE	256
 
 
 /*

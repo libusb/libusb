@@ -42,7 +42,7 @@ typedef struct libusb_device_descriptor USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESC
 int windows_common_init(struct libusb_context *ctx);
 void windows_common_exit(void);
 
-unsigned long htab_hash(char* str);
+unsigned long htab_hash(const char *str);
 int windows_clock_gettime(int clk_id, struct timespec *tp);
 
 void windows_clear_transfer_priv(struct usbi_transfer *itransfer);
@@ -54,5 +54,5 @@ void windows_handle_callback(struct usbi_transfer *itransfer, uint32_t io_result
 int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready);
 
 #if defined(ENABLE_LOGGING)
-char *windows_error_str(uint32_t retval);
+const char *windows_error_str(DWORD retval);
 #endif
