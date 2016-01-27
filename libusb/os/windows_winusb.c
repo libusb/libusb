@@ -760,9 +760,9 @@ static int windows_init(struct libusb_context *ctx)
 {
 	int i, r = LIBUSB_ERROR_OTHER;
 	HANDLE semaphore;
-	char sem_name[11 + 1 + 8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
+	char sem_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
 
-	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId());
+	sprintf(sem_name, "libusb_init%08X", (unsigned int)(GetCurrentProcessId() & 0xFFFFFFFF));
 	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		usbi_err(ctx, "could not create semaphore: %s", windows_error_str(0));
@@ -782,6 +782,7 @@ static int windows_init(struct libusb_context *ctx)
 	if (++concurrent_usage == 0) { // First init?
 		get_windows_version();
 		usbi_dbg(windows_version_str);
+
 		if (windows_version == WINDOWS_UNSUPPORTED) {
 			usbi_err(ctx, "This version of Windows is NOT supported");
 			r = LIBUSB_ERROR_NOT_SUPPORTED;
@@ -813,6 +814,9 @@ static int windows_init(struct libusb_context *ctx)
 
 init_exit: // Holds semaphore here.
 	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
+		for (i = 0; i < USB_API_MAX; i++)
+			usb_api_backend[i].exit(SUBAPI_NOT_SET);
+		exit_polling();
 		windows_common_exit();
 		usbi_mutex_destroy(&autoclaim_lock);
 	}
@@ -1622,9 +1626,9 @@ static void windows_exit(void)
 {
 	int i;
 	HANDLE semaphore;
-	char sem_name[11 + 1 + 8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
+	char sem_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
 
-	sprintf(sem_name, "libusb_init%08X", (unsigned int)GetCurrentProcessId());
+	sprintf(sem_name, "libusb_init%08X", (unsigned int)(GetCurrentProcessId() & 0xFFFFFFFF));
 	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
 	if (semaphore == NULL)
 		return;

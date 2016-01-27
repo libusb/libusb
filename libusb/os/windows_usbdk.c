@@ -114,16 +114,18 @@ static FARPROC get_usbdk_proc_addr(struct libusb_context *ctx, LPCSTR api_name)
 {
 	FARPROC api_ptr = GetProcAddress(usbdk_helper.module, api_name);
 
-	if (api_ptr == NULL) {
+	if (api_ptr == NULL)
 		usbi_err(ctx, "UsbDkHelper API %s not found, error %d", api_name, GetLastError());
-	}
 
 	return api_ptr;
 }
 
 static void unload_usbdk_helper_dll(void)
 {
-	FreeLibrary(usbdk_helper.module);
+	if (usbdk_helper.module != NULL) {
+		FreeLibrary(usbdk_helper.module);
+		usbdk_helper.module = NULL;
+	}
 }
 
 static int load_usbdk_helper_dll(struct libusb_context *ctx)
@@ -190,6 +192,7 @@ static int load_usbdk_helper_dll(struct libusb_context *ctx)
 
 error_unload:
 	FreeLibrary(usbdk_helper.module);
+	usbdk_helper.module = NULL;
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
@@ -197,23 +200,30 @@ static int usbdk_init(struct libusb_context *ctx)
 {
 	int r;
 
-	if (++concurrent_usage == 0) {
+	if (++concurrent_usage == 0) { // First init?
 		r = load_usbdk_helper_dll(ctx);
 		if (r)
-			return r;
+			goto init_exit;
 
 		init_polling();
 
 		r = windows_common_init(ctx);
 		if (r)
-			goto error_roll_back;
+			goto init_exit;
+	}
+	// At this stage, either we went through full init successfully, or didn't need to
+	r = LIBUSB_SUCCESS;
+
+init_exit:
+	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
+		exit_polling();
+		windows_common_exit();
+		unload_usbdk_helper_dll();
 	}
 
-	return LIBUSB_SUCCESS;
+	if (r != LIBUSB_SUCCESS)
+		--concurrent_usage; // Not expected to call libusb_exit if we failed.
 
-error_roll_back:
-	windows_common_exit();
-	unload_usbdk_helper_dll();
 	return r;
 }
 
