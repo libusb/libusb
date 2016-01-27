@@ -150,6 +150,7 @@ static bool htab_create(struct libusb_context *ctx, unsigned long nel)
 {
 	if (htab_table != NULL) {
 		usbi_err(ctx, "hash table already allocated");
+		return true;
 	}
 
 	// Create a mutex
@@ -537,6 +538,7 @@ int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_N
 	struct usbi_transfer *transfer;
 	struct winfd *pollable_fd = NULL;
 	DWORD io_size, io_result;
+	int r = LIBUSB_SUCCESS;
 
 	usbi_mutex_lock(&ctx->open_devs_lock);
 	for (i = 0; i < nfds && num_ready > 0; i++) {
@@ -570,14 +572,14 @@ int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_N
 			// newly allocated wfd that took the place of the one from the transfer.
 			windows_handle_callback(transfer, io_result, io_size);
 		} else {
-			usbi_mutex_unlock(&ctx->open_devs_lock);
 			usbi_err(ctx, "could not find a matching transfer for fd %d", fds[i]);
-			return LIBUSB_ERROR_NOT_FOUND;
+			r = LIBUSB_ERROR_NOT_FOUND;
+			break;
 		}
 	}
 	usbi_mutex_unlock(&ctx->open_devs_lock);
 
-	return LIBUSB_SUCCESS;
+	return r;
 }
 
 int windows_common_init(struct libusb_context *ctx)
