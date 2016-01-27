@@ -542,13 +542,14 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 	struct usbdk_device_priv *priv = _usbdk_device_priv(transfer->dev_handle->dev);
 	struct usbdk_transfer_priv *transfer_priv = _usbdk_transfer_priv(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
+	struct winfd wfd;
 	ULONG Length;
 	TransferResult transResult;
 	HANDLE sysHandle;
 
 	sysHandle = usbdk_helper.GetRedirectorSystemHandle(priv->redirector_handle);
 
-	struct winfd wfd = usbi_create_fd(sysHandle, RW_READ, NULL, NULL);
+	wfd = usbi_create_fd(sysHandle, RW_READ, NULL, NULL);
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0)
 		return LIBUSB_ERROR_NO_MEM;
