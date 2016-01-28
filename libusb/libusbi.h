@@ -52,14 +52,14 @@
 extern "C" {
 #endif
 
-#define DEVICE_DESC_LENGTH		18
+#define DEVICE_DESC_LENGTH	18
 
 #define USB_MAXENDPOINTS	32
 #define USB_MAXINTERFACES	32
 #define USB_MAXCONFIG		8
 
 /* Backend specific capabilities */
-#define USBI_CAP_HAS_HID_ACCESS					0x00010000
+#define USBI_CAP_HAS_HID_ACCESS			0x00010000
 #define USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER	0x00020000
 
 /* Maximum number of bytes in a log line */
@@ -68,10 +68,10 @@ extern "C" {
 #define USBI_LOG_LINE_END	"\n"
 
 /* The following is used to silence warnings for unused variables */
-#define UNUSED(var)			do { (void)(var); } while(0)
+#define UNUSED(var)		do { (void)(var); } while(0)
 
 #if !defined(ARRAYSIZE)
-#define ARRAYSIZE(array) (sizeof(array)/sizeof(array[0]))
+#define ARRAYSIZE(array) (sizeof(array) / sizeof(array[0]))
 #endif
 
 struct list_head {
@@ -96,14 +96,14 @@ struct list_head {
  *  type - the type of the first parameter
  */
 #define list_for_each_entry(pos, head, member, type)			\
-	for (pos = list_entry((head)->next, type, member);			\
-		 &pos->member != (head);								\
+	for (pos = list_entry((head)->next, type, member);		\
+		 &pos->member != (head);				\
 		 pos = list_entry(pos->member.next, type, member))
 
-#define list_for_each_entry_safe(pos, n, head, member, type)	\
-	for (pos = list_entry((head)->next, type, member),			\
-		 n = list_entry(pos->member.next, type, member);		\
-		 &pos->member != (head);								\
+#define list_for_each_entry_safe(pos, n, head, member, type)		\
+	for (pos = list_entry((head)->next, type, member),		\
+		 n = list_entry(pos->member.next, type, member);	\
+		 &pos->member != (head);				\
 		 pos = n, n = list_entry(n->member.next, type, member))
 
 #define list_empty(entry) ((entry)->next == (entry))
@@ -147,9 +147,9 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 	return ret;
 }
 
-#define container_of(ptr, type, member) ({                      \
-        const typeof( ((type *)0)->member ) *mptr = (ptr);    \
-        (type *)( (char *)mptr - offsetof(type,member) );})
+#define container_of(ptr, type, member) ({			\
+	const typeof( ((type *)0)->member ) *mptr = (ptr);	\
+	(type *)( (char *)mptr - offsetof(type,member) );})
 
 #ifndef MIN
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
@@ -168,11 +168,11 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 
 /* Some platforms don't have this define */
 #ifndef TIMESPEC_TO_TIMEVAL
-#define TIMESPEC_TO_TIMEVAL(tv, ts)                                     \
-        do {                                                            \
-                (tv)->tv_sec = (TIMEVAL_TV_SEC_TYPE) (ts)->tv_sec;      \
-                (tv)->tv_usec = (ts)->tv_nsec / 1000;                   \
-        } while (0)
+#define TIMESPEC_TO_TIMEVAL(tv, ts)					\
+	do {								\
+		(tv)->tv_sec = (TIMEVAL_TV_SEC_TYPE) (ts)->tv_sec;	\
+		(tv)->tv_usec = (ts)->tv_nsec / 1000;			\
+	} while (0)
 #endif
 
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
@@ -198,49 +198,54 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 #else /* !defined(_MSC_VER) || _MSC_VER >= 1400 */
 
 #ifdef ENABLE_LOGGING
-#define LOG_BODY(ctxt, level) \
-{                             \
-	va_list args;             \
-	va_start (args, format);  \
-	usbi_log_v(ctxt, level, "", format, args); \
-	va_end(args);             \
+#define LOG_BODY(ctxt, level)				\
+{							\
+	va_list args;					\
+	va_start(args, format);				\
+	usbi_log_v(ctxt, level, "", format, args);	\
+	va_end(args);					\
 }
 #else
-#define LOG_BODY(ctxt, level) do { (void)(ctxt); } while(0)
+#define LOG_BODY(ctxt, level)				\
+{							\
+	(void)(ctxt);					\
+}
 #endif
 
-static inline void usbi_info(struct libusb_context *ctx, const char *format,
-	...)
-	LOG_BODY(ctx,LIBUSB_LOG_LEVEL_INFO)
-static inline void usbi_warn(struct libusb_context *ctx, const char *format,
-	...)
-	LOG_BODY(ctx,LIBUSB_LOG_LEVEL_WARNING)
-static inline void usbi_err( struct libusb_context *ctx, const char *format,
-	...)
-	LOG_BODY(ctx,LIBUSB_LOG_LEVEL_ERROR)
+static inline void usbi_info(struct libusb_context *ctx, const char *format, ...)
+	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_INFO)
+static inline void usbi_warn(struct libusb_context *ctx, const char *format, ...)
+	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_WARNING)
+static inline void usbi_err(struct libusb_context *ctx, const char *format, ...)
+	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_ERROR)
 
 static inline void usbi_dbg(const char *format, ...)
-	LOG_BODY(NULL,LIBUSB_LOG_LEVEL_DEBUG)
+	LOG_BODY(NULL, LIBUSB_LOG_LEVEL_DEBUG)
 
 #endif /* !defined(_MSC_VER) || _MSC_VER >= 1400 */
 
-#define USBI_GET_CONTEXT(ctx) if (!(ctx)) (ctx) = usbi_default_context
-#define DEVICE_CTX(dev) ((dev)->ctx)
-#define HANDLE_CTX(handle) (DEVICE_CTX((handle)->dev))
-#define TRANSFER_CTX(transfer) (HANDLE_CTX((transfer)->dev_handle))
+#define USBI_GET_CONTEXT(ctx)				\
+	do {						\
+		if (!(ctx))				\
+			(ctx) = usbi_default_context;	\
+	} while(0)
+
+#define DEVICE_CTX(dev)		((dev)->ctx)
+#define HANDLE_CTX(handle)	(DEVICE_CTX((handle)->dev))
+#define TRANSFER_CTX(transfer)	(HANDLE_CTX((transfer)->dev_handle))
 #define ITRANSFER_CTX(transfer) \
 	(TRANSFER_CTX(USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)))
 
-#define IS_EPIN(ep) (0 != ((ep) & LIBUSB_ENDPOINT_IN))
-#define IS_EPOUT(ep) (!IS_EPIN(ep))
-#define IS_XFERIN(xfer) (0 != ((xfer)->endpoint & LIBUSB_ENDPOINT_IN))
-#define IS_XFEROUT(xfer) (!IS_XFERIN(xfer))
+#define IS_EPIN(ep)		(0 != ((ep) & LIBUSB_ENDPOINT_IN))
+#define IS_EPOUT(ep)		(!IS_EPIN(ep))
+#define IS_XFERIN(xfer)		(0 != ((xfer)->endpoint & LIBUSB_ENDPOINT_IN))
+#define IS_XFEROUT(xfer)	(!IS_XFERIN(xfer))
 
 /* Internal abstraction for thread synchronization */
 #if defined(THREADS_POSIX)
 #include "os/threads_posix.h"
 #elif defined(OS_WINDOWS) || defined(OS_WINCE)
-#include <os/threads_windows.h>
+#include "os/threads_windows.h"
 #endif
 
 extern struct libusb_context *usbi_default_context;
@@ -403,8 +408,8 @@ struct libusb_device_handle {
 };
 
 enum {
-  USBI_CLOCK_MONOTONIC,
-  USBI_CLOCK_REALTIME
+	USBI_CLOCK_MONOTONIC,
+	USBI_CLOCK_REALTIME
 };
 
 /* in-memory transfer layout:
@@ -469,11 +474,11 @@ enum usbi_transfer_flags {
 	USBI_TRANSFER_TIMEOUT_HANDLED = 1 << 7,
 };
 
-#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer) \
-	((struct libusb_transfer *)(((unsigned char *)(transfer)) \
+#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)			\
+	((struct libusb_transfer *)(((unsigned char *)(transfer))	\
 		+ sizeof(struct usbi_transfer)))
-#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer) \
-	((struct usbi_transfer *)(((unsigned char *)(transfer)) \
+#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)			\
+	((struct usbi_transfer *)(((unsigned char *)(transfer))		\
 		- sizeof(struct usbi_transfer)))
 
 static inline void *usbi_transfer_get_os_priv(struct usbi_transfer *transfer)
@@ -488,8 +493,8 @@ static inline void *usbi_transfer_get_os_priv(struct usbi_transfer *transfer)
 
 /* All standard descriptors have these 2 fields in common */
 struct usb_descriptor_header {
-	uint8_t  bLength;
-	uint8_t  bDescriptorType;
+	uint8_t bLength;
+	uint8_t bDescriptorType;
 };
 
 /* shared data and functions */
