@@ -815,7 +815,7 @@ static int windows_init(struct libusb_context *ctx)
 init_exit: // Holds semaphore here.
 	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
 		for (i = 0; i < USB_API_MAX; i++)
-			usb_api_backend[i].exit(SUBAPI_NOT_SET);
+			usb_api_backend[i].exit(SUB_API_NOTSET);
 		exit_polling();
 		windows_common_exit();
 		usbi_mutex_destroy(&autoclaim_lock);

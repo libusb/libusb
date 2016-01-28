@@ -37,6 +37,14 @@
 #define false FALSE
 #endif
 
+#if defined(__CYGWIN__ )
+#define _stricmp strcasecmp
+#define _snprintf snprintf
+#define _strdup strdup
+// _beginthreadex is MSVCRT => unavailable for cygwin. Fallback to using CreateThread
+#define _beginthreadex(a, b, c, d, e, f) CreateThread(a, b, (LPTHREAD_START_ROUTINE)c, d, e, (LPDWORD)f)
+#endif
+
 #define safe_free(p) do {if (p != NULL) {free((void*)p); p = NULL;}} while(0)
 #define safe_closehandle(h) do {if (h != INVALID_HANDLE_VALUE) {CloseHandle(h); h = INVALID_HANDLE_VALUE;}} while(0)
 #define safe_min(a, b) MIN((size_t)(a), (size_t)(b))
