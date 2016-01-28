@@ -75,7 +75,7 @@ const char *windows_error_str(DWORD retval)
 
 	error_code = retval ? retval : GetLastError();
 
-	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%u] ", error_code);
+	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%lu] ", error_code);
 
 	// Translate codes returned by SetupAPI. The ones we are dealing with are either
 	// in 0x0000xxxx or 0xE000xxxx and can be distinguished from standard error codes.
@@ -98,9 +98,9 @@ const char *windows_error_str(DWORD retval)
 		format_error = GetLastError();
 		if (format_error)
 			safe_sprintf(err_string, ERR_BUFFER_SIZE,
-					"Windows error code %u (FormatMessage error code %u)", error_code, format_error);
+					"Windows error code %lu (FormatMessage error code %lu)", error_code, format_error);
 		else
-			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", error_code);
+			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %lu", error_code);
 	}
 	else {
 		// Remove CR/LF terminators
