@@ -33,7 +33,7 @@
 #include "windows_nt_common.h"
 
 // Global variables
-const uint64_t epoch_time = UINT64_C(116444736000000000);	// 1970.01.01 00:00:000 in MS Filetime
+const uint64_t epoch_time = UINT64_C(116444736000000000); // 1970.01.01 00:00:000 in MS Filetime
 
 // Global variables for clock_gettime mechanism
 static uint64_t hires_ticks_to_ps;
@@ -75,14 +75,14 @@ const char *windows_error_str(DWORD retval)
 
 	error_code = retval ? retval : GetLastError();
 
-	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%u] ", error_code);
+	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%u] ", (unsigned int)error_code);
 
 	// Translate codes returned by SetupAPI. The ones we are dealing with are either
 	// in 0x0000xxxx or 0xE000xxxx and can be distinguished from standard error codes.
 	// See http://msdn.microsoft.com/en-us/library/windows/hardware/ff545011.aspx
 	switch (error_code & 0xE0000000) {
 	case 0:
-		error_code = HRESULT_FROM_WIN32(error_code);	// Still leaves ERROR_SUCCESS unmodified
+		error_code = HRESULT_FROM_WIN32(error_code); // Still leaves ERROR_SUCCESS unmodified
 		break;
 	case 0xE0000000:
 		error_code = 0x80000000 | (FACILITY_SETUPAPI << 16) | (error_code & 0x0000FFFF);
@@ -98,9 +98,10 @@ const char *windows_error_str(DWORD retval)
 		format_error = GetLastError();
 		if (format_error)
 			safe_sprintf(err_string, ERR_BUFFER_SIZE,
-					"Windows error code %u (FormatMessage error code %u)", error_code, format_error);
+					"Windows error code %u (FormatMessage error code %u)",
+					(unsigned int)error_code, (unsigned int)format_error);
 		else
-			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", error_code);
+			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", (unsigned int)error_code);
 	}
 	else {
 		// Remove CR/LF terminators
@@ -120,7 +121,7 @@ const char *windows_error_str(DWORD retval)
 
 typedef struct htab_entry {
 	unsigned long used;
-	char* str;
+	char *str;
 } htab_entry;
 
 static htab_entry *htab_table = NULL;
@@ -248,8 +249,7 @@ unsigned long htab_hash(const char *str)
 			// If entry is found use it.
 			if ((htab_table[idx].used == hval) && (safe_strcmp(str, htab_table[idx].str) == 0))
 				return idx;
-		}
-		while (htab_table[idx].used);
+		} while (htab_table[idx].used);
 	}
 
 	// Not found => New entry
