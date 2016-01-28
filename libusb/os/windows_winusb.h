@@ -48,14 +48,6 @@
 #define FACILITY_SETUPAPI	15
 #endif
 
-#if defined(__CYGWIN__ )
-#define _stricmp strcasecmp
-#define _snprintf snprintf
-#define _strdup strdup
-// _beginthreadex is MSVCRT => unavailable for cygwin. Fallback to using CreateThread
-#define _beginthreadex(a, b, c, d, e, f) CreateThread(a, b, (LPTHREAD_START_ROUTINE)c, d, e, (LPDWORD)f)
-#endif
-
 #define MAX_CTRL_BUFFER_LENGTH	4096
 #define MAX_USB_DEVICES		256
 #define MAX_USB_STRING_LENGTH	128
