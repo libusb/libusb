@@ -118,12 +118,6 @@ struct wince_device_priv {
 	UKW_DEVICE_DESCRIPTOR desc;
 };
 
-struct wince_device_handle_priv {
-	// This member isn't used, but only exists to avoid an empty structure
-	// for private data for the device handle.
-	int reserved;
-};
-
 struct wince_transfer_priv {
 	struct winfd pollable_fd;
 	uint8_t interface_number;

@@ -885,6 +885,6 @@ const struct usbi_os_backend wince_backend = {
 
 	wince_clock_gettime,
 	sizeof(struct wince_device_priv),
-	sizeof(struct wince_device_handle_priv),
+	0,
 	sizeof(struct wince_transfer_priv),
 };
