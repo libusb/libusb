@@ -109,31 +109,38 @@ static int translate_driver_error(DWORD error)
 	}
 }
 
-static int init_dllimports()
+static int init_dllimports(void)
 {
-	DLL_LOAD(ceusbkwrapper.dll, UkwOpenDriver, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwGetDeviceList, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwReleaseDeviceList, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwGetDeviceAddress, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwGetDeviceDescriptor, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwGetConfigDescriptor, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwCloseDriver, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwCancelTransfer, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwIssueControlTransfer, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwClaimInterface, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwReleaseInterface, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwSetInterfaceAlternateSetting, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwClearHaltHost, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwClearHaltDevice, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwGetConfig, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwSetConfig, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwResetDevice, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwKernelDriverActive, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwAttachKernelDriver, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwDetachKernelDriver, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwIssueBulkTransfer, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwIsPipeHalted, TRUE);
+	DLL_GET_HANDLE(ceusbkwrapper);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwOpenDriver, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwGetDeviceList, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwReleaseDeviceList, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwGetDeviceAddress, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwGetDeviceDescriptor, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwGetConfigDescriptor, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwCloseDriver, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwCancelTransfer, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwIssueControlTransfer, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwClaimInterface, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwReleaseInterface, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwSetInterfaceAlternateSetting, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwClearHaltHost, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwClearHaltDevice, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwGetConfig, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwSetConfig, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwResetDevice, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwKernelDriverActive, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwAttachKernelDriver, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwDetachKernelDriver, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwIssueBulkTransfer, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwIsPipeHalted, TRUE);
+
 	return LIBUSB_SUCCESS;
+}
+
+static void exit_dllimports(void)
+{
+	DLL_FREE_HANDLE(ceusbkwrapper);
 }
 
 static int init_device(
@@ -215,6 +222,9 @@ static int wince_init(struct libusb_context *ctx)
 
 init_exit: // Holds semaphore here.
 	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
+		exit_dllimports();
+		exit_polling();
+
 		if (driver_handle != INVALID_HANDLE_VALUE) {
 			UkwCloseDriver(driver_handle);
 			driver_handle = INVALID_HANDLE_VALUE;
@@ -248,6 +258,7 @@ static void wince_exit(void)
 
 	// Only works if exits and inits are balanced exactly
 	if (--concurrent_usage < 0) {	// Last exit
+		exit_dllimports();
 		exit_polling();
 
 		if (driver_handle != INVALID_HANDLE_VALUE) {

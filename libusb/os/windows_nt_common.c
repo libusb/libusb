@@ -54,9 +54,10 @@ static HANDLE timer_thread = NULL;
 static DWORD timer_thread_id = 0;
 
 /* User32 dependencies */
-DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, GetMessageA, (LPMSG, HWND, UINT, UINT));
-DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, PeekMessageA, (LPMSG, HWND, UINT, UINT, UINT));
-DLL_DECLARE_PREFIXED(WINAPI, BOOL, p, PostThreadMessageA, (DWORD, UINT, WPARAM, LPARAM));
+DLL_DECLARE_HANDLE(User32);
+DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, GetMessageA, (LPMSG, HWND, UINT, UINT));
+DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, PeekMessageA, (LPMSG, HWND, UINT, UINT, UINT));
+DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, PostThreadMessageA, (DWORD, UINT, WPARAM, LPARAM));
 
 static unsigned __stdcall windows_clock_gettime_threaded(void *param);
 
@@ -282,11 +283,17 @@ unsigned long htab_hash(const char *str)
 
 static int windows_init_dlls(void)
 {
-	DLL_LOAD_PREFIXED(User32.dll, p, GetMessageA, TRUE);
-	DLL_LOAD_PREFIXED(User32.dll, p, PeekMessageA, TRUE);
-	DLL_LOAD_PREFIXED(User32.dll, p, PostThreadMessageA, TRUE);
+	DLL_GET_HANDLE(User32);
+	DLL_LOAD_FUNC_PREFIXED(User32, p, GetMessageA, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(User32, p, PeekMessageA, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(User32, p, PostThreadMessageA, TRUE);
 
 	return LIBUSB_SUCCESS;
+}
+
+static void windows_exit_dlls(void)
+{
+	DLL_FREE_HANDLE(User32);
 }
 
 static bool windows_init_clock(struct libusb_context *ctx)
@@ -601,4 +608,5 @@ void windows_common_exit(void)
 {
 	htab_destroy();
 	windows_destroy_clock();
+	windows_exit_dlls();
 }

@@ -124,8 +124,10 @@ static usbi_mutex_t autoclaim_lock;
 			return LIBUSB_ERROR_ACCESS;	\
 	} while(0)
 
+static HMODULE WinUSBX_handle = NULL;
 static struct winusb_interface WinUSBX[SUB_API_MAX];
 static const char *sub_api_name[SUB_API_MAX] = WINUSBX_DRV_NAMES;
+
 static bool api_hid_available = false;
 #define CHECK_HID_AVAILABLE				\
 	do {						\
@@ -207,23 +209,43 @@ static char *sanitize_path(const char *path)
  */
 static int init_dlls(void)
 {
-	DLL_LOAD(Cfgmgr32.dll, CM_Get_Parent, TRUE);
-	DLL_LOAD(Cfgmgr32.dll, CM_Get_Child, TRUE);
-	DLL_LOAD(Cfgmgr32.dll, CM_Get_Sibling, TRUE);
-	DLL_LOAD(Cfgmgr32.dll, CM_Get_Device_IDA, TRUE);
+	DLL_GET_HANDLE(Cfgmgr32);
+	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Parent, TRUE);
+	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Child, TRUE);
+	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Sibling, TRUE);
+	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Device_IDA, TRUE);
+
 	// Prefixed to avoid conflict with header files
-	DLL_LOAD_PREFIXED(OLE32.dll, p, CLSIDFromString, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetClassDevsA, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiEnumDeviceInfo, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiEnumDeviceInterfaces, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetDeviceInterfaceDetailA, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiDestroyDeviceInfoList, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiOpenDevRegKey, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiGetDeviceRegistryPropertyA, TRUE);
-	DLL_LOAD_PREFIXED(SetupAPI.dll, p, SetupDiOpenDeviceInterfaceRegKey, TRUE);
-	DLL_LOAD_PREFIXED(AdvAPI32.dll, p, RegQueryValueExW, TRUE);
-	DLL_LOAD_PREFIXED(AdvAPI32.dll, p, RegCloseKey, TRUE);
+	DLL_GET_HANDLE(AdvAPI32);
+	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegQueryValueExW, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegCloseKey, TRUE);
+
+	DLL_GET_HANDLE(Kernel32);
+	DLL_LOAD_FUNC_PREFIXED(Kernel32, p, IsWow64Process, FALSE);
+
+	DLL_GET_HANDLE(OLE32);
+	DLL_LOAD_FUNC_PREFIXED(OLE32, p, CLSIDFromString, TRUE);
+
+	DLL_GET_HANDLE(SetupAPI);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetClassDevsA, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiEnumDeviceInfo, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiEnumDeviceInterfaces, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetDeviceInterfaceDetailA, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiDestroyDeviceInfoList, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiOpenDevRegKey, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetDeviceRegistryPropertyA, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiOpenDeviceInterfaceRegKey, TRUE);
+
 	return LIBUSB_SUCCESS;
+}
+
+static void exit_dlls(void)
+{
+	DLL_FREE_HANDLE(Cfgmgr32);
+	DLL_FREE_HANDLE(AdvAPI32);
+	DLL_FREE_HANDLE(Kernel32);
+	DLL_FREE_HANDLE(OLE32);
+	DLL_FREE_HANDLE(SetupAPI);
 }
 
 /*
@@ -647,9 +669,8 @@ static BOOL is_x64(void)
 
 	// Detect if we're running a 32 or 64 bit system
 	if (sizeof(uintptr_t) < 8) {
-		DLL_LOAD_PREFIXED(Kernel32.dll, p, IsWow64Process, FALSE);
 		if (pIsWow64Process != NULL)
-			(*pIsWow64Process)(GetCurrentProcess(), &ret);
+			pIsWow64Process(GetCurrentProcess(), &ret);
 	} else {
 		ret = TRUE;
 	}
@@ -816,6 +837,7 @@ init_exit: // Holds semaphore here.
 	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
 		for (i = 0; i < USB_API_MAX; i++)
 			usb_api_backend[i].exit(SUBAPI_NOT_SET);
+		exit_dlls();
 		exit_polling();
 		windows_common_exit();
 		usbi_mutex_destroy(&autoclaim_lock);
@@ -1644,6 +1666,7 @@ static void windows_exit(void)
 	if (--concurrent_usage < 0) { // Last exit
 		for (i = 0; i < USB_API_MAX; i++)
 			usb_api_backend[i].exit(SUB_API_NOTSET);
+		exit_dlls();
 		exit_polling();
 		windows_common_exit();
 		usbi_mutex_destroy(&autoclaim_lock);
@@ -2241,7 +2264,7 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 #define WinUSBX_Set(fn)										\
 	do {											\
 		if (native_winusb)								\
-			WinUSBX[i].fn = (WinUsb_##fn##_t) GetProcAddress(h, "WinUsb_" #fn);	\
+			WinUSBX[i].fn = (WinUsb_##fn##_t)GetProcAddress(h, "WinUsb_" #fn);	\
 		else										\
 			pLibK_GetProcAddress((PVOID *)&WinUSBX[i].fn, i, KUSB_FNID_##fn);	\
 	} while (0)
@@ -2255,15 +2278,11 @@ static int winusbx_init(int sub_api, struct libusb_context *ctx)
 	LibK_GetProcAddress_t pLibK_GetProcAddress = NULL;
 	LibK_GetVersion_t pLibK_GetVersion;
 
-	h = GetModuleHandleA("libusbK");
-	if (h == NULL)
-		h = LoadLibraryA("libusbK");
+	h = LoadLibraryA("libusbK");
 
 	if (h == NULL) {
 		usbi_info(ctx, "libusbK DLL is not available, will use native WinUSB");
-		h = GetModuleHandleA("WinUSB");
-		if (h == NULL)
-			h = LoadLibraryA("WinUSB");
+		h = LoadLibraryA("WinUSB");
 
 		if (h == NULL) {
 			usbi_warn(ctx, "WinUSB DLL is not available either, "
@@ -2281,6 +2300,7 @@ static int winusbx_init(int sub_api, struct libusb_context *ctx)
 		pLibK_GetProcAddress = (LibK_GetProcAddress_t)GetProcAddress(h, "LibK_GetProcAddress");
 		if (pLibK_GetProcAddress == NULL) {
 			usbi_err(ctx, "LibK_GetProcAddress() not found in libusbK DLL");
+			FreeLibrary(h);
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
 	}
@@ -2319,11 +2339,20 @@ static int winusbx_init(int sub_api, struct libusb_context *ctx)
 		}
 	}
 
+	WinUSBX_handle = h;
 	return LIBUSB_SUCCESS;
 }
 
 static int winusbx_exit(int sub_api)
 {
+	if (WinUSBX_handle != NULL) {
+		FreeLibrary(WinUSBX_handle);
+		WinUSBX_handle = NULL;
+
+		/* Reset the WinUSBX API structures */
+		memset(&WinUSBX, 0, sizeof(WinUSBX));
+	}
+
 	return LIBUSB_SUCCESS;
 }
 
@@ -3368,22 +3397,23 @@ static int _hid_class_request(struct hid_device_priv *dev, HANDLE hid_handle, in
  */
 static int hid_init(int sub_api, struct libusb_context *ctx)
 {
-	DLL_LOAD(hid.dll, HidD_GetAttributes, TRUE);
-	DLL_LOAD(hid.dll, HidD_GetHidGuid, TRUE);
-	DLL_LOAD(hid.dll, HidD_GetPreparsedData, TRUE);
-	DLL_LOAD(hid.dll, HidD_FreePreparsedData, TRUE);
-	DLL_LOAD(hid.dll, HidD_GetManufacturerString, TRUE);
-	DLL_LOAD(hid.dll, HidD_GetProductString, TRUE);
-	DLL_LOAD(hid.dll, HidD_GetSerialNumberString, TRUE);
-	DLL_LOAD(hid.dll, HidP_GetCaps, TRUE);
-	DLL_LOAD(hid.dll, HidD_SetNumInputBuffers, TRUE);
-	DLL_LOAD(hid.dll, HidD_SetFeature, TRUE);
-	DLL_LOAD(hid.dll, HidD_GetFeature, TRUE);
-	DLL_LOAD(hid.dll, HidD_GetPhysicalDescriptor, TRUE);
-	DLL_LOAD(hid.dll, HidD_GetInputReport, FALSE);
-	DLL_LOAD(hid.dll, HidD_SetOutputReport, FALSE);
-	DLL_LOAD(hid.dll, HidD_FlushQueue, TRUE);
-	DLL_LOAD(hid.dll, HidP_GetValueCaps, TRUE);
+	DLL_GET_HANDLE(hid);
+	DLL_LOAD_FUNC(hid, HidD_GetAttributes, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_GetHidGuid, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_GetPreparsedData, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_FreePreparsedData, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_GetManufacturerString, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_GetProductString, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_GetSerialNumberString, TRUE);
+	DLL_LOAD_FUNC(hid, HidP_GetCaps, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_SetNumInputBuffers, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_SetFeature, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_GetFeature, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_GetPhysicalDescriptor, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_GetInputReport, FALSE);
+	DLL_LOAD_FUNC(hid, HidD_SetOutputReport, FALSE);
+	DLL_LOAD_FUNC(hid, HidD_FlushQueue, TRUE);
+	DLL_LOAD_FUNC(hid, HidP_GetValueCaps, TRUE);
 
 	api_hid_available = true;
 	return LIBUSB_SUCCESS;
@@ -3391,6 +3421,8 @@ static int hid_init(int sub_api, struct libusb_context *ctx)
 
 static int hid_exit(int sub_api)
 {
+	DLL_FREE_HANDLE(hid);
+
 	return LIBUSB_SUCCESS;
 }
 
