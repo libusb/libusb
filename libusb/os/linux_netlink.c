@@ -36,19 +36,8 @@
 #include <asm/types.h>
 #endif
 
-#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
-#endif
-
-#include <arpa/inet.h>
-
-#ifdef HAVE_LINUX_NETLINK_H
 #include <linux/netlink.h>
-#endif
-
-#ifdef HAVE_LINUX_FILTER_H
-#include <linux/filter.h>
-#endif
 
 #include "libusbi.h"
 #include "linux_usbfs.h"
