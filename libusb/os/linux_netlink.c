@@ -4,6 +4,7 @@
  * Copyright (C) 2007-2009 Daniel Drake <dsd@gentoo.org>
  * Copyright (c) 2001 Johannes Erdfelt <johannes@erdfelt.com>
  * Copyright (c) 2013 Nathan Hjelm <hjelmn@mac.com>
+ * Copyright (c) 2016 Chris Dickens <christopher.a.dickens@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -42,15 +43,13 @@
 #include "libusbi.h"
 #include "linux_usbfs.h"
 
-#define KERNEL 1
+#define NL_GROUP_KERNEL 1
 
 static int linux_netlink_socket = -1;
 static int netlink_control_pipe[2] = { -1, -1 };
 static pthread_t libusb_linux_event_thread;
 
 static void *linux_netlink_event_thread_main(void *arg);
-
-static struct sockaddr_nl snl = { .nl_family = AF_NETLINK, .nl_groups = KERNEL };
 
 static int set_fd_cloexec_nb(int fd)
 {
@@ -89,7 +88,9 @@ static int set_fd_cloexec_nb(int fd)
 
 int linux_netlink_start_event_monitor(void)
 {
+	struct sockaddr_nl sa_nl = { .nl_family = AF_NETLINK, .nl_groups = NL_GROUP_KERNEL };
 	int socktype = SOCK_RAW;
+	int opt = 1;
 	int ret;
 
 #if defined(SOCK_CLOEXEC)
@@ -114,14 +115,17 @@ int linux_netlink_start_event_monitor(void)
 	if (ret == -1)
 		goto err_close_socket;
 
-	ret = bind(linux_netlink_socket, (struct sockaddr *)&snl, sizeof(snl));
+	ret = bind(linux_netlink_socket, (struct sockaddr *)&sa_nl, sizeof(sa_nl));
 	if (ret == -1) {
 		usbi_err(NULL, "failed to bind netlink socket (%d)", errno);
 		goto err_close_socket;
 	}
 
-	/* TODO -- add authentication */
-	/* setsockopt(linux_netlink_socket, SOL_SOCKET, SO_PASSCRED, &one, sizeof(one)); */
+	ret = setsockopt(linux_netlink_socket, SOL_SOCKET, SO_PASSCRED, &opt, sizeof(opt));
+	if (ret == -1) {
+		usbi_err(NULL, "failed to set netlink socket SO_PASSCRED option (%d)", errno);
+		goto err_close_socket;
+	}
 
 	ret = usbi_pipe(netlink_control_pipe);
 	if (ret) {
@@ -178,14 +182,13 @@ int linux_netlink_stop_event_monitor(void)
 
 static const char *netlink_message_parse(const char *buffer, size_t len, const char *key)
 {
+	const char *end = buffer + len;
 	size_t keylen = strlen(key);
-	size_t offset;
 
-	for (offset = 0; offset < len && buffer[offset] != '\0'; offset += strlen(buffer + offset) + 1) {
-		if (strncmp(buffer + offset, key, keylen) == 0 &&
-			buffer[offset + keylen] == '=') {
-			return buffer + offset + keylen + 1;
-		}
+	while (buffer < end && *buffer) {
+		if (strncmp(buffer, key, keylen) == 0 && buffer[keylen] == '=')
+			return buffer + keylen + 1;
+		buffer += strlen(buffer) + 1;
 	}
 
 	return NULL;
@@ -195,8 +198,7 @@ static const char *netlink_message_parse(const char *buffer, size_t len, const c
 static int linux_netlink_parse(const char *buffer, size_t len, int *detached,
 	const char **sys_name, uint8_t *busnum, uint8_t *devaddr)
 {
-	const char *tmp;
-	int i;
+	const char *tmp, *slash;
 
 	errno = 0;
 
@@ -230,7 +232,23 @@ static int linux_netlink_parse(const char *buffer, size_t len, int *detached,
 	}
 
 	tmp = netlink_message_parse(buffer, len, "BUSNUM");
-	if (!tmp) {
+	if (tmp) {
+		*busnum = (uint8_t)(strtoul(tmp, NULL, 10) & 0xff);
+		if (errno) {
+			errno = 0;
+			return -1;
+		}
+
+		tmp = netlink_message_parse(buffer, len, "DEVNUM");
+		if (NULL == tmp)
+			return -1;
+
+		*devaddr = (uint8_t)(strtoul(tmp, NULL, 10) & 0xff);
+		if (errno) {
+			errno = 0;
+			return -1;
+		}
+	} else {
 		/* no bus number. try "DEVICE" */
 		tmp = netlink_message_parse(buffer, len, "DEVICE");
 		if (!tmp) {
@@ -239,17 +257,17 @@ static int linux_netlink_parse(const char *buffer, size_t len, int *detached,
 		}
 
 		/* Parse a device path such as /dev/bus/usb/003/004 */
-		const char *pLastSlash = strrchr(tmp, '/');
-		if (!pLastSlash)
+		slash = strrchr(tmp, '/');
+		if (!slash)
 			return -1;
 
-		*busnum = (uint8_t)(strtoul(pLastSlash - 3, NULL, 10) & 0xff);
+		*busnum = (uint8_t)(strtoul(slash - 3, NULL, 10) & 0xff);
 		if (errno) {
 			errno = 0;
 			return -1;
 		}
 
-		*devaddr = (uint8_t)(strtoul(pLastSlash + 1, NULL, 10) & 0xff);
+		*devaddr = (uint8_t)(strtoul(slash + 1, NULL, 10) & 0xff);
 		if (errno) {
 			errno = 0;
 			return -1;
@@ -258,32 +276,13 @@ static int linux_netlink_parse(const char *buffer, size_t len, int *detached,
 		return 0;
 	}
 
-	*busnum = (uint8_t)(strtoul(tmp, NULL, 10) & 0xff);
-	if (errno) {
-		errno = 0;
-		return -1;
-	}
-
-	tmp = netlink_message_parse(buffer, len, "DEVNUM");
-	if (!tmp)
-		return -1;
-
-	*devaddr = (uint8_t)(strtoul(tmp, NULL, 10) & 0xff);
-	if (errno) {
-		errno = 0;
-		return -1;
-	}
-
 	tmp = netlink_message_parse(buffer, len, "DEVPATH");
 	if (!tmp)
 		return -1;
 
-	for (i = strlen(tmp) - 1; i; --i) {
-		if (tmp[i] == '/') {
-			*sys_name = tmp + i + 1;
-			break;
-		}
-	}
+	slash = strrchr(tmp, '/');
+	if (slash)
+		*sys_name = slash + 1;
 
 	/* found a usb device */
 	return 0;
@@ -291,29 +290,54 @@ static int linux_netlink_parse(const char *buffer, size_t len, int *detached,
 
 static int linux_netlink_read_message(void)
 {
-	char buffer[1024];
+	char cred_buffer[CMSG_SPACE(sizeof(struct ucred))];
+	char msg_buffer[2048];
 	const char *sys_name = NULL;
 	uint8_t busnum, devaddr;
 	int detached, r;
 	ssize_t len;
-	struct iovec iov = { .iov_base = buffer, .iov_len = sizeof(buffer) };
-	struct msghdr meh = {
+	struct cmsghdr *cmsg;
+	struct ucred *cred;
+	struct sockaddr_nl sa_nl;
+	struct iovec iov = { .iov_base = msg_buffer, .iov_len = sizeof(msg_buffer) };
+	struct msghdr msg = {
 		.msg_iov = &iov, .msg_iovlen = 1,
-		.msg_name = &snl, .msg_namelen = sizeof(snl)
+		.msg_control = cred_buffer, .msg_controllen = sizeof(cred_buffer),
+		.msg_name = &sa_nl, .msg_namelen = sizeof(sa_nl)
 	};
 
 	/* read netlink message */
-	memset(buffer, 0, sizeof(buffer));
-	len = recvmsg(linux_netlink_socket, &meh, 0);
-	if (len < 32) {
-		if (errno != EAGAIN)
-			usbi_dbg("error receiving message from netlink");
+	len = recvmsg(linux_netlink_socket, &msg, 0);
+	if (len == -1) {
+		if (errno != EAGAIN && errno != EINTR)
+			usbi_err(NULL, "error receiving message from netlink (%d)", errno);
 		return -1;
 	}
 
-	/* TODO -- authenticate this message is from the kernel or udevd */
+	if (len < 32 || (msg.msg_flags & MSG_TRUNC)) {
+		usbi_err(NULL, "invalid netlink message length");
+		return -1;
+	}
 
-	r = linux_netlink_parse(buffer, (size_t)len, &detached, &sys_name, &busnum, &devaddr);
+	if (sa_nl.nl_groups != NL_GROUP_KERNEL || sa_nl.nl_pid != 0) {
+		usbi_dbg("ignoring netlink message from unknown group/PID (%u/%u)",
+			 (unsigned int)sa_nl.nl_groups, (unsigned int)sa_nl.nl_pid);
+		return -1;
+	}
+
+	cmsg = CMSG_FIRSTHDR(&msg);
+	if (!cmsg || cmsg->cmsg_type != SCM_CREDENTIALS) {
+		usbi_dbg("ignoring netlink message with no sender credentials");
+		return -1;
+	}
+
+	cred = (struct ucred *)CMSG_DATA(cmsg);
+	if (cred->uid != 0) {
+		usbi_dbg("ignoring netlink message with non-zero sender UID %u", (unsigned int)cred->uid);
+		return -1;
+	}
+
+	r = linux_netlink_parse(msg_buffer, (size_t)len, &detached, &sys_name, &busnum, &devaddr);
 	if (r)
 		return r;
 
