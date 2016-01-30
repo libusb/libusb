@@ -66,7 +66,6 @@ int usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex);
 int usbi_cond_timedwait(usbi_cond_t *cond,
 	usbi_mutex_t *mutex, const struct timespec *abstime);
 int usbi_cond_broadcast(usbi_cond_t *cond);
-int usbi_cond_signal(usbi_cond_t *cond);
 int usbi_cond_destroy(usbi_cond_t *cond);
 
 int usbi_tls_key_create(usbi_tls_key_t *key, void (*destructor)(void *));

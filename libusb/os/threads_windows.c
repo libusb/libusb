@@ -155,25 +155,6 @@ int usbi_cond_broadcast(usbi_cond_t *cond)
 	return fail ? EINVAL : 0;
 }
 
-int usbi_cond_signal(usbi_cond_t *cond)
-{
-	// Assumes mutex is locked; this is not in keeping with POSIX spec, but
-	//   libusb does this anyway, so we simplify by not adding more sync
-	//   primitives to the CV definition!
-	struct usbi_cond_perthread *pos;
-
-	if (!cond)
-		return EINVAL;
-	if (list_empty(&cond->waiters))
-		return 0; // no one to wakeup.
-	pos = list_first_entry(&cond->waiters, struct usbi_cond_perthread, list);
-	// The wait function will remove its respective item from the list.
-	if (SetEvent(pos->event))
-		return 0;
-	else
-		return EINVAL;
-}
-
 __inline static int usbi_cond_intwait(usbi_cond_t *cond,
 	usbi_mutex_t *mutex, DWORD timeout_ms)
 {
