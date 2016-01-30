@@ -1124,12 +1124,12 @@ int usbi_io_init(struct libusb_context *ctx)
 {
 	int r;
 
-	usbi_mutex_init(&ctx->flying_transfers_lock, NULL);
-	usbi_mutex_init_recursive(&ctx->events_lock, NULL);
-	usbi_mutex_init(&ctx->event_waiters_lock, NULL);
-	usbi_cond_init(&ctx->event_waiters_cond, NULL);
-	usbi_mutex_init(&ctx->event_data_lock, NULL);
-	usbi_tls_key_create(&ctx->event_handling_key, NULL);
+	usbi_mutex_init(&ctx->flying_transfers_lock);
+	usbi_mutex_init_recursive(&ctx->events_lock);
+	usbi_mutex_init(&ctx->event_waiters_lock);
+	usbi_cond_init(&ctx->event_waiters_cond);
+	usbi_mutex_init(&ctx->event_data_lock);
+	usbi_tls_key_create(&ctx->event_handling_key);
 	list_init(&ctx->flying_transfers);
 	list_init(&ctx->ipollfds);
 	list_init(&ctx->hotplug_msgs);
@@ -1268,8 +1268,8 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 		return NULL;
 
 	itransfer->num_iso_packets = iso_packets;
-	usbi_mutex_init(&itransfer->lock, NULL);
-	usbi_mutex_init(&itransfer->flags_lock, NULL);
+	usbi_mutex_init(&itransfer->lock);
+	usbi_mutex_init(&itransfer->flags_lock);
 	transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	usbi_dbg("transfer %p", transfer);
 	return transfer;
@@ -1944,7 +1944,6 @@ void API_EXPORTED libusb_unlock_event_waiters(libusb_context *ctx)
  */
 int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 {
-	struct timespec timeout;
 	int r;
 
 	USBI_GET_CONTEXT(ctx);
@@ -1953,22 +1952,13 @@ int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 		return 0;
 	}
 
-	r = usbi_backend->clock_gettime(USBI_CLOCK_REALTIME, &timeout);
-	if (r < 0) {
-		usbi_err(ctx, "failed to read realtime clock, error %d", errno);
-		return LIBUSB_ERROR_OTHER;
-	}
-
-	timeout.tv_sec += tv->tv_sec;
-	timeout.tv_nsec += tv->tv_usec * 1000;
-	while (timeout.tv_nsec >= 1000000000) {
-		timeout.tv_nsec -= 1000000000;
-		timeout.tv_sec++;
-	}
-
 	r = usbi_cond_timedwait(&ctx->event_waiters_cond,
-		&ctx->event_waiters_lock, &timeout);
-	return (r == ETIMEDOUT);
+		&ctx->event_waiters_lock, tv);
+
+	if (r < 0)
+		return r;
+	else
+		return (r == ETIMEDOUT);
 }
 
 static void handle_timeout(struct usbi_transfer *itransfer)

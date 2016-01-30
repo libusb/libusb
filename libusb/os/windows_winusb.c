@@ -811,7 +811,7 @@ static int windows_init(struct libusb_context *ctx)
 		}
 
 		// We need a lock for proper auto-release
-		usbi_mutex_init(&autoclaim_lock, NULL);
+		usbi_mutex_init(&autoclaim_lock);
 
 		// Initialize pollable file descriptors
 		init_polling();

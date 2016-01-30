@@ -676,7 +676,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	if (!dev)
 		return NULL;
 
-	r = usbi_mutex_init(&dev->lock, NULL);
+	r = usbi_mutex_init(&dev->lock);
 	if (r) {
 		free(dev);
 		return NULL;
@@ -1242,7 +1242,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	if (!_dev_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
-	r = usbi_mutex_init(&_dev_handle->lock, NULL);
+	r = usbi_mutex_init(&_dev_handle->lock);
 	if (r) {
 		free(_dev_handle);
 		return LIBUSB_ERROR_OTHER;
@@ -2036,9 +2036,9 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	usbi_dbg("libusb v%u.%u.%u.%u%s", libusb_version_internal.major, libusb_version_internal.minor,
 		libusb_version_internal.micro, libusb_version_internal.nano, libusb_version_internal.rc);
 
-	usbi_mutex_init(&ctx->usb_devs_lock, NULL);
-	usbi_mutex_init(&ctx->open_devs_lock, NULL);
-	usbi_mutex_init(&ctx->hotplug_cbs_lock, NULL);
+	usbi_mutex_init(&ctx->usb_devs_lock);
+	usbi_mutex_init(&ctx->open_devs_lock);
+	usbi_mutex_init(&ctx->hotplug_cbs_lock);
 	list_init(&ctx->usb_devs);
 	list_init(&ctx->open_devs);
 	list_init(&ctx->hotplug_cbs);

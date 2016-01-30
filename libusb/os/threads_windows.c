@@ -25,8 +25,6 @@
 
 #include "libusbi.h"
 
-extern const uint64_t epoch_time;
-
 struct usbi_cond_perthread {
 	struct list_head list;
 	DWORD tid;
@@ -41,6 +39,7 @@ int usbi_mutex_static_lock(usbi_mutex_static_t *mutex)
 		SleepEx(0, TRUE);
 	return 0;
 }
+
 int usbi_mutex_static_unlock(usbi_mutex_static_t *mutex)
 {
 	if (!mutex)
@@ -49,9 +48,8 @@ int usbi_mutex_static_unlock(usbi_mutex_static_t *mutex)
 	return 0;
 }
 
-int usbi_mutex_init(usbi_mutex_t *mutex, const usbi_mutexattr_t *attr)
+int usbi_mutex_init(usbi_mutex_t *mutex)
 {
-	UNUSED(attr);
 	if (!mutex)
 		return EINVAL;
 	*mutex = CreateMutex(NULL, FALSE, NULL);
@@ -110,9 +108,8 @@ int usbi_mutex_destroy(usbi_mutex_t *mutex)
 	return 0;
 }
 
-int usbi_cond_init(usbi_cond_t *cond, const usbi_condattr_t *attr)
+int usbi_cond_init(usbi_cond_t *cond)
 {
-	UNUSED(attr);
 	if (!cond)
 		return EINVAL;
 	list_init(&cond->waiters);
@@ -213,44 +210,19 @@ int usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
 }
 
 int usbi_cond_timedwait(usbi_cond_t *cond,
-	usbi_mutex_t *mutex, const struct timespec *abstime)
+	usbi_mutex_t *mutex, const struct timeval *tv)
 {
-	FILETIME filetime;
-	ULARGE_INTEGER rtime;
-	struct timeval targ_time, cur_time, delta_time;
-	struct timespec cur_time_ns;
 	DWORD millis;
 
-	// GetSystemTimeAsFileTime() is not available on CE
-	SYSTEMTIME st;
-	GetSystemTime(&st);
-	if (!SystemTimeToFileTime(&st, &filetime))
-		return 0;
-	rtime.LowPart   = filetime.dwLowDateTime;
-	rtime.HighPart  = filetime.dwHighDateTime;
-	rtime.QuadPart -= epoch_time;
-	cur_time_ns.tv_sec = (long)(rtime.QuadPart / 10000000);
-	cur_time_ns.tv_nsec = (long)((rtime.QuadPart % 10000000) * 100);
-	TIMESPEC_TO_TIMEVAL(&cur_time, &cur_time_ns);
-
-	TIMESPEC_TO_TIMEVAL(&targ_time, abstime);
-	timersub(&targ_time, &cur_time, &delta_time);
-	if (delta_time.tv_sec < 0) {
-		// abstime already passed?
-		millis = 0;
-	} else {
-		millis  = delta_time.tv_usec / 1000;
-		millis += delta_time.tv_sec * 1000;
-		if (delta_time.tv_usec % 1000)
-			millis++; // round up to next millisecond
-	}
-
+	millis = (DWORD)(tv->tv_sec * 1000) + (tv->tv_usec / 1000);
+	/* round up to next millisecond */
+	if (tv->tv_usec % 1000)
+		millis++;
 	return usbi_cond_intwait(cond, mutex, millis);
 }
 
-int usbi_tls_key_create(usbi_tls_key_t *key, void (*destructor)(void *))
+int usbi_tls_key_create(usbi_tls_key_t *key)
 {
-	UNUSED(destructor);
 	if (!key)
 		return EINVAL;
 	*key = TlsAlloc();
@@ -265,9 +237,9 @@ void *usbi_tls_key_get(usbi_tls_key_t key)
 	return TlsGetValue(key);
 }
 
-int usbi_tls_key_set(usbi_tls_key_t key, const void *value)
+int usbi_tls_key_set(usbi_tls_key_t key, void *value)
 {
-	if (TlsSetValue(key, (LPVOID)value))
+	if (TlsSetValue(key, value))
 		return 0;
 	else
 		return EINVAL;
