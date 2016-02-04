@@ -53,7 +53,13 @@ const struct usbi_os_backend * const usbi_backend = &openbsd_backend;
 #elif defined(OS_NETBSD)
 const struct usbi_os_backend * const usbi_backend = &netbsd_backend;
 #elif defined(OS_WINDOWS)
+
+#if defined(USE_USBDK)
+const struct usbi_os_backend * const usbi_backend = &usbdk_backend;
+#else
 const struct usbi_os_backend * const usbi_backend = &windows_backend;
+#endif
+
 #elif defined(OS_WINCE)
 const struct usbi_os_backend * const usbi_backend = &wince_backend;
 #elif defined(OS_HAIKU)
@@ -137,7 +143,7 @@ struct list_head active_contexts_list;
  * libusb_set_debug(), or the setting of the environmental variable
  * LIBUSB_DEBUG outside of the application, can result in logging being
  * produced. Your application should therefore not close stderr, but instead
- * direct it to the null device if its output is undesireable.
+ * direct it to the null device if its output is undesirable.
  *
  * The libusb_set_debug() function can be used to enable logging of certain
  * messages. Under standard configuration, libusb doesn't really log much

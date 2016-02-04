@@ -36,6 +36,7 @@ m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AC_PREREQ([2.50])
 AC_PROG_CC
+AC_PROG_CXX
 LT_INIT
 LT_LANG([Windows Resource])
 AC_C_INLINE
@@ -91,7 +92,6 @@ case $host in
 	;;
 *-haiku*)
 	AC_MSG_RESULT([Haiku])
-	AC_CONFIG_SUBDIRS([libusb/os/haiku])
 	backend="haiku"
 	threads="posix"
 	;;
@@ -172,6 +172,14 @@ windows)
 	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	AC_DEFINE([WINVER], 0x0501, [Oldest Windows version supported])
+
+	AC_ARG_ENABLE([usbdk],
+		[AC_HELP_STRING([--enable-usbdk], [use UsbDk Windows backend [default=no]])],
+		[], [enable_usbdk="no"])
+		if test "x$enable_usbdk" = "xyes" ; then
+		    AC_DEFINE(USE_USBDK, 1, [Use UsbDk Windows backend])
+		fi
+		AC_SUBST(USE_USBDK)
 	;;
 haiku)
 	AC_DEFINE(OS_HAIKU, 1, [Haiku backend])
@@ -193,6 +201,7 @@ AM_CONDITIONAL(OS_HAIKU, test "x$backend" = xhaiku)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
 AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = "xyes")
 AM_CONDITIONAL(USE_UDEV, test "x$enable_udev" = xyes)
+AM_CONDITIONAL(USE_USBDK, test "x$enable_usbdk" = xyes)
 if test "$threads" = posix; then
 	AC_DEFINE(THREADS_POSIX, 1, [Use POSIX Threads])
 fi

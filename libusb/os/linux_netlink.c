@@ -308,7 +308,7 @@ static int linux_netlink_read_message(void)
 	len = recvmsg(linux_netlink_socket, &meh, 0);
 	if (len < 32) {
 		if (errno != EAGAIN)
-			usbi_dbg("error recieving message from netlink");
+			usbi_dbg("error receiving message from netlink");
 		return -1;
 	}
 

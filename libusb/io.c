@@ -1107,7 +1107,7 @@ printf("completed!\n");
  * (without implementing the rules and locking semantics documented above)
  * and another trying to send a synchronous USB transfer, you will end up with
  * two threads monitoring the same descriptors, and the above-described
- * undesirable behaviour occuring. The solution is for your polling thread to
+ * undesirable behaviour occurring. The solution is for your polling thread to
  * play by the rules; the synchronous I/O functions do so, and this will result
  * in them getting along in perfect harmony.
  *
@@ -1857,6 +1857,29 @@ int API_EXPORTED libusb_event_handler_active(libusb_context *ctx)
 }
 
 /** \ingroup poll
+ * Interrupt any active thread that is handling events. This is mainly useful
+ * for interrupting a dedicated event handling thread when an application
+ * wishes to call libusb_exit().
+ *
+ * Since version 1.0.21, \ref LIBUSB_API_VERSION >= 0x01000105
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \ref mtasync
+ */
+void API_EXPORTED libusb_interrupt_event_handler(libusb_context *ctx)
+{
+	USBI_GET_CONTEXT(ctx);
+
+	usbi_dbg("");
+	usbi_mutex_lock(&ctx->event_data_lock);
+	if (!usbi_pending_events(ctx)) {
+		ctx->event_flags |= USBI_EVENT_USER_INTERRUPT;
+		usbi_signal_event(ctx);
+	}
+	usbi_mutex_unlock(&ctx->event_data_lock);
+}
+
+/** \ingroup poll
  * Acquire the event waiters lock. This lock is designed to be obtained under
  * the situation where you want to be aware when events are completed, but
  * some other thread is event handling so calling libusb_handle_events() is not
@@ -2070,7 +2093,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	/* only reallocate the poll fds when the list of poll fds has been modified
 	 * since the last poll, otherwise reuse them to save the additional overhead */
 	usbi_mutex_lock(&ctx->event_data_lock);
-	if (ctx->pollfds_modified) {
+	if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED) {
 		usbi_dbg("poll fds modified, reallocating");
 
 		if (ctx->pollfds) {
@@ -2097,7 +2120,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		}
 
 		/* reset the flag now that we have the updated list */
-		ctx->pollfds_modified = 0;
+		ctx->event_flags &= ~USBI_EVENT_POLLFDS_MODIFIED;
 
 		/* if no further pending events, clear the event pipe so that we do
 		 * not immediately return from poll */
@@ -2146,8 +2169,13 @@ redo_poll:
 		usbi_mutex_lock(&ctx->event_data_lock);
 
 		/* check if someone added a new poll fd */
-		if (ctx->pollfds_modified)
+		if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED)
 			usbi_dbg("someone updated the poll fds");
+
+		if (ctx->event_flags & USBI_EVENT_USER_INTERRUPT) {
+			usbi_dbg("someone purposely interrupted");
+			ctx->event_flags &= ~USBI_EVENT_USER_INTERRUPT;
+		}
 
 		/* check if someone is closing a device */
 		if (ctx->device_close)
@@ -2606,7 +2634,7 @@ static void usbi_fd_notification(struct libusb_context *ctx)
 	/* Record that there is a new poll fd.
 	 * Only signal an event if there are no prior pending events. */
 	pending_events = usbi_pending_events(ctx);
-	ctx->pollfds_modified = 1;
+	ctx->event_flags |= USBI_EVENT_POLLFDS_MODIFIED;
 	if (!pending_events)
 		usbi_signal_event(ctx);
 }

@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -19,8 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectName>libusb-1.0 (dll)</ProjectName>
-    <ProjectGuid>{349EE8FA-7D25-4909-AAF5-FF3FADE72187}</ProjectGuid>
+    <ProjectName>libusb-usbdk-1.0 (dll)</ProjectName>
+    <ProjectGuid>{F53A5974-2319-48EB-A67B-27933AEDF14A}</ProjectGuid>
     <RootNamespace>libusbdll</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -28,19 +28,23 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
+    <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
+    <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -61,29 +65,29 @@
   <PropertyGroup>
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\</OutDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\libusb-1.0\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\libusb-usbdk-1.0\</IntDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\</OutDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\libusb-1.0\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\libusb-usbdk-1.0\</IntDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\</OutDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\libusb-1.0\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\libusb-usbdk-1.0\</IntDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\</OutDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\libusb-1.0\</IntDir>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">libusb-1.0</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">libusb-1.0</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">libusb-1.0</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">libusb-1.0</TargetName>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\$(Platform)\$(Configuration)\dll\libusb-usbdk-1.0\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">libusb-usbdk-1.0</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">libusb-usbdk-1.0</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">libusb-usbdk-1.0</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">libusb-usbdk-1.0</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>.;..\libusb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;USE_USBDK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <OutputFile>$(OutDir)libusb-1.0.dll</OutputFile>
+      <OutputFile>$(OutDir)libusb-usbdk-1.0.dll</OutputFile>
       <ModuleDefinitionFile>..\libusb\libusb-1.0.def</ModuleDefinitionFile>
       <EmbedManagedResourceFile>libusb-1.0.rc;%(EmbedManagedResourceFile)</EmbedManagedResourceFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -96,13 +100,13 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>.;..\libusb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WIN32;_WIN64;_DEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32;_WIN64;_DEBUG;_CRT_SECURE_NO_WARNINGS;USE_USBDK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <OutputFile>$(OutDir)libusb-1.0.dll</OutputFile>
+      <OutputFile>$(OutDir)libusb-usbdk-1.0.dll</OutputFile>
       <ModuleDefinitionFile>..\libusb\libusb-1.0.def</ModuleDefinitionFile>
       <EmbedManagedResourceFile>libusb-1.0.rc;%(EmbedManagedResourceFile)</EmbedManagedResourceFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -111,12 +115,12 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <AdditionalIncludeDirectories>.;..\libusb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WIN32;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32;_LIB;_CRT_SECURE_NO_WARNINGS;USE_USBDK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
     </ClCompile>
     <Link>
-      <OutputFile>$(OutDir)libusb-1.0.dll</OutputFile>
+      <OutputFile>$(OutDir)libusb-usbdk-1.0.dll</OutputFile>
       <ModuleDefinitionFile>..\libusb\libusb-1.0.def</ModuleDefinitionFile>
       <EmbedManagedResourceFile>libusb-1.0.rc;%(EmbedManagedResourceFile)</EmbedManagedResourceFile>
     </Link>
@@ -127,12 +131,12 @@
     </Midl>
     <ClCompile>
       <AdditionalIncludeDirectories>.;..\libusb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WIN32;_WIN64;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32;_WIN64;_LIB;_CRT_SECURE_NO_WARNINGS;USE_USBDK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
     </ClCompile>
     <Link>
-      <OutputFile>$(OutDir)libusb-1.0.dll</OutputFile>
+      <OutputFile>$(OutDir)libusb-usbdk-1.0.dll</OutputFile>
       <ModuleDefinitionFile>..\libusb\libusb-1.0.def</ModuleDefinitionFile>
       <EmbedManagedResourceFile>libusb-1.0.rc;%(EmbedManagedResourceFile)</EmbedManagedResourceFile>
     </Link>
@@ -147,7 +151,7 @@
     <ClCompile Include="..\libusb\sync.c" />
     <ClCompile Include="..\libusb\os\threads_windows.c" />
     <ClCompile Include="..\libusb\os\windows_nt_common.c" />
-    <ClCompile Include="..\libusb\os\windows_winusb.c" />
+    <ClCompile Include="..\libusb\os\windows_usbdk.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include=".\config.h" />
@@ -160,7 +164,7 @@
     <ClInclude Include="..\libusb\version_nano.h" />
     <ClInclude Include="..\libusb\os\windows_common.h" />
     <ClInclude Include="..\libusb\os\windows_nt_common.h" />
-    <ClInclude Include="..\libusb\os\windows_winusb.h" />
+    <ClInclude Include="..\libusb\os\windows_usbdk.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\libusb\libusb-1.0.def" />

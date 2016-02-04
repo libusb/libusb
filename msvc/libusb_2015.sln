@@ -2,28 +2,28 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.21005.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-1.0 (static)", "libusb_static_2013.vcxproj", "{349EE8F9-7D25-4909-AAF5-FF3FADE72187}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-1.0 (static)", "libusb_static_2015.vcxproj", "{349EE8F9-7D25-4909-AAF5-FF3FADE72187}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-1.0 (dll)", "libusb_dll_2013.vcxproj", "{349EE8FA-7D25-4909-AAF5-FF3FADE72187}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-1.0 (dll)", "libusb_dll_2015.vcxproj", "{349EE8FA-7D25-4909-AAF5-FF3FADE72187}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "listdevs", "listdevs_2013.vcxproj", "{F4938DB0-3DE7-4737-9C5A-EAD1BE819F87}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "listdevs", "listdevs_2015.vcxproj", "{F4938DB0-3DE7-4737-9C5A-EAD1BE819F87}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xusb", "xusb_2013.vcxproj", "{3F3138D0-7AB7-4268-9BF3-1A3EA5503A11}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xusb", "xusb_2015.vcxproj", "{3F3138D0-7AB7-4268-9BF3-1A3EA5503A11}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fxload", "fxload_2013.vcxproj", "{9E166F7A-A793-9FB6-0A67-F0AED8AE8C88}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fxload", "fxload_2015.vcxproj", "{9E166F7A-A793-9FB6-0A67-F0AED8AE8C88}"
 	ProjectSection(ProjectDependencies) = postProject
 		{AE83E1B4-CE06-47EE-B7A3-C3A1D7C2D71E} = {AE83E1B4-CE06-47EE-B7A3-C3A1D7C2D71E}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "getopt", "getopt_2013.vcxproj", "{AE83E1B4-CE06-47EE-B7A3-C3A1D7C2D71E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "getopt", "getopt_2015.vcxproj", "{AE83E1B4-CE06-47EE-B7A3-C3A1D7C2D71E}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stress", "stress_2013.vcxproj", "{53942EFF-C810-458D-B3CB-EE5CE9F1E781}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stress", "stress_2015.vcxproj", "{53942EFF-C810-458D-B3CB-EE5CE9F1E781}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hotplugtest", "hotplugtest_2013.vcxproj", "{99D2AC64-DC66-4422-91CE-6715C403C9E5}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hotplugtest", "hotplugtest_2015.vcxproj", "{99D2AC64-DC66-4422-91CE-6715C403C9E5}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-usbdk-1.0 (dll)", "libusb_usbdk_dll_2013.vcxproj", "{F53A5974-2319-48EB-A67B-27933AEDF14A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-usbdk-1.0 (dll)", "libusb_usbdk_dll_2015.vcxproj", "{F53A5974-2319-48EB-A67B-27933AEDF14A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-usbdk-1.0 (static)", "libusb_usbdk_static_2013.vcxproj", "{0B3D86CF-5D70-41A9-B391-A2E7C5C969ED}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-usbdk-1.0 (static)", "libusb_usbdk_static_2015.vcxproj", "{0B3D86CF-5D70-41A9-B391-A2E7C5C969ED}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
