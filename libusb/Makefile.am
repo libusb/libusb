@@ -8,6 +8,7 @@ POSIX_POLL_SRC = os/poll_posix.h os/poll_posix.c
 POSIX_THREADS_SRC = os/threads_posix.h os/threads_posix.c
 WINDOWS_POLL_SRC = os/poll_windows.h os/poll_windows.c
 WINDOWS_THREADS_SRC = os/threads_windows.h os/threads_windows.c
+ANDROID_USBFS_SRC = os/android_usbfs.h os/linux_usbfs.h os/android_usbfs.c
 LINUX_USBFS_SRC = os/linux_usbfs.h os/linux_usbfs.c
 DARWIN_USB_SRC = os/darwin_usb.h os/darwin_usb.c
 OPENBSD_USB_SRC = os/openbsd_usb.c
@@ -36,6 +37,10 @@ else
 OS_SRC = $(LINUX_USBFS_SRC) os/linux_netlink.c
 endif
 
+endif
+
+if OS_ANDROID
+OS_SRC = $(ANDROID_USBFS_SRC) os/linux_netlink.c
 endif
 
 if OS_DARWIN

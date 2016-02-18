@@ -1,5 +1,5 @@
-# Android application build config for libusb
-# Copyright © 2012-2013 RealVNC Ltd. <toby.gray@realvnc.com>
+# Android build config for libftdi tests and examples to be run by test_app
+# Copyright © 2016 Eugene Hutorny <eugene@hutorny.in.ua>
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -14,14 +14,27 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
-#
 
-APP_ABI := $(or $(APP_ABI),all)
+LOCAL_PATH:= $(call my-dir)
+LIBUSB_ROOT_REL:= ../../..
+LIBUSB_ROOT_ABS:= $(abspath $(LOCAL_PATH)/$(LIBUSB_ROOT_REL))
 
-#If no platform specified, using the most recent one
-APP_PLATFORM := $(or $(APP_PLATFORM),$(shell echo `for i in $(NDK)/platforms/*-?? ; do basename $${i%%}; done | tail -1`))
-# Workaround for MIPS toolchain linker being unable to find liblog dependency
-# of shared object in NDK versions at least up to r9.
-#
-APP_LDFLAGS := -llog
-APP_PIE := 1
+#LIBFTDI_ROOT must be specified by the caller
+LIBFTDI_ROOT_SET := $(if $(LIBFTDI_ROOT),yes,$(error LIBFTDI_ROOT is not set))
+
+# libftdi
+
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
+  $(LIBFTDI_ROOT)/src/ftdi.c												\
+  $(LIBFTDI_ROOT)/src/ftdi_stream.c
+
+LOCAL_C_INCLUDES += \
+  $(LIBFTDI_ROOT)/src
+
+LOCAL_SHARED_LIBRARIES += usb-1.0
+
+LOCAL_MODULE:= ftdi
+
+include $(BUILD_SHARED_LIBRARY)

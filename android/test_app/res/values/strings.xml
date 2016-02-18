@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">libusb test app</string>
+    <string name="menu_run_tests">Run Tests</string>
+    <string name="menu_enable_debug">Print diagnostics</string>
+    <string name="menu_clear_screen">Clear screen</string>
+</resources>

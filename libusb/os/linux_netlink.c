@@ -110,6 +110,7 @@ int linux_netlink_start_event_monitor(void)
 	}
 
 	if (-1 == linux_netlink_socket) {
+		usbi_err(NULL, "error creating NETLINK_KOBJECT_UEVENT socket");
 		return LIBUSB_ERROR_OTHER;
 	}
 
