@@ -387,7 +387,11 @@ struct libusb_device {
 #else
 	[0] /* non-standard, but usually working code */
 #endif
+#if defined(OS_SUNOS)
+	__attribute__ ((aligned (8)));
+#else
 	;
+#endif
 };
 
 struct libusb_device_handle {
@@ -404,7 +408,11 @@ struct libusb_device_handle {
 #else
 	[0] /* non-standard, but usually working code */
 #endif
+#if defined(OS_SUNOS)
+	__attribute__ ((aligned (8)));
+#else
 	;
+#endif
 };
 
 enum {
@@ -527,7 +535,8 @@ int usbi_signal_event(struct libusb_context *ctx);
 int usbi_clear_event(struct libusb_context *ctx);
 
 /* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
-#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) || defined(OS_HAIKU)
+#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) ||\
+	defined(OS_HAIKU) || defined(OS_SUNOS)
 #include <unistd.h>
 #include "os/poll_posix.h"
 #elif defined(OS_WINDOWS) || defined(OS_WINCE)
@@ -1126,6 +1135,7 @@ extern const struct usbi_os_backend windows_backend;
 extern const struct usbi_os_backend usbdk_backend;
 extern const struct usbi_os_backend wince_backend;
 extern const struct usbi_os_backend haiku_usb_raw_backend;
+extern const struct usbi_os_backend sunos_backend;
 
 extern struct list_head active_contexts_list;
 extern usbi_mutex_static_t active_contexts_lock;
