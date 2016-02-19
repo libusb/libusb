@@ -12,6 +12,7 @@ LINUX_USBFS_SRC = os/linux_usbfs.h os/linux_usbfs.c
 DARWIN_USB_SRC = os/darwin_usb.h os/darwin_usb.c
 OPENBSD_USB_SRC = os/openbsd_usb.c
 NETBSD_USB_SRC = os/netbsd_usb.c
+SUNOS_USB_SRC = os/sunos_usb.c os/sunos_usb.h
 WINDOWS_COMMON_SRC = os/windows_nt_common.h os/windows_nt_common.c \
                      os/windows_common.h libusb-1.0.rc libusb-1.0.def
 WINDOWS_USB_SRC = os/windows_winusb.h os/windows_winusb.c
@@ -49,6 +50,10 @@ endif
 
 if OS_NETBSD
 OS_SRC = $(NETBSD_USB_SRC)
+endif
+
+if OS_SUNOS
+OS_SRC = $(SUNOS_USB_SRC)
 endif
 
 if OS_HAIKU
