@@ -20,6 +20,10 @@ EXPORTS
   libusb_control_transfer@32 = libusb_control_transfer
   libusb_detach_kernel_driver
   libusb_detach_kernel_driver@8 = libusb_detach_kernel_driver
+  libusb_dev_mem_alloc
+  libusb_dev_mem_alloc@8 = libusb_dev_mem_alloc
+  libusb_dev_mem_free
+  libusb_dev_mem_free@12 = libusb_dev_mem_free
   libusb_error_name
   libusb_error_name@4 = libusb_error_name
   libusb_event_handler_active

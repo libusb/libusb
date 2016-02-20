@@ -933,6 +933,16 @@ struct usbi_os_backend {
 	int (*free_streams)(struct libusb_device_handle *dev_handle,
 		unsigned char *endpoints, int num_endpoints);
 
+	/* Allocate persistent DMA memory for the given device, suitable for
+	 * zerocopy. May return NULL on failure. Optional to implement.
+	 */
+	unsigned char *(*dev_mem_alloc)(struct libusb_device_handle *handle,
+		size_t len);
+
+	/* Free memory allocated by dev_mem_alloc. */
+	int (*dev_mem_free)(struct libusb_device_handle *handle,
+		unsigned char *buffer, size_t len);
+
 	/* Determine if a kernel driver is active on an interface. Optional.
 	 *
 	 * The presence of a kernel driver on an interface indicates that any

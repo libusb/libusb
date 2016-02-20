@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
@@ -1557,6 +1558,32 @@ static int op_free_streams(struct libusb_device_handle *handle,
 				endpoints, num_endpoints);
 }
 
+static unsigned char *op_dev_mem_alloc(struct libusb_device_handle *handle,
+	size_t len)
+{
+	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
+	unsigned char *buffer = (unsigned char *)mmap(NULL, len,
+		PROT_READ | PROT_WRITE, MAP_SHARED, hpriv->fd, 0);
+	if (buffer == MAP_FAILED) {
+		usbi_err(HANDLE_CTX(handle), "alloc dev mem failed errno %d",
+			errno);
+		return NULL;
+	}
+	return buffer;
+}
+
+static int op_dev_mem_free(struct libusb_device_handle *handle,
+	unsigned char *buffer, size_t len)
+{
+	if (munmap(buffer, len) != 0) {
+		usbi_err(HANDLE_CTX(handle), "free dev mem failed errno %d",
+			errno);
+		return LIBUSB_ERROR_OTHER;
+	} else {
+		return LIBUSB_SUCCESS;
+	}
+}
+
 static int op_kernel_driver_active(struct libusb_device_handle *handle,
 	int interface)
 {
@@ -2677,6 +2704,9 @@ const struct usbi_os_backend linux_usbfs_backend = {
 
 	.alloc_streams = op_alloc_streams,
 	.free_streams = op_free_streams,
+
+	.dev_mem_alloc = op_dev_mem_alloc,
+	.dev_mem_free = op_dev_mem_free,
 
 	.kernel_driver_active = op_kernel_driver_active,
 	.detach_kernel_driver = op_detach_kernel_driver,
