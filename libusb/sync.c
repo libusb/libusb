@@ -188,7 +188,9 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 
 	sync_transfer_wait_for_completion(transfer);
 
-	*transferred = transfer->actual_length;
+	if (transferred)
+		*transferred = transfer->actual_length;
+
 	switch (transfer->status) {
 	case LIBUSB_TRANSFER_COMPLETED:
 		r = 0;
@@ -245,7 +247,9 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \param length for bulk writes, the number of bytes from data to be sent. for
  * bulk reads, the maximum number of bytes to receive into the data buffer.
  * \param transferred output location for the number of bytes actually
- * transferred.
+ * transferred. Since version 1.0.21 (\ref LIBUSB_API_VERSION >= 0x01000105),
+ * it is legal to pass a NULL pointer if you do not wish to receive this
+ * information.
  * \param timeout timeout (in millseconds) that this function should wait
  * before giving up due to no response being received. For an unlimited
  * timeout, use value 0.
@@ -296,7 +300,9 @@ int API_EXPORTED libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \param length for bulk writes, the number of bytes from data to be sent. for
  * bulk reads, the maximum number of bytes to receive into the data buffer.
  * \param transferred output location for the number of bytes actually
- * transferred.
+ * transferred. Since version 1.0.21 (\ref LIBUSB_API_VERSION >= 0x01000105),
+ * it is legal to pass a NULL pointer if you do not wish to receive this
+ * information.
  * \param timeout timeout (in millseconds) that this function should wait
  * before giving up due to no response being received. For an unlimited
  * timeout, use value 0.
