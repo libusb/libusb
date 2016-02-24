@@ -2673,6 +2673,8 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 	transfer_priv->pollable_fd = INVALID_WINFD;
 	size = transfer->length - LIBUSB_CONTROL_SETUP_SIZE;
 
+	// Windows places upper limits on the control transfer size
+	// See: https://msdn.microsoft.com/en-us/library/windows/hardware/ff538112.aspx
 	if (size > MAX_CTRL_BUFFER_LENGTH)
 		return LIBUSB_ERROR_INVALID_PARAM;
 

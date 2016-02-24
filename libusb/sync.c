@@ -87,6 +87,8 @@ static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
  * device
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns LIBUSB_ERROR_BUSY if called from event handling context
+ * \returns LIBUSB_ERROR_INVALID_PARAM if the transfer size is larger than
+ * the operating system and/or hardware can support
  * \returns another LIBUSB_ERROR code on other failures
  */
 int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
