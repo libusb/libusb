@@ -27,11 +27,11 @@
 #include "libusbi.h"
 
 /**
- * @defgroup syncio Synchronous device I/O
+ * @defgroup libusb_syncio Synchronous device I/O
  *
  * This page documents libusb's synchronous (blocking) API for USB device I/O.
  * This interface is easy to use but has some limitations. More advanced users
- * may wish to consider using the \ref asyncio "asynchronous I/O API" instead.
+ * may wish to consider using the \ref libusb_asyncio "asynchronous I/O API" instead.
  */
 
 static void LIBUSB_CALL sync_transfer_cb(struct libusb_transfer *transfer)
@@ -60,7 +60,7 @@ static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
 	}
 }
 
-/** \ingroup syncio
+/** \ingroup libusb_syncio
  * Perform a USB control transfer.
  *
  * The direction of the transfer is inferred from the bmRequestType field of
@@ -221,7 +221,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	return r;
 }
 
-/** \ingroup syncio
+/** \ingroup libusb_syncio
  * Perform a USB bulk transfer. The direction of the transfer is inferred from
  * the direction bits of the endpoint address.
  *
@@ -259,7 +259,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * <tt>transferred</tt>)
  * \returns LIBUSB_ERROR_PIPE if the endpoint halted
  * \returns LIBUSB_ERROR_OVERFLOW if the device offered more data, see
- * \ref packetoverflow
+ * \ref libusb_packetoverflow
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns LIBUSB_ERROR_BUSY if called from event handling context
  * \returns another LIBUSB_ERROR code on other failures
@@ -272,7 +272,7 @@ int API_EXPORTED libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
 		transferred, timeout, LIBUSB_TRANSFER_TYPE_BULK);
 }
 
-/** \ingroup syncio
+/** \ingroup libusb_syncio
  * Perform a USB interrupt transfer. The direction of the transfer is inferred
  * from the direction bits of the endpoint address.
  *
@@ -311,7 +311,7 @@ int API_EXPORTED libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \returns LIBUSB_ERROR_TIMEOUT if the transfer timed out
  * \returns LIBUSB_ERROR_PIPE if the endpoint halted
  * \returns LIBUSB_ERROR_OVERFLOW if the device offered more data, see
- * \ref packetoverflow
+ * \ref libusb_packetoverflow
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns LIBUSB_ERROR_BUSY if called from event handling context
  * \returns another LIBUSB_ERROR code on other error

@@ -34,14 +34,14 @@
 #include "hotplug.h"
 
 /**
- * @defgroup hotplug  Device hotplug event notification
+ * @defgroup libusb_hotplug Device hotplug event notification
  * This page details how to use the libusb hotplug interface, where available.
  *
  * Be mindful that not all platforms currently implement hotplug notification and
  * that you should first call on \ref libusb_has_capability() with parameter
  * \ref LIBUSB_CAP_HAS_HOTPLUG to confirm that hotplug support is available.
  *
- * \page hotplug Device hotplug event notification
+ * \page libusb_hotplug Device hotplug event notification
  *
  * \section hotplug_intro Introduction
  *
@@ -83,8 +83,8 @@
  * safe to call any libusb function that takes a libusb_device. It also safe to
  * open a device and submit asynchronous transfers. However, most other functions
  * that take a libusb_device_handle are <b>not</b> safe to call. Examples of such
- * functions are any of the \ref syncio "synchronous API" functions or the blocking
- * functions that retrieve various \ref desc "USB descriptors". These functions must
+ * functions are any of the \ref libusb_syncio "synchronous API" functions or the blocking
+ * functions that retrieve various \ref libusb_desc "USB descriptors". These functions must
  * be used outside of the context of the hotplug callback.
  *
  * When handling a LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT event the only safe function

@@ -35,7 +35,7 @@
 #define ENDPOINT_DESC_LENGTH		7
 #define ENDPOINT_AUDIO_DESC_LENGTH	9
 
-/** @defgroup desc USB descriptors
+/** @defgroup libusb_desc USB descriptors
  * This page details how to examine the various standard USB descriptors
  * for detected devices
  */
@@ -532,7 +532,7 @@ int usbi_device_cache_descriptor(libusb_device *dev)
 	return LIBUSB_SUCCESS;
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Get the USB device descriptor for a given device.
  *
  * This is a non-blocking function; the device descriptor is cached in memory.
@@ -553,7 +553,7 @@ int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
 	return 0;
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Get the USB configuration descriptor for the currently active configuration.
  * This is a non-blocking function which does not involve any requests being
  * sent to the device.
@@ -600,7 +600,7 @@ int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 	return r;
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Get a USB configuration descriptor based on its index.
  * This is a non-blocking function which does not involve any requests being
  * sent to the device.
@@ -683,7 +683,7 @@ int usbi_get_config_index_by_value(struct libusb_device *dev,
 	return 0;
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Get a USB configuration descriptor with a specific bConfigurationValue.
  * This is a non-blocking function which does not involve any requests being
  * sent to the device.
@@ -723,7 +723,7 @@ int API_EXPORTED libusb_get_config_descriptor_by_value(libusb_device *dev,
 		return libusb_get_config_descriptor(dev, (uint8_t) idx, config);
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Free a configuration descriptor obtained from
  * libusb_get_active_config_descriptor() or libusb_get_config_descriptor().
  * It is safe to call this function with a NULL config parameter, in which
@@ -741,7 +741,7 @@ void API_EXPORTED libusb_free_config_descriptor(
 	free(config);
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Get an endpoints superspeed endpoint companion descriptor (if any)
  *
  * \param ctx the context to operate on, or NULL for the default context
@@ -791,7 +791,7 @@ int API_EXPORTED libusb_get_ss_endpoint_companion_descriptor(
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Free a superspeed endpoint companion descriptor obtained from
  * libusb_get_ss_endpoint_companion_descriptor().
  * It is safe to call this function with a NULL ep_comp parameter, in which
@@ -884,7 +884,7 @@ static int parse_bos(struct libusb_context *ctx,
 	return LIBUSB_SUCCESS;
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Get a Binary Object Store (BOS) descriptor
  * This is a BLOCKING function, which will send requests to the device.
  *
@@ -937,7 +937,7 @@ int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *dev_handle,
 	return r;
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Free a BOS descriptor obtained from libusb_get_bos_descriptor().
  * It is safe to call this function with a NULL bos parameter, in which
  * case the function simply returns.
@@ -956,7 +956,7 @@ void API_EXPORTED libusb_free_bos_descriptor(struct libusb_bos_descriptor *bos)
 	free(bos);
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Get an USB 2.0 Extension descriptor
  *
  * \param ctx the context to operate on, or NULL for the default context
@@ -1000,7 +1000,7 @@ int API_EXPORTED libusb_get_usb_2_0_extension_descriptor(
 	return LIBUSB_SUCCESS;
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Free a USB 2.0 Extension descriptor obtained from
  * libusb_get_usb_2_0_extension_descriptor().
  * It is safe to call this function with a NULL usb_2_0_extension parameter,
@@ -1014,7 +1014,7 @@ void API_EXPORTED libusb_free_usb_2_0_extension_descriptor(
 	free(usb_2_0_extension);
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Get a SuperSpeed USB Device Capability descriptor
  *
  * \param ctx the context to operate on, or NULL for the default context
@@ -1058,7 +1058,7 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
 	return LIBUSB_SUCCESS;
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Free a SuperSpeed USB Device Capability descriptor obtained from
  * libusb_get_ss_usb_device_capability_descriptor().
  * It is safe to call this function with a NULL ss_usb_device_cap
@@ -1072,7 +1072,7 @@ void API_EXPORTED libusb_free_ss_usb_device_capability_descriptor(
 	free(ss_usb_device_cap);
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Get a Container ID descriptor
  *
  * \param ctx the context to operate on, or NULL for the default context
@@ -1115,7 +1115,7 @@ int API_EXPORTED libusb_get_container_id_descriptor(struct libusb_context *ctx,
 	return LIBUSB_SUCCESS;
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Free a Container ID descriptor obtained from
  * libusb_get_container_id_descriptor().
  * It is safe to call this function with a NULL container_id parameter,
@@ -1129,7 +1129,7 @@ void API_EXPORTED libusb_free_container_id_descriptor(
 	free(container_id);
 }
 
-/** \ingroup desc
+/** \ingroup libusb_desc
  * Retrieve a string descriptor in C style ASCII.
  *
  * Wrapper around libusb_get_string_descriptor(). Uses the first language
