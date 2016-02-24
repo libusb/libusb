@@ -1334,7 +1334,7 @@ int LIBUSB_CALL libusb_get_ss_endpoint_companion_descriptor(
 	struct libusb_ss_endpoint_companion_descriptor **ep_comp);
 void LIBUSB_CALL libusb_free_ss_endpoint_companion_descriptor(
 	struct libusb_ss_endpoint_companion_descriptor *ep_comp);
-int LIBUSB_CALL libusb_get_bos_descriptor(libusb_device_handle *handle,
+int LIBUSB_CALL libusb_get_bos_descriptor(libusb_device_handle *dev_handle,
 	struct libusb_bos_descriptor **bos);
 void LIBUSB_CALL libusb_free_bos_descriptor(struct libusb_bos_descriptor *bos);
 int LIBUSB_CALL libusb_get_usb_2_0_extension_descriptor(
@@ -1367,39 +1367,39 @@ int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
 int LIBUSB_CALL libusb_get_max_iso_packet_size(libusb_device *dev,
 	unsigned char endpoint);
 
-int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle **handle);
+int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle **dev_handle);
 void LIBUSB_CALL libusb_close(libusb_device_handle *dev_handle);
 libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle);
 
-int LIBUSB_CALL libusb_set_configuration(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_set_configuration(libusb_device_handle *dev_handle,
 	int configuration);
-int LIBUSB_CALL libusb_claim_interface(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_claim_interface(libusb_device_handle *dev_handle,
 	int interface_number);
-int LIBUSB_CALL libusb_release_interface(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_release_interface(libusb_device_handle *dev_handle,
 	int interface_number);
 
 libusb_device_handle * LIBUSB_CALL libusb_open_device_with_vid_pid(
 	libusb_context *ctx, uint16_t vendor_id, uint16_t product_id);
 
-int LIBUSB_CALL libusb_set_interface_alt_setting(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_set_interface_alt_setting(libusb_device_handle *dev_handle,
 	int interface_number, int alternate_setting);
-int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_clear_halt(libusb_device_handle *dev_handle,
 	unsigned char endpoint);
-int LIBUSB_CALL libusb_reset_device(libusb_device_handle *dev);
+int LIBUSB_CALL libusb_reset_device(libusb_device_handle *dev_handle);
 
-int LIBUSB_CALL libusb_alloc_streams(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_alloc_streams(libusb_device_handle *dev_handle,
 	uint32_t num_streams, unsigned char *endpoints, int num_endpoints);
-int LIBUSB_CALL libusb_free_streams(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_free_streams(libusb_device_handle *dev_handle,
 	unsigned char *endpoints, int num_endpoints);
 
-int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *dev_handle,
 	int interface_number);
-int LIBUSB_CALL libusb_detach_kernel_driver(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
 	int interface_number);
-int LIBUSB_CALL libusb_attach_kernel_driver(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
 	int interface_number);
 int LIBUSB_CALL libusb_set_auto_detach_kernel_driver(
-	libusb_device_handle *dev, int enable);
+	libusb_device_handle *dev_handle, int enable);
 
 /* async I/O */
 
@@ -1754,17 +1754,17 @@ int LIBUSB_CALL libusb_interrupt_transfer(libusb_device_handle *dev_handle,
  * This is a convenience function which formulates the appropriate control
  * message to retrieve the descriptor.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param desc_type the descriptor type, see \ref libusb_descriptor_type
  * \param desc_index the index of the descriptor to retrieve
  * \param data output buffer for descriptor
  * \param length size of data buffer
  * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
  */
-static inline int libusb_get_descriptor(libusb_device_handle *dev,
+static inline int libusb_get_descriptor(libusb_device_handle *dev_handle,
 	uint8_t desc_type, uint8_t desc_index, unsigned char *data, int length)
 {
-	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
+	return libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_IN,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, (uint16_t) ((desc_type << 8) | desc_index),
 		0, data, (uint16_t) length, 1000);
 }
@@ -1775,7 +1775,7 @@ static inline int libusb_get_descriptor(libusb_device_handle *dev,
  * message to retrieve the descriptor. The string returned is Unicode, as
  * detailed in the USB specifications.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param desc_index the index of the descriptor to retrieve
  * \param langid the language ID for the string descriptor
  * \param data output buffer for descriptor
@@ -1783,15 +1783,15 @@ static inline int libusb_get_descriptor(libusb_device_handle *dev,
  * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
  * \see libusb_get_string_descriptor_ascii()
  */
-static inline int libusb_get_string_descriptor(libusb_device_handle *dev,
+static inline int libusb_get_string_descriptor(libusb_device_handle *dev_handle,
 	uint8_t desc_index, uint16_t langid, unsigned char *data, int length)
 {
-	return libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
+	return libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_IN,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, (uint16_t)((LIBUSB_DT_STRING << 8) | desc_index),
 		langid, data, (uint16_t) length, 1000);
 }
 
-int LIBUSB_CALL libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
+int LIBUSB_CALL libusb_get_string_descriptor_ascii(libusb_device_handle *dev_handle,
 	uint8_t desc_index, unsigned char *data, int length);
 
 /* polling and timeouts */
@@ -1967,7 +1967,7 @@ typedef int (LIBUSB_CALL *libusb_hotplug_callback_fn)(libusb_context *ctx,
  * \param[in] dev_class the device class to match or \ref LIBUSB_HOTPLUG_MATCH_ANY
  * \param[in] cb_fn the function to be invoked on a matching event/device
  * \param[in] user_data user data to pass to the callback function
- * \param[out] handle pointer to store the handle of the allocated callback (can be NULL)
+ * \param[out] callback_handle pointer to store the handle of the allocated callback (can be NULL)
  * \returns LIBUSB_SUCCESS on success LIBUSB_ERROR code on failure
  */
 int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
@@ -1977,7 +1977,7 @@ int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
 						int dev_class,
 						libusb_hotplug_callback_fn cb_fn,
 						void *user_data,
-						libusb_hotplug_callback_handle *handle);
+						libusb_hotplug_callback_handle *callback_handle);
 
 /** \ingroup hotplug
  * Deregisters a hotplug callback.
@@ -1988,10 +1988,10 @@ int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
  * Since version 1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102
  *
  * \param[in] ctx context this callback is registered with
- * \param[in] handle the handle of the callback to deregister
+ * \param[in] callback_handle the handle of the callback to deregister
  */
 void LIBUSB_CALL libusb_hotplug_deregister_callback(libusb_context *ctx,
-						libusb_hotplug_callback_handle handle);
+						libusb_hotplug_callback_handle callback_handle);
 
 #ifdef __cplusplus
 }

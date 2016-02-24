@@ -888,14 +888,14 @@ static int parse_bos(struct libusb_context *ctx,
  * Get a Binary Object Store (BOS) descriptor
  * This is a BLOCKING function, which will send requests to the device.
  *
- * \param handle the handle of an open libusb device
+ * \param dev_handle the handle of an open libusb device
  * \param bos output location for the BOS descriptor. Only valid if 0 was returned.
  * Must be freed with \ref libusb_free_bos_descriptor() after use.
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the device doesn't have a BOS descriptor
  * \returns another LIBUSB_ERROR code on error
  */
-int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *handle,
+int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *dev_handle,
 	struct libusb_bos_descriptor **bos)
 {
 	struct libusb_bos_descriptor _bos;
@@ -906,15 +906,15 @@ int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *handle,
 
 	/* Read the BOS. This generates 2 requests on the bus,
 	 * one for the header, and one for the full BOS */
-	r = libusb_get_descriptor(handle, LIBUSB_DT_BOS, 0, bos_header,
+	r = libusb_get_descriptor(dev_handle, LIBUSB_DT_BOS, 0, bos_header,
 				  LIBUSB_DT_BOS_SIZE);
 	if (r < 0) {
 		if (r != LIBUSB_ERROR_PIPE)
-			usbi_err(handle->dev->ctx, "failed to read BOS (%d)", r);
+			usbi_err(HANDLE_CTX(dev_handle), "failed to read BOS (%d)", r);
 		return r;
 	}
 	if (r < LIBUSB_DT_BOS_SIZE) {
-		usbi_err(handle->dev->ctx, "short BOS read %d/%d",
+		usbi_err(HANDLE_CTX(dev_handle), "short BOS read %d/%d",
 			 r, LIBUSB_DT_BOS_SIZE);
 		return LIBUSB_ERROR_IO;
 	}
@@ -926,12 +926,12 @@ int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *handle,
 	if (bos_data == NULL)
 		return LIBUSB_ERROR_NO_MEM;
 
-	r = libusb_get_descriptor(handle, LIBUSB_DT_BOS, 0, bos_data,
+	r = libusb_get_descriptor(dev_handle, LIBUSB_DT_BOS, 0, bos_data,
 				  _bos.wTotalLength);
 	if (r >= 0)
-		r = parse_bos(handle->dev->ctx, bos, bos_data, r, host_endian);
+		r = parse_bos(HANDLE_CTX(dev_handle), bos, bos_data, r, host_endian);
 	else
-		usbi_err(handle->dev->ctx, "failed to read BOS (%d)", r);
+		usbi_err(HANDLE_CTX(dev_handle), "failed to read BOS (%d)", r);
 
 	free(bos_data);
 	return r;
@@ -1135,13 +1135,13 @@ void API_EXPORTED libusb_free_container_id_descriptor(
  * Wrapper around libusb_get_string_descriptor(). Uses the first language
  * supported by the device.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param desc_index the index of the descriptor to retrieve
  * \param data output buffer for ASCII string descriptor
  * \param length size of data buffer
  * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
  */
-int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
+int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_handle,
 	uint8_t desc_index, unsigned char *data, int length)
 {
 	unsigned char tbuf[255]; /* Some devices choke on size > 255 */
@@ -1160,7 +1160,7 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
 	if (desc_index == 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	r = libusb_get_string_descriptor(dev, 0, 0, tbuf, sizeof(tbuf));
+	r = libusb_get_string_descriptor(dev_handle, 0, 0, tbuf, sizeof(tbuf));
 	if (r < 0)
 		return r;
 
@@ -1169,7 +1169,7 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev,
 
 	langid = tbuf[2] | (tbuf[3] << 8);
 
-	r = libusb_get_string_descriptor(dev, desc_index, langid, tbuf,
+	r = libusb_get_string_descriptor(dev_handle, desc_index, langid, tbuf,
 		sizeof(tbuf));
 	if (r < 0)
 		return r;

@@ -97,7 +97,7 @@
 \code
 unsigned char data[4];
 int actual_length;
-int r = libusb_bulk_transfer(handle, LIBUSB_ENDPOINT_IN, data, sizeof(data), &actual_length, 0);
+int r = libusb_bulk_transfer(dev_handle, LIBUSB_ENDPOINT_IN, data, sizeof(data), &actual_length, 0);
 if (r == 0 && actual_length == sizeof(data)) {
 	// results of the transaction can now be found in the data buffer
 	// parse them here and report button press
@@ -567,12 +567,12 @@ void *event_thread_func(void *ctx)
  * thread until after their first call to libusb_open(), and should stop the
  * thread when closing the last open device as follows:
 \code
-void my_close_handle(libusb_device_handle *handle)
+void my_close_handle(libusb_device_handle *dev_handle)
 {
     if (open_devs == 1)
         event_thread_run = 0;
 
-    libusb_close(handle); // This wakes up libusb_handle_events()
+    libusb_close(dev_handle); // This wakes up libusb_handle_events()
 
     if (open_devs == 1)
         pthread_join(event_thread);
@@ -626,7 +626,7 @@ void my_libusb_exit(void)
  * descriptors in your main event loop, you must also consider that libusb
  * sometimes needs to be called into at fixed points in time even when there
  * is no file descriptor activity, see \ref polltime details.
- * 
+ *
  * In order to know precisely when libusb needs to be called into, libusb
  * offers you a set of pollable file descriptors and information about when
  * the next timeout expires.
@@ -1627,7 +1627,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 {
 	struct libusb_transfer *transfer =
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct libusb_device_handle *handle = transfer->dev_handle;
+	struct libusb_device_handle *dev_handle = transfer->dev_handle;
 	uint8_t flags;
 	int r;
 
@@ -1661,7 +1661,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	 * this point. */
 	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER)
 		libusb_free_transfer(transfer);
-	libusb_unref_device(handle->dev);
+	libusb_unref_device(dev_handle->dev);
 	return r;
 }
 
@@ -2759,13 +2759,13 @@ void API_EXPORTED libusb_free_pollfds(const struct libusb_pollfd **pollfds)
  * device. This function ensures transfers get cancelled appropriately.
  * Callers of this function must hold the events_lock.
  */
-void usbi_handle_disconnect(struct libusb_device_handle *handle)
+void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 {
 	struct usbi_transfer *cur;
 	struct usbi_transfer *to_cancel;
 
 	usbi_dbg("device %d.%d",
-		handle->dev->bus_number, handle->dev->device_address);
+		dev_handle->dev->bus_number, dev_handle->dev->device_address);
 
 	/* terminate all pending transfers with the LIBUSB_TRANSFER_NO_DEVICE
 	 * status code.
@@ -2781,9 +2781,9 @@ void usbi_handle_disconnect(struct libusb_device_handle *handle)
 
 	while (1) {
 		to_cancel = NULL;
-		usbi_mutex_lock(&HANDLE_CTX(handle)->flying_transfers_lock);
-		list_for_each_entry(cur, &HANDLE_CTX(handle)->flying_transfers, list, struct usbi_transfer)
-			if (USBI_TRANSFER_TO_LIBUSB_TRANSFER(cur)->dev_handle == handle) {
+		usbi_mutex_lock(&HANDLE_CTX(dev_handle)->flying_transfers_lock);
+		list_for_each_entry(cur, &HANDLE_CTX(dev_handle)->flying_transfers, list, struct usbi_transfer)
+			if (USBI_TRANSFER_TO_LIBUSB_TRANSFER(cur)->dev_handle == dev_handle) {
 				usbi_mutex_lock(&cur->flags_lock);
 				if (cur->flags & USBI_TRANSFER_IN_FLIGHT)
 					to_cancel = cur;
@@ -2794,7 +2794,7 @@ void usbi_handle_disconnect(struct libusb_device_handle *handle)
 				if (to_cancel)
 					break;
 			}
-		usbi_mutex_unlock(&HANDLE_CTX(handle)->flying_transfers_lock);
+		usbi_mutex_unlock(&HANDLE_CTX(dev_handle)->flying_transfers_lock);
 
 		if (!to_cancel)
 			break;
