@@ -1,0 +1,14 @@
+language: c
+
+compiler:
+    - gcc
+    - clang
+
+os:
+    - linux
+    - osx
+
+install:
+    - ./autogen.sh
+    - ./configure
+    - make -j4
