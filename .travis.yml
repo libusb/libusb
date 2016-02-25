@@ -10,7 +10,7 @@ os:
     - osx
 
 before_install:
-if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then apt-get install -qq libudev-dev ; fi
+    - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then apt-get install -qq libudev-dev ; fi
 
 install:
     - ./autogen.sh
