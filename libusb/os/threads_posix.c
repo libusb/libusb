@@ -35,6 +35,7 @@
 #endif
 
 #include "threads_posix.h"
+#include "libusbi.h"
 
 int usbi_mutex_init_recursive(pthread_mutex_t *mutex)
 {
@@ -64,7 +65,7 @@ int usbi_cond_timedwait(pthread_cond_t *cond,
 	struct timespec timeout;
 	int r;
 
-	r = clock_gettime(CLOCK_REALTIME, &timeout);
+	r = usbi_backend->clock_gettime(USBI_CLOCK_REALTIME, &timeout);
 	if (r < 0)
 		return r;
 
