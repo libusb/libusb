@@ -1,5 +1,6 @@
-libusb
-======
+# libusb
+
+[![Build Status](https://travis-ci.org/libusb/libusb.svg?branch=master)](https://travis-ci.org/libusb/libusb)
 
 libusb is a library for USB device access from Linux, Mac OS X,
 Windows, OpenBSD/NetBSD and Haiku userspace.
@@ -26,4 +27,5 @@ http://mailing-list.libusb.info
 - Ludovic Rousseau <ludovic.rousseau@gmail.com>
 - Nathan Hjelm <hjelmn@users.sourceforge.net>
 - Chris Dickens <christopher.a.dickens@gmail.com>
+
 (Please use the mailing list rather than mailing developers directly)
