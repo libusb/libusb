@@ -12,13 +12,14 @@ os:
 
 addons:
     apt:
-        - autoconf
-        - automake
-        - libtool
-        - m4
-        - libudev-dev
-    sources:
-        - ubuntu-toolchain-r-test
+        packages:
+            - autoconf
+            - automake
+            - libtool
+            - m4
+            - libudev-dev
+        sources:
+            - ubuntu-toolchain-r-test
 
 script:
     - ./autogen.sh && make -j4
