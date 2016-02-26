@@ -13,10 +13,10 @@ os:
 addons:
     apt:
         - autoconf
-	- automake
-	- libtool
-	- m4
-	- libudev-dev
+        - automake
+        - libtool
+        - m4
+        - libudev-dev
 
 script:
     - ./autogen.sh && make -j4
