@@ -2358,7 +2358,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 			"libusb: %s [%s] ", prefix, function);
 	}
 
-	if (header_len < 0 || header_len >= sizeof(buf)) {
+	if (header_len < 0 || header_len >= (int)sizeof(buf)) {
 		/* Somehow snprintf failed to write to the buffer,
 		 * remove the header so something useful is output. */
 		header_len = 0;
@@ -2367,7 +2367,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	buf[header_len] = '\0';
 	text_len = vsnprintf(buf + header_len, sizeof(buf) - header_len,
 		format, args);
-	if (text_len < 0 || text_len + header_len >= sizeof(buf)) {
+	if (text_len < 0 || text_len + header_len >= (int)sizeof(buf)) {
 		/* Truncated log output. On some platforms a -1 return value means
 		 * that the output was truncated. */
 		text_len = sizeof(buf) - header_len;
