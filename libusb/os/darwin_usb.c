@@ -238,7 +238,7 @@ static int get_ioregistry_value_number (io_service_t service, CFStringRef proper
   return ret;
 }
 
-static int get_ioregistry_value_data (io_service_t service, CFStringRef property, size_t size, void *p) {
+static int get_ioregistry_value_data (io_service_t service, CFStringRef property, ssize_t size, void *p) {
   CFTypeRef cfData = IORegistryEntryCreateCFProperty (service, property, kCFAllocatorDefault, 0);
   int ret = 0;
 
