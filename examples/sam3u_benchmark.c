@@ -42,7 +42,7 @@ static struct timeval tv_start;
 
 static void LIBUSB_CALL cb_xfr(struct libusb_transfer *xfr)
 {
-	unsigned int i;
+	int i;
 
 	if (xfr->status != LIBUSB_TRANSFER_COMPLETED) {
 		fprintf(stderr, "transfer status %d\n", xfr->status);
