@@ -23,5 +23,5 @@ addons:
 
 script:
     - ./autogen.sh && make -j4
-    - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./autogen.sh --disable-udev && make -j4; fi
+    - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./travis-autogen.sh --disable-udev && make -j4; fi
     - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cd Xcode && xcodebuild -project libusb.xcodeproj ; fi
