@@ -1,6 +1,7 @@
 # libusb
 
 [![Build Status](https://travis-ci.org/libusb/libusb.svg?branch=master)](https://travis-ci.org/libusb/libusb)
+[![Coverity Scan Build Status](https://scan.coverity.com/projects/2180/badge.svg)](https://scan.coverity.com/projects/libusb-libusb)
 
 libusb is a library for USB device access from Linux, Mac OS X,
 Windows, OpenBSD/NetBSD and Haiku userspace.
