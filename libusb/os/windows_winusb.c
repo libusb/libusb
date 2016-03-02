@@ -56,11 +56,6 @@
 		continue;			\
 	}
 
-// Helper prototypes
-static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
-// Common calls
-static int common_configure_endpoints(int sub_api, struct libusb_device_handle *dev_handle, int iface);
-
 // WinUSB-like API prototypes
 static int winusbx_init(int sub_api, struct libusb_context *ctx);
 static int winusbx_exit(int sub_api);
@@ -527,7 +522,7 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int
 	const struct libusb_interface_descriptor *if_desc;
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 
-	r = libusb_get_config_descriptor(dev_handle->dev, (uint8_t)(priv->active_config-1), &conf_desc);
+	r = libusb_get_active_config_descriptor(dev_handle->dev, &conf_desc);
 	if (r != LIBUSB_SUCCESS) {
 		usbi_warn(ctx, "could not read config descriptor: error %d", r);
 		return r;
@@ -4124,7 +4119,7 @@ static int composite_submit_control_transfer(int sub_api, struct usbi_transfer *
 		iface = setup->index & 0xFF;
 		break;
 	case LIBUSB_RECIPIENT_ENDPOINT:
-		r = libusb_get_config_descriptor(transfer->dev_handle->dev, (uint8_t)(priv->active_config - 1), &conf_desc);
+		r = libusb_get_active_config_descriptor(transfer->dev_handle->dev, &conf_desc);
 		if (r == LIBUSB_SUCCESS) {
 			iface = get_interface_by_endpoint(conf_desc, (setup->index & 0xFF));
 			libusb_free_config_descriptor(conf_desc);
