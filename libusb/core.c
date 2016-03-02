@@ -627,6 +627,16 @@ static struct discovered_devs *discovered_devs_alloc(void)
 	return ret;
 }
 
+static void discovered_devs_free(struct discovered_devs *discdevs)
+{
+	size_t i;
+
+	for (i = 0; i < discdevs->len; i++)
+		libusb_unref_device(discdevs->devices[i]);
+
+	free(discdevs);
+}
+
 /* append a device to the discovered devices collection. may realloc itself,
  * returning new discdevs. returns NULL on realloc failure. */
 struct discovered_devs *discovered_devs_append(
@@ -634,6 +644,7 @@ struct discovered_devs *discovered_devs_append(
 {
 	size_t len = discdevs->len;
 	size_t capacity;
+	struct discovered_devs *new_discdevs;
 
 	/* if there is space, just append the device */
 	if (len < discdevs->capacity) {
@@ -645,25 +656,21 @@ struct discovered_devs *discovered_devs_append(
 	/* exceeded capacity, need to grow */
 	usbi_dbg("need to increase capacity");
 	capacity = discdevs->capacity + DISCOVERED_DEVICES_SIZE_STEP;
-	discdevs = usbi_reallocf(discdevs,
+	/* can't use usbi_reallocf here because in failure cases it would
+	 * free the existing discdevs without unreferencing its devices. */
+	new_discdevs = realloc(discdevs,
 		sizeof(*discdevs) + (sizeof(void *) * capacity));
-	if (discdevs) {
-		discdevs->capacity = capacity;
-		discdevs->devices[len] = libusb_ref_device(dev);
-		discdevs->len++;
+	if (!new_discdevs) {
+		discovered_devs_free(discdevs);
+		return NULL;
 	}
 
+	discdevs = new_discdevs;
+	discdevs->capacity = capacity;
+	discdevs->devices[len] = libusb_ref_device(dev);
+	discdevs->len++;
+
 	return discdevs;
-}
-
-static void discovered_devs_free(struct discovered_devs *discdevs)
-{
-	size_t i;
-
-	for (i = 0; i < discdevs->len; i++)
-		libusb_unref_device(discdevs->devices[i]);
-
-	free(discdevs);
 }
 
 /* Allocate a new device with a specific session ID. The returned device has
@@ -854,7 +861,8 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 	*list = ret;
 
 out:
-	discovered_devs_free(discdevs);
+	if (discdevs)
+		discovered_devs_free(discdevs);
 	return len;
 }
 
