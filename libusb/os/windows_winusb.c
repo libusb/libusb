@@ -1718,18 +1718,49 @@ static int windows_get_config_descriptor(struct libusb_device *dev, uint8_t conf
 	return (int)size;
 }
 
+static int windows_get_config_descriptor_by_value(struct libusb_device *dev, uint8_t bConfigurationValue,
+	unsigned char **buffer, int *host_endian)
+{
+	struct windows_device_priv *priv = _device_priv(dev);
+	PUSB_CONFIGURATION_DESCRIPTOR config_header;
+	uint8_t index;
+
+	*buffer = NULL;
+	*host_endian = 0;
+
+	if (priv->config_descriptor == NULL)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	for (index = 0; index < dev->num_configurations; index++) {
+		config_header = (PUSB_CONFIGURATION_DESCRIPTOR)priv->config_descriptor[index];
+		if (config_header->bConfigurationValue == bConfigurationValue) {
+			*buffer = priv->config_descriptor[index];
+			return (int)config_header->wTotalLength;
+		}
+	}
+
+	return LIBUSB_ERROR_NOT_FOUND;
+}
+
 /*
  * return the cached copy of the active config descriptor
  */
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian)
 {
 	struct windows_device_priv *priv = _device_priv(dev);
+	unsigned char *config_desc;
+	int r;
 
 	if (priv->active_config == 0)
 		return LIBUSB_ERROR_NOT_FOUND;
 
-	// config index is zero based
-	return windows_get_config_descriptor(dev, (uint8_t)(priv->active_config-1), buffer, len, host_endian);
+	r = windows_get_config_descriptor_by_value(dev, priv->active_config, &config_desc, host_endian);
+	if (r < 0)
+		return r;
+
+	len = MIN((size_t)r, len);
+	memcpy(buffer, config_desc, len);
+	return (int)len;
 }
 
 static int windows_open(struct libusb_device_handle *dev_handle)
@@ -2024,7 +2055,7 @@ const struct usbi_os_backend windows_backend = {
 	windows_get_device_descriptor,
 	windows_get_active_config_descriptor,
 	windows_get_config_descriptor,
-	NULL,				/* get_config_descriptor_by_value() */
+	windows_get_config_descriptor_by_value,
 
 	windows_get_configuration,
 	windows_set_configuration,
