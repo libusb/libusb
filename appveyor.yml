@@ -1,0 +1,11 @@
+version: 1.0.{build}
+configuration:
+- Debug
+- Release
+platform:
+- x86
+- x64
+build:
+  project: msvc\libusb_2013.sln
+  parallel: true
+  verbosity: detailed
