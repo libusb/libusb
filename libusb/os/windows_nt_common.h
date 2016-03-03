@@ -26,6 +26,11 @@
 
 #pragma once
 
+// Missing from MinGW
+#if !defined(FACILITY_SETUPAPI)
+#define FACILITY_SETUPAPI	15
+#endif
+
 typedef struct USB_CONFIGURATION_DESCRIPTOR {
   UCHAR  bLength;
   UCHAR  bDescriptorType;
