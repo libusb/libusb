@@ -43,11 +43,6 @@
 #define SPDRP_INSTALL_STATE	34
 #endif
 
-// Missing from MinGW
-#if !defined(FACILITY_SETUPAPI)
-#define FACILITY_SETUPAPI	15
-#endif
-
 #define MAX_CTRL_BUFFER_LENGTH	4096
 #define MAX_USB_DEVICES		256
 #define MAX_USB_STRING_LENGTH	128

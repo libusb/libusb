@@ -56,11 +56,6 @@
 		continue;			\
 	}
 
-// Helper prototypes
-static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian);
-// Common calls
-static int common_configure_endpoints(int sub_api, struct libusb_device_handle *dev_handle, int iface);
-
 // WinUSB-like API prototypes
 static int winusbx_init(int sub_api, struct libusb_context *ctx);
 static int winusbx_exit(int sub_api);
@@ -528,7 +523,7 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, int
 	const struct libusb_interface_descriptor *if_desc;
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 
-	r = libusb_get_config_descriptor(dev_handle->dev, (uint8_t)(priv->active_config-1), &conf_desc);
+	r = libusb_get_active_config_descriptor(dev_handle->dev, &conf_desc);
 	if (r != LIBUSB_SUCCESS) {
 		usbi_warn(ctx, "could not read config descriptor: error %d", r);
 		return r;
@@ -812,7 +807,7 @@ static int windows_init(struct libusb_context *ctx)
 		}
 
 		// We need a lock for proper auto-release
-		usbi_mutex_init(&autoclaim_lock, NULL);
+		usbi_mutex_init(&autoclaim_lock);
 
 		// Initialize pollable file descriptors
 		init_polling();
@@ -1265,7 +1260,7 @@ static int set_hid_interface(struct libusb_context *ctx, struct libusb_device *d
 	for (i = 0; i < priv->hid->nb_interfaces; i++) {
 		if (safe_strcmp(priv->usb_interface[i].path, dev_interface_path) == 0) {
 			usbi_dbg("interface[%d] already set to %s", i, dev_interface_path);
-			return LIBUSB_SUCCESS;
+			return LIBUSB_ERROR_ACCESS;
 		}
 	}
 
@@ -1524,6 +1519,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				} else {
 					usbi_dbg("found existing device for session [%lX] (%u.%u)",
 						session_id, dev->bus_number, dev->device_address);
+					if (_device_priv(dev)->parent_dev != parent_dev) {
+						usbi_err(ctx,"program assertion failed - existing device should share parent");
+					} else {
+						// We hold a reference to parent_dev instance, but this device already
+						// has a parent_dev reference (only one per child)
+						libusb_unref_device(parent_dev);
+					}
 				}
 
 				// Keep track of devices that need unref
@@ -1542,6 +1544,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			// Setup device
 			switch (pass) {
 			case HCD_PASS:
+				// If the hcd has already been setup, don't do it again
+				if (priv->path != NULL)
+					break;
 				dev->bus_number = (uint8_t)(i + 1); // bus 0 is reserved for disconnected
 				dev->device_address = 0;
 				dev->num_configurations = 0;
@@ -1601,21 +1606,21 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				}
 				break;
 			default: // HID_PASS and later
-				if (parent_priv->apib->id == USB_API_HID) {
-					usbi_dbg("setting HID interface for [%lX]:", parent_dev->session_data);
-					r = set_hid_interface(ctx, parent_dev, dev_interface_path);
-					if (r != LIBUSB_SUCCESS)
-						LOOP_BREAK(r);
-
-					dev_interface_path = NULL;
-				} else if (parent_priv->apib->id == USB_API_COMPOSITE) {
-					usbi_dbg("setting composite interface for [%lX]:", parent_dev->session_data);
-					switch (set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api, sub_api)) {
+				if (parent_priv->apib->id == USB_API_HID || parent_priv->apib->id == USB_API_COMPOSITE) {
+					if (parent_priv->apib->id == USB_API_HID) {
+						usbi_dbg("setting HID interface for [%lX]:", parent_dev->session_data);
+						r = set_hid_interface(ctx, parent_dev, dev_interface_path);
+					} else {
+						usbi_dbg("setting composite interface for [%lX]:", parent_dev->session_data);
+						r = set_composite_interface(ctx, parent_dev, dev_interface_path, dev_id_path, api, sub_api);
+					}
+					switch (r) {
 					case LIBUSB_SUCCESS:
 						dev_interface_path = NULL;
 						break;
 					case LIBUSB_ERROR_ACCESS:
 						// interface has already been set => make sure dev_interface_path is freed then
+						r = LIBUSB_SUCCESS;
 						break;
 					default:
 						LOOP_BREAK(r);
@@ -1709,18 +1714,49 @@ static int windows_get_config_descriptor(struct libusb_device *dev, uint8_t conf
 	return (int)size;
 }
 
+static int windows_get_config_descriptor_by_value(struct libusb_device *dev, uint8_t bConfigurationValue,
+	unsigned char **buffer, int *host_endian)
+{
+	struct windows_device_priv *priv = _device_priv(dev);
+	PUSB_CONFIGURATION_DESCRIPTOR config_header;
+	uint8_t index;
+
+	*buffer = NULL;
+	*host_endian = 0;
+
+	if (priv->config_descriptor == NULL)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	for (index = 0; index < dev->num_configurations; index++) {
+		config_header = (PUSB_CONFIGURATION_DESCRIPTOR)priv->config_descriptor[index];
+		if (config_header->bConfigurationValue == bConfigurationValue) {
+			*buffer = priv->config_descriptor[index];
+			return (int)config_header->wTotalLength;
+		}
+	}
+
+	return LIBUSB_ERROR_NOT_FOUND;
+}
+
 /*
  * return the cached copy of the active config descriptor
  */
 static int windows_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian)
 {
 	struct windows_device_priv *priv = _device_priv(dev);
+	unsigned char *config_desc;
+	int r;
 
 	if (priv->active_config == 0)
 		return LIBUSB_ERROR_NOT_FOUND;
 
-	// config index is zero based
-	return windows_get_config_descriptor(dev, (uint8_t)(priv->active_config-1), buffer, len, host_endian);
+	r = windows_get_config_descriptor_by_value(dev, priv->active_config, &config_desc, host_endian);
+	if (r < 0)
+		return r;
+
+	len = MIN((size_t)r, len);
+	memcpy(buffer, config_desc, len);
+	return (int)len;
 }
 
 static int windows_open(struct libusb_device_handle *dev_handle)
@@ -2019,7 +2055,7 @@ const struct usbi_os_backend windows_backend = {
 	windows_get_device_descriptor,
 	windows_get_active_config_descriptor,
 	windows_get_config_descriptor,
-	NULL,				/* get_config_descriptor_by_value() */
+	windows_get_config_descriptor_by_value,
 
 	windows_get_configuration,
 	windows_set_configuration,
@@ -2680,6 +2716,8 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 	transfer_priv->pollable_fd = INVALID_WINFD;
 	size = transfer->length - LIBUSB_CONTROL_SETUP_SIZE;
 
+	// Windows places upper limits on the control transfer size
+	// See: https://msdn.microsoft.com/en-us/library/windows/hardware/ff538112.aspx
 	if (size > MAX_CTRL_BUFFER_LENGTH)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -4237,7 +4275,7 @@ static int composite_submit_control_transfer(int sub_api, struct usbi_transfer *
 		iface = setup->index & 0xFF;
 		break;
 	case LIBUSB_RECIPIENT_ENDPOINT:
-		r = libusb_get_config_descriptor(transfer->dev_handle->dev, (uint8_t)(priv->active_config - 1), &conf_desc);
+		r = libusb_get_active_config_descriptor(transfer->dev_handle->dev, &conf_desc);
 		if (r == LIBUSB_SUCCESS) {
 			iface = get_interface_by_endpoint(conf_desc, (setup->index & 0xFF));
 			libusb_free_config_descriptor(conf_desc);

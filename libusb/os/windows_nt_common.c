@@ -156,7 +156,7 @@ static bool htab_create(struct libusb_context *ctx, unsigned long nel)
 	}
 
 	// Create a mutex
-	usbi_mutex_init(&htab_write_mutex, NULL);
+	usbi_mutex_init(&htab_write_mutex);
 
 	// Change nel to the first prime number not smaller as nel.
 	nel |= 1;

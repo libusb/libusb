@@ -508,7 +508,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	unsigned long session_id);
 int usbi_sanitize_device(struct libusb_device *dev);
-void usbi_handle_disconnect(struct libusb_device_handle *handle);
+void usbi_handle_disconnect(struct libusb_device_handle *dev_handle);
 
 int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
@@ -705,7 +705,7 @@ struct usbi_os_backend {
 	 * Do not worry about freeing the handle on failed open, the upper layers
 	 * do this for you.
 	 */
-	int (*open)(struct libusb_device_handle *handle);
+	int (*open)(struct libusb_device_handle *dev_handle);
 
 	/* Close a device such that the handle cannot be used again. Your backend
 	 * should destroy any resources that were allocated in the open path.
@@ -715,7 +715,7 @@ struct usbi_os_backend {
 	 *
 	 * This function is called when the user closes a device handle.
 	 */
-	void (*close)(struct libusb_device_handle *handle);
+	void (*close)(struct libusb_device_handle *dev_handle);
 
 	/* Retrieve the device descriptor from a device.
 	 *
@@ -822,7 +822,7 @@ struct usbi_os_backend {
 	 *   blocking
 	 * - another LIBUSB_ERROR code on other failure.
 	 */
-	int (*get_configuration)(struct libusb_device_handle *handle, int *config);
+	int (*get_configuration)(struct libusb_device_handle *dev_handle, int *config);
 
 	/* Set the active configuration for a device.
 	 *
@@ -839,7 +839,7 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure.
 	 */
-	int (*set_configuration)(struct libusb_device_handle *handle, int config);
+	int (*set_configuration)(struct libusb_device_handle *dev_handle, int config);
 
 	/* Claim an interface. When claimed, the application can then perform
 	 * I/O to an interface's endpoints.
@@ -858,7 +858,7 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*claim_interface)(struct libusb_device_handle *handle, int interface_number);
+	int (*claim_interface)(struct libusb_device_handle *dev_handle, int interface_number);
 
 	/* Release a previously claimed interface.
 	 *
@@ -875,7 +875,7 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*release_interface)(struct libusb_device_handle *handle, int interface_number);
+	int (*release_interface)(struct libusb_device_handle *dev_handle, int interface_number);
 
 	/* Set the alternate setting for an interface.
 	 *
@@ -891,7 +891,7 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*set_interface_altsetting)(struct libusb_device_handle *handle,
+	int (*set_interface_altsetting)(struct libusb_device_handle *dev_handle,
 		int interface_number, int altsetting);
 
 	/* Clear a halt/stall condition on an endpoint.
@@ -905,12 +905,12 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*clear_halt)(struct libusb_device_handle *handle,
+	int (*clear_halt)(struct libusb_device_handle *dev_handle,
 		unsigned char endpoint);
 
 	/* Perform a USB port reset to reinitialize a device.
 	 *
-	 * If possible, the handle should still be usable after the reset
+	 * If possible, the device handle should still be usable after the reset
 	 * completes, assuming that the device descriptors did not change during
 	 * reset and all previous interface state can be restored.
 	 *
@@ -924,14 +924,14 @@ struct usbi_os_backend {
 	 *   has been disconnected since it was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*reset_device)(struct libusb_device_handle *handle);
+	int (*reset_device)(struct libusb_device_handle *dev_handle);
 
 	/* Alloc num_streams usb3 bulk streams on the passed in endpoints */
-	int (*alloc_streams)(struct libusb_device_handle *handle,
+	int (*alloc_streams)(struct libusb_device_handle *dev_handle,
 		uint32_t num_streams, unsigned char *endpoints, int num_endpoints);
 
 	/* Free usb3 bulk streams allocated with alloc_streams */
-	int (*free_streams)(struct libusb_device_handle *handle,
+	int (*free_streams)(struct libusb_device_handle *dev_handle,
 		unsigned char *endpoints, int num_endpoints);
 
 	/* Determine if a kernel driver is active on an interface. Optional.
@@ -946,7 +946,7 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*kernel_driver_active)(struct libusb_device_handle *handle,
+	int (*kernel_driver_active)(struct libusb_device_handle *dev_handle,
 		int interface_number);
 
 	/* Detach a kernel driver from an interface. Optional.
@@ -962,7 +962,7 @@ struct usbi_os_backend {
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*detach_kernel_driver)(struct libusb_device_handle *handle,
+	int (*detach_kernel_driver)(struct libusb_device_handle *dev_handle,
 		int interface_number);
 
 	/* Attach a kernel driver to an interface. Optional.
@@ -979,7 +979,7 @@ struct usbi_os_backend {
 	 *   preventing reattachment
 	 * - another LIBUSB_ERROR code on other failure
 	 */
-	int (*attach_kernel_driver)(struct libusb_device_handle *handle,
+	int (*attach_kernel_driver)(struct libusb_device_handle *dev_handle,
 		int interface_number);
 
 	/* Destroy a device. Optional.

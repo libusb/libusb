@@ -102,7 +102,7 @@ struct list_head active_contexts_list;
  *
  * \section API Application Programming Interface (API)
  *
- * See the \ref api page for a complete list of the libusb functions.
+ * See the \ref libusb_api page for a complete list of the libusb functions.
  *
  * \section features Library features
  *
@@ -114,7 +114,7 @@ struct list_head active_contexts_list;
  *   usually won't need to thread)
  * - Lightweight with lean API
  * - Compatible with libusb-0.1 through the libusb-compat-0.1 translation layer
- * - Hotplug support (on some platforms). See \ref hotplug.
+ * - Hotplug support (on some platforms). See \ref libusb_hotplug.
  *
  * \section gettingstarted Getting Started
  *
@@ -122,7 +122,7 @@ struct list_head active_contexts_list;
  * links to the different categories of libusb's functionality.
  *
  * One decision you will have to make is whether to use the synchronous
- * or the asynchronous data transfer interface. The \ref io documentation
+ * or the asynchronous data transfer interface. The \ref libusb_io documentation
  * provides some insight into this topic.
  *
  * Some example programs can be found in the libusb source distribution under
@@ -133,7 +133,7 @@ struct list_head active_contexts_list;
  *
  * libusb functions typically return 0 on success or a negative error code
  * on failure. These negative error codes relate to LIBUSB_ERROR constants
- * which are listed on the \ref misc "miscellaneous" documentation page.
+ * which are listed on the \ref libusb_misc "miscellaneous" documentation page.
  *
  * \section msglog Debug message logging
  *
@@ -178,12 +178,12 @@ struct list_head active_contexts_list;
  *
  * \section remarks Other remarks
  *
- * libusb does have imperfections. The \ref caveats "caveats" page attempts
+ * libusb does have imperfections. The \ref libusb_caveats "caveats" page attempts
  * to document these.
  */
 
 /**
- * \page caveats Caveats
+ * \page libusb_caveats Caveats
  *
  * \section devresets Device resets
  *
@@ -299,7 +299,7 @@ if (cfg != desired)
  */
 
 /**
- * \page contexts Contexts
+ * \page libusb_contexts Contexts
  *
  * It is possible that libusb may be used simultaneously from two independent
  * libraries linked into the same executable. For example, if your application
@@ -338,7 +338,7 @@ if (cfg != desired)
  */
 
  /**
-  * \page api Application Programming Interface
+  * \page libusb_api Application Programming Interface
   *
   * This is the complete list of libusb functions, structures and
   * enumerations in alphabetical order.
@@ -415,6 +415,7 @@ if (cfg != desired)
   * - libusb_hotplug_deregister_callback()
   * - libusb_hotplug_register_callback()
   * - libusb_init()
+  * - libusb_interrupt_event_handler()
   * - libusb_interrupt_transfer()
   * - libusb_kernel_driver_active()
   * - libusb_lock_events()
@@ -486,14 +487,14 @@ if (cfg != desired)
   */
 
 /**
- * @defgroup lib Library initialization/deinitialization
+ * @defgroup libusb_lib Library initialization/deinitialization
  * This page details how to initialize and deinitialize libusb. Initialization
  * must be performed before using any libusb functionality, and similarly you
  * must not call any libusb functions after deinitialization.
  */
 
 /**
- * @defgroup dev Device handling and enumeration
+ * @defgroup libusb_dev Device handling and enumeration
  * The functionality documented below is designed to help with the following
  * operations:
  * - Enumerating the USB devices currently attached to the system
@@ -603,7 +604,7 @@ libusb_free_device_list(list, 1);
  * libusb_close().
  */
 
-/** @defgroup misc Miscellaneous */
+/** @defgroup libusb_misc Miscellaneous */
 
 /* we traverse usbfs without knowing how many devices we are going to find.
  * so we create this discovered_devs model which is similar to a linked-list
@@ -675,7 +676,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	if (!dev)
 		return NULL;
 
-	r = usbi_mutex_init(&dev->lock, NULL);
+	r = usbi_mutex_init(&dev->lock);
 	if (r) {
 		free(dev);
 		return NULL;
@@ -775,7 +776,7 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	return ret;
 }
 
-/** @ingroup dev
+/** @ingroup libusb_dev
  * Returns a list of USB devices currently attached to the system. This is
  * your entry point into finding a USB device to operate.
  *
@@ -855,7 +856,7 @@ out:
 	return len;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Frees a list of devices previously discovered using
  * libusb_get_device_list(). If the unref_devices parameter is set, the
  * reference count of each device in the list is decremented by 1.
@@ -878,7 +879,7 @@ void API_EXPORTED libusb_free_device_list(libusb_device **list,
 	free(list);
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Get the number of the bus that a device is connected to.
  * \param dev a device
  * \returns the bus number
@@ -888,7 +889,7 @@ uint8_t API_EXPORTED libusb_get_bus_number(libusb_device *dev)
 	return dev->bus_number;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Get the number of the port that a device is connected to.
  * Unless the OS does something funky, or you are hot-plugging USB extension cards,
  * the port number returned by this call is usually guaranteed to be uniquely tied
@@ -907,7 +908,7 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
 	return dev->port_number;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Get the list of all port numbers from root for the specified device
  *
  * Since version 1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102
@@ -941,7 +942,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 	return port_numbers_len - i;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Deprecated please use libusb_get_port_numbers instead.
  */
 int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
@@ -952,7 +953,7 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
 	return libusb_get_port_numbers(dev, port_numbers, port_numbers_len);
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Get the the parent from the specified device.
  * \param dev a device
  * \returns the device parent or NULL if not available
@@ -969,7 +970,7 @@ libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev)
 	return dev->parent_dev;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Get the address of the device on the bus it is connected to.
  * \param dev a device
  * \returns the device address
@@ -979,7 +980,7 @@ uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 	return dev->device_address;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Get the negotiated connection speed for a device.
  * \param dev a device
  * \returns a \ref libusb_speed code, where LIBUSB_SPEED_UNKNOWN means that
@@ -1015,7 +1016,7 @@ static const struct libusb_endpoint_descriptor *find_endpoint(
 	return NULL;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Convenience function to retrieve the wMaxPacketSize value for a particular
  * endpoint in the active device configuration.
  *
@@ -1058,7 +1059,7 @@ out:
 	return r;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Calculate the maximum packet size which a specific endpoint is capable is
  * sending or receiving in the duration of 1 microframe
  *
@@ -1119,7 +1120,7 @@ out:
 	return r;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Increment the reference count of a device.
  * \param dev the device to reference
  * \returns the same device
@@ -1133,7 +1134,7 @@ libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev)
 	return dev;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Decrement the reference count of a device. If the decrement operation
  * causes the reference count to reach zero, the device shall be destroyed.
  * \param dev the device to unreference
@@ -1206,10 +1207,10 @@ int usbi_clear_event(struct libusb_context *ctx)
 }
 
 static int do_open(libusb_device *dev, intptr_t fd,
-	libusb_device_handle **handle)
+	libusb_device_handle **dev_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
-	struct libusb_device_handle *_handle;
+	struct libusb_device_handle *_dev_handle;
 	size_t priv_size = usbi_backend->device_handle_priv_size;
 	int r;
 	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
@@ -1218,40 +1219,40 @@ static int do_open(libusb_device *dev, intptr_t fd,
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
 
-	_handle = malloc(sizeof(*_handle) + priv_size);
-	if (!_handle)
+	_dev_handle = malloc(sizeof(*_dev_handle) + priv_size);
+	if (!_dev_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
-	r = usbi_mutex_init(&_handle->lock, NULL);
+	r = usbi_mutex_init(&_dev_handle->lock);
 	if (r) {
-		free(_handle);
+		free(_dev_handle);
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	_handle->dev = libusb_ref_device(dev);
-	_handle->auto_detach_kernel_driver = 0;
-	_handle->claimed_interfaces = 0;
-	_handle->associated_fd = fd;
-	memset(&_handle->os_priv, 0, priv_size);
+	_dev_handle->dev = libusb_ref_device(dev);
+	_dev_handle->auto_detach_kernel_driver = 0;
+	_dev_handle->claimed_interfaces = 0;
+	_dev_handle->associated_fd = fd;
+	memset(&_dev_handle->os_priv, 0, priv_size);
 
-	r = usbi_backend->open(_handle);
+	r = usbi_backend->open(_dev_handle);
 	if (r < 0) {
 		usbi_dbg("open %d.%d returns %d", dev->bus_number, dev->device_address, r);
 		libusb_unref_device(dev);
-		usbi_mutex_destroy(&_handle->lock);
-		free(_handle);
+		usbi_mutex_destroy(&_dev_handle->lock);
+		free(_dev_handle);
 		return r;
 	}
 
 	usbi_mutex_lock(&ctx->open_devs_lock);
-	list_add(&_handle->list, &ctx->open_devs);
+	list_add(&_dev_handle->list, &ctx->open_devs);
 	usbi_mutex_unlock(&ctx->open_devs_lock);
-	*handle = _handle;
+	*dev_handle = _dev_handle;
 
 	return 0;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Open a device and obtain a device handle. A handle allows you to perform
  * I/O on the device in question.
  *
@@ -1262,7 +1263,7 @@ static int do_open(libusb_device *dev, intptr_t fd,
  * This is a non-blocking function; no requests are sent over the bus.
  *
  * \param dev the device to open
- * \param handle output location for the returned device handle pointer. Only
+ * \param dev_handle output location for the returned device handle pointer. Only
  * populated when the return code is 0.
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NO_MEM on memory allocation failure
@@ -1271,12 +1272,12 @@ static int do_open(libusb_device *dev, intptr_t fd,
  * \returns another LIBUSB_ERROR code on other failure
  */
 int API_EXPORTED libusb_open(libusb_device *dev,
-	libusb_device_handle **handle)
+	libusb_device_handle **dev_handle)
 {
-	return do_open(dev, -1, handle);
+	return do_open(dev, -1, dev_handle);
 }
 
- /** \ingroup dev
+ /** \ingroup libusb_dev
  * Open a device and obtain a device handle. A handle allows you to perform
  * I/O on the device in question.
  *
@@ -1291,7 +1292,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
  *
  * \param dev the device to open
  * \param fd the file descriptor to associate with the device 
- * \param handle output location for the returned device handle pointer. Only
+ * \param dev_handle output location for the returned device handle pointer. Only
  * populated when the return code is 0.
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NO_MEM on memory allocation failure
@@ -1300,12 +1301,12 @@ int API_EXPORTED libusb_open(libusb_device *dev,
  * \returns another LIBUSB_ERROR code on other failure
  */
 int API_EXPORTED libusb_fdopen(libusb_device *dev, intptr_t fd,
-	libusb_device_handle **handle)
+	libusb_device_handle **dev_handle)
 {
-	return do_open(dev, fd, handle);
+	return do_open(dev, fd, dev_handle);
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Convenience function for finding a device with a particular
  * <tt>idVendor</tt>/<tt>idProduct</tt> combination. This function is intended
  * for those scenarios where you are using libusb to knock up a quick test
@@ -1319,8 +1320,8 @@ int API_EXPORTED libusb_fdopen(libusb_device *dev, intptr_t fd,
  * \param ctx the context to operate on, or NULL for the default context
  * \param vendor_id the idVendor value to search for
  * \param product_id the idProduct value to search for
- * \returns a handle for the first found device, or NULL on error or if the
- * device could not be found. */
+ * \returns a device handle for the first found device, or NULL on error
+ * or if the device could not be found. */
 DEFAULT_VISIBILITY
 libusb_device_handle * LIBUSB_CALL libusb_open_device_with_vid_pid(
 	libusb_context *ctx, uint16_t vendor_id, uint16_t product_id)
@@ -1328,7 +1329,7 @@ libusb_device_handle * LIBUSB_CALL libusb_open_device_with_vid_pid(
 	struct libusb_device **devs;
 	struct libusb_device *found = NULL;
 	struct libusb_device *dev;
-	struct libusb_device_handle *handle = NULL;
+	struct libusb_device_handle *dev_handle = NULL;
 	size_t i = 0;
 	int r;
 
@@ -1347,14 +1348,14 @@ libusb_device_handle * LIBUSB_CALL libusb_open_device_with_vid_pid(
 	}
 
 	if (found) {
-		r = libusb_open(found, &handle);
+		r = libusb_open(found, &dev_handle);
 		if (r < 0)
-			handle = NULL;
+			dev_handle = NULL;
 	}
 
 out:
 	libusb_free_device_list(devs, 1);
-	return handle;
+	return dev_handle;
 }
 
 static void do_close(struct libusb_context *ctx,
@@ -1415,7 +1416,7 @@ static void do_close(struct libusb_context *ctx,
 	free(dev_handle);
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Close a device handle. Should be called on all open handles before your
  * application exits.
  *
@@ -1424,7 +1425,7 @@ static void do_close(struct libusb_context *ctx,
  *
  * This is a non-blocking function; no requests are sent over the bus.
  *
- * \param dev_handle the handle to close
+ * \param dev_handle the device handle to close
  */
 void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 {
@@ -1471,8 +1472,8 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 	libusb_unlock_events(ctx);
 }
 
-/** \ingroup dev
- * Get the underlying device for a handle. This function does not modify
+/** \ingroup libusb_dev
+ * Get the underlying device for a device handle. This function does not modify
  * the reference count of the returned device, so do not feel compelled to
  * unreference it when you are done.
  * \param dev_handle a device handle
@@ -1484,7 +1485,7 @@ libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle)
 	return dev_handle->dev;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Determine the bConfigurationValue of the currently active configuration.
  *
  * You could formulate your own control request to obtain this information,
@@ -1497,29 +1498,29 @@ libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle)
  * This function will return a value of 0 in the <tt>config</tt> output
  * parameter if the device is in unconfigured state.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param config output location for the bConfigurationValue of the active
  * configuration (only valid for return code 0)
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev,
+int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev_handle,
 	int *config)
 {
 	int r = LIBUSB_ERROR_NOT_SUPPORTED;
 
 	usbi_dbg("");
 	if (usbi_backend->get_configuration)
-		r = usbi_backend->get_configuration(dev, config);
+		r = usbi_backend->get_configuration(dev_handle, config);
 
 	if (r == LIBUSB_ERROR_NOT_SUPPORTED) {
 		uint8_t tmp = 0;
 		usbi_dbg("falling back to control message");
-		r = libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN,
+		r = libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_IN,
 			LIBUSB_REQUEST_GET_CONFIGURATION, 0, 0, &tmp, 1, 1000);
 		if (r == 0) {
-			usbi_err(HANDLE_CTX(dev), "zero bytes returned in ctrl transfer?");
+			usbi_err(HANDLE_CTX(dev_handle), "zero bytes returned in ctrl transfer?");
 			r = LIBUSB_ERROR_IO;
 		} else if (r == 1) {
 			r = 0;
@@ -1535,7 +1536,7 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev,
 	return r;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Set the active configuration for a device.
  *
  * The operating system may or may not have already set an active
@@ -1571,7 +1572,7 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev,
  *
  * This is a blocking function.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param configuration the bConfigurationValue of the configuration you
  * wish to activate, or -1 if you wish to put the device in an unconfigured
  * state
@@ -1582,14 +1583,14 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev,
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_set_auto_detach_kernel_driver()
  */
-int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev,
+int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
 	int configuration)
 {
 	usbi_dbg("configuration %d", configuration);
-	return usbi_backend->set_configuration(dev, configuration);
+	return usbi_backend->set_configuration(dev_handle, configuration);
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Claim an interface on a given device handle. You must claim the interface
  * you wish to use before you can perform I/O on any of its endpoints.
  *
@@ -1606,7 +1607,7 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev,
  *
  * This is a non-blocking function.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the interface you
  * wish to claim
  * \returns 0 on success
@@ -1617,7 +1618,7 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev,
  * \returns a LIBUSB_ERROR code on other failure
  * \see libusb_set_auto_detach_kernel_driver()
  */
-int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev,
+int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
 	int interface_number)
 {
 	int r = 0;
@@ -1626,23 +1627,23 @@ int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev,
 	if (interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	if (!dev->dev->attached)
+	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
-	usbi_mutex_lock(&dev->lock);
-	if (dev->claimed_interfaces & (1 << interface_number))
+	usbi_mutex_lock(&dev_handle->lock);
+	if (dev_handle->claimed_interfaces & (1 << interface_number))
 		goto out;
 
-	r = usbi_backend->claim_interface(dev, interface_number);
+	r = usbi_backend->claim_interface(dev_handle, interface_number);
 	if (r == 0)
-		dev->claimed_interfaces |= 1 << interface_number;
+		dev_handle->claimed_interfaces |= 1 << interface_number;
 
 out:
-	usbi_mutex_unlock(&dev->lock);
+	usbi_mutex_unlock(&dev_handle->lock);
 	return r;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Release an interface previously claimed with libusb_claim_interface(). You
  * should release all claimed interfaces before closing a device handle.
  *
@@ -1652,7 +1653,7 @@ out:
  * If auto_detach_kernel_driver is set to 1 for <tt>dev</tt>, the kernel
  * driver will be re-attached after releasing the interface.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the
  * previously-claimed interface
  * \returns 0 on success
@@ -1661,7 +1662,7 @@ out:
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_set_auto_detach_kernel_driver()
  */
-int API_EXPORTED libusb_release_interface(libusb_device_handle *dev,
+int API_EXPORTED libusb_release_interface(libusb_device_handle *dev_handle,
 	int interface_number)
 {
 	int r;
@@ -1670,22 +1671,22 @@ int API_EXPORTED libusb_release_interface(libusb_device_handle *dev,
 	if (interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	usbi_mutex_lock(&dev->lock);
-	if (!(dev->claimed_interfaces & (1 << interface_number))) {
+	usbi_mutex_lock(&dev_handle->lock);
+	if (!(dev_handle->claimed_interfaces & (1 << interface_number))) {
 		r = LIBUSB_ERROR_NOT_FOUND;
 		goto out;
 	}
 
-	r = usbi_backend->release_interface(dev, interface_number);
+	r = usbi_backend->release_interface(dev_handle, interface_number);
 	if (r == 0)
-		dev->claimed_interfaces &= ~(1 << interface_number);
+		dev_handle->claimed_interfaces &= ~(1 << interface_number);
 
 out:
-	usbi_mutex_unlock(&dev->lock);
+	usbi_mutex_unlock(&dev_handle->lock);
 	return r;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Activate an alternate setting for an interface. The interface must have
  * been previously claimed with libusb_claim_interface().
  *
@@ -1695,7 +1696,7 @@ out:
  *
  * This is a blocking function.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the
  * previously-claimed interface
  * \param alternate_setting the <tt>bAlternateSetting</tt> of the alternate
@@ -1706,7 +1707,7 @@ out:
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev,
+int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_handle,
 	int interface_number, int alternate_setting)
 {
 	usbi_dbg("interface %d altsetting %d",
@@ -1714,23 +1715,23 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev,
 	if (interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	usbi_mutex_lock(&dev->lock);
-	if (!dev->dev->attached) {
-		usbi_mutex_unlock(&dev->lock);
+	usbi_mutex_lock(&dev_handle->lock);
+	if (!dev_handle->dev->attached) {
+		usbi_mutex_unlock(&dev_handle->lock);
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
 
-	if (!(dev->claimed_interfaces & (1 << interface_number))) {
-		usbi_mutex_unlock(&dev->lock);
+	if (!(dev_handle->claimed_interfaces & (1 << interface_number))) {
+		usbi_mutex_unlock(&dev_handle->lock);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
-	usbi_mutex_unlock(&dev->lock);
+	usbi_mutex_unlock(&dev_handle->lock);
 
-	return usbi_backend->set_interface_altsetting(dev, interface_number,
+	return usbi_backend->set_interface_altsetting(dev_handle, interface_number,
 		alternate_setting);
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Clear the halt/stall condition for an endpoint. Endpoints with halt status
  * are unable to receive or transmit data until the halt condition is stalled.
  *
@@ -1739,24 +1740,24 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev,
  *
  * This is a blocking function.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param endpoint the endpoint to clear halt status
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-int API_EXPORTED libusb_clear_halt(libusb_device_handle *dev,
+int API_EXPORTED libusb_clear_halt(libusb_device_handle *dev_handle,
 	unsigned char endpoint)
 {
 	usbi_dbg("endpoint %x", endpoint);
-	if (!dev->dev->attached)
+	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
-	return usbi_backend->clear_halt(dev, endpoint);
+	return usbi_backend->clear_halt(dev_handle, endpoint);
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Perform a USB port reset to reinitialize a device. The system will attempt
  * to restore the previous configuration and alternate settings after the
  * reset has completed.
@@ -1769,22 +1770,22 @@ int API_EXPORTED libusb_clear_halt(libusb_device_handle *dev,
  *
  * This is a blocking function which usually incurs a noticeable delay.
  *
- * \param dev a handle of the device to reset
+ * \param dev_handle a handle of the device to reset
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if re-enumeration is required, or if the
  * device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
-int API_EXPORTED libusb_reset_device(libusb_device_handle *dev)
+int API_EXPORTED libusb_reset_device(libusb_device_handle *dev_handle)
 {
 	usbi_dbg("");
-	if (!dev->dev->attached)
+	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
-	return usbi_backend->reset_device(dev);
+	return usbi_backend->reset_device(dev_handle);
 }
 
-/** \ingroup asyncio
+/** \ingroup libusb_asyncio
  * Allocate up to num_streams usb bulk streams on the specified endpoints. This
  * function takes an array of endpoints rather then a single endpoint because
  * some protocols require that endpoints are setup with similar stream ids.
@@ -1799,62 +1800,62 @@ int API_EXPORTED libusb_reset_device(libusb_device_handle *dev)
  *
  * Since version 1.0.19, \ref LIBUSB_API_VERSION >= 0x01000103
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param num_streams number of streams to try to allocate
  * \param endpoints array of endpoints to allocate streams on
  * \param num_endpoints length of the endpoints array
  * \returns number of streams allocated, or a LIBUSB_ERROR code on failure
  */
-int API_EXPORTED libusb_alloc_streams(libusb_device_handle *dev,
+int API_EXPORTED libusb_alloc_streams(libusb_device_handle *dev_handle,
 	uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
 {
 	usbi_dbg("streams %u eps %d", (unsigned) num_streams, num_endpoints);
 
-	if (!dev->dev->attached)
+	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
 	if (usbi_backend->alloc_streams)
-		return usbi_backend->alloc_streams(dev, num_streams, endpoints,
+		return usbi_backend->alloc_streams(dev_handle, num_streams, endpoints,
 						   num_endpoints);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-/** \ingroup asyncio
+/** \ingroup libusb_asyncio
  * Free usb bulk streams allocated with libusb_alloc_streams().
  *
  * Note streams are automatically free-ed when releasing an interface.
  *
  * Since version 1.0.19, \ref LIBUSB_API_VERSION >= 0x01000103
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param endpoints array of endpoints to free streams on
  * \param num_endpoints length of the endpoints array
  * \returns LIBUSB_SUCCESS, or a LIBUSB_ERROR code on failure
  */
-int API_EXPORTED libusb_free_streams(libusb_device_handle *dev,
+int API_EXPORTED libusb_free_streams(libusb_device_handle *dev_handle,
 	unsigned char *endpoints, int num_endpoints)
 {
 	usbi_dbg("eps %d", num_endpoints);
 
-	if (!dev->dev->attached)
+	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
 	if (usbi_backend->free_streams)
-		return usbi_backend->free_streams(dev, endpoints,
+		return usbi_backend->free_streams(dev_handle, endpoints,
 						  num_endpoints);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Determine if a kernel driver is active on an interface. If a kernel driver
  * is active, you cannot claim the interface, and libusb will be unable to
  * perform I/O.
  *
  * This functionality is not available on Windows.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param interface_number the interface to check
  * \returns 0 if no kernel driver is active
  * \returns 1 if a kernel driver is active
@@ -1864,21 +1865,21 @@ int API_EXPORTED libusb_free_streams(libusb_device_handle *dev,
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_detach_kernel_driver()
  */
-int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev,
+int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev_handle,
 	int interface_number)
 {
 	usbi_dbg("interface %d", interface_number);
 
-	if (!dev->dev->attached)
+	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
 	if (usbi_backend->kernel_driver_active)
-		return usbi_backend->kernel_driver_active(dev, interface_number);
+		return usbi_backend->kernel_driver_active(dev_handle, interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Detach a kernel driver from an interface. If successful, you will then be
  * able to claim the interface and perform I/O.
  *
@@ -1888,7 +1889,7 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev,
  * driver, if this driver is already attached to the device, this call will
  * not detach it and return LIBUSB_ERROR_NOT_FOUND.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param interface_number the interface to detach the driver from
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
@@ -1899,28 +1900,28 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev,
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_kernel_driver_active()
  */
-int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev,
+int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
 	int interface_number)
 {
 	usbi_dbg("interface %d", interface_number);
 
-	if (!dev->dev->attached)
+	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
 	if (usbi_backend->detach_kernel_driver)
-		return usbi_backend->detach_kernel_driver(dev, interface_number);
+		return usbi_backend->detach_kernel_driver(dev_handle, interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Re-attach an interface's kernel driver, which was previously detached
  * using libusb_detach_kernel_driver(). This call is only effective on
  * Linux and returns LIBUSB_ERROR_NOT_SUPPORTED on all other platforms.
  *
  * This functionality is not available on Darwin or Windows.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param interface_number the interface to attach the driver from
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
@@ -1933,21 +1934,21 @@ int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev,
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_kernel_driver_active()
  */
-int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
+int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
 	int interface_number)
 {
 	usbi_dbg("interface %d", interface_number);
 
-	if (!dev->dev->attached)
+	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
 	if (usbi_backend->attach_kernel_driver)
-		return usbi_backend->attach_kernel_driver(dev, interface_number);
+		return usbi_backend->attach_kernel_driver(dev_handle, interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Enable/disable libusb's automatic kernel driver detachment. When this is
  * enabled libusb will automatically detach the kernel driver on an interface
  * when claiming the interface, and attach it when releasing the interface.
@@ -1959,7 +1960,7 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
  * this function will return LIBUSB_ERROR_NOT_SUPPORTED, and libusb will
  * continue as if this function was never called.
  *
- * \param dev a device handle
+ * \param dev_handle a device handle
  * \param enable whether to enable or disable auto kernel driver detachment
  *
  * \returns LIBUSB_SUCCESS on success
@@ -1970,16 +1971,16 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev,
  * \see libusb_set_configuration()
  */
 int API_EXPORTED libusb_set_auto_detach_kernel_driver(
-	libusb_device_handle *dev, int enable)
+	libusb_device_handle *dev_handle, int enable)
 {
 	if (!(usbi_backend->caps & USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER))
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 
-	dev->auto_detach_kernel_driver = enable;
+	dev_handle->auto_detach_kernel_driver = enable;
 	return LIBUSB_SUCCESS;
 }
 
-/** \ingroup lib
+/** \ingroup libusb_lib
  * Set log message verbosity.
  *
  * The default level is LIBUSB_LOG_LEVEL_NONE, which means no messages are ever
@@ -2011,7 +2012,7 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 		ctx->debug = level;
 }
 
-/** \ingroup lib
+/** \ingroup libusb_lib
  * Initialize libusb. This function must be called before calling any other
  * libusb function.
  *
@@ -2022,7 +2023,7 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
  * \param context Optional output location for context pointer.
  * Only valid on return code 0.
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
- * \see contexts
+ * \see libusb_contexts
  */
 int API_EXPORTED libusb_init(libusb_context **context)
 {
@@ -2071,9 +2072,9 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	usbi_dbg("libusb v%u.%u.%u.%u%s", libusb_version_internal.major, libusb_version_internal.minor,
 		libusb_version_internal.micro, libusb_version_internal.nano, libusb_version_internal.rc);
 
-	usbi_mutex_init(&ctx->usb_devs_lock, NULL);
-	usbi_mutex_init(&ctx->open_devs_lock, NULL);
-	usbi_mutex_init(&ctx->hotplug_cbs_lock, NULL);
+	usbi_mutex_init(&ctx->usb_devs_lock);
+	usbi_mutex_init(&ctx->open_devs_lock);
+	usbi_mutex_init(&ctx->hotplug_cbs_lock);
 	list_init(&ctx->usb_devs);
 	list_init(&ctx->open_devs);
 	list_init(&ctx->hotplug_cbs);
@@ -2133,7 +2134,7 @@ err_unlock:
 	return r;
 }
 
-/** \ingroup lib
+/** \ingroup libusb_lib
  * Deinitialize libusb. Should be called after closing all open devices and
  * before your application terminates.
  * \param ctx the context to deinitialize, or NULL for the default context
@@ -2213,7 +2214,7 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	free(ctx);
 }
 
-/** \ingroup misc
+/** \ingroup libusb_misc
  * Check at runtime if the loaded library has a given capability.
  * This call should be performed after \ref libusb_init(), to ensure the
  * backend has updated its capability set.
@@ -2402,7 +2403,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 			"libusb: %s [%s] ", prefix, function);
 	}
 
-	if (header_len < 0 || header_len >= sizeof(buf)) {
+	if (header_len < 0 || header_len >= (int)sizeof(buf)) {
 		/* Somehow snprintf failed to write to the buffer,
 		 * remove the header so something useful is output. */
 		header_len = 0;
@@ -2411,7 +2412,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	buf[header_len] = '\0';
 	text_len = vsnprintf(buf + header_len, sizeof(buf) - header_len,
 		format, args);
-	if (text_len < 0 || text_len + header_len >= sizeof(buf)) {
+	if (text_len < 0 || text_len + header_len >= (int)sizeof(buf)) {
 		/* Truncated log output. On some platforms a -1 return value means
 		 * that the output was truncated. */
 		text_len = sizeof(buf) - header_len;
@@ -2435,7 +2436,7 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 	va_end (args);
 }
 
-/** \ingroup misc
+/** \ingroup libusb_misc
  * Returns a constant NULL-terminated string with the ASCII name of a libusb
  * error or transfer status code. The caller must not free() the returned
  * string.
@@ -2495,7 +2496,7 @@ DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
 	}
 }
 
-/** \ingroup misc
+/** \ingroup libusb_misc
  * Returns a pointer to const struct libusb_version with the version
  * (major, minor, micro, nano and rc) of the running library.
  */

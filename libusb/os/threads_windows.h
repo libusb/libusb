@@ -48,34 +48,31 @@ struct timespec {
 #  define ETIMEDOUT 10060     /* This is the value in winsock.h. */
 #endif
 
-#define usbi_mutexattr_t	void
-#define usbi_condattr_t		void
 #define usbi_tls_key_t		DWORD
 
 int usbi_mutex_static_lock(usbi_mutex_static_t *mutex);
 int usbi_mutex_static_unlock(usbi_mutex_static_t *mutex);
 
-int usbi_mutex_init(usbi_mutex_t *mutex, const usbi_mutexattr_t *attr);
+int usbi_mutex_init(usbi_mutex_t *mutex);
 int usbi_mutex_lock(usbi_mutex_t *mutex);
 int usbi_mutex_unlock(usbi_mutex_t *mutex);
 int usbi_mutex_trylock(usbi_mutex_t *mutex);
 int usbi_mutex_destroy(usbi_mutex_t *mutex);
 
-int usbi_cond_init(usbi_cond_t *cond, const usbi_condattr_t *attr);
+int usbi_cond_init(usbi_cond_t *cond);
 int usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex);
 int usbi_cond_timedwait(usbi_cond_t *cond,
-	usbi_mutex_t *mutex, const struct timespec *abstime);
+	usbi_mutex_t *mutex, const struct timeval *tv);
 int usbi_cond_broadcast(usbi_cond_t *cond);
-int usbi_cond_signal(usbi_cond_t *cond);
 int usbi_cond_destroy(usbi_cond_t *cond);
 
-int usbi_tls_key_create(usbi_tls_key_t *key, void (*destructor)(void *));
+int usbi_tls_key_create(usbi_tls_key_t *key);
 void *usbi_tls_key_get(usbi_tls_key_t key);
-int usbi_tls_key_set(usbi_tls_key_t key, const void *value);
+int usbi_tls_key_set(usbi_tls_key_t key, void *value);
 int usbi_tls_key_delete(usbi_tls_key_t key);
 
 // all Windows mutexes are recursive
-#define usbi_mutex_init_recursive(mutex, attr) usbi_mutex_init((mutex), (attr))
+#define usbi_mutex_init_recursive	usbi_mutex_init
 
 int usbi_get_tid(void);
 
