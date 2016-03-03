@@ -3,8 +3,8 @@ configuration:
 - Debug
 - Release
 platform:
-- x86
 - x64
+- Any CPU
 build:
   project: msvc\libusb_2013.sln
   parallel: true
