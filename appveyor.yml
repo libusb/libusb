@@ -3,20 +3,9 @@ configuration:
 - Debug
 - Release
 platform:
+- x86
 - x64
-- Win32
-environment:
-  matrix:
-  - libusb_2015: msvc\libusb_2015.sln
-    libusb_2013: msvc\libusb_2013.sln
-    libusb_2012: msvc\libusb_2012.sln
-    libusb_2010: msvc\libusb_2010.sln
-build_script:
-- cmd: >-
-    msbuild %libusb_2015% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-
-    msbuild %libusb_2013% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-
-    msbuild %libusb_2012% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-
-    msbuild %libusb_2010% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+build:
+  project: msvc\libusb_2013.sln
+  parallel: true
+  verbosity: detailed
