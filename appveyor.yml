@@ -5,6 +5,10 @@ configuration:
 platform:
 - x64
 - Win32
+build:
+  project: msvc\libusb_2013.sln
+  parallel: true
+  verbosity: detailed
 environment:
   matrix:
   - libusb_2015: msvc\libusb_2015.sln
@@ -19,4 +23,4 @@ build_script:
 
     msbuild %libusb_2012% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
 
-    msbuild %libusb_2010% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+    msvc/appveyor.bat
