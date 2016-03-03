@@ -4,7 +4,7 @@ configuration:
 - Release
 platform:
 - x64
-- Any CPU
+- Win32
 build:
   project: msvc\libusb_2013.sln
   parallel: true
