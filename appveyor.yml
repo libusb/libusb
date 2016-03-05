@@ -14,6 +14,7 @@ environment:
   - libusb_2015: msvc\libusb_2015.sln
     libusb_2013: msvc\libusb_2013.sln
     libusb_2012: msvc\libusb_2012.sln
+    libusb_2010: msvc\libusb_2010.sln
 build_script:
 - cmd: >-
     msbuild %libusb_2015% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
