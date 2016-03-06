@@ -94,7 +94,7 @@ int usbi_parse_descriptor(const unsigned char *source, const char *descriptor,
 
 static void clear_endpoint(struct libusb_endpoint_descriptor *endpoint)
 {
-	free(endpoint->extra);
+	free((void *) endpoint->extra);
 }
 
 static int parse_endpoint(struct libusb_context *ctx,
@@ -192,17 +192,19 @@ static void clear_interface(struct libusb_interface *usb_interface)
 	int i;
 	int j;
 
-	for (i = 0; i < usb_interface->num_altsetting; i++) {
-		struct libusb_interface_descriptor *ifp =
-			(struct libusb_interface_descriptor *)
-			usb_interface->altsetting + i;
-		free(ifp->extra);
-		for (j = 0; j < ifp->bNumEndpoints; j++)
-			clear_endpoint((struct libusb_endpoint_descriptor *)
-				ifp->endpoint + j);
-		free(ifp->endpoint);
+	if (usb_interface->altsetting) {
+		for (i = 0; i < usb_interface->num_altsetting; i++) {
+			struct libusb_interface_descriptor *ifp =
+				(struct libusb_interface_descriptor *)
+				usb_interface->altsetting + i;
+			free((void *) ifp->extra);
+			for (j = 0; j < ifp->bNumEndpoints; j++)
+				clear_endpoint((struct libusb_endpoint_descriptor *)
+					       ifp->endpoint + j);
+			free((void *) ifp->endpoint);
+		}
 	}
-	free(usb_interface->altsetting);
+	free((void *) usb_interface->altsetting);
 	usb_interface->altsetting = NULL;
 }
 
@@ -355,11 +357,13 @@ err:
 static void clear_configuration(struct libusb_config_descriptor *config)
 {
 	int i;
-	for (i = 0; i < config->bNumInterfaces; i++)
-		clear_interface((struct libusb_interface *)
-			config->interface + i);
-	free(config->interface);
-	free(config->extra);
+	if (config->interface) {
+		for (i = 0; i < config->bNumInterfaces; i++)
+			clear_interface((struct libusb_interface *)
+					config->interface + i);
+	}
+	free((void *) config->interface);
+	free((void *) config->extra);
 }
 
 static int parse_configuration(struct libusb_context *ctx,
