@@ -198,9 +198,11 @@ static void clear_interface(struct libusb_interface *usb_interface)
 				(struct libusb_interface_descriptor *)
 				usb_interface->altsetting + i;
 			free((void *) ifp->extra);
-			for (j = 0; j < ifp->bNumEndpoints; j++)
-				clear_endpoint((struct libusb_endpoint_descriptor *)
-					       ifp->endpoint + j);
+			if (ifp->endpoint) {
+				for (j = 0; j < ifp->bNumEndpoints; j++)
+					clear_endpoint((struct libusb_endpoint_descriptor *)
+						       ifp->endpoint + j);
+			}
 			free((void *) ifp->endpoint);
 		}
 	}
