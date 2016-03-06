@@ -1,7 +1,7 @@
 # libusb
 
 [![Build Status](https://travis-ci.org/libusb/libusb.svg?branch=master)](https://travis-ci.org/libusb/libusb)
-[![Build status](https://ci.appveyor.com/api/projects/status/3qvcj8uceo1bylik?svg=true)](https://ci.appveyor.com/project/LudovicRousseau/libusb)
+[![Build status](https://ci.appveyor.com/api/projects/status/h2r5xqfwcpq0jf7o?svg=true)](https://ci.appveyor.com/project/LudovicRousseau/libusb)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/2180/badge.svg)](https://scan.coverity.com/projects/libusb-libusb)
 
 libusb is a library for USB device access from Linux, Mac OS X,
