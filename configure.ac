@@ -27,14 +27,13 @@ lt_age="1"
 LTLDFLAGS="-version-info ${lt_current}:${lt_revision}:${lt_age}"
 
 AM_INIT_AUTOMAKE
-AM_MAINTAINER_MODE
 
 AC_CONFIG_SRCDIR([libusb/core.c])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
-AC_PREREQ([2.50])
+AC_PREREQ([2.69])
 AC_PROG_CC
 AC_PROG_CXX
 LT_INIT

@@ -1,4 +1,6 @@
+# Require trusty for now as it has a more recent version of autoconf
 sudo: required
+dist: trusty
 language: c
 
 compiler:
