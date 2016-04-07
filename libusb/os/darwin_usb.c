@@ -19,6 +19,7 @@
  */
 
 #include "config.h"
+#include <time.h>
 #include <ctype.h>
 #include <errno.h>
 #include <pthread.h>
@@ -53,6 +54,7 @@ static clock_serv_t clock_realtime;
 static clock_serv_t clock_monotonic;
 
 static CFRunLoopRef libusb_darwin_acfl = NULL; /* event cf loop */
+static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for event cf loop */
 static volatile int32_t initCount = 0;
 
 static usbi_mutex_t darwin_cached_devices_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -382,6 +384,7 @@ static void *darwin_event_thread_main (void *arg0) {
 #endif
 
   /* hotplug (device arrival/removal) sources */
+  CFRunLoopSourceContext libusb_shutdown_cfsourcectx;
   CFRunLoopSourceRef     libusb_notification_cfsource;
   io_notification_port_t libusb_notification_port;
   io_iterator_t          libusb_rem_device_iterator;
@@ -391,6 +394,13 @@ static void *darwin_event_thread_main (void *arg0) {
 
   runloop = CFRunLoopGetCurrent ();
   CFRetain (runloop);
+
+  /* add the shutdown cfsource to the run loop */
+  memset(&libusb_shutdown_cfsourcectx, 0, sizeof(libusb_shutdown_cfsourcectx));
+  libusb_shutdown_cfsourcectx.info = runloop;
+  libusb_shutdown_cfsourcectx.perform = (void (*)(void *))CFRunLoopStop;
+  libusb_darwin_acfls = CFRunLoopSourceCreate(NULL, 0, &libusb_shutdown_cfsourcectx);
+  CFRunLoopAddSource(runloop, libusb_darwin_acfls, kCFRunLoopDefaultMode);
 
   /* add the notification port to the run loop */
   libusb_notification_port     = IONotificationPortCreate (kIOMasterPortDefault);
@@ -441,6 +451,9 @@ static void *darwin_event_thread_main (void *arg0) {
   /* remove the notification cfsource */
   CFRunLoopRemoveSource(runloop, libusb_notification_cfsource, kCFRunLoopDefaultMode);
 
+  /* remove the shutdown cfsource */
+  CFRunLoopRemoveSource(runloop, libusb_darwin_acfls, kCFRunLoopDefaultMode);
+
   /* delete notification port */
   IONotificationPortDestroy (libusb_notification_port);
 
@@ -448,8 +461,10 @@ static void *darwin_event_thread_main (void *arg0) {
   IOObjectRelease (libusb_rem_device_iterator);
   IOObjectRelease (libusb_add_device_iterator);
 
+  CFRelease (libusb_darwin_acfls);
   CFRelease (runloop);
 
+  libusb_darwin_acfls = NULL;
   libusb_darwin_acfl = NULL;
 
   pthread_exit (NULL);
@@ -521,7 +536,8 @@ static void darwin_exit (void) {
     mach_port_deallocate(mach_task_self(), clock_monotonic);
 
     /* stop the event runloop and wait for the thread to terminate. */
-    CFRunLoopStop (libusb_darwin_acfl);
+    CFRunLoopSourceSignal(libusb_darwin_acfls);
+    CFRunLoopWakeUp (libusb_darwin_acfl);
     pthread_join (libusb_darwin_at, NULL);
   }
 }
@@ -764,7 +780,7 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct da
     if (kIOReturnSuccess != ret) {
       usbi_dbg("kernel responded with code: 0x%08x. sleeping for %d ms before trying again", ret, delay/1000);
       /* sleep for a little while before trying again */
-      usleep (delay);
+      nanosleep(&(struct timespec){delay / 1000000, (delay * 1000) % 1000000000UL}, NULL);
     }
   } while (kIOReturnSuccess != ret && retries--);
 

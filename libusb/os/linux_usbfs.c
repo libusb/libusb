@@ -36,7 +36,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
-#include <unistd.h>
+#include <time.h>
 
 #include "libusbi.h"
 #include "linux_usbfs.h"
@@ -212,7 +212,7 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 			usbi_err(ctx, "File doesn't exist, wait %d ms and try again", delay/1000);
    
 		/* Wait 10ms for USB device path creation.*/
-		usleep(delay);
+		nanosleep(&(struct timespec){delay / 1000000, (delay * 1000) % 1000000000UL}, NULL);
 
 		fd = open(path, mode);
 		if (fd != -1)
