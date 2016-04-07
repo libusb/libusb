@@ -1206,7 +1206,26 @@ int usbi_clear_event(struct libusb_context *ctx)
 	return 0;
 }
 
-static int do_open(libusb_device *dev, intptr_t fd,
+/** \ingroup libusb_dev
+ * Open a device and obtain a device handle. A handle allows you to perform
+ * I/O on the device in question.
+ *
+ * Internally, this function adds a reference to the device and makes it
+ * available to you through libusb_get_device(). This reference is removed
+ * during libusb_close().
+ *
+ * This is a non-blocking function; no requests are sent over the bus.
+ *
+ * \param dev the device to open
+ * \param dev_handle output location for the returned device handle pointer. Only
+ * populated when the return code is 0.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NO_MEM on memory allocation failure
+ * \returns LIBUSB_ERROR_ACCESS if the user has insufficient permissions
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+int API_EXPORTED libusb_open(libusb_device *dev,
 	libusb_device_handle **dev_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
@@ -1232,7 +1251,6 @@ static int do_open(libusb_device *dev, intptr_t fd,
 	_dev_handle->dev = libusb_ref_device(dev);
 	_dev_handle->auto_detach_kernel_driver = 0;
 	_dev_handle->claimed_interfaces = 0;
-	_dev_handle->associated_fd = fd;
 	memset(&_dev_handle->os_priv, 0, priv_size);
 
 	r = usbi_backend->open(_dev_handle);
@@ -1250,60 +1268,6 @@ static int do_open(libusb_device *dev, intptr_t fd,
 	*dev_handle = _dev_handle;
 
 	return 0;
-}
-
-/** \ingroup libusb_dev
- * Open a device and obtain a device handle. A handle allows you to perform
- * I/O on the device in question.
- *
- * Internally, this function adds a reference to the device and makes it
- * available to you through libusb_get_device(). This reference is removed
- * during libusb_close().
- *
- * This is a non-blocking function; no requests are sent over the bus.
- *
- * \param dev the device to open
- * \param dev_handle output location for the returned device handle pointer. Only
- * populated when the return code is 0.
- * \returns 0 on success
- * \returns LIBUSB_ERROR_NO_MEM on memory allocation failure
- * \returns LIBUSB_ERROR_ACCESS if the user has insufficient permissions
- * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
- * \returns another LIBUSB_ERROR code on other failure
- */
-int API_EXPORTED libusb_open(libusb_device *dev,
-	libusb_device_handle **dev_handle)
-{
-	return do_open(dev, -1, dev_handle);
-}
-
- /** \ingroup libusb_dev
- * Open a device and obtain a device handle. A handle allows you to perform
- * I/O on the device in question.
- *
- * Internally, this function adds a reference to the device and makes it
- * available to you through libusb_get_device(). This reference is removed
- * during libusb_close().
- *
- * This is a non-blocking function; no requests are sent over the bus.
- *
- * This function allows to associate a device handle with the existing file 
- * descriptor.
- *
- * \param dev the device to open
- * \param fd the file descriptor to associate with the device 
- * \param dev_handle output location for the returned device handle pointer. Only
- * populated when the return code is 0.
- * \returns 0 on success
- * \returns LIBUSB_ERROR_NO_MEM on memory allocation failure
- * \returns LIBUSB_ERROR_ACCESS if the user has insufficient permissions
- * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
- * \returns another LIBUSB_ERROR code on other failure
- */
-int API_EXPORTED libusb_fdopen(libusb_device *dev, intptr_t fd,
-	libusb_device_handle **dev_handle)
-{
-	return do_open(dev, fd, dev_handle);
 }
 
 /** \ingroup libusb_dev
@@ -2186,15 +2150,6 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 			libusb_unref_device(dev);
 		}
 		usbi_mutex_unlock(&ctx->usb_devs_lock);
-	}
-	else {
-		/* if hotplug is disabled the devices must be unrefed to avoid a memory leak */
-		if (!list_empty(&ctx->usb_devs)) {
-			list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
-				usbi_dbg("libusb_exit: unref device %d.%d (%lu) refs = %d", dev->bus_number, dev->device_address, dev->session_data, dev->refcnt);
-				libusb_unref_device(dev);
-			}
-		}
 	}
 
 	/* a few sanity checks. don't bother with locking because unless
