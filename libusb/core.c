@@ -2392,21 +2392,23 @@ static void usbi_log_str(struct libusb_context *ctx,
 	MultiByteToWideChar(CP_UTF8, 0, str, -1, wbuf, sizeof(wbuf));
 	OutputDebugStringW(wbuf);
 #elif defined(__ANDROID__)
-	int priority = ANDROID_LOG_UNKNOWN;
+	int priority;
 	switch (level) {
 	case LIBUSB_LOG_LEVEL_INFO: priority = ANDROID_LOG_INFO; break;
 	case LIBUSB_LOG_LEVEL_WARNING: priority = ANDROID_LOG_WARN; break;
 	case LIBUSB_LOG_LEVEL_ERROR: priority = ANDROID_LOG_ERROR; break;
 	case LIBUSB_LOG_LEVEL_DEBUG: priority = ANDROID_LOG_DEBUG; break;
+	default: priority = ANDROID_LOG_UNKNOWN;
 	}
 	__android_log_write(priority, "libusb", str);
 #elif defined(HAVE_SYSLOG_FUNC)
-	int syslog_level = LOG_INFO;
+	int syslog_level;
 	switch (level) {
 	case LIBUSB_LOG_LEVEL_INFO: syslog_level = LOG_INFO; break;
 	case LIBUSB_LOG_LEVEL_WARNING: syslog_level = LOG_WARNING; break;
 	case LIBUSB_LOG_LEVEL_ERROR: syslog_level = LOG_ERR; break;
 	case LIBUSB_LOG_LEVEL_DEBUG: syslog_level = LOG_DEBUG; break;
+	default: syslog_level = LOG_INFO;
 	}
 	syslog(syslog_level, "%s", str);
 #else /* All of gcc, Clang, XCode seem to use #warning */
