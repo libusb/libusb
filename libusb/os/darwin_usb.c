@@ -1742,7 +1742,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
 
   IOReturn               kresult;
 
-  bzero(&tpriv->req, sizeof(tpriv->req));
+  memset(&tpriv->req, 0, sizeof(tpriv->req));
 
   /* IOUSBDeviceInterface expects the request in cpu endianness */
   tpriv->req.bmRequestType     = setup->bmRequestType;
