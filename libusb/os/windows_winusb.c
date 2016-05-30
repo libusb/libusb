@@ -1514,16 +1514,20 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					if (dev == NULL)
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 
-					windows_device_priv_init(dev);
+					priv = windows_device_priv_init(dev);
 				} else {
 					usbi_dbg("found existing device for session [%lX] (%u.%u)",
 						session_id, dev->bus_number, dev->device_address);
-					if (_device_priv(dev)->parent_dev != parent_dev) {
-						usbi_err(ctx,"program assertion failed - existing device should share parent");
-					} else {
-						// We hold a reference to parent_dev instance, but this device already
-						// has a parent_dev reference (only one per child)
-						libusb_unref_device(parent_dev);
+
+					priv = _device_priv(dev);
+					if (priv->parent_dev != NULL) {
+						if (priv->parent_dev != parent_dev) {
+							usbi_err(ctx, "program assertion failed - existing device should share parent");
+						} else {
+							// We hold a reference to parent_dev instance, but this device already
+							// has a parent_dev reference (only one per child)
+							libusb_unref_device(parent_dev);
+						}
 					}
 				}
 
@@ -1537,7 +1541,6 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 					}
 				}
-				priv = _device_priv(dev);
 			}
 
 			// Setup device
