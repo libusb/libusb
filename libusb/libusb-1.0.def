@@ -148,6 +148,8 @@ EXPORTS
   libusb_set_configuration@8 = libusb_set_configuration
   libusb_set_debug
   libusb_set_debug@8 = libusb_set_debug
+  libusb_set_log_handler
+  libusb_set_log_handler@8 = libusb_set_log_handler
   libusb_set_interface_alt_setting
   libusb_set_interface_alt_setting@12 = libusb_set_interface_alt_setting
   libusb_setlocale

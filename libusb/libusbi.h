@@ -256,6 +256,7 @@ struct pollfd;
 struct libusb_context {
 	int debug;
 	int debug_fixed;
+	libusb_log_handler_cb log_handler;
 
 	/* internal event pipe, used for signalling occurrence of an internal event. */
 	int event_pipe[2];
