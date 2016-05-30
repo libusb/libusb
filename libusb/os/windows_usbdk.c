@@ -877,6 +877,9 @@ const struct usbi_os_backend usbdk_backend = {
 	NULL,
 	NULL,
 
+	NULL,	// dev_mem_alloc()
+	NULL,	// dev_mem_free()
+
 	usbdk_kernel_driver_active,
 	usbdk_detach_kernel_driver,
 	usbdk_attach_kernel_driver,

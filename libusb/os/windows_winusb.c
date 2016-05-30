@@ -2067,6 +2067,9 @@ const struct usbi_os_backend windows_backend = {
 	NULL,				/* alloc_streams */
 	NULL,				/* free_streams */
 
+	NULL,				/* dev_mem_alloc */
+	NULL,				/* dev_mem_free */
+
 	windows_kernel_driver_active,
 	windows_detach_kernel_driver,
 	windows_attach_kernel_driver,
