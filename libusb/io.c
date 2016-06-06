@@ -1338,7 +1338,7 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 			goto disarm;
 
 		/* act on first transfer that has not already been handled */
-		if (!(transfer->timeout_flags & USBI_TRANSFER_TIMEOUT_HANDLED)) {
+		if (!(transfer->timeout_flags & (USBI_TRANSFER_TIMEOUT_HANDLED | USBI_TRANSFER_OS_HANDLES_TIMEOUT))) {
 			int r;
 			const struct itimerspec it = { {0, 0},
 				{ cur_tv->tv_sec, cur_tv->tv_usec * 1000 } };
