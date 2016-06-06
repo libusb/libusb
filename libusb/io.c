@@ -1978,7 +1978,7 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 
 	itransfer->timeout_flags |= USBI_TRANSFER_TIMEOUT_HANDLED;
 	r = libusb_cancel_transfer(transfer);
-	if (r == 0)
+	if (r == LIBUSB_SUCCESS)
 		itransfer->timeout_flags |= USBI_TRANSFER_TIMED_OUT;
 	else
 		usbi_warn(TRANSFER_CTX(transfer),
