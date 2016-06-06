@@ -1351,6 +1351,7 @@ static void do_close(struct libusb_context *ctx,
 		if (transfer->dev_handle != dev_handle)
 			continue;
 
+		usbi_mutex_lock(&itransfer->lock);
 		if (!(itransfer->state_flags & USBI_TRANSFER_DEVICE_DISAPPEARED)) {
 			usbi_err(ctx, "Device handle closed while transfer was still being processed, but the device is still connected as far as we know");
 
@@ -1359,15 +1360,14 @@ static void do_close(struct libusb_context *ctx,
 			else
 				usbi_err(ctx, "A cancellation hasn't even been scheduled on the transfer for which the device is closing");
 		}
+		usbi_mutex_unlock(&itransfer->lock);
 
 		/* remove from the list of in-flight transfers and make sure
 		 * we don't accidentally use the device handle in the future
 		 * (or that such accesses will be easily caught and identified as a crash)
 		 */
-		usbi_mutex_lock(&itransfer->lock);
 		list_del(&itransfer->list);
 		transfer->dev_handle = NULL;
-		usbi_mutex_unlock(&itransfer->lock);
 
 		/* it is up to the user to free up the actual transfer struct.  this is
 		 * just making sure that we don't attempt to process the transfer after
