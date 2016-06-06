@@ -501,14 +501,9 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 		istatus = windows_copy_transfer_data(itransfer, io_size);
 		if (istatus != LIBUSB_TRANSFER_COMPLETED)
 			usbi_dbg("Failed to copy partial data in aborted operation: %d", istatus);
-		if (itransfer->flags & USBI_TRANSFER_TIMED_OUT) {
-			usbi_dbg("detected timeout");
-			status = LIBUSB_TRANSFER_TIMED_OUT;
-		}
-		else {
-			usbi_dbg("detected operation aborted");
-			status = LIBUSB_TRANSFER_CANCELLED;
-		}
+
+		usbi_dbg("detected operation aborted");
+		status = LIBUSB_TRANSFER_CANCELLED;
 		break;
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %u: %s", io_result, windows_error_str(io_result));
@@ -516,7 +511,10 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 		break;
 	}
 	windows_clear_transfer_priv(itransfer);	// Cancel polling
-	usbi_handle_transfer_completion(itransfer, (enum libusb_transfer_status)status);
+	if (status == LIBUSB_TRANSFER_CANCELLED)
+		usbi_handle_transfer_cancellation(itransfer);
+	else
+		usbi_handle_transfer_completion(itransfer, (enum libusb_transfer_status)status);
 }
 
 void windows_handle_callback(struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size)
