@@ -1684,8 +1684,15 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
  * will attempt to take the lock. */
 int usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
 {
+	struct libusb_context *ctx = ITRANSFER_CTX(transfer);
+	uint8_t timed_out;
+
+	usbi_mutex_lock(&ctx->flying_transfers_lock);
+	timed_out = transfer->timeout_flags & USBI_TRANSFER_TIMED_OUT;
+	usbi_mutex_unlock(&ctx->flying_transfers_lock);
+
 	/* if the URB was cancelled due to timeout, report timeout to the user */
-	if (transfer->timeout_flags & USBI_TRANSFER_TIMED_OUT) {
+	if (timed_out) {
 		usbi_dbg("detected timeout cancellation");
 		return usbi_handle_transfer_completion(transfer, LIBUSB_TRANSFER_TIMED_OUT);
 	}
