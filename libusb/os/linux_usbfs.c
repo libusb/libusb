@@ -2638,10 +2638,14 @@ static int op_handle_events(struct libusb_context *ctx,
 						handle->dev->device_address);
 			usbi_mutex_static_unlock(&linux_hotplug_lock);
 
-			if (!(hpriv->caps & USBFS_CAP_REAP_AFTER_DISCONNECT)) {
-				usbi_handle_disconnect(handle);
-				continue;
+			if (hpriv->caps & USBFS_CAP_REAP_AFTER_DISCONNECT) {
+				do {
+					r = reap_for_handle(handle);
+				} while (r == 0);
 			}
+
+			usbi_handle_disconnect(handle);
+			continue;
 		}
 
 		do {
