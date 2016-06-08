@@ -1369,8 +1369,12 @@ static int add_to_flying_list(struct usbi_transfer *transfer)
 	struct usbi_transfer *cur;
 	struct timeval *timeout = &transfer->timeout;
 	struct libusb_context *ctx = ITRANSFER_CTX(transfer);
-	int r = 0;
+	int r;
 	int first = 1;
+
+	r = calculate_timeout(transfer);
+	if (r)
+		return r;
 
 	/* if we have no other flying transfers, start the list with this one */
 	if (list_empty(&ctx->flying_transfers)) {
@@ -1513,13 +1517,6 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	itransfer->transferred = 0;
 	itransfer->state_flags = 0;
 	itransfer->timeout_flags = 0;
-	r = calculate_timeout(itransfer);
-	if (r < 0) {
-		usbi_mutex_unlock(&ctx->flying_transfers_lock);
-		usbi_mutex_unlock(&itransfer->lock);
-		return LIBUSB_ERROR_OTHER;
-	}
-
 	r = add_to_flying_list(itransfer);
 	if (r) {
 		usbi_mutex_unlock(&ctx->flying_transfers_lock);
