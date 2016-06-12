@@ -224,7 +224,7 @@ static inline struct windows_device_priv *_device_priv(struct libusb_device *dev
 	return (struct windows_device_priv *)dev->os_priv;
 }
 
-static inline void windows_device_priv_init(struct libusb_device *dev)
+static inline struct windows_device_priv *windows_device_priv_init(struct libusb_device *dev)
 {
 	struct windows_device_priv *p = _device_priv(dev);
 	int i;
@@ -247,6 +247,8 @@ static inline void windows_device_priv_init(struct libusb_device *dev)
 		p->usb_interface[i].endpoint = NULL;
 		p->usb_interface[i].restricted_functionality = false;
 	}
+
+	return p;
 }
 
 static inline void windows_device_priv_release(struct libusb_device *dev)

@@ -1137,7 +1137,10 @@ enum libusb_transfer_flags {
 	/** Report short frames as errors */
 	LIBUSB_TRANSFER_SHORT_NOT_OK = 1<<0,
 
-	/** Automatically free() transfer buffer during libusb_free_transfer() */
+	/** Automatically free() transfer buffer during libusb_free_transfer().
+	 * Note that buffers allocated with libusb_dev_mem_alloc() should not
+	 * be attempted freed in this way, since free() is not an appropriate
+	 * way to release such memory. */
 	LIBUSB_TRANSFER_FREE_BUFFER = 1<<1,
 
 	/** Automatically call libusb_free_transfer() after callback returns.
@@ -1391,6 +1394,11 @@ int LIBUSB_CALL libusb_alloc_streams(libusb_device_handle *dev_handle,
 	uint32_t num_streams, unsigned char *endpoints, int num_endpoints);
 int LIBUSB_CALL libusb_free_streams(libusb_device_handle *dev_handle,
 	unsigned char *endpoints, int num_endpoints);
+
+unsigned char * LIBUSB_CALL libusb_dev_mem_alloc(libusb_device_handle *dev_handle,
+	size_t length);
+int LIBUSB_CALL libusb_dev_mem_free(libusb_device_handle *dev_handle,
+	unsigned char *buffer, size_t length);
 
 int LIBUSB_CALL libusb_kernel_driver_active(libusb_device_handle *dev_handle,
 	int interface_number);

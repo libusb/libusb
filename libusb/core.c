@@ -357,6 +357,8 @@ if (cfg != desired)
   * - libusb_control_transfer_get_setup()
   * - libusb_cpu_to_le16()
   * - libusb_detach_kernel_driver()
+  * - libusb_dev_mem_alloc()
+  * - libusb_dev_mem_free()
   * - libusb_error_name()
   * - libusb_event_handler_active()
   * - libusb_event_handling_ok()
@@ -625,6 +627,16 @@ static struct discovered_devs *discovered_devs_alloc(void)
 	return ret;
 }
 
+static void discovered_devs_free(struct discovered_devs *discdevs)
+{
+	size_t i;
+
+	for (i = 0; i < discdevs->len; i++)
+		libusb_unref_device(discdevs->devices[i]);
+
+	free(discdevs);
+}
+
 /* append a device to the discovered devices collection. may realloc itself,
  * returning new discdevs. returns NULL on realloc failure. */
 struct discovered_devs *discovered_devs_append(
@@ -632,6 +644,7 @@ struct discovered_devs *discovered_devs_append(
 {
 	size_t len = discdevs->len;
 	size_t capacity;
+	struct discovered_devs *new_discdevs;
 
 	/* if there is space, just append the device */
 	if (len < discdevs->capacity) {
@@ -643,25 +656,21 @@ struct discovered_devs *discovered_devs_append(
 	/* exceeded capacity, need to grow */
 	usbi_dbg("need to increase capacity");
 	capacity = discdevs->capacity + DISCOVERED_DEVICES_SIZE_STEP;
-	discdevs = usbi_reallocf(discdevs,
+	/* can't use usbi_reallocf here because in failure cases it would
+	 * free the existing discdevs without unreferencing its devices. */
+	new_discdevs = realloc(discdevs,
 		sizeof(*discdevs) + (sizeof(void *) * capacity));
-	if (discdevs) {
-		discdevs->capacity = capacity;
-		discdevs->devices[len] = libusb_ref_device(dev);
-		discdevs->len++;
+	if (!new_discdevs) {
+		discovered_devs_free(discdevs);
+		return NULL;
 	}
 
+	discdevs = new_discdevs;
+	discdevs->capacity = capacity;
+	discdevs->devices[len] = libusb_ref_device(dev);
+	discdevs->len++;
+
 	return discdevs;
-}
-
-static void discovered_devs_free(struct discovered_devs *discdevs)
-{
-	size_t i;
-
-	for (i = 0; i < discdevs->len; i++)
-		libusb_unref_device(discdevs->devices[i]);
-
-	free(discdevs);
 }
 
 /* Allocate a new device with a specific session ID. The returned device has
@@ -852,7 +861,8 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 	*list = ret;
 
 out:
-	discovered_devs_free(discdevs);
+	if (discdevs)
+		discovered_devs_free(discdevs);
 	return len;
 }
 
@@ -1808,6 +1818,60 @@ int API_EXPORTED libusb_free_streams(libusb_device_handle *dev_handle,
 	if (usbi_backend->free_streams)
 		return usbi_backend->free_streams(dev_handle, endpoints,
 						  num_endpoints);
+	else
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+/** \ingroup libusb_asyncio
+ * Attempts to allocate a block of persistent DMA memory suitable for transfers
+ * against the given device. If successful, will return a block of memory
+ * that is suitable for use as "buffer" in \ref libusb_transfer against this
+ * device. Using this memory instead of regular memory means that the host
+ * controller can use DMA directly into the buffer to increase performance, and
+ * also that transfers can no longer fail due to kernel memory fragmentation.
+ *
+ * Note that this means you should not modify this memory (or even data on
+ * the same cache lines) when a transfer is in progress, although it is legal
+ * to have several transfers going on within the same memory block.
+ *
+ * Will return NULL on failure. Many systems do not support such zerocopy
+ * and will always return NULL. Memory allocated with this function must be
+ * freed with \ref libusb_dev_mem_free. Specifically, this means that the
+ * flag \ref LIBUSB_TRANSFER_FREE_BUFFER cannot be used to free memory allocated
+ * with this function.
+ *
+ * Since version 1.0.21, \ref LIBUSB_API_VERSION >= 0x01000105
+ *
+ * \param dev_handle a device handle
+ * \param length size of desired data buffer
+ * \returns a pointer to the newly allocated memory, or NULL on failure
+ */
+DEFAULT_VISIBILITY
+unsigned char * LIBUSB_CALL libusb_dev_mem_alloc(libusb_device_handle *dev_handle,
+        size_t length)
+{
+	if (!dev_handle->dev->attached)
+		return NULL;
+
+	if (usbi_backend->dev_mem_alloc)
+		return usbi_backend->dev_mem_alloc(dev_handle, length);
+	else
+		return NULL;
+}
+
+/** \ingroup libusb_asyncio
+ * Free device memory allocated with libusb_dev_mem_alloc().
+ *
+ * \param dev_handle a device handle
+ * \param buffer pointer to the previously allocated memory
+ * \param length size of previously allocated memory
+ * \returns LIBUSB_SUCCESS, or a LIBUSB_ERROR code on failure
+ */
+int API_EXPORTED libusb_dev_mem_free(libusb_device_handle *dev_handle,
+	unsigned char *buffer, size_t length)
+{
+	if (usbi_backend->dev_mem_free)
+		return usbi_backend->dev_mem_free(dev_handle, buffer, length);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }

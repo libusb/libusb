@@ -1277,7 +1277,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 {
 	struct discovered_devs *discdevs;
 	HDEVINFO dev_info = { 0 };
-	const char *usb_class[] = {"USB", "NUSB3", "IUSB3"};
+	const char *usb_class[] = {"USB", "NUSB3", "IUSB3", "IARUSB3"};
 	SP_DEVINFO_DATA dev_info_data = { 0 };
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	GUID hid_guid;
@@ -1305,7 +1305,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	GUID *if_guid;
 	LONG s;
 	// Keep a list of newly allocated devs to unref
-	libusb_device **unref_list;
+	libusb_device **unref_list, **new_unref_list;
 	unsigned int unref_size = 64;
 	unsigned int unref_cur = 0;
 
@@ -1370,6 +1370,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				// Workaround for a Nec/Renesas USB 3.0 driver bug where root hubs are
 				// being listed under the "NUSB3" PnP Symbolic Name rather than "USB".
 				// The Intel USB 3.0 driver behaves similar, but uses "IUSB3"
+				// The Intel Alpine Ridge USB 3.1 driver uses "IARUSB3"
 				for (; class_index < ARRAYSIZE(usb_class); class_index++) {
 					if (get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i))
 						break;
@@ -1514,16 +1515,20 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					if (dev == NULL)
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 
-					windows_device_priv_init(dev);
+					priv = windows_device_priv_init(dev);
 				} else {
 					usbi_dbg("found existing device for session [%lX] (%u.%u)",
 						session_id, dev->bus_number, dev->device_address);
-					if (_device_priv(dev)->parent_dev != parent_dev) {
-						usbi_err(ctx,"program assertion failed - existing device should share parent");
-					} else {
-						// We hold a reference to parent_dev instance, but this device already
-						// has a parent_dev reference (only one per child)
-						libusb_unref_device(parent_dev);
+
+					priv = _device_priv(dev);
+					if (priv->parent_dev != NULL) {
+						if (priv->parent_dev != parent_dev) {
+							usbi_err(ctx, "program assertion failed - existing device should share parent");
+						} else {
+							// We hold a reference to parent_dev instance, but this device already
+							// has a parent_dev reference (only one per child)
+							libusb_unref_device(parent_dev);
+						}
 					}
 				}
 
@@ -1531,13 +1536,14 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				unref_list[unref_cur++] = dev;
 				if (unref_cur >= unref_size) {
 					unref_size += 64;
-					unref_list = usbi_reallocf(unref_list, unref_size * sizeof(libusb_device *));
-					if (unref_list == NULL) {
+					new_unref_list = usbi_reallocf(unref_list, unref_size * sizeof(libusb_device *));
+					if (new_unref_list == NULL) {
 						usbi_err(ctx, "could not realloc list for unref - aborting.");
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+					} else {
+						unref_list = new_unref_list;
 					}
 				}
-				priv = _device_priv(dev);
 			}
 
 			// Setup device
@@ -1637,11 +1643,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 		safe_free(guid[pass]);
 
 	// Unref newly allocated devs
-	if (unref_list != NULL) {
-		for (i = 0; i < unref_cur; i++)
-			safe_unref_device(unref_list[i]);
-		free(unref_list);
-	}
+	for (i = 0; i < unref_cur; i++)
+		safe_unref_device(unref_list[i]);
+	free(unref_list);
 
 	return r;
 }
@@ -2066,6 +2070,9 @@ const struct usbi_os_backend windows_backend = {
 	NULL,				/* alloc_streams */
 	NULL,				/* free_streams */
 
+	NULL,				/* dev_mem_alloc */
+	NULL,				/* dev_mem_free */
+
 	windows_kernel_driver_active,
 	windows_detach_kernel_driver,
 	windows_attach_kernel_driver,
@@ -2178,7 +2185,7 @@ static int common_configure_endpoints(int sub_api, struct libusb_device_handle *
 }
 
 // These names must be uppercase
-static const char *hub_driver_names[] = {"USBHUB", "USBHUB3", "USB3HUB", "NUSB3HUB", "RUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3", "IUSB3HUB", "VUSB3HUB", "AMDHUB30", "VHHUB"};
+static const char *hub_driver_names[] = {"USBHUB", "USBHUB3", "USB3HUB", "NUSB3HUB", "RUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3", "IUSB3HUB", "VUSB3HUB", "AMDHUB30", "VHHUB", "AUSB3HUB"};
 static const char *composite_driver_names[] = {"USBCCGP"};
 static const char *winusbx_driver_names[] = WINUSBX_DRV_NAMES;
 static const char *hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
