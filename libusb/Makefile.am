@@ -2,7 +2,11 @@ all: libusb-1.0.la libusb-1.0.dll
 
 AUTOMAKE_OPTIONS = subdir-objects
 
+if BUILD_SUBPROJECT
+noinst_LTLIBRARIES = libusb-1.0.la
+else
 lib_LTLIBRARIES = libusb-1.0.la
+endif
 
 POSIX_POLL_SRC = os/poll_posix.h os/poll_posix.c
 POSIX_THREADS_SRC = os/threads_posix.h os/threads_posix.c
@@ -95,5 +99,9 @@ libusb_1_0_la_SOURCES = libusbi.h libusb.h version.h version_nano.h \
 	core.c descriptor.c hotplug.h hotplug.c io.c strerror.c sync.c \
 	$(POLL_SRC) $(THREADS_SRC) $(OS_SRC)
 
+if BUILD_SUBPROJECT
+noinst_HEADERS = libusb.h
+else
 hdrdir = $(includedir)/libusb-1.0
 hdr_HEADERS = libusb.h
+endif

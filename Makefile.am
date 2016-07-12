@@ -14,8 +14,10 @@ if BUILD_TESTS
 SUBDIRS += tests
 endif
 
+if !BUILD_SUBPROJECT
 pkgconfigdir=$(libdir)/pkgconfig
 pkgconfig_DATA=libusb-1.0.pc
+endif
 
 .PHONY: dist-up
 

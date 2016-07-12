@@ -278,6 +278,13 @@ AC_ARG_ENABLE([tests-build], [AS_HELP_STRING([--enable-tests-build],
 	[build_tests='no'])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != "xno"])
 
+# Subproject build
+AC_ARG_ENABLE([subproject-build], [AS_HELP_STRING([--enable-subproject-build],
+	[build as sub-project [default=no]])],
+	[build_subproject=$enableval],
+	[build_subproject='no'])
+AM_CONDITIONAL([BUILD_SUBPROJECT], [test "x$build_subproject" != "xno"])
+
 # check for -fvisibility=hidden compiler support (GCC >= 3.4)
 saved_cflags="$CFLAGS"
 # -Werror required for cygwin
