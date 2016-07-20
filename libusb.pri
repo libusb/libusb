@@ -94,3 +94,5 @@ macx {
     HEADERS += \
         $${SRC_DIR}/os/darwin_usb.h
 }
+
+CONFIG += warn_off
