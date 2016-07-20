@@ -1530,6 +1530,34 @@ out:
 	return r;
 }
 
+static int cancel_transfer_locked(struct libusb_transfer *transfer)
+{
+	struct usbi_transfer *itransfer =
+		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+	int r;
+	if (!(itransfer->flags & USBI_TRANSFER_IN_FLIGHT)
+			|| (itransfer->flags & USBI_TRANSFER_CANCELLING)) {
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	r = usbi_backend->cancel_transfer(itransfer);
+	if (r < 0) {
+		if (r != LIBUSB_ERROR_NOT_FOUND &&
+		    r != LIBUSB_ERROR_NO_DEVICE)
+			usbi_err(TRANSFER_CTX(transfer),
+				"cancel transfer failed error %d", r);
+		else
+			usbi_dbg("cancel transfer failed error %d", r);
+
+		if (r == LIBUSB_ERROR_NO_DEVICE)
+			itransfer->flags |= USBI_TRANSFER_DEVICE_DISAPPEARED;
+	}
+
+	itransfer->flags |= USBI_TRANSFER_CANCELLING;
+
+	return r;
+}
+
 /** \ingroup libusb_asyncio
  * Asynchronously cancel a previously submitted transfer.
  * This function returns immediately, but this does not indicate cancellation
@@ -1553,27 +1581,9 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 	usbi_dbg("transfer %p", transfer );
 	usbi_mutex_lock(&itransfer->lock);
 	usbi_mutex_lock(&itransfer->flags_lock);
-	if (!(itransfer->flags & USBI_TRANSFER_IN_FLIGHT)
-			|| (itransfer->flags & USBI_TRANSFER_CANCELLING)) {
-		r = LIBUSB_ERROR_NOT_FOUND;
-		goto out;
-	}
-	r = usbi_backend->cancel_transfer(itransfer);
-	if (r < 0) {
-		if (r != LIBUSB_ERROR_NOT_FOUND &&
-		    r != LIBUSB_ERROR_NO_DEVICE)
-			usbi_err(TRANSFER_CTX(transfer),
-				"cancel transfer failed error %d", r);
-		else
-			usbi_dbg("cancel transfer failed error %d", r);
 
-		if (r == LIBUSB_ERROR_NO_DEVICE)
-			itransfer->flags |= USBI_TRANSFER_DEVICE_DISAPPEARED;
-	}
+	r = cancel_transfer_locked(transfer);
 
-	itransfer->flags |= USBI_TRANSFER_CANCELLING;
-
-out:
 	usbi_mutex_unlock(&itransfer->flags_lock);
 	usbi_mutex_unlock(&itransfer->lock);
 	return r;
@@ -1967,13 +1977,20 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	int r;
 
+	usbi_mutex_lock(&itransfer->lock);
+	usbi_mutex_lock(&itransfer->flags_lock);
+
 	itransfer->flags |= USBI_TRANSFER_TIMEOUT_HANDLED;
-	r = libusb_cancel_transfer(transfer);
+	r = cancel_transfer_locked(transfer);
+
 	if (r == 0)
 		itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
 	else
 		usbi_warn(TRANSFER_CTX(transfer),
 			"async cancel failed %d errno=%d", r, errno);
+
+	usbi_mutex_unlock(&itransfer->flags_lock);
+	usbi_mutex_unlock(&itransfer->lock);
 }
 
 static int handle_timeouts_locked(struct libusb_context *ctx)
