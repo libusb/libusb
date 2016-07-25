@@ -5,6 +5,7 @@ visit: http://log.libusb.info
 * Darwin: Ignore root hub simulation devices
 * Darwin: Improved support for OS X El Capitan
 * Linux: Support preallocating kernel memory for zerocopy USB
+* Solaris: Add solaris backend
 * Windows: Add Visual Studio 2015 support
 * Prevent attempts to recursively hande events
 * Fix race condition in handle_timeout()
