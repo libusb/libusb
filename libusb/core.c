@@ -1459,6 +1459,27 @@ libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle)
 }
 
 /** \ingroup libusb_dev
+ * Get the underlying device for a dev_node.
+ * UseCase: Android
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param dev_node device path
+ * \param descriptors the raw USB descriptors for the device
+ * \param descriptors_size the size of the descriptors array
+ * \returns the underlying device
+ */
+DEFAULT_VISIBILITY
+libusb_device * LIBUSB_CALL libusb_get_device2(libusb_context *ctx, const char *dev_node,
+	const char* descriptors, size_t descriptors_size)
+{
+	if (usbi_backend->get_device2 == NULL) {
+		/* Not supported on this platform */
+		return NULL;
+	}
+
+	return usbi_backend->get_device2(ctx, dev_node, descriptors, descriptors_size);
+}
+
+/** \ingroup dev
  * Determine the bConfigurationValue of the currently active configuration.
  *
  * You could formulate your own control request to obtain this information,
@@ -2360,7 +2381,6 @@ int usbi_vsnprintf(char *str, size_t size, const char *format, va_list ap)
 
 static void usbi_log_str(enum libusb_log_level level, const char *str)
 {
-#if defined(USE_SYSTEM_LOGGING_FACILITY)
 #if defined(OS_WINDOWS)
 	OutputDebugString(str);
 #elif defined(OS_WINCE)
@@ -2392,9 +2412,6 @@ static void usbi_log_str(enum libusb_log_level level, const char *str)
 #warning System logging is not supported on this platform. Logging to stderr will be used instead.
 	fputs(str, stderr);
 #endif
-#else
-	fputs(str, stderr);
-#endif /* USE_SYSTEM_LOGGING_FACILITY */
 	UNUSED(level);
 }
 

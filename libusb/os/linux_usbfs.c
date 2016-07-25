@@ -2955,6 +2955,93 @@ close_out:
 	closedir(devices);
 	return r;
 }
+
+struct libusb_device* op_get_device2(struct libusb_context *ctx, const char *dev_node,
+	const char* descriptors, size_t descriptors_size)
+{
+	uint8_t busnum, devaddr;
+	unsigned int session_id;
+	if (linux_get_device_address(ctx, 0, &busnum, &devaddr,
+		dev_node, NULL) != LIBUSB_SUCCESS) {
+		usbi_dbg("failed to get device address (%s)", dev_node);
+		return NULL;
+	}
+
+	/* make sure device is enumerated */
+	if (linux_enumerate_device2(ctx, busnum, devaddr, descriptors, descriptors_size) < 0) {
+		usbi_dbg("failed to enumerate (%s)", dev_node);
+		return NULL;
+	}
+
+	/* retrive the device */
+	session_id = busnum << 8 | devaddr;
+	usbi_dbg("busnum %d devaddr %d session_id %ld", busnum, devaddr,
+		session_id);
+
+	return usbi_get_device_by_session_id(ctx, session_id);
+}
+
+static int initialize_device2(struct libusb_device *dev, uint8_t busnum,
+	uint8_t devaddr, const char* descriptors, size_t descriptors_size)
+{
+	struct linux_device_priv *priv = _device_priv(dev);
+
+	dev->bus_number = busnum;
+	dev->device_address = devaddr;
+
+	priv->descriptors = usbi_reallocf(priv->descriptors,
+					  descriptors_size);
+	if (!priv->descriptors) {
+		return LIBUSB_ERROR_NO_MEM;
+	}
+	memcpy(priv->descriptors, descriptors, descriptors_size);
+	priv->descriptors_len = descriptors_size;
+	return LIBUSB_SUCCESS;
+}
+
+int linux_enumerate_device2(struct libusb_context *ctx, uint8_t busnum, uint8_t devaddr,
+	const char* descriptors, size_t descriptors_size)
+{
+	unsigned long session_id;
+	struct libusb_device *dev;
+	int r = 0;
+
+	/* FIXME: session ID is not guaranteed unique as addresses can wrap and
+	 * will be reused. instead we should add a simple sysfs attribute with
+	 * a session ID. */
+	session_id = busnum << 8 | devaddr;
+	usbi_dbg("busnum %d devaddr %d session_id %ld", busnum, devaddr,
+		session_id);
+
+	dev = usbi_get_device_by_session_id(ctx, session_id);
+	if (dev) {
+		/* device already exists in the context */
+		usbi_dbg("session_id %ld already exists", session_id);
+		libusb_unref_device(dev);
+		return LIBUSB_SUCCESS;
+	}
+
+	usbi_dbg("allocating new device for %d/%d (session %ld)",
+		 busnum, devaddr, session_id);
+	dev = usbi_alloc_device(ctx, session_id);
+	if (!dev)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = initialize_device2(dev, busnum, devaddr, descriptors, descriptors_size);
+	if (r < 0)
+		goto out;
+	r = usbi_sanitize_device(dev);
+	if (r < 0)
+		goto out;
+
+out:
+	if (r < 0)
+		libusb_unref_device(dev);
+	else
+		usbi_connect_device(dev);
+
+	return r;
+}
 #endif
 
 const struct usbi_os_backend linux_usbfs_backend = {
@@ -2973,6 +3060,11 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.get_config_descriptor = op_get_config_descriptor,
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
 
+#ifdef __ANDROID__
+	.get_device2 = op_get_device2,
+#else
+	.get_device2 = NULL,
+#endif
 	.open = op_open,
 	.close = op_close,
 	.get_configuration = op_get_configuration,
