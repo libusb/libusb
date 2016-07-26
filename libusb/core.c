@@ -2327,7 +2327,11 @@ int API_EXPORTED libusb_has_capability(uint32_t capability)
 	case LIBUSB_CAP_HAS_CAPABILITY:
 		return 1;
 	case LIBUSB_CAP_HAS_HOTPLUG:
+#ifdef __ANDROID__
+		return 0;
+#else
 		return !(usbi_backend.get_device_list);
+#endif
 	case LIBUSB_CAP_HAS_HID_ACCESS:
 		return (usbi_backend.caps & USBI_CAP_HAS_HID_ACCESS);
 	case LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER:
