@@ -734,6 +734,8 @@ struct usbi_os_backend {
 	 */
 	int (*open)(struct libusb_device_handle *dev_handle);
 
+	int (*open2)(struct libusb_device_handle *handle, int fd);
+
 	/* Close a device such that the handle cannot be used again. Your backend
 	 * should destroy any resources that were allocated in the open path.
 	 * This may also be a good place to call usbi_remove_pollfd() to inform

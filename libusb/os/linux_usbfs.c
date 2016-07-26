@@ -1539,6 +1539,13 @@ static int op_open(struct libusb_device_handle *handle)
 	return r;
 }
 
+static int op_open2(struct libusb_device_handle *handle, int fd)
+{
+	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
+	hpriv->fd = fd;
+	return usbi_add_pollfd(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
+}
+
 static void op_close(struct libusb_device_handle *dev_handle)
 {
 	struct linux_device_handle_priv *hpriv = _device_handle_priv(dev_handle);
@@ -3001,6 +3008,11 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.get_device2 = NULL,
 #endif
 	.open = op_open,
+#ifdef __ANDROID__
+	.open2 = op_open2,
+#else
+	.open2 = NULL,
+#endif
 	.close = op_close,
 	.get_configuration = op_get_configuration,
 	.set_configuration = op_set_configuration,
