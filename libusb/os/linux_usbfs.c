@@ -2895,67 +2895,6 @@ static clockid_t op_get_timerfd_clockid(void)
 #endif
 
 #ifdef __ANDROID__
-static int op_get_device_list(struct libusb_context * ctx,
-	struct discovered_devs **discdevs)
-{
-	struct discovered_devs *ddd;
-	DIR *devices = opendir(SYSFS_DEVICE_PATH);
-	struct dirent *entry;
-	int r = LIBUSB_SUCCESS;
-	int num_failed = 0;
-	uint8_t busnum, devaddr;
-	unsigned long session_id;
-	struct libusb_device *dev;
-
-	if (!devices) {
-		usbi_err(ctx, "opendir devices failed errno=%d", errno);
-		return r;
-	}
-
-	while ((entry = readdir(devices))) {
-		if ((!isdigit(entry->d_name[0]) && strncmp(entry->d_name, "usb", 3))
-				|| strchr(entry->d_name, ':'))
-			continue;
-
-		r = linux_get_device_address (ctx, 0, &busnum, &devaddr, NULL, entry->d_name);
-		if (LIBUSB_SUCCESS != r) {
-			num_failed++;
-			usbi_dbg("failed to enumerate dir entry %s", entry->d_name);
-			continue;
-		}
-		session_id = busnum << 8 | devaddr;
-		usbi_dbg("busnum %d devaddr %d session_id %ld", busnum, devaddr,
-			 session_id);
-		dev = usbi_get_device_by_session_id(ctx, session_id);
-		if (dev == NULL) {
-			dev = usbi_alloc_device(ctx, session_id);
-			if (!dev) {
-				r = LIBUSB_ERROR_NO_MEM;
-				goto close_out;
-			}
-			r = initialize_device(dev, busnum, devaddr, entry->d_name);
-			if (r < 0)
-				goto out;
-			r = usbi_sanitize_device(dev);
-			if (r < 0)
-				goto out;
-
-		}
-		ddd = discovered_devs_append(*discdevs, dev);
-		if (ddd == NULL)
-			goto out;
-		libusb_unref_device(dev);
-		*discdevs = ddd;
-	}
-	closedir(devices);
-	return r;
-out:
-	libusb_unref_device(dev);
-close_out:
-	closedir(devices);
-	return r;
-}
-
 struct libusb_device* op_get_device2(struct libusb_context *ctx, const char *dev_node,
 	const char* descriptors, size_t descriptors_size)
 {
@@ -3049,11 +2988,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER|USBI_CAP_HAS_POLLABLE_DEVICE_FD,
 	.init = op_init,
 	.exit = op_exit,
-#ifdef __ANDROID__
-	.get_device_list = op_get_device_list,
-#else
 	.get_device_list = NULL,
-#endif
 	.hotplug_poll = op_hotplug_poll,
 	.get_device_descriptor = op_get_device_descriptor,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
