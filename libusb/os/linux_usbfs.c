@@ -2983,9 +2983,6 @@ int linux_enumerate_device2(struct libusb_context *ctx, uint8_t busnum, uint8_t 
 out:
 	if (r < 0)
 		libusb_unref_device(dev);
-	else
-		usbi_connect_device(dev);
-
 	return r;
 }
 #endif
