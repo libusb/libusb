@@ -706,7 +706,6 @@ struct usbi_os_backend {
 	struct libusb_device* (*get_device2)(struct libusb_context *ctx, const char *dev_node,
 		const char* descriptors, size_t descriptors_len);
 
-
 	/* Open a device for I/O and other USB operations. The device handle
 	 * is preallocated for you, you can retrieve the device in question
 	 * through handle->dev.
