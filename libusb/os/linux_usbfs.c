@@ -2919,7 +2919,7 @@ struct libusb_device* op_get_device2(struct libusb_context *ctx, const char *dev
 		return NULL;
 	}
 
-	/* retrive the device */
+	/* retrieve the device */
 	session_id = busnum << 8 | devaddr;
 	usbi_dbg("busnum %d devaddr %d session_id %ld", busnum, devaddr,
 		session_id);
