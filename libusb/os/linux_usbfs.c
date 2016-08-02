@@ -1539,12 +1539,14 @@ static int op_open(struct libusb_device_handle *handle)
 	return r;
 }
 
+#ifdef __ANDROID__
 static int op_open2(struct libusb_device_handle *handle, int fd)
 {
 	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
 	hpriv->fd = fd;
 	return usbi_add_pollfd(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
 }
+#endif
 
 static void op_close(struct libusb_device_handle *dev_handle)
 {
