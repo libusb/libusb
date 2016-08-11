@@ -1523,6 +1523,10 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		usbi_mutex_unlock(&itransfer->lock);
 		return r;
 	}
+	/*
+	 * We must release the flying transfers lock here, because with
+	 * some backends the submit_transfer method is synchroneous.
+	 */
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
 	r = usbi_backend->submit_transfer(itransfer);
