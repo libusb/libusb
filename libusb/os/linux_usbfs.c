@@ -1554,7 +1554,10 @@ static void op_close(struct libusb_device_handle *dev_handle)
 	/* fd may have already been removed by POLLERR condition in op_handle_events() */
 	if (!hpriv->fd_removed)
 		usbi_remove_pollfd(HANDLE_CTX(dev_handle), hpriv->fd);
+	//open(fd) is called in java side as is close.
+#ifndef __ANDROID__
 	close(hpriv->fd);
+#endif
 }
 
 static int op_get_configuration(struct libusb_device_handle *handle,
