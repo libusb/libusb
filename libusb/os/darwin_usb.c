@@ -373,7 +373,7 @@ static void *darwin_event_thread_main (void *arg0) {
 
   /* Set this thread's name, so it can be seen in the debugger
      and crash reports. */
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060 && MAC_OS_X_VERSION_MIN_REQUIRED <= 1080
   pthread_setname_np ("org.libusb.device-hotplug");
 
   /* Tell the Objective-C garbage collector about this thread.
