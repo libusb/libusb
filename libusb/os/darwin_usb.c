@@ -1201,7 +1201,7 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
   u_int8_t numep, direction, number;
   u_int8_t dont_care1, dont_care3;
   u_int16_t dont_care2;
-  int i;
+  int rc;
 
   usbi_dbg ("building table of endpoints.");
 
@@ -1213,19 +1213,36 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
   }
 
   /* iterate through pipe references */
-  for (i = 1 ; i <= numep ; i++) {
+  for (int i = 1 ; i <= numep ; i++) {
     kresult = (*(cInterface->interface))->GetPipeProperties(cInterface->interface, i, &direction, &number, &dont_care1,
                                                             &dont_care2, &dont_care3);
 
     if (kresult != kIOReturnSuccess) {
-      usbi_err (HANDLE_CTX (dev_handle), "error getting pipe information for pipe %d: %s", i, darwin_error_str(kresult));
+      /* probably a buggy device. try to get the endpoint address from the descriptors */
+      struct libusb_config_descriptor *config;
+      const struct libusb_endpoint_descriptor *endpoint_desc;
+      UInt8 alt_setting;
 
-      return darwin_to_libusb (kresult);
+      kresult = (*(cInterface->interface))->GetAlternateSetting (cInterface->interface, &alt_setting);
+      if (kresult) {
+        usbi_err (HANDLE_CTX (dev_handle), "can't get alternate setting for interface");
+        return darwin_to_libusb (kresult);
+      }
+
+      rc = libusb_get_active_config_descriptor (dev_handle->dev, &config);
+      if (LIBUSB_SUCCESS != rc) {
+        return rc;
+      }
+
+      endpoint_desc = config->interface[iface].altsetting[alt_setting].endpoint + i - 1;
+
+      cInterface->endpoint_addrs[i - 1] = endpoint_desc->bEndpointAddress;
+    } else {
+      cInterface->endpoint_addrs[i - 1] = (((kUSBIn == direction) << kUSBRqDirnShift) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
     }
 
-    usbi_dbg ("interface: %i pipe %i: dir: %i number: %i", iface, i, direction, number);
-
-    cInterface->endpoint_addrs[i - 1] = (((kUSBIn == direction) << kUSBRqDirnShift) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
+    usbi_dbg ("interface: %i pipe %i: dir: %i number: %i", iface, i, cInterface->endpoint_addrs[i - 1] >> kUSBRqDirnShift,
+              cInterface->endpoint_addrs[i - 1] & LIBUSB_ENDPOINT_ADDRESS_MASK);
   }
 
   cInterface->num_endpoints = numep;
