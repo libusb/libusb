@@ -14,5 +14,5 @@
 #endif
 /* LIBUSB_RC is the release candidate suffix. Should normally be empty. */
 #ifndef LIBUSB_RC
-#define LIBUSB_RC "-rc3"
+#define LIBUSB_RC "-rc4"
 #endif
