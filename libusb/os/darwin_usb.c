@@ -41,7 +41,7 @@
   #include <objc/objc-auto.h>
 #endif
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 /* Apple deprecated the darwin atomics in 10.12 in favor of C11 atomics */
 #include <stdatomic.h>
 #define libusb_darwin_atomic_fetch_add(x, y) atomic_fetch_add(x, y)
