@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2014 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2008-2016 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,7 +29,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <libkern/OSAtomic.h>
 #include <sys/sysctl.h>
 
 #include <mach/clock.h>
@@ -40,6 +39,22 @@
 #include <AvailabilityMacros.h>
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
   #include <objc/objc-auto.h>
+#endif
+
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
+/* Apple deprecated the darwin atomics in 10.12 in favor of C11 atomics */
+#include <stdatomic.h>
+#define libusb_darwin_atomic_fetch_add(x, y) atomic_fetch_add(x, y)
+
+_Atomic int32_t initCount = ATOMIC_VAR_INIT(0);
+#else
+/* use darwin atomics if the target is older than 10.12 */
+#include <libkern/OSAtomic.h>
+
+/* OSAtomicAdd32Barrier returns the new value */
+#define libusb_darwin_atomic_fetch_add(x, y) (OSAtomicAdd32Barrier(x, y) - y)
+
+static volatile int32_t initCount = 0;
 #endif
 
 #include "darwin_usb.h"
@@ -55,7 +70,6 @@ static clock_serv_t clock_monotonic;
 
 static CFRunLoopRef libusb_darwin_acfl = NULL; /* event cf loop */
 static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for event cf loop */
-static volatile int32_t initCount = 0;
 
 static usbi_mutex_t darwin_cached_devices_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct list_head darwin_cached_devices = {&darwin_cached_devices, &darwin_cached_devices};
@@ -511,7 +525,7 @@ static int darwin_init(struct libusb_context *ctx) {
     return rc;
   }
 
-  if (OSAtomicIncrement32Barrier(&initCount) == 1) {
+  if (libusb_darwin_atomic_fetch_add (&initCount, 1) == 0) {
     /* create the clocks that will be used */
 
     host_self = mach_host_self();
@@ -531,7 +545,7 @@ static int darwin_init(struct libusb_context *ctx) {
 }
 
 static void darwin_exit (void) {
-  if (OSAtomicDecrement32Barrier(&initCount) == 0) {
+  if (libusb_darwin_atomic_fetch_add (&initCount, -1) == 1) {
     mach_port_deallocate(mach_task_self(), clock_realtime);
     mach_port_deallocate(mach_task_self(), clock_monotonic);
 
