@@ -864,12 +864,12 @@ static int force_hcd_device_descriptor(struct libusb_device *dev)
 	priv->dev_descriptor.bNumConfigurations = 1;
 	priv->active_config = 1;
 
-	if (priv->parent_dev == NULL) {
+	if (dev->parent_dev == NULL) {
 		usbi_err(ctx, "program assertion failed - HCD hub has no parent");
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
 
-	parent_priv = _device_priv(priv->parent_dev);
+	parent_priv = _device_priv(dev->parent_dev);
 	if (sscanf(parent_priv->path, "\\\\.\\PCI#VEN_%04x&DEV_%04x%*s", &vid, &pid) == 2) {
 		priv->dev_descriptor.idVendor = (uint16_t)vid;
 		priv->dev_descriptor.idProduct = (uint16_t)pid;
@@ -1043,7 +1043,6 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	priv->port = port_number;
 	dev->port_number = port_number;
 	priv->depth = parent_priv->depth + 1;
-	priv->parent_dev = parent_dev;
 	dev->parent_dev = parent_dev;
 
 	// If the device address is already set, we can stop here
@@ -1521,9 +1520,16 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						session_id, dev->bus_number, dev->device_address);
 
 					priv = _device_priv(dev);
-					if (priv->parent_dev != NULL) {
-						if (priv->parent_dev != parent_dev) {
-							usbi_err(ctx, "program assertion failed - existing device should share parent");
+					if ((parent_dev != NULL) && (dev->parent_dev != NULL)) {
+						if (dev->parent_dev != parent_dev) {
+							// It is possible for the actual parent device to not have existed at the
+							// time of enumeration, so the currently assigned parent may in fact be a
+							// grandparent.  If the devices differ, we assume the "new" parent device
+							// is in fact closer to the device.
+                                                        usbi_dbg("updating parent device [session %lX -> %lX]",
+                                                                dev->parent_dev->session_data, parent_dev->session_data);
+							libusb_unref_device(dev->parent_dev);
+							dev->parent_dev = parent_dev;
 						} else {
 							// We hold a reference to parent_dev instance, but this device already
 							// has a parent_dev reference (only one per child)
