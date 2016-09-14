@@ -29,8 +29,8 @@
 #if defined(_WIN32)
 #define msleep(msecs) Sleep(msecs)
 #else
-#include <unistd.h>
-#define msleep(msecs) usleep(1000*msecs)
+#include <time.h>
+#define msleep(msecs) nanosleep(&(struct timespec){msecs / 1000, (msecs * 1000000) % 1000000000UL}, NULL);
 #endif
 
 #if defined(_MSC_VER)

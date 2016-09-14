@@ -1,0 +1,29 @@
+# Require trusty for now as it has a more recent version of autoconf
+sudo: required
+dist: trusty
+language: c
+
+compiler:
+    - gcc
+    - clang
+
+os:
+    - linux
+    - osx
+
+
+addons:
+    apt:
+        packages:
+            - autoconf
+            - automake
+            - libtool
+            - m4
+            - libudev-dev
+        sources:
+            - ubuntu-toolchain-r-test
+
+script:
+    - ./autogen.sh && make -j4
+    - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./travis-autogen.sh --disable-udev && make -j4; fi
+    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cd Xcode && xcodebuild -project libusb.xcodeproj ; fi

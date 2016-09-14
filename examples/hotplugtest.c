@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * libusb example program for hotplug API
- * Copyright © 2012-2013 Nathan Hjelm <hjelmn@mac.ccom>
+ * Copyright © 2012-2013 Nathan Hjelm <hjelmn@mac.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -73,9 +73,9 @@ int main(int argc, char *argv[])
 	int product_id, vendor_id, class_id;
 	int rc;
 
-	vendor_id  = (argc > 1) ? strtol (argv[1], NULL, 0) : 0x045a;
-	product_id = (argc > 2) ? strtol (argv[2], NULL, 0) : 0x5005;
-	class_id   = (argc > 3) ? strtol (argv[3], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
+	vendor_id  = (argc > 1) ? (int)strtol (argv[1], NULL, 0) : 0x045a;
+	product_id = (argc > 2) ? (int)strtol (argv[2], NULL, 0) : 0x5005;
+	class_id   = (argc > 3) ? (int)strtol (argv[3], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
 
 	rc = libusb_init (NULL);
 	if (rc < 0)

@@ -60,120 +60,120 @@ typedef enum {
 
 typedef union {
 	struct {
-		status_t						status;
+		status_t status;
 	} version;
 
 	struct {
-		status_t						status;
-		usb_device_descriptor			*descriptor;
+		status_t status;
+		usb_device_descriptor *descriptor;
 	} device;
 
 	struct {
-		status_t						status;
-		usb_configuration_descriptor	*descriptor;
-		uint32							config_index;
+		status_t status;
+		usb_configuration_descriptor *descriptor;
+		uint32 config_index;
 	} config;
 
 	struct {
-		status_t						status;
-		uint32							alternate_info;
-		uint32							config_index;
-		uint32							interface_index;
+		status_t status;
+		uint32 alternate_info;
+		uint32 config_index;
+		uint32 interface_index;
 	} alternate;
 
 	struct {
-		status_t						status;
-		usb_interface_descriptor		*descriptor;
-		uint32							config_index;
-		uint32							interface_index;
+		status_t status;
+		usb_interface_descriptor *descriptor;
+		uint32 config_index;
+		uint32 interface_index;
 	} interface;
 
 	struct {
-		status_t						status;
-		usb_interface_descriptor		*descriptor;
-		uint32							config_index;
-		uint32							interface_index;
-		uint32							alternate_index;
+		status_t status;
+		usb_interface_descriptor *descriptor;
+		uint32 config_index;
+		uint32 interface_index;
+		uint32 alternate_index;
 	} interface_etc;
 
 	struct {
-		status_t						status;
-		usb_endpoint_descriptor			*descriptor;
-		uint32							config_index;
-		uint32							interface_index;
-		uint32							endpoint_index;
+		status_t status;
+		usb_endpoint_descriptor *descriptor;
+		uint32 config_index;
+		uint32 interface_index;
+		uint32 endpoint_index;
 	} endpoint;
 
 	struct {
-		status_t						status;
-		usb_endpoint_descriptor			*descriptor;
-		uint32							config_index;
-		uint32							interface_index;
-		uint32							alternate_index;
-		uint32							endpoint_index;
+		status_t status;
+		usb_endpoint_descriptor *descriptor;
+		uint32 config_index;
+		uint32 interface_index;
+		uint32 alternate_index;
+		uint32 endpoint_index;
 	} endpoint_etc;
 
 	struct {
-		status_t						status;
-		usb_descriptor					*descriptor;
-		uint32							config_index;
-		uint32							interface_index;
-		uint32							generic_index;
-		size_t							length;
+		status_t status;
+		usb_descriptor *descriptor;
+		uint32 config_index;
+		uint32 interface_index;
+		uint32 generic_index;
+		size_t length;
 	} generic;
 
 	struct {
-		status_t						status;
-		usb_descriptor					*descriptor;
-		uint32							config_index;
-		uint32							interface_index;
-		uint32							alternate_index;
-		uint32							generic_index;
-		size_t							length;
+		status_t status;
+		usb_descriptor *descriptor;
+		uint32 config_index;
+		uint32 interface_index;
+		uint32 alternate_index;
+		uint32 generic_index;
+		size_t length;
 	} generic_etc;
 
 	struct {
-		status_t						status;
-		usb_string_descriptor			*descriptor;
-		uint32							string_index;
-		size_t							length;
+		status_t status;
+		usb_string_descriptor *descriptor;
+		uint32 string_index;
+		size_t length;
 	} string;
 
 	struct {
-		status_t						status;
-		uint8							type;
-		uint8							index;
-		uint16							language_id;
-		void							*data;
-		size_t							length;
+		status_t status;
+		uint8 type;
+		uint8 index;
+		uint16 language_id;
+		void *data;
+		size_t length;
 	} descriptor;
 
 	struct {
-		status_t						status;
-		uint8							request_type;
-		uint8							request;
-		uint16							value;
-		uint16							index;
-		uint16							length;
-		void							*data;
+		status_t status;
+		uint8 request_type;
+		uint8 request;
+		uint16 value;
+		uint16 index;
+		uint16 length;
+		void *data;
 	} control;
 
 	struct {
-		status_t						status;
-		uint32							interface;
-		uint32							endpoint;
-		void							*data;
-		size_t							length;
+		status_t status;
+		uint32 interface;
+		uint32 endpoint;
+		void *data;
+		size_t length;
 	} transfer;
 
 	struct {
-		status_t						status;
-		uint32							interface;
-		uint32							endpoint;
-		void							*data;
-		size_t							length;
-		usb_iso_packet_descriptor		*packet_descriptors;
-		uint32							packet_count;
+		status_t status;
+		uint32 interface;
+		uint32 endpoint;
+		void *data;
+		size_t length;
+		usb_iso_packet_descriptor *packet_descriptors;
+		uint32 packet_count;
 	} isochronous;
 } usb_raw_command;
 

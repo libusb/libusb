@@ -13,6 +13,7 @@
 			buildPhases = (
 			);
 			dependencies = (
+				006AD4281C8C5BBC007F8C6A /* PBXTargetDependency */,
 				008FC0371628BC9A00BC5BE2 /* PBXTargetDependency */,
 				008FC0391628BC9A00BC5BE2 /* PBXTargetDependency */,
 				008FC03B1628BC9A00BC5BE2 /* PBXTargetDependency */,
@@ -26,6 +27,9 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		006AD4241C8C5AAE007F8C6A /* hotplugtest.c in Sources */ = {isa = PBXBuildFile; fileRef = 006AD4231C8C5AAE007F8C6A /* hotplugtest.c */; };
+		006AD4251C8C5AC4007F8C6A /* hotplugtest.c in Sources */ = {isa = PBXBuildFile; fileRef = 006AD4231C8C5AAE007F8C6A /* hotplugtest.c */; };
+		006AD4261C8C5AD9007F8C6A /* libusb-1.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */; };
 		008FBF861628B7E800BC5BE2 /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBF541628B7E800BC5BE2 /* core.c */; };
 		008FBF871628B7E800BC5BE2 /* descriptor.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBF551628B7E800BC5BE2 /* descriptor.c */; };
 		008FBF881628B7E800BC5BE2 /* io.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBF561628B7E800BC5BE2 /* io.c */; };
@@ -61,6 +65,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		006AD4271C8C5BBC007F8C6A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 008FBF281628B79300BC5BE2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 006AD41B1C8C5A90007F8C6A;
+			remoteInfo = hotplugtest;
+		};
 		008FC0361628BC9A00BC5BE2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 008FBF281628B79300BC5BE2 /* Project object */;
@@ -141,6 +152,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		006AD41A1C8C5A90007F8C6A /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 		008FBFBB1628B9FE00BC5BE2 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -189,6 +209,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		006AD41C1C8C5A90007F8C6A /* hotplugtest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = hotplugtest; sourceTree = BUILT_PRODUCTS_DIR; };
+		006AD4231C8C5AAE007F8C6A /* hotplugtest.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = hotplugtest.c; sourceTree = "<group>"; };
 		008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = "libusb-1.0.0.dylib"; sourceTree = BUILT_PRODUCTS_DIR; };
 		008FBF541628B7E800BC5BE2 /* core.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = core.c; sourceTree = "<group>"; };
 		008FBF551628B7E800BC5BE2 /* descriptor.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = descriptor.c; sourceTree = "<group>"; };
@@ -232,6 +254,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		006AD4191C8C5A90007F8C6A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				006AD4261C8C5AD9007F8C6A /* libusb-1.0.0.dylib in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		008FBF2E1628B79300BC5BE2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -306,6 +336,7 @@
 				008FC0051628BBDB00BC5BE2 /* dpfp_threaded */,
 				008FC0151628BC0300BC5BE2 /* fxload */,
 				008FC0261628BC6B00BC5BE2 /* listdevs */,
+				006AD41C1C8C5A90007F8C6A /* hotplugtest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -346,13 +377,14 @@
 		008FBFC81628BA0E00BC5BE2 /* examples */ = {
 			isa = PBXGroup;
 			children = (
-				008FBFD71628BA0E00BC5BE2 /* dpfp.c */,
 				008FBFDB1628BA0E00BC5BE2 /* dpfp_threaded.c */,
+				008FBFD71628BA0E00BC5BE2 /* dpfp.c */,
 				008FBFDC1628BA0E00BC5BE2 /* ezusb.c */,
+				008FBFDD1628BA0E00BC5BE2 /* ezusb.h */,
 				008FBFE11628BA0E00BC5BE2 /* fxload.c */,
+				006AD4231C8C5AAE007F8C6A /* hotplugtest.c */,
 				008FBFE71628BA0E00BC5BE2 /* listdevs.c */,
 				008FBFED1628BA0E00BC5BE2 /* xusb.c */,
-				008FBFDD1628BA0E00BC5BE2 /* ezusb.h */,
 			);
 			name = examples;
 			path = ../examples;
@@ -405,6 +437,23 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
+		006AD41B1C8C5A90007F8C6A /* hotplugtest */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 006AD4221C8C5A90007F8C6A /* Build configuration list for PBXNativeTarget "hotplugtest" */;
+			buildPhases = (
+				006AD4181C8C5A90007F8C6A /* Sources */,
+				006AD4191C8C5A90007F8C6A /* Frameworks */,
+				006AD41A1C8C5A90007F8C6A /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = hotplugtest;
+			productName = hotplugtest;
+			productReference = 006AD41C1C8C5A90007F8C6A /* hotplugtest */;
+			productType = "com.apple.product-type.tool";
+		};
 		008FBF301628B79300BC5BE2 /* libusb */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 008FBF351628B79300BC5BE2 /* Build configuration list for PBXNativeTarget "libusb" */;
@@ -520,6 +569,11 @@
 			attributes = {
 				LastUpgradeCheck = 0450;
 				ORGANIZATIONNAME = libusb;
+				TargetAttributes = {
+					006AD41B1C8C5A90007F8C6A = {
+						CreatedOnToolsVersion = 7.2.1;
+					};
+				};
 			};
 			buildConfigurationList = 008FBF2B1628B79300BC5BE2 /* Build configuration list for PBXProject "libusb" */;
 			compatibilityVersion = "Xcode 3.1";
@@ -539,12 +593,21 @@
 				008FC0041628BBDB00BC5BE2 /* dpfp_threaded */,
 				008FC0141628BC0300BC5BE2 /* fxload */,
 				008FC0251628BC6B00BC5BE2 /* listdevs */,
+				006AD41B1C8C5A90007F8C6A /* hotplugtest */,
 				008FC0321628BC9400BC5BE2 /* all */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
+		006AD4181C8C5A90007F8C6A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				006AD4251C8C5AC4007F8C6A /* hotplugtest.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		008FBF2D1628B79300BC5BE2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -558,6 +621,7 @@
 				1438D77A17A2ED9F00166101 /* hotplug.c in Sources */,
 				1438D77D17A2EDCD00166101 /* poll_posix.c in Sources */,
 				1438D77F17A2F0EA00166101 /* strerror.c in Sources */,
+				006AD4241C8C5AAE007F8C6A /* hotplugtest.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -605,6 +669,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		006AD4281C8C5BBC007F8C6A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 006AD41B1C8C5A90007F8C6A /* hotplugtest */;
+			targetProxy = 006AD4271C8C5BBC007F8C6A /* PBXContainerItemProxy */;
+		};
 		008FC0371628BC9A00BC5BE2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 008FBF301628B79300BC5BE2 /* libusb */;
@@ -663,6 +732,20 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		006AD4201C8C5A90007F8C6A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		006AD4211C8C5A90007F8C6A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 		008FBF331628B79300BC5BE2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -786,6 +869,14 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		006AD4221C8C5A90007F8C6A /* Build configuration list for PBXNativeTarget "hotplugtest" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				006AD4201C8C5A90007F8C6A /* Debug */,
+				006AD4211C8C5A90007F8C6A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+		};
 		008FBF2B1628B79300BC5BE2 /* Build configuration list for PBXProject "libusb" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -862,4 +953,3 @@
 	};
 	rootObject = 008FBF281628B79300BC5BE2 /* Project object */;
 }
-
