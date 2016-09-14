@@ -37,7 +37,7 @@
 #include <mach/mach_port.h>
 
 #include <AvailabilityMacros.h>
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060 && MAC_OS_X_VERSION_MIN_REQUIRED < 101200
   #include <objc/objc-auto.h>
 #endif
 
@@ -385,15 +385,19 @@ static void *darwin_event_thread_main (void *arg0) {
   struct libusb_context *ctx = (struct libusb_context *)arg0;
   CFRunLoopRef runloop;
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
   /* Set this thread's name, so it can be seen in the debugger
      and crash reports. */
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060 && MAC_OS_X_VERSION_MIN_REQUIRED <= 1080
   pthread_setname_np ("org.libusb.device-hotplug");
+#endif
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060 && MAC_OS_X_VERSION_MIN_REQUIRED < 101200
   /* Tell the Objective-C garbage collector about this thread.
      This is required because, unlike NSThreads, pthreads are
      not automatically registered. Although we don't use
-     Objective-C, we use CoreFoundation, which does. */
+     Objective-C, we use CoreFoundation, which does.
+     Garbage collection support was entirely removed in 10.12,
+     so don't bother there. */
   objc_registerThreadWithCollector();
 #endif
 
