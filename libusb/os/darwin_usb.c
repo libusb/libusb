@@ -52,7 +52,7 @@ _Atomic int32_t initCount = ATOMIC_VAR_INIT(0);
 #include <libkern/OSAtomic.h>
 
 /* OSAtomicAdd32Barrier returns the new value */
-#define libusb_darwin_atomic_fetch_add(x, y) (OSAtomicAdd32Barrier(x, y) - y)
+#define libusb_darwin_atomic_fetch_add(x, y) (OSAtomicAdd32Barrier(y, x) - y)
 
 static volatile int32_t initCount = 0;
 #endif
