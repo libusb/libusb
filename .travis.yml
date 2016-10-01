@@ -23,6 +23,9 @@ addons:
         sources:
             - ubuntu-toolchain-r-test
 
+before_install:
+    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; brew upgrade automake libtool; fi
+
 script:
     - ./autogen.sh && make -j4
     - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./travis-autogen.sh --disable-udev && make -j4; fi
