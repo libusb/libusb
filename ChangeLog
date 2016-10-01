@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2016-09-12: v1.0.21:
+2016-10-01: v1.0.21:
 * Core: Refactor code related to transfer flags and timeout handling
 * Darwin: Ignore root hub simulation devices
 * Darwin: Improved support for OS X El Capitan
