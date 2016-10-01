@@ -29,6 +29,12 @@ matrix:
           osx_image: beta-xcode6.2
           compiler: clang
 
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "nw0QwlWKEvUICuky+plOlkh7xJxXz+oq5FiakgpwXPI6GidIuHPvnv0xTNnC4uFO9+UW5ARSbPnMEq5X4HJ9BxkuXVXVvuwZ4lkPMkNVGCzy0plTWhP8Wcrn5teldp7O5BiY3H/hVdDt44yUvdTKsjW5hJtltj92XwdrZq8l51RfgNAiy38E7u6ynX76sF2MLTA5lAv204bi5iOeKOYYLO/RFNlMrnNvNI2kPzl0sn2nD+mzik5Q08c4gYQtlKtox6n18kLVHWuQAR/cPp1ApBdD+0Nl+WggYUV0drBHWlx00hysLTWVIgl381amndTpvvKPym6oV1IMfS3AVXrMnOv44HE58T5sybPykXiiVXfgJ/uH7fhEjbYfY10J2I2vv1EyOAtLv39PHKZ9inzuag9VN535juMj+rp4TqeFN8ARSW91QdeokStuRLeqcuCzkTvLqnAMd9ZDYjUtJgI9xgdwY3RKuVjhPrED4RB9QhbgSz9s+1V05AJPcabSpX6RXlsZ8otQefghHxFpCkMFjtQ7LGAFTgDV+3mexZ7JgnvSwwYN7J/W+XOXdrO5ud30JZebeNnc1i6t9UB4lbmoUTI2SCaqXAprcNvEHEIBRecLyE4gs1DPzmAo8xLPT8jhXtUUd5nR8OqDm+nhqHN7UAyQWMYZqRswfLPZzM/ZqFU="
+
 addons:
     apt:
         packages:
@@ -39,6 +45,15 @@ addons:
             - libudev-dev
         sources:
             - ubuntu-toolchain-r-test
+
+    coverity_scan:
+        project:
+            name: "libusb/libusb"
+            description: "Build submitted via Travis CI"
+        notification_email: libusb-devel@lists.sourceforge.net
+        build_command_prepend: "./configure; make clean"
+        build_command:   "make -j 4"
+        branch_pattern: master
 
 before_install:
     # brew upgrade sets the return code to 1 if the latest version is already installed. the true command
