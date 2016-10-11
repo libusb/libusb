@@ -172,7 +172,11 @@ static void *linux_udev_event_thread_main(void *arg)
 
 	usbi_dbg("udev event thread entering.");
 
-	while (poll(fds, 2, -1) >= 0) {
+	while ((r = poll(fds, 2, -1)) >= 0 || errno == EINTR) {
+		if (r < 0) {
+			// temporary failure
+			continue;
+		}
 		if (fds[0].revents & POLLIN) {
 			/* activity on control pipe, read the byte and exit */
 			r = usbi_read(udev_control_pipe[0], &dummy, sizeof(dummy));
