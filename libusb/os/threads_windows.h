@@ -71,9 +71,6 @@ void *usbi_tls_key_get(usbi_tls_key_t key);
 int usbi_tls_key_set(usbi_tls_key_t key, void *value);
 int usbi_tls_key_delete(usbi_tls_key_t key);
 
-// all Windows mutexes are recursive
-#define usbi_mutex_init_recursive	usbi_mutex_init
-
 int usbi_get_tid(void);
 
 #endif /* LIBUSB_THREADS_WINDOWS_H */

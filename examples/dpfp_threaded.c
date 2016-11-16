@@ -1,6 +1,7 @@
 /*
  * libusb example program to manipulate U.are.U 4000B fingerprint scanner.
  * Copyright © 2007 Daniel Drake <dsd@gentoo.org>
+ * Copyright © 2016 Nathan Hjelm <hjelmn@mac.com>
  *
  * Basic image capture program only, does not consider the powerup quirks or
  * the fact that image encryption may be enabled. Not expected to work
@@ -28,6 +29,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
 
 #include "libusb.h"
 
@@ -37,6 +39,7 @@
 #define CTRL_OUT		(LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT)
 #define USB_RQ			0x04
 #define INTR_LENGTH		64
+#define SEM_NAME                "/org.libusb.example.dpfp_threaded"
 
 enum {
 	MODE_INIT = 0x00,
@@ -68,12 +71,12 @@ static int img_idx = 0;
 static volatile sig_atomic_t do_exit = 0;
 
 static pthread_t poll_thread;
-static sem_t exit_sem;
+static sem_t *exit_sem;
 
 static void request_exit(sig_atomic_t code)
 {
 	do_exit = code;
-	sem_post(&exit_sem);
+	sem_post(exit_sem);
 }
 
 static void *poll_thread_main(void *arg)
@@ -446,16 +449,18 @@ int main(void)
 	struct sigaction sigact;
 	int r = 1;
 
-	r = sem_init(&exit_sem, 0, 0);
-	if (r) {
+	exit_sem = sem_open (SEM_NAME, O_CREAT, 0);
+	if (!exit_sem) {
 		fprintf(stderr, "failed to initialise semaphore error %d", errno);
 		exit(1);
 	}
 
+	/* only using this semaphore in this process so go ahead and unlink it now */
+	sem_unlink (SEM_NAME);
+
 	r = libusb_init(NULL);
 	if (r < 0) {
 		fprintf(stderr, "failed to initialise libusb\n");
-		sem_destroy(&exit_sem);
 		exit(1);
 	}
 
@@ -508,7 +513,7 @@ int main(void)
 	}
 
 	while (!do_exit)
-		sem_wait(&exit_sem);
+		sem_wait(exit_sem);
 
 	printf("shutting down...\n");
 	pthread_join(poll_thread, NULL);
@@ -544,6 +549,5 @@ out_release:
 out:
 	libusb_close(devh);
 	libusb_exit(NULL);
-	sem_destroy(&exit_sem);
 	return r >= 0 ? r : -r;
 }

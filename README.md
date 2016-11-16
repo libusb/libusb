@@ -27,7 +27,7 @@ http://mailing-list.libusb.info
 - Hans de Goede <hdegoede@redhat.com>
 - Xiaofan Chen <xiaofanc@gmail.com>
 - Ludovic Rousseau <ludovic.rousseau@gmail.com>
-- Nathan Hjelm <hjelmn@users.sourceforge.net>
+- Nathan Hjelm <hjelmn@cs.unm.edu>
 - Chris Dickens <christopher.a.dickens@gmail.com>
 
 (Please use the mailing list rather than mailing developers directly)

@@ -37,28 +37,6 @@
 #include "threads_posix.h"
 #include "libusbi.h"
 
-int usbi_mutex_init_recursive(pthread_mutex_t *mutex)
-{
-	int err;
-	pthread_mutexattr_t attr;
-
-	err = pthread_mutexattr_init(&attr);
-	if (err != 0)
-		return err;
-
-	/* mutexattr_settype requires _GNU_SOURCE or _XOPEN_SOURCE >= 500 on Linux */
-	err = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-	if (err != 0)
-		goto finish;
-
-	err = pthread_mutex_init(mutex, &attr);
-
-finish:
-	pthread_mutexattr_destroy(&attr);
-
-	return err;
-}
-
 int usbi_cond_timedwait(pthread_cond_t *cond,
 	pthread_mutex_t *mutex, const struct timeval *tv)
 {

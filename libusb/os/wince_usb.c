@@ -720,13 +720,8 @@ static void wince_transfer_callback(
 		status = LIBUSB_TRANSFER_TIMED_OUT;
 		break;
 	case ERROR_OPERATION_ABORTED:
-		if (itransfer->flags & USBI_TRANSFER_TIMED_OUT) {
-			usbi_dbg("detected timeout");
-			status = LIBUSB_TRANSFER_TIMED_OUT;
-		} else {
-			usbi_dbg("detected operation aborted");
-			status = LIBUSB_TRANSFER_CANCELLED;
-		}
+		usbi_dbg("detected operation aborted");
+		status = LIBUSB_TRANSFER_CANCELLED;
 		break;
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error: %s", windows_error_str(io_result));

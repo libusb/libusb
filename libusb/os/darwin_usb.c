@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2014 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2008-2016 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,7 +29,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <libkern/OSAtomic.h>
 #include <sys/sysctl.h>
 
 #include <mach/clock.h>
@@ -38,8 +37,24 @@
 #include <mach/mach_port.h>
 
 #include <AvailabilityMacros.h>
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060 && MAC_OS_X_VERSION_MIN_REQUIRED < 101200
   #include <objc/objc-auto.h>
+#endif
+
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+/* Apple deprecated the darwin atomics in 10.12 in favor of C11 atomics */
+#include <stdatomic.h>
+#define libusb_darwin_atomic_fetch_add(x, y) atomic_fetch_add(x, y)
+
+_Atomic int32_t initCount = ATOMIC_VAR_INIT(0);
+#else
+/* use darwin atomics if the target is older than 10.12 */
+#include <libkern/OSAtomic.h>
+
+/* OSAtomicAdd32Barrier returns the new value */
+#define libusb_darwin_atomic_fetch_add(x, y) (OSAtomicAdd32Barrier(y, x) - y)
+
+static volatile int32_t initCount = 0;
 #endif
 
 #include "darwin_usb.h"
@@ -55,7 +70,6 @@ static clock_serv_t clock_monotonic;
 
 static CFRunLoopRef libusb_darwin_acfl = NULL; /* event cf loop */
 static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for event cf loop */
-static volatile int32_t initCount = 0;
 
 static usbi_mutex_t darwin_cached_devices_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct list_head darwin_cached_devices = {&darwin_cached_devices, &darwin_cached_devices};
@@ -371,15 +385,19 @@ static void *darwin_event_thread_main (void *arg0) {
   struct libusb_context *ctx = (struct libusb_context *)arg0;
   CFRunLoopRef runloop;
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
   /* Set this thread's name, so it can be seen in the debugger
      and crash reports. */
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
   pthread_setname_np ("org.libusb.device-hotplug");
+#endif
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060 && MAC_OS_X_VERSION_MIN_REQUIRED < 101200
   /* Tell the Objective-C garbage collector about this thread.
      This is required because, unlike NSThreads, pthreads are
      not automatically registered. Although we don't use
-     Objective-C, we use CoreFoundation, which does. */
+     Objective-C, we use CoreFoundation, which does.
+     Garbage collection support was entirely removed in 10.12,
+     so don't bother there. */
   objc_registerThreadWithCollector();
 #endif
 
@@ -511,7 +529,7 @@ static int darwin_init(struct libusb_context *ctx) {
     return rc;
   }
 
-  if (OSAtomicIncrement32Barrier(&initCount) == 1) {
+  if (libusb_darwin_atomic_fetch_add (&initCount, 1) == 0) {
     /* create the clocks that will be used */
 
     host_self = mach_host_self();
@@ -531,7 +549,7 @@ static int darwin_init(struct libusb_context *ctx) {
 }
 
 static void darwin_exit (void) {
-  if (OSAtomicDecrement32Barrier(&initCount) == 0) {
+  if (libusb_darwin_atomic_fetch_add (&initCount, -1) == 1) {
     mach_port_deallocate(mach_task_self(), clock_realtime);
     mach_port_deallocate(mach_task_self(), clock_monotonic);
 
@@ -1201,7 +1219,7 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
   u_int8_t numep, direction, number;
   u_int8_t dont_care1, dont_care3;
   u_int16_t dont_care2;
-  int i;
+  int rc;
 
   usbi_dbg ("building table of endpoints.");
 
@@ -1213,19 +1231,36 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
   }
 
   /* iterate through pipe references */
-  for (i = 1 ; i <= numep ; i++) {
+  for (int i = 1 ; i <= numep ; i++) {
     kresult = (*(cInterface->interface))->GetPipeProperties(cInterface->interface, i, &direction, &number, &dont_care1,
                                                             &dont_care2, &dont_care3);
 
     if (kresult != kIOReturnSuccess) {
-      usbi_err (HANDLE_CTX (dev_handle), "error getting pipe information for pipe %d: %s", i, darwin_error_str(kresult));
+      /* probably a buggy device. try to get the endpoint address from the descriptors */
+      struct libusb_config_descriptor *config;
+      const struct libusb_endpoint_descriptor *endpoint_desc;
+      UInt8 alt_setting;
 
-      return darwin_to_libusb (kresult);
+      kresult = (*(cInterface->interface))->GetAlternateSetting (cInterface->interface, &alt_setting);
+      if (kresult) {
+        usbi_err (HANDLE_CTX (dev_handle), "can't get alternate setting for interface");
+        return darwin_to_libusb (kresult);
+      }
+
+      rc = libusb_get_active_config_descriptor (dev_handle->dev, &config);
+      if (LIBUSB_SUCCESS != rc) {
+        return rc;
+      }
+
+      endpoint_desc = config->interface[iface].altsetting[alt_setting].endpoint + i - 1;
+
+      cInterface->endpoint_addrs[i - 1] = endpoint_desc->bEndpointAddress;
+    } else {
+      cInterface->endpoint_addrs[i - 1] = (((kUSBIn == direction) << kUSBRqDirnShift) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
     }
 
-    usbi_dbg ("interface: %i pipe %i: dir: %i number: %i", iface, i, direction, number);
-
-    cInterface->endpoint_addrs[i - 1] = (((kUSBIn == direction) << kUSBRqDirnShift) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
+    usbi_dbg ("interface: %i pipe %i: dir: %i number: %i", iface, i, cInterface->endpoint_addrs[i - 1] >> kUSBRqDirnShift,
+              cInterface->endpoint_addrs[i - 1] & LIBUSB_ENDPOINT_ADDRESS_MASK);
   }
 
   cInterface->num_endpoints = numep;
@@ -1561,7 +1596,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
       ret = (*(cInterface->interface))->WritePipeAsync(cInterface->interface, pipeRef, transfer->buffer,
                                                        transfer->length, darwin_async_io_callback, itransfer);
   } else {
-    itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+    itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
     if (IS_XFERIN(transfer))
       ret = (*(cInterface->interface))->ReadPipeAsyncTO(cInterface->interface, pipeRef, transfer->buffer,
@@ -1593,7 +1628,7 @@ static int submit_stream_transfer(struct usbi_transfer *itransfer) {
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
-  itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+  itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
   if (IS_XFERIN(transfer))
     ret = (*(cInterface->interface))->ReadStreamsPipeAsyncTO(cInterface->interface, pipeRef, itransfer->stream_id,
@@ -1721,7 +1756,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
   tpriv->req.completionTimeout = transfer->timeout;
   tpriv->req.noDataTimeout     = transfer->timeout;
 
-  itransfer->flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+  itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
   /* all transfers in libusb-1.0 are async */
 
@@ -1870,7 +1905,7 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 }
 
 static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_t result) {
-  if (itransfer->flags & USBI_TRANSFER_TIMED_OUT)
+  if (itransfer->timeout_flags & USBI_TRANSFER_TIMED_OUT)
     result = kIOUSBTransactionTimeout;
 
   switch (result) {
@@ -1887,7 +1922,7 @@ static int darwin_transfer_status (struct usbi_transfer *itransfer, kern_return_
     return LIBUSB_TRANSFER_OVERFLOW;
   case kIOUSBTransactionTimeout:
     usbi_warn (ITRANSFER_CTX (itransfer), "transfer error: timed out");
-    itransfer->flags |= USBI_TRANSFER_TIMED_OUT;
+    itransfer->timeout_flags |= USBI_TRANSFER_TIMED_OUT;
     return LIBUSB_TRANSFER_TIMED_OUT;
   default:
     usbi_warn (ITRANSFER_CTX (itransfer), "transfer error: %s (value = 0x%08x)", darwin_error_str (result), result);

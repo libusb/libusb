@@ -94,8 +94,13 @@ case $host in
 	backend="haiku"
 	threads="posix"
 	;;
+*-solaris*)
+	AC_MSG_RESULT([SunOS])
+	backend="sunos"
+	threads="posix"
+	;;
 *)
-	AC_MSG_ERROR([unsupported operating system])
+	AC_MSG_ERROR([unsupported operating system $host])
 esac
 
 case $backend in
@@ -154,6 +159,14 @@ openbsd)
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
+sunos)
+	AC_DEFINE(OS_SUNOS, 1, [SunOS backend])
+	AC_SUBST(OS_SUNOS)
+	THREAD_CFLAGS="-pthread"
+	LIBS="-pthread -ldevinfo"
+	AC_CHECK_HEADERS([poll.h])
+	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
+	;;
 netbsd)
 	AC_DEFINE(OS_NETBSD, 1, [NetBSD backend])
 	AC_SUBST(OS_NETBSD)
@@ -192,6 +205,7 @@ AC_SUBST(LIBS)
 AM_CONDITIONAL(OS_LINUX, test "x$backend" = xlinux)
 AM_CONDITIONAL(OS_DARWIN, test "x$backend" = xdarwin)
 AM_CONDITIONAL(OS_OPENBSD, test "x$backend" = xopenbsd)
+AM_CONDITIONAL(OS_SUNOS, test "x$backend" = xsunos)
 AM_CONDITIONAL(OS_NETBSD, test "x$backend" = xnetbsd)
 AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
 AM_CONDITIONAL(OS_HAIKU, test "x$backend" = xhaiku)

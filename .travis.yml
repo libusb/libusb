@@ -1,16 +1,33 @@
-# Require trusty for now as it has a more recent version of autoconf
-sudo: required
-dist: trusty
 language: c
 
-compiler:
-    - gcc
-    - clang
-
-os:
-    - linux
-    - osx
-
+matrix:
+    include:
+        - os: linux
+          dist: trusty
+          sudo: required
+          compiler: gcc
+        - os: linux
+          dist: trusty
+          sudo: required
+          compiler: clang
+        - os: osx
+          osx_image: xcode8
+          compiler: gcc
+        - os: osx
+          osx_image: xcode8
+          compiler: clang
+        - os: osx
+          osx_image: xcode7.1
+          compiler: gcc
+        - os: osx
+          osx_image: xcode7.1
+          compiler: clang
+        - os: osx
+          osx_image: beta-xcode6.2
+          compiler: gcc
+        - os: osx
+          osx_image: beta-xcode6.2
+          compiler: clang
 
 addons:
     apt:
@@ -22,6 +39,11 @@ addons:
             - libudev-dev
         sources:
             - ubuntu-toolchain-r-test
+
+before_install:
+    # brew upgrade sets the return code to 1 if the latest version is already installed. the true command
+    # is used to reset the return code to 0.
+    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; brew upgrade automake libtool ; true; fi
 
 script:
     - ./autogen.sh && make -j4

@@ -64,6 +64,8 @@ const struct usbi_os_backend * const usbi_backend = &windows_backend;
 const struct usbi_os_backend * const usbi_backend = &wince_backend;
 #elif defined(OS_HAIKU)
 const struct usbi_os_backend * const usbi_backend = &haiku_usb_raw_backend;
+#elif defined (OS_SUNOS)
+const struct usbi_os_backend * const usbi_backend = &sunos_backend;
 #else
 #error "Unsupported OS"
 #endif
@@ -1338,8 +1340,6 @@ static void do_close(struct libusb_context *ctx,
 	struct usbi_transfer *itransfer;
 	struct usbi_transfer *tmp;
 
-	libusb_lock_events(ctx);
-
 	/* remove any transfers in flight that are for this device */
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
 
@@ -1351,23 +1351,23 @@ static void do_close(struct libusb_context *ctx,
 		if (transfer->dev_handle != dev_handle)
 			continue;
 
-		if (!(itransfer->flags & USBI_TRANSFER_DEVICE_DISAPPEARED)) {
+		usbi_mutex_lock(&itransfer->lock);
+		if (!(itransfer->state_flags & USBI_TRANSFER_DEVICE_DISAPPEARED)) {
 			usbi_err(ctx, "Device handle closed while transfer was still being processed, but the device is still connected as far as we know");
 
-			if (itransfer->flags & USBI_TRANSFER_CANCELLING)
+			if (itransfer->state_flags & USBI_TRANSFER_CANCELLING)
 				usbi_warn(ctx, "A cancellation for an in-flight transfer hasn't completed but closing the device handle");
 			else
 				usbi_err(ctx, "A cancellation hasn't even been scheduled on the transfer for which the device is closing");
 		}
+		usbi_mutex_unlock(&itransfer->lock);
 
 		/* remove from the list of in-flight transfers and make sure
 		 * we don't accidentally use the device handle in the future
 		 * (or that such accesses will be easily caught and identified as a crash)
 		 */
-		usbi_mutex_lock(&itransfer->lock);
 		list_del(&itransfer->list);
 		transfer->dev_handle = NULL;
-		usbi_mutex_unlock(&itransfer->lock);
 
 		/* it is up to the user to free up the actual transfer struct.  this is
 		 * just making sure that we don't attempt to process the transfer after
@@ -1377,8 +1377,6 @@ static void do_close(struct libusb_context *ctx,
 			 transfer, dev_handle);
 	}
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
-
-	libusb_unlock_events(ctx);
 
 	usbi_mutex_lock(&ctx->open_devs_lock);
 	list_del(&dev_handle->list);
@@ -1404,6 +1402,7 @@ static void do_close(struct libusb_context *ctx,
 void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 {
 	struct libusb_context *ctx;
+	int handling_events;
 	int pending_events;
 
 	if (!dev_handle)
@@ -1411,39 +1410,46 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 	usbi_dbg("");
 
 	ctx = HANDLE_CTX(dev_handle);
+	handling_events = usbi_handling_events(ctx);
 
 	/* Similarly to libusb_open(), we want to interrupt all event handlers
 	 * at this point. More importantly, we want to perform the actual close of
 	 * the device while holding the event handling lock (preventing any other
 	 * thread from doing event handling) because we will be removing a file
-	 * descriptor from the polling loop. */
+	 * descriptor from the polling loop. If this is being called by the current
+	 * event handler, we can bypass the interruption code because we already
+	 * hold the event handling lock. */
 
-	/* Record that we are closing a device.
-	 * Only signal an event if there are no prior pending events. */
-	usbi_mutex_lock(&ctx->event_data_lock);
-	pending_events = usbi_pending_events(ctx);
-	ctx->device_close++;
-	if (!pending_events)
-		usbi_signal_event(ctx);
-	usbi_mutex_unlock(&ctx->event_data_lock);
+	if (!handling_events) {
+		/* Record that we are closing a device.
+		 * Only signal an event if there are no prior pending events. */
+		usbi_mutex_lock(&ctx->event_data_lock);
+		pending_events = usbi_pending_events(ctx);
+		ctx->device_close++;
+		if (!pending_events)
+			usbi_signal_event(ctx);
+		usbi_mutex_unlock(&ctx->event_data_lock);
 
-	/* take event handling lock */
-	libusb_lock_events(ctx);
+		/* take event handling lock */
+		libusb_lock_events(ctx);
+	}
 
 	/* Close the device */
 	do_close(ctx, dev_handle);
 
-	/* We're done with closing this device.
-	 * Clear the event pipe if there are no further pending events. */
-	usbi_mutex_lock(&ctx->event_data_lock);
-	ctx->device_close--;
-	pending_events = usbi_pending_events(ctx);
-	if (!pending_events)
-		usbi_clear_event(ctx);
-	usbi_mutex_unlock(&ctx->event_data_lock);
+	if (!handling_events) {
+		/* We're done with closing this device.
+		 * Clear the event pipe if there are no further pending events. */
+		usbi_mutex_lock(&ctx->event_data_lock);
+		ctx->device_close--;
+		pending_events = usbi_pending_events(ctx);
+		if (!pending_events)
+			usbi_clear_event(ctx);
+		usbi_mutex_unlock(&ctx->event_data_lock);
 
-	/* Release event handling lock and wake up event waiters */
-	libusb_unlock_events(ctx);
+		/* Release event handling lock and wake up event waiters */
+		libusb_unlock_events(ctx);
+	}
 }
 
 /** \ingroup libusb_dev
