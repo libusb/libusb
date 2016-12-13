@@ -146,6 +146,7 @@ struct linux_device_priv {
 struct linux_device_handle_priv {
 	int fd;
 	int fd_removed;
+	int fd_keep;
 	uint32_t caps;
 };
 
@@ -898,7 +899,7 @@ static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 }
 
 static int initialize_device(struct libusb_device *dev, uint8_t busnum,
-	uint8_t devaddr, const char *sysfs_dir)
+	uint8_t devaddr, const char *sysfs_dir, int wrapped_fd)
 {
 	struct linux_device_priv *priv = _device_priv(dev);
 	struct libusb_context *ctx = DEVICE_CTX(dev);
@@ -930,10 +931,18 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	}
 
 	/* cache descriptors in memory */
-	if (sysfs_dir && sysfs_has_descriptors)
+	if (sysfs_dir && sysfs_has_descriptors) {
 		fd = _open_sysfs_attr(dev, "descriptors");
-	else
+	} else if (wrapped_fd < 0) {
 		fd = _get_usbfs_fd(dev, O_RDONLY, 0);
+	} else {
+		fd = wrapped_fd;
+		r = lseek(fd, 0, SEEK_SET);
+		if (r < 0) {
+			usbi_err(ctx, "seek failed ret=%d errno=%d", r, errno);
+			return LIBUSB_ERROR_IO;
+		}
+	}
 	if (fd < 0)
 		return fd;
 
@@ -942,7 +951,8 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		priv->descriptors = usbi_reallocf(priv->descriptors,
 						  descriptors_size);
 		if (!priv->descriptors) {
-			close(fd);
+			if (fd != wrapped_fd)
+				close(fd);
 			return LIBUSB_ERROR_NO_MEM;
 		}
 		/* usbfs has holes in the file */
@@ -955,13 +965,15 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		if (r < 0) {
 			usbi_err(ctx, "read descriptor failed ret=%d errno=%d",
 				 fd, errno);
-			close(fd);
+			if (fd != wrapped_fd)
+				close(fd);
 			return LIBUSB_ERROR_IO;
 		}
 		priv->descriptors_len += r;
 	} while (priv->descriptors_len == descriptors_size);
 
-	close(fd);
+	if (fd != wrapped_fd)
+		close(fd);
 
 	if (priv->descriptors_len < DEVICE_DESC_LENGTH) {
 		usbi_err(ctx, "short descriptor read (%d)",
@@ -973,7 +985,10 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		return LIBUSB_SUCCESS;
 
 	/* cache active config */
-	fd = _get_usbfs_fd(dev, O_RDWR, 1);
+	if (wrapped_fd < 0)
+		fd = _get_usbfs_fd(dev, O_RDWR, 1);
+	else
+		fd = wrapped_fd;
 	if (fd < 0) {
 		/* cannot send a control message to determine the active
 		 * config. just assume the first one is active. */
@@ -993,7 +1008,8 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	}
 
 	r = usbfs_get_active_config(dev, fd);
-	close(fd);
+	if (wrapped_fd < 0)
+		close(fd);
 
 	return r;
 }
@@ -1094,7 +1110,7 @@ int linux_enumerate_device(struct libusb_context *ctx,
 	if (!dev)
 		return LIBUSB_ERROR_NO_MEM;
 
-	r = initialize_device(dev, busnum, devaddr, sysfs_dir);
+	r = initialize_device(dev, busnum, devaddr, sysfs_dir, -1);
 	if (r < 0)
 		goto out;
 	r = usbi_sanitize_device(dev);
@@ -1317,9 +1333,57 @@ static int initialize_handle(struct libusb_device_handle *handle, int fd)
 	return usbi_add_pollfd(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
 }
 
-static int op_open(struct libusb_device_handle *handle)
+static int op_wrap_fd(struct libusb_context *ctx,
+	struct libusb_device_handle *handle, int fd)
 {
 	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
+	uint8_t busnum, devaddr;
+	struct usbfs_connectinfo ci;
+	struct libusb_device *dev;
+	int r;
+
+	r = linux_get_device_address(ctx, 1, &busnum, &devaddr, NULL, NULL, fd);
+	if (r < 0) {
+		r = ioctl(fd, IOCTL_USBFS_CONNECTINFO, &ci);
+		if (r < 0) {
+			usbi_err(ctx, "connectinfo failed (%d)", errno);
+			return LIBUSB_ERROR_IO;
+		}
+		/* There is no ioctl to get the bus number. We choose 0 here
+		 * as linux starts numbering buses from 1. */
+		busnum = 0;
+		devaddr = ci.devnum;
+	}
+
+	/* Session id is unused as we do not add the device to the list of
+	 * connected devices. */
+	usbi_dbg("allocating new device for fd %d", fd);
+	dev = usbi_alloc_device(ctx, 0);
+	if (!dev)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = initialize_device(dev, busnum, devaddr, NULL, fd);
+	if (r < 0)
+		goto out;
+	r = usbi_sanitize_device(dev);
+	if (r < 0)
+		goto out;
+	/* Consider the device as connected, but do not add it to the managed
+	 * device list. */
+	dev->attached = 1;
+	handle->dev = dev;
+
+	r = initialize_handle(handle, fd);
+	hpriv->fd_keep = 1;
+
+out:
+	if (r < 0)
+		libusb_unref_device(dev);
+	return r;
+}
+
+static int op_open(struct libusb_device_handle *handle)
+{
 	int fd, r;
 
 	fd = _get_usbfs_fd(handle->dev, O_RDWR, 0);
@@ -1351,7 +1415,8 @@ static void op_close(struct libusb_device_handle *dev_handle)
 	/* fd may have already been removed by POLLERR condition in op_handle_events() */
 	if (!hpriv->fd_removed)
 		usbi_remove_pollfd(HANDLE_CTX(dev_handle), hpriv->fd);
-	close(hpriv->fd);
+	if (!hpriv->fd_keep)
+		close(hpriv->fd);
 }
 
 static int op_get_configuration(struct libusb_device_handle *handle,
@@ -2720,6 +2785,7 @@ const struct usbi_os_backend linux_usbfs_backend = {
 	.get_config_descriptor = op_get_config_descriptor,
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
 
+	.wrap_fd = op_wrap_fd,
 	.open = op_open,
 	.close = op_close,
 	.get_configuration = op_get_configuration,
