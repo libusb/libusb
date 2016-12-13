@@ -576,7 +576,7 @@ static int op_get_device_descriptor(struct libusb_device *dev,
 {
 	struct linux_device_priv *priv = _device_priv(dev);
 
-	*host_endian = sysfs_has_descriptors ? 0 : 1;
+	*host_endian = (priv->sysfs_dir && sysfs_has_descriptors) ? 0 : 1;
 	memcpy(buffer, priv->descriptors, DEVICE_DESC_LENGTH);
 
 	return 0;
@@ -696,9 +696,11 @@ static int seek_to_next_descriptor(struct libusb_context *ctx,
 }
 
 /* Return offset to next config */
-static int seek_to_next_config(struct libusb_context *ctx,
+static int seek_to_next_config(struct libusb_device *dev,
 	unsigned char *buffer, int size)
 {
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct linux_device_priv *priv = _device_priv(dev);
 	struct libusb_config_descriptor config;
 
 	if (size == 0)
@@ -725,7 +727,7 @@ static int seek_to_next_config(struct libusb_context *ctx,
 	 * config descriptor with verified bLength fields, with descriptors
 	 * with an invalid bLength removed.
 	 */
-	if (sysfs_has_descriptors) {
+	if (priv->sysfs_dir && sysfs_has_descriptors) {
 		int next = seek_to_next_descriptor(ctx, LIBUSB_DT_CONFIG,
 						   buffer, size);
 		if (next == LIBUSB_ERROR_NOT_FOUND)
@@ -754,7 +756,6 @@ static int seek_to_next_config(struct libusb_context *ctx,
 static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 	uint8_t value, unsigned char **buffer, int *host_endian)
 {
-	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct linux_device_priv *priv = _device_priv(dev);
 	unsigned char *descriptors = priv->descriptors;
 	int size = priv->descriptors_len;
@@ -770,7 +771,7 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 
 	/* Seek till the config is found, or till "EOF" */
 	while (1) {
-		int next = seek_to_next_config(ctx, descriptors, size);
+		int next = seek_to_next_config(dev, descriptors, size);
 		if (next < 0)
 			return next;
 		config = (struct libusb_config_descriptor *)descriptors;
@@ -786,16 +787,16 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 static int op_get_active_config_descriptor(struct libusb_device *dev,
 	unsigned char *buffer, size_t len, int *host_endian)
 {
+	struct linux_device_priv *priv = _device_priv(dev);
 	int r, config;
 	unsigned char *config_desc;
 
-	if (sysfs_can_relate_devices) {
+	if (priv->sysfs_dir && sysfs_can_relate_devices) {
 		r = sysfs_get_active_config(dev, &config);
 		if (r < 0)
 			return r;
 	} else {
 		/* Use cached bConfigurationValue */
-		struct linux_device_priv *priv = _device_priv(dev);
 		config = priv->active_config;
 	}
 	if (config == -1)
@@ -827,7 +828,7 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 
 	/* Seek till the config is found, or till "EOF" */
 	for (i = 0; ; i++) {
-		r = seek_to_next_config(DEVICE_CTX(dev), descriptors, size);
+		r = seek_to_next_config(dev, descriptors, size);
 		if (r < 0)
 			return r;
 		if (i == config_index)
@@ -918,7 +919,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	}
 
 	/* cache descriptors in memory */
-	if (sysfs_has_descriptors)
+	if (sysfs_dir && sysfs_has_descriptors)
 		fd = _open_sysfs_attr(dev, "descriptors");
 	else
 		fd = _get_usbfs_fd(dev, O_RDONLY, 0);
@@ -934,7 +935,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 			return LIBUSB_ERROR_NO_MEM;
 		}
 		/* usbfs has holes in the file */
-		if (!sysfs_has_descriptors) {
+		if (!(sysfs_dir && sysfs_has_descriptors)) {
 			memset(priv->descriptors + priv->descriptors_len,
 			       0, descriptors_size - priv->descriptors_len);
 		}
@@ -957,7 +958,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		return LIBUSB_ERROR_IO;
 	}
 
-	if (sysfs_can_relate_devices)
+	if (sysfs_dir && sysfs_can_relate_devices)
 		return LIBUSB_SUCCESS;
 
 	/* cache active config */
@@ -1335,15 +1336,16 @@ static void op_close(struct libusb_device_handle *dev_handle)
 static int op_get_configuration(struct libusb_device_handle *handle,
 	int *config)
 {
+	struct linux_device_priv *priv = _device_priv(handle->dev);
 	int r;
 
-	if (sysfs_can_relate_devices) {
+	if (priv->sysfs_dir && sysfs_can_relate_devices) {
 		r = sysfs_get_active_config(handle->dev, config);
 	} else {
 		r = usbfs_get_active_config(handle->dev,
 					    _device_handle_priv(handle)->fd);
 		if (r == LIBUSB_SUCCESS)
-			*config = _device_priv(handle->dev)->active_config;
+			*config = priv->active_config;
 	}
 	if (r < 0)
 		return r;
