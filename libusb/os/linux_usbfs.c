@@ -687,14 +687,23 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 
 int linux_get_device_address (struct libusb_context *ctx, int detached,
 	uint8_t *busnum, uint8_t *devaddr,const char *dev_node,
-	const char *sys_name)
+	const char *sys_name, int fd)
 {
+	char proc_path[PATH_MAX], fd_path[PATH_MAX];
 	int sysfs_attr;
+	ssize_t r;
 
 	usbi_dbg("getting address for device: %s detached: %d", sys_name, detached);
 	/* can't use sysfs to read the bus and device number if the
 	 * device has been detached */
 	if (!sysfs_can_relate_devices || detached || NULL == sys_name) {
+		if (NULL == dev_node && fd >= 0) {
+			/* try to retrieve the device node from fd */
+			snprintf(proc_path, PATH_MAX, "/proc/self/fd/%d", fd);
+			r = readlink(proc_path, fd_path, PATH_MAX);
+			if (r > 0)
+				dev_node = fd_path;
+		}
 		if (NULL == dev_node) {
 			return LIBUSB_ERROR_OTHER;
 		}
@@ -704,6 +713,8 @@ int linux_get_device_address (struct libusb_context *ctx, int detached,
 			sscanf (dev_node, "/dev/bus/usb/%hhu/%hhu", busnum, devaddr);
 		} else if (!strncmp(dev_node, "/proc/bus/usb", 13)) {
 			sscanf (dev_node, "/proc/bus/usb/%hhu/%hhu", busnum, devaddr);
+		} else {
+			return LIBUSB_ERROR_OTHER;
 		}
 
 		return LIBUSB_SUCCESS;
@@ -1287,7 +1298,7 @@ static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 	uint8_t busnum, devaddr;
 	int ret;
 
-	ret = linux_get_device_address (ctx, 0, &busnum, &devaddr, NULL, devname);
+	ret = linux_get_device_address (ctx, 0, &busnum, &devaddr, NULL, devname, -1);
 	if (LIBUSB_SUCCESS != ret) {
 		return ret;
 	}
