@@ -1216,6 +1216,78 @@ int usbi_clear_event(struct libusb_context *ctx)
 }
 
 /** \ingroup libusb_dev
+ * Wrap a platform-specific system device handle and obtain a libusb device
+ * handle for the underlying device. The handle allows you to use libusb to
+ * perform I/O on the device in question.
+ *
+ * On Linux, the system device handle must be a valid file descriptor opened
+ * on the device node.
+ *
+ * The system device handle must remain open until libusb_close() is called.
+ * The system device handle will not be closed by libusb_close().
+ *
+ * Internally, this function creates a temporary device and makes it
+ * available to you through libusb_get_device(). This device is destroyed
+ * during libusb_close(). The device shall not be opened through libusb_open().
+ *
+ * This is a non-blocking function; no requests are sent over the bus.
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param sys_dev the platform-specific system device handle
+ * \param dev_handle output location for the returned device handle pointer. Only
+ * populated when the return code is 0.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NO_MEM on memory allocation failure
+ * \returns LIBUSB_ERROR_ACCESS if the user has insufficient permissions
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED if the operation is not supported on this
+ * platform
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
+	libusb_device_handle **dev_handle)
+{
+	struct libusb_device_handle *_dev_handle;
+	size_t priv_size = usbi_backend.device_handle_priv_size;
+	int r;
+	usbi_dbg("wrap_sys_device %p", sys_dev);
+
+	USBI_GET_CONTEXT(ctx);
+
+	if (!usbi_backend.wrap_sys_device)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	_dev_handle = malloc(sizeof(*_dev_handle) + priv_size);
+	if (!_dev_handle)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = usbi_mutex_init(&_dev_handle->lock);
+	if (r) {
+		free(_dev_handle);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	_dev_handle->dev = NULL;
+	_dev_handle->auto_detach_kernel_driver = 0;
+	_dev_handle->claimed_interfaces = 0;
+	memset(&_dev_handle->os_priv, 0, priv_size);
+
+	r = usbi_backend.wrap_sys_device(ctx, _dev_handle, sys_dev);
+	if (r < 0) {
+		usbi_dbg("wrap_sys_device %p returns %d", sys_dev, r);
+		usbi_mutex_destroy(&_dev_handle->lock);
+		free(_dev_handle);
+		return r;
+	}
+
+	usbi_mutex_lock(&ctx->open_devs_lock);
+	list_add(&_dev_handle->list, &ctx->open_devs);
+	usbi_mutex_unlock(&ctx->open_devs_lock);
+	*dev_handle = _dev_handle;
+
+	return 0;
+}
+
+/** \ingroup libusb_dev
  * Open a device and obtain a device handle. A handle allows you to perform
  * I/O on the device in question.
  *
