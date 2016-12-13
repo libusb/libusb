@@ -1352,28 +1352,14 @@ static int linux_default_scan_devices (struct libusb_context *ctx)
 }
 #endif
 
-static int op_open(struct libusb_device_handle *handle)
+static int initialize_handle(struct libusb_device_handle *handle, int fd)
 {
 	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
 	int r;
 
-	hpriv->fd = _get_usbfs_fd(handle->dev, O_RDWR, 0);
-	if (hpriv->fd < 0) {
-		if (hpriv->fd == LIBUSB_ERROR_NO_DEVICE) {
-			/* device will still be marked as attached if hotplug monitor thread
-			 * hasn't processed remove event yet */
-			usbi_mutex_static_lock(&linux_hotplug_lock);
-			if (handle->dev->attached) {
-				usbi_dbg("open failed with no device, but device still attached");
-				linux_device_disconnected(handle->dev->bus_number,
-						handle->dev->device_address);
-			}
-			usbi_mutex_static_unlock(&linux_hotplug_lock);
-		}
-		return hpriv->fd;
-	}
+	hpriv->fd = fd;
 
-	r = ioctl(hpriv->fd, IOCTL_USBFS_GET_CAPABILITIES, &hpriv->caps);
+	r = ioctl(fd, IOCTL_USBFS_GET_CAPABILITIES, &hpriv->caps);
 	if (r < 0) {
 		if (errno == ENOTTY)
 			usbi_dbg("getcap not available");
@@ -1386,9 +1372,33 @@ static int op_open(struct libusb_device_handle *handle)
 			hpriv->caps |= USBFS_CAP_BULK_CONTINUATION;
 	}
 
-	r = usbi_add_pollfd(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
+	return usbi_add_pollfd(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
+}
+
+static int op_open(struct libusb_device_handle *handle)
+{
+	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
+	int fd, r;
+
+	fd = _get_usbfs_fd(handle->dev, O_RDWR, 0);
+	if (fd < 0) {
+		if (fd == LIBUSB_ERROR_NO_DEVICE) {
+			/* device will still be marked as attached if hotplug monitor thread
+			 * hasn't processed remove event yet */
+			usbi_mutex_static_lock(&linux_hotplug_lock);
+			if (handle->dev->attached) {
+				usbi_dbg("open failed with no device, but device still attached");
+				linux_device_disconnected(handle->dev->bus_number,
+						handle->dev->device_address);
+			}
+			usbi_mutex_static_unlock(&linux_hotplug_lock);
+		}
+		return fd;
+	}
+
+	r = initialize_handle(handle, fd);
 	if (r < 0)
-		close(hpriv->fd);
+		close(fd);
 
 	return r;
 }
