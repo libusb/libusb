@@ -534,8 +534,10 @@ static int linux_start_event_monitor(void)
 {
 #if defined(USE_UDEV)
 	return linux_udev_start_event_monitor();
-#else
+#elif !defined(__ANDROID__)
 	return linux_netlink_start_event_monitor();
+#else
+	return LIBUSB_SUCCESS;
 #endif
 }
 
@@ -543,20 +545,22 @@ static int linux_stop_event_monitor(void)
 {
 #if defined(USE_UDEV)
 	return linux_udev_stop_event_monitor();
-#else
+#elif !defined(__ANDROID__)
 	return linux_netlink_stop_event_monitor();
+#else
+	return LIBUSB_SUCCESS;
 #endif
 }
 
 static int linux_scan_devices(struct libusb_context *ctx)
 {
-	int ret;
+	int ret = 0;
 
 	usbi_mutex_static_lock(&linux_hotplug_lock);
 
 #if defined(USE_UDEV)
 	ret = linux_udev_scan_devices(ctx);
-#else
+#elif !defined(__ANDROID__)
 	ret = linux_default_scan_devices(ctx);
 #endif
 
@@ -569,7 +573,7 @@ static void op_hotplug_poll(void)
 {
 #if defined(USE_UDEV)
 	linux_udev_hotplug_poll();
-#else
+#elif !defined(__ANDROID__)
 	linux_netlink_hotplug_poll();
 #endif
 }
