@@ -35,7 +35,6 @@ CFLAGS+=" -Wno-deprecated-declarations"
 # should be removed and the code fixed
 CFLAGS+=" -Wno-incompatible-pointer-types-discards-qualifiers"
 
-# fails on warning
-CFLAGS+=" -Werror"
+export CFLAGS
 
 ./autogen.sh
