@@ -25,7 +25,6 @@ CFLAGS+=" -Wundef"
 CFLAGS+=" -Wuninitialized"
 CFLAGS+=" -Wunused"
 CFLAGS+=" -Wwrite-strings"
-CFLAGS+=" -fdiagnostics-color=auto"
 
 # warnings disabled on purpose
 CFLAGS+=" -Wno-unused-parameter"
