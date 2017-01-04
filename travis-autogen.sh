@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Warnings enabled
 CFLAGS="-Wall -Wextra"
