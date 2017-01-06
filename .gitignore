@@ -19,6 +19,7 @@ compile
 config.guess
 config.h*
 !msvc/config.h
+.vs
 config.log
 config.status
 config.sub
