@@ -53,13 +53,13 @@ set dstPath=%destType%\Release
 :isDebug
 
 if exist %destType% goto md2
-mkdir %destType%
+md %destType%
 :md2
 if exist %dstPath% goto md3
-mkdir %dstPath%
+md %dstPath%
 :md3
 if exist %dstPath%\dll goto md4
-mkdir %dstPath%\dll
+md %dstPath%\dll
 :md4
 if exist %dstPath%\lib goto md5
 md %dstPath%\lib
@@ -69,7 +69,7 @@ md %dstPath%\examples
 :md6
 @echo on
 
-@if /I NOT Test%1==TestDLL goto copylib
+if %TARGET%==LIBRARY goto copylib
 copy %srcPath%\libusb-%version%.dll %dstPath%\dll
 copy %srcPath%\libusb-%version%.pdb %dstPath%\dll
 :copylib
