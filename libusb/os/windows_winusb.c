@@ -733,12 +733,12 @@ static void get_windows_version(void)
 			switch (windows_version) {
 			case 0x50: w = "2000"; break;
 			case 0x51: w = "XP"; break;
-			case 0x52: w = ("2003"); break;
+			case 0x52: w = "2003"; break;
 			case 0x60: w = (ws ? "Vista" : "2008"); break;
 			case 0x61: w = (ws ? "7" : "2008_R2"); break;
 			case 0x62: w = (ws ? "8" : "2012"); break;
-			case 0x63: w = (ws ? "8.1": "2012_R2"); break;
-			case 0x64: w = (ws ? "10": "2015"); break;
+			case 0x63: w = (ws ? "8.1" : "2012_R2"); break;
+			case 0x64: w = (ws ? "10" : "2015"); break;
 			default:
 				if (windows_version < 0x50)
 					windows_version = WINDOWS_UNSUPPORTED;
@@ -1595,7 +1595,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						usbi_warn(ctx, "could not duplicate interface path '%s'", priv->path);
 					// The following is needed if we want API calls to work for both simple
 					// and composite devices.
-					for(j = 0; j < USB_MAXINTERFACES; j++)
+					for (j = 0; j < USB_MAXINTERFACES; j++)
 						priv->usb_interface[j].apib = &usb_api_backend[api];
 
 					break;
@@ -2035,12 +2035,10 @@ void windows_get_overlapped_result(struct usbi_transfer *transfer, struct winfd 
 	if (HasOverlappedIoCompletedSync(pollable_fd->overlapped)) {
 		*io_result = NO_ERROR;
 		*io_size = (DWORD)pollable_fd->overlapped->InternalHigh;
-	}
-	else if (GetOverlappedResult(pollable_fd->handle, pollable_fd->overlapped, io_size, false)) {
+	} else if (GetOverlappedResult(pollable_fd->handle, pollable_fd->overlapped, io_size, false)) {
 		// Regular async overlapped
 		*io_result = NO_ERROR;
-	}
-	else {
+	} else {
 		*io_result = GetLastError();
 	}
 }
@@ -2470,8 +2468,7 @@ static void winusbx_close(int sub_api, struct libusb_device_handle *dev_handle)
 					CloseHandle(handle);
 			}
 		}
-	}
-	else {
+	} else {
 		// If this is a WinUSB device, free all interfaces above interface 0,
 		// then free and close interface 0 last
 		for (i = 1; i < USB_MAXINTERFACES; i++) {
