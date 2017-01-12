@@ -318,7 +318,6 @@ AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
 # headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_FUNCS(gettimeofday)
-AC_CHECK_HEADERS([signal.h])
 
 # check for -std=gnu99 compiler support
 saved_cflags="$CFLAGS"

@@ -53,9 +53,6 @@
 /* Define to 1 if you have the <poll.h> header file. */
 #define HAVE_POLL_H 1
 
-/* Define to 1 if you have the <signal.h> header file. */
-#define HAVE_SIGNAL_H 1
-
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
 
