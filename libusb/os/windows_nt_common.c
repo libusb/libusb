@@ -519,7 +519,7 @@ void windows_handle_callback(struct usbi_transfer *itransfer, uint32_t io_result
 
 int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready)
 {
-	POLL_NFDS_TYPE i = 0;
+	POLL_NFDS_TYPE i;
 	bool found = false;
 	struct usbi_transfer *transfer;
 	struct winfd *pollable_fd = NULL;
