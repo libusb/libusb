@@ -2573,26 +2573,35 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 				for (i = 0; ; i++) {
 					safe_free(dev_interface_details);
 					safe_free(dev_path_no_guid);
+
 					dev_interface_details = get_interface_details_filter(ctx, &dev_info, &dev_info_data, &GUID_DEVINTERFACE_LIBUSB0_FILTER, i, filter_path);
 					if ((found_filter) || (dev_interface_details == NULL))
 						break;
 
 					// ignore GUID part
 					dev_path_no_guid = sanitize_path(strtok(dev_interface_details->DevicePath, "{"));
-					if (safe_strncmp(dev_path_no_guid, priv->usb_interface[iface].path, safe_strlen(dev_path_no_guid)) == 0) {
+					if (dev_path_no_guid == NULL)
+						continue;
+
+					if (strncmp(dev_path_no_guid, priv->usb_interface[iface].path, strlen(dev_path_no_guid)) == 0) {
 						file_handle = CreateFileA(filter_path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ,
 							NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
-						if (file_handle == INVALID_HANDLE_VALUE) {
-							usbi_err(ctx, "could not open device %s: %s", filter_path, windows_error_str(0));
-						} else {
-							WinUSBX[sub_api].Free(winusb_handle);
-							if (WinUSBX[sub_api].Initialize(file_handle, &winusb_handle))
+						if (file_handle != INVALID_HANDLE_VALUE) {
+							if (WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
+								// Replace the existing file handle with the working one
+								CloseHandle(handle_priv->interface_handle[iface].dev_handle);
+								handle_priv->interface_handle[iface].dev_handle = file_handle;
 								found_filter = true;
-							else
+							} else {
 								usbi_err(ctx, "could not initialize filter driver for %s", filter_path);
+								CloseHandle(file_handle);
+							}
+						} else {
+							usbi_err(ctx, "could not open device %s: %s", filter_path, windows_error_str(0));
 						}
 					}
 				}
+				free(dev_interface_details);
 				if (!found_filter) {
 					usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(err));
 					return LIBUSB_ERROR_ACCESS;
