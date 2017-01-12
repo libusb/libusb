@@ -161,36 +161,34 @@ static char *guid_to_string(const GUID *guid)
  */
 static char *sanitize_path(const char *path)
 {
-	const char root_prefix[] = "\\\\.\\";
-	size_t j, size, root_size;
-	char *ret_path = NULL;
+	const char root_prefix[] = { '\\', '\\', '.', '\\' };
+	size_t j, size;
+	char *ret_path;
 	size_t add_root = 0;
 
 	if (path == NULL)
 		return NULL;
 
-	size = safe_strlen(path) + 1;
-	root_size = sizeof(root_prefix) - 1;
+	size = strlen(path) + 1;
 
 	// Microsoft indiscriminately uses '\\?\', '\\.\', '##?#" or "##.#" for root prefixes.
 	if (!((size > 3) && (((path[0] == '\\') && (path[1] == '\\') && (path[3] == '\\'))
 			|| ((path[0] == '#') && (path[1] == '#') && (path[3] == '#'))))) {
-		add_root = root_size;
+		add_root = sizeof(root_prefix);
 		size += add_root;
 	}
 
-	ret_path = calloc(1, size);
+	ret_path = malloc(size);
 	if (ret_path == NULL)
 		return NULL;
 
-	safe_strcpy(&ret_path[add_root], size-add_root, path);
+	strcpy(&ret_path[add_root], path);
 
 	// Ensure consistency with root prefix
-	for (j = 0; j < root_size; j++)
-		ret_path[j] = root_prefix[j];
+	memcpy(ret_path, root_prefix, sizeof(root_prefix));
 
 	// Same goes for '\' and '#' after the root prefix. Ensure '#' is used
-	for (j = root_size; j < size; j++) {
+	for (j = sizeof(root_prefix); j < size; j++) {
 		ret_path[j] = (char)toupper((int)ret_path[j]); // Fix case too
 		if (ret_path[j] == '\\')
 			ret_path[j] = '#';
