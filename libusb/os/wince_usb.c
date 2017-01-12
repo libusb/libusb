@@ -41,38 +41,39 @@ static int concurrent_usage = -1;
  * uses retval as errorcode, or, if 0, use GetLastError()
  */
 #if defined(ENABLE_LOGGING)
-static const char *windows_error_str(DWORD retval)
+static const char *windows_error_str(DWORD error_code)
 {
 	static TCHAR wErr_string[ERR_BUFFER_SIZE];
 	static char err_string[ERR_BUFFER_SIZE];
 
-	DWORD error_code, format_error;
 	DWORD size;
-	size_t i;
+	int len;
 
-	error_code = retval ? retval : GetLastError();
+	if (error_code == 0)
+		error_code = GetLastError();
 
-	safe_stprintf(wErr_string, ERR_BUFFER_SIZE, _T("[%u] "), (unsigned int)error_code);
+	len = sprintf(err_string, "[%u] ", (unsigned int)error_code);
 
-	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &wErr_string[safe_tcslen(wErr_string)],
-		ERR_BUFFER_SIZE - (DWORD)safe_tcslen(wErr_string), NULL);
+	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		wErr_string, ERR_BUFFER_SIZE, NULL);
 	if (size == 0) {
-		format_error = GetLastError();
+		DWORD format_error = GetLastError();
 		if (format_error)
-			safe_stprintf(wErr_string, ERR_BUFFER_SIZE,
-				_T("Windows error code %u (FormatMessage error code %u)"),
+			snprintf(err_string, ERR_BUFFER_SIZE,
+				"Windows error code %u (FormatMessage error code %u)",
 				(unsigned int)error_code, (unsigned int)format_error);
 		else
-			safe_stprintf(wErr_string, ERR_BUFFER_SIZE, _T("Unknown error code %u"), (unsigned int)error_code);
+			snprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", (unsigned int)error_code);
 	} else {
-		// Remove CR/LF terminators
-		for (i = safe_tcslen(wErr_string) - 1; ((wErr_string[i] == 0x0A) || (wErr_string[i] == 0x0D)); i--)
-			wErr_string[i] = 0;
-	}
+		// Remove CR/LF terminators, if present
+		size_t pos = size - 2;
+		if (wErr_string[pos] == 0x0D)
+			wErr_string[pos] = 0;
 
-	if (WideCharToMultiByte(CP_ACP, 0, wErr_string, -1, err_string, ERR_BUFFER_SIZE, NULL, NULL) < 0)
-		strcpy(err_string, "Unable to convert error string");
+		if (!WideCharToMultiByte(CP_ACP, 0, wErr_string, -1, &err_string[len], ERR_BUFFER_SIZE - len, NULL, NULL))
+			strcpy(err_string, "Unable to convert error string");
+	}
 
 	return err_string;
 }

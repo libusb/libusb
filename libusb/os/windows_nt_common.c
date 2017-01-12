@@ -63,17 +63,17 @@ static unsigned __stdcall windows_clock_gettime_threaded(void *param);
 * uses retval as errorcode, or, if 0, use GetLastError()
 */
 #if defined(ENABLE_LOGGING)
-const char *windows_error_str(DWORD retval)
+const char *windows_error_str(DWORD error_code)
 {
 	static char err_string[ERR_BUFFER_SIZE];
 
-	DWORD error_code, format_error;
 	DWORD size;
-	ssize_t i;
+	int len;
 
-	error_code = retval ? retval : GetLastError();
+	if (error_code == 0)
+		error_code = GetLastError();
 
-	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%u] ", (unsigned int)error_code);
+	len = sprintf(err_string, "[%u] ", (unsigned int)error_code);
 
 	// Translate codes returned by SetupAPI. The ones we are dealing with are either
 	// in 0x0000xxxx or 0xE000xxxx and can be distinguished from standard error codes.
@@ -89,22 +89,22 @@ const char *windows_error_str(DWORD retval)
 		break;
 	}
 
-	size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
-			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &err_string[safe_strlen(err_string)],
-			ERR_BUFFER_SIZE - (DWORD)safe_strlen(err_string), NULL);
+	size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			&err_string[len], ERR_BUFFER_SIZE - len, NULL);
 	if (size == 0) {
-		format_error = GetLastError();
+		DWORD format_error = GetLastError();
 		if (format_error)
-			safe_sprintf(err_string, ERR_BUFFER_SIZE,
-					"Windows error code %u (FormatMessage error code %u)",
-					(unsigned int)error_code, (unsigned int)format_error);
+			snprintf(err_string, ERR_BUFFER_SIZE,
+				"Windows error code %u (FormatMessage error code %u)",
+				(unsigned int)error_code, (unsigned int)format_error);
 		else
-			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", (unsigned int)error_code);
-	}
-	else {
-		// Remove CR/LF terminators
-		for (i = safe_strlen(err_string) - 1; (i >= 0) && ((err_string[i] == 0x0A) || (err_string[i] == 0x0D)); i--)
-			err_string[i] = 0;
+			snprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", (unsigned int)error_code);
+	} else {
+		// Remove CRLF from end of message, if present
+		size_t pos = len + size - 2;
+		if (err_string[pos] == '\r')
+			err_string[pos] = '\0';
 	}
 
 	return err_string;

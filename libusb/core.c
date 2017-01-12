@@ -2307,7 +2307,9 @@ static void usbi_log_str(struct libusb_context *ctx,
 	enum libusb_log_level level, const char * str)
 {
 #if defined(USE_SYSTEM_LOGGING_FACILITY)
-#if defined(OS_WINDOWS) || defined(OS_WINCE)
+#if defined(OS_WINDOWS)
+	OutputDebugString(str);
+#elif defined(OS_WINCE)
 	/* Windows CE only supports the Unicode version of OutputDebugString. */
 	WCHAR wbuf[USBI_MAX_LOG_LEN];
 	MultiByteToWideChar(CP_UTF8, 0, str, -1, wbuf, sizeof(wbuf));
