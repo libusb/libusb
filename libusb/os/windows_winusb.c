@@ -106,7 +106,7 @@ static int composite_copy_transfer_data(int sub_api, struct usbi_transfer *itran
 
 // Global variables
 int windows_version = WINDOWS_UNDEFINED;
-static char windows_version_str[128] = "Windows Undefined";
+static char windows_version_str[128] = "Undefined";
 // Concurrency
 static int concurrent_usage = -1;
 static usbi_mutex_t autoclaim_lock;
@@ -676,10 +676,7 @@ static BOOL is_x64(void)
 static void get_windows_version(void)
 {
 	OSVERSIONINFOEXA vi, vi2;
-	const char *w = 0;
-	const char *w64 = "32 bit";
-	char *vptr;
-	size_t vlen;
+	const char *arch, *w = NULL;
 	unsigned major, minor;
 	ULONGLONG major_equal, minor_equal;
 	BOOL ws;
@@ -749,20 +746,21 @@ static void get_windows_version(void)
 		}
 	}
 
-	if (is_x64())
-		w64 = "64-bit";
+	arch = is_x64() ? "64-bit" : "32-bit";
 
-	vptr = &windows_version_str[sizeof("Windows ") - 1];
-	vlen = sizeof(windows_version_str) - sizeof("Windows ") - 1;
-	if (!w)
-		safe_sprintf(vptr, vlen, "%s %u.%u %s", (vi.dwPlatformId == VER_PLATFORM_WIN32_NT ? "NT" : "??"),
-			(unsigned int)vi.dwMajorVersion, (unsigned int)vi.dwMinorVersion, w64);
+	if (w == NULL)
+		snprintf(windows_version_str, sizeof(windows_version_str), "%s %u.%u %s",
+			(vi.dwPlatformId == VER_PLATFORM_WIN32_NT ? "NT" : "??"),
+			(unsigned int)vi.dwMajorVersion, (unsigned int)vi.dwMinorVersion, arch);
 	else if (vi.wServicePackMinor)
-		safe_sprintf(vptr, vlen, "%s SP%u.%u %s", w, vi.wServicePackMajor, vi.wServicePackMinor, w64);
+		snprintf(windows_version_str, sizeof(windows_version_str), "%s SP%u.%u %s",
+			w, vi.wServicePackMajor, vi.wServicePackMinor, arch);
 	else if (vi.wServicePackMajor)
-		safe_sprintf(vptr, vlen, "%s SP%u %s", w, vi.wServicePackMajor, w64);
+		snprintf(windows_version_str, sizeof(windows_version_str), "%s SP%u %s",
+			w, vi.wServicePackMajor, arch);
 	else
-		safe_sprintf(vptr, vlen, "%s %s", w, w64);
+		snprintf(windows_version_str, sizeof(windows_version_str), "%s %s",
+			w, arch);
 }
 
 /*
@@ -797,7 +795,7 @@ static int windows_init(struct libusb_context *ctx)
 	// exit calls. If init is called more than exit, we will not exit properly
 	if (++concurrent_usage == 0) { // First init?
 		get_windows_version();
-		usbi_dbg(windows_version_str);
+		usbi_dbg("Windows %s", windows_version_str);
 
 		if (windows_version == WINDOWS_UNSUPPORTED) {
 			usbi_err(ctx, "This version of Windows is NOT supported");
