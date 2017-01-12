@@ -333,14 +333,14 @@ static int wince_get_device_list(
 			goto err_out;
 		}
 
-		safe_unref_device(dev);
+		libusb_unref_device(dev);
 	}
 
 	*discdevs = new_devices;
 	return r;
 err_out:
 	*discdevs = new_devices;
-	safe_unref_device(dev);
+	libusb_unref_device(dev);
 	// Release the remainder of the unprocessed device list.
 	// The devices added to new_devices already will still be passed up to libusb,
 	// which can dispose of them at its leisure.

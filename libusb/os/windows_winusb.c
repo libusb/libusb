@@ -481,7 +481,7 @@ static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 		return 0;
 
 	session_id = htab_hash(sanitized_path);
-	safe_free(sanitized_path);
+	free(sanitized_path);
 	return session_id;
 }
 
@@ -561,7 +561,7 @@ static int get_sub_api(char *driver, int api)
 	int i;
 	const char sep_str[2] = {LIST_SEPARATOR, 0};
 	char *tok, *tmp_str;
-	size_t len = safe_strlen(driver);
+	size_t len = strlen(driver);
 
 	if (len == 0)
 		return SUB_API_NOTSET;
@@ -573,7 +573,7 @@ static int get_sub_api(char *driver, int api)
 	tok = strtok(tmp_str, sep_str);
 	while (tok != NULL) {
 		for (i = 0; i < usb_api_backend[api].nb_driver_names; i++) {
-			if (safe_stricmp(tok, usb_api_backend[api].driver_name_list[i]) == 0) {
+			if (_stricmp(tok, usb_api_backend[api].driver_name_list[i]) == 0) {
 				free(tmp_str);
 				return i;
 			}
@@ -1065,13 +1065,13 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			&conn_info, size, &size, NULL)) {
 			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
 				device_id, windows_error_str(0));
-			safe_closehandle(handle);
+			CloseHandle(handle);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
 
 		if (conn_info.ConnectionStatus == NoDeviceConnected) {
 			usbi_err(ctx, "device '%s' is no longer connected!", device_id);
-			safe_closehandle(handle);
+			CloseHandle(handle);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
 
@@ -1102,7 +1102,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			}
 		}
 
-		safe_closehandle(handle);
+		CloseHandle(handle);
 
 		if (conn_info.DeviceAddress > UINT8_MAX)
 			usbi_err(ctx, "program assertion failed: device address overflow");
@@ -1157,7 +1157,7 @@ static void get_api_type(struct libusb_context *ctx, HDEVINFO *dev_info,
 			// Turn the REG_SZ SPDRP_SERVICE into REG_MULTI_SZ
 			if (lookup[k].reg_prop == SPDRP_SERVICE)
 				// our buffers are MAX_KEY_LENGTH + 1 so we can overflow if needed
-				lookup[k].list[safe_strlen(lookup[k].list) + 1] = 0;
+				lookup[k].list[strlen(lookup[k].list) + 1] = 0;
 
 			// MULTI_SZ is a pain to work with. Turn it into something much more manageable
 			// NB: none of the driver names we check against contain LIST_SEPARATOR,
@@ -1256,7 +1256,7 @@ static int set_hid_interface(struct libusb_context *ctx, struct libusb_device *d
 	}
 
 	for (i = 0; i < priv->hid->nb_interfaces; i++) {
-		if (safe_strcmp(priv->usb_interface[i].path, dev_interface_path) == 0) {
+		if ((priv->usb_interface[i].path != NULL) && strcmp(priv->usb_interface[i].path, dev_interface_path) == 0) {
 			usbi_dbg("interface[%d] already set to %s", i, dev_interface_path);
 			return LIBUSB_ERROR_ACCESS;
 		}
@@ -1646,11 +1646,11 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 
 	// Free any additional GUIDs
 	for (pass = HID_PASS + 1; pass < nb_guids; pass++)
-		safe_free(guid[pass]);
+		free((void *)guid[pass]);
 
 	// Unref newly allocated devs
 	for (i = 0; i < unref_cur; i++)
-		safe_unref_device(unref_list[i]);
+		libusb_unref_device(unref_list[i]);
 	free(unref_list);
 
 	return r;
@@ -3318,7 +3318,7 @@ static int _hid_get_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 		buf, expected_size + 1, &read_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
 			usbi_dbg("Failed to Read HID Report: %s", windows_error_str(0));
-			safe_free(buf);
+			free(buf);
 			return LIBUSB_ERROR_IO;
 		}
 		// Asynchronous wait
@@ -3349,7 +3349,7 @@ static int _hid_get_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 			memcpy(data, buf, *size);
 	}
 
-	safe_free(buf);
+	free(buf);
 	return r;
 }
 
@@ -3405,7 +3405,7 @@ static int _hid_set_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 		buf, write_size, &write_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
 			usbi_dbg("Failed to Write HID Output Report: %s", windows_error_str(0));
-			safe_free(buf);
+			free(buf);
 			return LIBUSB_ERROR_IO;
 		}
 		tp->hid_buffer = buf;
@@ -3418,7 +3418,7 @@ static int _hid_set_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 	if (write_size == 0)
 		usbi_dbg("program assertion failed - write completed synchronously, but no data was written");
 
-	safe_free(buf);
+	free(buf);
 	return LIBUSB_COMPLETED;
 }
 
@@ -3592,7 +3592,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 				} else {
 					usbi_warn(ctx, "  could not process %s report IDs", type[j]);
 				}
-				safe_free(value_caps);
+				free(value_caps);
 			}
 		}
 
