@@ -31,7 +31,6 @@
 #include "wince_usb.h"
 
 // Global variables
-const uint64_t epoch_time = UINT64_C(116444736000000000); // 1970.01.01 00:00:000 in MS Filetime
 int windows_version = WINDOWS_CE;
 static uint64_t hires_frequency, hires_ticks_to_ps;
 static HANDLE driver_handle = INVALID_HANDLE_VALUE;
@@ -832,14 +831,14 @@ static int wince_clock_gettime(int clk_id, struct timespec *tp)
 		// Fall through and return real-time if monotonic read failed or was not detected @ init
 	case USBI_CLOCK_REALTIME:
 		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
-		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
+		// with a predef epoch time to have an epoch that starts at 1970.01.01 00:00
 		// Note however that our resolution is bounded by the Windows system time
 		// functions and is at best of the order of 1 ms (or, usually, worse)
 		GetSystemTime(&st);
 		SystemTimeToFileTime(&st, &filetime);
 		rtime.LowPart = filetime.dwLowDateTime;
 		rtime.HighPart = filetime.dwHighDateTime;
-		rtime.QuadPart -= epoch_time;
+		rtime.QuadPart -= EPOCH_TIME;
 		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
 		tp->tv_nsec = (long)((rtime.QuadPart % 10000000)*100);
 		return LIBUSB_SUCCESS;

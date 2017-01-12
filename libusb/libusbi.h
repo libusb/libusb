@@ -543,14 +543,6 @@ int usbi_clear_event(struct libusb_context *ctx);
 #if (defined(OS_WINDOWS) || defined(OS_WINCE)) && !defined(__GNUC__)
 #define snprintf _snprintf
 #define vsnprintf _vsnprintf
-int usbi_gettimeofday(struct timeval *tp, void *tzp);
-#define LIBUSB_GETTIMEOFDAY_WIN32
-#define HAVE_USBI_GETTIMEOFDAY
-#else
-#ifdef HAVE_GETTIMEOFDAY
-#define usbi_gettimeofday(tv, tz) gettimeofday((tv), (tz))
-#define HAVE_USBI_GETTIMEOFDAY
-#endif
 #endif
 
 struct usbi_pollfd {

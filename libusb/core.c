@@ -76,7 +76,7 @@ static const struct libusb_version libusb_version_internal =
 	  LIBUSB_RC, "http://libusb.info" };
 static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
-static struct timeval timestamp_origin = { 0, 0 };
+static struct timespec timestamp_origin = { 0, 0 };
 
 usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
 struct list_head active_contexts_list;
@@ -2070,7 +2070,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	usbi_mutex_static_lock(&default_context_lock);
 
 	if (!timestamp_origin.tv_sec) {
-		usbi_gettimeofday(&timestamp_origin, NULL);
+		usbi_backend->clock_gettime(USBI_CLOCK_REALTIME, &timestamp_origin);
 	}
 
 	if (!context && usbi_default_context) {
@@ -2262,58 +2262,6 @@ int API_EXPORTED libusb_has_capability(uint32_t capability)
 	return 0;
 }
 
-/* this is defined in libusbi.h if needed */
-#ifdef LIBUSB_GETTIMEOFDAY_WIN32
-/*
- * gettimeofday
- * Implementation according to:
- * The Open Group Base Specifications Issue 6
- * IEEE Std 1003.1, 2004 Edition
- */
-
-/*
- *  THIS SOFTWARE IS NOT COPYRIGHTED
- *
- *  This source code is offered for use in the public domain. You may
- *  use, modify or distribute it freely.
- *
- *  This code is distributed in the hope that it will be useful but
- *  WITHOUT ANY WARRANTY. ALL WARRANTIES, EXPRESS OR IMPLIED ARE HEREBY
- *  DISCLAIMED. This includes but is not limited to warranties of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- *
- *  Contributed by:
- *  Danny Smith <dannysmith@users.sourceforge.net>
- */
-
-/* Offset between 1/1/1601 and 1/1/1970 in 100 nanosec units */
-#define _W32_FT_OFFSET (116444736000000000)
-
-int usbi_gettimeofday(struct timeval *tp, void *tzp)
-{
-	union {
-		unsigned __int64 ns100; /* Time since 1 Jan 1601, in 100ns units */
-		FILETIME ft;
-	} _now;
-	UNUSED(tzp);
-
-	if(tp) {
-#if defined(OS_WINCE)
-		SYSTEMTIME st;
-		GetSystemTime(&st);
-		SystemTimeToFileTime(&st, &_now.ft);
-#else
-		GetSystemTimeAsFileTime (&_now.ft);
-#endif
-		tp->tv_usec=(long)((_now.ns100 / 10) % 1000000 );
-		tp->tv_sec= (long)((_now.ns100 - _W32_FT_OFFSET) / 10000000);
-	}
-	/* Always return 0 as per Open Group Base Specifications Issue 6.
-	   Do not set errno on error.  */
-	return 0;
-}
-#endif
-
 static void usbi_log_str(struct libusb_context *ctx,
 	enum libusb_log_level level, const char * str)
 {
@@ -2357,7 +2305,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 {
 	const char *prefix = "";
 	char buf[USBI_MAX_LOG_LEN];
-	struct timeval now;
+	struct timespec now;
 	int global_debug, header_len, text_len;
 	static int has_debug_header_been_displayed = 0;
 
@@ -2386,18 +2334,18 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 		return;
 #endif
 
-	usbi_gettimeofday(&now, NULL);
+	usbi_backend->clock_gettime(USBI_CLOCK_REALTIME, &now);
 	if ((global_debug) && (!has_debug_header_been_displayed)) {
 		has_debug_header_been_displayed = 1;
 		usbi_log_str(ctx, LIBUSB_LOG_LEVEL_DEBUG, "[timestamp] [threadID] facility level [function call] <message>" USBI_LOG_LINE_END);
 		usbi_log_str(ctx, LIBUSB_LOG_LEVEL_DEBUG, "--------------------------------------------------------------------------------" USBI_LOG_LINE_END);
 	}
-	if (now.tv_usec < timestamp_origin.tv_usec) {
+	if (now.tv_nsec < timestamp_origin.tv_nsec) {
 		now.tv_sec--;
-		now.tv_usec += 1000000;
+		now.tv_nsec += 1000000000L;
 	}
 	now.tv_sec -= timestamp_origin.tv_sec;
-	now.tv_usec -= timestamp_origin.tv_usec;
+	now.tv_nsec -= timestamp_origin.tv_nsec;
 
 	switch (level) {
 	case LIBUSB_LOG_LEVEL_INFO:
@@ -2422,7 +2370,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	if (global_debug) {
 		header_len = snprintf(buf, sizeof(buf),
 			"[%2d.%06d] [%08x] libusb: %s [%s] ",
-			(int)now.tv_sec, (int)now.tv_usec, usbi_get_tid(), prefix, function);
+			(int)now.tv_sec, (int)(now.tv_nsec / 1000L), usbi_get_tid(), prefix, function);
 	} else {
 		header_len = snprintf(buf, sizeof(buf),
 			"libusb: %s [%s] ", prefix, function);

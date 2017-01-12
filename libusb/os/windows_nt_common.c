@@ -32,9 +32,6 @@
 #include "windows_common.h"
 #include "windows_nt_common.h"
 
-// Global variables
-const uint64_t epoch_time = UINT64_C(116444736000000000); // 1970.01.01 00:00:000 in MS Filetime
-
 // Global variables for clock_gettime mechanism
 static uint64_t hires_ticks_to_ps;
 static uint64_t hires_frequency;
@@ -429,8 +426,10 @@ static unsigned __stdcall windows_clock_gettime_threaded(void *param)
 int windows_clock_gettime(int clk_id, struct timespec *tp)
 {
 	struct timer_request request;
+#if !defined(_MSC_VER) || (_MSC_VER < 1900)
 	FILETIME filetime;
 	ULARGE_INTEGER rtime;
+#endif
 	DWORD r;
 
 	switch (clk_id) {
@@ -463,16 +462,20 @@ int windows_clock_gettime(int clk_id, struct timespec *tp)
 		}
 		// Fall through and return real-time if monotonic was not detected @ timer init
 	case USBI_CLOCK_REALTIME:
+#if defined(_MSC_VER) && (_MSC_VER >= 1900)
+		timespec_get(tp, TIME_UTC);
+#else
 		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
-		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
+		// with a predef epoch time to have an epoch that starts at 1970.01.01 00:00
 		// Note however that our resolution is bounded by the Windows system time
 		// functions and is at best of the order of 1 ms (or, usually, worse)
 		GetSystemTimeAsFileTime(&filetime);
 		rtime.LowPart = filetime.dwLowDateTime;
 		rtime.HighPart = filetime.dwHighDateTime;
-		rtime.QuadPart -= epoch_time;
+		rtime.QuadPart -= EPOCH_TIME;
 		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
 		tp->tv_nsec = (long)((rtime.QuadPart % 10000000) * 100);
+#endif
 		return LIBUSB_SUCCESS;
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;

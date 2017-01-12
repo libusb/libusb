@@ -127,15 +127,10 @@ linux)
 		fi
 		AC_SUBST(USE_UDEV)
 
-case $is_backend_android in
-yes)
-	dnl there are gettimeofday function but configure doesn't seem to be able to find it.
-	AC_DEFINE([HAVE_GETTIMEOFDAY], [1], [Define if you have gettimeofday])
-	;;
-*)
-	THREAD_CFLAGS="-pthread"
-	LIBS="${LIBS} -pthread"
-esac
+	if test "x$is_backend_android" != xyes; then
+		THREAD_CFLAGS="-pthread"
+		LIBS="${LIBS} -pthread"
+	fi
 
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
@@ -317,7 +312,6 @@ AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
 
 # headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
-AC_CHECK_FUNCS(gettimeofday)
 
 # check for -std=gnu99 compiler support
 saved_cflags="$CFLAGS"

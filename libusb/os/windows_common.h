@@ -37,6 +37,8 @@
 #define false FALSE
 #endif
 
+#define EPOCH_TIME	UINT64_C(116444736000000000)	// 1970.01.01 00:00:000 in MS Filetime
+
 #if defined(__CYGWIN__ )
 #define _stricmp strcasecmp
 #define _snprintf snprintf
