@@ -431,7 +431,7 @@ static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details_filter(struct li
 				if (libusb0_symboliclink_index < 256) {
 					// libusb0.sys is connected to this device instance.
 					// If the the device interface guid is {F9F3FF14-AE21-48A0-8A25-8011A7A931D9} then it's a filter.
-					safe_sprintf(filter_path, sizeof("\\\\.\\libusb0-0000"), "\\\\.\\libusb0-%04u", (unsigned int)libusb0_symboliclink_index);
+					sprintf(filter_path, "\\\\.\\libusb0-%04u", (unsigned int)libusb0_symboliclink_index);
 					usbi_dbg("assigned libusb0 symbolic link %s", filter_path);
 				} else {
 					// libusb0.sys was connected to this device instance at one time; but not anymore.
