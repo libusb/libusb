@@ -2262,6 +2262,47 @@ int API_EXPORTED libusb_has_capability(uint32_t capability)
 	return 0;
 }
 
+/* this is defined in libusbi.h if needed */
+#ifdef LIBUSB_PRINTF_WIN32
+/*
+ * Prior to VS2015, Microsoft did not provide the snprintf() function and
+ * provided a vsnprintf() that did not guarantee NULL-terminated output.
+ * Microsoft did provide a _snprintf() function, but again it did not
+ * guarantee NULL-terminated output.
+ *
+ * The below implementations guarantee NULL-terminated output and are
+ * C99 compliant.
+ */
+
+int usbi_snprintf(char *str, size_t size, const char *format, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, format);
+	ret = usbi_vsnprintf(str, size, format, ap);
+	va_end(ap);
+
+	return ret;
+}
+
+int usbi_vsnprintf(char *str, size_t size, const char *format, va_list ap)
+{
+	int ret;
+
+	ret = _vsnprintf(str, size, format, ap);
+	if (ret < 0 || ret == (int)size) {
+		/* Output is truncated, ensure buffer is NULL-terminated and
+		 * determine how many characters would have been written. */
+		str[size - 1] = '\0';
+		if (ret < 0)
+			ret = _vsnprintf(NULL, 0, format, ap);
+	}
+
+	return ret;
+}
+#endif
+
 static void usbi_log_str(struct libusb_context *ctx,
 	enum libusb_log_level level, const char * str)
 {

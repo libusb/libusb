@@ -540,9 +540,12 @@ int usbi_clear_event(struct libusb_context *ctx);
 #include "os/poll_windows.h"
 #endif
 
-#if (defined(OS_WINDOWS) || defined(OS_WINCE)) && !defined(__GNUC__)
-#define snprintf _snprintf
-#define vsnprintf _vsnprintf
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+#define snprintf usbi_snprintf
+#define vsnprintf usbi_vsnprintf
+int usbi_snprintf(char *dst, size_t size, const char *format, ...);
+int usbi_vsnprintf(char *dst, size_t size, const char *format, va_list ap);
+#define LIBUSB_PRINTF_WIN32
 #endif
 
 struct usbi_pollfd {
