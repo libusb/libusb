@@ -41,6 +41,12 @@
     <ClCompile Include="..\libusb\hotplug.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\libusb\os\windows_nt_common.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libusb\os\windows_usbdk.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include=".\config.h">
@@ -68,6 +74,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\libusb\hotplug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libusb\os\windows_common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libusb\os\windows_nt_common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libusb\os\windows_usbdk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
