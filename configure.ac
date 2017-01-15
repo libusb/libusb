@@ -178,14 +178,6 @@ windows)
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	AC_DEFINE([WINVER], 0x0501, [Oldest Windows version supported])
 	AC_DEFINE([_WIN32_WINNT], 0x0501, [Oldest Windows version supported])
-
-	AC_ARG_ENABLE([usbdk],
-		[AC_HELP_STRING([--enable-usbdk], [use UsbDk Windows backend [default=no]])],
-		[], [enable_usbdk=no])
-		if test "x$enable_usbdk" = xyes; then
-		    AC_DEFINE(USE_USBDK, 1, [Use UsbDk Windows backend])
-		fi
-		AC_SUBST(USE_USBDK)
 	;;
 haiku)
 	AC_DEFINE(OS_HAIKU, 1, [Haiku backend])
@@ -208,7 +200,6 @@ AM_CONDITIONAL(OS_HAIKU, test "x$backend" = xhaiku)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
 AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = xyes)
 AM_CONDITIONAL(USE_UDEV, test "x$enable_udev" = xyes)
-AM_CONDITIONAL(USE_USBDK, test "x$enable_usbdk" = xyes)
 if test "x$threads" = xposix; then
 	AC_DEFINE(THREADS_POSIX, 1, [Use POSIX Threads])
 fi
