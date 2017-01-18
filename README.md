@@ -23,7 +23,6 @@ http://api.libusb.info
 Use the mailing list for questions, comments, etc:
 http://mailing-list.libusb.info
 
-- Pete Batard <pete@akeo.ie>
 - Hans de Goede <hdegoede@redhat.com>
 - Xiaofan Chen <xiaofanc@gmail.com>
 - Ludovic Rousseau <ludovic.rousseau@gmail.com>
