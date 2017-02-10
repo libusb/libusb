@@ -50,3 +50,5 @@ Release
 *.orig
 .dirstamp
 .amend
+*.VC.VC.opendb
+*.VC.db
