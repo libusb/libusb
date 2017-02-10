@@ -228,22 +228,11 @@ static inline struct windows_device_priv *windows_device_priv_init(struct libusb
 	struct windows_device_priv *p = _device_priv(dev);
 	int i;
 
-	p->depth = 0;
-	p->port = 0;
-	p->path = NULL;
 	p->apib = &usb_api_backend[USB_API_UNSUPPORTED];
 	p->sub_api = SUB_API_NOTSET;
-	p->hid = NULL;
-	p->active_config = 0;
-	p->config_descriptor = NULL;
-	memset(&p->dev_descriptor, 0, sizeof(USB_DEVICE_DESCRIPTOR));
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
-		p->usb_interface[i].path = NULL;
 		p->usb_interface[i].apib = &usb_api_backend[USB_API_UNSUPPORTED];
 		p->usb_interface[i].sub_api = SUB_API_NOTSET;
-		p->usb_interface[i].nb_endpoints = 0;
-		p->usb_interface[i].endpoint = NULL;
-		p->usb_interface[i].restricted_functionality = false;
 	}
 
 	return p;
@@ -254,16 +243,16 @@ static inline void windows_device_priv_release(struct libusb_device *dev)
 	struct windows_device_priv *p = _device_priv(dev);
 	int i;
 
-	safe_free(p->path);
+	free(p->path);
 	if ((dev->num_configurations > 0) && (p->config_descriptor != NULL)) {
 		for (i = 0; i < dev->num_configurations; i++)
-			safe_free(p->config_descriptor[i]);
+			free(p->config_descriptor[i]);
 	}
-	safe_free(p->config_descriptor);
-	safe_free(p->hid);
+	free(p->config_descriptor);
+	free(p->hid);
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
-		safe_free(p->usb_interface[i].path);
-		safe_free(p->usb_interface[i].endpoint);
+		free(p->usb_interface[i].path);
+		free(p->usb_interface[i].endpoint);
 	}
 }
 

@@ -1220,7 +1220,7 @@ struct libusb_transfer {
 	/** Type of the endpoint from \ref libusb_transfer_type */
 	unsigned char type;
 
-	/** Timeout for this transfer in millseconds. A value of 0 indicates no
+	/** Timeout for this transfer in milliseconds. A value of 0 indicates no
 	 * timeout. */
 	unsigned int timeout;
 

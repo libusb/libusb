@@ -27,9 +27,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#ifdef HAVE_SIGNAL_H
-#include <signal.h>
-#endif
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
@@ -1887,14 +1884,17 @@ int API_EXPORTED libusb_event_handler_active(libusb_context *ctx)
  */
 void API_EXPORTED libusb_interrupt_event_handler(libusb_context *ctx)
 {
+	int pending_events;
 	USBI_GET_CONTEXT(ctx);
 
 	usbi_dbg("");
 	usbi_mutex_lock(&ctx->event_data_lock);
-	if (!usbi_pending_events(ctx)) {
-		ctx->event_flags |= USBI_EVENT_USER_INTERRUPT;
+
+	pending_events = usbi_pending_events(ctx);
+	ctx->event_flags |= USBI_EVENT_USER_INTERRUPT;
+	if (!pending_events)
 		usbi_signal_event(ctx);
-	}
+
 	usbi_mutex_unlock(&ctx->event_data_lock);
 }
 

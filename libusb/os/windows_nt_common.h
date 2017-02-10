@@ -59,5 +59,5 @@ void windows_handle_callback(struct usbi_transfer *itransfer, uint32_t io_result
 int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready);
 
 #if defined(ENABLE_LOGGING)
-const char *windows_error_str(DWORD retval);
+const char *windows_error_str(DWORD error_code);
 #endif

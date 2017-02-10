@@ -127,15 +127,10 @@ linux)
 		fi
 		AC_SUBST(USE_UDEV)
 
-case $is_backend_android in
-yes)
-	dnl there are gettimeofday function but configure doesn't seem to be able to find it.
-	AC_DEFINE([HAVE_GETTIMEOFDAY], [1], [Define if you have gettimeofday])
-	;;
-*)
-	THREAD_CFLAGS="-pthread"
-	LIBS="${LIBS} -pthread"
-esac
+	if test "x$is_backend_android" != xyes; then
+		THREAD_CFLAGS="-pthread"
+		LIBS="${LIBS} -pthread"
+	fi
 
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
@@ -186,7 +181,7 @@ windows)
 	AC_ARG_ENABLE([usbdk],
 		[AC_HELP_STRING([--enable-usbdk], [use UsbDk Windows backend [default=no]])],
 		[], [enable_usbdk="no"])
-		if test "x$enable_usbdk" = "xyes" ; then
+		if test "x$enable_usbdk" = xyes; then
 		    AC_DEFINE(USE_USBDK, 1, [Use UsbDk Windows backend])
 		fi
 		AC_SUBST(USE_USBDK)
@@ -210,7 +205,7 @@ AM_CONDITIONAL(OS_NETBSD, test "x$backend" = xnetbsd)
 AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
 AM_CONDITIONAL(OS_HAIKU, test "x$backend" = xhaiku)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
-AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = "xyes")
+AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = xyes)
 AM_CONDITIONAL(USE_UDEV, test "x$enable_udev" = xyes)
 AM_CONDITIONAL(USE_USBDK, test "x$enable_usbdk" = xyes)
 if test "$threads" = posix; then
@@ -224,20 +219,20 @@ AC_ARG_ENABLE([timerfd],
 		[use timerfd for timing [default=auto]])],
 	[use_timerfd=$enableval], [use_timerfd='auto'])
 
-if test "x$use_timerfd" = "xyes" -a "x$timerfd_h" = "x0"; then
+if test "x$use_timerfd" = xyes -a "x$timerfd_h" = x0; then
 	AC_MSG_ERROR([timerfd header not available; glibc 2.9+ required])
 fi
 
 AC_CHECK_DECL([TFD_NONBLOCK], [tfd_hdr_ok=yes], [tfd_hdr_ok=no], [#include <sys/timerfd.h>])
-if test "x$use_timerfd" = "xyes" -a "x$tfd_hdr_ok" = "xno"; then
+if test "x$use_timerfd" = xyes -a "x$tfd_hdr_ok" = xno; then
 	AC_MSG_ERROR([timerfd header not usable; glibc 2.9+ required])
 fi
 
 AC_MSG_CHECKING([whether to use timerfd for timing])
-if test "x$use_timerfd" = "xno"; then
+if test "x$use_timerfd" = xno; then
 	AC_MSG_RESULT([no (disabled by user)])
 else
-	if test "x$timerfd_h" = "x1" -a "x$tfd_hdr_ok" = "xyes"; then
+	if test "x$timerfd_h" = x1 -a "x$tfd_hdr_ok" = xyes; then
 		AC_MSG_RESULT([yes])
 		AC_DEFINE(USBI_TIMERFD_AVAILABLE, 1, [timerfd headers available])
 	else
@@ -251,7 +246,7 @@ AC_CHECK_TYPES(struct timespec)
 AC_ARG_ENABLE([log], [AS_HELP_STRING([--disable-log], [disable all logging])],
 	[log_enabled=$enableval],
 	[log_enabled='yes'])
-if test "x$log_enabled" != "xno"; then
+if test "x$log_enabled" != xno; then
 	AC_DEFINE([ENABLE_LOGGING], 1, [Message logging])
 fi
 
@@ -259,7 +254,7 @@ AC_ARG_ENABLE([debug-log], [AS_HELP_STRING([--enable-debug-log],
 	[start with debug message logging enabled [default=no]])],
 	[debug_log_enabled=$enableval],
 	[debug_log_enabled='no'])
-if test "x$debug_log_enabled" != "xno"; then
+if test "x$debug_log_enabled" != xno; then
 	AC_DEFINE([ENABLE_DEBUG_LOGGING], 1, [Start with debug message logging enabled])
 fi
 
@@ -267,15 +262,15 @@ AC_ARG_ENABLE([system-log], [AS_HELP_STRING([--enable-system-log],
 	[output logging messages to system wide log, if supported by the OS [default=no]])],
 	[system_log_enabled=$enableval],
 	[system_log_enabled='no'])
-if test "x$system_log_enabled" != "xno"; then
+if test "x$system_log_enabled" != xno; then
 	AC_DEFINE([USE_SYSTEM_LOGGING_FACILITY], 1, [Enable output to system log])
-fi
 
-# Check if syslog is available in standard C library
-AC_CHECK_HEADERS(syslog.h)
-AC_CHECK_FUNC([syslog], [have_syslog=yes], [have_syslog=no])
-if test "x$have_syslog" != "xno"; then
-	AC_DEFINE([HAVE_SYSLOG_FUNC], 1, [syslog() function available])
+	# Check if syslog is available in standard C library
+	AC_CHECK_HEADERS(syslog.h)
+	AC_CHECK_FUNC([syslog], [have_syslog=yes], [have_syslog=no])
+	if test "x$have_syslog" != xno; then
+		AC_DEFINE([HAVE_SYSLOG_FUNC], 1, [syslog() function available])
+	fi
 fi
 
 # Examples build
@@ -283,14 +278,21 @@ AC_ARG_ENABLE([examples-build], [AS_HELP_STRING([--enable-examples-build],
 	[build example applications [default=no]])],
 	[build_examples=$enableval],
 	[build_examples='no'])
-AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != "xno"])
+AM_CONDITIONAL(BUILD_EXAMPLES, test "x$build_examples" != xno)
 
 # Tests build
 AC_ARG_ENABLE([tests-build], [AS_HELP_STRING([--enable-tests-build],
 	[build test applications [default=no]])],
 	[build_tests=$enableval],
 	[build_tests='no'])
-AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != "xno"])
+AM_CONDITIONAL(BUILD_TESTS, test "x$build_tests" != xno)
+
+# headers not available on all platforms but required on others
+AC_CHECK_HEADERS([sys/time.h])
+
+# sigaction not available on MinGW
+AC_CHECK_FUNC([sigaction], [have_sigaction=yes], [have_sigaction=no])
+AM_CONDITIONAL(HAVE_SIGACTION, test "x$have_sigaction" = xyes)
 
 # check for -fvisibility=hidden compiler support (GCC >= 3.4)
 saved_cflags="$CFLAGS"
@@ -310,15 +312,6 @@ CFLAGS="$CFLAGS -Wno-pointer-sign"
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
 	nopointersign_cflags="-Wno-pointer-sign", nopointersign_cflags="")
 CFLAGS="$saved_cflags"
-
-# sigaction not available on MinGW
-AC_CHECK_FUNC([sigaction], [have_sigaction=yes], [have_sigaction=no])
-AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = "xyes"])
-
-# headers not available on all platforms but required on others
-AC_CHECK_HEADERS([sys/time.h])
-AC_CHECK_FUNCS(gettimeofday)
-AC_CHECK_HEADERS([signal.h])
 
 # check for -std=gnu99 compiler support
 saved_cflags="$CFLAGS"

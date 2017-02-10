@@ -32,9 +32,6 @@
 #include "windows_common.h"
 #include "windows_nt_common.h"
 
-// Global variables
-const uint64_t epoch_time = UINT64_C(116444736000000000); // 1970.01.01 00:00:000 in MS Filetime
-
 // Global variables for clock_gettime mechanism
 static uint64_t hires_ticks_to_ps;
 static uint64_t hires_frequency;
@@ -66,17 +63,17 @@ static unsigned __stdcall windows_clock_gettime_threaded(void *param);
 * uses retval as errorcode, or, if 0, use GetLastError()
 */
 #if defined(ENABLE_LOGGING)
-const char *windows_error_str(DWORD retval)
+const char *windows_error_str(DWORD error_code)
 {
 	static char err_string[ERR_BUFFER_SIZE];
 
-	DWORD error_code, format_error;
 	DWORD size;
-	ssize_t i;
+	int len;
 
-	error_code = retval ? retval : GetLastError();
+	if (error_code == 0)
+		error_code = GetLastError();
 
-	safe_sprintf(err_string, ERR_BUFFER_SIZE, "[%u] ", (unsigned int)error_code);
+	len = sprintf(err_string, "[%u] ", (unsigned int)error_code);
 
 	// Translate codes returned by SetupAPI. The ones we are dealing with are either
 	// in 0x0000xxxx or 0xE000xxxx and can be distinguished from standard error codes.
@@ -92,22 +89,22 @@ const char *windows_error_str(DWORD retval)
 		break;
 	}
 
-	size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
-			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &err_string[safe_strlen(err_string)],
-			ERR_BUFFER_SIZE - (DWORD)safe_strlen(err_string), NULL);
+	size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			&err_string[len], ERR_BUFFER_SIZE - len, NULL);
 	if (size == 0) {
-		format_error = GetLastError();
+		DWORD format_error = GetLastError();
 		if (format_error)
-			safe_sprintf(err_string, ERR_BUFFER_SIZE,
-					"Windows error code %u (FormatMessage error code %u)",
-					(unsigned int)error_code, (unsigned int)format_error);
+			snprintf(err_string, ERR_BUFFER_SIZE,
+				"Windows error code %u (FormatMessage error code %u)",
+				(unsigned int)error_code, (unsigned int)format_error);
 		else
-			safe_sprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", (unsigned int)error_code);
-	}
-	else {
-		// Remove CR/LF terminators
-		for (i = safe_strlen(err_string) - 1; (i >= 0) && ((err_string[i] == 0x0A) || (err_string[i] == 0x0D)); i--)
-			err_string[i] = 0;
+			snprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", (unsigned int)error_code);
+	} else {
+		// Remove CRLF from end of message, if present
+		size_t pos = len + size - 2;
+		if (err_string[pos] == '\r')
+			err_string[pos] = '\0';
 	}
 
 	return err_string;
@@ -118,7 +115,7 @@ const char *windows_error_str(DWORD retval)
    [Aho,Sethi,Ullman] Compilers: Principles, Techniques and Tools, 1986
    [Knuth]            The Art of Computer Programming, part 3 (6.4)  */
 
-#define HTAB_SIZE 1021
+#define HTAB_SIZE 1021UL	// *MUST* be a prime number!!
 
 typedef struct htab_entry {
 	unsigned long used;
@@ -126,29 +123,14 @@ typedef struct htab_entry {
 } htab_entry;
 
 static htab_entry *htab_table = NULL;
-static usbi_mutex_t htab_write_mutex = NULL;
-static unsigned long htab_size, htab_filled;
-
-/* For the used double hash method the table size has to be a prime. To
-   correct the user given table size we need a prime test.  This trivial
-   algorithm is adequate because the code is called only during init and
-   the number is likely to be small  */
-static int isprime(unsigned long number)
-{
-	// no even number will be passed
-	unsigned int divider = 3;
-
-	while((divider * divider < number) && (number % divider != 0))
-		divider += 2;
-
-	return (number % divider != 0);
-}
+static usbi_mutex_t htab_mutex = NULL;
+static unsigned long htab_filled;
 
 /* Before using the hash table we must allocate memory for it.
    We allocate one element more as the found prime number says.
    This is done for more effective indexing as explained in the
    comment for the hash function.  */
-static bool htab_create(struct libusb_context *ctx, unsigned long nel)
+static bool htab_create(struct libusb_context *ctx)
 {
 	if (htab_table != NULL) {
 		usbi_err(ctx, "hash table already allocated");
@@ -156,19 +138,13 @@ static bool htab_create(struct libusb_context *ctx, unsigned long nel)
 	}
 
 	// Create a mutex
-	usbi_mutex_init(&htab_write_mutex);
+	usbi_mutex_init(&htab_mutex);
 
-	// Change nel to the first prime number not smaller as nel.
-	nel |= 1;
-	while (!isprime(nel))
-		nel += 2;
-
-	htab_size = nel;
-	usbi_dbg("using %lu entries hash table", nel);
+	usbi_dbg("using %lu entries hash table", HTAB_SIZE);
 	htab_filled = 0;
 
 	// allocate memory and zero out.
-	htab_table = calloc(htab_size + 1, sizeof(htab_entry));
+	htab_table = calloc(HTAB_SIZE + 1, sizeof(htab_entry));
 	if (htab_table == NULL) {
 		usbi_err(ctx, "could not allocate space for hash table");
 		return false;
@@ -185,13 +161,12 @@ static void htab_destroy(void)
 	if (htab_table == NULL)
 		return;
 
-	for (i = 0; i < htab_size; i++) {
-		if (htab_table[i].used)
-			safe_free(htab_table[i].str);
-	}
+	for (i = 0; i < HTAB_SIZE; i++)
+		free(htab_table[i].str);
 
-	usbi_mutex_destroy(&htab_write_mutex);
 	safe_free(htab_table);
+
+	usbi_mutex_destroy(&htab_mutex);
 }
 
 /* This is the search function. It uses double hashing with open addressing.
@@ -220,26 +195,29 @@ unsigned long htab_hash(const char *str)
 		++r;
 
 	// compute table hash: simply take the modulus
-	hval = r % htab_size;
+	hval = r % HTAB_SIZE;
 	if (hval == 0)
 		++hval;
 
 	// Try the first index
 	idx = hval;
 
+	// Mutually exclusive access (R/W lock would be better)
+	usbi_mutex_lock(&htab_mutex);
+
 	if (htab_table[idx].used) {
-		if ((htab_table[idx].used == hval) && (safe_strcmp(str, htab_table[idx].str) == 0))
-			return idx; // existing hash
+		if ((htab_table[idx].used == hval) && (strcmp(str, htab_table[idx].str) == 0))
+			goto out_unlock; // existing hash
 
 		usbi_dbg("hash collision ('%s' vs '%s')", str, htab_table[idx].str);
 
 		// Second hash function, as suggested in [Knuth]
-		hval2 = 1 + hval % (htab_size - 2);
+		hval2 = 1 + hval % (HTAB_SIZE - 2);
 
 		do {
 			// Because size is prime this guarantees to step through all available indexes
 			if (idx <= hval2)
-				idx = htab_size + idx - hval2;
+				idx = HTAB_SIZE + idx - hval2;
 			else
 				idx -= hval2;
 
@@ -248,35 +226,32 @@ unsigned long htab_hash(const char *str)
 				break;
 
 			// If entry is found use it.
-			if ((htab_table[idx].used == hval) && (safe_strcmp(str, htab_table[idx].str) == 0))
-				return idx;
+			if ((htab_table[idx].used == hval) && (strcmp(str, htab_table[idx].str) == 0))
+				goto out_unlock;
 		} while (htab_table[idx].used);
 	}
 
 	// Not found => New entry
 
 	// If the table is full return an error
-	if (htab_filled >= htab_size) {
-		usbi_err(NULL, "hash table is full (%d entries)", htab_size);
-		return 0;
+	if (htab_filled >= HTAB_SIZE) {
+		usbi_err(NULL, "hash table is full (%lu entries)", HTAB_SIZE);
+		idx = 0;
+		goto out_unlock;
 	}
 
-	// Concurrent threads might be storing the same entry at the same time
-	// (eg. "simultaneous" enums from different threads) => use a mutex
-	usbi_mutex_lock(&htab_write_mutex);
-	// Just free any previously allocated string (which should be the same as
-	// new one). The possibility of concurrent threads storing a collision
-	// string (same hash, different string) at the same time is extremely low
-	safe_free(htab_table[idx].str);
-	htab_table[idx].used = hval;
 	htab_table[idx].str = _strdup(str);
 	if (htab_table[idx].str == NULL) {
 		usbi_err(NULL, "could not duplicate string for hash table");
-		usbi_mutex_unlock(&htab_write_mutex);
-		return 0;
+		idx = 0;
+		goto out_unlock;
 	}
+
+	htab_table[idx].used = hval;
 	++htab_filled;
-	usbi_mutex_unlock(&htab_write_mutex);
+
+out_unlock:
+	usbi_mutex_unlock(&htab_mutex);
 
 	return idx;
 }
@@ -429,8 +404,10 @@ static unsigned __stdcall windows_clock_gettime_threaded(void *param)
 int windows_clock_gettime(int clk_id, struct timespec *tp)
 {
 	struct timer_request request;
+#if !defined(_MSC_VER) || (_MSC_VER < 1900)
 	FILETIME filetime;
 	ULARGE_INTEGER rtime;
+#endif
 	DWORD r;
 
 	switch (clk_id) {
@@ -463,16 +440,20 @@ int windows_clock_gettime(int clk_id, struct timespec *tp)
 		}
 		// Fall through and return real-time if monotonic was not detected @ timer init
 	case USBI_CLOCK_REALTIME:
+#if defined(_MSC_VER) && (_MSC_VER >= 1900)
+		timespec_get(tp, TIME_UTC);
+#else
 		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
-		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
+		// with a predef epoch time to have an epoch that starts at 1970.01.01 00:00
 		// Note however that our resolution is bounded by the Windows system time
 		// functions and is at best of the order of 1 ms (or, usually, worse)
 		GetSystemTimeAsFileTime(&filetime);
 		rtime.LowPart = filetime.dwLowDateTime;
 		rtime.HighPart = filetime.dwHighDateTime;
-		rtime.QuadPart -= epoch_time;
+		rtime.QuadPart -= EPOCH_TIME;
 		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
 		tp->tv_nsec = (long)((rtime.QuadPart % 10000000) * 100);
+#endif
 		return LIBUSB_SUCCESS;
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -538,7 +519,7 @@ void windows_handle_callback(struct usbi_transfer *itransfer, uint32_t io_result
 
 int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready)
 {
-	POLL_NFDS_TYPE i = 0;
+	POLL_NFDS_TYPE i;
 	bool found = false;
 	struct usbi_transfer *transfer;
 	struct winfd *pollable_fd = NULL;
@@ -592,7 +573,7 @@ int windows_common_init(struct libusb_context *ctx)
 	if (!windows_init_clock(ctx))
 		goto error_roll_back;
 
-	if (!htab_create(ctx, HTAB_SIZE))
+	if (!htab_create(ctx))
 		goto error_roll_back;
 
 	return LIBUSB_SUCCESS;

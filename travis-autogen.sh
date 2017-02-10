@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Warnings enabled
 CFLAGS="-Wall -Wextra"
@@ -25,7 +25,6 @@ CFLAGS+=" -Wundef"
 CFLAGS+=" -Wuninitialized"
 CFLAGS+=" -Wunused"
 CFLAGS+=" -Wwrite-strings"
-CFLAGS+=" -fdiagnostics-color=auto"
 
 # warnings disabled on purpose
 CFLAGS+=" -Wno-unused-parameter"
@@ -35,7 +34,6 @@ CFLAGS+=" -Wno-deprecated-declarations"
 # should be removed and the code fixed
 CFLAGS+=" -Wno-incompatible-pointer-types-discards-qualifiers"
 
-# fails on warning
-CFLAGS+=" -Werror"
+export CFLAGS
 
 ./autogen.sh

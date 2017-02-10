@@ -106,7 +106,7 @@ static int composite_copy_transfer_data(int sub_api, struct usbi_transfer *itran
 
 // Global variables
 int windows_version = WINDOWS_UNDEFINED;
-static char windows_version_str[128] = "Windows Undefined";
+static char windows_version_str[128] = "Undefined";
 // Concurrency
 static int concurrent_usage = -1;
 static usbi_mutex_t autoclaim_lock;
@@ -161,36 +161,34 @@ static char *guid_to_string(const GUID *guid)
  */
 static char *sanitize_path(const char *path)
 {
-	const char root_prefix[] = "\\\\.\\";
-	size_t j, size, root_size;
-	char *ret_path = NULL;
+	const char root_prefix[] = { '\\', '\\', '.', '\\' };
+	size_t j, size;
+	char *ret_path;
 	size_t add_root = 0;
 
 	if (path == NULL)
 		return NULL;
 
-	size = safe_strlen(path) + 1;
-	root_size = sizeof(root_prefix) - 1;
+	size = strlen(path) + 1;
 
 	// Microsoft indiscriminately uses '\\?\', '\\.\', '##?#" or "##.#" for root prefixes.
 	if (!((size > 3) && (((path[0] == '\\') && (path[1] == '\\') && (path[3] == '\\'))
 			|| ((path[0] == '#') && (path[1] == '#') && (path[3] == '#'))))) {
-		add_root = root_size;
+		add_root = sizeof(root_prefix);
 		size += add_root;
 	}
 
-	ret_path = calloc(1, size);
+	ret_path = malloc(size);
 	if (ret_path == NULL)
 		return NULL;
 
-	safe_strcpy(&ret_path[add_root], size-add_root, path);
+	strcpy(&ret_path[add_root], path);
 
 	// Ensure consistency with root prefix
-	for (j = 0; j < root_size; j++)
-		ret_path[j] = root_prefix[j];
+	memcpy(ret_path, root_prefix, sizeof(root_prefix));
 
 	// Same goes for '\' and '#' after the root prefix. Ensure '#' is used
-	for (j = root_size; j < size; j++) {
+	for (j = sizeof(root_prefix); j < size; j++) {
 		ret_path[j] = (char)toupper((int)ret_path[j]); // Fix case too
 		if (ret_path[j] == '\\')
 			ret_path[j] = '#';
@@ -295,7 +293,7 @@ static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_co
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID *guid, unsigned _index)
 {
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
-	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
+	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details;
 	DWORD size;
 
 	if (_index <= 0)
@@ -364,7 +362,7 @@ static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details_filter(struct li
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID *guid, unsigned _index, char *filter_path)
 {
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
-	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
+	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details;
 	DWORD size;
 
 	if (_index <= 0)
@@ -433,7 +431,7 @@ static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details_filter(struct li
 				if (libusb0_symboliclink_index < 256) {
 					// libusb0.sys is connected to this device instance.
 					// If the the device interface guid is {F9F3FF14-AE21-48A0-8A25-8011A7A931D9} then it's a filter.
-					safe_sprintf(filter_path, sizeof("\\\\.\\libusb0-0000"), "\\\\.\\libusb0-%04u", (unsigned int)libusb0_symboliclink_index);
+					sprintf(filter_path, "\\\\.\\libusb0-%04u", (unsigned int)libusb0_symboliclink_index);
 					usbi_dbg("assigned libusb0 symbolic link %s", filter_path);
 				} else {
 					// libusb0.sys was connected to this device instance at one time; but not anymore.
@@ -458,8 +456,8 @@ err_exit:
 static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 {
 	DWORD parent_devinst;
-	unsigned long session_id = 0;
-	char *sanitized_path = NULL;
+	unsigned long session_id;
+	char *sanitized_path;
 	char path[MAX_PATH_LENGTH];
 	unsigned i;
 
@@ -481,7 +479,7 @@ static unsigned long get_ancestor_session_id(DWORD devinst, unsigned level)
 		return 0;
 
 	session_id = htab_hash(sanitized_path);
-	safe_free(sanitized_path);
+	free(sanitized_path);
 	return session_id;
 }
 
@@ -561,7 +559,7 @@ static int get_sub_api(char *driver, int api)
 	int i;
 	const char sep_str[2] = {LIST_SEPARATOR, 0};
 	char *tok, *tmp_str;
-	size_t len = safe_strlen(driver);
+	size_t len = strlen(driver);
 
 	if (len == 0)
 		return SUB_API_NOTSET;
@@ -573,7 +571,7 @@ static int get_sub_api(char *driver, int api)
 	tok = strtok(tmp_str, sep_str);
 	while (tok != NULL) {
 		for (i = 0; i < usb_api_backend[api].nb_driver_names; i++) {
-			if (safe_stricmp(tok, usb_api_backend[api].driver_name_list[i]) == 0) {
+			if (_stricmp(tok, usb_api_backend[api].driver_name_list[i]) == 0) {
 				free(tmp_str);
 				return i;
 			}
@@ -676,10 +674,7 @@ static BOOL is_x64(void)
 static void get_windows_version(void)
 {
 	OSVERSIONINFOEXA vi, vi2;
-	const char *w = 0;
-	const char *w64 = "32 bit";
-	char *vptr;
-	size_t vlen;
+	const char *arch, *w = NULL;
 	unsigned major, minor;
 	ULONGLONG major_equal, minor_equal;
 	BOOL ws;
@@ -733,12 +728,12 @@ static void get_windows_version(void)
 			switch (windows_version) {
 			case 0x50: w = "2000"; break;
 			case 0x51: w = "XP"; break;
-			case 0x52: w = ("2003"); break;
+			case 0x52: w = "2003"; break;
 			case 0x60: w = (ws ? "Vista" : "2008"); break;
 			case 0x61: w = (ws ? "7" : "2008_R2"); break;
 			case 0x62: w = (ws ? "8" : "2012"); break;
-			case 0x63: w = (ws ? "8.1": "2012_R2"); break;
-			case 0x64: w = (ws ? "10": "2015"); break;
+			case 0x63: w = (ws ? "8.1" : "2012_R2"); break;
+			case 0x64: w = (ws ? "10" : "2015"); break;
 			default:
 				if (windows_version < 0x50)
 					windows_version = WINDOWS_UNSUPPORTED;
@@ -749,20 +744,21 @@ static void get_windows_version(void)
 		}
 	}
 
-	if (is_x64())
-		w64 = "64-bit";
+	arch = is_x64() ? "64-bit" : "32-bit";
 
-	vptr = &windows_version_str[sizeof("Windows ") - 1];
-	vlen = sizeof(windows_version_str) - sizeof("Windows ") - 1;
-	if (!w)
-		safe_sprintf(vptr, vlen, "%s %u.%u %s", (vi.dwPlatformId == VER_PLATFORM_WIN32_NT ? "NT" : "??"),
-			(unsigned int)vi.dwMajorVersion, (unsigned int)vi.dwMinorVersion, w64);
+	if (w == NULL)
+		snprintf(windows_version_str, sizeof(windows_version_str), "%s %u.%u %s",
+			(vi.dwPlatformId == VER_PLATFORM_WIN32_NT ? "NT" : "??"),
+			(unsigned int)vi.dwMajorVersion, (unsigned int)vi.dwMinorVersion, arch);
 	else if (vi.wServicePackMinor)
-		safe_sprintf(vptr, vlen, "%s SP%u.%u %s", w, vi.wServicePackMajor, vi.wServicePackMinor, w64);
+		snprintf(windows_version_str, sizeof(windows_version_str), "%s SP%u.%u %s",
+			w, vi.wServicePackMajor, vi.wServicePackMinor, arch);
 	else if (vi.wServicePackMajor)
-		safe_sprintf(vptr, vlen, "%s SP%u %s", w, vi.wServicePackMajor, w64);
+		snprintf(windows_version_str, sizeof(windows_version_str), "%s SP%u %s",
+			w, vi.wServicePackMajor, arch);
 	else
-		safe_sprintf(vptr, vlen, "%s %s", w, w64);
+		snprintf(windows_version_str, sizeof(windows_version_str), "%s %s",
+			w, arch);
 }
 
 /*
@@ -797,7 +793,7 @@ static int windows_init(struct libusb_context *ctx)
 	// exit calls. If init is called more than exit, we will not exit properly
 	if (++concurrent_usage == 0) { // First init?
 		get_windows_version();
-		usbi_dbg(windows_version_str);
+		usbi_dbg("Windows %s", windows_version_str);
 
 		if (windows_version == WINDOWS_UNSUPPORTED) {
 			usbi_err(ctx, "This version of Windows is NOT supported");
@@ -1065,13 +1061,13 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			&conn_info, size, &size, NULL)) {
 			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
 				device_id, windows_error_str(0));
-			safe_closehandle(handle);
+			CloseHandle(handle);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
 
 		if (conn_info.ConnectionStatus == NoDeviceConnected) {
 			usbi_err(ctx, "device '%s' is no longer connected!", device_id);
-			safe_closehandle(handle);
+			CloseHandle(handle);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
 
@@ -1102,7 +1098,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			}
 		}
 
-		safe_closehandle(handle);
+		CloseHandle(handle);
 
 		if (conn_info.DeviceAddress > UINT8_MAX)
 			usbi_err(ctx, "program assertion failed: device address overflow");
@@ -1157,7 +1153,7 @@ static void get_api_type(struct libusb_context *ctx, HDEVINFO *dev_info,
 			// Turn the REG_SZ SPDRP_SERVICE into REG_MULTI_SZ
 			if (lookup[k].reg_prop == SPDRP_SERVICE)
 				// our buffers are MAX_KEY_LENGTH + 1 so we can overflow if needed
-				lookup[k].list[safe_strlen(lookup[k].list) + 1] = 0;
+				lookup[k].list[strlen(lookup[k].list) + 1] = 0;
 
 			// MULTI_SZ is a pain to work with. Turn it into something much more manageable
 			// NB: none of the driver names we check against contain LIST_SEPARATOR,
@@ -1256,7 +1252,7 @@ static int set_hid_interface(struct libusb_context *ctx, struct libusb_device *d
 	}
 
 	for (i = 0; i < priv->hid->nb_interfaces; i++) {
-		if (safe_strcmp(priv->usb_interface[i].path, dev_interface_path) == 0) {
+		if ((priv->usb_interface[i].path != NULL) && strcmp(priv->usb_interface[i].path, dev_interface_path) == 0) {
 			usbi_dbg("interface[%d] already set to %s", i, dev_interface_path);
 			return LIBUSB_ERROR_ACCESS;
 		}
@@ -1595,7 +1591,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 						usbi_warn(ctx, "could not duplicate interface path '%s'", priv->path);
 					// The following is needed if we want API calls to work for both simple
 					// and composite devices.
-					for(j = 0; j < USB_MAXINTERFACES; j++)
+					for (j = 0; j < USB_MAXINTERFACES; j++)
 						priv->usb_interface[j].apib = &usb_api_backend[api];
 
 					break;
@@ -1646,11 +1642,11 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 
 	// Free any additional GUIDs
 	for (pass = HID_PASS + 1; pass < nb_guids; pass++)
-		safe_free(guid[pass]);
+		free((void *)guid[pass]);
 
 	// Unref newly allocated devs
 	for (i = 0; i < unref_cur; i++)
-		safe_unref_device(unref_list[i]);
+		libusb_unref_device(unref_list[i]);
 	free(unref_list);
 
 	return r;
@@ -2037,12 +2033,10 @@ void windows_get_overlapped_result(struct usbi_transfer *transfer, struct winfd 
 	if (HasOverlappedIoCompletedSync(pollable_fd->overlapped)) {
 		*io_result = NO_ERROR;
 		*io_size = (DWORD)pollable_fd->overlapped->InternalHigh;
-	}
-	else if (GetOverlappedResult(pollable_fd->handle, pollable_fd->overlapped, io_size, false)) {
+	} else if (GetOverlappedResult(pollable_fd->handle, pollable_fd->overlapped, io_size, false)) {
 		// Regular async overlapped
 		*io_result = NO_ERROR;
-	}
-	else {
+	} else {
 		*io_result = GetLastError();
 	}
 }
@@ -2472,8 +2466,7 @@ static void winusbx_close(int sub_api, struct libusb_device_handle *dev_handle)
 					CloseHandle(handle);
 			}
 		}
-	}
-	else {
+	} else {
 		// If this is a WinUSB device, free all interfaces above interface 0,
 		// then free and close interface 0 last
 		for (i = 1; i < USB_MAXINTERFACES; i++) {
@@ -2578,26 +2571,35 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 				for (i = 0; ; i++) {
 					safe_free(dev_interface_details);
 					safe_free(dev_path_no_guid);
+
 					dev_interface_details = get_interface_details_filter(ctx, &dev_info, &dev_info_data, &GUID_DEVINTERFACE_LIBUSB0_FILTER, i, filter_path);
 					if ((found_filter) || (dev_interface_details == NULL))
 						break;
 
 					// ignore GUID part
 					dev_path_no_guid = sanitize_path(strtok(dev_interface_details->DevicePath, "{"));
-					if (safe_strncmp(dev_path_no_guid, priv->usb_interface[iface].path, safe_strlen(dev_path_no_guid)) == 0) {
+					if (dev_path_no_guid == NULL)
+						continue;
+
+					if (strncmp(dev_path_no_guid, priv->usb_interface[iface].path, strlen(dev_path_no_guid)) == 0) {
 						file_handle = CreateFileA(filter_path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ,
 							NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
-						if (file_handle == INVALID_HANDLE_VALUE) {
-							usbi_err(ctx, "could not open device %s: %s", filter_path, windows_error_str(0));
-						} else {
-							WinUSBX[sub_api].Free(winusb_handle);
-							if (WinUSBX[sub_api].Initialize(file_handle, &winusb_handle))
+						if (file_handle != INVALID_HANDLE_VALUE) {
+							if (WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
+								// Replace the existing file handle with the working one
+								CloseHandle(handle_priv->interface_handle[iface].dev_handle);
+								handle_priv->interface_handle[iface].dev_handle = file_handle;
 								found_filter = true;
-							else
+							} else {
 								usbi_err(ctx, "could not initialize filter driver for %s", filter_path);
+								CloseHandle(file_handle);
+							}
+						} else {
+							usbi_err(ctx, "could not open device %s: %s", filter_path, windows_error_str(0));
 						}
 					}
 				}
+				free(dev_interface_details);
 				if (!found_filter) {
 					usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(err));
 					return LIBUSB_ERROR_ACCESS;
@@ -3320,7 +3322,7 @@ static int _hid_get_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 		buf, expected_size + 1, &read_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
 			usbi_dbg("Failed to Read HID Report: %s", windows_error_str(0));
-			safe_free(buf);
+			free(buf);
 			return LIBUSB_ERROR_IO;
 		}
 		// Asynchronous wait
@@ -3351,7 +3353,7 @@ static int _hid_get_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 			memcpy(data, buf, *size);
 	}
 
-	safe_free(buf);
+	free(buf);
 	return r;
 }
 
@@ -3407,7 +3409,7 @@ static int _hid_set_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 		buf, write_size, &write_size, overlapped)) {
 		if (GetLastError() != ERROR_IO_PENDING) {
 			usbi_dbg("Failed to Write HID Output Report: %s", windows_error_str(0));
-			safe_free(buf);
+			free(buf);
 			return LIBUSB_ERROR_IO;
 		}
 		tp->hid_buffer = buf;
@@ -3420,7 +3422,7 @@ static int _hid_set_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 	if (write_size == 0)
 		usbi_dbg("program assertion failed - write completed synchronously, but no data was written");
 
-	safe_free(buf);
+	free(buf);
 	return LIBUSB_COMPLETED;
 }
 
@@ -3594,7 +3596,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 				} else {
 					usbi_warn(ctx, "  could not process %s report IDs", type[j]);
 				}
-				safe_free(value_caps);
+				free(value_caps);
 			}
 		}
 

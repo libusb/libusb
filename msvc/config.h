@@ -45,6 +45,5 @@
 #define HAVE_MISSING_H
 #else
 #define OS_WINDOWS 1
-#define HAVE_SIGNAL_H 1
 #define HAVE_SYS_TYPES_H 1
 #endif
