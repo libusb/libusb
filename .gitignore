@@ -11,6 +11,7 @@ missing
 stamp-h1
 m4/
 autom4te.cache
+INSTALL
 install-sh
 depcomp
 configure
@@ -32,6 +33,7 @@ examples/dpfp_threaded
 examples/fxload
 examples/hotplugtest
 examples/sam3u_benchmark
+examples/testlibusb
 tests/stress
 *.exe
 *.pc
