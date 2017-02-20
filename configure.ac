@@ -223,7 +223,7 @@ if test "x$use_timerfd" = xyes -a "x$timerfd_h" = x0; then
 	AC_MSG_ERROR([timerfd header not available; glibc 2.9+ required])
 fi
 
-AC_CHECK_DECL([TFD_NONBLOCK], [tfd_hdr_ok=yes], [tfd_hdr_ok=no], [#include <sys/timerfd.h>])
+AC_CHECK_DECLS([TFD_NONBLOCK, TFD_CLOEXEC], [tfd_hdr_ok=yes], [tfd_hdr_ok=no], [#include <sys/timerfd.h>])
 if test "x$use_timerfd" = xyes -a "x$tfd_hdr_ok" = xno; then
 	AC_MSG_ERROR([timerfd header not usable; glibc 2.9+ required])
 fi
@@ -240,6 +240,7 @@ else
 	fi
 fi
 
+AC_CHECK_FUNCS([pipe2])
 AC_CHECK_TYPES([struct timespec])
 
 # Message logging

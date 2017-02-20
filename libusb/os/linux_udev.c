@@ -82,17 +82,33 @@ int linux_udev_start_event_monitor(void)
 
 	udev_monitor_fd = udev_monitor_get_fd(udev_monitor);
 
+#if defined(FD_CLOEXEC)
+	/* Make sure the udev file descriptor is marked as CLOEXEC */
+	r = fcntl(udev_monitor_fd, F_GETFD);
+	if (r == -1) {
+		usbi_err(NULL, "geting udev monitor fd flags (%d)", errno);
+		goto err_free_monitor;
+	}
+	if (!(r & FD_CLOEXEC)) {
+		if (fcntl(udev_monitor_fd, F_SETFD, r | FD_CLOEXEC) == -1) {
+			usbi_err(NULL, "setting udev monitor fd flags (%d)", errno);
+			goto err_free_monitor;
+		}
+	}
+#endif
+
 	/* Some older versions of udev are not non-blocking by default,
 	 * so make sure this is set */
 	r = fcntl(udev_monitor_fd, F_GETFL);
 	if (r == -1) {
-		usbi_err(NULL, "getting udev monitor fd flags (%d)", errno);
+		usbi_err(NULL, "getting udev monitor fd status flags (%d)", errno);
 		goto err_free_monitor;
 	}
-	r = fcntl(udev_monitor_fd, F_SETFL, r | O_NONBLOCK);
-	if (r) {
-		usbi_err(NULL, "setting udev monitor fd flags (%d)", errno);
-		goto err_free_monitor;
+	if (!(r & O_NONBLOCK)) {
+		if (fcntl(udev_monitor_fd, F_SETFL, r | O_NONBLOCK) == -1) {
+			usbi_err(NULL, "setting udev monitor fd status flags (%d)", errno);
+			goto err_free_monitor;
+		}
 	}
 
 	r = usbi_pipe(udev_control_pipe);

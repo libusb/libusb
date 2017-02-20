@@ -194,7 +194,7 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 		snprintf(path, PATH_MAX, "%s/%03d/%03d",
 			usbfs_path, dev->bus_number, dev->device_address);
 
-	fd = open(path, mode);
+	fd = open(path, mode | O_CLOEXEC);
 	if (fd != -1)
 		return fd; /* Success */
 
@@ -205,7 +205,7 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 		/* Wait 10ms for USB device path creation.*/
 		nanosleep(&(struct timespec){delay / 1000000, (delay * 1000) % 1000000000UL}, NULL);
 
-		fd = open(path, mode);
+		fd = open(path, mode | O_CLOEXEC);
 		if (fd != -1)
 			return fd; /* Success */
 	}
@@ -526,7 +526,7 @@ static int _open_sysfs_attr(struct libusb_device *dev, const char *attr)
 
 	snprintf(filename, PATH_MAX, "%s/%s/%s",
 		SYSFS_DEVICE_PATH, priv->sysfs_dir, attr);
-	fd = open(filename, O_RDONLY);
+	fd = open(filename, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		usbi_err(DEVICE_CTX(dev),
 			"open %s failed ret=%d errno=%d", filename, fd, errno);
@@ -546,7 +546,7 @@ static int __read_sysfs_attr(struct libusb_context *ctx,
 
 	snprintf(filename, PATH_MAX, "%s/%s/%s", SYSFS_DEVICE_PATH,
 		 devname, attr);
-	f = fopen(filename, "r");
+	f = fopen(filename, "re");
 	if (f == NULL) {
 		if (errno == ENOENT) {
 			/* File doesn't exist. Assume the device has been

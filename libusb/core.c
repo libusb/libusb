@@ -187,6 +187,20 @@ struct list_head active_contexts_list;
 /**
  * \page libusb_caveats Caveats
  *
+ * \section fork Fork considerations
+ *
+ * libusb is <em>not</em> designed to work across fork() calls. Depending on
+ * the platform, there may be resources in the parent process that are not
+ * available to the child (e.g. the hotplug monitor thread on Linux). In
+ * addition, since the parent and child will share libusb's internal file
+ * descriptors, using libusb in any way from the child could cause the parent
+ * process's \ref libusb_context to get into an inconsistent state.
+ *
+ * On Linux, libusb's file descriptors will be marked as CLOEXEC, which means
+ * that it is safe to fork() and exec() without worrying about the child
+ * process needing to clean up state or having access to these file descriptors.
+ * Other platforms may not be so forgiving, so consider yourself warned!
+ *
  * \section devresets Device resets
  *
  * The libusb_reset_device() function allows you to reset a device. If your
@@ -290,7 +304,6 @@ if (cfg != desired)
  * added to the buffer. Still, this is not a nice solution because it loses the
  * information about the end of the short packet, and the user probably wanted
  * that surplus data to arrive in the next logical transfer.
- *
  *
  * \section zlp Zero length packets
  *
