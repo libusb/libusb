@@ -134,7 +134,7 @@ int linux_udev_stop_event_monitor(void)
 
 	/* Write some dummy data to the control pipe and
 	 * wait for the thread to exit */
-	r = usbi_write(udev_control_pipe[1], &dummy, sizeof(dummy));
+	r = write(udev_control_pipe[1], &dummy, sizeof(dummy));
 	if (r <= 0) {
 		usbi_warn(NULL, "udev control pipe signal failed");
 	}
@@ -162,6 +162,7 @@ static void *linux_udev_event_thread_main(void *arg)
 {
 	char dummy;
 	int r;
+	ssize_t nb;
 	struct udev_device* udev_dev;
 	struct pollfd fds[] = {
 		{.fd = udev_control_pipe[0],
@@ -179,8 +180,8 @@ static void *linux_udev_event_thread_main(void *arg)
 		}
 		if (fds[0].revents & POLLIN) {
 			/* activity on control pipe, read the byte and exit */
-			r = usbi_read(udev_control_pipe[0], &dummy, sizeof(dummy));
-			if (r <= 0) {
+			nb = read(udev_control_pipe[0], &dummy, sizeof(dummy));
+			if (nb <= 0) {
 				usbi_warn(NULL, "udev control pipe read failed");
 			}
 			break;
