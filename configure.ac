@@ -21,9 +21,9 @@ AC_INIT([libusb],[LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO[]LIBUSB_RC],[libusb
 # These numbers should be tweaked on every release. Read carefully:
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 # http://sourceware.org/autobook/autobook/autobook_91.html
-lt_current="1"
-lt_revision="0"
-lt_age="1"
+lt_current=1
+lt_revision=0
+lt_age=1
 LTLDFLAGS="-version-info ${lt_current}:${lt_revision}:${lt_age}"
 
 AM_INIT_AUTOMAKE
@@ -50,54 +50,54 @@ dnl on linux-android platform, some functions are in different places
 case $host in
 *-linux-android*)
 	AC_MSG_RESULT([This is a Linux-Android system])
-	is_backend_android="yes"
+	is_backend_android=yes
 	;;
 *)
-	is_backend_android="no"
+	is_backend_android=no
 esac
 
 case $host in
 *-linux* | *-uclinux*)
 	AC_MSG_RESULT([Linux])
-	backend="linux"
-	threads="posix"
+	backend=linux
+	threads=posix
 	;;
 *-darwin*)
 	AC_MSG_RESULT([Darwin/Mac OS X])
-	backend="darwin"
-	threads="posix"
+	backend=darwin
+	threads=posix
 	;;
 *-openbsd*)
 	AC_MSG_RESULT([OpenBSD])
-	backend="openbsd"
-	threads="posix"
+	backend=openbsd
+	threads=posix
 	;;
 *-netbsd*)
 	AC_MSG_RESULT([NetBSD])
-	backend="netbsd"
-	threads="posix"
+	backend=netbsd
+	threads=posix
 	;;
 *-mingw* | *msys*)
 	AC_MSG_RESULT([Windows])
-	backend="windows"
-	threads="windows"
-	create_import_lib="yes"
+	backend=windows
+	threads=windows
+	create_import_lib=yes
 	AM_CFLAGS="${AM_CFLAGS} -fno-omit-frame-pointer"
 	;;
 *-cygwin*)
 	AC_MSG_RESULT([Cygwin (using Windows backend)])
-	backend="windows"
-	threads="posix"
+	backend=windows
+	threads=posix
 	;;
 *-haiku*)
 	AC_MSG_RESULT([Haiku])
-	backend="haiku"
-	threads="posix"
+	backend=haiku
+	threads=posix
 	;;
 *-solaris*)
 	AC_MSG_RESULT([SunOS])
-	backend="sunos"
-	threads="posix"
+	backend=sunos
+	threads=posix
 	;;
 *)
 	AC_MSG_ERROR([unsupported operating system $host])
@@ -107,18 +107,18 @@ case $backend in
 linux)
 	AC_DEFINE(OS_LINUX, 1, [Linux backend])
 	AC_SUBST(OS_LINUX)
-	AC_SEARCH_LIBS(clock_gettime, rt, [], [], -pthread)
+	AC_SEARCH_LIBS([clock_gettime2], [rt], [], [], [-pthread])
 	AC_ARG_ENABLE([udev],
 		[AC_HELP_STRING([--enable-udev], [use udev for device enumeration and hotplug support (recommended) [default=yes]])],
-		[], [enable_udev="yes"])
-		if test "x$enable_udev" = "xyes" ; then
+		[], [enable_udev=yes])
+		if test "x$enable_udev" = xyes ; then
 			# system has udev. use it or fail!
-			AC_CHECK_HEADERS([libudev.h],[],[AC_ERROR(["udev support requested but libudev not installed"])])
-			AC_CHECK_LIB([udev], [udev_new], [], [AC_ERROR(["udev support requested but libudev not installed"])])
+			AC_CHECK_HEADERS([libudev.h], [], [AC_MSG_ERROR([udev support requested but libudev header not installed])])
+			AC_CHECK_LIB([udev], [udev_new], [], [AC_MSG_ERROR([udev support requested but libudev not installed])])
 			AC_DEFINE(USE_UDEV, 1, [Use udev for device enumeration/hotplug])
 		else
 			AC_CHECK_HEADERS([asm/types.h], [], [])
-			AC_CHECK_HEADERS([sys/socket.h linux/netlink.h], [], [AC_ERROR(["Linux netlink headers not found"])], [
+			AC_CHECK_HEADERS([sys/socket.h linux/netlink.h], [], [AC_MSG_ERROR([Linux netlink headers not found])], [
 #ifdef HAVE_ASM_TYPES_H
 #include <asm/types.h>
 #endif
@@ -180,7 +180,7 @@ windows)
 
 	AC_ARG_ENABLE([usbdk],
 		[AC_HELP_STRING([--enable-usbdk], [use UsbDk Windows backend [default=no]])],
-		[], [enable_usbdk="no"])
+		[], [enable_usbdk=no])
 		if test "x$enable_usbdk" = xyes; then
 		    AC_DEFINE(USE_USBDK, 1, [Use UsbDk Windows backend])
 		fi
@@ -208,7 +208,7 @@ AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
 AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = xyes)
 AM_CONDITIONAL(USE_UDEV, test "x$enable_udev" = xyes)
 AM_CONDITIONAL(USE_USBDK, test "x$enable_usbdk" = xyes)
-if test "$threads" = posix; then
+if test "x$threads" = xposix; then
 	AC_DEFINE(THREADS_POSIX, 1, [Use POSIX Threads])
 fi
 
@@ -217,7 +217,7 @@ AC_CHECK_HEADER([sys/timerfd.h], [timerfd_h=1], [timerfd_h=0])
 AC_ARG_ENABLE([timerfd],
 	[AS_HELP_STRING([--enable-timerfd],
 		[use timerfd for timing [default=auto]])],
-	[use_timerfd=$enableval], [use_timerfd='auto'])
+	[use_timerfd=$enableval], [use_timerfd=auto])
 
 if test "x$use_timerfd" = xyes -a "x$timerfd_h" = x0; then
 	AC_MSG_ERROR([timerfd header not available; glibc 2.9+ required])
@@ -240,12 +240,12 @@ else
 	fi
 fi
 
-AC_CHECK_TYPES(struct timespec)
+AC_CHECK_TYPES([struct timespec])
 
 # Message logging
 AC_ARG_ENABLE([log], [AS_HELP_STRING([--disable-log], [disable all logging])],
 	[log_enabled=$enableval],
-	[log_enabled='yes'])
+	[log_enabled=yes])
 if test "x$log_enabled" != xno; then
 	AC_DEFINE([ENABLE_LOGGING], 1, [Message logging])
 fi
@@ -253,7 +253,7 @@ fi
 AC_ARG_ENABLE([debug-log], [AS_HELP_STRING([--enable-debug-log],
 	[start with debug message logging enabled [default=no]])],
 	[debug_log_enabled=$enableval],
-	[debug_log_enabled='no'])
+	[debug_log_enabled=no])
 if test "x$debug_log_enabled" != xno; then
 	AC_DEFINE([ENABLE_DEBUG_LOGGING], 1, [Start with debug message logging enabled])
 fi
@@ -261,7 +261,7 @@ fi
 AC_ARG_ENABLE([system-log], [AS_HELP_STRING([--enable-system-log],
 	[output logging messages to system wide log, if supported by the OS [default=no]])],
 	[system_log_enabled=$enableval],
-	[system_log_enabled='no'])
+	[system_log_enabled=no])
 if test "x$system_log_enabled" != xno; then
 	AC_DEFINE([USE_SYSTEM_LOGGING_FACILITY], 1, [Enable output to system log])
 
@@ -277,14 +277,14 @@ fi
 AC_ARG_ENABLE([examples-build], [AS_HELP_STRING([--enable-examples-build],
 	[build example applications [default=no]])],
 	[build_examples=$enableval],
-	[build_examples='no'])
+	[build_examples=no])
 AM_CONDITIONAL(BUILD_EXAMPLES, test "x$build_examples" != xno)
 
 # Tests build
 AC_ARG_ENABLE([tests-build], [AS_HELP_STRING([--enable-tests-build],
 	[build test applications [default=no]])],
 	[build_tests=$enableval],
-	[build_tests='no'])
+	[build_tests=no])
 AM_CONDITIONAL(BUILD_TESTS, test "x$build_tests" != xno)
 
 # headers not available on all platforms but required on others
@@ -300,9 +300,9 @@ saved_cflags="$CFLAGS"
 CFLAGS="$CFLAGS -Werror -fvisibility=hidden"
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
 	[VISIBILITY_CFLAGS="-fvisibility=hidden"
-	 AC_DEFINE([DEFAULT_VISIBILITY], [__attribute__((visibility("default")))], [Default visibility]) ],
-	[ VISIBILITY_CFLAGS=""
-	 AC_DEFINE([DEFAULT_VISIBILITY], [], [Default visibility]) ],
+	 AC_DEFINE([DEFAULT_VISIBILITY], [__attribute__((visibility("default")))], [Default visibility])],
+	[VISIBILITY_CFLAGS=""
+	 AC_DEFINE([DEFAULT_VISIBILITY], [], [Default visibility])],
 	])
 CFLAGS="$saved_cflags"
 
