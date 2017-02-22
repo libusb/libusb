@@ -806,7 +806,7 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 	if (r < 0)
 		return r;
 
-	len = MIN(len, r);
+	len = MIN(len, (size_t)r);
 	memcpy(buffer, config_desc, len);
 	return len;
 }
@@ -836,7 +836,7 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 		descriptors += r;
 	}
 
-	len = MIN(len, r);
+	len = MIN(len, (size_t)r);
 	memcpy(buffer, descriptors, len);
 	return len;
 }
