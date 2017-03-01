@@ -36,4 +36,4 @@ CFLAGS+=" -Wno-incompatible-pointer-types-discards-qualifiers"
 
 export CFLAGS
 
-./autogen.sh
+./autogen.sh "$@"
