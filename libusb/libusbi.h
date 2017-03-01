@@ -139,6 +139,19 @@ static inline void list_del(struct list_head *entry)
 	entry->next = entry->prev = NULL;
 }
 
+static inline void list_cut(struct list_head *list, struct list_head *head)
+{
+	if (list_empty(head))
+		return;
+
+	list->next = head->next;
+	list->next->prev = list;
+	list->prev = head->prev;
+	list->prev->next = list;
+
+	list_init(head);
+}
+
 static inline void *usbi_reallocf(void *ptr, size_t size)
 {
 	void *ret = realloc(ptr, size);

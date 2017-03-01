@@ -2077,7 +2077,6 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	struct pollfd *fds = NULL;
 	int i = -1;
 	int timeout_ms;
-	int special_event;
 
 	/* prevent attempts to recursively handle events (e.g. calling into
 	 * libusb_handle_events() from within a hotplug or transfer callback) */
@@ -2146,31 +2145,28 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	if (tv->tv_usec % 1000)
 		timeout_ms++;
 
-redo_poll:
 	usbi_dbg("poll() %d fds with timeout in %dms", nfds, timeout_ms);
 	r = usbi_poll(fds, nfds, timeout_ms);
 	usbi_dbg("poll() returned %d", r);
 	if (r == 0) {
 		r = handle_timeouts(ctx);
 		goto done;
-	}
-	else if (r == -1 && errno == EINTR) {
+	} else if (r == -1 && errno == EINTR) {
 		r = LIBUSB_ERROR_INTERRUPTED;
 		goto done;
-	}
-	else if (r < 0) {
+	} else if (r < 0) {
 		usbi_err(ctx, "poll failed %d err=%d", r, errno);
 		r = LIBUSB_ERROR_IO;
 		goto done;
 	}
 
-	special_event = 0;
-
 	/* fds[0] is always the event pipe */
 	if (fds[0].revents) {
-		libusb_hotplug_message *message = NULL;
+		struct list_head hotplug_msgs;
 		struct usbi_transfer *itransfer;
 		int ret = 0;
+
+		list_init(&hotplug_msgs);
 
 		usbi_dbg("caught a fish on the event pipe");
 
@@ -2193,9 +2189,7 @@ redo_poll:
 		/* check for any pending hotplug messages */
 		if (!list_empty(&ctx->hotplug_msgs)) {
 			usbi_dbg("hotplug message received");
-			special_event = 1;
-			message = list_first_entry(&ctx->hotplug_msgs, libusb_hotplug_message, list);
-			list_del(&message->list);
+			list_cut(&hotplug_msgs, &ctx->hotplug_msgs);
 		}
 
 		/* complete any pending transfers */
@@ -2215,14 +2209,18 @@ redo_poll:
 
 		usbi_mutex_unlock(&ctx->event_data_lock);
 
-		/* process the hotplug message, if any */
-		if (message) {
+		/* process the hotplug messages, if any */
+		while (!list_empty(&hotplug_msgs)) {
+			libusb_hotplug_message *message =
+				list_first_entry(&hotplug_msgs, libusb_hotplug_message, list);
+
 			usbi_hotplug_match(ctx, message->device, message->event);
 
 			/* the device left, dereference the device */
 			if (LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT == message->event)
 				libusb_unref_device(message->device);
 
+			list_del(&message->list);
 			free(message);
 		}
 
@@ -2233,7 +2231,7 @@ redo_poll:
 		}
 
 		if (0 == --r)
-			goto handled;
+			goto done;
 	}
 
 #ifdef USBI_TIMERFD_AVAILABLE
@@ -2242,7 +2240,6 @@ redo_poll:
 		/* timerfd indicates that a timeout has expired */
 		int ret;
 		usbi_dbg("timerfd triggered");
-		special_event = 1;
 
 		ret = handle_timerfd_trigger(ctx);
 		if (ret < 0) {
@@ -2252,19 +2249,13 @@ redo_poll:
 		}
 
 		if (0 == --r)
-			goto handled;
+			goto done;
 	}
 #endif
 
 	r = usbi_backend->handle_events(ctx, fds + internal_nfds, nfds - internal_nfds, r);
 	if (r)
 		usbi_err(ctx, "backend handle_events failed with error %d", r);
-
-handled:
-	if (r == 0 && special_event) {
-		timeout_ms = 0;
-		goto redo_poll;
-	}
 
 done:
 	usbi_end_event_handling(ctx);
