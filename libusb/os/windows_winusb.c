@@ -3357,11 +3357,13 @@ static int _hid_set_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 {
 	uint8_t *buf = NULL;
 	DWORD ioctl_code, write_size = (DWORD)*size;
+	// If an id is reported, we must allow MAX_HID_REPORT_SIZE + 1
+	unsigned int max_report_size = MAX_HID_REPORT_SIZE + id ? 1 : 0;
 
 	if (tp->hid_buffer != NULL)
 		usbi_dbg("program assertion failed: hid_buffer is not NULL");
 
-	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
+	if ((*size == 0) || (*size > max_report_size)) {
 		usbi_dbg("invalid size (%u)", *size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
