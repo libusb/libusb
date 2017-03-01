@@ -891,7 +891,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 
 	USB_CONFIGURATION_DESCRIPTOR_SHORT cd_buf_short; // dummy request
 	PUSB_DESCRIPTOR_REQUEST cd_buf_actual = NULL;    // actual request
-	PUSB_CONFIGURATION_DESCRIPTOR cd_data = NULL;
+	PUSB_CONFIGURATION_DESCRIPTOR cd_data;
 
 	if (dev->num_configurations == 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -899,9 +899,6 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 	priv->config_descriptor = calloc(dev->num_configurations, sizeof(unsigned char *));
 	if (priv->config_descriptor == NULL)
 		return LIBUSB_ERROR_NO_MEM;
-
-	for (i = 0; i < dev->num_configurations; i++)
-		priv->config_descriptor[i] = NULL;
 
 	for (i = 0, r = LIBUSB_SUCCESS; ; i++) {
 		// safe loop: release all dynamic resources
