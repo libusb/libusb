@@ -1734,6 +1734,8 @@ static int windows_get_config_descriptor_by_value(struct libusb_device *dev, uin
 
 	for (index = 0; index < dev->num_configurations; index++) {
 		config_header = (PUSB_CONFIGURATION_DESCRIPTOR)priv->config_descriptor[index];
+        if (config_header == NULL)
+			return LIBUSB_ERROR_NOT_FOUND;
 		if (config_header->bConfigurationValue == bConfigurationValue) {
 			*buffer = priv->config_descriptor[index];
 			return (int)config_header->wTotalLength;
