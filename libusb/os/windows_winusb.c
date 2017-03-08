@@ -3188,10 +3188,10 @@ static int _hid_get_report_descriptor(struct hid_device_priv *dev, void *data, s
 	uint8_t d[MAX_HID_DESCRIPTOR_SIZE];
 	size_t i = 0;
 
-	/* usage page (0xFFA0 == vendor defined) */
-	d[i++] = 0x06; d[i++] = 0xA0; d[i++] = 0xFF;
-	/* usage (vendor defined) */
-	d[i++] = 0x09; d[i++] = 0x01;
+	/* usage page */
+	d[i++] = 0x06; d[i++] = dev->usagePage & 0xFF; d[i++] = dev->usagePage >> 8;
+	/* usage */
+	d[i++] = 0x09; d[i++] = (uint8_t)dev->usage;
 	/* start collection (application) */
 	d[i++] = 0xA1; d[i++] = 0x01;
 	/* input report */
@@ -3614,6 +3614,10 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 		priv->hid->input_report_size = capabilities.InputReportByteLength;
 		priv->hid->output_report_size = capabilities.OutputReportByteLength;
 		priv->hid->feature_report_size = capabilities.FeatureReportByteLength;
+
+		// Store usage and usagePage values
+		priv->hid->usage = capabilities.Usage;
+		priv->hid->usagePage = capabilities.UsagePage;
 
 		// Fetch string descriptors
 		priv->hid->string_index[0] = priv->dev_descriptor.iManufacturer;
