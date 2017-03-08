@@ -193,6 +193,8 @@ struct hid_device_priv {
 	uint16_t input_report_size;
 	uint16_t output_report_size;
 	uint16_t feature_report_size;
+	uint16_t usage;
+	uint16_t usagePage;
 	WCHAR string[3][MAX_USB_STRING_LENGTH];
 	uint8_t string_index[3]; // man, prod, ser
 };
