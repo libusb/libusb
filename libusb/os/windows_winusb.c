@@ -3106,12 +3106,14 @@ static int _hid_get_config_descriptor(struct hid_device_priv *dev, void *data, s
 }
 
 static int _hid_get_string_descriptor(struct hid_device_priv *dev, int _index,
-	void *data, size_t *size)
+	void *data, size_t *size,HANDLE hid_handle)
 {
 	void *tmp = NULL;
+	WCHAR string[MAX_USB_STRING_LENGTH]= {0};
 	size_t tmp_size = 0;
 	int i;
-
+	bool rc = true;
+    
 	/* language ID, EN-US */
 	char string_langid[] = {0x09, 0x04};
 
@@ -3130,8 +3132,14 @@ static int _hid_get_string_descriptor(struct hid_device_priv *dev, int _index,
 			}
 		}
 
-		if (i == 3) // not found
-			return LIBUSB_ERROR_INVALID_PARAM;
+		if (i == 3){
+			rc = HidD_GetIndexedString(hid_handle, _index,
+								 string, sizeof(string));
+			if(!rc)
+			    return LIBUSB_ERROR_INVALID_PARAM;
+			tmp = string;
+			tmp_size = (_hid_wcslen(string) + 1) * sizeof(WCHAR);
+		}
 	}
 
 	if (!tmp_size)
@@ -3252,7 +3260,7 @@ static int _hid_get_descriptor(struct hid_device_priv *dev, HANDLE hid_handle, i
 		return LIBUSB_ERROR_INVALID_PARAM;
 	case LIBUSB_DT_STRING:
 		usbi_dbg("LIBUSB_DT_STRING");
-		return _hid_get_string_descriptor(dev, _index, data, size);
+		return _hid_get_string_descriptor(dev, _index, data, size,hid_handle);
 	case LIBUSB_DT_HID:
 		usbi_dbg("LIBUSB_DT_HID");
 		if (!_index)
@@ -3457,6 +3465,7 @@ static int hid_init(int sub_api, struct libusb_context *ctx)
 	DLL_LOAD_FUNC(hid, HidD_GetManufacturerString, TRUE);
 	DLL_LOAD_FUNC(hid, HidD_GetProductString, TRUE);
 	DLL_LOAD_FUNC(hid, HidD_GetSerialNumberString, TRUE);
+	DLL_LOAD_FUNC(hid, HidD_GetIndexedString,TRUE);
 	DLL_LOAD_FUNC(hid, HidP_GetCaps, TRUE);
 	DLL_LOAD_FUNC(hid, HidD_SetNumInputBuffers, TRUE);
 	DLL_LOAD_FUNC(hid, HidD_SetFeature, TRUE);
