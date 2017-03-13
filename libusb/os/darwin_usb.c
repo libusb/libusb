@@ -875,14 +875,29 @@ static int get_device_port (io_service_t service, UInt8 *port) {
   return ret;
 }
 
+static int get_device_parent_sessionID(io_service_t service, UInt64 *parent_sessionID) {
+  kern_return_t result;
+  io_service_t parent;
+
+  /* Walk up the tree in the IOService plane until we find a parent that has a sessionID */
+  parent = service;
+  while((result = IORegistryEntryGetParentEntry (parent, kIOServicePlane, &parent)) == kIOReturnSuccess) {
+    if (get_ioregistry_value_number (parent, CFSTR("sessionID"), kCFNumberSInt64Type, parent_sessionID)) {
+        /* Success */
+        return 1;
+    }
+  }
+
+  /* We ran out of parents */
+  return 0;
+}
+
 static int darwin_get_cached_device(struct libusb_context *ctx, io_service_t service,
                                     struct darwin_cached_device **cached_out) {
   struct darwin_cached_device *new_device;
   UInt64 sessionID = 0, parent_sessionID = 0;
   int ret = LIBUSB_SUCCESS;
   usb_device_t **device;
-  io_service_t parent;
-  kern_return_t result;
   UInt8 port = 0;
 
   /* get some info from the io registry */
@@ -893,11 +908,8 @@ static int darwin_get_cached_device(struct libusb_context *ctx, io_service_t ser
 
   usbi_dbg("finding cached device for sessionID 0x%" PRIx64, sessionID);
 
-  result = IORegistryEntryGetParentEntry (service, kIOUSBPlane, &parent);
-
-  if (kIOReturnSuccess == result) {
-    (void) get_ioregistry_value_number (parent, CFSTR("sessionID"), kCFNumberSInt64Type, &parent_sessionID);
-    IOObjectRelease(parent);
+  if (get_device_parent_sessionID(service, &parent_sessionID)) {
+    usbi_dbg("parent sessionID: 0x%" PRIx64, parent_sessionID);
   }
 
   usbi_mutex_lock(&darwin_cached_devices_lock);
