@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2016 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2008-2017 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -45,6 +45,7 @@
 /* Apple deprecated the darwin atomics in 10.12 in favor of C11 atomics */
 #include <stdatomic.h>
 #define libusb_darwin_atomic_fetch_add(x, y) atomic_fetch_add(x, y)
+#define OSX_USE_CLOCK_GETTIME 1
 
 _Atomic int32_t initCount = ATOMIC_VAR_INIT(0);
 #else
@@ -55,6 +56,8 @@ _Atomic int32_t initCount = ATOMIC_VAR_INIT(0);
 #define libusb_darwin_atomic_fetch_add(x, y) (OSAtomicAdd32Barrier(y, x) - y)
 
 static volatile int32_t initCount = 0;
+
+#define OSX_USE_CLOCK_GETTIME 0
 #endif
 
 #include "darwin_usb.h"
@@ -65,8 +68,10 @@ static pthread_cond_t  libusb_darwin_at_cond = PTHREAD_COND_INITIALIZER;
 
 static pthread_once_t darwin_init_once = PTHREAD_ONCE_INIT;
 
+#if !OSX_USE_CLOCK_GETTIME
 static clock_serv_t clock_realtime;
 static clock_serv_t clock_monotonic;
+#endif
 
 static CFRunLoopRef libusb_darwin_acfl = NULL; /* event cf loop */
 static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for event cf loop */
@@ -516,7 +521,6 @@ static void darwin_check_version (void) {
 }
 
 static int darwin_init(struct libusb_context *ctx) {
-  host_name_port_t host_self;
   int rc;
 
   rc = pthread_once (&darwin_init_once, darwin_check_version);
@@ -530,12 +534,15 @@ static int darwin_init(struct libusb_context *ctx) {
   }
 
   if (libusb_darwin_atomic_fetch_add (&initCount, 1) == 0) {
-    /* create the clocks that will be used */
+#if !OSX_USE_CLOCK_GETTIME
+    /* create the clocks that will be used if clock_gettime() is not available */
+    host_name_port_t host_self;
 
     host_self = mach_host_self();
     host_get_clock_service(host_self, CALENDAR_CLOCK, &clock_realtime);
     host_get_clock_service(host_self, SYSTEM_CLOCK, &clock_monotonic);
     mach_port_deallocate(mach_task_self(), host_self);
+#endif
 
     pthread_create (&libusb_darwin_at, NULL, darwin_event_thread_main, ctx);
 
@@ -550,8 +557,10 @@ static int darwin_init(struct libusb_context *ctx) {
 
 static void darwin_exit (void) {
   if (libusb_darwin_atomic_fetch_add (&initCount, -1) == 1) {
+#if !OSX_USE_CLOCK_GETTIME
     mach_port_deallocate(mach_task_self(), clock_realtime);
     mach_port_deallocate(mach_task_self(), clock_monotonic);
+#endif
 
     /* stop the event runloop and wait for the thread to terminate. */
     CFRunLoopSourceSignal(libusb_darwin_acfls);
@@ -1965,6 +1974,7 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
 }
 
 static int darwin_clock_gettime(int clk_id, struct timespec *tp) {
+#if !OSX_USE_CLOCK_GETTIME
   mach_timespec_t sys_time;
   clock_serv_t clock_ref;
 
@@ -1987,6 +1997,16 @@ static int darwin_clock_gettime(int clk_id, struct timespec *tp) {
   tp->tv_nsec = sys_time.tv_nsec;
 
   return 0;
+#else
+  switch (clk_id) {
+  case USBI_CLOCK_MONOTONIC:
+    return clock_gettime(CLOCK_MONOTONIC, tp);
+  case USBI_CLOCK_REALTIME:
+    return clock_gettime(CLOCK_REALTIME, tp);
+  default:
+    return LIBUSB_ERROR_INVALID_PARAM;
+  }
+#endif
 }
 
 #if InterfaceVersion >= 550
