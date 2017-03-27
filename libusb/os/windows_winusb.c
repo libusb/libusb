@@ -974,6 +974,16 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 			LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 		memcpy(priv->config_descriptor[i], cd_data, cd_data->wTotalLength);
 	}
+
+	// Any failure will result in dev->num_configurations being forced to 0.
+	// We need to release any memory that may have been allocated for config
+	// descriptors that were successfully retrieved, otherwise that memory
+	// will be leaked
+	if (r != LIBUSB_SUCCESS) {
+		for (i = 0; i < dev->num_configurations; i++)
+			free(priv->config_descriptor[i]);
+	}
+
 	return r;
 }
 

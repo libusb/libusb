@@ -244,10 +244,8 @@ static inline void windows_device_priv_release(struct libusb_device *dev)
 	int i;
 
 	free(p->path);
-	if ((dev->num_configurations > 0) && (p->config_descriptor != NULL)) {
-		for (i = 0; i < dev->num_configurations; i++)
-			free(p->config_descriptor[i]);
-	}
+	for (i = 0; i < dev->num_configurations; i++)
+		free(p->config_descriptor[i]);
 	free(p->config_descriptor);
 	free(p->hid);
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
