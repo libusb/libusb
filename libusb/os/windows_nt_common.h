@@ -31,6 +31,8 @@
 #define FACILITY_SETUPAPI	15
 #endif
 
+#include <pshpack1.h>
+
 typedef struct USB_CONFIGURATION_DESCRIPTOR {
   UCHAR  bLength;
   UCHAR  bDescriptorType;
@@ -41,6 +43,8 @@ typedef struct USB_CONFIGURATION_DESCRIPTOR {
   UCHAR  bmAttributes;
   UCHAR  MaxPower;
 } USB_CONFIGURATION_DESCRIPTOR, *PUSB_CONFIGURATION_DESCRIPTOR;
+
+#include <poppack.h>
 
 typedef struct libusb_device_descriptor USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESCRIPTOR;
 
