@@ -796,16 +796,12 @@ static DWORD usbdk_translate_usbd_status(USBD_STATUS UsbdStatus)
 		return NO_ERROR;
 
 	switch (UsbdStatus) {
-	case USBD_STATUS_STALL_PID:
-	case USBD_STATUS_ENDPOINT_HALTED:
-	case USBD_STATUS_BAD_START_FRAME:
-		return ERROR_GEN_FAILURE;
 	case USBD_STATUS_TIMEOUT:
 		return ERROR_SEM_TIMEOUT;
 	case USBD_STATUS_CANCELED:
 		return ERROR_OPERATION_ABORTED;
 	default:
-		return ERROR_FUNCTION_FAILED;
+		return ERROR_GEN_FAILURE;
 	}
 }
 
