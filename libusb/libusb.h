@@ -141,7 +141,7 @@ typedef unsigned __int32  uint32_t;
  * Internally, LIBUSB_API_VERSION is defined as follows:
  * (libusb major << 24) | (libusb minor << 16) | (16 bit incremental)
  */
-#define LIBUSB_API_VERSION 0x01000105
+#define LIBUSB_API_VERSION 0x01000106
 
 /* The following is kept for compatibility, but will be deprecated in the future */
 #define LIBUSBX_API_VERSION LIBUSB_API_VERSION
@@ -1303,6 +1303,17 @@ enum libusb_log_level {
 	LIBUSB_LOG_LEVEL_DEBUG,
 };
 
+/** \ingroup libusb_lib
+ * Enables force selection of a backend. Currently this only supports
+ * force using of UsbDK - if UsbDk is installed and functional - as a backend
+ * on Windows.
+*/
+typedef enum {
+    LIBUSB_NONE = 0,
+    /** UsbDk */
+    LIBUSB_USBDK,
+} libusb_force_backend;
+
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
@@ -1408,6 +1419,7 @@ int LIBUSB_CALL libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
 	int interface_number);
 int LIBUSB_CALL libusb_set_auto_detach_kernel_driver(
 	libusb_device_handle *dev_handle, int enable);
+int LIBUSB_CALL libusb_force_use_backend(libusb_force_backend backend);
 
 /* async I/O */
 
