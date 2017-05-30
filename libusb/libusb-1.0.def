@@ -24,6 +24,8 @@ EXPORTS
   libusb_dev_mem_alloc@8 = libusb_dev_mem_alloc
   libusb_dev_mem_free
   libusb_dev_mem_free@12 = libusb_dev_mem_free
+  libusb_force_use_backend
+  libusb_force_use_backend@8 = libusb_force_use_backend
   libusb_error_name
   libusb_error_name@4 = libusb_error_name
   libusb_event_handler_active

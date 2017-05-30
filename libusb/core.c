@@ -53,13 +53,7 @@ const struct usbi_os_backend * const usbi_backend = &openbsd_backend;
 #elif defined(OS_NETBSD)
 const struct usbi_os_backend * const usbi_backend = &netbsd_backend;
 #elif defined(OS_WINDOWS)
-
-#if defined(USE_USBDK)
-const struct usbi_os_backend * const usbi_backend = &usbdk_backend;
-#else
-const struct usbi_os_backend * const usbi_backend = &windows_backend;
-#endif
-
+const struct usbi_os_backend * usbi_backend;
 #elif defined(OS_WINCE)
 const struct usbi_os_backend * const usbi_backend = &wince_backend;
 #elif defined(OS_HAIKU)
@@ -80,6 +74,8 @@ static struct timespec timestamp_origin = { 0, 0 };
 
 usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
 struct list_head active_contexts_list;
+
+libusb_force_backend force_use_backend = LIBUSB_NONE;
 
 /**
  * \mainpage libusb-1.0 API Reference
@@ -384,6 +380,7 @@ if (cfg != desired)
   * - libusb_fill_control_transfer()
   * - libusb_fill_interrupt_transfer()
   * - libusb_fill_iso_transfer()
+  * - libusb_force_use_backend()
   * - libusb_free_bos_descriptor()
   * - libusb_free_config_descriptor()
   * - libusb_free_container_id_descriptor()
@@ -641,6 +638,26 @@ static struct discovered_devs *discovered_devs_alloc(void)
 	}
 	return ret;
 }
+
+#ifdef OS_WINDOWS
+static int is_usbdk_driver_installed(void)
+{
+	int usbdk_installed = 0;
+
+	SC_HANDLE managerHandle = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+	if (managerHandle)
+	{
+		SC_HANDLE serviceHandle = OpenService(managerHandle, TEXT("UsbDk"), GENERIC_READ);
+		if (serviceHandle)
+		{
+			usbdk_installed = 1;
+			CloseServiceHandle(serviceHandle);
+		}
+		CloseServiceHandle(managerHandle);
+	}
+	return usbdk_installed;
+}
+#endif
 
 static void discovered_devs_free(struct discovered_devs *discdevs)
 {
@@ -2061,7 +2078,7 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 
 /** \ingroup libusb_lib
  * Initialize libusb. This function must be called before calling any other
- * libusb function.
+ * libusb function (except for libusb_force_use_backend).
  *
  * If you do not provide an output location for a context pointer, a default
  * context will be created. If there was already a default context, it will
@@ -2079,6 +2096,19 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	struct libusb_context *ctx;
 	static int first_init = 1;
 	int r = 0;
+
+#ifdef OS_WINDOWS
+	if (force_use_backend == LIBUSB_USBDK && is_usbdk_driver_installed())
+	{
+		usbi_backend = &usbdk_backend;
+		usbi_dbg("libusb will work with UsbDk backend");
+	}
+	else
+	{
+		usbi_backend = &windows_backend;
+		usbi_dbg("libusb will work with windows_backend");
+	}
+#endif
 
 	usbi_mutex_static_lock(&default_context_lock);
 
@@ -2250,6 +2280,30 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
 	usbi_mutex_destroy(&ctx->hotplug_cbs_lock);
 	free(ctx);
+}
+
+/** \ingroup libusb_lib
+ * Enables force selection of a backend. Currently this function only supports
+ * force using UsbDK - if UsbDk is installed and functional - as a backend on Windows.
+ * This function must be called before calling linusb_init!
+ *
+ * \param a suitable enum which defines the appropriate backend that should be
+ * used.
+ * Only valid on return code 0.
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
+*/
+
+int API_EXPORTED libusb_force_use_backend(libusb_force_backend backend)
+{
+	switch (backend) {
+	case LIBUSB_USBDK:
+	case LIBUSB_NONE:
+		force_use_backend = backend;
+		break;
+	default:
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	return 0;
 }
 
 /** \ingroup libusb_misc
