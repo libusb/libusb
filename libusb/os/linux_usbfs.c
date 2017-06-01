@@ -1356,7 +1356,7 @@ static int op_open_fd(struct libusb_device_handle *handle, int fd)
 
 static int op_open(struct libusb_device_handle *handle)
 {
-    op_open_fd(handle, _get_usbfs_fd(handle->dev, O_RDWR, 0));
+    return op_open_fd(handle, _get_usbfs_fd(handle->dev, O_RDWR, 0));
 }
 
 static void op_close(struct libusb_device_handle *dev_handle)
