@@ -1405,9 +1405,11 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			if ((pass >= HUB_PASS) && (pass <= GEN_PASS)) {
 				if ((!pSetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_ADDRESS,
 					&reg_type, (BYTE *)&port_nr, 4, &size)) || (size != 4)) {
-					usbi_warn(ctx, "could not retrieve port number for device '%s', skipping: %s",
-						dev_id_path, windows_error_str(0));
-					continue;
+					usbi_warn(ctx, "could not retrieve port number for device '%s'",
+						dev_id_path);
+
+					// Some virtual USB devices, like Eltima's USB STUB, don't have SPDRP_ADDRESS.
+					// Enumerate them even we cannot get port number for them.
 				}
 			}
 
@@ -2190,7 +2192,8 @@ static int common_configure_endpoints(int sub_api, struct libusb_device_handle *
 }
 
 // These names must be uppercase
-static const char *hub_driver_names[] = {"USBHUB", "USBHUB3", "USB3HUB", "NUSB3HUB", "RUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3", "IUSB3HUB", "VUSB3HUB", "AMDHUB30", "VHHUB", "AUSB3HUB"};
+// EUSTUB is the driver name for Eltima's USB STUB virtual device, which behaves like a USB HUB
+static const char *hub_driver_names[] = {"USBHUB", "USBHUB3", "USB3HUB", "NUSB3HUB", "RUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3", "IUSB3HUB", "VUSB3HUB", "AMDHUB30", "VHHUB", "AUSB3HUB", "EUSTUB"};
 static const char *composite_driver_names[] = {"USBCCGP"};
 static const char *winusbx_driver_names[] = WINUSBX_DRV_NAMES;
 static const char *hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
