@@ -99,6 +99,11 @@ case $host in
 	backend=sunos
 	threads=posix
 	;;
+*-solaris*)
+	AC_MSG_RESULT([SunOS])
+	backend="sunos"
+	threads="posix"
+	;;
 *)
 	AC_MSG_ERROR([unsupported operating system $host])
 esac
