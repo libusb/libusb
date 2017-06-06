@@ -15,6 +15,7 @@ INSTALL
 install-sh
 depcomp
 configure
+configure.gnu
 aclocal.m4
 compile
 config.guess

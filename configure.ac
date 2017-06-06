@@ -295,6 +295,13 @@ AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_FUNC([sigaction], [have_sigaction=yes], [have_sigaction=no])
 AM_CONDITIONAL(HAVE_SIGACTION, test "x$have_sigaction" = xyes)
 
+# Subproject build
+AC_ARG_ENABLE([subproject-build], [AS_HELP_STRING([--enable-subproject-build],
+	[build as sub-project [default=no]])],
+	[build_subproject=$enableval],
+	[build_subproject='no'])
+AM_CONDITIONAL([BUILD_SUBPROJECT], [test "x$build_subproject" != "xno"])
+
 # check for -fvisibility=hidden compiler support (GCC >= 3.4)
 saved_cflags="$CFLAGS"
 # -Werror required for cygwin
