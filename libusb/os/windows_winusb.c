@@ -856,7 +856,7 @@ static int force_hcd_device_descriptor(struct libusb_device *dev)
 
 	dev->num_configurations = 1;
 	priv->dev_descriptor.bLength = sizeof(USB_DEVICE_DESCRIPTOR);
-	priv->dev_descriptor.bDescriptorType = USB_DEVICE_DESCRIPTOR_TYPE;
+	priv->dev_descriptor.bDescriptorType = LIBUSB_DT_DEVICE;
 	priv->dev_descriptor.bNumConfigurations = 1;
 	priv->active_config = 1;
 
@@ -908,15 +908,15 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		if ((i >= dev->num_configurations) || (r != LIBUSB_SUCCESS))
 			break;
 
-		size = sizeof(USB_CONFIGURATION_DESCRIPTOR_SHORT);
+		size = sizeof(cd_buf_short);
 		memset(&cd_buf_short, 0, size);
 
 		cd_buf_short.req.ConnectionIndex = (ULONG)priv->port;
 		cd_buf_short.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
-		cd_buf_short.req.SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
-		cd_buf_short.req.SetupPacket.wValue = (USB_CONFIGURATION_DESCRIPTOR_TYPE << 8) | i;
+		cd_buf_short.req.SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
+		cd_buf_short.req.SetupPacket.wValue = (LIBUSB_DT_CONFIG << 8) | i;
 		cd_buf_short.req.SetupPacket.wIndex = 0;
-		cd_buf_short.req.SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
+		cd_buf_short.req.SetupPacket.wLength = (USHORT)sizeof(USB_CONFIGURATION_DESCRIPTOR);
 
 		// Dummy call to get the required data size. Initial failures are reported as info rather
 		// than error as they can occur for non-penalizing situations, such as with some hubs.
@@ -927,12 +927,12 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
-		if ((ret_size != size) || (cd_buf_short.data.wTotalLength < sizeof(USB_CONFIGURATION_DESCRIPTOR))) {
+		if ((ret_size != size) || (cd_buf_short.desc.wTotalLength < sizeof(USB_CONFIGURATION_DESCRIPTOR))) {
 			usbi_info(ctx, "unexpected configuration descriptor size (dummy) for '%s'.", device_id);
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
-		size = sizeof(USB_DESCRIPTOR_REQUEST) + cd_buf_short.data.wTotalLength;
+		size = sizeof(USB_DESCRIPTOR_REQUEST) + cd_buf_short.desc.wTotalLength;
 		cd_buf_actual = calloc(1, size);
 		if (cd_buf_actual == NULL) {
 			usbi_err(ctx, "could not allocate configuration descriptor buffer for '%s'.", device_id);
@@ -942,10 +942,10 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		// Actual call
 		cd_buf_actual->ConnectionIndex = (ULONG)priv->port;
 		cd_buf_actual->SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
-		cd_buf_actual->SetupPacket.bRequest = USB_REQUEST_GET_DESCRIPTOR;
-		cd_buf_actual->SetupPacket.wValue = (USB_CONFIGURATION_DESCRIPTOR_TYPE << 8) | i;
+		cd_buf_actual->SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
+		cd_buf_actual->SetupPacket.wValue = (LIBUSB_DT_CONFIG << 8) | i;
 		cd_buf_actual->SetupPacket.wIndex = 0;
-		cd_buf_actual->SetupPacket.wLength = (USHORT)(size - sizeof(USB_DESCRIPTOR_REQUEST));
+		cd_buf_actual->SetupPacket.wLength = cd_buf_short.desc.wTotalLength;
 
 		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
 			cd_buf_actual, size, &ret_size, NULL)) {
@@ -955,12 +955,12 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 
 		cd_data = (PUSB_CONFIGURATION_DESCRIPTOR)((UCHAR *)cd_buf_actual + sizeof(USB_DESCRIPTOR_REQUEST));
 
-		if ((size != ret_size) || (cd_data->wTotalLength != cd_buf_short.data.wTotalLength)) {
+		if ((size != ret_size) || (cd_data->wTotalLength != cd_buf_short.desc.wTotalLength)) {
 			usbi_err(ctx, "unexpected configuration descriptor size (actual) for '%s'.", device_id);
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
 
-		if (cd_data->bDescriptorType != USB_CONFIGURATION_DESCRIPTOR_TYPE) {
+		if (cd_data->bDescriptorType != LIBUSB_DT_CONFIG) {
 			usbi_err(ctx, "not a configuration descriptor for '%s'", device_id);
 			LOOP_BREAK(LIBUSB_ERROR_IO);
 		}
@@ -2751,9 +2751,9 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 		return LIBUSB_ERROR_NO_MEM;
 
 	// Sending of set configuration control requests from WinUSB creates issues
-	if (((setup->request_type & (0x03 << 5)) == LIBUSB_REQUEST_TYPE_STANDARD)
-			&& (setup->request == LIBUSB_REQUEST_SET_CONFIGURATION)) {
-		if (setup->value != priv->active_config) {
+	if ((LIBUSB_REQ_TYPE(setup->RequestType) == LIBUSB_REQUEST_TYPE_STANDARD)
+			&& (setup->Request == LIBUSB_REQUEST_SET_CONFIGURATION)) {
+		if (setup->Value != priv->active_config) {
 			usbi_warn(ctx, "cannot set configuration other than the default one");
 			usbi_free_fd(&wfd);
 			return LIBUSB_ERROR_INVALID_PARAM;
@@ -3753,12 +3753,12 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 	if (wfd.fd < 0)
 		return LIBUSB_ERROR_NOT_FOUND;
 
-	switch(LIBUSB_REQ_TYPE(setup->request_type)) {
+	switch(LIBUSB_REQ_TYPE(setup->RequestType)) {
 	case LIBUSB_REQUEST_TYPE_STANDARD:
-		switch(setup->request) {
+		switch(setup->Request) {
 		case LIBUSB_REQUEST_GET_DESCRIPTOR:
-			r = _hid_get_descriptor(priv->hid, wfd.handle, LIBUSB_REQ_RECIPIENT(setup->request_type),
-				(setup->value >> 8) & 0xFF, setup->value & 0xFF, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, &size);
+			r = _hid_get_descriptor(priv->hid, wfd.handle, LIBUSB_REQ_RECIPIENT(setup->RequestType),
+				(setup->Value >> 8) & 0xFF, setup->Value & 0xFF, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, &size);
 			break;
 		case LIBUSB_REQUEST_GET_CONFIGURATION:
 			r = windows_get_configuration(transfer->dev_handle, &config);
@@ -3769,7 +3769,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 			}
 			break;
 		case LIBUSB_REQUEST_SET_CONFIGURATION:
-			if (setup->value == priv->active_config) {
+			if (setup->Value == priv->active_config) {
 				r = LIBUSB_COMPLETED;
 			} else {
 				usbi_warn(ctx, "cannot set configuration other than the default one");
@@ -3782,7 +3782,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 			r = LIBUSB_COMPLETED;
 			break;
 		case LIBUSB_REQUEST_SET_INTERFACE:
-			r = hid_set_interface_altsetting(0, transfer->dev_handle, setup->index, setup->value);
+			r = hid_set_interface_altsetting(0, transfer->dev_handle, setup->Index, setup->Value);
 			if (r == LIBUSB_SUCCESS)
 				r = LIBUSB_COMPLETED;
 			break;
@@ -3793,8 +3793,8 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 		}
 		break;
 	case LIBUSB_REQUEST_TYPE_CLASS:
-		r = _hid_class_request(priv->hid, wfd.handle, setup->request_type, setup->request, setup->value,
-			setup->index, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, transfer_priv,
+		r = _hid_class_request(priv->hid, wfd.handle, setup->RequestType, setup->Request, setup->Value,
+			setup->Index, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, transfer_priv,
 			&size, wfd.overlapped);
 		break;
 	default:
@@ -4138,14 +4138,14 @@ static int composite_submit_control_transfer(int sub_api, struct usbi_transfer *
 	// Interface shouldn't matter for control, but it does in practice, with Windows'
 	// restrictions with regards to accessing HID keyboards and mice. Try to target
 	// a specific interface first, if possible.
-	switch (LIBUSB_REQ_RECIPIENT(setup->request_type)) {
+	switch (LIBUSB_REQ_RECIPIENT(setup->RequestType)) {
 	case LIBUSB_RECIPIENT_INTERFACE:
-		iface = setup->index & 0xFF;
+		iface = setup->Index & 0xFF;
 		break;
 	case LIBUSB_RECIPIENT_ENDPOINT:
 		r = libusb_get_active_config_descriptor(transfer->dev_handle->dev, &conf_desc);
 		if (r == LIBUSB_SUCCESS) {
-			iface = get_interface_by_endpoint(conf_desc, (setup->index & 0xFF));
+			iface = get_interface_by_endpoint(conf_desc, (setup->Index & 0xFF));
 			libusb_free_config_descriptor(conf_desc);
 			break;
 		}
