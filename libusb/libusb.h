@@ -1303,9 +1303,20 @@ enum libusb_log_level {
 	LIBUSB_LOG_LEVEL_DEBUG,
 };
 
+/** \ingroup libusb_lib
+ * Callback function, invoked for a log message.
+ * \param ctx context this callback is registered with
+ * \param level the log level, see \ref libusb_log_level for a description
+ * \param str the log message
+ * \see libusb_set_log_handler()
+ */
+typedef void (LIBUSB_CALL *libusb_log_handler_cb)(libusb_context *ctx, enum libusb_log_level level,
+	const char *str);
+
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
+void LIBUSB_CALL libusb_set_log_handler(libusb_context *ctx, libusb_log_handler_cb callback);
 const struct libusb_version * LIBUSB_CALL libusb_get_version(void);
 int LIBUSB_CALL libusb_has_capability(uint32_t capability);
 const char * LIBUSB_CALL libusb_error_name(int errcode);

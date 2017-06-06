@@ -446,6 +446,7 @@ if (cfg != desired)
   * - libusb_set_auto_detach_kernel_driver()
   * - libusb_set_configuration()
   * - libusb_set_debug()
+  * - libusb_set_log_handler()
   * - libusb_set_interface_alt_setting()
   * - libusb_set_iso_packet_lengths()
   * - libusb_setlocale()
@@ -2060,6 +2061,23 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 }
 
 /** \ingroup libusb_lib
+ * Set log handler.
+ *
+ * libusb will redirect all its log messages to the provided callback function.
+ *
+ * If libusb was compiled without any message logging, the callback function will 
+ * never be called.
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param callback callback function to set, or NULL to stop log messages redirection
+ */
+void API_EXPORTED libusb_set_log_handler(libusb_context *ctx, libusb_log_handler_cb callback)
+{
+	USBI_GET_CONTEXT(ctx);
+	ctx->log_handler = callback;
+}
+
+/** \ingroup libusb_lib
  * Initialize libusb. This function must be called before calling any other
  * libusb function.
  *
@@ -2352,7 +2370,11 @@ static void usbi_log_str(struct libusb_context *ctx,
 	fputs(str, stderr);
 #endif
 #else
-	fputs(str, stderr);
+	USBI_GET_CONTEXT(ctx);
+	if (ctx && ctx->log_handler)
+		ctx->log_handler(ctx, level, str);
+	else
+		fputs(str, stderr);
 #endif /* USE_SYSTEM_LOGGING_FACILITY */
 	UNUSED(ctx);
 	UNUSED(level);
