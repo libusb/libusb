@@ -2336,7 +2336,7 @@ static void usbi_log_str(struct libusb_context *ctx,
 	case LIBUSB_LOG_LEVEL_DEBUG: priority = ANDROID_LOG_DEBUG; break;
 	case LIBUSB_LOG_LEVEL_NONE: return;
 	}
-	__android_log_write(priority, "libusb", str);
+	__android_log_print(priority, "libusb", "%s", str);
 #elif defined(HAVE_SYSLOG_FUNC)
 	int syslog_level = LOG_INFO;
 	switch (level) {
