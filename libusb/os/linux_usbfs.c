@@ -27,6 +27,10 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
+/* Older builds: O_CLOEXEC requires min. Linux 2.6.23 */
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
 #include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
