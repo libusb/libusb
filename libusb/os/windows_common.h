@@ -265,12 +265,19 @@ struct usbdk_device_handle_priv {
 	// Not currently used
 	char dummy;
 };
+ 
+enum WINUSB_ZLP {
+	WINUSB_ZLP_UNSET = 0,
+	WINUSB_ZLP_OFF = 1,
+	WINUSB_ZLP_ON = 2
+};
 
 struct winusb_device_handle_priv {
 	int active_interface;
 	struct {
 		HANDLE dev_handle; // WinUSB needs an extra handle for the file
 		HANDLE api_handle; // used by the API to communicate with the device
+		uint8_t zlp[USB_MAXENDPOINTS]; // Current per-endpoint SHORT_PACKET_TERMINATE status (enum WINUSB_ZLP)
 	} interface_handle[USB_MAXINTERFACES];
 	int autoclaim_count[USB_MAXINTERFACES]; // For auto-release
 };

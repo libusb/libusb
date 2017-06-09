@@ -2024,8 +2024,6 @@ static int winusb_submit_transfer(struct usbi_transfer *itransfer)
 		break;
 	case LIBUSB_TRANSFER_TYPE_BULK:
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-		if (IS_XFEROUT(transfer) && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET))
-			return LIBUSB_ERROR_NOT_SUPPORTED;
 		transfer_fn = priv->apib->submit_bulk_transfer;
 		break;
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
@@ -2474,6 +2472,7 @@ static int winusbx_configure_endpoints(int sub_api, struct libusb_device_handle 
 			continue; // Other policies don't apply to control endpoint or libusb0
 
 		policy = false;
+		handle_priv->interface_handle[iface].zlp[endpoint_address] = WINUSB_ZLP_UNSET;
 		if (!WinUSBX[sub_api].SetPipePolicy(winusb_handle, endpoint_address,
 			SHORT_PACKET_TERMINATE, sizeof(UCHAR), &policy))
 			usbi_dbg("failed to disable SHORT_PACKET_TERMINATE for endpoint %02X", endpoint_address);
@@ -3041,6 +3040,23 @@ static int winusbx_submit_bulk_transfer(int sub_api, struct usbi_transfer *itran
 		usbi_dbg("reading %d bytes", transfer->length);
 		ret = WinUSBX[sub_api].ReadPipe(winusb_handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, overlapped);
 	} else {
+		// Set SHORT_PACKET_TERMINATE if ZLP requested.
+		// Changing this can be a problem with packets in flight, so only allow on the first transfer.
+		UCHAR policy = (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET) != 0;
+		uint8_t* current_zlp = &handle_priv->interface_handle[current_interface].zlp[transfer->endpoint];
+		if (*current_zlp == WINUSB_ZLP_UNSET) {
+			if (policy &&
+				!WinUSBX[sub_api].SetPipePolicy(winusb_handle, transfer->endpoint,
+				SHORT_PACKET_TERMINATE, sizeof(UCHAR), &policy)) {
+				usbi_err(TRANSFER_CTX(transfer), "failed to set SHORT_PACKET_TERMINATE for endpoint %02X", transfer->endpoint);
+				return LIBUSB_ERROR_NOT_SUPPORTED;
+			}
+			*current_zlp = policy ? WINUSB_ZLP_ON : WINUSB_ZLP_OFF;
+		} else if (policy != (*current_zlp == WINUSB_ZLP_ON)) {
+			usbi_err(TRANSFER_CTX(transfer), "cannot change ZERO_PACKET for endpoint %02X on Windows", transfer->endpoint);
+			return LIBUSB_ERROR_NOT_SUPPORTED;
+		}
+
 		usbi_dbg("writing %d bytes", transfer->length);
 		ret = WinUSBX[sub_api].WritePipe(winusb_handle, transfer->endpoint, transfer->buffer, transfer->length, NULL, overlapped);
 	}
@@ -4005,6 +4021,9 @@ static int hid_submit_bulk_transfer(int sub_api, struct usbi_transfer *itransfer
 
 	UNUSED(sub_api);
 	CHECK_HID_AVAILABLE;
+
+	if (IS_XFEROUT(transfer) && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET))
+		return LIBUSB_ERROR_NOT_SUPPORTED;
 
 	transfer_priv->hid_dest = NULL;
 	safe_free(transfer_priv->hid_buffer);
