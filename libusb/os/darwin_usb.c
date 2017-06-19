@@ -1968,18 +1968,21 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
   usbi_dbg ("handling %s completion with kernel status %d",
              isControl ? "control" : isBulk ? "bulk" : isIsoc ? "isoc" : "interrupt", tpriv->result);
 
-  if (kIOReturnSuccess == tpriv->result || kIOReturnUnderrun == tpriv->result) {
-    if (isIsoc && tpriv->isoc_framelist) {
-      /* copy isochronous results back */
-
-      for (i = 0; i < transfer->num_iso_packets ; i++) {
-        struct libusb_iso_packet_descriptor *lib_desc = &transfer->iso_packet_desc[i];
-        lib_desc->status = darwin_to_libusb (tpriv->isoc_framelist[i].frStatus);
-        lib_desc->actual_length = tpriv->isoc_framelist[i].frActCount;
-      }
-    } else if (!isIsoc)
-      itransfer->transferred += tpriv->size;
+   /* not all isoc frames are ok in one transfer
+   * so we need to traverse all isoc frames one-by-one
+   * otherwise we can loose some good isoc frames 
+   */
+  if (isIsoc && tpriv->isoc_framelist) {
+	  /* copy isochronous results back */
+	  for (i = 0; i < transfer->num_iso_packets ; i++) {
+		  struct libusb_iso_packet_descriptor *lib_desc = &transfer->iso_packet_desc[i];
+		  lib_desc->status = darwin_to_libusb (tpriv->isoc_framelist[i].frStatus);
+		  lib_desc->actual_length = tpriv->isoc_framelist[i].frActCount;
+	  }
   }
+
+  if (!isIsoc && (kIOReturnSuccess == tpriv->result || kIOReturnUnderrun == tpriv->result))
+      itransfer->transferred += tpriv->size;
 
   /* it is ok to handle cancelled transfers without calling usbi_handle_transfer_cancellation (we catch timeout transfers) */
   return usbi_handle_transfer_completion (itransfer, darwin_transfer_status (itransfer, tpriv->result));
