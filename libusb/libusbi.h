@@ -39,6 +39,20 @@
 #include "libusb.h"
 #include "version.h"
 
+/* Attribute to ensure that a structure member is aligned to a natural
+ * pointer alignment. Used for os_priv member. */
+#if defined(_MSC_VER)
+#if defined(_WIN64)
+#define PTR_ALIGNED __declspec(align(8))
+#else
+#define PTR_ALIGNED __declspec(align(4))
+#endif
+#elif defined(__GNUC__)
+#define PTR_ALIGNED __attribute__((aligned(sizeof(void *))))
+#else
+#define PTR_ALIGNED
+#endif
+
 /* Inside the libusb code, mark all public functions as follows:
  *   return_type API_EXPORTED function_name(params) { ... }
  * But if the function returns a pointer, mark it as follows:
@@ -396,12 +410,7 @@ struct libusb_device {
 	struct libusb_device_descriptor device_descriptor;
 	int attached;
 
-	unsigned char os_priv[ZERO_SIZED_ARRAY]
-#if defined(OS_SUNOS)
-	__attribute__ ((aligned (8)));
-#else
-	;
-#endif
+	PTR_ALIGNED unsigned char os_priv[ZERO_SIZED_ARRAY];
 };
 
 struct libusb_device_handle {
@@ -413,12 +422,7 @@ struct libusb_device_handle {
 	struct libusb_device *dev;
 	int auto_detach_kernel_driver;
 
-	unsigned char os_priv[ZERO_SIZED_ARRAY]
-#if defined(OS_SUNOS)
-	__attribute__ ((aligned (8)));
-#else
-	;
-#endif
+	PTR_ALIGNED unsigned char os_priv[ZERO_SIZED_ARRAY];
 };
 
 enum {
