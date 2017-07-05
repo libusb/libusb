@@ -396,12 +396,7 @@ struct libusb_device {
 	struct libusb_device_descriptor device_descriptor;
 	int attached;
 
-	unsigned char os_priv
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-	[] /* valid C99 code */
-#else
-	[0] /* non-standard, but usually working code */
-#endif
+	unsigned char os_priv[ZERO_SIZED_ARRAY]
 #if defined(OS_SUNOS)
 	__attribute__ ((aligned (8)));
 #else
@@ -417,12 +412,8 @@ struct libusb_device_handle {
 	struct list_head list;
 	struct libusb_device *dev;
 	int auto_detach_kernel_driver;
-	unsigned char os_priv
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-	[] /* valid C99 code */
-#else
-	[0] /* non-standard, but usually working code */
-#endif
+
+	unsigned char os_priv[ZERO_SIZED_ARRAY]
 #if defined(OS_SUNOS)
 	__attribute__ ((aligned (8)));
 #else
@@ -581,13 +572,7 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd);
 struct discovered_devs {
 	size_t len;
 	size_t capacity;
-	struct libusb_device *devices
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-	[] /* valid C99 code */
-#else
-	[0] /* non-standard, but usually working code */
-#endif
-	;
+	struct libusb_device *devices[ZERO_SIZED_ARRAY];
 };
 
 struct discovered_devs *discovered_devs_append(

@@ -61,6 +61,12 @@ typedef unsigned __int32  uint32_t;
 #include <time.h>
 #include <limits.h>
 
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
+#define ZERO_SIZED_ARRAY		/* [] - valid C99 code */
+#else
+#define ZERO_SIZED_ARRAY	0	/* [0] - non-standard, but usually working code */
+#endif
+
 /* 'interface' might be defined as a macro on Windows, so we need to
  * undefine it so as not to break the current libusb API, because
  * libusb_config_descriptor has an 'interface' member
@@ -729,13 +735,7 @@ struct libusb_bos_dev_capability_descriptor {
 	/** Device Capability type */
 	uint8_t bDevCapabilityType;
 	/** Device Capability data (bLength - 3 bytes) */
-	uint8_t dev_capability_data
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-	[] /* valid C99 code */
-#else
-	[0] /* non-standard, but usually working code */
-#endif
-	;
+	uint8_t dev_capability_data[ZERO_SIZED_ARRAY];
 };
 
 /** \ingroup libusb_desc
@@ -760,13 +760,7 @@ struct libusb_bos_descriptor {
 	uint8_t  bNumDeviceCaps;
 
 	/** bNumDeviceCap Device Capability Descriptors */
-	struct libusb_bos_dev_capability_descriptor *dev_capability
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-	[] /* valid C99 code */
-#else
-	[0] /* non-standard, but usually working code */
-#endif
-	;
+	struct libusb_bos_dev_capability_descriptor *dev_capability[ZERO_SIZED_ARRAY];
 };
 
 /** \ingroup libusb_desc
@@ -1256,13 +1250,7 @@ struct libusb_transfer {
 	int num_iso_packets;
 
 	/** Isochronous packet descriptors, for isochronous transfers only. */
-	struct libusb_iso_packet_descriptor iso_packet_desc
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-	[] /* valid C99 code */
-#else
-	[0] /* non-standard, but usually working code */
-#endif
-	;
+	struct libusb_iso_packet_descriptor iso_packet_desc[ZERO_SIZED_ARRAY];
 };
 
 /** \ingroup libusb_misc
