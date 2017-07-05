@@ -1740,6 +1740,9 @@ static int windows_get_config_descriptor_by_value(struct libusb_device *dev, uin
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	for (index = 0; index < dev->num_configurations; index++) {
+		if (priv->config_descriptor[index] == NULL)
+			continue;
+
 		config_header = (PUSB_CONFIGURATION_DESCRIPTOR)priv->config_descriptor[index];
 		if (config_header->bConfigurationValue == bConfigurationValue) {
 			*buffer = priv->config_descriptor[index];
