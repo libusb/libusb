@@ -358,6 +358,8 @@ struct libusb_context {
 #endif
 
 	struct list_head list;
+
+	PTR_ALIGNED unsigned char os_priv[ZERO_SIZED_ARRAY];
 };
 
 enum usbi_event_flags {
@@ -1111,6 +1113,11 @@ struct usbi_os_backend {
 	/* clock ID of the clock that should be used for timerfd */
 	clockid_t (*get_timerfd_clockid)(void);
 #endif
+
+	/* Number of bytes to reserve for per-context private backend data.
+	 * This private data area is accessible through the "os_priv" field of
+	 * struct libusb_context. */
+	size_t context_priv_size;
 
 	/* Number of bytes to reserve for per-device private backend data.
 	 * This private data area is accessible through the "os_priv" field of

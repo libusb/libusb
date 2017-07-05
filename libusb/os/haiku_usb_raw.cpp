@@ -244,6 +244,7 @@ const struct usbi_os_backend usbi_backend = {
 	/*.get_timerfd_clockid =*/ NULL,
 #endif
 
+	/*.context_priv_size=*/ 0,
 	/*.device_priv_size =*/ sizeof(USBDevice *),
 	/*.device_handle_priv_size =*/ sizeof(USBDeviceHandle *),
 	/*.transfer_priv_size =*/ sizeof(USBTransfer *),
