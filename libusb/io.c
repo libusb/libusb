@@ -1144,7 +1144,7 @@ int usbi_io_init(struct libusb_context *ctx)
 		goto err_close_pipe;
 
 #ifdef USBI_TIMERFD_AVAILABLE
-	ctx->timerfd = timerfd_create(usbi_backend->get_timerfd_clockid(),
+	ctx->timerfd = timerfd_create(usbi_backend.get_timerfd_clockid(),
 		TFD_NONBLOCK | TFD_CLOEXEC);
 	if (ctx->timerfd >= 0) {
 		usbi_dbg("using timerfd for timeouts");
@@ -1208,7 +1208,7 @@ static int calculate_timeout(struct usbi_transfer *transfer)
 	if (!timeout)
 		return 0;
 
-	r = usbi_backend->clock_gettime(USBI_CLOCK_MONOTONIC, &current_time);
+	r = usbi_backend.clock_gettime(USBI_CLOCK_MONOTONIC, &current_time);
 	if (r < 0) {
 		usbi_err(ITRANSFER_CTX(transfer),
 			"failed to read monotonic clock, errno=%d", errno);
@@ -1255,7 +1255,7 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	int iso_packets)
 {
 	struct libusb_transfer *transfer;
-	size_t os_alloc_size = usbi_backend->transfer_priv_size;
+	size_t os_alloc_size = usbi_backend.transfer_priv_size;
 	size_t alloc_size = sizeof(struct usbi_transfer)
 		+ sizeof(struct libusb_transfer)
 		+ (sizeof(struct libusb_iso_packet_descriptor) * iso_packets)
@@ -1526,7 +1526,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	 */
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
-	r = usbi_backend->submit_transfer(itransfer);
+	r = usbi_backend.submit_transfer(itransfer);
 	if (r == LIBUSB_SUCCESS) {
 		itransfer->state_flags |= USBI_TRANSFER_IN_FLIGHT;
 		/* keep a reference to this device */
@@ -1567,7 +1567,7 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 		r = LIBUSB_ERROR_NOT_FOUND;
 		goto out;
 	}
-	r = usbi_backend->cancel_transfer(itransfer);
+	r = usbi_backend.cancel_transfer(itransfer);
 	if (r < 0) {
 		if (r != LIBUSB_ERROR_NOT_FOUND &&
 		    r != LIBUSB_ERROR_NO_DEVICE)
@@ -2004,7 +2004,7 @@ static int handle_timeouts_locked(struct libusb_context *ctx)
 		return 0;
 
 	/* get current time */
-	r = usbi_backend->clock_gettime(USBI_CLOCK_MONOTONIC, &systime_ts);
+	r = usbi_backend.clock_gettime(USBI_CLOCK_MONOTONIC, &systime_ts);
 	if (r < 0)
 		return r;
 
@@ -2197,7 +2197,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 			itransfer = list_first_entry(&ctx->completed_transfers, struct usbi_transfer, completed_list);
 			list_del(&itransfer->completed_list);
 			usbi_mutex_unlock(&ctx->event_data_lock);
-			ret = usbi_backend->handle_transfer_completion(itransfer);
+			ret = usbi_backend.handle_transfer_completion(itransfer);
 			if (ret)
 				usbi_err(ctx, "backend handle_transfer_completion failed with error %d", ret);
 			usbi_mutex_lock(&ctx->event_data_lock);
@@ -2253,7 +2253,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	}
 #endif
 
-	r = usbi_backend->handle_events(ctx, fds + internal_nfds, nfds - internal_nfds, r);
+	r = usbi_backend.handle_events(ctx, fds + internal_nfds, nfds - internal_nfds, r);
 	if (r)
 		usbi_err(ctx, "backend handle_events failed with error %d", r);
 
@@ -2574,7 +2574,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 		return 0;
 	}
 
-	r = usbi_backend->clock_gettime(USBI_CLOCK_MONOTONIC, &cur_ts);
+	r = usbi_backend.clock_gettime(USBI_CLOCK_MONOTONIC, &cur_ts);
 	if (r < 0) {
 		usbi_err(ctx, "failed to read monotonic clock, errno=%d", errno);
 		return 0;
@@ -2802,7 +2802,7 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 			 USBI_TRANSFER_TO_LIBUSB_TRANSFER(to_cancel));
 
 		usbi_mutex_lock(&to_cancel->lock);
-		usbi_backend->clear_transfer_priv(to_cancel);
+		usbi_backend.clear_transfer_priv(to_cancel);
 		usbi_mutex_unlock(&to_cancel->lock);
 		usbi_handle_transfer_completion(to_cancel, LIBUSB_TRANSFER_NO_DEVICE);
 	}

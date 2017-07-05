@@ -2079,7 +2079,7 @@ static int darwin_free_streams (struct libusb_device_handle *dev_handle, unsigne
 }
 #endif
 
-const struct usbi_os_backend darwin_backend = {
+const struct usbi_os_backend usbi_backend = {
         .name = "Darwin",
         .caps = 0,
         .init = darwin_init,

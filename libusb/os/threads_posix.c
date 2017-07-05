@@ -43,7 +43,7 @@ int usbi_cond_timedwait(pthread_cond_t *cond,
 	struct timespec timeout;
 	int r;
 
-	r = usbi_backend->clock_gettime(USBI_CLOCK_REALTIME, &timeout);
+	r = usbi_backend.clock_gettime(USBI_CLOCK_REALTIME, &timeout);
 	if (r < 0)
 		return r;
 

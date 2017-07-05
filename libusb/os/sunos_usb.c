@@ -1254,7 +1254,7 @@ sunos_usb_get_status(int fd)
 	return (status);
 }
 
-const struct usbi_os_backend sunos_backend = {
+const struct usbi_os_backend usbi_backend = {
         .name = "Solaris",
         .caps = 0,
         .init = sunos_init,
