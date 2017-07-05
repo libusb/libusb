@@ -2095,6 +2095,7 @@ const struct usbi_os_backend usbi_backend = {
 #if defined(USBI_TIMERFD_AVAILABLE)
 	NULL,
 #endif
+	0,
 	sizeof(struct windows_device_priv),
 	sizeof(struct windows_device_handle_priv),
 	sizeof(struct windows_transfer_priv),

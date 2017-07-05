@@ -2050,6 +2050,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 {
 	struct libusb_device *dev, *next;
 	char *dbg = getenv("LIBUSB_DEBUG");
+	size_t priv_size = usbi_backend.context_priv_size;
 	struct libusb_context *ctx;
 	static int first_init = 1;
 	int r = 0;
@@ -2067,7 +2068,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 		return 0;
 	}
 
-	ctx = calloc(1, sizeof(*ctx));
+	ctx = calloc(1, sizeof(*ctx) + priv_size);
 	if (!ctx) {
 		r = LIBUSB_ERROR_NO_MEM;
 		goto err_unlock;

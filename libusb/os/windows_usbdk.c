@@ -893,6 +893,7 @@ const struct usbi_os_backend usbi_backend = {
 #if defined(USBI_TIMERFD_AVAILABLE)
 	NULL,
 #endif
+	0,
 	sizeof(struct usbdk_device_priv),
 	0,
 	sizeof(struct usbdk_transfer_priv),
