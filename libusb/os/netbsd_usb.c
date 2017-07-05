@@ -86,7 +86,7 @@ static int _sync_control_transfer(struct usbi_transfer *);
 static int _sync_gen_transfer(struct usbi_transfer *);
 static int _access_endpoint(struct libusb_transfer *);
 
-const struct usbi_os_backend netbsd_backend = {
+const struct usbi_os_backend usbi_backend = {
 	"Synchronous NetBSD backend",
 	0,
 	NULL,				/* init() */

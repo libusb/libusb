@@ -195,7 +195,7 @@ haiku_clock_gettime(int clkid, struct timespec *tp)
 	return LIBUSB_ERROR_INVALID_PARAM;
 }
 
-const struct usbi_os_backend haiku_usb_raw_backend = {
+const struct usbi_os_backend usbi_backend = {
 	/*.name =*/ "Haiku usbfs",
 	/*.caps =*/ 0,
 	/*.init =*/ haiku_init,

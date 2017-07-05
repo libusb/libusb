@@ -2047,7 +2047,7 @@ void windows_get_overlapped_result(struct usbi_transfer *transfer, struct winfd 
 }
 
 // NB: MSVC6 does not support named initializers.
-const struct usbi_os_backend windows_backend = {
+const struct usbi_os_backend usbi_backend = {
 	"Windows",
 	USBI_CAP_HAS_HID_ACCESS,
 	windows_init,

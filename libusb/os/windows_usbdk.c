@@ -845,7 +845,7 @@ static int usbdk_clock_gettime(int clk_id, struct timespec *tp)
 	return windows_clock_gettime(clk_id, tp);
 }
 
-const struct usbi_os_backend usbdk_backend = {
+const struct usbi_os_backend usbi_backend = {
 	"Windows",
 	USBI_CAP_HAS_HID_ACCESS,
 	usbdk_init,

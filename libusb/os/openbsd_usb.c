@@ -89,7 +89,7 @@ static int _access_endpoint(struct libusb_transfer *);
 static int _bus_open(int);
 
 
-const struct usbi_os_backend openbsd_backend = {
+const struct usbi_os_backend usbi_backend = {
 	"Synchronous OpenBSD backend",
 	0,
 	NULL,				/* init() */

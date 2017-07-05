@@ -848,7 +848,7 @@ static int wince_clock_gettime(int clk_id, struct timespec *tp)
 	}
 }
 
-const struct usbi_os_backend wince_backend = {
+const struct usbi_os_backend usbi_backend = {
 	"Windows CE",
 	0,
 	wince_init,
