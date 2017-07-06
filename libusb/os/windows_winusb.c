@@ -106,7 +106,6 @@ static int composite_copy_transfer_data(int sub_api, struct usbi_transfer *itran
 
 // Global variables
 int windows_version = WINDOWS_UNDEFINED;
-static char windows_version_str[128] = "Undefined";
 // Concurrency
 static int concurrent_usage = -1;
 static usbi_mutex_t autoclaim_lock;
@@ -747,18 +746,14 @@ static void get_windows_version(void)
 	arch = is_x64() ? "64-bit" : "32-bit";
 
 	if (w == NULL)
-		snprintf(windows_version_str, sizeof(windows_version_str), "%s %u.%u %s",
-			(vi.dwPlatformId == VER_PLATFORM_WIN32_NT ? "NT" : "??"),
+		usbi_dbg("Windows %s %u.%u %s", (vi.dwPlatformId == VER_PLATFORM_WIN32_NT ? "NT" : "??"),
 			(unsigned int)vi.dwMajorVersion, (unsigned int)vi.dwMinorVersion, arch);
 	else if (vi.wServicePackMinor)
-		snprintf(windows_version_str, sizeof(windows_version_str), "%s SP%u.%u %s",
-			w, vi.wServicePackMajor, vi.wServicePackMinor, arch);
+		usbi_dbg("Windows %s SP%u.%u %s", w, vi.wServicePackMajor, vi.wServicePackMinor, arch);
 	else if (vi.wServicePackMajor)
-		snprintf(windows_version_str, sizeof(windows_version_str), "%s SP%u %s",
-			w, vi.wServicePackMajor, arch);
+		usbi_dbg("Windows %s SP%u %s", w, vi.wServicePackMajor, arch);
 	else
-		snprintf(windows_version_str, sizeof(windows_version_str), "%s %s",
-			w, arch);
+		usbi_dbg("Windows %s %s", w, arch);
 }
 
 /*
@@ -793,7 +788,6 @@ static int windows_init(struct libusb_context *ctx)
 	// exit calls. If init is called more than exit, we will not exit properly
 	if (++concurrent_usage == 0) { // First init?
 		get_windows_version();
-		usbi_dbg("Windows %s", windows_version_str);
 
 		if (windows_version == WINDOWS_UNSUPPORTED) {
 			usbi_err(ctx, "This version of Windows is NOT supported");
