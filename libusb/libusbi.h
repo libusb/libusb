@@ -202,29 +202,33 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 	} while (0)
 #endif
 
+#ifdef ENABLE_LOGGING
+
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+#define snprintf usbi_snprintf
+#define vsnprintf usbi_vsnprintf
+int usbi_snprintf(char *dst, size_t size, const char *format, ...);
+int usbi_vsnprintf(char *dst, size_t size, const char *format, va_list ap);
+#define LIBUSB_PRINTF_WIN32
+#endif /* defined(_MSC_VER) && (_MSC_VER < 1900) */
+
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, ...);
 
 void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, va_list args);
 
-#if !defined(_MSC_VER) || _MSC_VER >= 1400
+#if !defined(_MSC_VER) || (_MSC_VER >= 1400)
 
-#ifdef ENABLE_LOGGING
 #define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __FUNCTION__, __VA_ARGS__)
-#define usbi_dbg(...) _usbi_log(NULL, LIBUSB_LOG_LEVEL_DEBUG, __VA_ARGS__)
-#else
-#define _usbi_log(ctx, level, ...) do { (void)(ctx); } while(0)
-#define usbi_dbg(...) do {} while(0)
-#endif
 
-#define usbi_info(ctx, ...) _usbi_log(ctx, LIBUSB_LOG_LEVEL_INFO, __VA_ARGS__)
-#define usbi_warn(ctx, ...) _usbi_log(ctx, LIBUSB_LOG_LEVEL_WARNING, __VA_ARGS__)
 #define usbi_err(ctx, ...) _usbi_log(ctx, LIBUSB_LOG_LEVEL_ERROR, __VA_ARGS__)
+#define usbi_warn(ctx, ...) _usbi_log(ctx, LIBUSB_LOG_LEVEL_WARNING, __VA_ARGS__)
+#define usbi_info(ctx, ...) _usbi_log(ctx, LIBUSB_LOG_LEVEL_INFO, __VA_ARGS__)
+#define usbi_dbg(...) _usbi_log(NULL, LIBUSB_LOG_LEVEL_DEBUG, __VA_ARGS__)
 
-#else /* !defined(_MSC_VER) || _MSC_VER >= 1400 */
+#else /* !defined(_MSC_VER) || (_MSC_VER >= 1400) */
 
-#ifdef ENABLE_LOGGING
 #define LOG_BODY(ctxt, level)				\
 {							\
 	va_list args;					\
@@ -232,24 +236,26 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	usbi_log_v(ctxt, level, "", format, args);	\
 	va_end(args);					\
 }
-#else
-#define LOG_BODY(ctxt, level)				\
-{							\
-	(void)(ctxt);					\
-}
-#endif
 
-static inline void usbi_info(struct libusb_context *ctx, const char *format, ...)
-	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_INFO)
-static inline void usbi_warn(struct libusb_context *ctx, const char *format, ...)
-	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_WARNING)
 static inline void usbi_err(struct libusb_context *ctx, const char *format, ...)
 	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_ERROR)
-
+static inline void usbi_warn(struct libusb_context *ctx, const char *format, ...)
+	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_WARNING)
+static inline void usbi_info(struct libusb_context *ctx, const char *format, ...)
+	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_INFO)
 static inline void usbi_dbg(const char *format, ...)
 	LOG_BODY(NULL, LIBUSB_LOG_LEVEL_DEBUG)
 
-#endif /* !defined(_MSC_VER) || _MSC_VER >= 1400 */
+#endif /* !defined(_MSC_VER) || (_MSC_VER >= 1400) */
+
+#else /* ENABLE_LOGGING */
+
+#define usbi_err(ctx, ...) do { (void)ctx; } while (0)
+#define usbi_warn(ctx, ...) do { (void)ctx; } while (0)
+#define usbi_info(ctx, ...) do { (void)ctx; } while (0)
+#define usbi_dbg(...) do {} while (0)
+
+#endif /* ENABLE_LOGGING */
 
 #define USBI_GET_CONTEXT(ctx)				\
 	do {						\
@@ -281,8 +287,10 @@ extern struct libusb_context *usbi_default_context;
 struct pollfd;
 
 struct libusb_context {
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 	int debug;
 	int debug_fixed;
+#endif
 
 	/* internal event pipe, used for signalling occurrence of an internal event. */
 	int event_pipe[2];
@@ -548,14 +556,6 @@ int usbi_clear_event(struct libusb_context *ctx);
 #include "os/poll_posix.h"
 #elif defined(OS_WINDOWS) || defined(OS_WINCE)
 #include "os/poll_windows.h"
-#endif
-
-#if defined(_MSC_VER) && (_MSC_VER < 1900)
-#define snprintf usbi_snprintf
-#define vsnprintf usbi_vsnprintf
-int usbi_snprintf(char *dst, size_t size, const char *format, ...);
-int usbi_vsnprintf(char *dst, size_t size, const char *format, va_list ap);
-#define LIBUSB_PRINTF_WIN32
 #endif
 
 struct usbi_pollfd {

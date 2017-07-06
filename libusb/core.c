@@ -2028,9 +2028,14 @@ int API_EXPORTED libusb_set_auto_detach_kernel_driver(
  */
 void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 {
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 	USBI_GET_CONTEXT(ctx);
 	if (!ctx->debug_fixed)
 		ctx->debug = level;
+#else
+	UNUSED(ctx);
+	UNUSED(level);
+#endif
 }
 
 /** \ingroup libusb_lib
@@ -2049,7 +2054,6 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 int API_EXPORTED libusb_init(libusb_context **context)
 {
 	struct libusb_device *dev, *next;
-	char *dbg = getenv("LIBUSB_DEBUG");
 	size_t priv_size = usbi_backend.context_priv_size;
 	struct libusb_context *ctx;
 	static int first_init = 1;
@@ -2074,15 +2078,16 @@ int API_EXPORTED libusb_init(libusb_context **context)
 		goto err_unlock;
 	}
 
-#ifdef ENABLE_DEBUG_LOGGING
-	ctx->debug = LIBUSB_LOG_LEVEL_DEBUG;
-#endif
-
-	if (dbg) {
-		ctx->debug = atoi(dbg);
-		if (ctx->debug)
-			ctx->debug_fixed = 1;
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
+	{
+		const char *dbg = getenv("LIBUSB_DEBUG");
+		if (dbg) {
+			ctx->debug = atoi(dbg);
+			if (ctx->debug)
+				ctx->debug_fixed = 1;
+		}
 	}
+#endif
 
 	/* default context should be initialized before calling usbi_dbg */
 	if (!usbi_default_context) {
@@ -2250,6 +2255,8 @@ int API_EXPORTED libusb_has_capability(uint32_t capability)
 	return 0;
 }
 
+#ifdef ENABLE_LOGGING
+
 /* this is defined in libusbi.h if needed */
 #ifdef LIBUSB_PRINTF_WIN32
 /*
@@ -2289,10 +2296,9 @@ int usbi_vsnprintf(char *str, size_t size, const char *format, va_list ap)
 
 	return ret;
 }
-#endif
+#endif /* LIBUSB_PRINTF_WIN32 */
 
-static void usbi_log_str(struct libusb_context *ctx,
-	enum libusb_log_level level, const char * str)
+static void usbi_log_str(enum libusb_log_level level, const char *str)
 {
 #if defined(USE_SYSTEM_LOGGING_FACILITY)
 #if defined(OS_WINDOWS)
@@ -2305,21 +2311,21 @@ static void usbi_log_str(struct libusb_context *ctx,
 #elif defined(__ANDROID__)
 	int priority = ANDROID_LOG_UNKNOWN;
 	switch (level) {
-	case LIBUSB_LOG_LEVEL_INFO: priority = ANDROID_LOG_INFO; break;
-	case LIBUSB_LOG_LEVEL_WARNING: priority = ANDROID_LOG_WARN; break;
-	case LIBUSB_LOG_LEVEL_ERROR: priority = ANDROID_LOG_ERROR; break;
-	case LIBUSB_LOG_LEVEL_DEBUG: priority = ANDROID_LOG_DEBUG; break;
 	case LIBUSB_LOG_LEVEL_NONE: return;
+	case LIBUSB_LOG_LEVEL_ERROR: priority = ANDROID_LOG_ERROR; break;
+	case LIBUSB_LOG_LEVEL_WARNING: priority = ANDROID_LOG_WARN; break;
+	case LIBUSB_LOG_LEVEL_INFO: priority = ANDROID_LOG_INFO; break;
+	case LIBUSB_LOG_LEVEL_DEBUG: priority = ANDROID_LOG_DEBUG; break;
 	}
 	__android_log_write(priority, "libusb", str);
 #elif defined(HAVE_SYSLOG_FUNC)
 	int syslog_level = LOG_INFO;
 	switch (level) {
-	case LIBUSB_LOG_LEVEL_INFO: syslog_level = LOG_INFO; break;
-	case LIBUSB_LOG_LEVEL_WARNING: syslog_level = LOG_WARNING; break;
-	case LIBUSB_LOG_LEVEL_ERROR: syslog_level = LOG_ERR; break;
-	case LIBUSB_LOG_LEVEL_DEBUG: syslog_level = LOG_DEBUG; break;
 	case LIBUSB_LOG_LEVEL_NONE: return;
+	case LIBUSB_LOG_LEVEL_ERROR: syslog_level = LOG_ERR; break;
+	case LIBUSB_LOG_LEVEL_WARNING: syslog_level = LOG_WARNING; break;
+	case LIBUSB_LOG_LEVEL_INFO: syslog_level = LOG_INFO; break;
+	case LIBUSB_LOG_LEVEL_DEBUG: syslog_level = LOG_DEBUG; break;
 	}
 	syslog(syslog_level, "%s", str);
 #else /* All of gcc, Clang, XCode seem to use #warning */
@@ -2329,14 +2335,13 @@ static void usbi_log_str(struct libusb_context *ctx,
 #else
 	fputs(str, stderr);
 #endif /* USE_SYSTEM_LOGGING_FACILITY */
-	UNUSED(ctx);
 	UNUSED(level);
 }
 
 void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, va_list args)
 {
-	const char *prefix = "";
+	const char *prefix;
 	char buf[USBI_MAX_LOG_LEN];
 	struct timespec now;
 	int global_debug, header_len, text_len;
@@ -2352,7 +2357,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	if (ctx) {
 		ctx_level = ctx->debug;
 	} else {
-		char *dbg = getenv("LIBUSB_DEBUG");
+		const char *dbg = getenv("LIBUSB_DEBUG");
 		if (dbg)
 			ctx_level = atoi(dbg);
 	}
@@ -2370,8 +2375,8 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	usbi_backend.clock_gettime(USBI_CLOCK_REALTIME, &now);
 	if ((global_debug) && (!has_debug_header_been_displayed)) {
 		has_debug_header_been_displayed = 1;
-		usbi_log_str(ctx, LIBUSB_LOG_LEVEL_DEBUG, "[timestamp] [threadID] facility level [function call] <message>" USBI_LOG_LINE_END);
-		usbi_log_str(ctx, LIBUSB_LOG_LEVEL_DEBUG, "--------------------------------------------------------------------------------" USBI_LOG_LINE_END);
+		usbi_log_str(LIBUSB_LOG_LEVEL_DEBUG, "[timestamp] [threadID] facility level [function call] <message>" USBI_LOG_LINE_END);
+		usbi_log_str(LIBUSB_LOG_LEVEL_DEBUG, "--------------------------------------------------------------------------------" USBI_LOG_LINE_END);
 	}
 	if (now.tv_nsec < timestamp_origin.tv_nsec) {
 		now.tv_sec--;
@@ -2381,20 +2386,20 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	now.tv_nsec -= timestamp_origin.tv_nsec;
 
 	switch (level) {
-	case LIBUSB_LOG_LEVEL_INFO:
-		prefix = "info";
+	case LIBUSB_LOG_LEVEL_NONE:
+		return;
+	case LIBUSB_LOG_LEVEL_ERROR:
+		prefix = "error";
 		break;
 	case LIBUSB_LOG_LEVEL_WARNING:
 		prefix = "warning";
 		break;
-	case LIBUSB_LOG_LEVEL_ERROR:
-		prefix = "error";
+	case LIBUSB_LOG_LEVEL_INFO:
+		prefix = "info";
 		break;
 	case LIBUSB_LOG_LEVEL_DEBUG:
 		prefix = "debug";
 		break;
-	case LIBUSB_LOG_LEVEL_NONE:
-		return;
 	default:
 		prefix = "unknown";
 		break;
@@ -2429,7 +2434,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	}
 	strcpy(buf + header_len + text_len, USBI_LOG_LINE_END);
 
-	usbi_log_str(ctx, level, buf);
+	usbi_log_str(level, buf);
 }
 
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
@@ -2441,6 +2446,8 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 	usbi_log_v(ctx, level, function, format, args);
 	va_end (args);
 }
+
+#endif /* ENABLE_LOGGING */
 
 /** \ingroup libusb_misc
  * Returns a constant NULL-terminated string with the ASCII name of a libusb
