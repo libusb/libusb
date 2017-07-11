@@ -116,15 +116,17 @@ struct list_head active_contexts_list;
  * libusb uses stderr for all logging. By default, logging is set to NONE,
  * which means that no output will be produced. However, unless the library
  * has been compiled with logging disabled, then any application calls to
- * libusb_set_debug(), or the setting of the environmental variable
- * LIBUSB_DEBUG outside of the application, can result in logging being
- * produced. Your application should therefore not close stderr, but instead
- * direct it to the null device if its output is undesirable.
+ * libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level), or the setting of the
+ * environmental variable LIBUSB_DEBUG outside of the application, can result
+ * in logging being produced. Your application should therefore not close
+ * stderr, but instead direct it to the null device if its output is
+ * undesirable.
  *
- * The libusb_set_debug() function can be used to enable logging of certain
- * messages. Under standard configuration, libusb doesn't really log much
- * so you are advised to use this function to enable all error/warning/
- * informational messages. It will help debug problems with your software.
+ * The libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level) function can be
+ * used to enable logging of certain messages. Under standard configuration,
+ * libusb doesn't really log much so you are advised to use this function
+ * to enable all error/warning/ informational messages. It will help debug
+ * problems with your software.
  *
  * The logged messages are unstructured. There is no one-to-one correspondence
  * between messages being logged and success or failure return codes from
@@ -139,18 +141,20 @@ struct list_head active_contexts_list;
  *
  * The LIBUSB_DEBUG environment variable can be used to enable message logging
  * at run-time. This environment variable should be set to a log level number,
- * which is interpreted the same as the libusb_set_debug() parameter. When this
+ * which is interpreted the same as the
+ * libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level) parameter. When this
  * environment variable is set, the message logging verbosity level is fixed
- * and libusb_set_debug() effectively does nothing.
+ * and libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level) effectively does
+ * nothing.
  *
  * libusb can be compiled without any logging functions, useful for embedded
- * systems. In this case, libusb_set_debug() and the LIBUSB_DEBUG environment
- * variable have no effects.
+ * systems. In this case, libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level)
+ * and the LIBUSB_DEBUG environment variable have no effects.
  *
  * libusb can also be compiled with verbose debugging messages always. When
  * the library is compiled in this way, all messages of all verbosities are
- * always logged. libusb_set_debug() and the LIBUSB_DEBUG environment variable
- * have no effects.
+ * always logged. libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level) and
+ * the LIBUSB_DEBUG environment variable have no effects.
  *
  * \section remarks Other remarks
  *
@@ -297,7 +301,7 @@ if (cfg != desired)
  * developed modules may both use libusb.
  *
  * libusb is written to allow for these multiple user scenarios. The two
- * "instances" of libusb will not interfere: libusb_set_debug() calls
+ * "instances" of libusb will not interfere: libusb_set_option() calls
  * from one user will not affect the same settings for other users, other
  * users can continue using libusb after one of them calls libusb_exit(), etc.
  *
@@ -422,6 +426,7 @@ if (cfg != desired)
   * - libusb_set_debug()
   * - libusb_set_interface_alt_setting()
   * - libusb_set_iso_packet_lengths()
+  * - libusb_set_option()
   * - libusb_setlocale()
   * - libusb_set_pollfd_notifiers()
   * - libusb_strerror()
@@ -465,6 +470,7 @@ if (cfg != desired)
   * - \ref libusb_iso_sync_type
   * - \ref libusb_iso_usage_type
   * - \ref libusb_log_level
+  * - \ref libusb_option
   * - \ref libusb_request_recipient
   * - \ref libusb_request_type
   * - \ref libusb_speed
@@ -2002,29 +2008,8 @@ int API_EXPORTED libusb_set_auto_detach_kernel_driver(
 }
 
 /** \ingroup libusb_lib
- * Set log message verbosity.
- *
- * The default level is LIBUSB_LOG_LEVEL_NONE, which means no messages are ever
- * printed. If you choose to increase the message verbosity level, ensure
- * that your application does not close the stdout/stderr file descriptors.
- *
- * You are advised to use level LIBUSB_LOG_LEVEL_WARNING. libusb is conservative
- * with its message logging and most of the time, will only log messages that
- * explain error conditions and other oddities. This will help you debug
- * your software.
- *
- * If the LIBUSB_DEBUG environment variable was set when libusb was
- * initialized, this function does nothing: the message verbosity is fixed
- * to the value in the environment variable.
- *
- * If libusb was compiled without any message logging, this function does
- * nothing: you'll never get any messages.
- *
- * If libusb was compiled with verbose debug message logging, this function
- * does nothing: you'll always get messages from all levels.
- *
- * \param ctx the context to operate on, or NULL for the default context
- * \param level debug level to set
+ * \deprecated Use libusb_set_option() instead using the
+ * \ref LIBUSB_OPTION_LOG_LEVEL option.
  */
 void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 {
@@ -2038,6 +2023,54 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 	UNUSED(ctx);
 	UNUSED(level);
 #endif
+}
+
+/** \ingroup libusb_lib
+ * Set an option in the library.
+ *
+ * Use this function to configure a specific option within the library.
+ *
+ * Some options require one or more arguments to be provided. Consult each
+ * option's documentation for specific requirements.
+ *
+ * Since version 1.0.22, \ref LIBUSB_API_VERSION >= 0x01000106
+ *
+ * \param ctx context on which to operate
+ * \param option which option to set
+ * \param ... any required arguments for the specified option
+ *
+ * \returns LIBUSB_SUCCESS on success
+ * \returns LIBUSB_ERROR_INVALID_PARAM if the option or arguments are invalid
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED if the option is valid but not supported
+ * on this platform
+ */
+int API_EXPORTED libusb_set_option(libusb_context *ctx,
+	enum libusb_option option, ...)
+{
+	int arg, r = LIBUSB_SUCCESS;
+	va_list ap;
+
+	USBI_GET_CONTEXT(ctx);
+
+	va_start(ap, option);
+	switch (option) {
+	case LIBUSB_OPTION_LOG_LEVEL:
+		arg = va_arg(ap, int);
+		if (arg < LIBUSB_LOG_LEVEL_NONE || arg > LIBUSB_LOG_LEVEL_DEBUG) {
+			r = LIBUSB_ERROR_INVALID_PARAM;
+			break;
+		}
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
+		if (!ctx->debug_fixed)
+			ctx->debug = (enum libusb_log_level)arg;
+#endif
+		break;
+	default:
+		r = LIBUSB_ERROR_INVALID_PARAM;
+	}
+	va_end(ap);
+
+	return r;
 }
 
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
