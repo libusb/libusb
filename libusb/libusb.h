@@ -147,7 +147,7 @@ typedef unsigned __int32  uint32_t;
  * Internally, LIBUSB_API_VERSION is defined as follows:
  * (libusb major << 24) | (libusb minor << 16) | (16 bit incremental)
  */
-#define LIBUSB_API_VERSION 0x01000105
+#define LIBUSB_API_VERSION 0x01000106
 
 /* The following is kept for compatibility, but will be deprecated in the future */
 #define LIBUSBX_API_VERSION LIBUSB_API_VERSION
@@ -921,7 +921,7 @@ struct libusb_version {
  * sessions allows for your program to use two libraries (or dynamically
  * load two modules) which both independently use libusb. This will prevent
  * interference between the individual libusb users - for example
- * libusb_set_debug() will not affect the other user of the library, and
+ * libusb_set_option() will not affect the other user of the library, and
  * libusb_exit() will not destroy resources that the other user is still
  * using.
  *
@@ -1278,21 +1278,20 @@ enum libusb_capability {
  *  - LIBUSB_LOG_LEVEL_NONE (0)    : no messages ever printed by the library (default)
  *  - LIBUSB_LOG_LEVEL_ERROR (1)   : error messages are printed to stderr
  *  - LIBUSB_LOG_LEVEL_WARNING (2) : warning and error messages are printed to stderr
- *  - LIBUSB_LOG_LEVEL_INFO (3)    : informational messages are printed to stdout, warning
- *    and error messages are printed to stderr
- *  - LIBUSB_LOG_LEVEL_DEBUG (4)   : debug and informational messages are printed to stdout,
- *    warnings and errors to stderr
+ *  - LIBUSB_LOG_LEVEL_INFO (3)    : informational messages are printed to stderr
+ *  - LIBUSB_LOG_LEVEL_DEBUG (4)   : debug and informational messages are printed to stderr
  */
 enum libusb_log_level {
 	LIBUSB_LOG_LEVEL_NONE = 0,
-	LIBUSB_LOG_LEVEL_ERROR,
-	LIBUSB_LOG_LEVEL_WARNING,
-	LIBUSB_LOG_LEVEL_INFO,
-	LIBUSB_LOG_LEVEL_DEBUG,
+	LIBUSB_LOG_LEVEL_ERROR = 1,
+	LIBUSB_LOG_LEVEL_WARNING = 2,
+	LIBUSB_LOG_LEVEL_INFO = 3,
+	LIBUSB_LOG_LEVEL_DEBUG = 4,
 };
 
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
+LIBUSB_DEPRECATED_FOR(libusb_set_option)
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
 const struct libusb_version * LIBUSB_CALL libusb_get_version(void);
 int LIBUSB_CALL libusb_has_capability(uint32_t capability);
@@ -1988,6 +1987,36 @@ int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
  */
 void LIBUSB_CALL libusb_hotplug_deregister_callback(libusb_context *ctx,
 						libusb_hotplug_callback_handle callback_handle);
+
+/** \ingroup libusb_lib
+ * Available option values for libusb_set_option().
+ */
+enum libusb_option {
+	/** Set the log message verbosity.
+	 *
+	 * The default level is LIBUSB_LOG_LEVEL_NONE, which means no messages are ever
+	 * printed. If you choose to increase the message verbosity level, ensure
+	 * that your application does not close the stderr file descriptor.
+	 *
+	 * You are advised to use level LIBUSB_LOG_LEVEL_WARNING. libusb is conservative
+	 * with its message logging and most of the time, will only log messages that
+	 * explain error conditions and other oddities. This will help you debug
+	 * your software.
+	 *
+	 * If the LIBUSB_DEBUG environment variable was set when libusb was
+	 * initialized, this function does nothing: the message verbosity is fixed
+	 * to the value in the environment variable.
+	 *
+	 * If libusb was compiled without any message logging, this function does
+	 * nothing: you'll never get any messages.
+	 *
+	 * If libusb was compiled with verbose debug message logging, this function
+	 * does nothing: you'll always get messages from all levels.
+	 */
+	LIBUSB_OPTION_LOG_LEVEL,
+};
+
+int LIBUSB_CALL libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);
 
 #ifdef __cplusplus
 }

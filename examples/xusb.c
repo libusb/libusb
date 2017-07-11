@@ -1095,7 +1095,7 @@ int main(int argc, char** argv)
 	}
 
 	// xusb is commonly used as a debug tool, so it's convenient to have debug output during libusb_init(),
-	// but since we can't call on libusb_set_debug() before libusb_init(), we use the env variable method
+	// but since we can't call on libusb_set_option() before libusb_init(), we use the env variable method
 	old_dbg_str = getenv("LIBUSB_DEBUG");
 	if (debug_mode) {
 		if (putenv("LIBUSB_DEBUG=4") != 0)	// LIBUSB_LOG_LEVEL_DEBUG
@@ -1110,7 +1110,7 @@ int main(int argc, char** argv)
 
 	// If not set externally, and no debug option was given, use info log level
 	if ((old_dbg_str == NULL) && (!debug_mode))
-		libusb_set_debug(NULL, LIBUSB_LOG_LEVEL_INFO);
+		libusb_set_option(NULL, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_INFO);
 	if (error_lang != NULL) {
 		r = libusb_setlocale(error_lang);
 		if (r < 0)
