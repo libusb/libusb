@@ -178,6 +178,9 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 	const typeof( ((type *)0)->member ) *mptr = (ptr);	\
 	(type *)( (char *)mptr - offsetof(type,member) );})
 
+#ifndef CLAMP
+#define CLAMP(val, min, max) ((val) < (min) ? (min) : ((val) > (max) ? (max) : (val)))
+#endif
 #ifndef MIN
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
 #endif
@@ -288,7 +291,7 @@ struct pollfd;
 
 struct libusb_context {
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-	int debug;
+	enum libusb_log_level debug;
 	int debug_fixed;
 #endif
 

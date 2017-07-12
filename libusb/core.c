@@ -2030,13 +2030,35 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 {
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 	USBI_GET_CONTEXT(ctx);
-	if (!ctx->debug_fixed)
-		ctx->debug = level;
+	if (!ctx->debug_fixed) {
+		level = CLAMP(level, LIBUSB_LOG_LEVEL_NONE, LIBUSB_LOG_LEVEL_DEBUG);
+		ctx->debug = (enum libusb_log_level)level;
+	}
 #else
 	UNUSED(ctx);
 	UNUSED(level);
 #endif
 }
+
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
+/* returns the log level as defined in the LIBUSB_DEBUG environment variable.
+ * if LIBUSB_DEBUG is not present or not a number, returns LIBUSB_LOG_LEVEL_NONE.
+ * value is clamped to ensure it is within the valid range of possibilities.
+ */
+static enum libusb_log_level get_env_debug_level(void)
+{
+	const char *dbg = getenv("LIBUSB_DEBUG");
+	enum libusb_log_level level;
+	if (dbg) {
+		int dbg_level = atoi(dbg);
+		dbg_level = CLAMP(dbg_level, LIBUSB_LOG_LEVEL_NONE, LIBUSB_LOG_LEVEL_DEBUG);
+		level = (enum libusb_log_level)dbg_level;
+	} else {
+		level = LIBUSB_LOG_LEVEL_NONE;
+	}
+	return level;
+}
+#endif
 
 /** \ingroup libusb_lib
  * Initialize libusb. This function must be called before calling any other
@@ -2079,14 +2101,9 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	}
 
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-	{
-		const char *dbg = getenv("LIBUSB_DEBUG");
-		if (dbg) {
-			ctx->debug = atoi(dbg);
-			if (ctx->debug)
-				ctx->debug_fixed = 1;
-		}
-	}
+	ctx->debug = get_env_debug_level();
+	if (ctx->debug != LIBUSB_LOG_LEVEL_NONE)
+		ctx->debug_fixed = 1;
 #endif
 
 	/* default context should be initialized before calling usbi_dbg */
@@ -2351,18 +2368,15 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	global_debug = 1;
 	UNUSED(ctx);
 #else
-	int ctx_level = 0;
+	enum libusb_log_level ctx_level = LIBUSB_LOG_LEVEL_NONE;
 
 	USBI_GET_CONTEXT(ctx);
-	if (ctx) {
+	if (ctx)
 		ctx_level = ctx->debug;
-	} else {
-		const char *dbg = getenv("LIBUSB_DEBUG");
-		if (dbg)
-			ctx_level = atoi(dbg);
-	}
-	global_debug = (ctx_level == LIBUSB_LOG_LEVEL_DEBUG);
-	if (!ctx_level)
+	else
+		ctx_level = get_env_debug_level();
+
+	if (ctx_level == LIBUSB_LOG_LEVEL_NONE)
 		return;
 	if (level == LIBUSB_LOG_LEVEL_WARNING && ctx_level < LIBUSB_LOG_LEVEL_WARNING)
 		return;
@@ -2370,6 +2384,8 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 		return;
 	if (level == LIBUSB_LOG_LEVEL_DEBUG && ctx_level < LIBUSB_LOG_LEVEL_DEBUG)
 		return;
+
+	global_debug = (ctx_level == LIBUSB_LOG_LEVEL_DEBUG);
 #endif
 
 	usbi_backend.clock_gettime(USBI_CLOCK_REALTIME, &now);
