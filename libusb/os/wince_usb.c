@@ -239,10 +239,11 @@ init_exit: // Holds semaphore here.
 	return r;
 }
 
-static void wince_exit(void)
+static void wince_exit(struct libusb_context *ctx)
 {
 	HANDLE semaphore;
 	TCHAR sem_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
+	UNUSED(ctx);
 
 	_stprintf(sem_name, _T("libusb_init%08X"), (unsigned int)(GetCurrentProcessId() & 0xFFFFFFFF));
 	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);

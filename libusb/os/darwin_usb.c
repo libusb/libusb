@@ -555,7 +555,8 @@ static int darwin_init(struct libusb_context *ctx) {
   return rc;
 }
 
-static void darwin_exit (void) {
+static void darwin_exit (struct libusb_context *ctx) {
+  UNUSED(ctx);
   if (libusb_darwin_atomic_fetch_add (&initCount, -1) == 1) {
 #if !OSX_USE_CLOCK_GETTIME
     mach_port_deallocate(mach_task_self(), clock_realtime);

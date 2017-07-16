@@ -2183,7 +2183,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 
 err_backend_exit:
 	if (usbi_backend.exit)
-		usbi_backend.exit();
+		usbi_backend.exit(ctx);
 err_free_ctx:
 	if (ctx == usbi_default_context) {
 		usbi_default_context = NULL;
@@ -2274,7 +2274,7 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 
 	usbi_io_exit(ctx);
 	if (usbi_backend.exit)
-		usbi_backend.exit();
+		usbi_backend.exit(ctx);
 
 	usbi_mutex_destroy(&ctx->open_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);

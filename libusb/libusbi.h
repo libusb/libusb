@@ -614,7 +614,7 @@ struct usbi_os_backend {
 	 *
 	 * This function is called when the user deinitializes the library.
 	 */
-	void (*exit)(void);
+	void (*exit)(struct libusb_contex *ctx);
 
 	/* Enumerate all the USB devices on the system, returning them in a list
 	 * of discovered devices.

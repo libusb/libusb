@@ -371,8 +371,9 @@ func_exit:
 	return r;
 }
 
-static void usbdk_exit(void)
+static void usbdk_exit(struct libusb_context *ctx)
 {
+	UNUSED(ctx);
 	if (--concurrent_usage < 0) {
 		windows_common_exit();
 		exit_polling();

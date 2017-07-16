@@ -38,8 +38,9 @@ haiku_init(struct libusb_context *ctx)
 }
 
 static void
-haiku_exit(void)
+haiku_exit(struct libusb_context *ctx)
 {
+	UNUSED(ctx);
 	if (atomic_add(&gInitCount, -1) == 1)
 		gUsbRoster.Stop();
 }

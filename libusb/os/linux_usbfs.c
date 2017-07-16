@@ -486,8 +486,9 @@ static int op_init(struct libusb_context *ctx)
 	return r;
 }
 
-static void op_exit(void)
+static void op_exit(struct libusb_context *ctx)
 {
+	UNUSED(ctx);
 	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	assert(init_count != 0);
 	if (!--init_count) {

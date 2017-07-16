@@ -42,7 +42,7 @@
  * Backend functions
  */
 static int sunos_init(struct libusb_context *);
-static void sunos_exit(void);
+static void sunos_exit(struct libusb_context *);
 static int sunos_get_device_list(struct libusb_context *,
     struct discovered_devs **);
 static int sunos_open(struct libusb_device_handle *);
@@ -79,7 +79,7 @@ static int sunos_init(struct libusb_context *ctx)
 	return (LIBUSB_SUCCESS);
 }
 
-static void sunos_exit(void)
+static void sunos_exit(struct libusb_context *ctx)
 {
 	usbi_dbg("");
 }
