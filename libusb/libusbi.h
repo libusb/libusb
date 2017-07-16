@@ -616,6 +616,16 @@ struct usbi_os_backend {
 	 */
 	void (*exit)(struct libusb_contex *ctx);
 
+	/* Set a backend-specific option. Optional.
+	 *
+	 * This function is called when the user calls libusb_set_option() and
+	 * the option is not handled by the core library.
+	 *
+	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
+	 */
+	int (*set_option)(struct libusb_context *ctx, enum libusb_option option,
+		va_list args);
+
 	/* Enumerate all the USB devices on the system, returning them in a list
 	 * of discovered devices.
 	 *

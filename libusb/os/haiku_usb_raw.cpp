@@ -201,6 +201,7 @@ const struct usbi_os_backend usbi_backend = {
 	/*.caps =*/ 0,
 	/*.init =*/ haiku_init,
 	/*.exit =*/ haiku_exit,
+	/*.set_option =*/ NULL,
 	/*.get_device_list =*/ NULL,
 	/*.hotplug_poll =*/ NULL,
 	/*.open =*/ haiku_open,

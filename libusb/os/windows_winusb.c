@@ -2047,6 +2047,7 @@ const struct usbi_os_backend usbi_backend = {
 	USBI_CAP_HAS_HID_ACCESS,
 	windows_init,
 	windows_exit,
+	NULL,				/* set_option */
 
 	windows_get_device_list,
 	NULL,				/* hotplug_poll */

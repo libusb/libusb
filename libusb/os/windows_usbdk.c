@@ -851,6 +851,7 @@ const struct usbi_os_backend usbi_backend = {
 	USBI_CAP_HAS_HID_ACCESS,
 	usbdk_init,
 	usbdk_exit,
+	NULL,	// set_option()
 
 	usbdk_get_device_list,
 	NULL,
