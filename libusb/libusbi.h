@@ -614,7 +614,7 @@ struct usbi_os_backend {
 	 *
 	 * This function is called when the user deinitializes the library.
 	 */
-	void (*exit)(struct libusb_contex *ctx);
+	void (*exit)(struct libusb_context *ctx);
 
 	/* Set a backend-specific option. Optional.
 	 *
