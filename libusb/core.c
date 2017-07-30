@@ -1280,7 +1280,7 @@ int API_EXPORTED libusb_open_fd(libusb_device *dev,
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device_handle *_dev_handle;
-	size_t priv_size = usbi_backend->device_handle_priv_size;
+	size_t priv_size = usbi_backend.device_handle_priv_size;
 	int r;
 	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
 
@@ -1303,7 +1303,7 @@ int API_EXPORTED libusb_open_fd(libusb_device *dev,
 	_dev_handle->claimed_interfaces = 0;
 	memset(&_dev_handle->os_priv, 0, priv_size);
 
-	r = usbi_backend->open_fd(_dev_handle, fd);
+	r = usbi_backend.open_fd(_dev_handle, fd);
 	if (r < 0) {
 		usbi_dbg("open %d.%d returns %d", dev->bus_number, dev->device_address, r);
 		libusb_unref_device(dev);
