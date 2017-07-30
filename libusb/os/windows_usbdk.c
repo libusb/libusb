@@ -841,11 +841,6 @@ void windows_get_overlapped_result(struct usbi_transfer *transfer, struct winfd 
 	}
 }
 
-static int usbdk_clock_gettime(int clk_id, struct timespec *tp)
-{
-	return windows_clock_gettime(clk_id, tp);
-}
-
 const struct usbi_os_backend usbi_backend = {
 	"Windows",
 	USBI_CAP_HAS_HID_ACCESS,
@@ -891,7 +886,7 @@ const struct usbi_os_backend usbi_backend = {
 	windows_handle_events,
 	NULL,
 
-	usbdk_clock_gettime,
+	windows_clock_gettime,
 #if defined(USBI_TIMERFD_AVAILABLE)
 	NULL,
 #endif
