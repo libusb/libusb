@@ -928,12 +928,22 @@ static int test_device(uint16_t vid, uint16_t pid)
 		}
 	}
 	// Read the OS String Descriptor
-	if (libusb_get_string_descriptor_ascii(handle, 0xEE, (unsigned char*)string, 128) >= 0) {
-		printf("   String (0x%02X): \"%s\"\n", 0xEE, string);
+	r = libusb_get_string_descriptor(handle, 0xEE, 0, (unsigned char*)string, 128);
+	if (r > 0) {
+		for (i = 0; 2 + 2*i < r; i++) {
+			string[i] = string[2 + 2 * i] & 0x80 || string[3 + 2 * i] ? '?' : string[2 + 2 * i];
+		}
+		string[i] = 0;
+
+		printf("   String (0x%02X): \"%s\"", 0xEE, string);
 		// If this is a Microsoft OS String Descriptor,
 		// attempt to read the WinUSB extended Feature Descriptors
-		if (strncmp(string, "MSFT100", 7) == 0)
-			read_ms_winsub_feature_descriptors(handle, string[7], first_iface);
+		if (strncmp(string, "MSFT100", 7) == 0) {
+			printf(" (Vendor Code = 0x%02X)\n", ((unsigned)string[16]) & 0xFF);
+			read_ms_winsub_feature_descriptors(handle, string[16], first_iface);
+		} else {
+			printf("\n");
+		}
 	}
 
 	switch(test_mode) {
