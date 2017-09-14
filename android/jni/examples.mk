@@ -18,7 +18,7 @@
 
 LOCAL_PATH:= $(call my-dir)
 LIBUSB_ROOT_REL:= ../..
-LIBUSB_ROOT_ABS:= $(LOCAL_PATH)/../../libusb
+LIBUSB_ROOT_ABS:= $(LOCAL_PATH)/../..
 
 # listdevs
 
@@ -28,7 +28,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/listdevs.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
 LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
@@ -44,7 +44,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/xusb.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
 LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
@@ -60,7 +60,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/hotplugtest.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
 LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
@@ -77,7 +77,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/ezusb.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
 LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
@@ -93,7 +93,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/sam3u_benchmark.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
 LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
@@ -109,7 +109,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/dpfp.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
 LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
@@ -125,7 +125,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/dpfp_threaded.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
 LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
