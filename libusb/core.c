@@ -832,7 +832,11 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 		usbi_mutex_unlock(&ctx->usb_devs_lock);
 	} else {
 		/* backend does not provide hotplug support */
-		r = usbi_backend.get_device_list(ctx, &discdevs);
+		if (!usbi_backend.get_device_list) {
+	          len = -1;
+		  goto out;
+		}
+		r = usbi_backend->get_device_list(ctx, &discdevs);
 	}
 
 	if (r < 0) {
