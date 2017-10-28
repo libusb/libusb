@@ -1716,10 +1716,7 @@ static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
 	strcpy(dc.driver, "usbfs");
 	dc.flags = USBFS_DISCONNECT_CLAIM_EXCEPT_DRIVER;
 	r = ioctl(fd, IOCTL_USBFS_DISCONNECT_CLAIM, &dc);
-	if (r == 0 || (r != 0 && errno != ENOTTY)) {
-		if (r == 0)
-			return 0;
-
+	if (r != 0 && errno != ENOTTY) {
 		switch (errno) {
 		case EBUSY:
 			return LIBUSB_ERROR_BUSY;
@@ -1731,7 +1728,8 @@ static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
 		usbi_err(HANDLE_CTX(handle),
 			"disconnect-and-claim failed errno %d", errno);
 		return LIBUSB_ERROR_OTHER;
-	}
+	} else if (r == 0)
+		return 0;
 
 	/* Fallback code for kernels which don't support the
 	   disconnect-and-claim ioctl */
