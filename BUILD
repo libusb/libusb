@@ -40,6 +40,7 @@ genrule(
     ],
     outs = ["config.h"],
     cmd = "$(location :bootstrap) $< $@",
+    local = True,
 )
 
 cc_library(
