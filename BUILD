@@ -12,36 +12,6 @@ config_setting(
     },
 )
 
-sh_binary(
-    name = "bootstrap",
-    srcs = ["bazel_bootstrap.sh"],
-)
-
-genrule(
-    name = "config_hdr",
-    srcs = ["configure.ac"],
-    tools = [
-        "doc/Makefile.am",
-        "doc/doxygen.cfg.in",
-        "examples/Makefile.am",
-        "libusb/Makefile.am",
-        "libusb/core.c",
-        "libusb/version.h",
-        "tests/Makefile.am",
-        "AUTHORS",
-        "ChangeLog",
-        "COPYING",
-        "NEWS",
-        "README",
-        "Makefile.am",
-        "bootstrap.sh",
-        "libusb-1.0.pc.in",
-        ":bootstrap",
-    ],
-    outs = ["config.h"],
-    cmd = "$(location :bootstrap) $< $@",
-)
-
 cc_library(
     name = "libusb",
     srcs = glob([
@@ -61,7 +31,7 @@ cc_library(
             "libusb/os/linux_usbfs.c",
             "libusb/os/linux_usbfs.h",
             "libusb/os/linux_udev.c",
-            ":config_hdr",
+            "config.h",
         ],
         "//conditions:default": [],
     }),
