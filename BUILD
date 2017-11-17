@@ -26,12 +26,13 @@ cc_library(
         ":darwin": [
             "libusb/os/darwin_usb.c",
             "libusb/os/darwin_usb.h",
+            "Xcode/config.h",
         ],
         ":linux": [
             "libusb/os/linux_usbfs.c",
             "libusb/os/linux_usbfs.h",
             "libusb/os/linux_udev.c",
-            "config.h",
+            "linux/config.h",
         ],
         "//conditions:default": [],
     }),
@@ -44,6 +45,9 @@ cc_library(
     ] + select({
         ":darwin": [
             "-I" + PACKAGE_NAME + "/Xcode",
+        ],
+        ":linux": [
+            "-I" + PACKAGE_NAME + "/linux",
         ],
         "//conditions:default": [],
     }),
