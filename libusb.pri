@@ -55,6 +55,7 @@ linux {
         SOURCES += \
             $${SRC_DIR}/os/linux_netlink.c
     } else {
+        INCLUDEPATH += $${PWD}/linux
         LIBS += -ludev
 
         SOURCES += \
