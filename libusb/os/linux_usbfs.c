@@ -2082,6 +2082,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		for (j = 0, k = packet_offset - urb_packet_offset;
 				k < packet_offset; k++, j++) {
 			packet_len = transfer->iso_packet_desc[k].length;
+			urb->buffer_length += packet_len;
 			urb->iso_frame_desc[j].length = packet_len;
 		}
 
