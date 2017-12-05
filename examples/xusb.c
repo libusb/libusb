@@ -71,7 +71,8 @@ static int perr(char const *format, ...)
 }
 
 #define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)errcode)); return -1; } while (0)
-#define CALL_CHECK(fcall) do { r=fcall; if (r < 0) ERR_EXIT(r); } while (0);
+#define CALL_CHECK(fcall) do { int _r=fcall; if (_r < 0) ERR_EXIT(_r); } while (0)
+#define CALL_CHECK_CLOSE(fcall, hdl) do { int _r=fcall; if (_r < 0) { libusb_close(hdl); ERR_EXIT(_r); } } while (0)
 #define B(x) (((x)!=0)?1:0)
 #define be_to_int32(buf) (((buf)[0]<<24)|((buf)[1]<<16)|((buf)[2]<<8)|(buf)[3])
 
@@ -185,7 +186,6 @@ static char* uuid_to_string(const uint8_t* uuid)
 // removed by Sony
 static int display_ps3_status(libusb_device_handle *handle)
 {
-	int r;
 	uint8_t input_report[49];
 	uint8_t master_bt_address[8];
 	uint8_t device_bt_address[18];
@@ -276,7 +276,6 @@ static int display_ps3_status(libusb_device_handle *handle)
 // Input/Output reports described at http://euc.jp/periphs/xbox-controller.ja.html
 static int display_xbox_status(libusb_device_handle *handle)
 {
-	int r;
 	uint8_t input_report[20];
 	printf("\nReading XBox Input Report...\n");
 	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
@@ -297,7 +296,6 @@ static int display_xbox_status(libusb_device_handle *handle)
 
 static int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_t right)
 {
-	int r;
 	uint8_t output_report[6];
 
 	printf("\nWriting XBox Controller Output Report...\n");
@@ -790,7 +788,7 @@ static void print_device_cap(struct libusb_bos_dev_capability_descriptor *dev_ca
 	}
 	default:
 		printf("    Unknown BOS device capability %02x:\n", dev_cap->bDevCapabilityType);
-	}	
+	}
 }
 
 static int test_device(uint16_t vid, uint16_t pid)
@@ -837,7 +835,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 	}
 
 	printf("\nReading device descriptor:\n");
-	CALL_CHECK(libusb_get_device_descriptor(dev, &dev_desc));
+	CALL_CHECK_CLOSE(libusb_get_device_descriptor(dev, &dev_desc), handle);
 	printf("            length: %d\n", dev_desc.bLength);
 	printf("      device class: %d\n", dev_desc.bDeviceClass);
 	printf("               S/N: %d\n", dev_desc.iSerialNumber);
@@ -861,7 +859,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 	}
 
 	printf("\nReading first configuration descriptor:\n");
-	CALL_CHECK(libusb_get_config_descriptor(dev, 0, &conf_desc));
+	CALL_CHECK_CLOSE(libusb_get_config_descriptor(dev, 0, &conf_desc), handle);
 	nb_ifaces = conf_desc->bNumInterfaces;
 	printf("             nb interfaces: %d\n", nb_ifaces);
 	if (nb_ifaces > 0)
@@ -940,19 +938,19 @@ static int test_device(uint16_t vid, uint16_t pid)
 
 	switch(test_mode) {
 	case USE_PS3:
-		CALL_CHECK(display_ps3_status(handle));
+		CALL_CHECK_CLOSE(display_ps3_status(handle), handle);
 		break;
 	case USE_XBOX:
-		CALL_CHECK(display_xbox_status(handle));
-		CALL_CHECK(set_xbox_actuators(handle, 128, 222));
+		CALL_CHECK_CLOSE(display_xbox_status(handle), handle);
+		CALL_CHECK_CLOSE(set_xbox_actuators(handle, 128, 222), handle);
 		msleep(2000);
-		CALL_CHECK(set_xbox_actuators(handle, 0, 0));
+		CALL_CHECK_CLOSE(set_xbox_actuators(handle, 0, 0), handle);
 		break;
 	case USE_HID:
 		test_hid(handle, endpoint_in);
 		break;
 	case USE_SCSI:
-		CALL_CHECK(test_mass_storage(handle, endpoint_in, endpoint_out));
+		CALL_CHECK_CLOSE(test_mass_storage(handle, endpoint_in, endpoint_out), handle);
 	case USE_GENERIC:
 		break;
 	}

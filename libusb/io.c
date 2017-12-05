@@ -1205,8 +1205,10 @@ static int calculate_timeout(struct usbi_transfer *transfer)
 	unsigned int timeout =
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)->timeout;
 
-	if (!timeout)
+	if (!timeout) {
+		timerclear(&transfer->timeout);
 		return 0;
+	}
 
 	r = usbi_backend.clock_gettime(USBI_CLOCK_MONOTONIC, &current_time);
 	if (r < 0) {
