@@ -2243,7 +2243,6 @@ static void op_clear_transfer_priv(struct usbi_transfer *itransfer)
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct linux_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
 
-	/* urbs can be freed also in submit_transfer so lock mutex first */
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
 	case LIBUSB_TRANSFER_TYPE_BULK:
