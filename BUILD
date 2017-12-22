@@ -45,6 +45,7 @@ cc_library(
     ] + select({
         ":darwin": [
             "-I" + PACKAGE_NAME + "/Xcode",
+            "-mmacosx-version-min=10.12",
         ],
         ":linux": [
             "-I" + PACKAGE_NAME + "/linux",
