@@ -23,8 +23,6 @@
 
 #include <config.h>
 
-#if defined(USE_USBDK)
-
 #include <windows.h>
 #include <cfgmgr32.h>
 #include <stdio.h>
@@ -196,11 +194,16 @@ error_unload:
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
+static void backend_init(void);
+
 static int usbdk_init(struct libusb_context *ctx)
 {
 	int r;
 
 	if (++concurrent_usage == 0) { // First init?
+
+		backend_init();
+
 		r = load_usbdk_helper_dll(ctx);
 		if (r)
 			goto init_exit;
@@ -534,7 +537,7 @@ static void usbdk_destroy_device(struct libusb_device *dev)
 		usbdk_release_config_descriptors(p, p->info.DeviceDescriptor.bNumConfigurations);
 }
 
-void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
+static void usbdk_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 	struct usbdk_transfer_priv *transfer_priv = _usbdk_transfer_priv(itransfer);
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
@@ -779,13 +782,13 @@ static int usbdk_cancel_transfer(struct usbi_transfer *itransfer)
 	}
 }
 
-int windows_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size)
+static int usbdk_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size)
 {
 	itransfer->transferred += io_size;
 	return LIBUSB_TRANSFER_COMPLETED;
 }
 
-struct winfd *windows_get_fd(struct usbi_transfer *transfer)
+static struct winfd *usbdk_get_fd(struct usbi_transfer *transfer)
 {
 	struct usbdk_transfer_priv *transfer_priv = _usbdk_transfer_priv(transfer);
 	return &transfer_priv->pollable_fd;
@@ -806,7 +809,7 @@ static DWORD usbdk_translate_usbd_status(USBD_STATUS UsbdStatus)
 	}
 }
 
-void windows_get_overlapped_result(struct usbi_transfer *transfer, struct winfd *pollable_fd, DWORD *io_result, DWORD *io_size)
+static void usbdk_get_overlapped_result(struct usbi_transfer *transfer, struct winfd *pollable_fd, DWORD *io_result, DWORD *io_size)
 {
 	if (HasOverlappedIoCompletedSync(pollable_fd->overlapped) // Handle async requests that completed synchronously first
 			|| GetOverlappedResult(pollable_fd->handle, pollable_fd->overlapped, io_size, false)) { // Regular async overlapped
@@ -841,9 +844,14 @@ void windows_get_overlapped_result(struct usbi_transfer *transfer, struct winfd 
 	}
 }
 
-static int usbdk_clock_gettime(int clk_id, struct timespec *tp)
+static void backend_init(void)
 {
-	return windows_clock_gettime(clk_id, tp);
+	win_backend backend;
+	backend.clear_transfer_priv = usbdk_clear_transfer_priv;
+	backend.copy_transfer_data = usbdk_copy_transfer_data;
+	backend.get_fd = usbdk_get_fd;
+	backend.get_overlapped_result = usbdk_get_overlapped_result;
+	win_nt_init(&backend);
 }
 
 const struct usbi_os_backend usbi_backend = {
@@ -886,12 +894,12 @@ const struct usbi_os_backend usbi_backend = {
 
 	usbdk_submit_transfer,
 	usbdk_cancel_transfer,
-	windows_clear_transfer_priv,
+	usbdk_clear_transfer_priv,
 
 	windows_handle_events,
 	NULL,
 
-	usbdk_clock_gettime,
+	windows_clock_gettime,
 #if defined(USBI_TIMERFD_AVAILABLE)
 	NULL,
 #endif
@@ -900,5 +908,3 @@ const struct usbi_os_backend usbi_backend = {
 	0,
 	sizeof(struct usbdk_transfer_priv),
 };
-
-#endif /* USE_USBDK */
