@@ -31,7 +31,6 @@
 #include "wince_usb.h"
 
 // Global variables
-const uint64_t epoch_time = UINT64_C(116444736000000000); // 1970.01.01 00:00:000 in MS Filetime
 int windows_version = WINDOWS_CE;
 static uint64_t hires_frequency, hires_ticks_to_ps;
 static HANDLE driver_handle = INVALID_HANDLE_VALUE;
@@ -42,38 +41,39 @@ static int concurrent_usage = -1;
  * uses retval as errorcode, or, if 0, use GetLastError()
  */
 #if defined(ENABLE_LOGGING)
-static const char *windows_error_str(DWORD retval)
+static const char *windows_error_str(DWORD error_code)
 {
 	static TCHAR wErr_string[ERR_BUFFER_SIZE];
 	static char err_string[ERR_BUFFER_SIZE];
 
-	DWORD error_code, format_error;
 	DWORD size;
-	size_t i;
+	int len;
 
-	error_code = retval ? retval : GetLastError();
+	if (error_code == 0)
+		error_code = GetLastError();
 
-	safe_stprintf(wErr_string, ERR_BUFFER_SIZE, _T("[%u] "), (unsigned int)error_code);
+	len = sprintf(err_string, "[%u] ", (unsigned int)error_code);
 
-	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &wErr_string[safe_tcslen(wErr_string)],
-		ERR_BUFFER_SIZE - (DWORD)safe_tcslen(wErr_string), NULL);
+	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		wErr_string, ERR_BUFFER_SIZE, NULL);
 	if (size == 0) {
-		format_error = GetLastError();
+		DWORD format_error = GetLastError();
 		if (format_error)
-			safe_stprintf(wErr_string, ERR_BUFFER_SIZE,
-				_T("Windows error code %u (FormatMessage error code %u)"),
+			snprintf(err_string, ERR_BUFFER_SIZE,
+				"Windows error code %u (FormatMessage error code %u)",
 				(unsigned int)error_code, (unsigned int)format_error);
 		else
-			safe_stprintf(wErr_string, ERR_BUFFER_SIZE, _T("Unknown error code %u"), (unsigned int)error_code);
+			snprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", (unsigned int)error_code);
 	} else {
-		// Remove CR/LF terminators
-		for (i = safe_tcslen(wErr_string) - 1; ((wErr_string[i] == 0x0A) || (wErr_string[i] == 0x0D)); i--)
-			wErr_string[i] = 0;
-	}
+		// Remove CR/LF terminators, if present
+		size_t pos = size - 2;
+		if (wErr_string[pos] == 0x0D)
+			wErr_string[pos] = 0;
 
-	if (WideCharToMultiByte(CP_ACP, 0, wErr_string, -1, err_string, ERR_BUFFER_SIZE, NULL, NULL) < 0)
-		strcpy(err_string, "Unable to convert error string");
+		if (!WideCharToMultiByte(CP_ACP, 0, wErr_string, -1, &err_string[len], ERR_BUFFER_SIZE - len, NULL, NULL))
+			strcpy(err_string, "Unable to convert error string");
+	}
 
 	return err_string;
 }
@@ -239,10 +239,11 @@ init_exit: // Holds semaphore here.
 	return r;
 }
 
-static void wince_exit(void)
+static void wince_exit(struct libusb_context *ctx)
 {
 	HANDLE semaphore;
 	TCHAR sem_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
+	UNUSED(ctx);
 
 	_stprintf(sem_name, _T("libusb_init%08X"), (unsigned int)(GetCurrentProcessId() & 0xFFFFFFFF));
 	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
@@ -333,14 +334,14 @@ static int wince_get_device_list(
 			goto err_out;
 		}
 
-		safe_unref_device(dev);
+		libusb_unref_device(dev);
 	}
 
 	*discdevs = new_devices;
 	return r;
 err_out:
 	*discdevs = new_devices;
-	safe_unref_device(dev);
+	libusb_unref_device(dev);
 	// Release the remainder of the unprocessed device list.
 	// The devices added to new_devices already will still be passed up to libusb,
 	// which can dispose of them at its leisure.
@@ -832,14 +833,14 @@ static int wince_clock_gettime(int clk_id, struct timespec *tp)
 		// Fall through and return real-time if monotonic read failed or was not detected @ init
 	case USBI_CLOCK_REALTIME:
 		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
-		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
+		// with a predef epoch time to have an epoch that starts at 1970.01.01 00:00
 		// Note however that our resolution is bounded by the Windows system time
 		// functions and is at best of the order of 1 ms (or, usually, worse)
 		GetSystemTime(&st);
 		SystemTimeToFileTime(&st, &filetime);
 		rtime.LowPart = filetime.dwLowDateTime;
 		rtime.HighPart = filetime.dwHighDateTime;
-		rtime.QuadPart -= epoch_time;
+		rtime.QuadPart -= EPOCH_TIME;
 		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
 		tp->tv_nsec = (long)((rtime.QuadPart % 10000000)*100);
 		return LIBUSB_SUCCESS;
@@ -848,11 +849,12 @@ static int wince_clock_gettime(int clk_id, struct timespec *tp)
 	}
 }
 
-const struct usbi_os_backend wince_backend = {
+const struct usbi_os_backend usbi_backend = {
 	"Windows CE",
 	0,
 	wince_init,
 	wince_exit,
+	NULL,				/* set_option() */
 
 	wince_get_device_list,
 	NULL,				/* hotplug_poll */
@@ -893,6 +895,7 @@ const struct usbi_os_backend wince_backend = {
 	NULL,				/* handle_transfer_completion() */
 
 	wince_clock_gettime,
+	0,
 	sizeof(struct wince_device_priv),
 	0,
 	sizeof(struct wince_transfer_priv),

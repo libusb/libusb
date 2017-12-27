@@ -86,11 +86,12 @@ static int _sync_control_transfer(struct usbi_transfer *);
 static int _sync_gen_transfer(struct usbi_transfer *);
 static int _access_endpoint(struct libusb_transfer *);
 
-const struct usbi_os_backend netbsd_backend = {
+const struct usbi_os_backend usbi_backend = {
 	"Synchronous NetBSD backend",
 	0,
 	NULL,				/* init() */
 	NULL,				/* exit() */
+	NULL,				/* set_option() */
 	netbsd_get_device_list,
 	NULL,				/* hotplug_poll */
 	netbsd_open,
@@ -131,6 +132,7 @@ const struct usbi_os_backend netbsd_backend = {
 	netbsd_handle_transfer_completion,
 
 	netbsd_clock_gettime,
+	0,				/* context_priv_size */
 	sizeof(struct device_priv),
 	sizeof(struct handle_priv),
 	0,				/* transfer_priv_size */

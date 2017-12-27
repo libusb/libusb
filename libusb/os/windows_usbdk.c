@@ -371,8 +371,9 @@ func_exit:
 	return r;
 }
 
-static void usbdk_exit(void)
+static void usbdk_exit(struct libusb_context *ctx)
 {
+	UNUSED(ctx);
 	if (--concurrent_usage < 0) {
 		windows_common_exit();
 		exit_polling();
@@ -796,16 +797,12 @@ static DWORD usbdk_translate_usbd_status(USBD_STATUS UsbdStatus)
 		return NO_ERROR;
 
 	switch (UsbdStatus) {
-	case USBD_STATUS_STALL_PID:
-	case USBD_STATUS_ENDPOINT_HALTED:
-	case USBD_STATUS_BAD_START_FRAME:
-		return ERROR_GEN_FAILURE;
 	case USBD_STATUS_TIMEOUT:
 		return ERROR_SEM_TIMEOUT;
 	case USBD_STATUS_CANCELED:
 		return ERROR_OPERATION_ABORTED;
 	default:
-		return ERROR_FUNCTION_FAILED;
+		return ERROR_GEN_FAILURE;
 	}
 }
 
@@ -849,11 +846,12 @@ static int usbdk_clock_gettime(int clk_id, struct timespec *tp)
 	return windows_clock_gettime(clk_id, tp);
 }
 
-const struct usbi_os_backend usbdk_backend = {
+const struct usbi_os_backend usbi_backend = {
 	"Windows",
 	USBI_CAP_HAS_HID_ACCESS,
 	usbdk_init,
 	usbdk_exit,
+	NULL,	// set_option()
 
 	usbdk_get_device_list,
 	NULL,
@@ -897,6 +895,7 @@ const struct usbi_os_backend usbdk_backend = {
 #if defined(USBI_TIMERFD_AVAILABLE)
 	NULL,
 #endif
+	0,
 	sizeof(struct usbdk_device_priv),
 	0,
 	sizeof(struct usbdk_transfer_priv),

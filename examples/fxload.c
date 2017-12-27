@@ -178,7 +178,7 @@ int main(int argc, char*argv[])
 		logerror("libusb_init() failed: %s\n", libusb_error_name(status));
 		return -1;
 	}
-	libusb_set_debug(NULL, verbose);
+	libusb_set_option(NULL, LIBUSB_OPTION_LOG_LEVEL, verbose);
 
 	/* try to pick up missing parameters from known devices */
 	if ((type == NULL) || (device_id == NULL) || (device_path != NULL)) {

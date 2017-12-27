@@ -31,6 +31,8 @@
 #define FACILITY_SETUPAPI	15
 #endif
 
+#include <pshpack1.h>
+
 typedef struct USB_CONFIGURATION_DESCRIPTOR {
   UCHAR  bLength;
   UCHAR  bDescriptorType;
@@ -41,6 +43,8 @@ typedef struct USB_CONFIGURATION_DESCRIPTOR {
   UCHAR  bmAttributes;
   UCHAR  MaxPower;
 } USB_CONFIGURATION_DESCRIPTOR, *PUSB_CONFIGURATION_DESCRIPTOR;
+
+#include <poppack.h>
 
 typedef struct libusb_device_descriptor USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESCRIPTOR;
 
@@ -59,5 +63,5 @@ void windows_handle_callback(struct usbi_transfer *itransfer, uint32_t io_result
 int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready);
 
 #if defined(ENABLE_LOGGING)
-const char *windows_error_str(DWORD retval);
+const char *windows_error_str(DWORD error_code);
 #endif

@@ -21,6 +21,10 @@
 #include <string.h>
 #include "libusb.h"
 
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+#define snprintf _snprintf
+#endif
+
 int verbose = 0;
 
 static void print_endpoint_comp(const struct libusb_ss_endpoint_companion_descriptor *ep_comp)
@@ -105,35 +109,35 @@ static void print_bos(libusb_device_handle *handle)
 	if (0 > ret) {
 		return;
 	}
-	
+
 	printf("  Binary Object Store (BOS):\n");
 	printf("    wTotalLength:       %d\n", bos->wTotalLength);
 	printf("    bNumDeviceCaps:     %d\n", bos->bNumDeviceCaps);
-		
+
 	if(bos->dev_capability[0]->bDevCapabilityType == LIBUSB_BT_USB_2_0_EXTENSION) {
-	
+
 		struct libusb_usb_2_0_extension_descriptor *usb_2_0_extension;
 	        ret =  libusb_get_usb_2_0_extension_descriptor(NULL, bos->dev_capability[0],&usb_2_0_extension);
 	        if (0 > ret) {
 		        return;
 	        }
-	        
+
                 print_2_0_ext_cap(usb_2_0_extension);
                 libusb_free_usb_2_0_extension_descriptor(usb_2_0_extension);
         }
-	
+
 	if(bos->dev_capability[0]->bDevCapabilityType == LIBUSB_BT_SS_USB_DEVICE_CAPABILITY) {
-	
+
 	        struct libusb_ss_usb_device_capability_descriptor *dev_cap;
 		ret = libusb_get_ss_usb_device_capability_descriptor(NULL, bos->dev_capability[0],&dev_cap);
 	        if (0 > ret) {
 		        return;
 	        }
-	        
+
 	        print_ss_usb_cap(dev_cap);
 	        libusb_free_ss_usb_device_capability_descriptor(dev_cap);
         }
-        
+
 	libusb_free_bos_descriptor(bos);
 }
 
@@ -233,7 +237,6 @@ static int print_device(libusb_device *dev, int level)
 			libusb_free_config_descriptor(config);
 		}
 
-                
 		if (handle && desc.bcdUSB >= 0x0201) {
 			print_bos(handle);
 		}
