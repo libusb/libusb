@@ -96,6 +96,16 @@ static int perr(char const *format, ...)
 #define BOMS_RESET                    0xFF
 #define BOMS_GET_MAX_LUN              0xFE
 
+// Microsoft OS Descriptor
+#define MS_OS_DESC_STRING_INDEX		0xEE
+#define MS_OS_DESC_STRING_LENGTH	0x12
+#define MS_OS_DESC_VENDOR_CODE_OFFSET	0x10
+static const uint8_t ms_os_desc_string[] = {
+	MS_OS_DESC_STRING_LENGTH,
+	LIBUSB_DT_STRING,
+	'M', 0, 'S', 0, 'F', 0, 'T', 0, '1', 0, '0', 0, '0', 0,
+};
+
 // Section 5.1: Command Block Wrapper (CBW)
 struct command_block_wrapper {
 	uint8_t dCBWSignature[4];
@@ -923,17 +933,16 @@ static int test_device(uint16_t vid, uint16_t pid)
 		if (string_index[i] == 0) {
 			continue;
 		}
-		if (libusb_get_string_descriptor_ascii(handle, string_index[i], (unsigned char*)string, 128) >= 0) {
+		if (libusb_get_string_descriptor_ascii(handle, string_index[i], (unsigned char*)string, sizeof(string)) > 0) {
 			printf("   String (0x%02X): \"%s\"\n", string_index[i], string);
 		}
 	}
 	// Read the OS String Descriptor
-	if (libusb_get_string_descriptor_ascii(handle, 0xEE, (unsigned char*)string, 128) >= 0) {
-		printf("   String (0x%02X): \"%s\"\n", 0xEE, string);
+	r = libusb_get_string_descriptor(handle, MS_OS_DESC_STRING_INDEX, 0, (unsigned char*)string, MS_OS_DESC_STRING_LENGTH);
+	if (r == MS_OS_DESC_STRING_LENGTH && memcmp(ms_os_desc_string, string, sizeof(ms_os_desc_string)) == 0) {
 		// If this is a Microsoft OS String Descriptor,
 		// attempt to read the WinUSB extended Feature Descriptors
-		if (strncmp(string, "MSFT100", 7) == 0)
-			read_ms_winsub_feature_descriptors(handle, string[7], first_iface);
+		read_ms_winsub_feature_descriptors(handle, string[MS_OS_DESC_VENDOR_CODE_OFFSET], first_iface);
 	}
 
 	switch(test_mode) {
