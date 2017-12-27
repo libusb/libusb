@@ -19,6 +19,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stress", "stress_2012.vcxpr
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hotplugtest", "hotplugtest_2012.vcxproj", "{99D2AC64-DC66-4422-91CE-6715C403C9E5}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "testlibusb", "testlibusb_2012.vcxproj", "{70828935-325B-4749-B381-0E55EF31AEE8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -87,6 +89,14 @@ Global
 		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Release|Win32.Build.0 = Release|Win32
 		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Release|x64.ActiveCfg = Release|x64
 		{99D2AC64-DC66-4422-91CE-6715C403C9E5}.Release|x64.Build.0 = Release|x64
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Debug|Win32.ActiveCfg = Debug|Win32
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Debug|Win32.Build.0 = Debug|Win32
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Debug|x64.ActiveCfg = Debug|x64
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Debug|x64.Build.0 = Debug|x64
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Release|Win32.ActiveCfg = Release|Win32
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Release|Win32.Build.0 = Release|Win32
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Release|x64.ActiveCfg = Release|x64
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

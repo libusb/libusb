@@ -25,6 +25,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-usbdk-1.0 (dll)", "l
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusb-usbdk-1.0 (static)", "libusb_usbdk_static_2013.vcxproj", "{0B3D86CF-5D70-41A9-B391-A2E7C5C969ED}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "testlibusb", "testlibusb_2013.vcxproj", "{70828935-325B-4749-B381-0E55EF31AEE8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -113,6 +115,14 @@ Global
 		{0B3D86CF-5D70-41A9-B391-A2E7C5C969ED}.Release|Win32.Build.0 = Release|Win32
 		{0B3D86CF-5D70-41A9-B391-A2E7C5C969ED}.Release|x64.ActiveCfg = Release|x64
 		{0B3D86CF-5D70-41A9-B391-A2E7C5C969ED}.Release|x64.Build.0 = Release|x64
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Debug|Win32.ActiveCfg = Debug|Win32
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Debug|Win32.Build.0 = Debug|Win32
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Debug|x64.ActiveCfg = Debug|x64
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Debug|x64.Build.0 = Debug|x64
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Release|Win32.ActiveCfg = Release|Win32
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Release|Win32.Build.0 = Release|Win32
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Release|x64.ActiveCfg = Release|x64
+		{70828935-325B-4749-B381-0E55EF31AEE8}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
