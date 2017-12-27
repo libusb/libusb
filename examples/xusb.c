@@ -58,16 +58,13 @@ static bool extra_info = false;
 static bool force_device_request = false;	// For WCID descriptor queries
 static const char* binary_name = NULL;
 
-static int perr(char const *format, ...)
+static void perr(char const *format, ...)
 {
 	va_list args;
-	int r;
 
 	va_start (args, format);
-	r = vfprintf(stderr, format, args);
+	vfprintf(stderr, format, args);
 	va_end(args);
-
-	return r;
 }
 
 #define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)errcode)); return -1; } while (0)
@@ -125,7 +122,7 @@ struct command_status_wrapper {
 	uint8_t bCSWStatus;
 };
 
-static uint8_t cdb_length[256] = {
+static const uint8_t cdb_length[256] = {
 //	 0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
 	06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,  //  0
 	06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,  //  1
@@ -812,8 +809,8 @@ static int test_device(uint16_t vid, uint16_t pid)
 	int i, j, k, r;
 	int iface, nb_ifaces, first_iface = -1;
 	struct libusb_device_descriptor dev_desc;
-	const char* speed_name[5] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
-		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)"};
+	const char* const speed_name[5] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
+		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)" };
 	char string[128];
 	uint8_t string_index[3];	// indexes of the string descriptors
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
@@ -1106,7 +1103,7 @@ int main(int argc, char** argv)
 	old_dbg_str = getenv("LIBUSB_DEBUG");
 	if (debug_mode) {
 		if (putenv("LIBUSB_DEBUG=4") != 0)	// LIBUSB_LOG_LEVEL_DEBUG
-			printf("Unable to set debug level");
+			printf("Unable to set debug level\n");
 	}
 
 	version = libusb_get_version();
