@@ -531,7 +531,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	}
 
 	// Send Read
-	printf("Attempting to read %d bytes:\n", block_size);
+	printf("Attempting to read %u bytes:\n", block_size);
 	memset(cdb, 0, sizeof(cdb));
 
 	cdb[0] = 0x28;	// Read(10)
