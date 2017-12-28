@@ -419,7 +419,7 @@ static void sighandler(int signum)
 int main(void)
 {
 	struct sigaction sigact;
-	int r = 1;
+	int r;
 
 	r = libusb_init(NULL);
 	if (r < 0) {
