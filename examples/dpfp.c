@@ -411,6 +411,8 @@ static int alloc_transfers(void)
 
 static void sighandler(int signum)
 {
+	(void)signum;
+
 	do_exit = 1;
 }
 
