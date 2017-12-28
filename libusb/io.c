@@ -2166,6 +2166,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	if (fds[0].revents) {
 		struct list_head hotplug_msgs;
 		struct usbi_transfer *itransfer;
+		int hotplug_cb_deregistered = 0;
 		int ret = 0;
 
 		list_init(&hotplug_msgs);
@@ -2182,6 +2183,12 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		if (ctx->event_flags & USBI_EVENT_USER_INTERRUPT) {
 			usbi_dbg("someone purposely interrupted");
 			ctx->event_flags &= ~USBI_EVENT_USER_INTERRUPT;
+		}
+
+		if (ctx->event_flags & USBI_EVENT_HOTPLUG_CB_DEREGISTERED) {
+			usbi_dbg("someone unregistered a hotplug cb");
+			ctx->event_flags &= ~USBI_EVENT_HOTPLUG_CB_DEREGISTERED;
+			hotplug_cb_deregistered = 1;
 		}
 
 		/* check if someone is closing a device */
@@ -2211,10 +2218,13 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 		usbi_mutex_unlock(&ctx->event_data_lock);
 
+		if (hotplug_cb_deregistered)
+			usbi_hotplug_deregister(ctx, 0);
+
 		/* process the hotplug messages, if any */
 		while (!list_empty(&hotplug_msgs)) {
-			libusb_hotplug_message *message =
-				list_first_entry(&hotplug_msgs, libusb_hotplug_message, list);
+			struct libusb_hotplug_message *message =
+				list_first_entry(&hotplug_msgs, struct libusb_hotplug_message, list);
 
 			usbi_hotplug_match(ctx, message->device, message->event);
 
