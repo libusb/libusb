@@ -329,7 +329,7 @@ static int wince_get_device_list(
 		}
 
 		new_devices = discovered_devs_append(new_devices, dev);
-		if (!discdevs) {
+		if (!new_devices) {
 			r = LIBUSB_ERROR_NO_MEM;
 			goto err_out;
 		}
