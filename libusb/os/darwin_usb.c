@@ -305,6 +305,7 @@ static usb_device_t **darwin_device_from_service (io_service_t service)
 }
 
 static void darwin_devices_attached (void *ptr, io_iterator_t add_devices) {
+  UNUSED(ptr);
   struct libusb_context *ctx;
   io_service_t service;
 
@@ -323,6 +324,7 @@ static void darwin_devices_attached (void *ptr, io_iterator_t add_devices) {
 }
 
 static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
+  UNUSED(ptr);
   struct libusb_device *dev = NULL;
   struct libusb_context *ctx;
   struct darwin_cached_device *old_device;
