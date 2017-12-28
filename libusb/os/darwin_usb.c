@@ -314,7 +314,7 @@ static void darwin_devices_attached (void *ptr, io_iterator_t add_devices) {
   while ((service = IOIteratorNext(add_devices))) {
     /* add this device to each active context's device list */
     list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
-      process_new_device (ctx, service);;
+      process_new_device (ctx, service);
     }
 
     IOObjectRelease(service);
