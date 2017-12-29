@@ -1245,9 +1245,9 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, int iface) {
 
   kern_return_t kresult;
 
-  u_int8_t numep, direction, number;
-  u_int8_t dont_care1, dont_care3;
-  u_int16_t dont_care2;
+  UInt8 numep, direction, number;
+  UInt8 dont_care1, dont_care3;
+  UInt16 dont_care2;
   int rc;
 
   usbi_dbg ("building table of endpoints.");
