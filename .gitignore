@@ -54,3 +54,7 @@ Release
 *.orig
 .dirstamp
 .amend
+xcuserdata
+*.xcuserdatad
+*.xccheckout
+*.xcscmblueprint
