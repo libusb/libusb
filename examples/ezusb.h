@@ -1,5 +1,5 @@
-#ifndef __ezusb_H
-#define __ezusb_H
+#ifndef ezusb_H
+#define ezusb_H
 /*
  * Copyright © 2001 Stephen Williams (steve@icarus.com)
  * Copyright © 2002 David Brownell (dbrownell@users.sourceforge.net)

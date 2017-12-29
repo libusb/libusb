@@ -256,7 +256,7 @@ static void exit_dlls(void)
 static bool get_devinfo_data(struct libusb_context *ctx,
 	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const char *usb_class, unsigned _index)
 {
-	if (_index <= 0) {
+	if (_index == 0) {
 		*dev_info = pSetupDiGetClassDevsA(NULL, usb_class, NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
 		if (*dev_info == INVALID_HANDLE_VALUE)
 			return false;
@@ -295,7 +295,7 @@ static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details(struct libusb_co
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details;
 	DWORD size;
 
-	if (_index <= 0)
+	if (_index == 0)
 		*dev_info = pSetupDiGetClassDevsA(guid, NULL, NULL, DIGCF_PRESENT|DIGCF_DEVICEINTERFACE);
 
 	if (dev_info_data != NULL) {
@@ -364,7 +364,7 @@ static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details_filter(struct li
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details;
 	DWORD size;
 
-	if (_index <= 0)
+	if (_index == 0)
 		*dev_info = pSetupDiGetClassDevsA(guid, NULL, NULL, DIGCF_PRESENT|DIGCF_DEVICEINTERFACE);
 
 	if (dev_info_data != NULL) {

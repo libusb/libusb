@@ -85,6 +85,8 @@ typedef unsigned __int32  uint32_t;
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
 #define LIBUSB_DEPRECATED_FOR(f) \
   __attribute__((deprecated("Use " #f " instead")))
+#elif __GNUC__ >= 3
+#define LIBUSB_DEPRECATED_FOR(f) __attribute__((deprecated))
 #else
 #define LIBUSB_DEPRECATED_FOR(f)
 #endif /* __GNUC__ */

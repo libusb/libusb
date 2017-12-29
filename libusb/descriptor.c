@@ -333,7 +333,7 @@ static int parse_interface(libusb_context *ctx,
 					goto err;
 				if (r == 0) {
 					ifp->bNumEndpoints = (uint8_t)i;
-					break;;
+					break;
 				}
 
 				buffer += r;
