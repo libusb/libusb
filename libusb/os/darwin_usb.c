@@ -45,7 +45,6 @@
 /* Apple deprecated the darwin atomics in 10.12 in favor of C11 atomics */
 #include <stdatomic.h>
 #define libusb_darwin_atomic_fetch_add(x, y) atomic_fetch_add(x, y)
-#define OSX_USE_CLOCK_GETTIME 1
 
 _Atomic int32_t initCount = ATOMIC_VAR_INIT(0);
 #else
@@ -57,6 +56,12 @@ _Atomic int32_t initCount = ATOMIC_VAR_INIT(0);
 
 static volatile int32_t initCount = 0;
 
+#endif
+
+/* On 10.12 and later, use newly available clock_*() functions */
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#define OSX_USE_CLOCK_GETTIME 1
+#else
 #define OSX_USE_CLOCK_GETTIME 0
 #endif
 
