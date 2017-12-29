@@ -29,7 +29,7 @@
 # include <unistd.h>
 # include <sys/syscall.h>
 #elif defined(__APPLE__)
-# include <mach/mach.h>
+# include <pthread.h>
 #elif defined(__CYGWIN__)
 # include <windows.h>
 #endif
@@ -69,8 +69,7 @@ int usbi_get_tid(void)
 	   real thread support. For 5.1 and earlier, -1 is returned. */
 	ret = syscall(SYS_getthrid);
 #elif defined(__APPLE__)
-	ret = mach_thread_self();
-	mach_port_deallocate(mach_task_self(), ret);
+	ret = (int)pthread_mach_thread_np(pthread_self());
 #elif defined(__CYGWIN__)
 	ret = GetCurrentThreadId();
 #else
