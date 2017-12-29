@@ -300,7 +300,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 		if (len < 0) {
 			libusb_hotplug_deregister_callback(ctx,
 							new_callback->handle);
-			return len;
+			return (int)len;
 		}
 
 		for (i = 0; i < len; i++) {
