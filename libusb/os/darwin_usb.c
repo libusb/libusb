@@ -1037,6 +1037,9 @@ static int process_new_device (struct libusb_context *ctx, io_service_t service)
 #if DeviceVersion >= 500
     case kUSBDeviceSpeedSuper: dev->speed = LIBUSB_SPEED_SUPER; break;
 #endif
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101200
+    case kUSBDeviceSpeedSuperPlus: dev->speed = LIBUSB_SPEED_SUPER_PLUS; break;
+#endif
     default:
       usbi_warn (ctx, "Got unknown device speed %d", devSpeed);
     }
