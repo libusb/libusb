@@ -1,4 +1,4 @@
-# Copyright 2013-2014 (C) Butterfly Network, Inc.
+# Copyright 2012-2018 (C) Butterfly Network, Inc.
 
 TARGET = libusb
 
