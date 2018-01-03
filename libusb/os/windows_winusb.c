@@ -216,7 +216,7 @@ static int init_dlls(void)
 	DLL_LOAD_FUNC_PREFIXED(Kernel32, p, IsWow64Process, FALSE);
 
 	DLL_GET_HANDLE(OLE32);
-	DLL_LOAD_FUNC_PREFIXED(OLE32, p, CLSIDFromString, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(OLE32, p, IIDFromString, TRUE);
 
 	DLL_GET_HANDLE(SetupAPI);
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetClassDevsA, TRUE);
@@ -246,7 +246,7 @@ static void exit_dlls(void)
  * Parameters:
  * dev_info: a pointer to a dev_info list
  * dev_info_data: a pointer to an SP_DEVINFO_DATA to be filled (or NULL if not needed)
- * usb_class: the generic USB class for which to retrieve interface details
+ * enumerator: the generic USB class for which to retrieve interface details
  * index: zero based index of the interface in the device info list
  *
  * Note: it is the responsibility of the caller to free the DEVICE_INTERFACE_DETAIL_DATA
@@ -254,19 +254,22 @@ static void exit_dlls(void)
  * incremented index starting at zero) until all interfaces have been returned.
  */
 static bool get_devinfo_data(struct libusb_context *ctx,
-	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const char *usb_class, unsigned _index)
+	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const char *enumerator, unsigned _index)
 {
 	if (_index == 0) {
-		*dev_info = pSetupDiGetClassDevsA(NULL, usb_class, NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
-		if (*dev_info == INVALID_HANDLE_VALUE)
+		*dev_info = pSetupDiGetClassDevsA(NULL, enumerator, NULL, DIGCF_PRESENT|DIGCF_ALLCLASSES);
+		if (*dev_info == INVALID_HANDLE_VALUE) {
+			usbi_err(ctx, "could not obtain device info set for PnP enumerator '%s': %s",
+				enumerator, windows_error_str(0));
 			return false;
+		}
 	}
 
 	dev_info_data->cbSize = sizeof(SP_DEVINFO_DATA);
 	if (!pSetupDiEnumDeviceInfo(*dev_info, _index, dev_info_data)) {
 		if (GetLastError() != ERROR_NO_MORE_ITEMS)
-			usbi_err(ctx, "Could not obtain device info data for index %u: %s",
-				_index, windows_error_str(0));
+			usbi_err(ctx, "could not obtain device info data for PnP enumerator '%s' index %u: %s",
+				enumerator, _index, windows_error_str(0));
 
 		pSetupDiDestroyDeviceInfoList(*dev_info);
 		*dev_info = INVALID_HANDLE_VALUE;
@@ -1273,21 +1276,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 {
 	struct discovered_devs *discdevs;
 	HDEVINFO dev_info = { 0 };
-	const char *usb_class[] = {"USB", "NUSB3", "IUSB3", "IARUSB3"};
 	SP_DEVINFO_DATA dev_info_data = { 0 };
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	GUID hid_guid;
-#define MAX_ENUM_GUIDS 64
-	const GUID *guid[MAX_ENUM_GUIDS];
-#define HCD_PASS 0
-#define HUB_PASS 1
-#define GEN_PASS 2
-#define DEV_PASS 3
-#define HID_PASS 4
 	int r = LIBUSB_SUCCESS;
 	int api, sub_api;
-	size_t class_index = 0;
-	unsigned int nb_guids, pass, i, j, ancestor;
+	unsigned int pass, i, j, ancestor;
+	char enumerator[16];
 	char path[MAX_PATH_LENGTH];
 	char strbuf[MAX_PATH_LENGTH];
 	struct libusb_device *dev, *parent_dev;
@@ -1300,9 +1295,25 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	WCHAR guid_string_w[MAX_GUID_STRING_LENGTH];
 	GUID *if_guid;
 	LONG s;
+#define HCD_PASS 0
+#define HUB_PASS 1
+#define GEN_PASS 2
+#define DEV_PASS 3
+#define HID_PASS 4
+#define EXT_PASS 5
+	// Keep a list of guids that will be enumerated
+#define GUID_SIZE_STEP 8
+	const GUID **guid_list, **new_guid_list;
+	unsigned int guid_size = GUID_SIZE_STEP;
+	unsigned int nb_guids;
+	// Keep a list of PnP enumerator strings that are found
+	char *usb_enumerator[8];
+	unsigned int nb_usb_enumerators = 0;
+	unsigned int usb_enum_index = 0;
 	// Keep a list of newly allocated devs to unref
+#define UNREF_SIZE_STEP 16
 	libusb_device **unref_list, **new_unref_list;
-	unsigned int unref_size = 64;
+	unsigned int unref_size = UNREF_SIZE_STEP;
 	unsigned int unref_cur = 0;
 
 	// PASS 1 : (re)enumerate HCDs (allows for HCD hotplug)
@@ -1314,24 +1325,33 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	//           set the device interfaces.
 
 	// Init the GUID table
-	guid[HCD_PASS] = &GUID_DEVINTERFACE_USB_HOST_CONTROLLER;
-	guid[HUB_PASS] = &GUID_DEVINTERFACE_USB_HUB;
-	guid[GEN_PASS] = NULL;
-	guid[DEV_PASS] = &GUID_DEVINTERFACE_USB_DEVICE;
-	HidD_GetHidGuid(&hid_guid);
-	guid[HID_PASS] = &hid_guid;
-	nb_guids = HID_PASS + 1;
-
-	unref_list = calloc(unref_size, sizeof(libusb_device *));
-	if (unref_list == NULL)
+	guid_list = malloc(guid_size * sizeof(void *));
+	if (guid_list == NULL) {
+		usbi_err(ctx, "failed to alloc guid list");
 		return LIBUSB_ERROR_NO_MEM;
+	}
+
+	guid_list[HCD_PASS] = &GUID_DEVINTERFACE_USB_HOST_CONTROLLER;
+	guid_list[HUB_PASS] = &GUID_DEVINTERFACE_USB_HUB;
+	guid_list[GEN_PASS] = NULL;
+	guid_list[DEV_PASS] = &GUID_DEVINTERFACE_USB_DEVICE;
+	HidD_GetHidGuid(&hid_guid);
+	guid_list[HID_PASS] = &hid_guid;
+	nb_guids = EXT_PASS;
+
+	unref_list = malloc(unref_size * sizeof(void *));
+	if (unref_list == NULL) {
+		usbi_err(ctx, "failed to alloc unref list");
+		free((void *)guid_list);
+		return LIBUSB_ERROR_NO_MEM;
+	}
 
 	for (pass = 0; ((pass < nb_guids) && (r == LIBUSB_SUCCESS)); pass++) {
 //#define ENUM_DEBUG
 #if defined(ENABLE_LOGGING) && defined(ENUM_DEBUG)
 		const char *passname[] = { "HCD", "HUB", "GEN", "DEV", "HID", "EXT" };
-		usbi_dbg("#### PROCESSING %ss %s", passname[(pass <= HID_PASS) ? pass : (HID_PASS + 1)],
-			(pass != GEN_PASS) ? guid_to_string(guid[pass]) : "");
+		usbi_dbg("#### PROCESSING %ss %s", passname[MIN(pass, EXT_PASS)],
+			(pass != GEN_PASS) ? guid_to_string(guid_list[pass]) : "");
 #endif
 		for (i = 0; ; i++) {
 			// safe loop: free up any (unprotected) dynamic resource
@@ -1353,7 +1373,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 
 			if (pass != GEN_PASS) {
 				// Except for GEN, all passes deal with device interfaces
-				dev_interface_details = get_interface_details(ctx, &dev_info, &dev_info_data, guid[pass], i);
+				dev_interface_details = get_interface_details(ctx, &dev_info, &dev_info_data, guid_list[pass], i);
 				if (dev_interface_details == NULL)
 					break;
 
@@ -1367,12 +1387,12 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				// being listed under the "NUSB3" PnP Symbolic Name rather than "USB".
 				// The Intel USB 3.0 driver behaves similar, but uses "IUSB3"
 				// The Intel Alpine Ridge USB 3.1 driver uses "IARUSB3"
-				for (; class_index < ARRAYSIZE(usb_class); class_index++) {
-					if (get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_class[class_index], i))
+				for (; usb_enum_index < nb_usb_enumerators; usb_enum_index++) {
+					if (get_devinfo_data(ctx, &dev_info, &dev_info_data, usb_enumerator[usb_enum_index], i))
 						break;
 					i = 0;
 				}
-				if (class_index >= ARRAYSIZE(usb_class))
+				if (usb_enum_index == nb_usb_enumerators)
 					break;
 			}
 
@@ -1413,6 +1433,31 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				break;
 			case HUB_PASS:
 				api = USB_API_HUB;
+				// Fetch the PnP enumerator class for this hub
+				// This will allow us to enumerate all classes during the GEN pass
+				if (!pSetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_ENUMERATOR_NAME,
+					NULL, (PBYTE)enumerator, sizeof(enumerator), NULL)) {
+					usbi_err(ctx, "could not read enumerator string for device '%s': %s", dev_id_path, windows_error_str(0));
+					LOOP_BREAK(LIBUSB_ERROR_OTHER);
+				}
+				for (j = 0; j < nb_usb_enumerators; j++) {
+					if (strcmp(usb_enumerator[j], enumerator) == 0)
+						break;
+				}
+				if (j == nb_usb_enumerators) {
+					usbi_dbg("found new PnP enumerator string '%s'", enumerator);
+					if (nb_usb_enumerators < ARRAYSIZE(usb_enumerator)) {
+						usb_enumerator[nb_usb_enumerators] = _strdup(enumerator);
+						if (usb_enumerator[nb_usb_enumerators] != NULL) {
+							nb_usb_enumerators++;
+						} else {
+							usbi_err(ctx, "could not allocate enumerator string '%s'", enumerator);
+							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+						}
+					} else {
+						usbi_warn(ctx, "too many enumerator strings, some devices may not be accessible");
+					}
+				}
 				break;
 			case GEN_PASS:
 				// We use the GEN pass to detect driverless devices...
@@ -1425,24 +1470,50 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				// ...and to add the additional device interface GUIDs
 				key = pSetupDiOpenDevRegKey(dev_info, &dev_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
 				if (key != INVALID_HANDLE_VALUE) {
+					// Look for both DeviceInterfaceGUIDs *and* DeviceInterfaceGUID, in that order
 					size = sizeof(guid_string_w);
 					s = pRegQueryValueExW(key, L"DeviceInterfaceGUIDs", NULL, &reg_type,
 						(BYTE *)guid_string_w, &size);
+					if (s == ERROR_FILE_NOT_FOUND)
+						s = pRegQueryValueExW(key, L"DeviceInterfaceGUID", NULL, &reg_type,
+							(BYTE *)guid_string_w, &size);
 					pRegCloseKey(key);
-					if (s == ERROR_SUCCESS) {
-						if (nb_guids >= MAX_ENUM_GUIDS) {
-							// If this assert is ever reported, grow a GUID table dynamically
-							usbi_err(ctx, "program assertion failed: too many GUIDs");
-							LOOP_BREAK(LIBUSB_ERROR_OVERFLOW);
+					if ((s == ERROR_SUCCESS) &&
+					    (((reg_type == REG_SZ) && (size == (sizeof(guid_string_w) - sizeof(WCHAR)))) ||
+					     ((reg_type == REG_MULTI_SZ) && (size == sizeof(guid_string_w))))) {
+						if (nb_guids == guid_size) {
+							new_guid_list = realloc((void *)guid_list, (guid_size + GUID_SIZE_STEP) * sizeof(void *));
+							if (new_guid_list == NULL) {
+								usbi_err(ctx, "failed to realloc guid list");
+								LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+							}
+							guid_list = new_guid_list;
+							guid_size += GUID_SIZE_STEP;
 						}
-						if_guid = calloc(1, sizeof(GUID));
+						if_guid = malloc(sizeof(*if_guid));
 						if (if_guid == NULL) {
-							usbi_err(ctx, "could not calloc for if_guid: not enough memory");
+							usbi_err(ctx, "failed to alloc if_guid");
 							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 						}
-						pCLSIDFromString(guid_string_w, if_guid);
-						guid[nb_guids++] = if_guid;
-						usbi_dbg("extra GUID: %s", guid_to_string(if_guid));
+						if (pIIDFromString(guid_string_w, if_guid) != 0) {
+							usbi_warn(ctx, "device '%s' has malformed DeviceInterfaceGUID string, skipping", dev_id_path);
+							free(if_guid);
+						} else {
+							// Check if we've already seen this GUID
+							for (j = EXT_PASS; j < nb_guids; j++) {
+								if (memcmp(guid_list[j], if_guid, sizeof(*if_guid)) == 0)
+									break;
+							}
+							if (j == nb_guids) {
+								usbi_dbg("extra GUID: %s", guid_to_string(if_guid));
+								guid_list[nb_guids++] = if_guid;
+							} else {
+								// Duplicate, ignore
+								free(if_guid);
+							}
+						}
+					} else if (s == ERROR_SUCCESS) {
+						usbi_warn(ctx, "unexpected type/size of DeviceInterfaceGUID for '%s'", dev_id_path);
 					}
 				}
 				break;
@@ -1539,17 +1610,16 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				}
 
 				// Keep track of devices that need unref
-				unref_list[unref_cur++] = dev;
-				if (unref_cur >= unref_size) {
-					unref_size += 64;
-					new_unref_list = usbi_reallocf(unref_list, unref_size * sizeof(libusb_device *));
+				if (unref_cur == unref_size) {
+					new_unref_list = realloc(unref_list, (unref_size + UNREF_SIZE_STEP) * sizeof(void *));
 					if (new_unref_list == NULL) {
 						usbi_err(ctx, "could not realloc list for unref - aborting.");
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-					} else {
-						unref_list = new_unref_list;
 					}
+					unref_list = new_unref_list;
+					unref_size += UNREF_SIZE_STEP;
 				}
+				unref_list[unref_cur++] = dev;
 			}
 
 			// Setup device
@@ -1645,8 +1715,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	}
 
 	// Free any additional GUIDs
-	for (pass = HID_PASS + 1; pass < nb_guids; pass++)
-		free((void *)guid[pass]);
+	for (pass = EXT_PASS; pass < nb_guids; pass++)
+		free((void *)guid_list[pass]);
+	free((void *)guid_list);
+
+	// Free any PnP enumerator strings
+	for (i = 0; i < nb_usb_enumerators; i++)
+		free(usb_enumerator[i]);
 
 	// Unref newly allocated devs
 	for (i = 0; i < unref_cur; i++)
