@@ -1171,7 +1171,7 @@ static void get_api_type(struct libusb_context *ctx, HDEVINFO *dev_info,
 		}
 	}
 
-	for (i = 1; i < USB_API_MAX; i++) {
+	for (i = 2; i < USB_API_MAX; i++) {
 		for (k = 0; k < 3; k++) {
 			j = get_sub_api(lookup[k].list, i);
 			if (j >= 0) {
@@ -1410,6 +1410,9 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 			sub_api = SUB_API_NOTSET;
 			switch (pass) {
 			case HCD_PASS:
+				break;
+			case HUB_PASS:
+				api = USB_API_HUB;
 				break;
 			case GEN_PASS:
 				// We use the GEN pass to detect driverless devices...
@@ -2187,7 +2190,6 @@ static int common_configure_endpoints(int sub_api, struct libusb_device_handle *
 }
 
 // These names must be uppercase
-static const char *hub_driver_names[] = {"USBHUB", "USBHUB3", "USB3HUB", "NUSB3HUB", "RUSB3HUB", "FLXHCIH", "TIHUB3", "ETRONHUB3", "VIAHUB3", "ASMTHUB3", "IUSB3HUB", "VUSB3HUB", "AMDHUB30", "VHHUB", "AUSB3HUB"};
 static const char *composite_driver_names[] = {"USBCCGP"};
 static const char *winusbx_driver_names[] = WINUSBX_DRV_NAMES;
 static const char *hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
@@ -2217,8 +2219,8 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	{
 		USB_API_HUB,
 		"HUB API",
-		hub_driver_names,
-		ARRAYSIZE(hub_driver_names),
+		NULL,
+		0,
 		unsupported_init,
 		unsupported_exit,
 		unsupported_open,
