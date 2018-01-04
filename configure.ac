@@ -177,6 +177,7 @@ windows)
 	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
 	AC_DEFINE([WINVER], 0x0501, [Oldest Windows version supported])
+	AC_DEFINE([_WIN32_WINNT], 0x0501, [Oldest Windows version supported])
 
 	AC_ARG_ENABLE([usbdk],
 		[AC_HELP_STRING([--enable-usbdk], [use UsbDk Windows backend [default=no]])],

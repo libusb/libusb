@@ -5,6 +5,10 @@
 #error "Please make sure the msvc/ directory is removed from your build path."
 #endif
 
+/* Only support Windows XP and later */
+#define WINVER		0x0501
+#define _WIN32_WINNT	0x0501
+
 /* Visual Studio 2015 and later defines timespec */
 #if defined(_MSC_VER) && (_MSC_VER >= 1900)
 #define _TIMESPEC_DEFINED 1
