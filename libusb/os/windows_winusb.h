@@ -197,7 +197,6 @@ struct hid_device_priv {
 
 struct windows_device_priv {
 	uint8_t depth; // distance to HCD
-	uint8_t port;  // port number on the hub
 	uint8_t active_config;
 	struct windows_usb_api_backend const *apib;
 	char *path;  // device interface path

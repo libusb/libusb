@@ -903,7 +903,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		size = sizeof(cd_buf_short);
 		memset(&cd_buf_short, 0, size);
 
-		cd_buf_short.req.ConnectionIndex = (ULONG)priv->port;
+		cd_buf_short.req.ConnectionIndex = (ULONG)dev->port_number;
 		cd_buf_short.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
 		cd_buf_short.req.SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
 		cd_buf_short.req.SetupPacket.wValue = (LIBUSB_DT_CONFIG << 8) | i;
@@ -932,7 +932,7 @@ static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle
 		}
 
 		// Actual call
-		cd_buf_actual->ConnectionIndex = (ULONG)priv->port;
+		cd_buf_actual->ConnectionIndex = (ULONG)dev->port_number;
 		cd_buf_actual->SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
 		cd_buf_actual->SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
 		cd_buf_actual->SetupPacket.wValue = (LIBUSB_DT_CONFIG << 8) | i;
@@ -1035,7 +1035,6 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	}
 
 	dev->bus_number = parent_dev->bus_number;
-	priv->port = port_number;
 	dev->port_number = port_number;
 	priv->depth = parent_priv->depth + 1;
 	dev->parent_dev = parent_dev;
@@ -1123,7 +1122,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	usbi_sanitize_device(dev);
 
 	usbi_dbg("(bus: %u, addr: %u, depth: %u, port: %u): '%s'",
-		dev->bus_number, dev->device_address, priv->depth, priv->port, device_id);
+		dev->bus_number, dev->device_address, priv->depth, dev->port_number, device_id);
 
 	return LIBUSB_SUCCESS;
 }
