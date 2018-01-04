@@ -126,12 +126,12 @@ static bool api_hid_available = false;
 	} while (0)
 
 #if defined(ENABLE_LOGGING)
-static char *guid_to_string(const GUID *guid)
+static const char *guid_to_string(const GUID *guid)
 {
 	static char guid_string[MAX_GUID_STRING_LENGTH];
 
 	if (guid == NULL)
-		return NULL;
+		return "";
 
 	sprintf(guid_string, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
 		(unsigned int)guid->Data1, guid->Data2, guid->Data3,
@@ -1348,9 +1348,8 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 	for (pass = 0; ((pass < nb_guids) && (r == LIBUSB_SUCCESS)); pass++) {
 //#define ENUM_DEBUG
 #if defined(ENABLE_LOGGING) && defined(ENUM_DEBUG)
-		const char *passname[] = { "HCD", "HUB", "GEN", "DEV", "HID", "EXT" };
-		usbi_dbg("#### PROCESSING %ss %s", passname[MIN(pass, EXT_PASS)],
-			(pass != GEN_PASS) ? guid_to_string(guid_list[pass]) : "");
+		const char * const passname[] = {"HCD", "HUB", "GEN", "DEV", "HID", "EXT"};
+		usbi_dbg("#### PROCESSING %ss %s", passname[MIN(pass, EXT_PASS)], guid_to_string(guid_list[pass]));
 #endif
 		if ((pass == HID_PASS) && (guid_list[HID_PASS] == NULL))
 			continue;
@@ -2206,9 +2205,9 @@ const struct usbi_os_backend usbi_backend = {
  * USB API backends
  */
 
-static const char *composite_driver_names[] = {"USBCCGP"};
-static const char *winusbx_driver_names[] = {"libusbK", "libusb0", "WinUSB"};
-static const char *hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
+static const char * const composite_driver_names[] = {"USBCCGP"};
+static const char * const winusbx_driver_names[] = {"libusbK", "libusb0", "WinUSB"};
+static const char * const hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
 const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	{
 		USB_API_UNSUPPORTED,
@@ -3476,7 +3475,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 	ULONG size[3];
 	int nb_ids[2]; // zero and nonzero report IDs
 #if defined(ENABLE_LOGGING)
-	const char *type[3] = {"input", "output", "feature"};
+	const char * const type[3] = {"input", "output", "feature"};
 #endif
 
 	CHECK_HID_AVAILABLE;

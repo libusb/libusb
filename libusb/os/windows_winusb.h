@@ -94,8 +94,8 @@ const GUID GUID_DEVINTERFACE_LIBUSB0_FILTER = {0xF9F3FF14, 0xAE21, 0x48A0, {0x8A
 
 struct windows_usb_api_backend {
 	const uint8_t id;
-	const char *designation;
-	const char **driver_name_list; // Driver name, without .sys, e.g. "usbccgp"
+	const char * const designation;
+	const char * const * const driver_name_list; // Driver name, without .sys, e.g. "usbccgp"
 	const uint8_t nb_driver_names;
 	int (*init)(struct libusb_context *ctx);
 	void (*exit)(void);
