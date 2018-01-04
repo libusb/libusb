@@ -92,15 +92,13 @@ const GUID GUID_DEVINTERFACE_LIBUSB0_FILTER = {0xF9F3FF14, 0xAE21, 0x48A0, {0x8A
 #define SUB_API_WINUSB		2
 #define SUB_API_MAX		3
 
-#define WINUSBX_DRV_NAMES	{"libusbK", "libusb0", "WinUSB"}
-
 struct windows_usb_api_backend {
 	const uint8_t id;
 	const char *designation;
 	const char **driver_name_list; // Driver name, without .sys, e.g. "usbccgp"
 	const uint8_t nb_driver_names;
-	int (*init)(int sub_api, struct libusb_context *ctx);
-	int (*exit)(int sub_api);
+	int (*init)(struct libusb_context *ctx);
+	void (*exit)(void);
 	int (*open)(int sub_api, struct libusb_device_handle *dev_handle);
 	void (*close)(int sub_api, struct libusb_device_handle *dev_handle);
 	int (*configure_endpoints)(int sub_api, struct libusb_device_handle *dev_handle, int iface);
@@ -120,8 +118,8 @@ struct windows_usb_api_backend {
 extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
 
 #define PRINT_UNSUPPORTED_API(fname)				\
-	usbi_dbg("unsupported API call for '"			\
-		#fname "' (unrecognized device driver)");	\
+	usbi_dbg("unsupported API call for '%s' "		\
+		"(unrecognized device driver)", #fname);	\
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 
 /*
