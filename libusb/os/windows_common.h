@@ -75,7 +75,7 @@
 	do {							\
 		__dll_##name##_handle = DLL_LOAD_LIBRARY(name);	\
 		if (!__dll_##name##_handle)			\
-			return LIBUSB_ERROR_OTHER;		\
+			return LIBUSB_ERROR_NOT_FOUND;		\
 	} while (0)
 
 #define DLL_FREE_HANDLE(name)					\
@@ -84,7 +84,7 @@
 			FreeLibrary(__dll_##name##_handle);	\
 			__dll_##name##_handle = NULL;		\
 		}						\
-	} while(0)
+	} while (0)
 
 
 /*
@@ -116,7 +116,7 @@
 			break;						\
 		if (ret_on_failure)					\
 			return LIBUSB_ERROR_NOT_FOUND;			\
-	} while(0)
+	} while (0)
 
 #define DLL_LOAD_FUNC(dll, name, ret_on_failure)			\
 	DLL_LOAD_FUNC_PREFIXNAME(dll, name, name, ret_on_failure)

@@ -10,7 +10,7 @@
 #define _WIN32_WINNT	0x0501
 
 /* Visual Studio 2015 and later defines timespec */
-#if defined(_MSC_VER) && (_MSC_VER >= 1900)
+#if (_MSC_VER >= 1900)
 #define _TIMESPEC_DEFINED 1
 #endif
 

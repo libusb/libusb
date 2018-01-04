@@ -41,7 +41,7 @@
 #include "poll_windows.h"
 #include "windows_winusb.h"
 
-#define HANDLE_VALID(h) (((h) != 0) && ((h) != INVALID_HANDLE_VALUE))
+#define HANDLE_VALID(h) (((h) != NULL) && ((h) != INVALID_HANDLE_VALUE))
 
 // The 2 macros below are used in conjunction with safe loops.
 #define LOOP_CHECK(fcall)			\
@@ -110,16 +110,16 @@ int windows_version = WINDOWS_UNDEFINED;
 static int concurrent_usage = -1;
 static usbi_mutex_t autoclaim_lock;
 // API globals
+static HMODULE WinUSBX_handle = NULL;
+static struct winusb_interface WinUSBX[SUB_API_MAX];
 #define CHECK_WINUSBX_AVAILABLE(sub_api)		\
 	do {						\
 		if (sub_api == SUB_API_NOTSET)		\
 			sub_api = priv->sub_api;	\
 		if (!WinUSBX[sub_api].initialized) 	\
 			return LIBUSB_ERROR_ACCESS;	\
-	} while(0)
+	} while (0)
 
-static HMODULE WinUSBX_handle = NULL;
-static struct winusb_interface WinUSBX[SUB_API_MAX];
 static const char *sub_api_name[SUB_API_MAX] = WINUSBX_DRV_NAMES;
 
 static bool api_hid_available = false;
@@ -160,7 +160,7 @@ static char *guid_to_string(const GUID *guid)
  */
 static char *sanitize_path(const char *path)
 {
-	const char root_prefix[] = { '\\', '\\', '.', '\\' };
+	const char root_prefix[] = {'\\', '\\', '.', '\\'};
 	size_t j, size;
 	char *ret_path;
 	size_t add_root = 0;
@@ -223,9 +223,9 @@ static int init_dlls(void)
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiEnumDeviceInfo, TRUE);
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiEnumDeviceInterfaces, TRUE);
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetDeviceInterfaceDetailA, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetDeviceRegistryPropertyA, TRUE);
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiDestroyDeviceInfoList, TRUE);
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiOpenDevRegKey, TRUE);
-	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetDeviceRegistryPropertyA, TRUE);
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiOpenDeviceInterfaceRegKey, TRUE);
 
 	return LIBUSB_SUCCESS;
@@ -597,7 +597,7 @@ static int auto_claim(struct libusb_transfer *transfer, int *interface_number, i
 	int current_interface = *interface_number;
 	int r = LIBUSB_SUCCESS;
 
-	switch(api_type) {
+	switch (api_type) {
 	case USB_API_WINUSBX:
 	case USB_API_HID:
 		break;
@@ -1647,7 +1647,7 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 				dev_interface_path = NULL;
 				priv->apib = &usb_api_backend[api];
 				priv->sub_api = sub_api;
-				switch(api) {
+				switch (api) {
 				case USB_API_COMPOSITE:
 				case USB_API_HUB:
 					break;
@@ -1655,14 +1655,13 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 					priv->hid = calloc(1, sizeof(struct hid_device_priv));
 					if (priv->hid == NULL)
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-
-					priv->hid->nb_interfaces = 0;
 					break;
 				default:
 					// For other devices, the first interface is the same as the device
 					priv->usb_interface[0].path = _strdup(priv->path);
 					if (priv->usb_interface[0].path == NULL)
-						usbi_warn(ctx, "could not duplicate interface path '%s'", priv->path);
+						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+
 					// The following is needed if we want API calls to work for both simple
 					// and composite devices.
 					for (j = 0; j < USB_MAXINTERFACES; j++)
@@ -2488,7 +2487,6 @@ static int winusbx_open(int sub_api, struct libusb_device_handle *dev_handle)
 	struct libusb_context *ctx = DEVICE_CTX(dev_handle->dev);
 	struct windows_device_priv *priv = _device_priv(dev_handle->dev);
 	struct windows_device_handle_priv *handle_priv = _device_handle_priv(dev_handle);
-
 	HANDLE file_handle;
 	int i;
 
@@ -2502,7 +2500,7 @@ static int winusbx_open(int sub_api, struct libusb_device_handle *dev_handle)
 				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 			if (file_handle == INVALID_HANDLE_VALUE) {
 				usbi_err(ctx, "could not open device %s (interface %d): %s", priv->usb_interface[i].path, i, windows_error_str(0));
-				switch(GetLastError()) {
+				switch (GetLastError()) {
 				case ERROR_FILE_NOT_FOUND: // The device was disconnected
 					return LIBUSB_ERROR_NO_DEVICE;
 				case ERROR_ACCESS_DENIED:
@@ -2639,7 +2637,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 		if (!WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
 			handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
 			err = GetLastError();
-			switch(err) {
+			switch (err) {
 			case ERROR_BAD_COMMAND:
 				// The device was disconnected
 				usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(0));
@@ -2704,7 +2702,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 		if (!WinUSBX[sub_api].GetAssociatedInterface(winusb_handle, (UCHAR)(iface - 1),
 			&handle_priv->interface_handle[iface].api_handle)) {
 			handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
-			switch(GetLastError()) {
+			switch (GetLastError()) {
 			case ERROR_NO_MORE_ITEMS:   // invalid iface
 				return LIBUSB_ERROR_NOT_FOUND;
 			case ERROR_BAD_COMMAND:     // The device was disconnected
@@ -3330,7 +3328,7 @@ static int _hid_get_report_descriptor(struct hid_device_priv *dev, void *data, s
 static int _hid_get_descriptor(struct hid_device_priv *dev, HANDLE hid_handle, int recipient,
 	int type, int _index, void *data, size_t *size)
 {
-	switch(type) {
+	switch (type) {
 	case LIBUSB_DT_DEVICE:
 		usbi_dbg("LIBUSB_DT_DEVICE");
 		return _hid_get_device_descriptor(dev, data, size);
@@ -3539,6 +3537,7 @@ static int _hid_class_request(struct hid_device_priv *dev, HANDLE hid_handle, in
 static int hid_init(int sub_api, struct libusb_context *ctx)
 {
 	DLL_GET_HANDLE(hid);
+
 	DLL_LOAD_FUNC(hid, HidD_GetAttributes, TRUE);
 	DLL_LOAD_FUNC(hid, HidD_GetHidGuid, TRUE);
 	DLL_LOAD_FUNC(hid, HidD_GetPreparsedData, TRUE);
@@ -3614,7 +3613,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 					NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 				if (hid_handle == INVALID_HANDLE_VALUE) {
 					usbi_err(ctx, "could not open device %s (interface %d): %s", priv->path, i, windows_error_str(0));
-					switch(GetLastError()) {
+					switch (GetLastError()) {
 					case ERROR_FILE_NOT_FOUND: // The device was disconnected
 						return LIBUSB_ERROR_NO_DEVICE;
 					case ERROR_ACCESS_DENIED:
@@ -3714,7 +3713,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 			HidD_GetSerialNumberString(hid_handle, priv->hid->string[2], sizeof(priv->hid->string[2]));
 		else
 			priv->hid->string[2][0] = 0;
-	} while(0);
+	} while (0);
 
 	if (preparsed_data)
 		HidD_FreePreparsedData(preparsed_data);
@@ -3755,7 +3754,6 @@ static int hid_claim_interface(int sub_api, struct libusb_device_handle *dev_han
 	// We use dev_handle as a flag for interface claimed
 	if (handle_priv->interface_handle[iface].dev_handle == INTERFACE_CLAIMED)
 		return LIBUSB_ERROR_BUSY; // already claimed
-
 
 	handle_priv->interface_handle[iface].dev_handle = INTERFACE_CLAIMED;
 
@@ -3837,9 +3835,9 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 	if (wfd.fd < 0)
 		return LIBUSB_ERROR_NOT_FOUND;
 
-	switch(LIBUSB_REQ_TYPE(setup->RequestType)) {
+	switch (LIBUSB_REQ_TYPE(setup->RequestType)) {
 	case LIBUSB_REQUEST_TYPE_STANDARD:
-		switch(setup->Request) {
+		switch (setup->Request) {
 		case LIBUSB_REQUEST_GET_DESCRIPTOR:
 			r = _hid_get_descriptor(priv->hid, wfd.handle, LIBUSB_REQ_RECIPIENT(setup->RequestType),
 				(setup->Value >> 8) & 0xFF, setup->Value & 0xFF, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, &size);
