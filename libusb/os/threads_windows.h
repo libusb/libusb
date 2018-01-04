@@ -24,7 +24,7 @@
 #define usbi_mutex_static_t	volatile LONG
 #define USBI_MUTEX_INITIALIZER	0
 
-#define usbi_mutex_t		HANDLE
+#define usbi_mutex_t		CRITICAL_SECTION
 
 typedef struct usbi_cond {
 	// Every time a thread touches the CV, it winds up in one of these lists.

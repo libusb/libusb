@@ -123,7 +123,7 @@ typedef struct htab_entry {
 } htab_entry;
 
 static htab_entry *htab_table = NULL;
-static usbi_mutex_t htab_mutex = NULL;
+static usbi_mutex_t htab_mutex;
 static unsigned long htab_filled;
 
 /* Before using the hash table we must allocate memory for it.
