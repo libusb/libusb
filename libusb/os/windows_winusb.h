@@ -44,7 +44,6 @@
 #endif
 
 #define MAX_CTRL_BUFFER_LENGTH	4096
-#define MAX_USB_DEVICES		256
 #define MAX_USB_STRING_LENGTH	128
 #define MAX_HID_REPORT_SIZE	1024
 #define MAX_HID_DESCRIPTOR_SIZE	256
@@ -84,8 +83,6 @@ const GUID GUID_DEVINTERFACE_LIBUSB0_FILTER = {0xF9F3FF14, 0xAE21, 0x48A0, {0x8A
 #define USB_API_WINUSBX		3
 #define USB_API_HID		4
 #define USB_API_MAX		5
-// The following is used to indicate if the HID or composite extra props have already been set.
-#define USB_API_SET		(1 << USB_API_MAX)
 
 // Sub-APIs for WinUSB-like driver APIs (WinUSB, libusbK, libusb-win32 through the libusbK DLL)
 // Must have the same values as the KUSB_DRVID enum from libusbk.h
@@ -306,7 +303,6 @@ typedef RETURN_TYPE CONFIGRET;
 DLL_DECLARE_HANDLE(Cfgmgr32);
 DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_Parent, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_Child, (PDEVINST, DEVINST, ULONG));
-DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_Sibling, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_Device_IDA, (DEVINST, PCHAR, ULONG, ULONG));
 
 /* AdvAPI32 dependencies */
@@ -463,12 +459,6 @@ typedef struct _USB_NODE_CONNECTION_INFORMATION_EX_V2 {
 #define AUTO_FLUSH		0x06
 #define RAW_IO			0x07
 #define MAXIMUM_TRANSFER_SIZE	0x08
-#define AUTO_SUSPEND		0x81
-#define SUSPEND_DELAY		0x83
-#define DEVICE_SPEED		0x01
-#define LowSpeed		0x01
-#define FullSpeed		0x02
-#define HighSpeed		0x03
 
 typedef enum _USBD_PIPE_TYPE {
 	UsbdPipeTypeControl,
@@ -476,13 +466,6 @@ typedef enum _USBD_PIPE_TYPE {
 	UsbdPipeTypeBulk,
 	UsbdPipeTypeInterrupt
 } USBD_PIPE_TYPE;
-
-typedef struct _WINUSB_PIPE_INFORMATION {
-	USBD_PIPE_TYPE PipeType;
-	UCHAR PipeId;
-	USHORT MaximumPacketSize;
-	UCHAR Interval;
-} WINUSB_PIPE_INFORMATION, *PWINUSB_PIPE_INFORMATION;
 
 #include <pshpack1.h>
 
@@ -522,58 +505,9 @@ typedef BOOL (WINAPI *WinUsb_GetAssociatedInterface_t)(
 	UCHAR AssociatedInterfaceIndex,
 	PWINUSB_INTERFACE_HANDLE AssociatedInterfaceHandle
 );
-typedef BOOL (WINAPI *WinUsb_GetCurrentAlternateSetting_t)(
-	WINUSB_INTERFACE_HANDLE InterfaceHandle,
-	PUCHAR AlternateSetting
-);
-typedef BOOL (WINAPI *WinUsb_GetDescriptor_t)(
-	WINUSB_INTERFACE_HANDLE InterfaceHandle,
-	UCHAR DescriptorType,
-	UCHAR Index,
-	USHORT LanguageID,
-	PUCHAR Buffer,
-	ULONG BufferLength,
-	PULONG LengthTransferred
-);
-typedef BOOL (WINAPI *WinUsb_GetOverlappedResult_t)(
-	WINUSB_INTERFACE_HANDLE InterfaceHandle,
-	LPOVERLAPPED lpOverlapped,
-	LPDWORD lpNumberOfBytesTransferred,
-	BOOL bWait
-);
-typedef BOOL (WINAPI *WinUsb_GetPipePolicy_t)(
-	WINUSB_INTERFACE_HANDLE InterfaceHandle,
-	UCHAR PipeID,
-	ULONG PolicyType,
-	PULONG ValueLength,
-	PVOID Value
-);
-typedef BOOL (WINAPI *WinUsb_GetPowerPolicy_t)(
-	WINUSB_INTERFACE_HANDLE InterfaceHandle,
-	ULONG PolicyType,
-	PULONG ValueLength,
-	PVOID Value
-);
 typedef BOOL (WINAPI *WinUsb_Initialize_t)(
 	HANDLE DeviceHandle,
 	PWINUSB_INTERFACE_HANDLE InterfaceHandle
-);
-typedef BOOL (WINAPI *WinUsb_QueryDeviceInformation_t)(
-	WINUSB_INTERFACE_HANDLE InterfaceHandle,
-	ULONG InformationType,
-	PULONG BufferLength,
-	PVOID Buffer
-);
-typedef BOOL (WINAPI *WinUsb_QueryInterfaceSettings_t)(
-	WINUSB_INTERFACE_HANDLE InterfaceHandle,
-	UCHAR AlternateSettingNumber,
-	PUSB_INTERFACE_DESCRIPTOR UsbAltInterfaceDescriptor
-);
-typedef BOOL (WINAPI *WinUsb_QueryPipe_t)(
-	WINUSB_INTERFACE_HANDLE InterfaceHandle,
-	UCHAR AlternateInterfaceNumber,
-	UCHAR PipeIndex,
-	PWINUSB_PIPE_INFORMATION PipeInformation
 );
 typedef BOOL (WINAPI *WinUsb_ReadPipe_t)(
 	WINUSB_INTERFACE_HANDLE InterfaceHandle,
@@ -582,6 +516,9 @@ typedef BOOL (WINAPI *WinUsb_ReadPipe_t)(
 	ULONG BufferLength,
 	PULONG LengthTransferred,
 	LPOVERLAPPED Overlapped
+);
+typedef BOOL (WINAPI *WinUsb_ResetDevice_t)(
+	WINUSB_INTERFACE_HANDLE InterfaceHandle
 );
 typedef BOOL (WINAPI *WinUsb_ResetPipe_t)(
 	WINUSB_INTERFACE_HANDLE InterfaceHandle,
@@ -598,12 +535,6 @@ typedef BOOL (WINAPI *WinUsb_SetPipePolicy_t)(
 	ULONG ValueLength,
 	PVOID Value
 );
-typedef BOOL (WINAPI *WinUsb_SetPowerPolicy_t)(
-	WINUSB_INTERFACE_HANDLE InterfaceHandle,
-	ULONG PolicyType,
-	ULONG ValueLength,
-	PVOID Value
-);
 typedef BOOL (WINAPI *WinUsb_WritePipe_t)(
 	WINUSB_INTERFACE_HANDLE InterfaceHandle,
 	UCHAR PipeID,
@@ -611,9 +542,6 @@ typedef BOOL (WINAPI *WinUsb_WritePipe_t)(
 	ULONG BufferLength,
 	PULONG LengthTransferred,
 	LPOVERLAPPED Overlapped
-);
-typedef BOOL (WINAPI *WinUsb_ResetDevice_t)(
-	WINUSB_INTERFACE_HANDLE InterfaceHandle
 );
 
 /* /!\ These must match the ones from the official libusbk.h */
@@ -679,22 +607,13 @@ struct winusb_interface {
 	WinUsb_FlushPipe_t FlushPipe;
 	WinUsb_Free_t Free;
 	WinUsb_GetAssociatedInterface_t GetAssociatedInterface;
-	WinUsb_GetCurrentAlternateSetting_t GetCurrentAlternateSetting;
-	WinUsb_GetDescriptor_t GetDescriptor;
-	WinUsb_GetOverlappedResult_t GetOverlappedResult;
-	WinUsb_GetPipePolicy_t GetPipePolicy;
-	WinUsb_GetPowerPolicy_t GetPowerPolicy;
 	WinUsb_Initialize_t Initialize;
-	WinUsb_QueryDeviceInformation_t QueryDeviceInformation;
-	WinUsb_QueryInterfaceSettings_t QueryInterfaceSettings;
-	WinUsb_QueryPipe_t QueryPipe;
 	WinUsb_ReadPipe_t ReadPipe;
+	WinUsb_ResetDevice_t ResetDevice;
 	WinUsb_ResetPipe_t ResetPipe;
 	WinUsb_SetCurrentAlternateSetting_t SetCurrentAlternateSetting;
 	WinUsb_SetPipePolicy_t SetPipePolicy;
-	WinUsb_SetPowerPolicy_t SetPowerPolicy;
 	WinUsb_WritePipe_t WritePipe;
-	WinUsb_ResetDevice_t ResetDevice;
 };
 
 /* hid.dll interface */
@@ -787,10 +706,6 @@ DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetSerialNumberString, (HANDLE, PVOID, ULONG
 DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetIndexedString, (HANDLE, ULONG, PVOID, ULONG));
 DLL_DECLARE_FUNC(WINAPI, LONG, HidP_GetCaps, (PHIDP_PREPARSED_DATA, PHIDP_CAPS));
 DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_SetNumInputBuffers, (HANDLE, ULONG));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_SetFeature, (HANDLE, PVOID, ULONG));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetFeature, (HANDLE, PVOID, ULONG));
 DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetPhysicalDescriptor, (HANDLE, PVOID, ULONG));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetInputReport, (HANDLE, PVOID, ULONG));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_SetOutputReport, (HANDLE, PVOID, ULONG));
 DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_FlushQueue, (HANDLE));
 DLL_DECLARE_FUNC(WINAPI, BOOL, HidP_GetValueCaps, (HIDP_REPORT_TYPE, PHIDP_VALUE_CAPS, PULONG, PHIDP_PREPARSED_DATA));

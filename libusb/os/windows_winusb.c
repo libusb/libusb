@@ -129,14 +129,6 @@ static bool api_hid_available = false;
 			return LIBUSB_ERROR_ACCESS;	\
 	} while (0)
 
-static inline BOOLEAN guid_eq(const GUID *guid1, const GUID *guid2)
-{
-	if ((guid1 != NULL) && (guid2 != NULL))
-		return (memcmp(guid1, guid2, sizeof(GUID)) == 0);
-
-	return false;
-}
-
 #if defined(ENABLE_LOGGING)
 static char *guid_to_string(const GUID *guid)
 {
@@ -204,7 +196,6 @@ static int init_dlls(void)
 	DLL_GET_HANDLE(Cfgmgr32);
 	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Parent, TRUE);
 	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Child, TRUE);
-	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Sibling, TRUE);
 	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Device_IDA, TRUE);
 
 	// Prefixed to avoid conflict with header files
@@ -2435,23 +2426,14 @@ static int winusbx_init(int sub_api, struct libusb_context *ctx)
 		WinUSBX_Set(FlushPipe);
 		WinUSBX_Set(Free);
 		WinUSBX_Set(GetAssociatedInterface);
-		WinUSBX_Set(GetCurrentAlternateSetting);
-		WinUSBX_Set(GetDescriptor);
-		WinUSBX_Set(GetOverlappedResult);
-		WinUSBX_Set(GetPipePolicy);
-		WinUSBX_Set(GetPowerPolicy);
 		WinUSBX_Set(Initialize);
-		WinUSBX_Set(QueryDeviceInformation);
-		WinUSBX_Set(QueryInterfaceSettings);
-		WinUSBX_Set(QueryPipe);
 		WinUSBX_Set(ReadPipe);
+		if (!native_winusb)
+			WinUSBX_Set(ResetDevice);
 		WinUSBX_Set(ResetPipe);
 		WinUSBX_Set(SetCurrentAlternateSetting);
 		WinUSBX_Set(SetPipePolicy);
-		WinUSBX_Set(SetPowerPolicy);
 		WinUSBX_Set(WritePipe);
-		if (!native_winusb)
-			WinUSBX_Set(ResetDevice);
 
 		if (WinUSBX[i].Initialize != NULL) {
 			WinUSBX[i].initialized = true;
@@ -3548,11 +3530,7 @@ static int hid_init(int sub_api, struct libusb_context *ctx)
 	DLL_LOAD_FUNC(hid, HidD_GetIndexedString, TRUE);
 	DLL_LOAD_FUNC(hid, HidP_GetCaps, TRUE);
 	DLL_LOAD_FUNC(hid, HidD_SetNumInputBuffers, TRUE);
-	DLL_LOAD_FUNC(hid, HidD_SetFeature, TRUE);
-	DLL_LOAD_FUNC(hid, HidD_GetFeature, TRUE);
 	DLL_LOAD_FUNC(hid, HidD_GetPhysicalDescriptor, TRUE);
-	DLL_LOAD_FUNC(hid, HidD_GetInputReport, FALSE);
-	DLL_LOAD_FUNC(hid, HidD_SetOutputReport, FALSE);
 	DLL_LOAD_FUNC(hid, HidD_FlushQueue, TRUE);
 	DLL_LOAD_FUNC(hid, HidP_GetValueCaps, TRUE);
 
