@@ -1186,31 +1186,25 @@ static void get_api_type(struct libusb_context *ctx, HDEVINFO *dev_info,
 static int set_composite_interface(struct libusb_context *ctx, struct libusb_device *dev,
 	char *dev_interface_path, char *device_id, int api, int sub_api)
 {
-	unsigned i;
 	struct windows_device_priv *priv = _device_priv(dev);
 	int interface_number;
-
-	if (priv->apib->id != USB_API_COMPOSITE) {
-		usbi_err(ctx, "program assertion failed: '%s' is not composite", device_id);
-		return LIBUSB_ERROR_NO_DEVICE;
-	}
+	const char *mi_str;
 
 	// Because MI_## are not necessarily in sequential order (some composite
 	// devices will have only MI_00 & MI_03 for instance), we retrieve the actual
 	// interface number from the path's MI value
-	interface_number = 0;
-	for (i = 0; device_id[i] != 0; ) {
-		if ((device_id[i++] == 'M') && (device_id[i++] == 'I')
-				&& (device_id[i++] == '_')) {
-			interface_number = (device_id[i++] - '0') * 10;
-			interface_number += device_id[i] - '0';
-			break;
-		}
+	mi_str = strstr(device_id, "MI_");
+	if ((mi_str != NULL) && isdigit(mi_str[3]) && isdigit(mi_str[4])) {
+		interface_number = ((mi_str[3] - '0') * 10) + (mi_str[4] - '0');
+	} else {
+		usbi_warn(ctx, "failure to read interface number for %s, using default value", device_id);
+		interface_number = 0;
 	}
 
-	if (device_id[i] == 0)
-		usbi_warn(ctx, "failure to read interface number for %s. Using default value %d",
-			device_id, interface_number);
+	if (interface_number >= USB_MAXINTERFACES) {
+		usbi_warn(ctx, "interface %d too large - ignoring interface path %s", interface_number, dev_interface_path);
+		return LIBUSB_ERROR_ACCESS;
+	}
 
 	if (priv->usb_interface[interface_number].path != NULL) {
 		if (api == USB_API_HID) {
