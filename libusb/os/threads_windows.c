@@ -29,87 +29,16 @@ struct usbi_cond_perthread {
 	HANDLE event;
 };
 
-int usbi_mutex_static_lock(usbi_mutex_static_t *mutex)
+void usbi_mutex_static_lock(usbi_mutex_static_t *mutex)
 {
-	while (InterlockedExchange(mutex, 1) == 1)
+	while (InterlockedExchange(mutex, 1L) == 1L)
 		SleepEx(0, TRUE);
-	return 0;
 }
 
-int usbi_mutex_static_unlock(usbi_mutex_static_t *mutex)
-{
-	InterlockedExchange(mutex, 0);
-	return 0;
-}
-
-int usbi_mutex_init(usbi_mutex_t *mutex)
-{
-	InitializeCriticalSection(mutex);
-	return 0;
-}
-
-int usbi_mutex_lock(usbi_mutex_t *mutex)
-{
-	EnterCriticalSection(mutex);
-	return 0;
-}
-
-int usbi_mutex_unlock(usbi_mutex_t *mutex)
-{
-	LeaveCriticalSection(mutex);
-	return 0;
-}
-
-int usbi_mutex_trylock(usbi_mutex_t *mutex)
-{
-	if (TryEnterCriticalSection(mutex))
-		return 0;
-	else
-		return EBUSY;
-}
-
-int usbi_mutex_destroy(usbi_mutex_t *mutex)
-{
-	DeleteCriticalSection(mutex);
-	return 0;
-}
-
-int usbi_cond_init(usbi_cond_t *cond)
+void usbi_cond_init(usbi_cond_t *cond)
 {
 	list_init(&cond->waiters);
 	list_init(&cond->not_waiting);
-	return 0;
-}
-
-int usbi_cond_destroy(usbi_cond_t *cond)
-{
-	// This assumes no one is using this anymore.  The check MAY NOT BE safe.
-	struct usbi_cond_perthread *pos, *next;
-
-	if (!list_empty(&cond->waiters))
-		return EBUSY; // (!see above!)
-	list_for_each_entry_safe(pos, next, &cond->not_waiting, list, struct usbi_cond_perthread) {
-		CloseHandle(pos->event);
-		list_del(&pos->list);
-		free(pos);
-	}
-	return 0;
-}
-
-int usbi_cond_broadcast(usbi_cond_t *cond)
-{
-	// Assumes mutex is locked; this is not in keeping with POSIX spec, but
-	//   libusb does this anyway, so we simplify by not adding more sync
-	//   primitives to the CV definition!
-	struct usbi_cond_perthread *pos;
-	int r = 0;
-
-	list_for_each_entry(pos, &cond->waiters, list, struct usbi_cond_perthread) {
-		if (!SetEvent(pos->event))
-			r = EINVAL;
-	}
-	// The wait function will remove its respective item from the list.
-	return r;
 }
 
 static int usbi_cond_intwait(usbi_cond_t *cond,
@@ -170,37 +99,28 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 	return usbi_cond_intwait(cond, mutex, millis);
 }
 
-int usbi_tls_key_create(usbi_tls_key_t *key)
+void usbi_cond_broadcast(usbi_cond_t *cond)
 {
-	*key = TlsAlloc();
-	if (*key == TLS_OUT_OF_INDEXES)
-		return ENOMEM;
-	else
-		return 0;
+	// Assumes mutex is locked; this is not in keeping with POSIX spec, but
+	//   libusb does this anyway, so we simplify by not adding more sync
+	//   primitives to the CV definition!
+	struct usbi_cond_perthread *pos;
+
+	list_for_each_entry(pos, &cond->waiters, list, struct usbi_cond_perthread)
+		SetEvent(pos->event);
+	// The wait function will remove its respective item from the list.
 }
 
-void *usbi_tls_key_get(usbi_tls_key_t key)
+void usbi_cond_destroy(usbi_cond_t *cond)
 {
-	return TlsGetValue(key);
-}
+	// This assumes no one is using this anymore.  The check MAY NOT BE safe.
+	struct usbi_cond_perthread *pos, *next;
 
-int usbi_tls_key_set(usbi_tls_key_t key, void *value)
-{
-	if (TlsSetValue(key, value))
-		return 0;
-	else
-		return EINVAL;
-}
-
-int usbi_tls_key_delete(usbi_tls_key_t key)
-{
-	if (TlsFree(key))
-		return 0;
-	else
-		return EINVAL;
-}
-
-int usbi_get_tid(void)
-{
-	return (int)GetCurrentThreadId();
+	if (!list_empty(&cond->waiters))
+		return; // (!see above!)
+	list_for_each_entry_safe(pos, next, &cond->not_waiting, list, struct usbi_cond_perthread) {
+		CloseHandle(pos->event);
+		list_del(&pos->list);
+		free(pos);
+	}
 }
