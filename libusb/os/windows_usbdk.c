@@ -533,9 +533,12 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 	struct winfd wfd;
 	ULONG Length;
 	TransferResult transResult;
+	bool direction_in;
 
+	// Direction is specified by bmRequestType
+	direction_in = ((transfer->buffer[0] & LIBUSB_ENDPOINT_IN) == LIBUSB_ENDPOINT_IN);
 
-	wfd = usbi_create_fd(priv->system_handle, RW_READ, NULL, NULL);
+	wfd = usbi_create_fd(priv->system_handle, direction_in ? RW_READ : RW_WRITE, NULL, NULL);
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0)
 		return LIBUSB_ERROR_NO_MEM;
@@ -546,7 +549,7 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 	transfer_priv->pollable_fd = INVALID_WINFD;
 	Length = (ULONG)transfer->length;
 
-	if (IS_XFERIN(transfer))
+	if (direction_in)
 		transResult = usbdk_helper.ReadPipe(priv->redirector_handle, &transfer_priv->request, wfd.overlapped);
 	else
 		transResult = usbdk_helper.WritePipe(priv->redirector_handle, &transfer_priv->request, wfd.overlapped);
@@ -566,7 +569,7 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 
 	// Use priv_transfer to store data needed for async polling
 	transfer_priv->pollable_fd = wfd;
-	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, POLLIN);
+	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, direction_in ? POLLIN : POLLOUT);
 
 	return LIBUSB_SUCCESS;
 }
