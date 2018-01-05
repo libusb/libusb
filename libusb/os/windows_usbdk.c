@@ -69,6 +69,7 @@ struct usbdk_device_priv {
 	USB_DK_DEVICE_INFO info;
 	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptors;
 	HANDLE redirector_handle;
+	HANDLE system_handle;
 	uint8_t active_configuration;
 };
 
@@ -422,6 +423,8 @@ static int usbdk_open(struct libusb_device_handle *dev_handle)
 		return LIBUSB_ERROR_OTHER;
 	}
 
+	priv->system_handle = usbdk_helper.GetRedirectorSystemHandle(priv->redirector_handle);
+
 	return LIBUSB_SUCCESS;
 }
 
@@ -551,11 +554,9 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 	struct winfd wfd;
 	ULONG Length;
 	TransferResult transResult;
-	HANDLE sysHandle;
 
-	sysHandle = usbdk_helper.GetRedirectorSystemHandle(priv->redirector_handle);
 
-	wfd = usbi_create_fd(sysHandle, RW_READ, NULL, NULL);
+	wfd = usbi_create_fd(priv->system_handle, RW_READ, NULL, NULL);
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0)
 		return LIBUSB_ERROR_NO_MEM;
@@ -599,7 +600,6 @@ static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 	struct libusb_context *ctx = TRANSFER_CTX(transfer);
 	struct winfd wfd;
 	TransferResult transferRes;
-	HANDLE sysHandle;
 
 	transfer_priv->request.Buffer = (PVOID64)transfer->buffer;
 	transfer_priv->request.BufferLength = transfer->length;
@@ -619,9 +619,7 @@ static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 
 	transfer_priv->pollable_fd = INVALID_WINFD;
 
-	sysHandle = usbdk_helper.GetRedirectorSystemHandle(priv->redirector_handle);
-
-	wfd = usbi_create_fd(sysHandle, IS_XFERIN(transfer) ? RW_READ : RW_WRITE, NULL, NULL);
+	wfd = usbi_create_fd(priv->system_handle, IS_XFERIN(transfer) ? RW_READ : RW_WRITE, NULL, NULL);
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0)
 		return LIBUSB_ERROR_NO_MEM;
@@ -658,7 +656,6 @@ static int usbdk_do_iso_transfer(struct usbi_transfer *itransfer)
 	struct winfd wfd;
 	TransferResult transferRes;
 	int i;
-	HANDLE sysHandle;
 
 	transfer_priv->request.Buffer = (PVOID64)transfer->buffer;
 	transfer_priv->request.BufferLength = transfer->length;
@@ -685,9 +682,7 @@ static int usbdk_do_iso_transfer(struct usbi_transfer *itransfer)
 
 	transfer_priv->pollable_fd = INVALID_WINFD;
 
-	sysHandle = usbdk_helper.GetRedirectorSystemHandle(priv->redirector_handle);
-
-	wfd = usbi_create_fd(sysHandle, IS_XFERIN(transfer) ? RW_READ : RW_WRITE, NULL, NULL);
+	wfd = usbi_create_fd(priv->system_handle, IS_XFERIN(transfer) ? RW_READ : RW_WRITE, NULL, NULL);
 	// Always use the handle returned from usbi_create_fd (wfd.handle)
 	if (wfd.fd < 0) {
 		free(transfer_priv->IsochronousPacketsArray);
