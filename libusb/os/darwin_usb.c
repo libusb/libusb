@@ -36,6 +36,10 @@
 #include <mach/mach_host.h>
 #include <mach/mach_port.h>
 
+/* Suppress warnings about the use of the deprecated objc_registerThreadWithCollector
+ * function. Its use is also conditionalized to only older deployment targets. */
+#define OBJC_SILENCE_GC_DEPRECATIONS 1
+
 #include <AvailabilityMacros.h>
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060 && MAC_OS_X_VERSION_MIN_REQUIRED < 101200
   #include <objc/objc-auto.h>
