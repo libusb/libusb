@@ -33,9 +33,6 @@
 #include "windows_common.h"
 #include "windows_nt_common.h"
 
-#define ULONG64 uint64_t
-#define PVOID64 uint64_t
-
 typedef CONST WCHAR *PCWCHAR;
 #define wcsncpy_s wcsncpy
 
@@ -55,7 +52,7 @@ typedef LONG NTSTATUS;
 #endif
 
 #if !defined(USBD_SUCCESS)
-typedef int32_t USBD_STATUS;
+typedef LONG USBD_STATUS;
 #define USBD_SUCCESS(Status)		((USBD_STATUS) (Status) >= 0)
 #define USBD_PENDING(Status)		((ULONG) (Status) >> 30 == 1)
 #define USBD_ERROR(Status)		((USBD_STATUS) (Status) < 0)
@@ -296,7 +293,7 @@ static void usbdk_device_init(libusb_device *dev, PUSB_DK_DEVICE_INFO info)
 	dev->port_number = (uint8_t)info->Port;
 	dev->parent_dev = NULL;
 
-	//Addresses in libusb are 1-based
+	// Addresses in libusb are 1-based
 	dev->device_address = (uint8_t)(info->Port + 1);
 
 	dev->num_configurations = info->DeviceDescriptor.bNumConfigurations;
@@ -565,7 +562,7 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 	if (wfd.fd < 0)
 		return LIBUSB_ERROR_NO_MEM;
 
-	transfer_priv->request.Buffer = (PVOID64)(uintptr_t)transfer->buffer;
+	transfer_priv->request.Buffer = (PVOID64)transfer->buffer;
 	transfer_priv->request.BufferLength = transfer->length;
 	transfer_priv->request.TransferType = ControlTransferType;
 	transfer_priv->pollable_fd = INVALID_WINFD;
@@ -606,7 +603,7 @@ static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 	TransferResult transferRes;
 	HANDLE sysHandle;
 
-	transfer_priv->request.Buffer = (PVOID64)(uintptr_t)transfer->buffer;
+	transfer_priv->request.Buffer = (PVOID64)transfer->buffer;
 	transfer_priv->request.BufferLength = transfer->length;
 	transfer_priv->request.EndpointAddress = transfer->endpoint;
 
@@ -665,20 +662,20 @@ static int usbdk_do_iso_transfer(struct usbi_transfer *itransfer)
 	int i;
 	HANDLE sysHandle;
 
-	transfer_priv->request.Buffer = (PVOID64)(uintptr_t)transfer->buffer;
+	transfer_priv->request.Buffer = (PVOID64)transfer->buffer;
 	transfer_priv->request.BufferLength = transfer->length;
 	transfer_priv->request.EndpointAddress = transfer->endpoint;
 	transfer_priv->request.TransferType = IsochronousTransferType;
 	transfer_priv->request.IsochronousPacketsArraySize = transfer->num_iso_packets;
 	transfer_priv->IsochronousPacketsArray = malloc(transfer->num_iso_packets * sizeof(ULONG64));
-	transfer_priv->request.IsochronousPacketsArray = (PVOID64)(uintptr_t)transfer_priv->IsochronousPacketsArray;
+	transfer_priv->request.IsochronousPacketsArray = (PVOID64)transfer_priv->IsochronousPacketsArray;
 	if (!transfer_priv->IsochronousPacketsArray) {
 		usbi_err(ctx, "Allocation of IsochronousPacketsArray is failed, %s", windows_error_str(0));
 		return LIBUSB_ERROR_IO;
 	}
 
 	transfer_priv->IsochronousResultsArray = malloc(transfer->num_iso_packets * sizeof(USB_DK_ISO_TRANSFER_RESULT));
-	transfer_priv->request.Result.IsochronousResultsArray = (PVOID64)(uintptr_t)transfer_priv->IsochronousResultsArray;
+	transfer_priv->request.Result.IsochronousResultsArray = (PVOID64)transfer_priv->IsochronousResultsArray;
 	if (!transfer_priv->IsochronousResultsArray) {
 		usbi_err(ctx, "Allocation of isochronousResultsArray is failed, %s", windows_error_str(0));
 		free(transfer_priv->IsochronousPacketsArray);
