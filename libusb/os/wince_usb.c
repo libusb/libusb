@@ -31,6 +31,7 @@
 #include "wince_usb.h"
 
 // Global variables
+int errno = 0;
 int windows_version = WINDOWS_CE;
 static uint64_t hires_frequency, hires_ticks_to_ps;
 static HANDLE driver_handle = INVALID_HANDLE_VALUE;
