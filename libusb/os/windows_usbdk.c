@@ -595,7 +595,7 @@ static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 		transfer_priv->request.TransferType = InterruptTransferType;
 		break;
 	default:
-		usbi_err(ctx, "Wrong transfer type (%d) in usbdk_do_bulk_transfer. %s", transfer->type, windows_error_str(0));
+		usbi_err(ctx, "Wrong transfer type (%d) in usbdk_do_bulk_transfer", transfer->type);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
@@ -647,16 +647,16 @@ static int usbdk_do_iso_transfer(struct usbi_transfer *itransfer)
 	transfer_priv->IsochronousPacketsArray = malloc(transfer->num_iso_packets * sizeof(ULONG64));
 	transfer_priv->request.IsochronousPacketsArray = (PVOID64)transfer_priv->IsochronousPacketsArray;
 	if (!transfer_priv->IsochronousPacketsArray) {
-		usbi_err(ctx, "Allocation of IsochronousPacketsArray is failed, %s", windows_error_str(0));
-		return LIBUSB_ERROR_IO;
+		usbi_err(ctx, "Allocation of IsochronousPacketsArray failed");
+		return LIBUSB_ERROR_NO_MEM;
 	}
 
 	transfer_priv->IsochronousResultsArray = malloc(transfer->num_iso_packets * sizeof(USB_DK_ISO_TRANSFER_RESULT));
 	transfer_priv->request.Result.IsochronousResultsArray = (PVOID64)transfer_priv->IsochronousResultsArray;
 	if (!transfer_priv->IsochronousResultsArray) {
-		usbi_err(ctx, "Allocation of isochronousResultsArray is failed, %s", windows_error_str(0));
+		usbi_err(ctx, "Allocation of isochronousResultsArray failed");
 		free(transfer_priv->IsochronousPacketsArray);
-		return LIBUSB_ERROR_IO;
+		return LIBUSB_ERROR_NO_MEM;
 	}
 
 	for (i = 0; i < transfer->num_iso_packets; i++)
