@@ -619,12 +619,8 @@ static int wince_submit_control_or_bulk_transfer(struct usbi_transfer *itransfer
 	}
 	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, direction_in ? POLLIN : POLLOUT);
 
-	return LIBUSB_SUCCESS;
-}
 
-static int wince_submit_iso_transfer(struct usbi_transfer *itransfer)
-{
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+	return LIBUSB_SUCCESS;
 }
 
 static int wince_submit_transfer(struct usbi_transfer *itransfer)
@@ -637,7 +633,6 @@ static int wince_submit_transfer(struct usbi_transfer *itransfer)
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 		return wince_submit_control_or_bulk_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		return wince_submit_iso_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 	default:
