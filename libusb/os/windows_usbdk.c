@@ -503,27 +503,6 @@ static int usbdk_reset_device(struct libusb_device_handle *dev_handle)
 	return LIBUSB_SUCCESS;
 }
 
-static int usbdk_kernel_driver_active(struct libusb_device_handle *dev_handle, int iface)
-{
-	UNUSED(dev_handle);
-	UNUSED(iface);
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
-static int usbdk_attach_kernel_driver(struct libusb_device_handle *dev_handle, int iface)
-{
-	UNUSED(dev_handle);
-	UNUSED(iface);
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
-static int usbdk_detach_kernel_driver(struct libusb_device_handle *dev_handle, int iface)
-{
-	UNUSED(dev_handle);
-	UNUSED(iface);
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
 static void usbdk_destroy_device(struct libusb_device *dev)
 {
 	struct usbdk_device_priv* p = _usbdk_device_priv(dev);
@@ -831,11 +810,6 @@ void windows_get_overlapped_result(struct usbi_transfer *transfer, struct winfd 
 	}
 }
 
-static int usbdk_clock_gettime(int clk_id, struct timespec *tp)
-{
-	return windows_clock_gettime(clk_id, tp);
-}
-
 const struct usbi_os_backend usbi_backend = {
 	"Windows",
 	USBI_CAP_HAS_HID_ACCESS,
@@ -868,9 +842,9 @@ const struct usbi_os_backend usbi_backend = {
 	NULL,	// dev_mem_alloc()
 	NULL,	// dev_mem_free()
 
-	usbdk_kernel_driver_active,
-	usbdk_detach_kernel_driver,
-	usbdk_attach_kernel_driver,
+	NULL,	// kernel_driver_active()
+	NULL,	// detach_kernel_driver()
+	NULL,	// attach_kernel_driver()
 
 	usbdk_destroy_device,
 
@@ -881,10 +855,8 @@ const struct usbi_os_backend usbi_backend = {
 	windows_handle_events,
 	NULL,
 
-	usbdk_clock_gettime,
-#if defined(USBI_TIMERFD_AVAILABLE)
-	NULL,
-#endif
+	windows_clock_gettime,
+
 	0,
 	sizeof(struct usbdk_device_priv),
 	0,
