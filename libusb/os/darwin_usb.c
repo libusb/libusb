@@ -233,20 +233,21 @@ static int usb_setup_device_iterator (io_iterator_t *deviceIterator, UInt32 loca
                                                                          &kCFTypeDictionaryKeyCallBacks,
                                                                          &kCFTypeDictionaryValueCallBacks);
 
-    if (propertyMatchDict) {
-      /* there are no unsigned CFNumber types so treat the value as signed. the os seems to do this
-         internally (CFNumberType of locationID is 3) */
-      CFTypeRef locationCF = CFNumberCreate (NULL, kCFNumberSInt32Type, &location);
+    /* there are no unsigned CFNumber types so treat the value as signed. the OS seems to do this
+         internally (CFNumberType of locationID is kCFNumberSInt32Type) */
+    CFTypeRef locationCF = CFNumberCreate (NULL, kCFNumberSInt32Type, &location);
 
+    if (propertyMatchDict && locationCF) {
       CFDictionarySetValue (propertyMatchDict, CFSTR(kUSBDevicePropertyLocationID), locationCF);
-      /* release our reference to the CFNumber (CFDictionarySetValue retains it) */
-      CFRelease (locationCF);
-
       CFDictionarySetValue (matchingDict, CFSTR(kIOPropertyMatchKey), propertyMatchDict);
-      /* release out reference to the CFMutableDictionaryRef (CFDictionarySetValue retains it) */
-      CFRelease (propertyMatchDict);
     }
     /* else we can still proceed as long as the caller accounts for the possibility of other devices in the iterator */
+
+    /* release our references as per the Create Rule */
+    if (propertyMatchDict)
+      CFRelease (propertyMatchDict);
+    if (locationCF)
+      CFRelease (locationCF);
   }
 
   return IOServiceGetMatchingServices(kIOMasterPortDefault, matchingDict, deviceIterator);
