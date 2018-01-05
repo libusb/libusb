@@ -157,12 +157,13 @@
     <ClCompile Include="..\examples\fxload.c" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include=".\getopt_2017.vcxproj">
+      <Project>{ae83e1b4-ce06-47ee-b7a3-c3a1d7c2d71e}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include=".\libusb_static_2017.vcxproj">
       <Project>{349ee8f9-7d25-4909-aaf5-ff3fade72187}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-    </ProjectReference>
-    <ProjectReference Include="getopt_2017.vcxproj">
-      <Project>{ae83e1b4-ce06-47ee-b7a3-c3a1d7c2d71e}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
