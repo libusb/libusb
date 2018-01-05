@@ -760,7 +760,7 @@ static int wince_handle_events(
 	struct wince_transfer_priv* transfer_priv = NULL;
 	POLL_NFDS_TYPE i = 0;
 	BOOL found = FALSE;
-	struct usbi_transfer *transfer;
+	struct usbi_transfer *itransfer;
 	DWORD io_size, io_result;
 	int r = LIBUSB_SUCCESS;
 
@@ -777,8 +777,8 @@ static int wince_handle_events(
 		// Because a Windows OVERLAPPED is used for poll emulation,
 		// a pollable fd is created and stored with each transfer
 		usbi_mutex_lock(&ctx->flying_transfers_lock);
-		list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
-			transfer_priv = usbi_transfer_get_os_priv(transfer);
+		list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
+			transfer_priv = usbi_transfer_get_os_priv(itransfer);
 			if (transfer_priv->pollable_fd.fd == fds[i].fd) {
 				found = TRUE;
 				break;
@@ -793,7 +793,7 @@ static int wince_handle_events(
 			// let handle_callback free the event using the transfer wfd
 			// If you don't use the transfer wfd, you run a risk of trying to free a
 			// newly allocated wfd that took the place of the one from the transfer.
-			wince_handle_callback(transfer, io_result, io_size);
+			wince_handle_callback(itransfer, io_result, io_size);
 		} else if (found) {
 			usbi_err(ctx, "matching transfer for fd %d has not completed", fds[i]);
 			r = LIBUSB_ERROR_OTHER;
