@@ -612,7 +612,7 @@ static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 		transfer_priv->request.TransferType = BulkTransferType;
 		break;
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-		transfer_priv->request.TransferType = IntertuptTransferType;
+		transfer_priv->request.TransferType = InterruptTransferType;
 		break;
 	default:
 		usbi_err(ctx, "Wrong transfer type (%d) in usbdk_do_bulk_transfer. %s", transfer->type, windows_error_str(0));
