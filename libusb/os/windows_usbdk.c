@@ -778,17 +778,16 @@ static DWORD usbdk_translate_usbd_status(USBD_STATUS UsbdStatus)
 	}
 }
 
-void windows_get_overlapped_result(struct usbi_transfer *transfer, struct winfd *pollable_fd, DWORD *io_result, DWORD *io_size)
+void windows_get_overlapped_result(struct usbi_transfer *itransfer, struct winfd *pollable_fd, DWORD *io_result, DWORD *io_size)
 {
 	if (HasOverlappedIoCompletedSync(pollable_fd->overlapped) // Handle async requests that completed synchronously first
-			|| GetOverlappedResult(pollable_fd->handle, pollable_fd->overlapped, io_size, false)) { // Regular async overlapped
-		struct libusb_transfer *ltransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer);
-		struct usbdk_transfer_priv *transfer_priv = _usbdk_transfer_priv(transfer);
+			|| GetOverlappedResult(pollable_fd->handle, pollable_fd->overlapped, io_size, FALSE)) { // Regular async overlapped
+		struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
-		if (ltransfer->type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS) {
-			int i;
+		if (transfer->type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS) {
+			ULONG64 i;
 			for (i = 0; i < transfer_priv->request.IsochronousPacketsArraySize; i++) {
-				struct libusb_iso_packet_descriptor *lib_desc = &ltransfer->iso_packet_desc[i];
+				struct libusb_iso_packet_descriptor *lib_desc = &transfer->iso_packet_desc[i];
 
 				switch (transfer_priv->IsochronousResultsArray[i].TransferResult) {
 				case STATUS_SUCCESS:
@@ -805,10 +804,9 @@ void windows_get_overlapped_result(struct usbi_transfer *transfer, struct winfd 
 			}
 		}
 
-		*io_size = (DWORD) transfer_priv->request.Result.GenResult.BytesTransferred;
-		*io_result = usbdk_translate_usbd_status((USBD_STATUS) transfer_priv->request.Result.GenResult.UsbdStatus);
-	}
-	else {
+		*io_size = (DWORD)transfer_priv->request.Result.GenResult.BytesTransferred;
+		*io_result = usbdk_translate_usbd_status((USBD_STATUS)transfer_priv->request.Result.GenResult.UsbdStatus);
+	} else {
 		*io_result = GetLastError();
 	}
 }
