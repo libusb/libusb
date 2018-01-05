@@ -196,14 +196,17 @@ struct hid_device_priv {
 };
 
 struct windows_device_priv {
-	uint8_t depth; // distance to HCD
+	bool initialized;
+	bool root_hub;
 	uint8_t active_config;
-	struct windows_usb_api_backend const *apib;
+	uint8_t depth;
+	const struct windows_usb_api_backend *apib;
+	char *dev_id;
 	char *path;  // device interface path
 	int sub_api; // for WinUSB-like APIs
 	struct {
 		char *path; // each interface needs a device interface path,
-		struct windows_usb_api_backend const *apib; // an API backend (multiple drivers support),
+		const struct windows_usb_api_backend *apib; // an API backend (multiple drivers support),
 		int sub_api;
 		int8_t nb_endpoints; // and a set of endpoint addresses (USB_MAXENDPOINTS)
 		uint8_t *endpoint;
@@ -212,7 +215,7 @@ struct windows_device_priv {
 	} usb_interface[USB_MAXINTERFACES];
 	struct hid_device_priv *hid;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
-	unsigned char **config_descriptor; // list of pointers to the cached config descriptors
+	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptor; // list of pointers to the cached config descriptors
 };
 
 static inline struct windows_device_priv *_device_priv(struct libusb_device *dev)
@@ -240,6 +243,7 @@ static inline void windows_device_priv_release(struct libusb_device *dev)
 	struct windows_device_priv *p = _device_priv(dev);
 	int i;
 
+	free(p->dev_id);
 	free(p->path);
 	if ((dev->num_configurations > 0) && (p->config_descriptor != NULL)) {
 		for (i = 0; i < dev->num_configurations; i++)
@@ -296,11 +300,10 @@ typedef RETURN_TYPE CONFIGRET;
 
 #define CR_SUCCESS	0x00000000
 
-/* Cfgmgr32.dll interface */
+/* Cfgmgr32 dependencies */
 DLL_DECLARE_HANDLE(Cfgmgr32);
 DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_Parent, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_Child, (PDEVINST, DEVINST, ULONG));
-DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_Device_IDA, (DEVINST, PCHAR, ULONG, ULONG));
 
 /* AdvAPI32 dependencies */
 DLL_DECLARE_HANDLE(AdvAPI32);
@@ -322,6 +325,8 @@ DLL_DECLARE_FUNC_PREFIXED(WINAPI, HDEVINFO, p, SetupDiGetClassDevsA, (LPCGUID, P
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, SetupDiEnumDeviceInfo, (HDEVINFO, DWORD, PSP_DEVINFO_DATA));
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, SetupDiEnumDeviceInterfaces, (HDEVINFO, PSP_DEVINFO_DATA,
 			LPCGUID, DWORD, PSP_DEVICE_INTERFACE_DATA));
+DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceInstanceIdA, (HDEVINFO, PSP_DEVINFO_DATA,
+			PCSTR, DWORD, PDWORD));
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceInterfaceDetailA, (HDEVINFO, PSP_DEVICE_INTERFACE_DATA,
 			PSP_DEVICE_INTERFACE_DETAIL_DATA_A, DWORD, PDWORD, PSP_DEVINFO_DATA));
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceRegistryPropertyA, (HDEVINFO,
