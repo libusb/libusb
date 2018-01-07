@@ -486,6 +486,10 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 		usbi_dbg("detected operation aborted");
 		status = LIBUSB_TRANSFER_CANCELLED;
 		break;
+	case ERROR_FILE_NOT_FOUND:
+		usbi_dbg("detected device removed");
+		status = LIBUSB_TRANSFER_NO_DEVICE;
+		break;
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %u: %s", io_result, windows_error_str(io_result));
 		status = LIBUSB_TRANSFER_ERROR;
