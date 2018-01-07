@@ -32,6 +32,9 @@
 #include "windows_common.h"
 #include "windows_nt_common.h"
 
+// Public
+BOOL (WINAPI *pCancelIoEx)(HANDLE, LPOVERLAPPED);
+
 // Global variables for clock_gettime mechanism
 static uint64_t hires_ticks_to_ps;
 static uint64_t hires_frequency;
@@ -258,6 +261,15 @@ out_unlock:
 
 static int windows_init_dlls(void)
 {
+	HMODULE hKernel32 = GetModuleHandleA("KERNEL32");
+
+	if (hKernel32 == NULL)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	pCancelIoEx = (BOOL (WINAPI *)(HANDLE, LPOVERLAPPED))
+		GetProcAddress(hKernel32, "CancelIoEx");
+	usbi_dbg("Will use CancelIo%s for I/O cancellation", pCancelIoEx ? "Ex" : "");
+
 	DLL_GET_HANDLE(User32);
 	DLL_LOAD_FUNC_PREFIXED(User32, p, GetMessageA, TRUE);
 	DLL_LOAD_FUNC_PREFIXED(User32, p, PeekMessageA, TRUE);
@@ -460,15 +472,15 @@ int windows_clock_gettime(int clk_id, struct timespec *tp)
 	}
 }
 
-static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size)
+static void windows_transfer_callback(struct usbi_transfer *itransfer, DWORD io_result, DWORD io_size)
 {
 	int status, istatus;
 
-	usbi_dbg("handling I/O completion with errcode %u, size %u", io_result, io_size);
+	usbi_dbg("handling I/O completion with errcode %u, size %u", (unsigned int)io_result, (unsigned int)io_size);
 
 	switch (io_result) {
 	case NO_ERROR:
-		status = windows_copy_transfer_data(itransfer, io_size);
+		status = windows_copy_transfer_data(itransfer, (uint32_t)io_size);
 		break;
 	case ERROR_GEN_FAILURE:
 		usbi_dbg("detected endpoint stall");
@@ -479,7 +491,7 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 		status = LIBUSB_TRANSFER_TIMED_OUT;
 		break;
 	case ERROR_OPERATION_ABORTED:
-		istatus = windows_copy_transfer_data(itransfer, io_size);
+		istatus = windows_copy_transfer_data(itransfer, (uint32_t)io_size);
 		if (istatus != LIBUSB_TRANSFER_COMPLETED)
 			usbi_dbg("Failed to copy partial data in aborted operation: %d", istatus);
 
@@ -491,7 +503,7 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 		status = LIBUSB_TRANSFER_NO_DEVICE;
 		break;
 	default:
-		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %u: %s", io_result, windows_error_str(io_result));
+		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %u: %s", (unsigned int)io_result, windows_error_str(io_result));
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	}
@@ -500,6 +512,16 @@ static void windows_transfer_callback(struct usbi_transfer *itransfer, uint32_t 
 		usbi_handle_transfer_cancellation(itransfer);
 	else
 		usbi_handle_transfer_completion(itransfer, (enum libusb_transfer_status)status);
+}
+
+/*
+* Make a transfer complete synchronously
+*/
+void windows_force_sync_completion(OVERLAPPED *overlapped, ULONG size)
+{
+	overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
+	overlapped->InternalHigh = size;
+	SetEvent(overlapped->hEvent);
 }
 
 void windows_handle_callback(struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size)
@@ -523,11 +545,11 @@ void windows_handle_callback(struct usbi_transfer *itransfer, uint32_t io_result
 
 int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready)
 {
-	POLL_NFDS_TYPE i;
-	bool found = false;
-	struct usbi_transfer *transfer;
-	struct winfd *pollable_fd = NULL;
+	struct usbi_transfer *itransfer;
 	DWORD io_size, io_result;
+	POLL_NFDS_TYPE i;
+	bool found;
+	int transfer_fd = -1;
 	int r = LIBUSB_SUCCESS;
 
 	usbi_mutex_lock(&ctx->open_devs_lock);
@@ -542,11 +564,11 @@ int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_N
 
 		// Because a Windows OVERLAPPED is used for poll emulation,
 		// a pollable fd is created and stored with each transfer
-		usbi_mutex_lock(&ctx->flying_transfers_lock);
 		found = false;
-		list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
-			pollable_fd = windows_get_fd(transfer);
-			if (pollable_fd->fd == fds[i].fd) {
+		usbi_mutex_lock(&ctx->flying_transfers_lock);
+		list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
+			transfer_fd = windows_get_transfer_fd(itransfer);
+			if (transfer_fd == fds[i].fd) {
 				found = true;
 				break;
 			}
@@ -554,13 +576,14 @@ int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_N
 		usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
 		if (found) {
-			windows_get_overlapped_result(transfer, pollable_fd, &io_result, &io_size);
+			windows_get_overlapped_result(itransfer, &io_result, &io_size);
 
-			usbi_remove_pollfd(ctx, pollable_fd->fd);
+			usbi_remove_pollfd(ctx, transfer_fd);
+
 			// let handle_callback free the event using the transfer wfd
 			// If you don't use the transfer wfd, you run a risk of trying to free a
 			// newly allocated wfd that took the place of the one from the transfer.
-			windows_handle_callback(transfer, io_result, io_size);
+			windows_handle_callback(itransfer, io_result, io_size);
 		} else {
 			usbi_err(ctx, "could not find a matching transfer for fd %d", fds[i]);
 			r = LIBUSB_ERROR_NOT_FOUND;

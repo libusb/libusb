@@ -22,7 +22,11 @@
 #define LIBUSB_THREADS_WINDOWS_H
 
 #define USBI_MUTEX_INITIALIZER	0L
+#ifdef _WIN32_WCE
+typedef LONG usbi_mutex_static_t;
+#else
 typedef volatile LONG usbi_mutex_static_t;
+#endif
 void usbi_mutex_static_lock(usbi_mutex_static_t *mutex);
 static inline void usbi_mutex_static_unlock(usbi_mutex_static_t *mutex)
 {

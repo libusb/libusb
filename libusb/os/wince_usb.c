@@ -187,9 +187,6 @@ static int wince_init(struct libusb_context *ctx)
 	// NB: concurrent usage supposes that init calls are equally balanced with
 	// exit calls. If init is called more than exit, we will not exit properly
 	if ( ++concurrent_usage == 0 ) {	// First init?
-		// Initialize pollable file descriptors
-		init_polling();
-
 		// Load DLL imports
 		if (init_dllimports() != LIBUSB_SUCCESS) {
 			usbi_err(ctx, "could not resolve DLL functions");
@@ -224,7 +221,6 @@ static int wince_init(struct libusb_context *ctx)
 init_exit: // Holds semaphore here.
 	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
 		exit_dllimports();
-		exit_polling();
 
 		if (driver_handle != INVALID_HANDLE_VALUE) {
 			UkwCloseDriver(driver_handle);
@@ -261,7 +257,6 @@ static void wince_exit(struct libusb_context *ctx)
 	// Only works if exits and inits are balanced exactly
 	if (--concurrent_usage < 0) {	// Last exit
 		exit_dllimports();
-		exit_polling();
 
 		if (driver_handle != INVALID_HANDLE_VALUE) {
 			UkwCloseDriver(driver_handle);
@@ -543,12 +538,9 @@ static void wince_destroy_device(struct libusb_device *dev)
 static void wince_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 	struct wince_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
-	struct winfd wfd = fd_to_winfd(transfer_priv->pollable_fd.fd);
 
-	// No need to cancel transfer as it is either complete or abandoned
-	wfd.itransfer = NULL;
-	CloseHandle(wfd.handle);
-	usbi_free_fd(&transfer_priv->pollable_fd);
+	usbi_close(transfer_priv->pollable_fd.fd);
+	transfer_priv->pollable_fd = INVALID_WINFD;
 }
 
 static int wince_cancel_transfer(struct usbi_transfer *itransfer)
@@ -572,11 +564,10 @@ static int wince_submit_control_or_bulk_transfer(struct usbi_transfer *itransfer
 	BOOL direction_in, ret;
 	struct winfd wfd;
 	DWORD flags;
-	HANDLE eventHandle;
 	PUKW_CONTROL_HEADER setup = NULL;
 	const BOOL control_transfer = transfer->type == LIBUSB_TRANSFER_TYPE_CONTROL;
+	int r;
 
-	transfer_priv->pollable_fd = INVALID_WINFD;
 	if (control_transfer) {
 		setup = (PUKW_CONTROL_HEADER) transfer->buffer;
 		direction_in = setup->bmRequestType & LIBUSB_ENDPOINT_IN;
@@ -586,19 +577,18 @@ static int wince_submit_control_or_bulk_transfer(struct usbi_transfer *itransfer
 	flags = direction_in ? UKW_TF_IN_TRANSFER : UKW_TF_OUT_TRANSFER;
 	flags |= UKW_TF_SHORT_TRANSFER_OK;
 
-	eventHandle = CreateEvent(NULL, FALSE, FALSE, NULL);
-	if (eventHandle == NULL) {
-		usbi_err(ctx, "Failed to create event for async transfer");
+	wfd = usbi_create_fd();
+	if (wfd.fd < 0)
 		return LIBUSB_ERROR_NO_MEM;
-	}
 
-	wfd = usbi_create_fd(eventHandle, direction_in ? RW_READ : RW_WRITE, itransfer, &wince_cancel_transfer);
-	if (wfd.fd < 0) {
-		CloseHandle(eventHandle);
-		return LIBUSB_ERROR_NO_MEM;
+	r = usbi_add_pollfd(ctx, wfd.fd, direction_in ? POLLIN : POLLOUT);
+	if (r) {
+		usbi_close(wfd.fd);
+		return r;
 	}
 
 	transfer_priv->pollable_fd = wfd;
+
 	if (control_transfer) {
 		// Split out control setup header and data buffer
 		DWORD bufLen = transfer->length - sizeof(UKW_CONTROL_HEADER);
@@ -614,10 +604,11 @@ static int wince_submit_control_or_bulk_transfer(struct usbi_transfer *itransfer
 		int libusbErr = translate_driver_error(GetLastError());
 		usbi_err(ctx, "UkwIssue%sTransfer failed: error %u",
 			control_transfer ? "Control" : "Bulk", (unsigned int)GetLastError());
-		wince_clear_transfer_priv(itransfer);
+		usbi_remove_pollfd(ctx, wfd.fd);
+		usbi_close(wfd.fd);
+		transfer_priv->pollable_fd = INVALID_WINFD;
 		return libusbErr;
 	}
-	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, direction_in ? POLLIN : POLLOUT);
 
 
 	return LIBUSB_SUCCESS;
