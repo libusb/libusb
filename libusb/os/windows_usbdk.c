@@ -23,19 +23,12 @@
 
 #include <config.h>
 
-#if defined(USE_USBDK)
-
 #include <windows.h>
-#include <cfgmgr32.h>
 #include <stdio.h>
 
 #include "libusbi.h"
 #include "windows_common.h"
 #include "windows_nt_common.h"
-
-typedef CONST WCHAR *PCWCHAR;
-#define wcsncpy_s wcsncpy
-
 #include "windows_usbdk.h"
 
 #if !defined(STATUS_SUCCESS)
@@ -62,24 +55,6 @@ typedef LONG USBD_STATUS;
 #define USBD_STATUS_TIMEOUT		((USBD_STATUS) 0xc0006000)
 #define USBD_STATUS_CANCELED		((USBD_STATUS) 0xc0010000)
 #endif
-
-static int concurrent_usage = -1;
-
-struct usbdk_device_priv {
-	USB_DK_DEVICE_INFO info;
-	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptors;
-	HANDLE redirector_handle;
-	HANDLE system_handle;
-	uint8_t active_configuration;
-};
-
-struct usbdk_transfer_priv {
-	USB_DK_TRANSFER_REQUEST request;
-	struct winfd pollable_fd;
-	HANDLE system_handle;
-	PULONG64 IsochronousPacketsArray;
-	PUSB_DK_ISO_TRANSFER_RESULT IsochronousResultsArray;
-};
 
 static inline struct usbdk_device_priv *_usbdk_device_priv(struct libusb_device *dev)
 {
@@ -114,7 +89,7 @@ static FARPROC get_usbdk_proc_addr(struct libusb_context *ctx, LPCSTR api_name)
 	FARPROC api_ptr = GetProcAddress(usbdk_helper.module, api_name);
 
 	if (api_ptr == NULL)
-		usbi_err(ctx, "UsbDkHelper API %s not found, error %d", api_name, GetLastError());
+		usbi_err(ctx, "UsbDkHelper API %s not found: %s", api_name, windows_error_str(0));
 
 	return api_ptr;
 }
@@ -131,7 +106,7 @@ static int load_usbdk_helper_dll(struct libusb_context *ctx)
 {
 	usbdk_helper.module = LoadLibraryA("UsbDkHelper");
 	if (usbdk_helper.module == NULL) {
-		usbi_err(ctx, "Failed to load UsbDkHelper.dll, error %d", GetLastError());
+		usbi_err(ctx, "Failed to load UsbDkHelper.dll: %s", windows_error_str(0));
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
@@ -197,30 +172,33 @@ error_unload:
 
 static int usbdk_init(struct libusb_context *ctx)
 {
-	int r;
+	SC_HANDLE managerHandle;
+	SC_HANDLE serviceHandle;
 
-	if (++concurrent_usage == 0) { // First init?
-		r = load_usbdk_helper_dll(ctx);
-		if (r)
-			goto init_exit;
-
-		r = windows_common_init(ctx);
-		if (r)
-			goto init_exit;
-	}
-	// At this stage, either we went through full init successfully, or didn't need to
-	r = LIBUSB_SUCCESS;
-
-init_exit:
-	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
-		windows_common_exit();
-		unload_usbdk_helper_dll();
+	managerHandle = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+	if (managerHandle == NULL) {
+		usbi_warn(ctx, "failed to open service control manager: %s", windows_error_str(0));
+		return LIBUSB_ERROR_OTHER;
 	}
 
-	if (r != LIBUSB_SUCCESS)
-		--concurrent_usage; // Not expected to call libusb_exit if we failed.
+	serviceHandle = OpenServiceA(managerHandle, "UsbDk", GENERIC_READ);
+	CloseServiceHandle(managerHandle);
 
-	return r;
+	if (serviceHandle == NULL) {
+		if (GetLastError() != ERROR_SERVICE_DOES_NOT_EXIST)
+			usbi_warn(ctx, "failed to open UsbDk service: %s", windows_error_str(0));
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	CloseServiceHandle(serviceHandle);
+
+	return load_usbdk_helper_dll(ctx);
+}
+
+static void usbdk_exit(struct libusb_context *ctx)
+{
+	UNUSED(ctx);
+	unload_usbdk_helper_dll();
 }
 
 static int usbdk_get_session_id_for_device(struct libusb_context *ctx,
@@ -296,7 +274,7 @@ static void usbdk_device_init(libusb_device *dev, PUSB_DK_DEVICE_INFO info)
 	dev->device_address = (uint8_t)(info->Port + 1);
 
 	dev->num_configurations = info->DeviceDescriptor.bNumConfigurations;
-	dev->device_descriptor = info->DeviceDescriptor;
+	memcpy(&dev->device_descriptor, &info->DeviceDescriptor, LIBUSB_DT_DEVICE_SIZE);
 
 	switch (info->Speed) {
 	case LowSpeed:
@@ -326,7 +304,7 @@ static int usbdk_get_device_list(struct libusb_context *ctx, struct discovered_d
 	ULONG dev_number;
 	PUSB_DK_DEVICE_INFO devices;
 
-	if(!usbdk_helper.GetDevicesList(&devices, &dev_number))
+	if (!usbdk_helper.GetDevicesList(&devices, &dev_number))
 		return LIBUSB_ERROR_OTHER;
 
 	for (i = 0; i < dev_number; i++) {
@@ -367,26 +345,16 @@ func_exit:
 	return r;
 }
 
-static void usbdk_exit(struct libusb_context *ctx)
-{
-	UNUSED(ctx);
-	if (--concurrent_usage < 0) {
-		windows_common_exit();
-		unload_usbdk_helper_dll();
-	}
-}
-
-static int usbdk_get_device_descriptor(struct libusb_device *dev, unsigned char *buffer, int *host_endian)
+static int usbdk_get_device_descriptor(struct libusb_device *dev, unsigned char *buffer)
 {
 	struct usbdk_device_priv *priv = _usbdk_device_priv(dev);
 
 	memcpy(buffer, &priv->info.DeviceDescriptor, DEVICE_DESC_LENGTH);
-	*host_endian = 0;
 
 	return LIBUSB_SUCCESS;
 }
 
-static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
+static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len)
 {
 	struct usbdk_device_priv *priv = _usbdk_device_priv(dev);
 	PUSB_CONFIGURATION_DESCRIPTOR config_header;
@@ -399,15 +367,13 @@ static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config
 
 	size = min(config_header->wTotalLength, len);
 	memcpy(buffer, config_header, size);
-	*host_endian = 0;
-
 	return (int)size;
 }
 
-static inline int usbdk_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian)
+static inline int usbdk_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len)
 {
 	return usbdk_get_config_descriptor(dev, _usbdk_device_priv(dev)->active_configuration,
-			buffer, len, host_endian);
+			buffer, len);
 }
 
 static int usbdk_open(struct libusb_device_handle *dev_handle)
@@ -508,7 +474,7 @@ static void usbdk_destroy_device(struct libusb_device *dev)
 		usbdk_release_config_descriptors(p, p->info.DeviceDescriptor.bNumConfigurations);
 }
 
-void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
+static void usbdk_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 	struct usbdk_transfer_priv *transfer_priv = _usbdk_transfer_priv(itransfer);
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
@@ -678,7 +644,7 @@ static int usbdk_do_submit_transfer(struct usbi_transfer *itransfer,
 	r = transfer_fn(itransfer);
 	if (r != LIBUSB_SUCCESS) {
 		usbi_remove_pollfd(ctx, wfd.fd);
-		windows_clear_transfer_priv(itransfer);
+		usbdk_clear_transfer_priv(itransfer);
 		return r;
 	}
 
@@ -758,13 +724,13 @@ static int usbdk_cancel_transfer(struct usbi_transfer *itransfer)
 	}
 }
 
-int windows_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size)
+static int usbdk_copy_transfer_data(struct usbi_transfer *itransfer, uint32_t io_size)
 {
 	itransfer->transferred += io_size;
 	return LIBUSB_TRANSFER_COMPLETED;
 }
 
-int windows_get_transfer_fd(struct usbi_transfer *itransfer)
+static int usbdk_get_transfer_fd(struct usbi_transfer *itransfer)
 {
 	struct usbdk_transfer_priv *transfer_priv = _usbdk_transfer_priv(itransfer);
 	return transfer_priv->pollable_fd.fd;
@@ -785,7 +751,7 @@ static DWORD usbdk_translate_usbd_status(USBD_STATUS UsbdStatus)
 	}
 }
 
-void windows_get_overlapped_result(struct usbi_transfer *itransfer, DWORD *io_result, DWORD *io_size)
+static void usbdk_get_overlapped_result(struct usbi_transfer *itransfer, DWORD *io_result, DWORD *io_size)
 {
 	struct usbdk_transfer_priv *transfer_priv = _usbdk_transfer_priv(itransfer);
 	struct winfd *pollable_fd = &transfer_priv->pollable_fd;
@@ -821,57 +787,28 @@ void windows_get_overlapped_result(struct usbi_transfer *itransfer, DWORD *io_re
 	}
 }
 
-const struct usbi_os_backend usbi_backend = {
-	"Windows",
-	USBI_CAP_HAS_HID_ACCESS,
+const struct windows_backend usbdk_backend = {
 	usbdk_init,
 	usbdk_exit,
-	NULL,	// set_option()
-
 	usbdk_get_device_list,
-	NULL,
 	usbdk_open,
 	usbdk_close,
-
 	usbdk_get_device_descriptor,
 	usbdk_get_active_config_descriptor,
 	usbdk_get_config_descriptor,
-	NULL,
-
+	NULL,//usbdk_get_config_descriptor_by_value,
 	usbdk_get_configuration,
 	usbdk_set_configuration,
 	usbdk_claim_interface,
 	usbdk_release_interface,
-
 	usbdk_set_interface_altsetting,
 	usbdk_clear_halt,
 	usbdk_reset_device,
-
-	NULL,
-	NULL,
-
-	NULL,	// dev_mem_alloc()
-	NULL,	// dev_mem_free()
-
-	NULL,	// kernel_driver_active()
-	NULL,	// detach_kernel_driver()
-	NULL,	// attach_kernel_driver()
-
 	usbdk_destroy_device,
-
 	usbdk_submit_transfer,
 	usbdk_cancel_transfer,
-	windows_clear_transfer_priv,
-
-	windows_handle_events,
-	NULL,
-
-	windows_clock_gettime,
-
-	0,
-	sizeof(struct usbdk_device_priv),
-	0,
-	sizeof(struct usbdk_transfer_priv),
+	usbdk_clear_transfer_priv,
+	usbdk_copy_transfer_data,
+	usbdk_get_transfer_fd,
+	usbdk_get_overlapped_result,
 };
-
-#endif /* USE_USBDK */

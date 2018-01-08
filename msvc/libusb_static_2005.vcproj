@@ -318,6 +318,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\libusb\os\windows_usbdk.c"
+				>
+			</File>
+			<File
 				RelativePath="..\libusb\os\windows_winusb.c"
 				>
 			</File>
@@ -365,6 +369,14 @@
 			</File>
 			<File
 				RelativePath="..\libusb\os\windows_nt_common.h"
+				>
+			</File>
+			<File
+				RelativePath="..\libusb\os\windows_nt_shared_types.h"
+				>
+			</File>
+			<File
+				RelativePath="..\libusb\os\windows_usbdk.h"
 				>
 			</File>
 			<File

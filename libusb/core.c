@@ -2065,19 +2065,15 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 			ctx->debug = (enum libusb_log_level)arg;
 #endif
 		break;
+
 	/* Handle all backend-specific options here */
-#if 0
-	/* This code is compiled out until the first backend-specific option is
-	 * added to the library. When this time comes, remove the #if/#endif
-	 * lines and this comment, then replace the case statement with the
-	 * valid option name. */
-	case LIBUSB_OPTION_<...>:
+	case LIBUSB_OPTION_USE_USBDK:
 		if (usbi_backend.set_option)
 			r = usbi_backend.set_option(ctx, option, ap);
 		else
 			r = LIBUSB_ERROR_NOT_SUPPORTED;
 		break;
-#endif
+
 	default:
 		r = LIBUSB_ERROR_INVALID_PARAM;
 	}

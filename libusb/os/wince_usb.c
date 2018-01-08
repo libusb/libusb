@@ -32,7 +32,6 @@
 
 // Global variables
 int errno = 0;
-int windows_version = WINDOWS_CE;
 static uint64_t hires_frequency, hires_ticks_to_ps;
 static HANDLE driver_handle = INVALID_HANDLE_VALUE;
 static int concurrent_usage = -1;
@@ -110,7 +109,7 @@ static int translate_driver_error(DWORD error)
 	}
 }
 
-static int init_dllimports(void)
+static BOOL init_dllimports(void)
 {
 	DLL_GET_HANDLE(ceusbkwrapper);
 	DLL_LOAD_FUNC(ceusbkwrapper, UkwOpenDriver, TRUE);
@@ -136,7 +135,7 @@ static int init_dllimports(void)
 	DLL_LOAD_FUNC(ceusbkwrapper, UkwIssueBulkTransfer, TRUE);
 	DLL_LOAD_FUNC(ceusbkwrapper, UkwIsPipeHalted, TRUE);
 
-	return LIBUSB_SUCCESS;
+	return TRUE;
 }
 
 static void exit_dllimports(void)
@@ -188,7 +187,7 @@ static int wince_init(struct libusb_context *ctx)
 	// exit calls. If init is called more than exit, we will not exit properly
 	if ( ++concurrent_usage == 0 ) {	// First init?
 		// Load DLL imports
-		if (init_dllimports() != LIBUSB_SUCCESS) {
+		if (!init_dllimports()) {
 			usbi_err(ctx, "could not resolve DLL functions");
 			r = LIBUSB_ERROR_NOT_SUPPORTED;
 			goto init_exit;

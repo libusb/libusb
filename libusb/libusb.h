@@ -2016,6 +2016,15 @@ enum libusb_option {
 	 * does nothing: you'll always get messages from all levels.
 	 */
 	LIBUSB_OPTION_LOG_LEVEL,
+
+	/** Use the UsbDk backend for a specific context, if available.
+	 *
+	 * This option should be set immediately after calling libusb_init(), otherwise
+	 * unspecified behavior may occur.
+	 *
+	 * Only valid on Windows.
+	 */
+	LIBUSB_OPTION_USE_USBDK,
 };
 
 int LIBUSB_CALL libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);

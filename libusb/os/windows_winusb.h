@@ -195,37 +195,14 @@ struct hid_device_priv {
 	uint8_t string_index[3]; // man, prod, ser
 };
 
-struct windows_device_priv {
-	bool initialized;
-	bool root_hub;
-	uint8_t active_config;
-	uint8_t depth;
-	const struct windows_usb_api_backend *apib;
-	char *dev_id;
-	char *path;  // device interface path
-	int sub_api; // for WinUSB-like APIs
-	struct {
-		char *path; // each interface needs a device interface path,
-		const struct windows_usb_api_backend *apib; // an API backend (multiple drivers support),
-		int sub_api;
-		int8_t nb_endpoints; // and a set of endpoint addresses (USB_MAXENDPOINTS)
-		uint8_t *endpoint;
-		bool restricted_functionality;  // indicates if the interface functionality is restricted
-                                                // by Windows (eg. HID keyboards or mice cannot do R/W)
-	} usb_interface[USB_MAXINTERFACES];
-	struct hid_device_priv *hid;
-	USB_DEVICE_DESCRIPTOR dev_descriptor;
-	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptor; // list of pointers to the cached config descriptors
-};
-
-static inline struct windows_device_priv *_device_priv(struct libusb_device *dev)
+static inline struct winusb_device_priv *_device_priv(struct libusb_device *dev)
 {
-	return (struct windows_device_priv *)dev->os_priv;
+	return (struct winusb_device_priv *)dev->os_priv;
 }
 
-static inline struct windows_device_priv *windows_device_priv_init(struct libusb_device *dev)
+static inline struct winusb_device_priv *winusb_device_priv_init(struct libusb_device *dev)
 {
-	struct windows_device_priv *p = _device_priv(dev);
+	struct winusb_device_priv *p = _device_priv(dev);
 	int i;
 
 	p->apib = &usb_api_backend[USB_API_UNSUPPORTED];
@@ -238,9 +215,9 @@ static inline struct windows_device_priv *windows_device_priv_init(struct libusb
 	return p;
 }
 
-static inline void windows_device_priv_release(struct libusb_device *dev)
+static inline void winusb_device_priv_release(struct libusb_device *dev)
 {
-	struct windows_device_priv *p = _device_priv(dev);
+	struct winusb_device_priv *p = _device_priv(dev);
 	int i;
 
 	free(p->dev_id);
@@ -257,32 +234,11 @@ static inline void windows_device_priv_release(struct libusb_device *dev)
 	}
 }
 
-struct interface_handle_t {
-	HANDLE dev_handle; // WinUSB needs an extra handle for the file
-	HANDLE api_handle; // used by the API to communicate with the device
-};
-
-struct windows_device_handle_priv {
-	int active_interface;
-	struct interface_handle_t interface_handle[USB_MAXINTERFACES];
-	int autoclaim_count[USB_MAXINTERFACES]; // For auto-release
-};
-
-static inline struct windows_device_handle_priv *_device_handle_priv(
+static inline struct winusb_device_handle_priv *_device_handle_priv(
 	struct libusb_device_handle *handle)
 {
-	return (struct windows_device_handle_priv *)handle->os_priv;
+	return (struct winusb_device_handle_priv *)handle->os_priv;
 }
-
-// used for async polling functions
-struct windows_transfer_priv {
-	struct winfd pollable_fd;
-	HANDLE handle;
-	uint8_t interface_number;
-	uint8_t *hid_buffer; // 1 byte extended data buffer, required for HID
-	uint8_t *hid_dest;   // transfer buffer destination, required for HID
-	size_t hid_expected_size;
-};
 
 // used to match a device driver (including filter drivers) against a supported API
 struct driver_lookup {
@@ -314,11 +270,6 @@ DLL_DECLARE_FUNC_PREFIXED(WINAPI, LONG, p, RegCloseKey, (HKEY));
 /* OLE32 dependency */
 DLL_DECLARE_HANDLE(OLE32);
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, HRESULT, p, IIDFromString, (LPCOLESTR, LPIID));
-
-/* Kernel32 dependencies */
-DLL_DECLARE_HANDLE(Kernel32);
-/* This call is only available from XP SP2 */
-DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, IsWow64Process, (HANDLE, PBOOL));
 
 /* SetupAPI dependencies */
 DLL_DECLARE_HANDLE(SetupAPI);
