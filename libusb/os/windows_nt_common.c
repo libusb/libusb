@@ -729,9 +729,10 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
 		return LIBUSB_SUCCESS;
+	default:
+		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
 
-	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **discdevs)

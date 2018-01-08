@@ -496,13 +496,11 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 	struct usbdk_transfer_priv *transfer_priv = _usbdk_transfer_priv(itransfer);
 	struct libusb_context *ctx = TRANSFER_CTX(transfer);
 	OVERLAPPED *overlapped = transfer_priv->pollable_fd.overlapped;
-	ULONG Length;
 	TransferResult transResult;
 
 	transfer_priv->request.Buffer = (PVOID64)transfer->buffer;
 	transfer_priv->request.BufferLength = transfer->length;
 	transfer_priv->request.TransferType = ControlTransferType;
-	Length = (ULONG)transfer->length;
 
 	if (transfer->buffer[0] & LIBUSB_ENDPOINT_IN)
 		transResult = usbdk_helper.ReadPipe(priv->redirector_handle, &transfer_priv->request, overlapped);

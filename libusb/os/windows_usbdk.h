@@ -25,12 +25,6 @@
 
 #include "windows_nt_common.h"
 
-static inline void UsbDkFillIDStruct(USB_DK_DEVICE_ID *ID, const WCHAR *DeviceID, const WCHAR *InstanceID)
-{
-	wcsncpy(ID->DeviceID, DeviceID, MAX_DEVICE_ID_LEN);
-	wcsncpy(ID->InstanceID, InstanceID, MAX_DEVICE_ID_LEN);
-}
-
 typedef struct USB_DK_CONFIG_DESCRIPTOR_REQUEST {
 	USB_DK_DEVICE_ID ID;
 	ULONG64 Index;
