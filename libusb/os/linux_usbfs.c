@@ -41,6 +41,7 @@
 #ifdef __ANDROID__
 #include <dirent.h>
 #include <sys/resource.h>
+#include <sys/sysmacros.h>
 #endif
 
 #include "libusbi.h"
