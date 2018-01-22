@@ -2020,6 +2020,17 @@ int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
 void LIBUSB_CALL libusb_hotplug_deregister_callback(libusb_context *ctx,
 						libusb_hotplug_callback_handle callback_handle);
 
+/** \ingroup libusb_hotplug
+ * Gets the user_data associated with a hotplug callback.
+ *
+ * Since version v1.0.24 \ref LIBUSB_API_VERSION >= 0x01000108
+ *
+ * \param[in] ctx context this callback is registered with
+ * \param[in] callback_handle the handle of the callback to get the user_data of
+ */
+void * LIBUSB_CALL libusb_hotplug_get_user_data(struct libusb_context *ctx,
+						libusb_hotplug_callback_handle callback_handle);
+
 /** \ingroup libusb_lib
  * Available option values for libusb_set_option().
  */

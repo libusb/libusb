@@ -116,6 +116,8 @@ EXPORTS
   libusb_has_capability@4 = libusb_has_capability
   libusb_hotplug_deregister_callback
   libusb_hotplug_deregister_callback@8 = libusb_hotplug_deregister_callback
+  libusb_hotplug_get_user_data
+  libusb_hotplug_get_user_data@8 = libusb_hotplug_get_user_data
   libusb_hotplug_register_callback
   libusb_hotplug_register_callback@36 = libusb_hotplug_register_callback
   libusb_init
