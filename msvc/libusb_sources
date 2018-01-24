@@ -28,11 +28,13 @@ TARGETLIBS=$(SDK_LIB_PATH)\kernel32.lib
 
 SOURCES=..\core.c \
 	..\descriptor.c \
+	..\hotplug.c \
 	..\io.c \
 	..\strerror.c \
 	..\sync.c \
-	..\hotplug.c \
 	threads_windows.c \
 	poll_windows.c \
-	windows_usb.c \
+	windows_nt_common.c \
+	windows_usbdk.c \
+	windows_winusb.c \
 	..\libusb-1.0.rc

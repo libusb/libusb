@@ -89,7 +89,8 @@ int main(int argc, char*argv[])
 	const char *fx_name[FX_TYPE_MAX] = FX_TYPE_NAMES;
 	const char *ext, *img_name[] = IMG_TYPE_NAMES;
 	int fx_type = FX_TYPE_UNDEFINED, img_type[ARRAYSIZE(path)];
-	int i, j, opt, status;
+	int opt, status;
+	unsigned int i, j;
 	unsigned vid = 0, pid = 0;
 	unsigned busnum = 0, devaddr = 0, _busnum, _devaddr;
 	libusb_device *dev, **devs;
@@ -177,7 +178,7 @@ int main(int argc, char*argv[])
 		logerror("libusb_init() failed: %s\n", libusb_error_name(status));
 		return -1;
 	}
-	libusb_set_debug(NULL, verbose);
+	libusb_set_option(NULL, LIBUSB_OPTION_LOG_LEVEL, verbose);
 
 	/* try to pick up missing parameters from known devices */
 	if ((type == NULL) || (device_id == NULL) || (device_path != NULL)) {

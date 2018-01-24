@@ -11,6 +11,7 @@ missing
 stamp-h1
 m4/
 autom4te.cache
+INSTALL
 install-sh
 depcomp
 configure
@@ -19,6 +20,9 @@ compile
 config.guess
 config.h*
 !msvc/config.h
+!android/config.h
+!Xcode/config.h
+.vs
 config.log
 config.status
 config.sub
@@ -31,6 +35,7 @@ examples/dpfp_threaded
 examples/fxload
 examples/hotplugtest
 examples/sam3u_benchmark
+examples/testlibusb
 tests/stress
 *.exe
 *.pc
@@ -48,3 +53,8 @@ Release
 *~
 *.orig
 .dirstamp
+.amend
+xcuserdata
+*.xcuserdatad
+*.xccheckout
+*.xcscmblueprint
