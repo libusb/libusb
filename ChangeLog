@@ -1,10 +1,11 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2018-01-08: v1.0.22:
+2018-01-27: v1.0.22:
 * New libusb_set_option() API
 * Fix transfer timeout not being cleared upon resubmission
 * Report super speed plus devices on modern Linux and macOS
+* Darwin: Improve support for macOS Sierra and High Sierra
 * Darwin: SDK fixes and improvements
 * Linux: Let initialization succeed when no devices are present
 * Linux: Mark internal file descriptors with CLOEXEC flag
