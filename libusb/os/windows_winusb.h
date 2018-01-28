@@ -119,8 +119,15 @@ extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
 
 #define PRINT_UNSUPPORTED_API(fname)				\
 	usbi_dbg("unsupported API call for '%s' "		\
-		"(unrecognized device driver)", #fname);	\
-	return LIBUSB_ERROR_NOT_SUPPORTED;
+		"(unrecognized device driver)", #fname)
+
+#define CHECK_SUPPORTED_API(apip, fname)			\
+	do {							\
+		if ((apip)->fname == NULL) {			\
+			PRINT_UNSUPPORTED_API(fname);		\
+			return LIBUSB_ERROR_NOT_SUPPORTED;	\
+		}						\
+	} while (0)
 
 /*
  * private structures definition
