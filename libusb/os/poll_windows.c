@@ -149,8 +149,7 @@ static int check_pollfds(struct pollfd *fds, unsigned int nfds,
 			continue;
 		}
 
-		// The following macro only works if overlapped I/O was reported pending
-		if (HasOverlappedIoCompleted(&fd->overlapped)) {
+		if (WaitForSingleObject(fd->overlapped.hEvent, 0) == WAIT_OBJECT_0) {
 			fds[n].revents = fds[n].events;
 			nready++;
 		} else if (wait_handles != NULL) {
