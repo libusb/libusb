@@ -1132,8 +1132,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	unsigned int guid_size = GUID_SIZE_STEP;
 	unsigned int nb_guids;
 	// Keep a list of PnP enumerator strings that are found
-	char *usb_enumerator[8];
-	unsigned int nb_usb_enumerators = 0;
+	char *usb_enumerator[8] = { "USB" };
+	unsigned int nb_usb_enumerators = 1;
 	unsigned int usb_enum_index = 0;
 	// Keep a list of newly allocated devs to unref
 #define UNREF_SIZE_STEP 16
@@ -1512,7 +1512,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	free((void *)guid_list);
 
 	// Free any PnP enumerator strings
-	for (i = 0; i < nb_usb_enumerators; i++)
+	for (i = 1; i < nb_usb_enumerators; i++)
 		free(usb_enumerator[i]);
 
 	// Unref newly allocated devs
