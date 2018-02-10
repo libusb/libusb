@@ -3671,7 +3671,7 @@ static int hid_abort_transfers(int sub_api, struct usbi_transfer *itransfer)
 	}
 	usbi_dbg("will use interface %d", current_interface);
 
-	hid_handle = handle_priv->interface_handle[current_interface].dev_handle;
+	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 
 	if (pCancelIoEx != NULL) {
 		// Use CancelIoEx if available to cancel just a single transfer
