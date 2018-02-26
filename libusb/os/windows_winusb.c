@@ -2302,6 +2302,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 				return LIBUSB_ERROR_ACCESS;
 			}
 		}
+		handle_priv->interface_handle[iface].dev_handle = handle_priv->interface_handle[0].dev_handle;
 	}
 	usbi_dbg("claimed interface %d", iface);
 	handle_priv->active_interface = iface;
@@ -2342,11 +2343,33 @@ static int get_valid_interface(struct libusb_device_handle *dev_handle, int api_
 	}
 
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
-		if (HANDLE_VALID(handle_priv->interface_handle[i].dev_handle)
-				&& HANDLE_VALID(handle_priv->interface_handle[i].api_handle)
-				&& (priv->usb_interface[i].apib->id == api_id))
-			return i;
+	if (HANDLE_VALID(handle_priv->interface_handle[i].dev_handle)
+			&& HANDLE_VALID(handle_priv->interface_handle[i].api_handle)
+			&& (priv->usb_interface[i].apib->id == api_id))
+		return i;
 	}
+
+	return -1;
+}
+
+/*
+* Check a specific interface is valid (of the same API type), for control transfers
+*/
+static int check_valid_interface(struct libusb_device_handle *dev_handle, unsigned short interface, int api_id)
+{
+	struct winusb_device_handle_priv *handle_priv = _device_handle_priv(dev_handle);
+	struct winusb_device_priv *priv = _device_priv(dev_handle->dev);
+
+	if ((api_id < USB_API_WINUSBX) || (api_id > USB_API_HID)) {
+		usbi_dbg("unsupported API ID");
+		return -1;
+	}
+
+	// try the requested interface
+	if (HANDLE_VALID(handle_priv->interface_handle[interface].dev_handle)
+		&& HANDLE_VALID(handle_priv->interface_handle[interface].api_handle)
+		&& (priv->usb_interface[interface].apib->id == api_id))
+		return interface;
 
 	return -1;
 }
@@ -2395,7 +2418,10 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 	if (size > MAX_CTRL_BUFFER_LENGTH)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	current_interface = get_valid_interface(transfer->dev_handle, USB_API_WINUSBX);
+	if ((setup->RequestType & 0x1F) == LIBUSB_RECIPIENT_INTERFACE)
+		current_interface = check_valid_interface(transfer->dev_handle, setup->Index, USB_API_WINUSBX);
+	else
+		current_interface = get_valid_interface(transfer->dev_handle, USB_API_WINUSBX);
 	if (current_interface < 0) {
 		if (auto_claim(transfer, &current_interface, USB_API_WINUSBX) != LIBUSB_SUCCESS)
 			return LIBUSB_ERROR_NOT_FOUND;
