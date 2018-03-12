@@ -603,6 +603,7 @@ typedef BOOL(WINAPI *WinUsb_IsoWritePipe_t)(
 
 struct winusb_interface {
 	bool initialized;
+	bool CancelIoEx_supported;
 	WinUsb_AbortPipe_t AbortPipe;
 	WinUsb_ControlTransfer_t ControlTransfer;
 	WinUsb_FlushPipe_t FlushPipe;

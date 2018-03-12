@@ -2053,6 +2053,8 @@ static int winusbx_init(struct libusb_context *ctx)
 
 		if (WinUSBX[i].Initialize != NULL) {
 			WinUSBX[i].initialized = true;
+			// Assume driver supports CancelIoEx() if it is available
+			WinUSBX[i].CancelIoEx_supported = (pCancelIoEx != NULL);
 			usbi_dbg("initalized sub API %s", winusbx_driver_names[i]);
 		} else {
 			usbi_warn(ctx, "Failed to initalize sub API %s", winusbx_driver_names[i]);
@@ -2642,23 +2644,23 @@ static int winusbx_abort_transfers(int sub_api, struct usbi_transfer *itransfer)
 	}
 	usbi_dbg("will use interface %d", current_interface);
 
-	handle = handle_priv->interface_handle[current_interface].dev_handle;
+	if (WinUSBX[sub_api].CancelIoEx_supported) {
+		// Try to use CancelIoEx if available to cancel just a single transfer
+		handle = handle_priv->interface_handle[current_interface].dev_handle;
+		if (pCancelIoEx(handle, transfer_priv->pollable_fd.overlapped))
+			return LIBUSB_SUCCESS;
+		else if (GetLastError() == ERROR_NOT_FOUND)
+			return LIBUSB_ERROR_NOT_FOUND;
 
-	if (pCancelIoEx != NULL) {
-		// Use CancelIoEx if available to cancel just a single transfer
-		if (!pCancelIoEx(handle, transfer_priv->pollable_fd.overlapped)) {
-			usbi_err(ctx, "CancelIoEx failed: %s", windows_error_str(0));
-			return LIBUSB_ERROR_NO_DEVICE;
-		}
-	} else {
-		if (!CancelIo(handle)) {
-			usbi_err(ctx, "CancelIo failed: %s", windows_error_str(0));
-			handle = handle_priv->interface_handle[current_interface].api_handle;
-			if (!WinUSBX[sub_api].AbortPipe(handle, transfer->endpoint)) {
-				usbi_err(ctx, "AbortPipe failed: %s", windows_error_str(0));
-				return LIBUSB_ERROR_NO_DEVICE;
-			}
-		}
+		// Not every driver implements the necessary functionality for CancelIoEx
+		usbi_warn(ctx, "CancelIoEx not supported for sub API %s", winusbx_driver_names[sub_api]);
+		WinUSBX[sub_api].CancelIoEx_supported = false;
+	}
+
+	handle = handle_priv->interface_handle[current_interface].api_handle;
+	if (!WinUSBX[sub_api].AbortPipe(handle, transfer->endpoint)) {
+		usbi_err(ctx, "AbortPipe failed: %s", windows_error_str(0));
+		return LIBUSB_ERROR_NO_DEVICE;
 	}
 
 	return LIBUSB_SUCCESS;
