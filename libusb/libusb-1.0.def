@@ -151,7 +151,7 @@ EXPORTS
   libusb_set_interface_alt_setting
   libusb_set_interface_alt_setting@12 = libusb_set_interface_alt_setting
   libusb_set_option
-  libusb_set_option = libusb_set_option
+  _libusb_set_option = libusb_set_option
   libusb_set_pollfd_notifiers
   libusb_set_pollfd_notifiers@16 = libusb_set_pollfd_notifiers
   libusb_setlocale

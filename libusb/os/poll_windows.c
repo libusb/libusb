@@ -185,7 +185,7 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 	if ((nready == 0) && (nb_wait_handles != 0) && (timeout != 0)) {
 		ret = WaitForMultipleObjects(nb_wait_handles, wait_handles,
 			FALSE, (timeout < 0) ? INFINITE : (DWORD)timeout);
-		if ((ret >= WAIT_OBJECT_0) && (ret < (WAIT_OBJECT_0 + nb_wait_handles))) {
+		if (ret < (WAIT_OBJECT_0 + nb_wait_handles)) {
 			nready = check_pollfds(fds, nfds, NULL, NULL);
 		} else if (ret != WAIT_TIMEOUT) {
 			if (ret == WAIT_FAILED)
