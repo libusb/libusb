@@ -857,6 +857,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			return LIBUSB_ERROR_ACCESS;
 		}
 
+		memset(&conn_info, 0, sizeof(conn_info));
 		conn_info.ConnectionIndex = (ULONG)port_number;
 		// coverity[tainted_data_argument]
 		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
