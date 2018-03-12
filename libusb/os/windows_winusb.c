@@ -898,6 +898,8 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			}
 		}
 
+		CloseHandle(hub_handle);
+
 		if (conn_info.DeviceAddress > UINT8_MAX)
 			usbi_err(ctx, "program assertion failed - device address overflow");
 
