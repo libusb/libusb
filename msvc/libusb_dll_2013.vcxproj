@@ -58,6 +58,10 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
+    <Link>
+      <EmbedManagedResourceFile>libusb-1.0.rc;%(EmbedManagedResourceFile)</EmbedManagedResourceFile>
+      <ModuleDefinitionFile>..\libusb\libusb-1.0.def</ModuleDefinitionFile>
+    </Link>
     <Link Condition="'$(Configuration)'=='Debug'">
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
