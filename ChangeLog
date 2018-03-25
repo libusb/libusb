@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2018-03-17: v1.0.22:
+2018-03-24: v1.0.22:
 * New libusb_set_option() API
 * Fix transfer timeout not being cleared upon resubmission
 * Report super speed plus devices on modern Linux and macOS
