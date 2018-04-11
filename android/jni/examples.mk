@@ -28,9 +28,9 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/listdevs.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
-LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
 LOCAL_MODULE:= listdevs
 
@@ -44,9 +44,9 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/xusb.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
-LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
 LOCAL_MODULE:= xusb
 
@@ -60,9 +60,9 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/hotplugtest.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
-LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
 LOCAL_MODULE:= hotplugtest
 
@@ -77,9 +77,9 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/ezusb.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
-LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
 LOCAL_MODULE:= fxload
 
@@ -93,9 +93,9 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/sam3u_benchmark.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
-LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
 LOCAL_MODULE:= sam3u_benchmark
 
@@ -109,9 +109,9 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/dpfp.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
-LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
 LOCAL_MODULE:= dpfp
 
@@ -125,9 +125,9 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/dpfp_threaded.c
 
 LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)
+  $(LIBUSB_ROOT_ABS)/libusb
 
-LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_SHARED_LIBRARIES += libusb-1.0.0
 
 LOCAL_MODULE:= dpfp_threaded
 

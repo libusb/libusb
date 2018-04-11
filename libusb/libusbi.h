@@ -148,9 +148,11 @@ static inline void list_add_tail(struct list_head *entry,
 
 static inline void list_del(struct list_head *entry)
 {
-	entry->next->prev = entry->prev;
-	entry->prev->next = entry->next;
-	entry->next = entry->prev = NULL;
+	if (entry->next && entry->prev) {
+		entry->next->prev = entry->prev;
+		entry->prev->next = entry->next;
+		entry->next = entry->prev = NULL;
+	}
 }
 
 static inline void list_cut(struct list_head *list, struct list_head *head)
@@ -701,6 +703,9 @@ struct usbi_os_backend {
 	 */
 	void (*hotplug_poll)(void);
 
+	struct libusb_device* (*get_device2)(struct libusb_context *ctx, const char *dev_node,
+		const char* descriptors, size_t descriptors_len);
+
 	/* Open a device for I/O and other USB operations. The device handle
 	 * is preallocated for you, you can retrieve the device in question
 	 * through handle->dev.
@@ -727,6 +732,8 @@ struct usbi_os_backend {
 	 * do this for you.
 	 */
 	int (*open)(struct libusb_device_handle *dev_handle);
+
+	int (*open2)(struct libusb_device_handle *handle, int fd);
 
 	/* Close a device such that the handle cannot be used again. Your backend
 	 * should destroy any resources that were allocated in the open path.

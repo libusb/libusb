@@ -832,7 +832,11 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 		usbi_mutex_unlock(&ctx->usb_devs_lock);
 	} else {
 		/* backend does not provide hotplug support */
-		r = usbi_backend.get_device_list(ctx, &discdevs);
+		if (!usbi_backend.get_device_list) {
+	          len = -1;
+		  goto out;
+		}
+		r = usbi_backend->get_device_list(ctx, &discdevs);
 	}
 
 	if (r < 0) {
@@ -1276,6 +1280,74 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 }
 
 /** \ingroup libusb_dev
+ * Open a device with a file descriptor and obtain a device handle.
+ * A handle allows you to perform I/O on the device in question.
+ *
+ * UseCase: Android, after permission granted from Android Device Manager.
+ * The fd can be obtained by calling UsbDeviceConnection.getFileDescriptor().
+ *
+ * Internally, this function adds a reference to the device and makes it
+ * available to you through libusb_get_device(). This reference is removed
+ * during libusb_close().
+ *
+ * This is a non-blocking function; no requests are sent over the bus.
+ *
+ * \param dev the device to open
+ * \param fd the file descriptor for the device
+ * \param handle output location for the returned device handle pointer. Only
+ * populated when the return code is 0.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NO_MEM on memory allocation failure
+ * \returns LIBUSB_ERROR_ACCESS if the user has insufficient permissions
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+int API_EXPORTED libusb_open2(libusb_device *dev, int fd,
+	libusb_device_handle **handle)
+{
+	if (usbi_backend->open2 == NULL) {
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	}
+
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_device_handle *_handle;
+	size_t priv_size = usbi_backend->device_handle_priv_size;
+	int r;
+	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
+
+	_handle = malloc(sizeof(*_handle) + priv_size);
+	if (!_handle)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = usbi_mutex_init(&_handle->lock);
+	if (r) {
+		free(_handle);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	_handle->dev = libusb_ref_device(dev);
+	_handle->auto_detach_kernel_driver = 0;
+	_handle->claimed_interfaces = 0;
+	memset(&_handle->os_priv, 0, priv_size);
+
+	r = usbi_backend->open2(_handle, fd);
+	if (r < 0) {
+		usbi_dbg("open2 %d.%d returns %d", dev->bus_number, dev->device_address, r);
+		libusb_unref_device(dev);
+		usbi_mutex_destroy(&_handle->lock);
+		free(_handle);
+		return r;
+	}
+
+	usbi_mutex_lock(&ctx->open_devs_lock);
+	list_add(&_handle->list, &ctx->open_devs);
+	usbi_mutex_unlock(&ctx->open_devs_lock);
+	*handle = _handle;
+
+	return 0;
+}
+
+/** \ingroup dev
  * Convenience function for finding a device with a particular
  * <tt>idVendor</tt>/<tt>idProduct</tt> combination. This function is intended
  * for those scenarios where you are using libusb to knock up a quick test
@@ -1345,6 +1417,7 @@ static void do_close(struct libusb_context *ctx,
 			continue;
 
 		usbi_mutex_lock(&itransfer->lock);
+
 		if (!(itransfer->state_flags & USBI_TRANSFER_DEVICE_DISAPPEARED)) {
 			usbi_err(ctx, "Device handle closed while transfer was still being processed, but the device is still connected as far as we know");
 
@@ -1459,6 +1532,27 @@ libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle)
 }
 
 /** \ingroup libusb_dev
+ * Get the underlying device for a dev_node.
+ * UseCase: Android
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param dev_node device path
+ * \param descriptors the raw USB descriptors for the device
+ * \param descriptors_size the size of the descriptors array
+ * \returns the underlying device
+ */
+DEFAULT_VISIBILITY
+libusb_device * LIBUSB_CALL libusb_get_device2(libusb_context *ctx, const char *dev_node,
+	const char* descriptors, size_t descriptors_size)
+{
+	if (usbi_backend->get_device2 == NULL) {
+		/* Not supported on this platform */
+		return NULL;
+	}
+
+	return usbi_backend->get_device2(ctx, dev_node, descriptors, descriptors_size);
+}
+
+/** \ingroup dev
  * Determine the bConfigurationValue of the currently active configuration.
  *
  * You could formulate your own control request to obtain this information,
@@ -2306,7 +2400,11 @@ int API_EXPORTED libusb_has_capability(uint32_t capability)
 	case LIBUSB_CAP_HAS_CAPABILITY:
 		return 1;
 	case LIBUSB_CAP_HAS_HOTPLUG:
+#ifdef __ANDROID__
+		return 0;
+#else
 		return !(usbi_backend.get_device_list);
+#endif
 	case LIBUSB_CAP_HAS_HID_ACCESS:
 		return (usbi_backend.caps & USBI_CAP_HAS_HID_ACCESS);
 	case LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER:
@@ -2377,7 +2475,7 @@ static void usbi_log_str(enum libusb_log_level level, const char *str)
 	case LIBUSB_LOG_LEVEL_INFO: priority = ANDROID_LOG_INFO; break;
 	case LIBUSB_LOG_LEVEL_DEBUG: priority = ANDROID_LOG_DEBUG; break;
 	}
-	__android_log_write(priority, "libusb", str);
+	__android_log_print(priority, "libusb", str);
 #elif defined(HAVE_SYSLOG_FUNC)
 	int syslog_level = LOG_INFO;
 	switch (level) {

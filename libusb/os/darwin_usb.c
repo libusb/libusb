@@ -743,7 +743,7 @@ static int darwin_request_descriptor (usb_device_t **device, UInt8 desc, UInt8 d
 
 static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct darwin_cached_device *dev) {
   usb_device_t **device = dev->device;
-  int retries = 1, delay = 30000;
+  int retries = 2, delay = 30000;
   int unsuspended = 0, try_unsuspend = 1, try_reconfigure = 1;
   int is_open = 0;
   int ret = 0, ret2;
@@ -755,11 +755,6 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct da
   (*device)->GetDeviceClass (device, &bDeviceClass);
   (*device)->GetDeviceProduct (device, &idProduct);
   (*device)->GetDeviceVendor (device, &idVendor);
-
-  /* According to Apple's documentation the device must be open for DeviceRequest but we may not be able to open some
-   * devices and Apple's USB Prober doesn't bother to open the device before issuing a descriptor request.  Still,
-   * to follow the spec as closely as possible, try opening the device */
-  is_open = ((*device)->USBDeviceOpenSeize(device) == kIOReturnSuccess);
 
   do {
     /**** retrieve device descriptor ****/
@@ -788,6 +783,13 @@ static int darwin_cache_device_descriptor (struct libusb_context *ctx, struct da
       }
 
       ret = kIOUSBPipeStalled;
+    }
+
+    if (kIOReturnSuccess != ret && !is_open) {
+      /* if the device descriptor request failed on the unopened device, try again with the device opened */
+      is_open = ((*device)->USBDeviceOpenSeize(device) == kIOReturnSuccess);
+      if (is_open)
+        continue;
     }
 
     if (kIOReturnSuccess != ret && is_open && try_unsuspend) {
@@ -1618,7 +1620,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
     return darwin_to_libusb (ret);
   }
 
-  if (0 != (transfer->length % maxPacketSize)) {
+  if (0 != maxPacketSize && 0 != (transfer->length % maxPacketSize)) {
     /* do not need a zero packet */
     transfer->flags &= ~LIBUSB_TRANSFER_ADD_ZERO_PACKET;
   }

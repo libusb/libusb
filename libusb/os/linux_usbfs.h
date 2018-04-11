@@ -190,5 +190,6 @@ int linux_get_device_address (struct libusb_context *ctx, int detached,
 	const char *sys_name);
 int linux_enumerate_device(struct libusb_context *ctx,
 	uint8_t busnum, uint8_t devaddr, const char *sysfs_dir);
-
+int linux_enumerate_device2(struct libusb_context *ctx, uint8_t busnum, uint8_t devaddr,
+	const char* descriptors, size_t descriptors_size);
 #endif
