@@ -476,7 +476,7 @@ static int
 sunos_fill_in_dev_info(di_node_t node, struct libusb_device *dev)
 {
 	int	proplen;
-	int	n, *addr, *port_prop;
+	int	*i, n, *addr, *port_prop;
 	char	*phypath;
 	uint8_t	*rdata;
 	struct libusb_device_descriptor	*descr;
@@ -546,13 +546,13 @@ sunos_fill_in_dev_info(di_node_t node, struct libusb_device *dev)
 	}
 
 	/* speed */
-	if (di_prop_exists(DDI_DEV_T_ANY, node, "low-speed") == 1) {
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "low-speed", &i) >= 0) {
 		dev->speed = LIBUSB_SPEED_LOW;
-	} else if (di_prop_exists(DDI_DEV_T_ANY, node, "high-speed") == 1) {
+	} else if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "high-speed", &i) >= 0) {
 		dev->speed = LIBUSB_SPEED_HIGH;
-	} else if (di_prop_exists(DDI_DEV_T_ANY, node, "full-speed") == 1) {
+	} else if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "full-speed", &i) >= 0) {
 		dev->speed = LIBUSB_SPEED_FULL;
-	} else if (di_prop_exists(DDI_DEV_T_ANY, node, "super-speed") == 1) {
+	} else if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "super-speed", &i) >= 0) {
 		dev->speed = LIBUSB_SPEED_SUPER;
 	}
 
@@ -574,7 +574,7 @@ sunos_add_devices(di_devlink_t link, void *arg)
 	uint64_t		bdf = 0;
 	struct libusb_device	*dev;
 	sunos_dev_priv_t	*devpriv;
-	int			n;
+	int			n, *j;
 	int			i = 0;
 	int			*addr_prop;
 	uint8_t			bus_number = 0;
@@ -594,7 +594,7 @@ sunos_add_devices(di_devlink_t link, void *arg)
 
 	dn = myself;
 	/* find the root hub */
-	while (di_prop_exists(DDI_DEV_T_ANY, dn, "root-hub") != 1) {
+	while (di_prop_lookup_ints(DDI_DEV_T_ANY, dn, "root-hub", &j) != 0) {
 		usbi_dbg("find_root_hub:%s", di_devfs_path(dn));
 		n = di_prop_lookup_ints(DDI_DEV_T_ANY, dn,
 				"assigned-address", &addr_prop);
