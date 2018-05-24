@@ -1706,15 +1706,19 @@ int usbi_handle_transfer_cancellation(struct usbi_transfer *transfer)
  * function will be called the next time an event handler runs. */
 void usbi_signal_transfer_completion(struct usbi_transfer *transfer)
 {
-	struct libusb_context *ctx = ITRANSFER_CTX(transfer);
-	int pending_events;
+	libusb_device_handle *dev_handle = USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)->dev_handle;
 
-	usbi_mutex_lock(&ctx->event_data_lock);
-	pending_events = usbi_pending_events(ctx);
-	list_add_tail(&transfer->completed_list, &ctx->completed_transfers);
-	if (!pending_events)
-		usbi_signal_event(ctx);
-	usbi_mutex_unlock(&ctx->event_data_lock);
+	if (dev_handle) {
+		struct libusb_context *ctx = HANDLE_CTX(dev_handle);
+		int pending_events;
+
+		usbi_mutex_lock(&ctx->event_data_lock);
+		pending_events = usbi_pending_events(ctx);
+		list_add_tail(&transfer->completed_list, &ctx->completed_transfers);
+		if (!pending_events)
+			usbi_signal_event(ctx);
+		usbi_mutex_unlock(&ctx->event_data_lock);
+	}
 }
 
 /** \ingroup libusb_poll
