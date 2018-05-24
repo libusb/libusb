@@ -1360,9 +1360,15 @@ solaris_submit_ctrl_on_default(struct libusb_transfer *transfer)
 	}
 	usbi_dbg("Done: ctrl data bytes %d", ret);
 
-	/* sync transfer handling */
+	/**
+	 * Sync transfer handling.
+ 	 * We should release transfer lock here and later get it back
+	 * as usbi_handle_transfer_completion() takes its own transfer lock.
+	 */
+	usbi_mutex_unlock(&LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)->lock);
 	ret = usbi_handle_transfer_completion(LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer),
 	    transfer->status);
+	usbi_mutex_lock(&LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)->lock);
 
 	return (ret);
 }
