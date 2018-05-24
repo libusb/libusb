@@ -161,6 +161,25 @@ sunos)
 	LIBS="-pthread -ldevinfo"
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
+	AC_MSG_CHECKING([whether public list API is available])
+	AC_LINK_IFELSE([AC_LANG_PROGRAM(
+	[[#include <sys/list.h>
+		#include <stdlib.h>
+		#include <stddef.h>
+		typedef list_t string_list_t;
+		typedef struct string_node {
+			char            *string;
+			list_node_t     link;
+		} string_node_t;
+	]],
+        [string_list_t *list;
+		list = calloc(1, sizeof(*list));
+		if (list != NULL)
+               list_create(list, sizeof(string_node_t),
+                            offsetof(string_node_t, link));])],
+                    [AC_DEFINE([HAVE_LIST_API], [1], [Public list API is present])
+			 AC_MSG_RESULT([yes])],
+                    [AC_MSG_RESULT([no])])
 	;;
 netbsd)
 	AC_DEFINE(OS_NETBSD, 1, [NetBSD backend])

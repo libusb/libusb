@@ -81,6 +81,8 @@ static int sunos_cancel_transfer(struct usbi_transfer *);
 static void sunos_clear_transfer_priv(struct usbi_transfer *);
 static int sunos_handle_transfer_completion(struct usbi_transfer *);
 static int sunos_clock_gettime(int, struct timespec *);
+
+#ifdef HAVE_LIST_API
 static int sunos_kernel_driver_active(struct libusb_device_handle *, int interface);
 static int sunos_detach_kernel_driver (struct libusb_device_handle *dev, int interface_number);
 static int sunos_attach_kernel_driver (struct libusb_device_handle *dev, int interface_number);
@@ -88,6 +90,7 @@ static int sunos_usb_open_ep0(sunos_dev_handle_priv_t *hpriv, sunos_dev_priv_t *
 static int sunos_usb_ioctl(struct libusb_device *dev, int cmd);
 
 static struct devctl_iocdata iocdata;
+#endif
 static int sunos_get_link(di_devlink_t devlink, void *arg)
 {
 	walk_link_t *larg = (walk_link_t *)arg;
@@ -146,6 +149,7 @@ static int sunos_physpath_to_devlink(
 	return 0;
 }
 
+#ifdef HAVE_LIST_API
 static int
 sunos_usb_ioctl(struct libusb_device *dev, int cmd)
 {
@@ -237,6 +241,7 @@ sunos_kernel_driver_active(struct libusb_device_handle *dev, int interface)
 
 	return (dpriv->ugenpath == NULL);
 }
+#endif
 
 /*
  * Private functions
@@ -254,6 +259,7 @@ static void sunos_exit(struct libusb_context *ctx)
 	usbi_dbg("");
 }
 
+#ifdef HAVE_LIST_API
 static string_list_t *
 sunos_new_string_list(void)
 {
@@ -471,6 +477,7 @@ sunos_attach_kernel_driver(struct libusb_device_handle *dev_handle,
 
 	return 0;
 }
+#endif
 
 static int
 sunos_fill_in_dev_info(di_node_t node, struct libusb_device *dev)
@@ -983,10 +990,12 @@ sunos_open(struct libusb_device_handle *handle)
 		hpriv->eps[i].statfd = -1;
 	}
 
+#ifdef HAVE_LIST_API
 	if (sunos_kernel_driver_active(handle, 0)) {
 		/* pretend we can open the device */
 		return (LIBUSB_SUCCESS);
 	}
+#endif
 
 	if ((ret = sunos_usb_open_ep0(hpriv, dpriv)) != LIBUSB_SUCCESS) {
 		usbi_dbg("fail: %d", ret);
@@ -1659,9 +1668,15 @@ const struct usbi_os_backend usbi_backend = {
         .reset_device = sunos_reset_device, /* TODO */
         .alloc_streams = NULL,
         .free_streams = NULL,
+#ifdef HAVE_LIST_API
         .kernel_driver_active = sunos_kernel_driver_active,
         .detach_kernel_driver = sunos_detach_kernel_driver,
         .attach_kernel_driver = sunos_attach_kernel_driver,
+#else
+        .kernel_driver_active = NULL,
+        .detach_kernel_driver = NULL,
+        .attach_kernel_driver = NULL,
+#endif
         .destroy_device = sunos_destroy_device,
         .submit_transfer = sunos_submit_transfer,
         .cancel_transfer = sunos_cancel_transfer,
