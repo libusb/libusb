@@ -1196,26 +1196,32 @@ sunos_async_callback(union sigval arg)
 	int ret;
 	sunos_dev_handle_priv_t *hpriv;
 	uint8_t ep;
+	libusb_device_handle *dev_handle;
 
-	hpriv = (sunos_dev_handle_priv_t *)xfer->dev_handle->os_priv;
-	ep = sunos_usb_ep_index(xfer->endpoint);
+	dev_handle = xfer->dev_handle;
 
-	ret = aio_error(aiocb);
-	if (ret != 0) {
-		xfer->status = sunos_usb_get_status(hpriv->eps[ep].statfd);
-	} else {
-		xfer->actual_length =
-		    LIBUSB_TRANSFER_TO_USBI_TRANSFER(xfer)->transferred =
-		    aio_return(aiocb);
+	/* libusb can forcibly interrupt transfer in do_close() */
+	if (dev_handle != NULL) {
+		hpriv = (sunos_dev_handle_priv_t *)dev_handle->os_priv;
+		ep = sunos_usb_ep_index(xfer->endpoint);
+
+		ret = aio_error(aiocb);
+		if (ret != 0) {
+			xfer->status = sunos_usb_get_status(hpriv->eps[ep].statfd);
+		} else {
+			xfer->actual_length =
+			    LIBUSB_TRANSFER_TO_USBI_TRANSFER(xfer)->transferred =
+			    aio_return(aiocb);
+		}
+
+		usb_dump_data(xfer->buffer, xfer->actual_length);
+
+		usbi_dbg("ret=%d, len=%d, actual_len=%d", ret, xfer->length,
+		    xfer->actual_length);
+
+		/* async notification */
+		usbi_signal_transfer_completion(LIBUSB_TRANSFER_TO_USBI_TRANSFER(xfer));
 	}
-
-	usb_dump_data(xfer->buffer, xfer->actual_length);
-
-	usbi_dbg("ret=%d, len=%d, actual_len=%d", ret, xfer->length,
-	    xfer->actual_length);
-
-	/* async notification */
-	usbi_signal_transfer_completion(LIBUSB_TRANSFER_TO_USBI_TRANSFER(xfer));
 }
 
 static int
