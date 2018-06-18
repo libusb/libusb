@@ -60,7 +60,7 @@ static size_t usbi_locale = 0;
  * </ol>
  */
 
-static const char* usbi_locale_supported[] = { "en", "nl", "fr", "ru" };
+static const char* usbi_locale_supported[] = { "en", "nl", "fr", "ru", "de" };
 static const char* usbi_localized_errors[ARRAYSIZE(usbi_locale_supported)][LIBUSB_ERROR_COUNT] = {
 	{ /* English (en) */
 		"Success",
@@ -122,6 +122,22 @@ static const char* usbi_localized_errors[ARRAYSIZE(usbi_locale_supported)][LIBUS
 		"Память исчерпана",
 		"Операция не поддерживается данной платформой",
 		"Неизвестная ошибка"
+	
+	}, { /* German (de) */
+		"Erfolgreich",
+		"Eingabe-/Ausgabefehler",
+		"Ungültiger Parameter",
+		"Keine Berechtigung (Zugriffsrechte fehlen)",
+		"Kein passendes Gerät gefunden (es könnte entfernt worden sein)",
+		"Entität nicht gefunden",
+		"Die Ressource ist belegt",
+		"Die Wartezeit für die Operation ist abgelaufen",
+		"Mehr Daten empfangen als erwartet",
+		"Datenübergabe unterbrochen (broken pipe)",
+		"Unterbrechung während des Betriebssystemaufrufs",
+		"Nicht genügend Hauptspeicher verfügbar",
+		"Die Operation wird nicht unterstützt oder ist auf dieser Platform nicht implementiert",
+		"Allgemeiner Fehler",
 	}
 };
 
