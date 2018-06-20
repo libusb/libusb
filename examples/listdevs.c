@@ -60,8 +60,10 @@ int main(void)
 		return r;
 
 	cnt = libusb_get_device_list(NULL, &devs);
-	if (cnt < 0)
+	if (cnt < 0){
+		libusb_exit(NULL);
 		return (int) cnt;
+	}
 
 	print_devs(devs);
 	libusb_free_device_list(devs, 1);
