@@ -114,30 +114,27 @@ static void print_bos(libusb_device_handle *handle)
 	printf("    wTotalLength:       %d\n", bos->wTotalLength);
 	printf("    bNumDeviceCaps:     %d\n", bos->bNumDeviceCaps);
 
-	if(bos->dev_capability[0]->bDevCapabilityType == LIBUSB_BT_USB_2_0_EXTENSION) {
-
+        for(uint8_t capIndex = 0; capIndex < bos->bNumDeviceCaps; capIndex++) {
+            if(bos->dev_capability[capIndex]->bDevCapabilityType == LIBUSB_BT_USB_2_0_EXTENSION) {
 		struct libusb_usb_2_0_extension_descriptor *usb_2_0_extension;
-	        ret =  libusb_get_usb_2_0_extension_descriptor(NULL, bos->dev_capability[0],&usb_2_0_extension);
+	        ret =  libusb_get_usb_2_0_extension_descriptor(NULL, bos->dev_capability[capIndex],&usb_2_0_extension);
 	        if (0 > ret) {
 		        return;
 	        }
-
                 print_2_0_ext_cap(usb_2_0_extension);
                 libusb_free_usb_2_0_extension_descriptor(usb_2_0_extension);
-        }
+            }
 
-	if(bos->dev_capability[0]->bDevCapabilityType == LIBUSB_BT_SS_USB_DEVICE_CAPABILITY) {
-
+   	    if(bos->dev_capability[capIndex]->bDevCapabilityType == LIBUSB_BT_SS_USB_DEVICE_CAPABILITY) {
 	        struct libusb_ss_usb_device_capability_descriptor *dev_cap;
-		ret = libusb_get_ss_usb_device_capability_descriptor(NULL, bos->dev_capability[0],&dev_cap);
+                ret = libusb_get_ss_usb_device_capability_descriptor(NULL, bos->dev_capability[capIndex],&dev_cap);
 	        if (0 > ret) {
 		        return;
 	        }
-
 	        print_ss_usb_cap(dev_cap);
 	        libusb_free_ss_usb_device_capability_descriptor(dev_cap);
-        }
-
+            }
+	}
 	libusb_free_bos_descriptor(bos);
 }
 
