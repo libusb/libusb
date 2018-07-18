@@ -12,6 +12,31 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "android_arm64-v8a",
+    values = {
+      "cpu": "arm64-v8a",
+    },
+)
+
+config_setting(
+    name = "android_x86_64",
+    values = {
+      "cpu": "x86_64",
+    },
+)
+
+_android_srcs = [
+    "android/config.h",
+    "libusb/os/linux_netlink.c",
+    "libusb/os/linux_usbfs.c",
+    "libusb/os/linux_usbfs.h",
+]
+
+_android_copts = [
+    "-I" + PACKAGE_NAME + "/android",
+]
+
 cc_library(
     name = "libusb",
     srcs = glob([
@@ -23,15 +48,17 @@ cc_library(
         "libusb/os/threads_posix.c",
         "libusb/os/threads_posix.h",
     ] + select({
+        ":android_arm64-v8a": _android_srcs,
+        ":android_x86_64": _android_srcs,
         ":darwin": [
             "libusb/os/darwin_usb.c",
             "libusb/os/darwin_usb.h",
             "Xcode/config.h",
         ],
         ":linux": [
+            "libusb/os/linux_udev.c",
             "libusb/os/linux_usbfs.c",
             "libusb/os/linux_usbfs.h",
-            "libusb/os/linux_udev.c",
             "linux/config.h",
         ],
         "//conditions:default": [],
@@ -43,6 +70,8 @@ cc_library(
     copts = [
         "-I" + PACKAGE_NAME + "/libusb",
     ] + select({
+        ":android_arm64-v8a": _android_copts,
+        ":android_x86_64": _android_copts,
         ":darwin": [
             "-I" + PACKAGE_NAME + "/Xcode",
             "-mmacosx-version-min=10.12",
