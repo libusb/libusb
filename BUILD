@@ -15,14 +15,14 @@ config_setting(
 config_setting(
     name = "android_arm64-v8a",
     values = {
-      "cpu": "arm64-v8a",
+        "cpu": "arm64-v8a",
     },
 )
 
 config_setting(
     name = "android_x86_64",
     values = {
-      "cpu": "x86_64",
+        "cpu": "x86_64",
     },
 )
 
@@ -66,7 +66,6 @@ cc_library(
     hdrs = [
         "libusb/libusb.h",
     ],
-    includes = ["."],
     copts = [
         "-I" + PACKAGE_NAME + "/libusb",
     ] + select({
@@ -81,6 +80,7 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    includes = ["."],
     linkopts = select({
         ":darwin": [
             "-framework CoreFoundation",
