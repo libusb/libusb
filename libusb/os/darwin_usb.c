@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2017 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2008-2018 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -1498,9 +1498,10 @@ static int darwin_reset_device(struct libusb_device_handle *dev_handle) {
   IOReturn kresult;
   int i;
 
-  kresult = (*(dpriv->device))->ResetDevice (dpriv->device);
+  /* from macOS 10.11 ResetDevice no longer does anything so just use USBDeviceReEnumerate */
+  kresult = (*(dpriv->device))->USBDeviceReEnumerate (dpriv->device, 0);
   if (kresult) {
-    usbi_err (HANDLE_CTX (dev_handle), "ResetDevice: %s", darwin_error_str (kresult));
+    usbi_err (HANDLE_CTX (dev_handle), "USBDeviceReEnumerate: %s", darwin_error_str (kresult));
     return darwin_to_libusb (kresult);
   }
 
