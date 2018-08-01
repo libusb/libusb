@@ -58,16 +58,13 @@ static bool extra_info = false;
 static bool force_device_request = false;	// For WCID descriptor queries
 static const char* binary_name = NULL;
 
-static int perr(char const *format, ...)
+static void perr(char const *format, ...)
 {
 	va_list args;
-	int r;
 
 	va_start (args, format);
-	r = vfprintf(stderr, format, args);
+	vfprintf(stderr, format, args);
 	va_end(args);
-
-	return r;
 }
 
 #define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)errcode)); return -1; } while (0)
@@ -96,6 +93,16 @@ static int perr(char const *format, ...)
 #define BOMS_RESET                    0xFF
 #define BOMS_GET_MAX_LUN              0xFE
 
+// Microsoft OS Descriptor
+#define MS_OS_DESC_STRING_INDEX		0xEE
+#define MS_OS_DESC_STRING_LENGTH	0x12
+#define MS_OS_DESC_VENDOR_CODE_OFFSET	0x10
+static const uint8_t ms_os_desc_string[] = {
+	MS_OS_DESC_STRING_LENGTH,
+	LIBUSB_DT_STRING,
+	'M', 0, 'S', 0, 'F', 0, 'T', 0, '1', 0, '0', 0, '0', 0,
+};
+
 // Section 5.1: Command Block Wrapper (CBW)
 struct command_block_wrapper {
 	uint8_t dCBWSignature[4];
@@ -115,7 +122,7 @@ struct command_status_wrapper {
 	uint8_t bCSWStatus;
 };
 
-static uint8_t cdb_length[256] = {
+static const uint8_t cdb_length[256] = {
 //	 0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
 	06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,  //  0
 	06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,  //  1
@@ -176,7 +183,8 @@ static char* uuid_to_string(const uint8_t* uuid)
 {
 	static char uuid_string[40];
 	if (uuid == NULL) return NULL;
-	sprintf(uuid_string, "{%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x}",
+	snprintf(uuid_string, sizeof(uuid_string),
+		"{%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x}",
 		uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7],
 		uuid[8], uuid[9], uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]);
 	return uuid_string;
@@ -523,7 +531,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	}
 
 	// Send Read
-	printf("Attempting to read %d bytes:\n", block_size);
+	printf("Attempting to read %u bytes:\n", block_size);
 	memset(cdb, 0, sizeof(cdb));
 
 	cdb[0] = 0x28;	// Read(10)
@@ -802,8 +810,8 @@ static int test_device(uint16_t vid, uint16_t pid)
 	int i, j, k, r;
 	int iface, nb_ifaces, first_iface = -1;
 	struct libusb_device_descriptor dev_desc;
-	const char* speed_name[5] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
-		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)"};
+	const char* const speed_name[5] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
+		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)" };
 	char string[128];
 	uint8_t string_index[3];	// indexes of the string descriptors
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
@@ -923,17 +931,16 @@ static int test_device(uint16_t vid, uint16_t pid)
 		if (string_index[i] == 0) {
 			continue;
 		}
-		if (libusb_get_string_descriptor_ascii(handle, string_index[i], (unsigned char*)string, 128) >= 0) {
+		if (libusb_get_string_descriptor_ascii(handle, string_index[i], (unsigned char*)string, sizeof(string)) > 0) {
 			printf("   String (0x%02X): \"%s\"\n", string_index[i], string);
 		}
 	}
 	// Read the OS String Descriptor
-	if (libusb_get_string_descriptor_ascii(handle, 0xEE, (unsigned char*)string, 128) >= 0) {
-		printf("   String (0x%02X): \"%s\"\n", 0xEE, string);
+	r = libusb_get_string_descriptor(handle, MS_OS_DESC_STRING_INDEX, 0, (unsigned char*)string, MS_OS_DESC_STRING_LENGTH);
+	if (r == MS_OS_DESC_STRING_LENGTH && memcmp(ms_os_desc_string, string, sizeof(ms_os_desc_string)) == 0) {
 		// If this is a Microsoft OS String Descriptor,
 		// attempt to read the WinUSB extended Feature Descriptors
-		if (strncmp(string, "MSFT100", 7) == 0)
-			read_ms_winsub_feature_descriptors(handle, string[7], first_iface);
+		read_ms_winsub_feature_descriptors(handle, string[MS_OS_DESC_VENDOR_CODE_OFFSET], first_iface);
 	}
 
 	switch(test_mode) {
@@ -1097,7 +1104,7 @@ int main(int argc, char** argv)
 	old_dbg_str = getenv("LIBUSB_DEBUG");
 	if (debug_mode) {
 		if (putenv("LIBUSB_DEBUG=4") != 0)	// LIBUSB_LOG_LEVEL_DEBUG
-			printf("Unable to set debug level");
+			printf("Unable to set debug level\n");
 	}
 
 	version = libusb_get_version();

@@ -68,31 +68,35 @@
 /*
  * Macros for handling DLL themselves
  */
+#define DLL_HANDLE_NAME(name) __dll_##name##_handle
+
 #define DLL_DECLARE_HANDLE(name)				\
-	static HMODULE __dll_##name##_handle = NULL
+	static HMODULE DLL_HANDLE_NAME(name) = NULL
 
 #define DLL_GET_HANDLE(name)					\
 	do {							\
-		__dll_##name##_handle = DLL_LOAD_LIBRARY(name);	\
-		if (!__dll_##name##_handle)			\
-			return LIBUSB_ERROR_OTHER;		\
+		DLL_HANDLE_NAME(name) = DLL_LOAD_LIBRARY(name);	\
+		if (!DLL_HANDLE_NAME(name))			\
+			return FALSE;				\
 	} while (0)
 
 #define DLL_FREE_HANDLE(name)					\
 	do {							\
-		if (__dll_##name##_handle) {			\
-			FreeLibrary(__dll_##name##_handle);	\
-			__dll_##name##_handle = NULL;		\
+		if (DLL_HANDLE_NAME(name)) {			\
+			FreeLibrary(DLL_HANDLE_NAME(name));	\
+			DLL_HANDLE_NAME(name) = NULL;		\
 		}						\
-	} while(0)
+	} while (0)
 
 
 /*
  * Macros for handling functions within a DLL
  */
+#define DLL_FUNC_NAME(name) __dll_##name##_func_t
+
 #define DLL_DECLARE_FUNC_PREFIXNAME(api, ret, prefixname, name, args)	\
-	typedef ret (api * __dll_##name##_func_t)args;			\
-	static __dll_##name##_func_t prefixname = NULL
+	typedef ret (api * DLL_FUNC_NAME(name))args;			\
+	static DLL_FUNC_NAME(name) prefixname = NULL
 
 #define DLL_DECLARE_FUNC(api, ret, name, args)				\
 	DLL_DECLARE_FUNC_PREFIXNAME(api, ret, name, name, args)
@@ -101,22 +105,22 @@
 
 #define DLL_LOAD_FUNC_PREFIXNAME(dll, prefixname, name, ret_on_failure)	\
 	do {								\
-		HMODULE h = __dll_##dll##_handle;			\
-		prefixname = (__dll_##name##_func_t)GetProcAddress(h,	\
+		HMODULE h = DLL_HANDLE_NAME(dll);			\
+		prefixname = (DLL_FUNC_NAME(name))GetProcAddress(h,	\
 				DLL_STRINGIFY(name));			\
 		if (prefixname)						\
 			break;						\
-		prefixname = (__dll_##name##_func_t)GetProcAddress(h,	\
+		prefixname = (DLL_FUNC_NAME(name))GetProcAddress(h,	\
 				DLL_STRINGIFY(name) DLL_STRINGIFY(A));	\
 		if (prefixname)						\
 			break;						\
-		prefixname = (__dll_##name##_func_t)GetProcAddress(h,	\
+		prefixname = (DLL_FUNC_NAME(name))GetProcAddress(h,	\
 				DLL_STRINGIFY(name) DLL_STRINGIFY(W));	\
 		if (prefixname)						\
 			break;						\
 		if (ret_on_failure)					\
-			return LIBUSB_ERROR_NOT_FOUND;			\
-	} while(0)
+			return FALSE;					\
+	} while (0)
 
 #define DLL_LOAD_FUNC(dll, name, ret_on_failure)			\
 	DLL_LOAD_FUNC_PREFIXNAME(dll, name, name, ret_on_failure)

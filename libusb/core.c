@@ -2110,19 +2110,15 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 			ctx->debug = (enum libusb_log_level)arg;
 #endif
 		break;
+
 	/* Handle all backend-specific options here */
-#if 0
-	/* This code is compiled out until the first backend-specific option is
-	 * added to the library. When this time comes, remove the #if/#endif
-	 * lines and this comment, then replace the case statement with the
-	 * valid option name. */
-	case LIBUSB_OPTION_<...>:
+	case LIBUSB_OPTION_USE_USBDK:
 		if (usbi_backend.set_option)
 			r = usbi_backend.set_option(ctx, option, ap);
 		else
 			r = LIBUSB_ERROR_NOT_SUPPORTED;
 		break;
-#endif
+
 	default:
 		r = LIBUSB_ERROR_INVALID_PARAM;
 	}
@@ -2213,6 +2209,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	list_init(&ctx->usb_devs);
 	list_init(&ctx->open_devs);
 	list_init(&ctx->hotplug_cbs);
+	ctx->next_hotplug_cb_handle = 1;
 
 	usbi_mutex_static_lock(&active_contexts_lock);
 	if (first_init) {
@@ -2301,7 +2298,7 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
 	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
-		usbi_hotplug_deregister_all(ctx);
+		usbi_hotplug_deregister(ctx, 1);
 
 		/*
 		 * Ensure any pending unplug events are read from the hotplug

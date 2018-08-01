@@ -41,9 +41,8 @@ addons:
             - ubuntu-toolchain-r-test
 
 before_install:
-    # brew upgrade sets the return code to 1 if the latest version is already installed. the true command
-    # is used to reset the return code to 0.
-    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; brew upgrade automake libtool ; true; fi
+    # brew bundle installs or upgrades packages in Brewfile
+    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew bundle && brew bundle cleanup --force; fi
 
 script:
     - ./autogen.sh && make clean && make

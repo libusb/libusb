@@ -308,6 +308,7 @@ struct libusb_context {
 
 	/* A list of registered hotplug callbacks */
 	struct list_head hotplug_cbs;
+	libusb_hotplug_callback_handle next_hotplug_cb_handle;
 	usbi_mutex_t hotplug_cbs_lock;
 
 	/* this is a list of in-flight transfer handles, sorted by timeout
@@ -379,6 +380,9 @@ enum usbi_event_flags {
 
 	/* The user has interrupted the event handler */
 	USBI_EVENT_USER_INTERRUPT = 1 << 1,
+
+	/* A hotplug callback deregistration is pending */
+	USBI_EVENT_HOTPLUG_CB_DEREGISTERED = 1 << 2,
 };
 
 /* Macros for managing event handling state */

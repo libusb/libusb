@@ -84,6 +84,8 @@ static void *poll_thread_main(void *arg)
 	int r = 0;
 	printf("poll thread running\n");
 
+	(void)arg;
+
 	while (!do_exit) {
 		struct timeval tv = { 1, 0 };
 		r = libusb_handle_events_timeout(NULL, &tv);
@@ -441,6 +443,8 @@ static int alloc_transfers(void)
 
 static void sighandler(int signum)
 {
+	(void)signum;
+
 	request_exit(1);
 }
 
