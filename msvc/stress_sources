@@ -1,4 +1,4 @@
-TARGETNAME=hotplugtest
+TARGETNAME=stress
 TARGETTYPE=PROGRAM
 386_STDCALL=0
 
@@ -17,4 +17,5 @@ USE_MSVCRT=1
 UMTYPE=console
 INCLUDES=..\..\msvc;..\..\libusb;$(DDK_INC_PATH)
 UMLIBS=..\..\libusb\os\obj$(BUILD_ALT_DIR)\*\libusb-1.0.lib
-SOURCES=..\hotplugtest.c
+SOURCES=..\stress.c \
+        ..\testlib.c

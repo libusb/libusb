@@ -21,6 +21,10 @@
 #include <string.h>
 #include "libusb.h"
 
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+#define snprintf _snprintf
+#endif
+
 int verbose = 0;
 
 static void print_endpoint_comp(const struct libusb_ss_endpoint_companion_descriptor *ep_comp)
@@ -63,7 +67,7 @@ static void print_endpoint(const struct libusb_endpoint_descriptor *endpoint)
 
 static void print_altsetting(const struct libusb_interface_descriptor *interface)
 {
-	int i;
+	uint8_t i;
 
 	printf("    Interface:\n");
 	printf("      bInterfaceNumber:   %d\n", interface->bInterfaceNumber);
@@ -147,7 +151,7 @@ static void print_interface(const struct libusb_interface *interface)
 
 static void print_configuration(struct libusb_config_descriptor *config)
 {
-	int i;
+	uint8_t i;
 
 	printf("  Configuration:\n");
 	printf("    wTotalLength:         %d\n", config->wTotalLength);
@@ -167,7 +171,8 @@ static int print_device(libusb_device *dev, int level)
 	libusb_device_handle *handle = NULL;
 	char description[256];
 	char string[256];
-	int ret, i;
+	int ret;
+	uint8_t i;
 
 	ret = libusb_get_device_descriptor(dev, &desc);
 	if (ret < 0) {

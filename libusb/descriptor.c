@@ -333,7 +333,7 @@ static int parse_interface(libusb_context *ctx,
 					goto err;
 				if (r == 0) {
 					ifp->bNumEndpoints = (uint8_t)i;
-					break;;
+					break;
 				}
 
 				buffer += r;
@@ -1176,7 +1176,8 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 	if (tbuf[0] > r)
 		return LIBUSB_ERROR_IO;
 
-	for (di = 0, si = 2; si < tbuf[0]; si += 2) {
+	di = 0;
+	for (si = 2; si < tbuf[0]; si += 2) {
 		if (di >= (length - 1))
 			break;
 
