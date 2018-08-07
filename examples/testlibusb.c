@@ -169,7 +169,7 @@ static int print_device(libusb_device *dev, int level)
 {
 	struct libusb_device_descriptor desc;
 	libusb_device_handle *handle = NULL;
-	char description[256];
+	char description[260];
 	char string[256];
 	int ret;
 	uint8_t i;
