@@ -528,7 +528,6 @@ static void darwin_check_version (void) {
   errno = 0;
   version = strtol (version_string, NULL, 10);
   if (0 == errno && version >= 15) {
-    darwin_device_class = "IOUSBHostDevice";
   }
 }
 
@@ -894,7 +893,7 @@ static int get_device_parent_sessionID(io_service_t service, UInt64 *parent_sess
 
   /* Walk up the tree in the IOService plane until we find a parent that has a sessionID */
   parent = service;
-  while((result = IORegistryEntryGetParentEntry (parent, kIOServicePlane, &parent)) == kIOReturnSuccess) {
+  while((result = IORegistryEntryGetParentEntry (parent, kIOUSBPlane, &parent)) == kIOReturnSuccess) {
     if (get_ioregistry_value_number (parent, CFSTR("sessionID"), kCFNumberSInt64Type, parent_sessionID)) {
         /* Success */
         return 1;
