@@ -2432,8 +2432,9 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 	transfer_priv->handle = winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 	overlapped = transfer_priv->pollable_fd.overlapped;
 
-	// Sending of set configuration control requests from WinUSB creates issues
-	if ((LIBUSB_REQ_TYPE(setup->RequestType) == LIBUSB_REQUEST_TYPE_STANDARD)
+	// Sending of set configuration control requests from WinUSB creates issues, except when using libusb0.sys
+	if (sub_api != SUB_API_LIBUSB0
+			&& (LIBUSB_REQ_TYPE(setup->RequestType) == LIBUSB_REQUEST_TYPE_STANDARD)
 			&& (setup->Request == LIBUSB_REQUEST_SET_CONFIGURATION)) {
 		if (setup->Value != priv->active_config) {
 			usbi_warn(ctx, "cannot set configuration other than the default one");
