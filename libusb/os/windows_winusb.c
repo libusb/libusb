@@ -1996,6 +1996,49 @@ static int winusbx_init(struct libusb_context *ctx)
 	LibK_GetProcAddress_t pLibK_GetProcAddress = NULL;
 	LibK_GetVersion_t pLibK_GetVersion;
 
+	// Try to load libusbK.dll. We'll attempt to look for libusbK.dll in the same directory as libusb-1.0.dll,
+	// so first find the path of libusb-1.0.dll and then try to load the library from there.
+	// SetDllDirectoryA is available on Windows XP SP1 and above, so don't attempt to do this on Windows XP RTM or
+	// earlier
+#if NTDDI_VERSION >= NTDDI_WINXPSP1
+	char path[MAX_PATH];
+	char drive[_MAX_DRIVE];
+	char dir[_MAX_DIR];
+	HMODULE hm = NULL;
+
+	if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+		GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		(LPCSTR)&winusbx_init, &hm) == 0)
+	{
+		int ret = GetLastError();
+		usbi_warn(ctx, "GetModuleHandle failed, error = %d\n", ret);
+	}
+	else
+	{
+		if (GetModuleFileNameA(hm, path, MAX_PATH) == 0)
+		{
+			int ret = GetLastError();
+			usbi_warn(ctx, "GetModuleFileNameA failed, error = %d\n", ret);
+		}
+		else
+		{
+			usbi_dbg("The current library is located at %s\n", path);
+
+			_splitpath(path, drive, dir, NULL /*fname*/, NULL /*ext*/);
+			_makepath(path, drive, dir, NULL, NULL);
+
+			usbi_dbg("Adding %s to the list of DLL directories\n", path);
+			if (SetDllDirectoryA(path) == 0)
+			{
+				int ret = GetLastError();
+				usbi_warn("SetDllDirectoryA failed, error = %d\n", ret);
+			}
+		}
+	}
+#else
+	usbi_dbg(ctx, "libusbK.dll must be located in a directory which is part of the search path.");
+#endif
+
 	h = LoadLibraryA("libusbK");
 
 	if (h == NULL) {
