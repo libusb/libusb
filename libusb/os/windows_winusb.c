@@ -1989,7 +1989,7 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 
 static int winusbx_init(struct libusb_context *ctx)
 {
-	HMODULE h;
+	HMODULE h = NULL;
 	bool native_winusb;
 	int i;
 	KLIB_VERSION LibK_Version;
@@ -1998,15 +1998,12 @@ static int winusbx_init(struct libusb_context *ctx)
 
 	// Try to load libusbK.dll. We'll attempt to look for libusbK.dll in the same directory as libusb-1.0.dll,
 	// so first find the path of libusb-1.0.dll and then try to load the library from there.
-	// SetDllDirectoryA is available on Windows XP SP1 and above, so don't attempt to do this on Windows XP RTM or
-	// earlier
-#if NTDDI_VERSION >= NTDDI_WINXPSP1
 	char path[MAX_PATH];
 	char drive[_MAX_DRIVE];
 	char dir[_MAX_DIR];
 	HMODULE hm = NULL;
 
-	if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+	if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
 		GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
 		(LPCSTR)&winusbx_init, &hm) == 0)
 	{
@@ -2025,21 +2022,22 @@ static int winusbx_init(struct libusb_context *ctx)
 			usbi_dbg("The current library is located at %s\n", path);
 
 			_splitpath(path, drive, dir, NULL /*fname*/, NULL /*ext*/);
-			_makepath(path, drive, dir, NULL, NULL);
+			_makepath(path, drive, dir, "libusbK", "dll");
 
-			usbi_dbg("Adding %s to the list of DLL directories\n", path);
-			if (SetDllDirectoryA(path) == 0)
-			{
-				int ret = GetLastError();
-				usbi_warn("SetDllDirectoryA failed, error = %d\n", ret);
+			usbi_dbg("Attempting to load libusbK from %s\n", path);
+			h = LoadLibraryA(path);
+
+			if (h == NULL) {
+				usbi_dbg("Failed to load libusbK from '%s': %s", windows_error_str(0));
 			}
 		}
 	}
-#else
-	usbi_dbg(ctx, "libusbK.dll must be located in a directory which is part of the search path.");
-#endif
 
-	h = LoadLibraryA("libusbK");
+	// If there's no libusbK in the current directory, do a global load.
+	if (h == NULL)
+	{
+		h = LoadLibraryA("libusbK");
+	}
 
 	if (h == NULL) {
 		usbi_info(ctx, "libusbK DLL is not available, will use native WinUSB");
