@@ -966,7 +966,7 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
  * function and make sure that you only access the parent before issuing
  * \ref libusb_free_device_list(). The reason is that libusb currently does
  * not maintain a permanent list of device instances, and therefore can
- * only guarantee that parents are fully instantiated within a
+ * only guarantee that parents are fully instantiated within a 
  * libusb_get_device_list() - libusb_free_device_list() block.
  */
 DEFAULT_VISIBILITY
@@ -1212,6 +1212,74 @@ int usbi_clear_event(struct libusb_context *ctx)
 }
 
 /** \ingroup libusb_dev
+ * Wrap an open file descriptor and obtain a device handle for the underlying
+ * device. A handle allows you to perform I/O on the device in question.
+ *
+ * The file descriptor must remain open until libusb_close() is called.
+ * The file descriptor will not be closed by libusb_close().
+ *
+ * Internally, this function creates a temporary device and makes it
+ * available to you through libusb_get_device(). This device is destroyed
+ * during libusb_close(). The device shall not be opened through libusb_open().
+ *
+ * This is a non-blocking function; no requests are sent over the bus.
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param fd the open file descriptor
+ * \param dev_handle output location for the returned device handle pointer. Only
+ * populated when the return code is 0.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NO_MEM on memory allocation failure
+ * \returns LIBUSB_ERROR_ACCESS if the user has insufficient permissions
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED if the operation is not supported on this
+ * platform
+ * \returns another LIBUSB_ERROR code on other failure
+ */
+int API_EXPORTED libusb_wrap_fd(libusb_context *ctx, int fd,
+	libusb_device_handle **dev_handle)
+{
+	struct libusb_device_handle *_dev_handle;
+	size_t priv_size = usbi_backend.device_handle_priv_size;
+	int r;
+	usbi_dbg("wrap %d", fd);
+
+	USBI_GET_CONTEXT(ctx);
+
+	if (!usbi_backend.wrap_fd)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	_dev_handle = malloc(sizeof(*_dev_handle) + priv_size);
+	if (!_dev_handle)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = usbi_mutex_init(&_dev_handle->lock);
+	if (r) {
+		free(_dev_handle);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	_dev_handle->dev = NULL;
+	_dev_handle->auto_detach_kernel_driver = 0;
+	_dev_handle->claimed_interfaces = 0;
+	memset(&_dev_handle->os_priv, 0, priv_size);
+
+	r = usbi_backend.wrap_fd(ctx, _dev_handle, fd);
+	if (r < 0) {
+		usbi_dbg("wrap %d returns %d", fd, r);
+		usbi_mutex_destroy(&_dev_handle->lock);
+		free(_dev_handle);
+		return r;
+	}
+
+	usbi_mutex_lock(&ctx->open_devs_lock);
+	list_add(&_dev_handle->list, &ctx->open_devs);
+	usbi_mutex_unlock(&ctx->open_devs_lock);
+	*dev_handle = _dev_handle;
+
+	return 0;
+}
+
+/** \ingroup libusb_dev
  * Open a device and obtain a device handle. A handle allows you to perform
  * I/O on the device in question.
  *
@@ -1275,52 +1343,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	return 0;
 }
 
-int API_EXPORTED libusb_open_fd(libusb_device *dev,
-    libusb_device_handle **dev_handle, int fd)
-{
-	struct libusb_context *ctx = DEVICE_CTX(dev);
-	struct libusb_device_handle *_dev_handle;
-	size_t priv_size = usbi_backend.device_handle_priv_size;
-	int r;
-	usbi_dbg("open %d.%d", dev->bus_number, dev->device_address);
-
-	if (!dev->attached) {
-		return LIBUSB_ERROR_NO_DEVICE;
-	}
-
-	_dev_handle = malloc(sizeof(*_dev_handle) + priv_size);
-	if (!_dev_handle)
-		return LIBUSB_ERROR_NO_MEM;
-
-	r = usbi_mutex_init(&_dev_handle->lock);
-	if (r) {
-		free(_dev_handle);
-		return LIBUSB_ERROR_OTHER;
-	}
-
-	_dev_handle->dev = libusb_ref_device(dev);
-	_dev_handle->auto_detach_kernel_driver = 0;
-	_dev_handle->claimed_interfaces = 0;
-	memset(&_dev_handle->os_priv, 0, priv_size);
-
-	r = usbi_backend.open_fd(_dev_handle, fd);
-	if (r < 0) {
-		usbi_dbg("open %d.%d returns %d", dev->bus_number, dev->device_address, r);
-		libusb_unref_device(dev);
-		usbi_mutex_destroy(&_dev_handle->lock);
-		free(_dev_handle);
-		return r;
-	}
-
-	usbi_mutex_lock(&ctx->open_devs_lock);
-	list_add(&_dev_handle->list, &ctx->open_devs);
-	usbi_mutex_unlock(&ctx->open_devs_lock);
-	*dev_handle = _dev_handle;
-
-	return 0;
-}
-
-/** \ingroup dev
+/** \ingroup libusb_dev
  * Convenience function for finding a device with a particular
  * <tt>idVendor</tt>/<tt>idProduct</tt> combination. This function is intended
  * for those scenarios where you are using libusb to knock up a quick test
@@ -2414,23 +2437,25 @@ static void usbi_log_str(enum libusb_log_level level, const char *str)
 	MultiByteToWideChar(CP_UTF8, 0, str, -1, wbuf, sizeof(wbuf));
 	OutputDebugStringW(wbuf);
 #elif defined(__ANDROID__)
-	int priority = ANDROID_LOG_UNKNOWN;
+	int priority;
 	switch (level) {
 	case LIBUSB_LOG_LEVEL_NONE: return;
 	case LIBUSB_LOG_LEVEL_ERROR: priority = ANDROID_LOG_ERROR; break;
 	case LIBUSB_LOG_LEVEL_WARNING: priority = ANDROID_LOG_WARN; break;
 	case LIBUSB_LOG_LEVEL_INFO: priority = ANDROID_LOG_INFO; break;
 	case LIBUSB_LOG_LEVEL_DEBUG: priority = ANDROID_LOG_DEBUG; break;
+	default: priority = ANDROID_LOG_UNKNOWN;
 	}
 	__android_log_write(priority, "libusb", str);
 #elif defined(HAVE_SYSLOG_FUNC)
-	int syslog_level = LOG_INFO;
+	int syslog_level;
 	switch (level) {
 	case LIBUSB_LOG_LEVEL_NONE: return;
 	case LIBUSB_LOG_LEVEL_ERROR: syslog_level = LOG_ERR; break;
 	case LIBUSB_LOG_LEVEL_WARNING: syslog_level = LOG_WARNING; break;
 	case LIBUSB_LOG_LEVEL_INFO: syslog_level = LOG_INFO; break;
 	case LIBUSB_LOG_LEVEL_DEBUG: syslog_level = LOG_DEBUG; break;
+	default: syslog_level = LOG_INFO;
 	}
 	syslog(syslog_level, "%s", str);
 #else /* All of gcc, Clang, XCode seem to use #warning */

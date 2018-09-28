@@ -232,7 +232,7 @@ static int udev_device_info(struct libusb_context *ctx, int detached,
 	}
 
 	return linux_get_device_address(ctx, detached, busnum, devaddr,
-					dev_node, *sys_name);
+					dev_node, *sys_name, -1);
 }
 
 static void udev_hotplug_event(struct udev_device* udev_dev)
