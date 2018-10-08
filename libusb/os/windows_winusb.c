@@ -925,15 +925,15 @@ static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id
 	DEVINST child_devinst;
 
 	if (CM_Get_Child(&child_devinst, devinst, 0) != CR_SUCCESS) {
-		usbi_err(ctx, "could not get child devinst for '%s'", dev_id);
-		return LIBUSB_ERROR_OTHER;
+		usbi_warn(ctx, "could not get child devinst for '%s'", dev_id);
+		return LIBUSB_SUCCESS;
 	}
 
 	session_id = (unsigned long)child_devinst;
 	dev = usbi_get_device_by_session_id(ctx, session_id);
 	if (dev == NULL) {
-		usbi_err(ctx, "program assertion failed - HCD '%s' child not found", dev_id);
-		return LIBUSB_ERROR_NO_DEVICE;
+		usbi_warn(ctx, "program assertion failed - HCD '%s' child not found", dev_id);
+		return LIBUSB_SUCCESS;
 	}
 
 	if (dev->bus_number == 0) {
