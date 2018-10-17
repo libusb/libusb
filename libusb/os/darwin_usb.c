@@ -75,8 +75,6 @@ static volatile int32_t initCount = 0;
 static pthread_mutex_t libusb_darwin_at_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  libusb_darwin_at_cond = PTHREAD_COND_INITIALIZER;
 
-static pthread_once_t darwin_init_once = PTHREAD_ONCE_INIT;
-
 #if !OSX_USE_CLOCK_GETTIME
 static clock_serv_t clock_realtime;
 static clock_serv_t clock_monotonic;
@@ -516,29 +514,8 @@ static void __attribute__((destructor)) _darwin_finalize(void) {
   usbi_mutex_unlock(&darwin_cached_devices_lock);
 }
 
-static void darwin_check_version (void) {
-  /* adjust for changes in the USB stack in xnu 15 */
-  int sysctl_args[] = {CTL_KERN, KERN_OSRELEASE};
-  long version;
-  char version_string[256] = {'\0',};
-  size_t length = 256;
-
-  sysctl(sysctl_args, 2, version_string, &length, NULL, 0);
-
-  errno = 0;
-  version = strtol (version_string, NULL, 10);
-  if (0 == errno && version >= 15) {
-    darwin_device_class = "IOUSBHostDevice";
-  }
-}
-
 static int darwin_init(struct libusb_context *ctx) {
   int rc;
-
-  rc = pthread_once (&darwin_init_once, darwin_check_version);
-  if (rc) {
-    return LIBUSB_ERROR_OTHER;
-  }
 
   rc = darwin_scan_devices (ctx);
   if (LIBUSB_SUCCESS != rc) {
@@ -894,7 +871,7 @@ static int get_device_parent_sessionID(io_service_t service, UInt64 *parent_sess
 
   /* Walk up the tree in the IOService plane until we find a parent that has a sessionID */
   parent = service;
-  while((result = IORegistryEntryGetParentEntry (parent, kIOServicePlane, &parent)) == kIOReturnSuccess) {
+  while((result = IORegistryEntryGetParentEntry (parent, kIOUSBPlane, &parent)) == kIOReturnSuccess) {
     if (get_ioregistry_value_number (parent, CFSTR("sessionID"), kCFNumberSInt64Type, parent_sessionID)) {
         /* Success */
         return 1;
