@@ -293,6 +293,7 @@ struct libusb_context {
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 	enum libusb_log_level debug;
 	int debug_fixed;
+	libusb_log_cb log_handler;
 #endif
 
 	/* internal event pipe, used for signalling occurrence of an internal event. */
