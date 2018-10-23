@@ -51,6 +51,9 @@ static const struct libusb_version libusb_version_internal =
 static int default_context_refcnt = 0;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 static struct timespec timestamp_origin = { 0, 0 };
+#ifndef USE_SYSTEM_LOGGING_FACILITY
+static libusb_log_cb log_handler = NULL;
+#endif
 
 usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
 struct list_head active_contexts_list;
@@ -424,6 +427,7 @@ if (cfg != desired)
   * - libusb_set_auto_detach_kernel_driver()
   * - libusb_set_configuration()
   * - libusb_set_debug()
+  * - libusb_set_log_cb()
   * - libusb_set_interface_alt_setting()
   * - libusb_set_iso_packet_lengths()
   * - libusb_set_option()
@@ -2026,6 +2030,49 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 }
 
 /** \ingroup libusb_lib
+ * Set log handler.
+ *
+ * libusb will redirect its log messages to the provided callback function.
+ * libusb supports redirection of per context and global log messages.
+ * Log messages sent to the context will be sent to the global log handler too.
+ *
+ * If libusb is compiled without message logging or USE_SYSTEM_LOGGING_FACILITY
+ * is defined then global callback function will never be called.
+ * If ENABLE_DEBUG_LOGGING is defined then per context callback function will
+ * never be called.
+ *
+ * \param ctx context on which to assign log handler, or NULL for the default
+ * context. Parameter ignored if only LIBUSB_LOG_CB_GLOBAL mode is requested.
+ * \param cb pointer to the callback function, or NULL to stop log
+ * messages redirection
+ * \param mode mode of callback function operation. Several modes can be
+ * selected for a single callback function, see \ref libusb_log_cb_mode for
+ * a description.
+ * \see libusb_log_cb, libusb_log_cb_mode
+ */
+void API_EXPORTED libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb,
+	int mode)
+{
+#if !defined(USE_SYSTEM_LOGGING_FACILITY)
+	if (mode & LIBUSB_LOG_CB_GLOBAL) {
+		log_handler = cb;
+	}
+#endif
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
+	if (mode & LIBUSB_LOG_CB_CONTEXT) {
+		USBI_GET_CONTEXT(ctx);
+		ctx->log_handler = cb;
+	}
+#else
+	UNUSED(ctx);
+#if defined(USE_SYSTEM_LOGGING_FACILITY)
+	UNUSED(cb);
+	UNUSED(mode);
+#endif
+#endif
+}
+
+/** \ingroup libusb_lib
  * Set an option in the library.
  *
  * Use this function to configure a specific option within the library.
@@ -2393,7 +2440,11 @@ static void usbi_log_str(enum libusb_log_level level, const char *str)
 	fputs(str, stderr);
 #endif
 #else
-	fputs(str, stderr);
+	/* Global log handler */
+	if (log_handler != NULL)
+		log_handler(NULL, level, str);
+	else
+		fputs(str, stderr);
 #endif /* USE_SYSTEM_LOGGING_FACILITY */
 	UNUSED(level);
 }
@@ -2494,6 +2545,12 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	strcpy(buf + header_len + text_len, USBI_LOG_LINE_END);
 
 	usbi_log_str(level, buf);
+
+	/* Per context log handler */
+#ifndef ENABLE_DEBUG_LOGGING
+	if (ctx && ctx->log_handler)
+		ctx->log_handler(ctx, level, buf);
+#endif
 }
 
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
