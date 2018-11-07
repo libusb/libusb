@@ -60,7 +60,7 @@ static size_t usbi_locale = 0;
  * </ol>
  */
 
-static const char* usbi_locale_supported[] = { "en", "nl", "fr", "ru", "de" };
+static const char* usbi_locale_supported[] = { "en", "nl", "fr", "ru", "de", "hu" };
 static const char* usbi_localized_errors[ARRAYSIZE(usbi_locale_supported)][LIBUSB_ERROR_COUNT] = {
 	{ /* English (en) */
 		"Success",
@@ -138,6 +138,21 @@ static const char* usbi_localized_errors[ARRAYSIZE(usbi_locale_supported)][LIBUS
 		"Nicht genügend Hauptspeicher verfügbar",
 		"Die Operation wird nicht unterstützt oder ist auf dieser Platform nicht implementiert",
 		"Allgemeiner Fehler",
+	}, { /* Hungarian (hu) */
+		"Sikeres",
+		"Be-/kimeneti hiba",
+		"Érvénytelen paraméter",
+		"Hozzáférés megtagadva",
+		"Az eszköz nem található (eltávolították?)",
+		"Nem található",
+		"Az erőforrás foglalt",
+		"Időtúllépés",
+		"Túlcsordulás",
+		"Törött adatcsatorna",
+		"Rendszerhívás megszakítva",
+		"Nincs elég memória",
+		"A művelet nem támogatott ezen a rendszeren",
+		"Általános hiba",
 	}
 };
 
