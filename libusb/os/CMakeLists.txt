@@ -1,0 +1,5 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.5.0)
+
+SET(CMAKE_CXX_STANDARD 11)
+
+SET(OS_SRC_LIST darwin_usb.c poll_posix.c threads_posix.c)
