@@ -1,6 +1,18 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
+2018-12-05: v1.0.23 (in progress)
+* Add German translation (#446)
+* Add Hungarian translation (#493)
+* configure.ac: Fix detection of clock_gettime library (#439)
+* Darwin(macOS): Switch from using ResetDevice to USBDeviceReEnumerate (#455)
+* Darwin(macOS): Remove code that changed the device class used (#428)
+* New API libusb_set_log_cb() to redirect global and per context log
+  messages to the provided log handling function
+* Solaris: Break infinite recursion in backend clock_gettime
+* Solaris: Enable timerfd on sunos when available
+* Various other bug fixes and improvements
+
 2018-03-24: v1.0.22:
 * New libusb_set_option() API
 * Fix transfer timeout not being cleared upon resubmission
