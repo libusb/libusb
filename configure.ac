@@ -21,7 +21,7 @@ AC_INIT([libusb],[LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO[]LIBUSB_RC],[libusb
 # These numbers should be tweaked on every release. Read carefully:
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 # http://sourceware.org/autobook/autobook/autobook_91.html
-lt_current=1
+lt_current=2
 lt_revision=0
 lt_age=1
 LTLDFLAGS="-version-info ${lt_current}:${lt_revision}:${lt_age}"
