@@ -793,6 +793,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	DWORD size;
 	uint8_t bus_number, depth;
 	int r;
+	int ginfotimeout;
 
 	priv = _device_priv(dev);
 
@@ -850,23 +851,46 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		memset(&conn_info, 0, sizeof(conn_info));
 		conn_info.ConnectionIndex = (ULONG)port_number;
 		// coverity[tainted_data_argument]
-		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
-			&conn_info, sizeof(conn_info), &size, NULL)) {
-			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
-				  priv->dev_id, windows_error_str(0));
-			CloseHandle(hub_handle);
-			return LIBUSB_ERROR_NO_DEVICE;
+		ginfotimeout = 20;
+		do {
+			if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
+				&conn_info, sizeof(conn_info), &size, NULL)) {
+				usbi_warn(ctx, "could not get node connection information for device '%s': %s",
+					priv->dev_id, windows_error_str(0));
+				CloseHandle(hub_handle);
+				return LIBUSB_ERROR_NO_DEVICE;
+			}
+
+			if (conn_info.ConnectionStatus == NoDeviceConnected) {
+				usbi_err(ctx, "device '%s' is no longer connected!", priv->dev_id);
+				CloseHandle(hub_handle);
+				return LIBUSB_ERROR_NO_DEVICE;
+			}
+
+			memcpy(&priv->dev_descriptor, &(conn_info.DeviceDescriptor), sizeof(USB_DEVICE_DESCRIPTOR));
+			dev->num_configurations = priv->dev_descriptor.bNumConfigurations;
+			priv->active_config = conn_info.CurrentConfigurationValue;
+			if (priv->active_config == 0) {
+				usbi_dbg("0x%x:0x%x found %u configurations (active conf: %u) \n",
+					priv->dev_descriptor.idVendor,
+					priv->dev_descriptor.idProduct,
+					dev->num_configurations,
+					priv->active_config);
+			}
+			if (priv->active_config == 0)
+				Sleep(50);
+		} while (priv->active_config == 0 && --ginfotimeout >= 0);
+
+		if (priv->active_config == 0) {
+			usbi_dbg("after try 0x%x:0x%x found %u configurations (active conf: %u) \n",
+				priv->dev_descriptor.idVendor,
+				priv->dev_descriptor.idProduct,
+				dev->num_configurations,
+				priv->active_config);
+			usbi_dbg("Force this device active config to 1 in libusb! \nNOTICE: Should not reach this place!!!!!! \n");
+			priv->active_config = 1;
 		}
 
-		if (conn_info.ConnectionStatus == NoDeviceConnected) {
-			usbi_err(ctx, "device '%s' is no longer connected!", priv->dev_id);
-			CloseHandle(hub_handle);
-			return LIBUSB_ERROR_NO_DEVICE;
-		}
-
-		memcpy(&priv->dev_descriptor, &(conn_info.DeviceDescriptor), sizeof(USB_DEVICE_DESCRIPTOR));
-		dev->num_configurations = priv->dev_descriptor.bNumConfigurations;
-		priv->active_config = conn_info.CurrentConfigurationValue;
 		usbi_dbg("found %u configurations (active conf: %u)", dev->num_configurations, priv->active_config);
 
 		// Cache as many config descriptors as we can
