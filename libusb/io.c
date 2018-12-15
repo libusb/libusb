@@ -2598,7 +2598,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 		timerclear(tv);
 	} else {
 		timersub(&next_timeout, &cur_tv, tv);
-		usbi_dbg("next timeout in %d.%06ds", tv->tv_sec, tv->tv_usec);
+		usbi_dbg("next timeout in %ld.%06lds", (long)tv->tv_sec, (long)tv->tv_usec);
 	}
 
 	return 1;
