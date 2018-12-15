@@ -1675,8 +1675,8 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
 
   struct darwin_interface *cInterface;
 
-  /* construct an array of IOUSBIsocFrames, reuse the old one if possible */
-  if (tpriv->isoc_framelist && tpriv->num_iso_packets != transfer->num_iso_packets) {
+  /* construct an array of IOUSBIsocFrames, reuse the old one if the sizes are the same */
+  if (tpriv->num_iso_packets != transfer->num_iso_packets) {
     free(tpriv->isoc_framelist);
     tpriv->isoc_framelist = NULL;
   }

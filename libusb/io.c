@@ -1194,8 +1194,7 @@ void usbi_io_exit(struct libusb_context *ctx)
 	usbi_cond_destroy(&ctx->event_waiters_cond);
 	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_tls_key_delete(ctx->event_handling_key);
-	if (ctx->pollfds)
-		free(ctx->pollfds);
+	free(ctx->pollfds);
 }
 
 static int calculate_timeout(struct usbi_transfer *transfer)
@@ -1297,7 +1296,7 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 		return;
 
 	usbi_dbg("transfer %p", transfer);
-	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER && transfer->buffer)
+	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER)
 		free(transfer->buffer);
 
 	itransfer = LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
@@ -2106,10 +2105,8 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED) {
 		usbi_dbg("poll fds modified, reallocating");
 
-		if (ctx->pollfds) {
-			free(ctx->pollfds);
-			ctx->pollfds = NULL;
-		}
+		free(ctx->pollfds);
+		ctx->pollfds = NULL;
 
 		/* sanity check - it is invalid for a context to have fewer than the
 		 * required internal fds (memory corruption?) */
@@ -2755,15 +2752,12 @@ out:
  * Since version 1.0.20, \ref LIBUSB_API_VERSION >= 0x01000104
  *
  * It is legal to call this function with a NULL pollfd list. In this case,
- * the function will simply return safely.
+ * the function will simply do nothing.
  *
  * \param pollfds the list of libusb_pollfd structures to free
  */
 void API_EXPORTED libusb_free_pollfds(const struct libusb_pollfd **pollfds)
 {
-	if (!pollfds)
-		return;
-
 	free((void *)pollfds);
 }
 
