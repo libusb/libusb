@@ -1248,7 +1248,7 @@ static int calculate_timeout(struct usbi_transfer *transfer)
  * use it on a non-isochronous endpoint. If you do this, ensure that at time
  * of submission, num_iso_packets is 0 and that type is set appropriately.
  *
- * \param iso_packets number of isochronous packet descriptors to allocate
+ * \param iso_packets number of isochronous packet descriptors to allocate. Must be non-negative.
  * \returns a newly allocated transfer, or NULL on error
  */
 DEFAULT_VISIBILITY
@@ -1256,12 +1256,18 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	int iso_packets)
 {
 	struct libusb_transfer *transfer;
-	size_t os_alloc_size = usbi_backend.transfer_priv_size;
-	size_t alloc_size = sizeof(struct usbi_transfer)
+	size_t os_alloc_size;
+	size_t alloc_size;
+	struct usbi_transfer *itransfer;
+
+	assert(iso_packets >= 0);
+
+	os_alloc_size = usbi_backend.transfer_priv_size;
+	alloc_size = sizeof(struct usbi_transfer)
 		+ sizeof(struct libusb_transfer)
-		+ (sizeof(struct libusb_iso_packet_descriptor) * iso_packets)
+		+ (sizeof(struct libusb_iso_packet_descriptor) * (size_t)iso_packets)
 		+ os_alloc_size;
-	struct usbi_transfer *itransfer = calloc(1, alloc_size);
+	itransfer = calloc(1, alloc_size);
 	if (!itransfer)
 		return NULL;
 

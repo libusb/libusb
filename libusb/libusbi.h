@@ -24,7 +24,7 @@
 #include <config.h>
 
 #include <stdlib.h>
-
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
@@ -387,13 +387,13 @@ struct libusb_context {
 
 enum usbi_event_flags {
 	/* The list of pollfds has been modified */
-	USBI_EVENT_POLLFDS_MODIFIED = 1 << 0,
+	USBI_EVENT_POLLFDS_MODIFIED = 1U << 0,
 
 	/* The user has interrupted the event handler */
-	USBI_EVENT_USER_INTERRUPT = 1 << 1,
+	USBI_EVENT_USER_INTERRUPT = 1U << 1,
 
 	/* A hotplug callback deregistration is pending */
-	USBI_EVENT_HOTPLUG_CB_DEREGISTERED = 1 << 2,
+	USBI_EVENT_HOTPLUG_CB_DEREGISTERED = 1U << 2,
 };
 
 /* Macros for managing event handling state */
@@ -495,24 +495,24 @@ struct usbi_transfer {
 
 enum usbi_transfer_state_flags {
 	/* Transfer successfully submitted by backend */
-	USBI_TRANSFER_IN_FLIGHT = 1 << 0,
+	USBI_TRANSFER_IN_FLIGHT = 1U << 0,
 
 	/* Cancellation was requested via libusb_cancel_transfer() */
-	USBI_TRANSFER_CANCELLING = 1 << 1,
+	USBI_TRANSFER_CANCELLING = 1U << 1,
 
 	/* Operation on the transfer failed because the device disappeared */
-	USBI_TRANSFER_DEVICE_DISAPPEARED = 1 << 2,
+	USBI_TRANSFER_DEVICE_DISAPPEARED = 1U << 2,
 };
 
 enum usbi_transfer_timeout_flags {
 	/* Set by backend submit_transfer() if the OS handles timeout */
-	USBI_TRANSFER_OS_HANDLES_TIMEOUT = 1 << 0,
+	USBI_TRANSFER_OS_HANDLES_TIMEOUT = 1U << 0,
 
 	/* The transfer timeout has been handled */
-	USBI_TRANSFER_TIMEOUT_HANDLED = 1 << 1,
+	USBI_TRANSFER_TIMEOUT_HANDLED = 1U << 1,
 
 	/* The transfer timeout was successfully processed */
-	USBI_TRANSFER_TIMED_OUT = 1 << 2,
+	USBI_TRANSFER_TIMED_OUT = 1U << 2,
 };
 
 #define USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)			\
@@ -524,9 +524,10 @@ enum usbi_transfer_timeout_flags {
 
 static inline void *usbi_transfer_get_os_priv(struct usbi_transfer *transfer)
 {
+	assert(transfer->num_iso_packets >= 0);
 	return ((unsigned char *)transfer) + sizeof(struct usbi_transfer)
 		+ sizeof(struct libusb_transfer)
-		+ (transfer->num_iso_packets
+		+ ((size_t)transfer->num_iso_packets
 			* sizeof(struct libusb_iso_packet_descriptor));
 }
 

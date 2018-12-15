@@ -577,7 +577,7 @@ struct libusb_endpoint_descriptor {
 	 * it will store them here, should you wish to parse them. */
 	const unsigned char *extra;
 
-	/** Length of the extra descriptors, in bytes. */
+	/** Length of the extra descriptors, in bytes. Must be non-negative. */
 	int extra_length;
 };
 
@@ -627,7 +627,7 @@ struct libusb_interface_descriptor {
 	 * it will store them here, should you wish to parse them. */
 	const unsigned char *extra;
 
-	/** Length of the extra descriptors, in bytes. */
+	/** Length of the extra descriptors, in bytes. Must be non-negative. */
 	int extra_length;
 };
 
@@ -639,7 +639,8 @@ struct libusb_interface {
 	 * by the num_altsetting field. */
 	const struct libusb_interface_descriptor *altsetting;
 
-	/** The number of alternate settings that belong to this interface */
+	/** The number of alternate settings that belong to this interface.
+	 * Must be non-negative. */
 	int num_altsetting;
 };
 
@@ -686,7 +687,7 @@ struct libusb_config_descriptor {
 	 * descriptors, it will store them here, should you wish to parse them. */
 	const unsigned char *extra;
 
-	/** Length of the extra descriptors, in bytes. */
+	/** Length of the extra descriptors, in bytes. Must be non-negative. */
 	int extra_length;
 };
 
@@ -1134,19 +1135,19 @@ enum libusb_transfer_status {
  * libusb_transfer.flags values */
 enum libusb_transfer_flags {
 	/** Report short frames as errors */
-	LIBUSB_TRANSFER_SHORT_NOT_OK = 1<<0,
+	LIBUSB_TRANSFER_SHORT_NOT_OK = 1U << 0,
 
 	/** Automatically free() transfer buffer during libusb_free_transfer().
 	 * Note that buffers allocated with libusb_dev_mem_alloc() should not
 	 * be attempted freed in this way, since free() is not an appropriate
 	 * way to release such memory. */
-	LIBUSB_TRANSFER_FREE_BUFFER = 1<<1,
+	LIBUSB_TRANSFER_FREE_BUFFER = 1U << 1,
 
 	/** Automatically call libusb_free_transfer() after callback returns.
 	 * If this flag is set, it is illegal to call libusb_free_transfer()
 	 * from your transfer callback, as this will result in a double-free
 	 * when this flag is acted upon. */
-	LIBUSB_TRANSFER_FREE_TRANSFER = 1<<2,
+	LIBUSB_TRANSFER_FREE_TRANSFER = 1U << 2,
 
 	/** Terminate transfers that are a multiple of the endpoint's
 	 * wMaxPacketSize with an extra zero length packet. This is useful
@@ -1171,7 +1172,7 @@ enum libusb_transfer_flags {
 	 *
 	 * Available since libusb-1.0.9.
 	 */
-	LIBUSB_TRANSFER_ADD_ZERO_PACKET = 1 << 3,
+	LIBUSB_TRANSFER_ADD_ZERO_PACKET = 1U << 3,
 };
 
 /** \ingroup libusb_asyncio
@@ -1232,7 +1233,7 @@ struct libusb_transfer {
 	 * to determine if errors occurred. */
 	enum libusb_transfer_status status;
 
-	/** Length of the data buffer */
+	/** Length of the data buffer. Must be non-negative. */
 	int length;
 
 	/** Actual length of data that was transferred. Read-only, and only for
@@ -1251,7 +1252,7 @@ struct libusb_transfer {
 	unsigned char *buffer;
 
 	/** Number of isochronous packets. Only used for I/O with isochronous
-	 * endpoints. */
+	 * endpoints. Must be non-negative. */
 	int num_iso_packets;
 
 	/** Isochronous packet descriptors, for isochronous transfers only. */
@@ -1910,10 +1911,10 @@ typedef int libusb_hotplug_callback_handle;
  * Flags for hotplug events */
 typedef enum {
 	/** Default value when not using any flags. */
-	LIBUSB_HOTPLUG_NO_FLAGS = 0,
+	LIBUSB_HOTPLUG_NO_FLAGS = 0U,
 
 	/** Arm the callback and fire it for all matching currently attached devices. */
-	LIBUSB_HOTPLUG_ENUMERATE = 1<<0,
+	LIBUSB_HOTPLUG_ENUMERATE = 1U << 0,
 } libusb_hotplug_flag;
 
 /** \ingroup libusb_hotplug
@@ -1923,12 +1924,12 @@ typedef enum {
  * Hotplug events */
 typedef enum {
 	/** A device has been plugged in and is ready to use */
-	LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED = 0x01,
+	LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED = 0x01U,
 
 	/** A device has left and is no longer available.
 	 * It is the user's responsibility to call libusb_close on any handle associated with a disconnected device.
 	 * It is safe to call libusb_get_device_descriptor on a device that has left */
-	LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT    = 0x02,
+	LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT    = 0x02U,
 } libusb_hotplug_event;
 
 /** \ingroup libusb_hotplug

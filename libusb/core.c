@@ -845,8 +845,8 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 	}
 
 	/* convert discovered_devs into a list */
-	len = discdevs->len;
-	ret = calloc(len + 1, sizeof(struct libusb_device *));
+	len = (ssize_t)discdevs->len;
+	ret = calloc((size_t)len + 1, sizeof(struct libusb_device *));
 	if (!ret) {
 		len = LIBUSB_ERROR_NO_MEM;
 		goto out;
@@ -1680,12 +1680,12 @@ int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
 		return LIBUSB_ERROR_NO_DEVICE;
 
 	usbi_mutex_lock(&dev_handle->lock);
-	if (dev_handle->claimed_interfaces & (1 << interface_number))
+	if (dev_handle->claimed_interfaces & (1U << interface_number))
 		goto out;
 
 	r = usbi_backend.claim_interface(dev_handle, interface_number);
 	if (r == 0)
-		dev_handle->claimed_interfaces |= 1 << interface_number;
+		dev_handle->claimed_interfaces |= 1U << interface_number;
 
 out:
 	usbi_mutex_unlock(&dev_handle->lock);
@@ -1721,14 +1721,14 @@ int API_EXPORTED libusb_release_interface(libusb_device_handle *dev_handle,
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	usbi_mutex_lock(&dev_handle->lock);
-	if (!(dev_handle->claimed_interfaces & (1 << interface_number))) {
+	if (!(dev_handle->claimed_interfaces & (1U << interface_number))) {
 		r = LIBUSB_ERROR_NOT_FOUND;
 		goto out;
 	}
 
 	r = usbi_backend.release_interface(dev_handle, interface_number);
 	if (r == 0)
-		dev_handle->claimed_interfaces &= ~(1 << interface_number);
+		dev_handle->claimed_interfaces &= ~(1U << interface_number);
 
 out:
 	usbi_mutex_unlock(&dev_handle->lock);
@@ -1770,7 +1770,7 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_hand
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
 
-	if (!(dev_handle->claimed_interfaces & (1 << interface_number))) {
+	if (!(dev_handle->claimed_interfaces & (1U << interface_number))) {
 		usbi_mutex_unlock(&dev_handle->lock);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
@@ -2507,7 +2507,7 @@ static void usbi_log_str(enum libusb_log_level level, const char *str)
 	case LIBUSB_LOG_LEVEL_DEBUG: syslog_level = LOG_DEBUG; break;
 	}
 	syslog(syslog_level, "%s", str);
-#else /* All of gcc, Clang, XCode seem to use #warning */
+#else /* All of gcc, Clang, Xcode seem to use #warning */
 #warning System logging is not supported on this platform. Logging to stderr will be used instead.
 	fputs(str, stderr);
 #endif
@@ -2589,8 +2589,8 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 
 	if (global_debug) {
 		header_len = snprintf(buf, sizeof(buf),
-			"[%2d.%06d] [%08x] libusb: %s [%s] ",
-			(int)now.tv_sec, (int)(now.tv_nsec / 1000L), usbi_get_tid(), prefix, function);
+			"[%2ld.%06ld] [%08x] libusb: %s [%s] ",
+			(long)now.tv_sec, (long)(now.tv_nsec / 1000L), usbi_get_tid(), prefix, function);
 	} else {
 		header_len = snprintf(buf, sizeof(buf),
 			"libusb: %s [%s] ", prefix, function);
@@ -2603,16 +2603,16 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	}
 	/* Make sure buffer is NUL terminated */
 	buf[header_len] = '\0';
-	text_len = vsnprintf(buf + header_len, sizeof(buf) - header_len,
+	text_len = vsnprintf(buf + header_len, sizeof(buf) - (size_t)header_len,
 		format, args);
 	if (text_len < 0 || text_len + header_len >= (int)sizeof(buf)) {
 		/* Truncated log output. On some platforms a -1 return value means
 		 * that the output was truncated. */
-		text_len = sizeof(buf) - header_len;
+		text_len = (int)sizeof(buf) - header_len;
 	}
-	if (header_len + text_len + sizeof(USBI_LOG_LINE_END) >= sizeof(buf)) {
+	if (header_len + text_len + (int)sizeof(USBI_LOG_LINE_END) >= (int)sizeof(buf)) {
 		/* Need to truncate the text slightly to fit on the terminator. */
-		text_len -= (header_len + text_len + sizeof(USBI_LOG_LINE_END)) - sizeof(buf);
+		text_len -= (header_len + text_len + (int)sizeof(USBI_LOG_LINE_END)) - (int)sizeof(buf);
 	}
 	strcpy(buf + header_len + text_len, USBI_LOG_LINE_END);
 
