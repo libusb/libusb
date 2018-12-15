@@ -627,7 +627,7 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	}
 	display_buffer_hex(hid_report_descriptor, descriptor_size);
 	if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-		if (fwrite(hid_report_descriptor, 1, descriptor_size, fd) != descriptor_size) {
+		if (fwrite(hid_report_descriptor, 1, descriptor_size, fd) != (size_t)descriptor_size) {
 			printf("   Error writing descriptor to file\n");
 		}
 		fclose(fd);

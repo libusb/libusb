@@ -55,11 +55,11 @@ static void LIBUSB_CALL cb_xfr(struct libusb_transfer *xfr)
 			struct libusb_iso_packet_descriptor *pack = &xfr->iso_packet_desc[i];
 
 			if (pack->status != LIBUSB_TRANSFER_COMPLETED) {
-				fprintf(stderr, "Error: pack %u status %d\n", i, pack->status);
+				fprintf(stderr, "Error: pack %d status %d\n", i, pack->status);
 				exit(5);
 			}
 
-			printf("pack%u length:%u, actual_length:%u\n", i, pack->length, pack->actual_length);
+			printf("pack%d length:%u, actual_length:%u\n", i, pack->length, pack->actual_length);
 		}
 	}
 
