@@ -34,7 +34,7 @@ _android_srcs = [
 ]
 
 _android_copts = [
-    "-I" + PACKAGE_NAME + "/android",
+    "-I" + native.package_name() + "/android",
 ]
 
 cc_library(
@@ -67,16 +67,16 @@ cc_library(
         "libusb/libusb.h",
     ],
     copts = [
-        "-I" + PACKAGE_NAME + "/libusb",
+        "-I" + native.package_name() + "/libusb",
     ] + select({
         ":android_arm64-v8a": _android_copts,
         ":android_x86_64": _android_copts,
         ":darwin": [
-            "-I" + PACKAGE_NAME + "/Xcode",
+            "-I" + native.package_name() + "/Xcode",
             "-mmacosx-version-min=10.12",
         ],
         ":linux": [
-            "-I" + PACKAGE_NAME + "/linux",
+            "-I" + native.package_name() + "/linux",
         ],
         "//conditions:default": [],
     }),
