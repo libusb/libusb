@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2018 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2008-2019 Nathan Hjelm <hjelmn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -380,8 +380,8 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
 
 static void darwin_hotplug_poll (void)
 {
-  /* not sure if 5 seconds will be too long/short but it should work ok */
-  mach_timespec_t timeout = {.tv_sec = 5, .tv_nsec = 0};
+  /* not sure if 1 ms will be too long/short but it should work ok */
+  mach_timespec_t timeout = {.tv_sec = 0, .tv_nsec = 1000000ul};
 
   /* since a kernel thread may nodify the IOInterators used for
    * hotplug notidication we can't just clear the iterators.
