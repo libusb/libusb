@@ -2081,9 +2081,16 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 	/* prevent attempts to recursively handle events (e.g. calling into
 	 * libusb_handle_events() from within a hotplug or transfer callback) */
+	usbi_mutex_lock(&ctx->event_data_lock);
+	r = 0;
 	if (usbi_handling_events(ctx))
-		return LIBUSB_ERROR_BUSY;
-	usbi_start_event_handling(ctx);
+		r = LIBUSB_ERROR_BUSY;
+	else
+		usbi_start_event_handling(ctx);
+	usbi_mutex_unlock(&ctx->event_data_lock);
+
+	if (r)
+		return r;
 
 	/* there are certain fds that libusb uses internally, currently:
 	 *
