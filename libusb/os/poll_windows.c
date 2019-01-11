@@ -50,6 +50,7 @@ const struct winfd INVALID_WINFD = { -1, NULL };
 struct file_descriptor {
 	enum fd_type { FD_TYPE_PIPE, FD_TYPE_TRANSFER } type;
 	OVERLAPPED overlapped;
+	int refcount;
 };
 
 static usbi_mutex_static_t fd_table_lock = USBI_MUTEX_INITIALIZER;
@@ -66,6 +67,7 @@ static struct file_descriptor *create_fd(enum fd_type type)
 		return NULL;
 	}
 	fd->type = type;
+	fd->refcount = 1;
 	return fd;
 }
 
@@ -116,6 +118,43 @@ struct winfd usbi_create_fd(void)
 
 	return wfd;
 }
+
+int usbi_inc_fds_ref(struct pollfd *fds, unsigned int nfds)
+{
+	int n;
+	usbi_mutex_static_lock(&fd_table_lock);
+	for (n = 0; n < nfds; ++n) {
+		fd_table[fds[n].fd]->refcount++;
+	}
+	usbi_mutex_static_unlock(&fd_table_lock);
+}
+
+int usbi_dec_fds_ref(struct pollfd *fds, unsigned int nfds)
+{
+	int n;
+	struct file_descriptor *fd;
+
+	usbi_mutex_static_lock(&fd_table_lock);
+	for (n = 0; n < nfds; ++n) {
+		fd = fd_table[fds[n].fd];
+		fd->refcount--;
+		if (fd->refcount == 0)
+		{
+			if (fd->type == FD_TYPE_PIPE) {
+				// InternalHigh is our reference count
+				fd->overlapped.InternalHigh--;
+				if (fd->overlapped.InternalHigh == 0)
+					free_fd(fd);
+			}
+			else {
+				free_fd(fd);
+			}
+			fd_table[fds[n].fd] = NULL;
+		}
+	}
+	usbi_mutex_static_unlock(&fd_table_lock);
+}
+
 
 static int check_pollfds(struct pollfd *fds, unsigned int nfds,
 	HANDLE *wait_handles, DWORD *nb_wait_handles)
@@ -209,20 +248,24 @@ int usbi_close(int _fd)
 
 	usbi_mutex_static_lock(&fd_table_lock);
 	fd = fd_table[_fd];
-	fd_table[_fd] = NULL;
+	fd->refcount--;
+	if(fd->refcount==0)
+	{	fd_table[_fd] = NULL;
+
+		if (fd->type == FD_TYPE_PIPE) {
+			// InternalHigh is our reference count
+			fd->overlapped.InternalHigh--;
+			if (fd->overlapped.InternalHigh == 0)
+				free_fd(fd);
+		}
+		else {
+			free_fd(fd);
+		}
+	}
 	usbi_mutex_static_unlock(&fd_table_lock);
 
 	if (fd == NULL)
 		goto err_badfd;
-
-	if (fd->type == FD_TYPE_PIPE) {
-		// InternalHigh is our reference count
-		fd->overlapped.InternalHigh--;
-		if (fd->overlapped.InternalHigh == 0)
-			free_fd(fd);
-	} else {
-		free_fd(fd);
-	}
 
 	return 0;
 
