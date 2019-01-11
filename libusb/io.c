@@ -2146,6 +2146,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	}
 	fds = ctx->pollfds;
 	nfds = ctx->pollfds_cnt;
+	usbi_inc_fds_ref(fds, nfds);
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
 	timeout_ms = (int)(tv->tv_sec * 1000) + (tv->tv_usec / 1000);
@@ -2278,6 +2279,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 done:
 	usbi_end_event_handling(ctx);
+	usbi_dec_fds_ref(fds, nfds);
 	return r;
 }
 
