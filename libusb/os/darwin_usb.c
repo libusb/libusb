@@ -1343,7 +1343,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int i
 
   /* Do the actual claim */
   kresult = (*plugInInterface)->QueryInterface(plugInInterface,
-                                               CFUUIDGetUUIDBytes(kIOUSBInterfaceInterfaceID),
+                                               CFUUIDGetUUIDBytes(InterfaceInterfaceID),
                                                (LPVOID)&cInterface->interface);
   /* We no longer need the intermediate plug-in */
   /* Use release instead of IODestroyPlugInInterface to avoid stopping IOServices associated with this device */
