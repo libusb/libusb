@@ -29,6 +29,9 @@
 USBRoster gUsbRoster;
 int32 gInitCount = 0;
 
+static int haiku_get_config_descriptor(struct libusb_device *, uint8_t,
+    unsigned char *, size_t, int *);
+
 static int
 haiku_init(struct libusb_context *ctx)
 {
@@ -83,12 +86,7 @@ static int
 haiku_get_active_config_descriptor(struct libusb_device *device, unsigned char *buffer, size_t len, int *host_endian)
 {
 	USBDevice *dev = *((USBDevice **)device->os_priv);
-	const usb_configuration_descriptor *act_config = dev->ActiveConfiguration();
-	if (len > act_config->total_length)
-		return LIBUSB_ERROR_OVERFLOW;
-	memcpy(buffer, act_config, len);
-	*host_endian = 0;
-	return LIBUSB_SUCCESS;
+	return haiku_get_config_descriptor(device, dev->ActiveConfigurationIndex(), buffer, len, host_endian);
 }
 
 static int
@@ -100,8 +98,9 @@ haiku_get_config_descriptor(struct libusb_device *device, uint8_t config_index, 
 		usbi_err(DEVICE_CTX(device), "failed getting configuration descriptor");
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-	if (len > config->total_length)
+	if (len > config->total_length) {
 		len = config->total_length;
+	}
 	memcpy(buffer, config, len);
 	*host_endian = 0;
 	return len;
