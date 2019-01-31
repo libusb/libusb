@@ -2408,13 +2408,14 @@ int usbi_vsnprintf(char *str, size_t size, const char *format, va_list ap)
 static void usbi_log_str(enum libusb_log_level level, const char *str)
 {
 #if defined(USE_SYSTEM_LOGGING_FACILITY)
-#if defined(OS_WINDOWS)
+#if defined(OS_WINDOWS) || defined(OS_WINCE)
+#if !defined(UNICODE)
 	OutputDebugStringA(str);
-#elif defined(OS_WINCE)
-	/* Windows CE only supports the Unicode version of OutputDebugString. */
+#else
 	WCHAR wbuf[USBI_MAX_LOG_LEN];
-	MultiByteToWideChar(CP_UTF8, 0, str, -1, wbuf, sizeof(wbuf));
-	OutputDebugStringW(wbuf);
+	if (MultiByteToWideChar(CP_UTF8, 0, str, -1, wbuf, sizeof(wbuf)) != 0)
+		OutputDebugStringW(wbuf);
+#endif
 #elif defined(__ANDROID__)
 	int priority = ANDROID_LOG_UNKNOWN;
 	switch (level) {
