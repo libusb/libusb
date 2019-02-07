@@ -909,6 +909,8 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size, NULL)) {
 				usbi_warn(ctx, "could not get node connection information (V2) for device '%s': %s",
 					  priv->dev_id,  windows_error_str(0));
+			} else if (conn_info_v2.Flags.DeviceIsOperatingAtSuperSpeedPlusOrHigher) {
+				conn_info.Speed = 4;
 			} else if (conn_info_v2.Flags.DeviceIsOperatingAtSuperSpeedOrHigher) {
 				conn_info.Speed = 3;
 			}
@@ -926,6 +928,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		case 1: dev->speed = LIBUSB_SPEED_FULL; break;
 		case 2: dev->speed = LIBUSB_SPEED_HIGH; break;
 		case 3: dev->speed = LIBUSB_SPEED_SUPER; break;
+		case 4: dev->speed = LIBUSB_SPEED_SUPER_PLUS; break;
 		default:
 			usbi_warn(ctx, "unknown device speed %u", conn_info.Speed);
 			break;
