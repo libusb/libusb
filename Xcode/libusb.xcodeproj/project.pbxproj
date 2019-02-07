@@ -734,6 +734,7 @@
 /* Begin XCBuildConfiguration section */
 		006AD4201C8C5A90007F8C6A /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -741,6 +742,7 @@
 		};
 		006AD4211C8C5A90007F8C6A /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -748,12 +750,14 @@
 		};
 		008FBF331628B79300BC5BE2 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
 			};
 			name = Debug;
 		};
 		008FBF341628B79300BC5BE2 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
 			};
 			name = Release;

@@ -23,6 +23,9 @@ GCC_STRICT_ALIASING = NO
 // Use C99 dialect.
 GCC_C_LANGUAGE_STANDARD = c99
 
+// Don't search user paths with <> style #includes.
+ALWAYS_SEARCH_USER_PATHS = NO
+
 // Compiler warnings.
 GCC_WARN_64_TO_32_BIT_CONVERSION = YES
 GCC_WARN_ABOUT_RETURN_TYPE = YES
