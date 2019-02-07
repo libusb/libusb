@@ -810,8 +810,8 @@ static int test_device(uint16_t vid, uint16_t pid)
 	int i, j, k, r;
 	int iface, nb_ifaces, first_iface = -1;
 	struct libusb_device_descriptor dev_desc;
-	const char* const speed_name[5] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
-		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)" };
+	const char* const speed_name[6] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
+		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)", "10000 Mbit/s (USB SuperSpeedPlus)" };
 	char string[128];
 	uint8_t string_index[3];	// indexes of the string descriptors
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
@@ -838,7 +838,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 			printf(" (from root hub)\n");
 		}
 		r = libusb_get_device_speed(dev);
-		if ((r<0) || (r>4)) r=0;
+		if ((r<0) || (r>5)) r=0;
 		printf("             speed: %s\n", speed_name[r]);
 	}
 
