@@ -492,7 +492,7 @@ static int raw_desc_to_config(struct libusb_context *ctx,
 {
 	struct libusb_config_descriptor *_config = malloc(sizeof(*_config));
 	int r;
-	
+
 	if (!_config)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -504,7 +504,7 @@ static int raw_desc_to_config(struct libusb_context *ctx,
 	} else if (r > 0) {
 		usbi_warn(ctx, "still %d bytes of descriptor data left", r);
 	}
-	
+
 	*config = _config;
 	return LIBUSB_SUCCESS;
 }
@@ -1060,7 +1060,8 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
  * It is safe to call this function with a NULL ss_usb_device_cap
  * parameter, in which case the function simply returns.
  *
- * \param ss_usb_device_cap the USB 2.0 Extension descriptor to free
+ * \param ss_usb_device_cap the SuperSpeed USB Device Capability descriptor
+ * to free
  */
 void API_EXPORTED libusb_free_ss_usb_device_capability_descriptor(
 	struct libusb_ss_usb_device_capability_descriptor *ss_usb_device_cap)
@@ -1117,7 +1118,7 @@ int API_EXPORTED libusb_get_container_id_descriptor(struct libusb_context *ctx,
  * It is safe to call this function with a NULL container_id parameter,
  * in which case the function simply returns.
  *
- * \param container_id the USB 2.0 Extension descriptor to free
+ * \param container_id the Container ID descriptor to free
  */
 void API_EXPORTED libusb_free_container_id_descriptor(
 	struct libusb_container_id_descriptor *container_id)
