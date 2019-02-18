@@ -637,6 +637,40 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
   return (int) len;
 }
 
+static int darwin_get_platform_device_id (libusb_device *dev, char *data, int length) {
+  struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
+  io_iterator_t deviceIterator;
+  io_service_t service;
+  io_string_t path;
+  kern_return_t kresult;
+  size_t s;
+
+  kresult = usb_setup_device_iterator (&deviceIterator, priv->location);
+  if (kresult != kIOReturnSuccess)
+    return darwin_to_libusb (kresult);
+
+  service = IOIteratorNext (deviceIterator);
+  if (service == IO_OBJECT_NULL) {
+    IOObjectRelease(deviceIterator);
+    return LIBUSB_ERROR_NOT_FOUND;
+  }
+
+  kresult = IORegistryEntryGetPath(service, kIOServicePlane, path);
+
+  IOObjectRelease(service);
+  IOObjectRelease(deviceIterator);
+
+  if (kresult != kIOReturnSuccess)
+    return darwin_to_libusb (kresult);
+
+  s = strlen(path) + 1;
+  if (s > length)
+    return LIBUSB_ERROR_OVERFLOW;
+
+  memcpy(data, path, s);
+  return LIBUSB_SUCCESS;
+}
+
 /* check whether the os has configured the device */
 static enum libusb_error darwin_check_configuration (struct libusb_context *ctx, struct darwin_cached_device *dev) {
   usb_device_t **darwin_device = dev->device;
@@ -697,7 +731,7 @@ static enum libusb_error darwin_check_configuration (struct libusb_context *ctx,
   } else
     /* not configured */
     dev->active_config = 0;
-  
+
   usbi_dbg ("active config: %u, first config: %u", dev->active_config, dev->first_config);
 
   return LIBUSB_SUCCESS;
@@ -2103,6 +2137,7 @@ const struct usbi_os_backend usbi_backend = {
         .get_device_descriptor = darwin_get_device_descriptor,
         .get_active_config_descriptor = darwin_get_active_config_descriptor,
         .get_config_descriptor = darwin_get_config_descriptor,
+        .get_platform_device_id = darwin_get_platform_device_id,
         .hotplug_poll = darwin_hotplug_poll,
 
         .open = darwin_open,

@@ -210,7 +210,7 @@ const struct usbi_os_backend usbi_backend = {
 	.get_active_config_descriptor = haiku_get_active_config_descriptor,
 	.get_config_descriptor = haiku_get_config_descriptor,
 	.get_config_descriptor_by_value = NULL,
-
+	.get_platform_device_id = NULL,
 
 	.get_configuration = NULL,
 	.set_configuration = haiku_set_configuration,

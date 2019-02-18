@@ -785,6 +785,12 @@ static int windows_get_config_descriptor_by_value(struct libusb_device *dev,
 	return priv->backend->get_config_descriptor_by_value(dev, bConfigurationValue, buffer);
 }
 
+static int windows_get_platform_device_id(struct libusb_device *dev, char *data, int length)
+{
+	struct windows_context_priv *priv = _context_priv(DEVICE_CTX(dev));
+	return priv->backend->get_platform_device_id(dev, data, length);
+}
+
 static int windows_get_configuration(struct libusb_device_handle *dev_handle, int *config)
 {
 	struct windows_context_priv *priv = _context_priv(HANDLE_CTX(dev_handle));
@@ -981,6 +987,7 @@ const struct usbi_os_backend usbi_backend = {
 	windows_get_active_config_descriptor,
 	windows_get_config_descriptor,
 	windows_get_config_descriptor_by_value,
+	windows_get_platform_device_id,
 	windows_get_configuration,
 	windows_set_configuration,
 	windows_claim_interface,

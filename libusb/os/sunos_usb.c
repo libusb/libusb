@@ -1651,6 +1651,7 @@ const struct usbi_os_backend usbi_backend = {
         .get_device_descriptor = sunos_get_device_descriptor,
         .get_active_config_descriptor = sunos_get_active_config_descriptor,
         .get_config_descriptor = sunos_get_config_descriptor,
+        .get_platform_device_id = NULL,
         .hotplug_poll = NULL,
         .open = sunos_open,
         .close = sunos_close,

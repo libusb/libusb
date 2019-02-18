@@ -61,6 +61,7 @@ struct windows_backend {
 		uint8_t config_index, unsigned char *buffer, size_t len);
 	int (*get_config_descriptor_by_value)(struct libusb_device *device,
 		uint8_t bConfigurationValue, unsigned char **buffer);
+	int (*get_platform_device_id)(struct libusb_device *dev, char *data, int length);
 	int (*get_configuration)(struct libusb_device_handle *dev_handle, int *config);
 	int (*set_configuration)(struct libusb_device_handle *dev_handle, int config);
 	int (*claim_interface)(struct libusb_device_handle *dev_handle, int interface_number);

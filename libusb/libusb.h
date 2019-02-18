@@ -1274,7 +1274,7 @@ enum libusb_capability {
 	 * still have to call additional libusb functions such as
 	 * \ref libusb_detach_kernel_driver(). */
 	LIBUSB_CAP_HAS_HID_ACCESS = 0x0100,
-	/** The library supports detaching of the default USB driver, using 
+	/** The library supports detaching of the default USB driver, using
 	 * \ref libusb_detach_kernel_driver(), if one is set by the OS kernel */
 	LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER = 0x0101
 };
@@ -1382,6 +1382,7 @@ LIBUSB_DEPRECATED_FOR(libusb_get_port_numbers)
 int LIBUSB_CALL libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t* path, uint8_t path_length);
 libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *dev);
+int LIBUSB_CALL libusb_get_platform_device_id(libusb_device *dev, char *data, int length);
 int LIBUSB_CALL libusb_get_device_speed(libusb_device *dev);
 int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint);

@@ -229,9 +229,9 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 		return fd; /* Success */
 
 	if (errno == ENOENT) {
-		if (!silent) 
+		if (!silent)
 			usbi_err(ctx, "File doesn't exist, wait %d ms and try again", delay/1000);
-   
+
 		/* Wait 10ms for USB device path creation.*/
 		nanosleep(&(struct timespec){delay / 1000000, (delay * 1000) % 1000000000UL}, NULL);
 
@@ -239,7 +239,7 @@ static int _get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 		if (fd != -1)
 			return fd; /* Success */
 	}
-	
+
 	if (!silent) {
 		usbi_err(ctx, "libusb couldn't open USB device %s: %s",
 			 path, strerror(errno));
@@ -860,6 +860,19 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 		size -= next;
 		descriptors += next;
 	}
+}
+
+static int op_get_platform_device_id(libusb_device *dev, char *data, int length)
+{
+	struct linux_device_priv *priv = _device_priv(dev);
+	size_t s;
+
+	s = strlen(priv->sysfs_dir) + 1;
+	if (s > length)
+		return LIBUSB_ERROR_OVERFLOW;
+
+	memcpy(data, priv->sysfs_dir, s);
+	return LIBUSB_SUCCESS;
 }
 
 static int op_get_active_config_descriptor(struct libusb_device *dev,
@@ -2853,6 +2866,7 @@ const struct usbi_os_backend usbi_backend = {
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
+	.get_platform_device_id = op_get_platform_device_id,
 
 	.wrap_sys_device = op_wrap_sys_device,
 	.open = op_open,

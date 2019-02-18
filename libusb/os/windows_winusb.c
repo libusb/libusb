@@ -1564,6 +1564,19 @@ static int winusb_get_config_descriptor_by_value(struct libusb_device *dev, uint
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
+static int winusb_get_platform_device_id(struct libusb_device *dev, char *data, int length)
+{
+	struct winusb_device_priv *priv = _device_priv(dev);
+	size_t s;
+
+	s = strlen(priv->dev_id) + 1;
+	if (s > length)
+		return LIBUSB_ERROR_OVERFLOW;
+
+	memcpy(data, priv->dev_id, s);
+	return LIBUSB_SUCCESS;
+}
+
 /*
  * return the cached copy of the active config descriptor
  */
@@ -1873,6 +1886,7 @@ const struct windows_backend winusb_backend = {
 	winusb_get_active_config_descriptor,
 	winusb_get_config_descriptor,
 	winusb_get_config_descriptor_by_value,
+	winusb_get_platform_device_id,
 	winusb_get_configuration,
 	winusb_set_configuration,
 	winusb_claim_interface,
