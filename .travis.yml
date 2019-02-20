@@ -30,6 +30,9 @@ matrix:
           compiler: clang
 
 addons:
+    homebrew:
+        update: true
+        brewfile: true
     apt:
         packages:
             - autoconf
@@ -39,10 +42,6 @@ addons:
             - libudev-dev
         sources:
             - ubuntu-toolchain-r-test
-
-before_install:
-    # brew bundle installs or upgrades packages in Brewfile
-    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew bundle && brew bundle cleanup --force; fi
 
 script:
     - ./autogen.sh && make clean && make

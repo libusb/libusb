@@ -1408,10 +1408,11 @@ static int initialize_handle(struct libusb_device_handle *handle, int fd)
 	return usbi_add_pollfd(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
 }
 
-static int op_wrap_fd(struct libusb_context *ctx,
-	struct libusb_device_handle *handle, int fd)
+static int op_wrap_sys_device(struct libusb_context *ctx,
+	struct libusb_device_handle *handle, intptr_t sys_dev)
 {
 	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
+	int fd = (int)sys_dev;
 	uint8_t busnum, devaddr;
 	struct usbfs_connectinfo ci;
 	struct libusb_device *dev;
@@ -2853,7 +2854,7 @@ const struct usbi_os_backend usbi_backend = {
 	.get_config_descriptor = op_get_config_descriptor,
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
 
-	.wrap_fd = op_wrap_fd,
+	.wrap_sys_device = op_wrap_sys_device,
 	.open = op_open,
 	.close = op_close,
 	.get_configuration = op_get_configuration,

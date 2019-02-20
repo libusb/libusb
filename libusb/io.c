@@ -1194,8 +1194,7 @@ void usbi_io_exit(struct libusb_context *ctx)
 	usbi_cond_destroy(&ctx->event_waiters_cond);
 	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_tls_key_delete(ctx->event_handling_key);
-	if (ctx->pollfds)
-		free(ctx->pollfds);
+	free(ctx->pollfds);
 }
 
 static int calculate_timeout(struct usbi_transfer *transfer)
@@ -1249,7 +1248,7 @@ static int calculate_timeout(struct usbi_transfer *transfer)
  * use it on a non-isochronous endpoint. If you do this, ensure that at time
  * of submission, num_iso_packets is 0 and that type is set appropriately.
  *
- * \param iso_packets number of isochronous packet descriptors to allocate
+ * \param iso_packets number of isochronous packet descriptors to allocate. Must be non-negative.
  * \returns a newly allocated transfer, or NULL on error
  */
 DEFAULT_VISIBILITY
@@ -1257,12 +1256,18 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	int iso_packets)
 {
 	struct libusb_transfer *transfer;
-	size_t os_alloc_size = usbi_backend.transfer_priv_size;
-	size_t alloc_size = sizeof(struct usbi_transfer)
+	size_t os_alloc_size;
+	size_t alloc_size;
+	struct usbi_transfer *itransfer;
+
+	assert(iso_packets >= 0);
+
+	os_alloc_size = usbi_backend.transfer_priv_size;
+	alloc_size = sizeof(struct usbi_transfer)
 		+ sizeof(struct libusb_transfer)
-		+ (sizeof(struct libusb_iso_packet_descriptor) * iso_packets)
+		+ (sizeof(struct libusb_iso_packet_descriptor) * (size_t)iso_packets)
 		+ os_alloc_size;
-	struct usbi_transfer *itransfer = calloc(1, alloc_size);
+	itransfer = calloc(1, alloc_size);
 	if (!itransfer)
 		return NULL;
 
@@ -1297,7 +1302,7 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 		return;
 
 	usbi_dbg("transfer %p", transfer);
-	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER && transfer->buffer)
+	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER)
 		free(transfer->buffer);
 
 	itransfer = LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
@@ -2082,9 +2087,16 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 	/* prevent attempts to recursively handle events (e.g. calling into
 	 * libusb_handle_events() from within a hotplug or transfer callback) */
+	usbi_mutex_lock(&ctx->event_data_lock);
+	r = 0;
 	if (usbi_handling_events(ctx))
-		return LIBUSB_ERROR_BUSY;
-	usbi_start_event_handling(ctx);
+		r = LIBUSB_ERROR_BUSY;
+	else
+		usbi_start_event_handling(ctx);
+	usbi_mutex_unlock(&ctx->event_data_lock);
+
+	if (r)
+		return r;
 
 	/* there are certain fds that libusb uses internally, currently:
 	 *
@@ -2106,10 +2118,8 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED) {
 		usbi_dbg("poll fds modified, reallocating");
 
-		if (ctx->pollfds) {
-			free(ctx->pollfds);
-			ctx->pollfds = NULL;
-		}
+		free(ctx->pollfds);
+		ctx->pollfds = NULL;
 
 		/* sanity check - it is invalid for a context to have fewer than the
 		 * required internal fds (memory corruption?) */
@@ -2598,7 +2608,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 		timerclear(tv);
 	} else {
 		timersub(&next_timeout, &cur_tv, tv);
-		usbi_dbg("next timeout in %d.%06ds", tv->tv_sec, tv->tv_usec);
+		usbi_dbg("next timeout in %ld.%06lds", (long)tv->tv_sec, (long)tv->tv_usec);
 	}
 
 	return 1;
@@ -2755,15 +2765,12 @@ out:
  * Since version 1.0.20, \ref LIBUSB_API_VERSION >= 0x01000104
  *
  * It is legal to call this function with a NULL pollfd list. In this case,
- * the function will simply return safely.
+ * the function will simply do nothing.
  *
  * \param pollfds the list of libusb_pollfd structures to free
  */
 void API_EXPORTED libusb_free_pollfds(const struct libusb_pollfd **pollfds)
 {
-	if (!pollfds)
-		return;
-
 	free((void *)pollfds);
 }
 
