@@ -5,10 +5,20 @@
 #error "Please make sure the msvc/ directory is removed from your build path."
 #endif
 
+/* Visual Studio 2015 and later defines timespec */
+#if (_MSC_VER >= 1900)
+#define _TIMESPEC_DEFINED 1
+#endif
+
 /* Disable: warning C4200: nonstandard extension used : zero-sized array in struct/union */
 #pragma warning(disable:4200)
+/* Disable: warning C4324: structure was padded due to __declspec(align()) */
+#pragma warning(disable:4324)
 /* Disable: warning C6258: Using TerminateThread does not allow proper thread clean up */
-#pragma warning(disable: 6258)
+#pragma warning(disable:6258)
+/* Disable: warning C4996: 'GetVersionA': was declared deprecated */
+#pragma warning(disable:4996)
+
 #if defined(_PREFAST_)
 /* Disable "Banned API" errors when using the MS's WDK OACR/Prefast */
 #pragma warning(disable:28719)
@@ -21,6 +31,11 @@
 
 /* Enable global message logging */
 #define ENABLE_LOGGING 1
+
+/* VS 2015 includes timespec */
+#if _MSC_VER >= 1900
+#define HAVE_STRUCT_TIMESPEC 1
+#endif
 
 /* Uncomment to start with debug message logging enabled */
 // #define ENABLE_DEBUG_LOGGING 1
@@ -37,6 +52,5 @@
 #define HAVE_MISSING_H
 #else
 #define OS_WINDOWS 1
-#define HAVE_SIGNAL_H 1
 #define HAVE_SYS_TYPES_H 1
 #endif

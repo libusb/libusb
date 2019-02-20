@@ -133,7 +133,7 @@ static int ezusb_write(libusb_device_handle *device, const char *label,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
 		opcode, addr & 0xFFFF, addr >> 16,
 		(unsigned char*)data, (uint16_t)len, 1000);
-	if (status != len) {
+	if (status != (signed)len) {
 		if (status < 0)
 			logerror("%s: %s\n", label, libusb_error_name(status));
 		else
@@ -156,7 +156,7 @@ static int ezusb_read(libusb_device_handle *device, const char *label,
 		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
 		opcode, addr & 0xFFFF, addr >> 16,
 		(unsigned char*)data, (uint16_t)len, 1000);
-	if (status != len) {
+	if (status != (signed)len) {
 		if (status < 0)
 			logerror("%s: %s\n", label, libusb_error_name(status));
 		else
@@ -299,7 +299,7 @@ static int parse_ihex(FILE *image, void *context,
 		/* Read the target offset (address up to 64KB) */
 		tmp = buf[7];
 		buf[7] = 0;
-		off = (int)strtoul(buf+3, NULL, 16);
+		off = (unsigned int)strtoul(buf+3, NULL, 16);
 		buf[7] = tmp;
 
 		/* Initialize data_addr */

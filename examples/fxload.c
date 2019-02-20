@@ -65,8 +65,9 @@ void logerror(const char *format, ...)
 }
 
 static int print_usage(int error_code) {
-	fprintf(stderr, "\nUsage: fxload [-v] [-V] [-t type] [-d vid:pid] [-p bus,addr] -i firmware\n");
+	fprintf(stderr, "\nUsage: fxload [-v] [-V] [-t type] [-d vid:pid] [-p bus,addr] [-s loader] -i firmware\n");
 	fprintf(stderr, "  -i <path>       -- Firmware to upload\n");
+	fprintf(stderr, "  -s <path>       -- Second stage loader\n");
 	fprintf(stderr, "  -t <type>       -- Target type: an21, fx, fx2, fx2lp, fx3\n");
 	fprintf(stderr, "  -d <vid:pid>    -- Target device, as an USB VID:PID\n");
 	fprintf(stderr, "  -p <bus,addr>   -- Target device, as a libusb bus number and device address path\n");
@@ -88,14 +89,15 @@ int main(int argc, char*argv[])
 	const char *fx_name[FX_TYPE_MAX] = FX_TYPE_NAMES;
 	const char *ext, *img_name[] = IMG_TYPE_NAMES;
 	int fx_type = FX_TYPE_UNDEFINED, img_type[ARRAYSIZE(path)];
-	int i, j, opt, status;
+	int opt, status;
+	unsigned int i, j;
 	unsigned vid = 0, pid = 0;
 	unsigned busnum = 0, devaddr = 0, _busnum, _devaddr;
 	libusb_device *dev, **devs;
 	libusb_device_handle *device = NULL;
 	struct libusb_device_descriptor desc;
 
-	while ((opt = getopt(argc, argv, "qvV?hd:p:i:I:t:")) != EOF)
+	while ((opt = getopt(argc, argv, "qvV?hd:p:i:I:s:S:t:")) != EOF)
 		switch (opt) {
 
 		case 'd':
@@ -117,6 +119,11 @@ int main(int argc, char*argv[])
 		case 'i':
 		case 'I':
 			path[FIRMWARE] = optarg;
+			break;
+
+		case 's':
+		case 'S':
+			path[LOADER] = optarg;
 			break;
 
 		case 'V':
@@ -171,7 +178,7 @@ int main(int argc, char*argv[])
 		logerror("libusb_init() failed: %s\n", libusb_error_name(status));
 		return -1;
 	}
-	libusb_set_debug(NULL, verbose);
+	libusb_set_option(NULL, LIBUSB_OPTION_LOG_LEVEL, verbose);
 
 	/* try to pick up missing parameters from known devices */
 	if ((type == NULL) || (device_id == NULL) || (device_path != NULL)) {
@@ -224,15 +231,16 @@ int main(int argc, char*argv[])
 		}
 		if (dev == NULL) {
 			libusb_free_device_list(devs, 1);
+			libusb_exit(NULL);
 			logerror("could not find a known device - please specify type and/or vid:pid and/or bus,dev\n");
 			return print_usage(-1);
 		}
 		status = libusb_open(dev, &device);
+		libusb_free_device_list(devs, 1);
 		if (status < 0) {
 			logerror("libusb_open() failed: %s\n", libusb_error_name(status));
 			goto err;
 		}
-		libusb_free_device_list(devs, 1);
 	} else if (device_id != NULL) {
 		device = libusb_open_device_with_vid_pid(NULL, (uint16_t)vid, (uint16_t)pid);
 		if (device == NULL) {
@@ -245,6 +253,7 @@ int main(int argc, char*argv[])
 	libusb_set_auto_detach_kernel_driver(device, 1);
 	status = libusb_claim_interface(device, 0);
 	if (status != LIBUSB_SUCCESS) {
+		libusb_close(device);
 		logerror("libusb_claim_interface failed: %s\n", libusb_error_name(status));
 		goto err;
 	}
@@ -272,10 +281,23 @@ int main(int argc, char*argv[])
 			logerror("%s: type %s\n", path[i], img_name[img_type[i]]);
 	}
 
-	/* single stage, put into internal memory */
-	if (verbose > 1)
-		logerror("single stage: load on-chip memory\n");
-	status = ezusb_load_ram(device, path[FIRMWARE], fx_type, img_type[FIRMWARE], 0);
+	if (path[LOADER] == NULL) {
+		/* single stage, put into internal memory */
+		if (verbose > 1)
+			logerror("single stage: load on-chip memory\n");
+		status = ezusb_load_ram(device, path[FIRMWARE], fx_type, img_type[FIRMWARE], 0);
+	} else {
+		/* two-stage, put loader into internal memory */
+		if (verbose > 1)
+			logerror("1st stage: load 2nd stage loader\n");
+		status = ezusb_load_ram(device, path[LOADER], fx_type, img_type[LOADER], 0);
+		if (status == 0) {
+			/* two-stage, put firmware into internal memory */
+			if (verbose > 1)
+				logerror("2nd state: load on-chip memory\n");
+			status = ezusb_load_ram(device, path[FIRMWARE], fx_type, img_type[FIRMWARE], 1);
+		}
+	}
 
 	libusb_release_interface(device, 0);
 	libusb_close(device);

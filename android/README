@@ -24,8 +24,10 @@ The libusb library, examples and tests can then be found in:
 Where $ARCH is one of:
     armeabi
     armeabi-v7a
+    mips
+    mips64
     x86
-
+    x86_64
 
 Installing:
 -----------
@@ -62,7 +64,7 @@ image of a running device:
     # Install libusb
     adb push obj/local/armeabi/libusb1.0.so /sdcard/
     adb shell su -c "cat > /system/lib/libusb1.0.so < /sdcard/libusb1.0.so"
-    adb shell rm /system/lib/libusb1.0.so
+    adb shell rm /sdcard/libusb1.0.so
 
     # Install the samples and tests
     for B in listdevs fxload xusb sam3u_benchmark hotplugtest stress

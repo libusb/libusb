@@ -411,13 +411,15 @@ static int alloc_transfers(void)
 
 static void sighandler(int signum)
 {
+	(void)signum;
+
 	do_exit = 1;
 }
 
 int main(void)
 {
 	struct sigaction sigact;
-	int r = 1;
+	int r;
 
 	r = libusb_init(NULL);
 	if (r < 0) {

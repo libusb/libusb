@@ -1,14 +1,77 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
+2018-12-05: v1.0.23 (in progress)
+* Add German translation (#446)
+* Add Hungarian translation (#493)
+* configure.ac: Fix detection of clock_gettime library (#439)
+* Darwin(macOS): Switch from using ResetDevice to USBDeviceReEnumerate (#455)
+* Darwin(macOS): Remove code that changed the device class used (#428)
+* New API libusb_set_log_cb() to redirect global and per context log
+  messages to the provided log handling function
+* Solaris: Break infinite recursion in backend clock_gettime
+* Solaris: Enable timerfd on sunos when available
+* Various other bug fixes and improvements
+
+2018-03-24: v1.0.22:
+* New libusb_set_option() API
+* Fix transfer timeout not being cleared upon resubmission
+* Report super speed plus devices on modern Linux and macOS
+* Darwin: Improve support for macOS Sierra and High Sierra
+* Darwin: SDK fixes and improvements
+* Linux: Let initialization succeed when no devices are present
+* Linux: Mark internal file descriptors with CLOEXEC flag
+* Solaris: Add support for attach/detach kernel driver
+* Windows: Add dynamic UsbDk backend selection
+* Windows: Add isochronous transfer support via libusbK
+* Windows: Add Visual Studio 2017 support
+* Windows: Fix enumeration problems on Windows 8 and later
+* Windows: Major rework of poll() emulation
+* Windows: Numerous HID API fixes
+* Windows: Support cancelation of individual transfers (Vista and later)
+* Various other bug fixes and improvements
+
+2016-10-01: v1.0.21:
+* Core: Refactor code related to transfer flags and timeout handling
+* Darwin: Ignore root hub simulation devices
+* Darwin: Improved support for OS X El Capitan
+* Darwin: Work around devices with buggy endpoint descriptors
+* Darwin: Do not use objc_registerThreadWithCollector after its deprecation
+* Darwin: Use C11 atomics on 10.12+ as the OS atomics are now deprecated
+* Linux: Support preallocating kernel memory for zerocopy USB
+* Linux: Deal with receiving POLLERR before all transfers have completed
+* Solaris: Add solaris backend
+* Windows: Add Visual Studio 2015 support
+* Windows: Add usbdk backend
+* Prevent attempts to recursively handle events
+* Fix race condition in handle_timeout()
+* Allow transferred argument to be optional in bulk APIs
+* Various other bug fixes and improvements
+
+2015-09-13: v1.0.20
+* Add Haiku support
+* Fix multiple memory and resource leaks (#16, #52, #76, #81)
+* Fix possible deadlock when executing transfer callback
+* New libusb_free_pollfds() API
+* Darwin: Fix devices not being detected on OS X 10.8 (#48)
+* Linux: Allow larger isochronous transfer submission (#23)
+* Windows: Fix broken builds Cygwin/MinGW builds and compiler warnings
+* Windows: Fix broken bus number lookup
+* Windows: Improve submission of control requests for composite devices
+* Examples: Add two-stage load support to fxload (#12)
+* Correctly report cancellations due to timeouts
+* Improve efficiency of event handling
+* Improve speed of transfer submission in multi-threaded environments
+* Various other bug fixes and improvements
+The (#xx) numbers are libusb issue numbers, see ie:
+https://github.com/libusb/libusb/issues/16
+
 2014-05-30: v1.0.19
 * Add support for USB bulk streams on Linux and Mac OS X (#11)
 * Windows: Add AMD and Intel USB-3.0 root hub support
 * Windows: Fix USB 3.0 speed detection on Windows 8 or later (#10)
 * Added Russian translation for libusb_strerror strings
 * All: Various small fixes and cleanups
-The (#xx) numbers are libusb issue numbers, see ie:
-https://github.com/libusb/libusb/issues/11
 
 2014-01-25: v1.0.18
 * Fix multiple memory leaks

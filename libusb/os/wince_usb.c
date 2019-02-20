@@ -22,135 +22,130 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <libusbi.h>
+#include <config.h>
 
 #include <stdint.h>
-#include <errno.h>
 #include <inttypes.h>
 
+#include "libusbi.h"
 #include "wince_usb.h"
 
-// Forward declares
-static int wince_clock_gettime(int clk_id, struct timespec *tp);
-unsigned __stdcall wince_clock_gettime_threaded(void* param);
-
 // Global variables
-uint64_t hires_frequency, hires_ticks_to_ps;
-int errno;
-const uint64_t epoch_time = UINT64_C(116444736000000000);       // 1970.01.01 00:00:000 in MS Filetime
-int windows_version = WINDOWS_CE;
+int errno = 0;
+static uint64_t hires_frequency, hires_ticks_to_ps;
+static HANDLE driver_handle = INVALID_HANDLE_VALUE;
 static int concurrent_usage = -1;
-// Timer thread
-// NB: index 0 is for monotonic and 1 is for the thread exit event
-HANDLE timer_thread = NULL;
-HANDLE timer_mutex = NULL;
-struct timespec timer_tp;
-volatile LONG request_count[2] = {0, 1};	// last one must be > 0
-HANDLE timer_request[2] = { NULL, NULL };
-HANDLE timer_response = NULL;
-HANDLE driver_handle = INVALID_HANDLE_VALUE;
 
 /*
  * Converts a windows error to human readable string
  * uses retval as errorcode, or, if 0, use GetLastError()
  */
 #if defined(ENABLE_LOGGING)
-static char* windows_error_str(uint32_t retval)
+static const char *windows_error_str(DWORD error_code)
 {
 	static TCHAR wErr_string[ERR_BUFFER_SIZE];
 	static char err_string[ERR_BUFFER_SIZE];
 
 	DWORD size;
-	size_t i;
-	uint32_t error_code, format_error;
+	int len;
 
-	error_code = retval?retval:GetLastError();
-	
-	safe_stprintf(wErr_string, ERR_BUFFER_SIZE, _T("[%d] "), error_code);
-	
-	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), &wErr_string[safe_tcslen(wErr_string)],
-		ERR_BUFFER_SIZE - (DWORD)safe_tcslen(wErr_string), NULL);
+	if (error_code == 0)
+		error_code = GetLastError();
+
+	len = sprintf(err_string, "[%u] ", (unsigned int)error_code);
+
+	size = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		wErr_string, ERR_BUFFER_SIZE, NULL);
 	if (size == 0) {
-		format_error = GetLastError();
+		DWORD format_error = GetLastError();
 		if (format_error)
-			safe_stprintf(wErr_string, ERR_BUFFER_SIZE,
-				_T("Windows error code %u (FormatMessage error code %u)"), error_code, format_error);
+			snprintf(err_string, ERR_BUFFER_SIZE,
+				"Windows error code %u (FormatMessage error code %u)",
+				(unsigned int)error_code, (unsigned int)format_error);
 		else
-			safe_stprintf(wErr_string, ERR_BUFFER_SIZE, _T("Unknown error code %u"), error_code);
+			snprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", (unsigned int)error_code);
 	} else {
-		// Remove CR/LF terminators
-		for (i=safe_tcslen(wErr_string)-1; ((wErr_string[i]==0x0A) || (wErr_string[i]==0x0D)); i--) {
-			wErr_string[i] = 0;
-		}
+		// Remove CR/LF terminators, if present
+		size_t pos = size - 2;
+		if (wErr_string[pos] == 0x0D)
+			wErr_string[pos] = 0;
+
+		if (!WideCharToMultiByte(CP_ACP, 0, wErr_string, -1, &err_string[len], ERR_BUFFER_SIZE - len, NULL, NULL))
+			strcpy(err_string, "Unable to convert error string");
 	}
-	if (WideCharToMultiByte(CP_ACP, 0, wErr_string, -1, err_string, ERR_BUFFER_SIZE, NULL, NULL) < 0)
-	{
-		strcpy(err_string, "Unable to convert error string");
-	}
+
 	return err_string;
 }
 #endif
 
 static struct wince_device_priv *_device_priv(struct libusb_device *dev)
 {
-        return (struct wince_device_priv *) dev->os_priv;
+	return (struct wince_device_priv *)dev->os_priv;
 }
 
 // ceusbkwrapper to libusb error code mapping
-static int translate_driver_error(int error) 
+static int translate_driver_error(DWORD error)
 {
 	switch (error) {
-		case ERROR_INVALID_PARAMETER:
-			return LIBUSB_ERROR_INVALID_PARAM;
-		case ERROR_CALL_NOT_IMPLEMENTED:
-		case ERROR_NOT_SUPPORTED:
-			return LIBUSB_ERROR_NOT_SUPPORTED;
-		case ERROR_NOT_ENOUGH_MEMORY:
-			return LIBUSB_ERROR_NO_MEM;
-		case ERROR_INVALID_HANDLE:
-			return LIBUSB_ERROR_NO_DEVICE;
-		case ERROR_BUSY:
-			return LIBUSB_ERROR_BUSY;
+	case ERROR_INVALID_PARAMETER:
+		return LIBUSB_ERROR_INVALID_PARAM;
+	case ERROR_CALL_NOT_IMPLEMENTED:
+	case ERROR_NOT_SUPPORTED:
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	case ERROR_NOT_ENOUGH_MEMORY:
+		return LIBUSB_ERROR_NO_MEM;
+	case ERROR_INVALID_HANDLE:
+		return LIBUSB_ERROR_NO_DEVICE;
+	case ERROR_BUSY:
+		return LIBUSB_ERROR_BUSY;
 
-		// Error codes that are either unexpected, or have 
-		// no suitable LIBUSB_ERROR equivilant.
-		case ERROR_CANCELLED:
-		case ERROR_INTERNAL_ERROR:
-		default:
-			return LIBUSB_ERROR_OTHER;
+	// Error codes that are either unexpected, or have
+	// no suitable LIBUSB_ERROR equivalent.
+	case ERROR_CANCELLED:
+	case ERROR_INTERNAL_ERROR:
+	default:
+		return LIBUSB_ERROR_OTHER;
 	}
 }
 
-static int init_dllimports()
+static BOOL init_dllimports(void)
 {
-	DLL_LOAD(ceusbkwrapper.dll, UkwOpenDriver, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwGetDeviceList, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwReleaseDeviceList, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwGetDeviceAddress, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwGetDeviceDescriptor, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwGetConfigDescriptor, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwCloseDriver, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwCancelTransfer, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwIssueControlTransfer, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwClaimInterface, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwReleaseInterface, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwSetInterfaceAlternateSetting, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwClearHaltHost, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwClearHaltDevice, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwGetConfig, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwSetConfig, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwResetDevice, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwKernelDriverActive, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwAttachKernelDriver, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwDetachKernelDriver, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwIssueBulkTransfer, TRUE);
-	DLL_LOAD(ceusbkwrapper.dll, UkwIsPipeHalted, TRUE);
-	return LIBUSB_SUCCESS;
+	DLL_GET_HANDLE(ceusbkwrapper);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwOpenDriver, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwGetDeviceList, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwReleaseDeviceList, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwGetDeviceAddress, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwGetDeviceDescriptor, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwGetConfigDescriptor, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwCloseDriver, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwCancelTransfer, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwIssueControlTransfer, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwClaimInterface, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwReleaseInterface, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwSetInterfaceAlternateSetting, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwClearHaltHost, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwClearHaltDevice, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwGetConfig, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwSetConfig, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwResetDevice, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwKernelDriverActive, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwAttachKernelDriver, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwDetachKernelDriver, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwIssueBulkTransfer, TRUE);
+	DLL_LOAD_FUNC(ceusbkwrapper, UkwIsPipeHalted, TRUE);
+
+	return TRUE;
 }
 
-static int init_device(struct libusb_device *dev, UKW_DEVICE drv_dev,
-					   unsigned char bus_addr, unsigned char dev_addr)
+static void exit_dllimports(void)
+{
+	DLL_FREE_HANDLE(ceusbkwrapper);
+}
+
+static int init_device(
+	struct libusb_device *dev, UKW_DEVICE drv_dev,
+	unsigned char bus_addr, unsigned char dev_addr)
 {
 	struct wince_device_priv *priv = _device_priv(dev);
 	int r = LIBUSB_SUCCESS;
@@ -159,20 +154,21 @@ static int init_device(struct libusb_device *dev, UKW_DEVICE drv_dev,
 	dev->device_address = dev_addr;
 	priv->dev = drv_dev;
 
-	if (!UkwGetDeviceDescriptor(priv->dev, &(priv->desc))) {
+	if (!UkwGetDeviceDescriptor(priv->dev, &(priv->desc)))
 		r = translate_driver_error(GetLastError());
-	}
+
 	return r;
 }
 
 // Internal API functions
 static int wince_init(struct libusb_context *ctx)
 {
-	int i, r = LIBUSB_ERROR_OTHER;
+	int r = LIBUSB_ERROR_OTHER;
 	HANDLE semaphore;
-	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
+	LARGE_INTEGER li_frequency;
+	TCHAR sem_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
 
-	_stprintf(sem_name, _T("libusb_init%08X"), (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
+	_stprintf(sem_name, _T("libusb_init%08X"), (unsigned int)(GetCurrentProcessId() & 0xFFFFFFFF));
 	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
 	if (semaphore == NULL) {
 		usbi_err(ctx, "could not create semaphore: %s", windows_error_str(0));
@@ -190,11 +186,8 @@ static int wince_init(struct libusb_context *ctx)
 	// NB: concurrent usage supposes that init calls are equally balanced with
 	// exit calls. If init is called more than exit, we will not exit properly
 	if ( ++concurrent_usage == 0 ) {	// First init?
-		// Initialize pollable file descriptors
-		init_polling();
-
 		// Load DLL imports
-		if (init_dllimports() != LIBUSB_SUCCESS) {
+		if (!init_dllimports()) {
 			usbi_err(ctx, "could not resolve DLL functions");
 			r = LIBUSB_ERROR_NOT_SUPPORTED;
 			goto init_exit;
@@ -208,37 +201,17 @@ static int wince_init(struct libusb_context *ctx)
 			goto init_exit;
 		}
 
-		// Windows CE doesn't have a way of specifying thread affinity, so this code
-		// just has  to hope QueryPerformanceCounter doesn't report different values when
-		// running on different cores.
-		r = LIBUSB_ERROR_NO_MEM;
-		for (i = 0; i < 2; i++) {
-			timer_request[i] = CreateEvent(NULL, TRUE, FALSE, NULL);
-			if (timer_request[i] == NULL) {
-				usbi_err(ctx, "could not create timer request event %d - aborting", i);
-				goto init_exit;
-			}
-		}
-		timer_response = CreateSemaphore(NULL, 0, MAX_TIMER_SEMAPHORES, NULL);
-		if (timer_response == NULL) {
-			usbi_err(ctx, "could not create timer response semaphore - aborting");
-			goto init_exit;
-		}
-		timer_mutex = CreateMutex(NULL, FALSE, NULL);
-		if (timer_mutex == NULL) {
-			usbi_err(ctx, "could not create timer mutex - aborting");
-			goto init_exit;
-		}
-		timer_thread = CreateThread(NULL, 0, wince_clock_gettime_threaded, NULL, 0, NULL);
-		if (timer_thread == NULL) {
-			usbi_err(ctx, "Unable to create timer thread - aborting");
-			goto init_exit;
-		}
-
-		// Wait for timer thread to init before continuing.
-		if (WaitForSingleObject(timer_response, INFINITE) != WAIT_OBJECT_0) {
-			usbi_err(ctx, "Failed to wait for timer thread to become ready - aborting");
-			goto init_exit;
+		// find out if we have access to a monotonic (hires) timer
+		if (QueryPerformanceFrequency(&li_frequency)) {
+			hires_frequency = li_frequency.QuadPart;
+			// The hires frequency can go as high as 4 GHz, so we'll use a conversion
+			// to picoseconds to compute the tv_nsecs part in clock_gettime
+			hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency;
+			usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
+		} else {
+			usbi_dbg("no hires timer available on this platform");
+			hires_frequency = 0;
+			hires_ticks_to_ps = UINT64_C(0);
 		}
 	}
 	// At this stage, either we went through full init successfully, or didn't need to
@@ -246,33 +219,11 @@ static int wince_init(struct libusb_context *ctx)
 
 init_exit: // Holds semaphore here.
 	if (!concurrent_usage && r != LIBUSB_SUCCESS) { // First init failed?
+		exit_dllimports();
+
 		if (driver_handle != INVALID_HANDLE_VALUE) {
 			UkwCloseDriver(driver_handle);
 			driver_handle = INVALID_HANDLE_VALUE;
-		}
-		if (timer_thread) {
-			SetEvent(timer_request[1]); // actually the signal to quit the thread.
-			if (WAIT_OBJECT_0 != WaitForSingleObject(timer_thread, INFINITE)) {
-				usbi_warn(ctx, "could not wait for timer thread to quit");
-				TerminateThread(timer_thread, 1); // shouldn't happen, but we're destroying
-												  // all objects it might have held anyway.
-			}
-			CloseHandle(timer_thread);
-			timer_thread = NULL;
-		}
-		for (i = 0; i < 2; i++) {
-			if (timer_request[i]) {
-				CloseHandle(timer_request[i]);
-				timer_request[i] = NULL;
-			}
-		}
-		if (timer_response) {
-			CloseHandle(timer_response);
-			timer_response = NULL;
-		}
-		if (timer_mutex) {
-			CloseHandle(timer_mutex);
-			timer_mutex = NULL;
 		}
 	}
 
@@ -284,17 +235,16 @@ init_exit: // Holds semaphore here.
 	return r;
 }
 
-static void wince_exit(void)
+static void wince_exit(struct libusb_context *ctx)
 {
-	int i;
 	HANDLE semaphore;
-	TCHAR sem_name[11+1+8]; // strlen(libusb_init)+'\0'+(32-bit hex PID)
+	TCHAR sem_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
+	UNUSED(ctx);
 
-	_stprintf(sem_name, _T("libusb_init%08X"), (unsigned int)GetCurrentProcessId()&0xFFFFFFFF);
+	_stprintf(sem_name, _T("libusb_init%08X"), (unsigned int)(GetCurrentProcessId() & 0xFFFFFFFF));
 	semaphore = CreateSemaphore(NULL, 1, 1, sem_name);
-	if (semaphore == NULL) {
+	if (semaphore == NULL)
 		return;
-	}
 
 	// A successful wait brings our semaphore count to 0 (unsignaled)
 	// => any concurent wait stalls until the semaphore release
@@ -305,31 +255,8 @@ static void wince_exit(void)
 
 	// Only works if exits and inits are balanced exactly
 	if (--concurrent_usage < 0) {	// Last exit
-		exit_polling();
+		exit_dllimports();
 
-		if (timer_thread) {
-			SetEvent(timer_request[1]); // actually the signal to quit the thread.
-			if (WAIT_OBJECT_0 != WaitForSingleObject(timer_thread, INFINITE)) {
-				usbi_dbg("could not wait for timer thread to quit");
-				TerminateThread(timer_thread, 1);
-			}
-			CloseHandle(timer_thread);
-			timer_thread = NULL;
-		}
-		for (i = 0; i < 2; i++) {
-			if (timer_request[i]) {
-				CloseHandle(timer_request[i]);
-				timer_request[i] = NULL;
-			}
-		}
-		if (timer_response) {
-			CloseHandle(timer_response);
-			timer_response = NULL;
-		}
-		if (timer_mutex) {
-			CloseHandle(timer_mutex);
-			timer_mutex = NULL;
-		}
 		if (driver_handle != INVALID_HANDLE_VALUE) {
 			UkwCloseDriver(driver_handle);
 			driver_handle = INVALID_HANDLE_VALUE;
@@ -345,7 +272,7 @@ static int wince_get_device_list(
 	struct discovered_devs **discdevs)
 {
 	UKW_DEVICE devices[MAX_DEVICE_COUNT];
-	struct discovered_devs * new_devices = *discdevs;
+	struct discovered_devs *new_devices = *discdevs;
 	DWORD count = 0, i;
 	struct libusb_device *dev = NULL;
 	unsigned char bus_addr, dev_addr;
@@ -360,51 +287,58 @@ static int wince_get_device_list(
 		usbi_err(ctx, "could not get devices: %s", windows_error_str(0));
 		return libusbErr;
 	}
-	for(i = 0; i < count; ++i) {
+
+	for (i = 0; i < count; ++i) {
 		release_list_offset = i;
 		success = UkwGetDeviceAddress(devices[i], &bus_addr, &dev_addr, &session_id);
 		if (!success) {
 			r = translate_driver_error(GetLastError());
-			usbi_err(ctx, "could not get device address for %d: %s", i, windows_error_str(0));
+			usbi_err(ctx, "could not get device address for %u: %s", (unsigned int)i, windows_error_str(0));
 			goto err_out;
 		}
+
 		dev = usbi_get_device_by_session_id(ctx, session_id);
 		if (dev) {
-			usbi_dbg("using existing device for %d/%d (session %ld)",
+			usbi_dbg("using existing device for %u/%u (session %lu)",
 					bus_addr, dev_addr, session_id);
-			// Release just this element in the device list (as we already hold a 
+			// Release just this element in the device list (as we already hold a
 			// reference to it).
 			UkwReleaseDeviceList(driver_handle, &devices[i], 1);
 			release_list_offset++;
 		} else {
-			usbi_dbg("allocating new device for %d/%d (session %ld)",
+			usbi_dbg("allocating new device for %u/%u (session %lu)",
 					bus_addr, dev_addr, session_id);
 			dev = usbi_alloc_device(ctx, session_id);
 			if (!dev) {
 				r = LIBUSB_ERROR_NO_MEM;
 				goto err_out;
 			}
+
 			r = init_device(dev, devices[i], bus_addr, dev_addr);
 			if (r < 0)
 				goto err_out;
+
 			r = usbi_sanitize_device(dev);
 			if (r < 0)
 				goto err_out;
 		}
+
 		new_devices = discovered_devs_append(new_devices, dev);
-		if (!discdevs) {
+		if (!new_devices) {
 			r = LIBUSB_ERROR_NO_MEM;
 			goto err_out;
 		}
-		safe_unref_device(dev);
+
+		libusb_unref_device(dev);
 	}
+
 	*discdevs = new_devices;
 	return r;
 err_out:
 	*discdevs = new_devices;
-	safe_unref_device(dev);
+	libusb_unref_device(dev);
 	// Release the remainder of the unprocessed device list.
-	// The devices added to new_devices already will still be passed up to libusb, 
+	// The devices added to new_devices already will still be passed up to libusb,
 	// which can dispose of them at its leisure.
 	UkwReleaseDeviceList(driver_handle, &devices[release_list_offset], count - release_list_offset);
 	return r;
@@ -423,8 +357,8 @@ static void wince_close(struct libusb_device_handle *handle)
 }
 
 static int wince_get_device_descriptor(
-   struct libusb_device *device,
-   unsigned char *buffer, int *host_endian)
+	struct libusb_device *device,
+	unsigned char *buffer, int *host_endian)
 {
 	struct wince_device_priv *priv = _device_priv(device);
 
@@ -439,10 +373,11 @@ static int wince_get_active_config_descriptor(
 {
 	struct wince_device_priv *priv = _device_priv(device);
 	DWORD actualSize = len;
+
 	*host_endian = 0;
-	if (!UkwGetConfigDescriptor(priv->dev, UKW_ACTIVE_CONFIGURATION, buffer, len, &actualSize)) {
+	if (!UkwGetConfigDescriptor(priv->dev, UKW_ACTIVE_CONFIGURATION, buffer, len, &actualSize))
 		return translate_driver_error(GetLastError());
-	}
+
 	return actualSize;
 }
 
@@ -453,22 +388,24 @@ static int wince_get_config_descriptor(
 {
 	struct wince_device_priv *priv = _device_priv(device);
 	DWORD actualSize = len;
+
 	*host_endian = 0;
-	if (!UkwGetConfigDescriptor(priv->dev, config_index, buffer, len, &actualSize)) {
+	if (!UkwGetConfigDescriptor(priv->dev, config_index, buffer, len, &actualSize))
 		return translate_driver_error(GetLastError());
-	}
+
 	return actualSize;
 }
 
 static int wince_get_configuration(
-   struct libusb_device_handle *handle,
-   int *config)
+	struct libusb_device_handle *handle,
+	int *config)
 {
 	struct wince_device_priv *priv = _device_priv(handle->dev);
 	UCHAR cv = 0;
-	if (!UkwGetConfig(priv->dev, &cv)) {
+
+	if (!UkwGetConfig(priv->dev, &cv))
 		return translate_driver_error(GetLastError());
-	}
+
 	(*config) = cv;
 	return LIBUSB_SUCCESS;
 }
@@ -482,9 +419,9 @@ static int wince_set_configuration(
 	// This should correspond to the "unconfigured state" required by
 	// libusb when the specified configuration is -1.
 	UCHAR cv = (config < 0) ? 0 : config;
-	if (!UkwSetConfig(priv->dev, cv)) {
+	if (!UkwSetConfig(priv->dev, cv))
 		return translate_driver_error(GetLastError());
-	}
+
 	return LIBUSB_SUCCESS;
 }
 
@@ -493,9 +430,10 @@ static int wince_claim_interface(
 	int interface_number)
 {
 	struct wince_device_priv *priv = _device_priv(handle->dev);
-	if (!UkwClaimInterface(priv->dev, interface_number)) {
+
+	if (!UkwClaimInterface(priv->dev, interface_number))
 		return translate_driver_error(GetLastError());
-	}
+
 	return LIBUSB_SUCCESS;
 }
 
@@ -504,12 +442,13 @@ static int wince_release_interface(
 	int interface_number)
 {
 	struct wince_device_priv *priv = _device_priv(handle->dev);
-	if (!UkwSetInterfaceAlternateSetting(priv->dev, interface_number, 0)) {
+
+	if (!UkwSetInterfaceAlternateSetting(priv->dev, interface_number, 0))
 		return translate_driver_error(GetLastError());
-	}
-	if (!UkwReleaseInterface(priv->dev, interface_number)) {
+
+	if (!UkwReleaseInterface(priv->dev, interface_number))
 		return translate_driver_error(GetLastError());
-	}
+
 	return LIBUSB_SUCCESS;
 }
 
@@ -518,9 +457,10 @@ static int wince_set_interface_altsetting(
 	int interface_number, int altsetting)
 {
 	struct wince_device_priv *priv = _device_priv(handle->dev);
-	if (!UkwSetInterfaceAlternateSetting(priv->dev, interface_number, altsetting)) {
+
+	if (!UkwSetInterfaceAlternateSetting(priv->dev, interface_number, altsetting))
 		return translate_driver_error(GetLastError());
-	}
+
 	return LIBUSB_SUCCESS;
 }
 
@@ -529,12 +469,13 @@ static int wince_clear_halt(
 	unsigned char endpoint)
 {
 	struct wince_device_priv *priv = _device_priv(handle->dev);
-	if (!UkwClearHaltHost(priv->dev, endpoint)) {
+
+	if (!UkwClearHaltHost(priv->dev, endpoint))
 		return translate_driver_error(GetLastError());
-	}
-	if (!UkwClearHaltDevice(priv->dev, endpoint)) {
+
+	if (!UkwClearHaltDevice(priv->dev, endpoint))
 		return translate_driver_error(GetLastError());
-	}
+
 	return LIBUSB_SUCCESS;
 }
 
@@ -542,9 +483,10 @@ static int wince_reset_device(
 	struct libusb_device_handle *handle)
 {
 	struct wince_device_priv *priv = _device_priv(handle->dev);
-	if (!UkwResetDevice(priv->dev)) {
+
+	if (!UkwResetDevice(priv->dev))
 		return translate_driver_error(GetLastError());
-	}
+
 	return LIBUSB_SUCCESS;
 }
 
@@ -554,9 +496,10 @@ static int wince_kernel_driver_active(
 {
 	struct wince_device_priv *priv = _device_priv(handle->dev);
 	BOOL result = FALSE;
-	if (!UkwKernelDriverActive(priv->dev, interface_number, &result)) {
+
+	if (!UkwKernelDriverActive(priv->dev, interface_number, &result))
 		return translate_driver_error(GetLastError());
-	}
+
 	return result ? 1 : 0;
 }
 
@@ -565,9 +508,10 @@ static int wince_detach_kernel_driver(
 	int interface_number)
 {
 	struct wince_device_priv *priv = _device_priv(handle->dev);
-	if (!UkwDetachKernelDriver(priv->dev, interface_number)) {
+
+	if (!UkwDetachKernelDriver(priv->dev, interface_number))
 		return translate_driver_error(GetLastError());
-	}
+
 	return LIBUSB_SUCCESS;
 }
 
@@ -576,40 +520,37 @@ static int wince_attach_kernel_driver(
 	int interface_number)
 {
 	struct wince_device_priv *priv = _device_priv(handle->dev);
-	if (!UkwAttachKernelDriver(priv->dev, interface_number)) {
+
+	if (!UkwAttachKernelDriver(priv->dev, interface_number))
 		return translate_driver_error(GetLastError());
-	}	
+
 	return LIBUSB_SUCCESS;
 }
 
-static void wince_destroy_device(
-	struct libusb_device *dev)
+static void wince_destroy_device(struct libusb_device *dev)
 {
 	struct wince_device_priv *priv = _device_priv(dev);
+
 	UkwReleaseDeviceList(driver_handle, &priv->dev, 1);
 }
 
-static void wince_clear_transfer_priv(
-	struct usbi_transfer *itransfer)
+static void wince_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
-	struct wince_transfer_priv *transfer_priv = (struct wince_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
-	struct winfd wfd = fd_to_winfd(transfer_priv->pollable_fd.fd);
-	// No need to cancel transfer as it is either complete or abandoned
-	wfd.itransfer = NULL;
-	CloseHandle(wfd.handle);
-	usbi_free_fd(&transfer_priv->pollable_fd);
+	struct wince_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
+
+	usbi_close(transfer_priv->pollable_fd.fd);
+	transfer_priv->pollable_fd = INVALID_WINFD;
 }
 
-static int wince_cancel_transfer(
-	struct usbi_transfer *itransfer)
+static int wince_cancel_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct wince_device_priv *priv = _device_priv(transfer->dev_handle->dev);
-	struct wince_transfer_priv *transfer_priv = (struct wince_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
-	
-	if (!UkwCancelTransfer(priv->dev, transfer_priv->pollable_fd.overlapped, UKW_TF_NO_WAIT)) {
+	struct wince_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
+
+	if (!UkwCancelTransfer(priv->dev, transfer_priv->pollable_fd.overlapped, UKW_TF_NO_WAIT))
 		return translate_driver_error(GetLastError());
-	}
+
 	return LIBUSB_SUCCESS;
 }
 
@@ -617,16 +558,15 @@ static int wince_submit_control_or_bulk_transfer(struct usbi_transfer *itransfer
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = DEVICE_CTX(transfer->dev_handle->dev);
-	struct wince_transfer_priv *transfer_priv = (struct wince_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
+	struct wince_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	struct wince_device_priv *priv = _device_priv(transfer->dev_handle->dev);
 	BOOL direction_in, ret;
 	struct winfd wfd;
 	DWORD flags;
-	HANDLE eventHandle;
 	PUKW_CONTROL_HEADER setup = NULL;
 	const BOOL control_transfer = transfer->type == LIBUSB_TRANSFER_TYPE_CONTROL;
+	int r;
 
-	transfer_priv->pollable_fd = INVALID_WINFD;
 	if (control_transfer) {
 		setup = (PUKW_CONTROL_HEADER) transfer->buffer;
 		direction_in = setup->bmRequestType & LIBUSB_ENDPOINT_IN;
@@ -636,19 +576,18 @@ static int wince_submit_control_or_bulk_transfer(struct usbi_transfer *itransfer
 	flags = direction_in ? UKW_TF_IN_TRANSFER : UKW_TF_OUT_TRANSFER;
 	flags |= UKW_TF_SHORT_TRANSFER_OK;
 
-	eventHandle = CreateEvent(NULL, FALSE, FALSE, NULL);
-	if (eventHandle == NULL) {
-		usbi_err(ctx, "Failed to create event for async transfer");
+	wfd = usbi_create_fd();
+	if (wfd.fd < 0)
 		return LIBUSB_ERROR_NO_MEM;
-	}
 
-	wfd = usbi_create_fd(eventHandle, direction_in ? RW_READ : RW_WRITE, itransfer, &wince_cancel_transfer);
-	if (wfd.fd < 0) {
-		CloseHandle(eventHandle);
-		return LIBUSB_ERROR_NO_MEM;
+	r = usbi_add_pollfd(ctx, wfd.fd, direction_in ? POLLIN : POLLOUT);
+	if (r) {
+		usbi_close(wfd.fd);
+		return r;
 	}
 
 	transfer_priv->pollable_fd = wfd;
+
 	if (control_transfer) {
 		// Split out control setup header and data buffer
 		DWORD bufLen = transfer->length - sizeof(UKW_CONTROL_HEADER);
@@ -656,29 +595,25 @@ static int wince_submit_control_or_bulk_transfer(struct usbi_transfer *itransfer
 
 		ret = UkwIssueControlTransfer(priv->dev, flags, setup, buf, bufLen, &transfer->actual_length, wfd.overlapped);
 	} else {
-		ret = UkwIssueBulkTransfer(priv->dev, flags, transfer->endpoint, transfer->buffer, 
+		ret = UkwIssueBulkTransfer(priv->dev, flags, transfer->endpoint, transfer->buffer,
 			transfer->length, &transfer->actual_length, wfd.overlapped);
 	}
+
 	if (!ret) {
 		int libusbErr = translate_driver_error(GetLastError());
-		usbi_err(ctx, "UkwIssue%sTransfer failed: error %d",
-			control_transfer ? "Control" : "Bulk", GetLastError());
-		wince_clear_transfer_priv(itransfer);
+		usbi_err(ctx, "UkwIssue%sTransfer failed: error %u",
+			control_transfer ? "Control" : "Bulk", (unsigned int)GetLastError());
+		usbi_remove_pollfd(ctx, wfd.fd);
+		usbi_close(wfd.fd);
+		transfer_priv->pollable_fd = INVALID_WINFD;
 		return libusbErr;
 	}
-	usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, direction_in ? POLLIN : POLLOUT);
-	itransfer->flags |= USBI_TRANSFER_UPDATED_FDS;
+
 
 	return LIBUSB_SUCCESS;
 }
 
-static int wince_submit_iso_transfer(struct usbi_transfer *itransfer)
-{
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
-static int wince_submit_transfer(
-	struct usbi_transfer *itransfer)
+static int wince_submit_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
@@ -688,7 +623,6 @@ static int wince_submit_transfer(
 	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 		return wince_submit_control_or_bulk_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		return wince_submit_iso_transfer(itransfer);
 	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 	default:
@@ -697,19 +631,21 @@ static int wince_submit_transfer(
 	}
 }
 
-static void wince_transfer_callback(struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size)
+static void wince_transfer_callback(
+	struct usbi_transfer *itransfer,
+	uint32_t io_result, uint32_t io_size)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct wince_transfer_priv *transfer_priv = (struct wince_transfer_priv*)usbi_transfer_get_os_priv(itransfer);
 	struct wince_device_priv *priv = _device_priv(transfer->dev_handle->dev);
 	int status;
 
-	usbi_dbg("handling I/O completion with errcode %d", io_result);
+	usbi_dbg("handling I/O completion with errcode %u", io_result);
 
-	if (io_result == ERROR_NOT_SUPPORTED && 
+	if (io_result == ERROR_NOT_SUPPORTED &&
 		transfer->type != LIBUSB_TRANSFER_TYPE_CONTROL) {
-		/* For functional stalls, the WinCE USB layer (and therefore the USB Kernel Wrapper 
-		 * Driver) will report USB_ERROR_STALL/ERROR_NOT_SUPPORTED in situations where the 
+		/* For functional stalls, the WinCE USB layer (and therefore the USB Kernel Wrapper
+		 * Driver) will report USB_ERROR_STALL/ERROR_NOT_SUPPORTED in situations where the
 		 * endpoint isn't actually stalled.
 		 *
 		 * One example of this is that some devices will occasionally fail to reply to an IN
@@ -723,7 +659,7 @@ static void wince_transfer_callback(struct usbi_transfer *itransfer, uint32_t io
 		usbi_dbg("checking I/O completion with errcode ERROR_NOT_SUPPORTED is really a stall");
 		if (UkwIsPipeHalted(priv->dev, transfer->endpoint, &halted)) {
 			/* Pipe status retrieved, so now request endpoint status by sending a GET_STATUS
-			 * control request to the device. This is done synchronously, which is a bit 
+			 * control request to the device. This is done synchronously, which is a bit
 			 * naughty, but this is a special corner case.
 			 */
 			WORD wStatus = 0;
@@ -771,28 +707,25 @@ static void wince_transfer_callback(struct usbi_transfer *itransfer, uint32_t io
 		status = LIBUSB_TRANSFER_TIMED_OUT;
 		break;
 	case ERROR_OPERATION_ABORTED:
-		if (itransfer->flags & USBI_TRANSFER_TIMED_OUT) {
-			usbi_dbg("detected timeout");
-			status = LIBUSB_TRANSFER_TIMED_OUT;
-		} else {
-			usbi_dbg("detected operation aborted");
-			status = LIBUSB_TRANSFER_CANCELLED;
-		}
+		usbi_dbg("detected operation aborted");
+		status = LIBUSB_TRANSFER_CANCELLED;
 		break;
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error: %s", windows_error_str(io_result));
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	}
+
 	wince_clear_transfer_priv(itransfer);
-	if (status == LIBUSB_TRANSFER_CANCELLED) {
+	if (status == LIBUSB_TRANSFER_CANCELLED)
 		usbi_handle_transfer_cancellation(itransfer);
-	} else {
+	else
 		usbi_handle_transfer_completion(itransfer, (enum libusb_transfer_status)status);
-	}
 }
 
-static void wince_handle_callback (struct usbi_transfer *itransfer, uint32_t io_result, uint32_t io_size)
+static void wince_handle_callback(
+	struct usbi_transfer *itransfer,
+	uint32_t io_result, uint32_t io_size)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
@@ -804,7 +737,7 @@ static void wince_handle_callback (struct usbi_transfer *itransfer, uint32_t io_
 		wince_transfer_callback (itransfer, io_result, io_size);
 		break;
 	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
-		return LIBUSB_ERROR_NOT_SUPPORTED;
+		break;
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "unknown endpoint type %d", transfer->type);
 	}
@@ -817,25 +750,25 @@ static int wince_handle_events(
 	struct wince_transfer_priv* transfer_priv = NULL;
 	POLL_NFDS_TYPE i = 0;
 	BOOL found = FALSE;
-	struct usbi_transfer *transfer;
+	struct usbi_transfer *itransfer;
 	DWORD io_size, io_result;
+	int r = LIBUSB_SUCCESS;
 
 	usbi_mutex_lock(&ctx->open_devs_lock);
 	for (i = 0; i < nfds && num_ready > 0; i++) {
 
 		usbi_dbg("checking fd %d with revents = %04x", fds[i].fd, fds[i].revents);
 
-		if (!fds[i].revents) {
+		if (!fds[i].revents)
 			continue;
-		}
 
 		num_ready--;
 
 		// Because a Windows OVERLAPPED is used for poll emulation,
 		// a pollable fd is created and stored with each transfer
 		usbi_mutex_lock(&ctx->flying_transfers_lock);
-		list_for_each_entry(transfer, &ctx->flying_transfers, list, struct usbi_transfer) {
-			transfer_priv = usbi_transfer_get_os_priv(transfer);
+		list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
+			transfer_priv = usbi_transfer_get_os_priv(itransfer);
 			if (transfer_priv->pollable_fd.fd == fds[i].fd) {
 				found = TRUE;
 				break;
@@ -850,132 +783,50 @@ static int wince_handle_events(
 			// let handle_callback free the event using the transfer wfd
 			// If you don't use the transfer wfd, you run a risk of trying to free a
 			// newly allocated wfd that took the place of the one from the transfer.
-			wince_handle_callback(transfer, io_result, io_size);
+			wince_handle_callback(itransfer, io_result, io_size);
 		} else if (found) {
-			usbi_err(ctx, "matching transfer for fd %x has not completed", fds[i]);
-			return LIBUSB_ERROR_OTHER;
+			usbi_err(ctx, "matching transfer for fd %d has not completed", fds[i]);
+			r = LIBUSB_ERROR_OTHER;
+			break;
 		} else {
-			usbi_err(ctx, "could not find a matching transfer for fd %x", fds[i]);
-			return LIBUSB_ERROR_NOT_FOUND;
+			usbi_err(ctx, "could not find a matching transfer for fd %d", fds[i]);
+			r = LIBUSB_ERROR_NOT_FOUND;
+			break;
 		}
 	}
-
 	usbi_mutex_unlock(&ctx->open_devs_lock);
-	return LIBUSB_SUCCESS;
+
+	return r;
 }
 
 /*
  * Monotonic and real time functions
  */
-unsigned __stdcall wince_clock_gettime_threaded(void* param)
-{
-	LARGE_INTEGER hires_counter, li_frequency;
-	LONG nb_responses;
-	int timer_index;
-
-	// Init - find out if we have access to a monotonic (hires) timer
-	if (!QueryPerformanceFrequency(&li_frequency)) {
-		usbi_dbg("no hires timer available on this platform");
-		hires_frequency = 0;
-		hires_ticks_to_ps = UINT64_C(0);
-	} else {
-		hires_frequency = li_frequency.QuadPart;
-		// The hires frequency can go as high as 4 GHz, so we'll use a conversion
-		// to picoseconds to compute the tv_nsecs part in clock_gettime
-		hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency;
-		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
-	}
-
-	// Signal wince_init() that we're ready to service requests
-	if (ReleaseSemaphore(timer_response, 1, NULL) == 0) {
-		usbi_dbg("unable to release timer semaphore: %s", windows_error_str(0));
-	}
-
-	// Main loop - wait for requests
-	while (1) {
-		timer_index = WaitForMultipleObjects(2, timer_request, FALSE, INFINITE) - WAIT_OBJECT_0;
-		if ( (timer_index != 0) && (timer_index != 1) ) {
-			usbi_dbg("failure to wait on requests: %s", windows_error_str(0));
-			continue;
-		}
-		if (request_count[timer_index] == 0) {
-			// Request already handled
-			ResetEvent(timer_request[timer_index]);
-			// There's still a possiblity that a thread sends a request between the
-			// time we test request_count[] == 0 and we reset the event, in which case
-			// the request would be ignored. The simple solution to that is to test
-			// request_count again and process requests if non zero.
-			if (request_count[timer_index] == 0)
-				continue;
-		}
-		switch (timer_index) {
-		case 0:
-			WaitForSingleObject(timer_mutex, INFINITE);
-			// Requests to this thread are for hires always
-			if (QueryPerformanceCounter(&hires_counter) != 0) {
-				timer_tp.tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
-				timer_tp.tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency)/1000) * hires_ticks_to_ps);
-			} else {
-				// Fallback to real-time if we can't get monotonic value
-				// Note that real-time clock does not wait on the mutex or this thread.
-				wince_clock_gettime(USBI_CLOCK_REALTIME, &timer_tp);
-			}
-			ReleaseMutex(timer_mutex);
-
-			nb_responses = InterlockedExchange((LONG*)&request_count[0], 0);
-			if ( (nb_responses)
-			  && (ReleaseSemaphore(timer_response, nb_responses, NULL) == 0) ) {
-				usbi_dbg("unable to release timer semaphore: %s", windows_error_str(0));
-			}
-			continue;
-		case 1: // time to quit
-			usbi_dbg("timer thread quitting");
-			return 0;
-		}
-	}
-	usbi_dbg("ERROR: broken timer thread");
-	return 1;
-}
-
 static int wince_clock_gettime(int clk_id, struct timespec *tp)
 {
-	FILETIME filetime;
+	LARGE_INTEGER hires_counter;
 	ULARGE_INTEGER rtime;
-	DWORD r;
+	FILETIME filetime;
 	SYSTEMTIME st;
+
 	switch(clk_id) {
 	case USBI_CLOCK_MONOTONIC:
-		if (hires_frequency != 0) {
-			while (1) {
-				InterlockedIncrement((LONG*)&request_count[0]);
-				SetEvent(timer_request[0]);
-				r = WaitForSingleObject(timer_response, TIMER_REQUEST_RETRY_MS);
-				switch(r) {
-				case WAIT_OBJECT_0:
-					WaitForSingleObject(timer_mutex, INFINITE);
-					*tp = timer_tp;
-					ReleaseMutex(timer_mutex);
-					return LIBUSB_SUCCESS;
-				case WAIT_TIMEOUT:
-					usbi_dbg("could not obtain a timer value within reasonable timeframe - too much load?");
-					break; // Retry until successful
-				default:
-					usbi_dbg("WaitForSingleObject failed: %s", windows_error_str(0));
-					return LIBUSB_ERROR_OTHER;
-				}
-			}
+		if (hires_frequency != 0 && QueryPerformanceCounter(&hires_counter)) {
+			tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
+			tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency) / 1000) * hires_ticks_to_ps);
+			return LIBUSB_SUCCESS;
 		}
-		// Fall through and return real-time if monotonic was not detected @ timer init
+		// Fall through and return real-time if monotonic read failed or was not detected @ init
 	case USBI_CLOCK_REALTIME:
 		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
-		// with a predef epoch_time to have an epoch that starts at 1970.01.01 00:00
+		// with a predef epoch time to have an epoch that starts at 1970.01.01 00:00
 		// Note however that our resolution is bounded by the Windows system time
 		// functions and is at best of the order of 1 ms (or, usually, worse)
 		GetSystemTime(&st);
 		SystemTimeToFileTime(&st, &filetime);
 		rtime.LowPart = filetime.dwLowDateTime;
 		rtime.HighPart = filetime.dwHighDateTime;
-		rtime.QuadPart -= epoch_time;
+		rtime.QuadPart -= EPOCH_TIME;
 		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
 		tp->tv_nsec = (long)((rtime.QuadPart % 10000000)*100);
 		return LIBUSB_SUCCESS;
@@ -984,49 +835,54 @@ static int wince_clock_gettime(int clk_id, struct timespec *tp)
 	}
 }
 
-const struct usbi_os_backend wince_backend = {
-        "Windows CE",
-        0,
-        wince_init,
-        wince_exit,
+const struct usbi_os_backend usbi_backend = {
+	"Windows CE",
+	0,
+	wince_init,
+	wince_exit,
+	NULL,				/* set_option() */
 
-        wince_get_device_list,
+	wince_get_device_list,
 	NULL,				/* hotplug_poll */
-        wince_open,
-        wince_close,
+	wince_open,
+	wince_close,
 
-        wince_get_device_descriptor,
-        wince_get_active_config_descriptor,
-        wince_get_config_descriptor,
+	wince_get_device_descriptor,
+	wince_get_active_config_descriptor,
+	wince_get_config_descriptor,
 	NULL,				/* get_config_descriptor_by_value() */
 
-        wince_get_configuration,
-        wince_set_configuration,
-        wince_claim_interface,
-        wince_release_interface,
+	wince_get_configuration,
+	wince_set_configuration,
+	wince_claim_interface,
+	wince_release_interface,
 
-        wince_set_interface_altsetting,
-        wince_clear_halt,
-        wince_reset_device,
+	wince_set_interface_altsetting,
+	wince_clear_halt,
+	wince_reset_device,
 
 	NULL,				/* alloc_streams */
 	NULL,				/* free_streams */
 
-        wince_kernel_driver_active,
-        wince_detach_kernel_driver,
-        wince_attach_kernel_driver,
+	NULL,				/* dev_mem_alloc() */
+	NULL,				/* dev_mem_free() */
 
-        wince_destroy_device,
+	wince_kernel_driver_active,
+	wince_detach_kernel_driver,
+	wince_attach_kernel_driver,
 
-        wince_submit_transfer,
-        wince_cancel_transfer,
-        wince_clear_transfer_priv,
+	wince_destroy_device,
 
-        wince_handle_events,
+	wince_submit_transfer,
+	wince_cancel_transfer,
+	wince_clear_transfer_priv,
 
-        wince_clock_gettime,
-        sizeof(struct wince_device_priv),
-        sizeof(struct wince_device_handle_priv),
-        sizeof(struct wince_transfer_priv),
-        0,
+	wince_handle_events,
+	NULL,				/* handle_transfer_completion() */
+
+	wince_clock_gettime,
+	0,
+	sizeof(struct wince_device_priv),
+	0,
+	sizeof(struct wince_transfer_priv),
 };
