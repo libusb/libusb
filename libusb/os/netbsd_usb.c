@@ -215,6 +215,8 @@ int
 netbsd_open(struct libusb_device_handle *handle)
 {
 	struct device_priv *dpriv = (struct device_priv *)handle->dev->os_priv;
+	struct handle_priv *hpriv = (struct handle_priv *)handle->os_priv;
+	int i;
 
 	dpriv->fd = open(dpriv->devnode, O_RDWR);
 	if (dpriv->fd < 0) {
@@ -222,6 +224,9 @@ netbsd_open(struct libusb_device_handle *handle)
 		if (dpriv->fd < 0)
 			return _errno_to_libusb(errno);
 	}
+
+	for (i = 0; i < USB_MAX_ENDPOINTS; i++)
+		hpriv->endpoints[i] = -1;
 
 	usbi_dbg("open %s: fd %d", dpriv->devnode, dpriv->fd);
 
