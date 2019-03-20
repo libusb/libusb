@@ -296,10 +296,24 @@ static usb_device_t **darwin_device_from_service (io_service_t service)
   usb_device_t **device;
   IOReturn kresult;
   SInt32 score;
+  const int max_retries = 5;
 
-  kresult = IOCreatePlugInInterfaceForService(service, kIOUSBDeviceUserClientTypeID,
-                                              kIOCFPlugInInterfaceID, &plugInInterface,
-                                              &score);
+  /* The IOCreatePlugInInterfaceForService function might consistently return
+     an "out of resources" error with certain USB devices the first time we run 
+     it. The reason is still unclear, but retrying fixes the problem */
+  for (int count = 0; count < max_retries; count++) {
+    kresult = IOCreatePlugInInterfaceForService(service, kIOUSBDeviceUserClientTypeID,
+                                                kIOCFPlugInInterfaceID, &plugInInterface,
+                                                &score);
+    if (kIOReturnSuccess == kresult && plugInInterface) {
+      break;
+    }
+
+    usbi_dbg ("set up plugin for service retry: %s", darwin_error_str (kresult));
+
+    /* sleep for a little while before trying again */
+    nanosleep(&(struct timespec){.tv_sec = 0, .tv_nsec = 1000}, NULL);
+  }
 
   if (kIOReturnSuccess != kresult || !plugInInterface) {
     usbi_dbg ("could not set up plugin for service: %s", darwin_error_str (kresult));
