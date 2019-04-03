@@ -1190,9 +1190,16 @@ int linux_enumerate_device(struct libusb_context *ctx,
 out:
 	if (r < 0)
 		libusb_unref_device(dev);
-	else
+	else if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+		/* The usbi_alloc_device() has been called and that function calls
+		 * usbi_connect_device() in non-hotplug case. The check here is to
+		 * prevent calling it twice in such situation.
+		 *
+		 * Maybe we shouldn't call usbi_connect_device() in usbi_alloc_device()
+		 * at first place since what it does is irrelevant to alloc a device...
+		 */
 		usbi_connect_device(dev);
-
+	}
 	return r;
 }
 
