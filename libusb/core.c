@@ -1079,7 +1079,9 @@ out:
  * If acting on an isochronous or interrupt endpoint, this function will
  * multiply the value found in bits 0:10 by the number of transactions per
  * microframe (determined by bits 11:12). Otherwise, this function just
- * returns the numeric value found in bits 0:10.
+ * returns the numeric value found in bits 0:10. For USB 3.0 device, it
+ * will attempts to retrieve the Endpoint Companion Descriptor to return
+ * wBytesPerInterval.
  *
  * This function is useful for setting up isochronous transfers, for example
  * you might pass the return value from this function to
@@ -1099,9 +1101,11 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 {
 	struct libusb_config_descriptor *config;
 	const struct libusb_endpoint_descriptor *ep;
+	struct libusb_ss_endpoint_companion_descriptor *ss_ep_cmp;
 	enum libusb_transfer_type ep_type;
 	uint16_t val;
 	int r;
+	int speed;
 
 	r = libusb_get_active_config_descriptor(dev, &config);
 	if (r < 0) {
@@ -1116,13 +1120,25 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 		goto out;
 	}
 
-	val = ep->wMaxPacketSize;
-	ep_type = (enum libusb_transfer_type) (ep->bmAttributes & 0x3);
+	speed = libusb_get_device_speed( dev );
+	if (speed == LIBUSB_SPEED_SUPER) {
+		r = libusb_get_ss_endpoint_companion_descriptor(dev->ctx, ep, &ss_ep_cmp);
+		if (r == LIBUSB_SUCCESS) {
+			r = ss_ep_cmp->wBytesPerInterval;
+			libusb_free_ss_endpoint_companion_descriptor(ss_ep_cmp);
+		}
+	}
 
-	r = val & 0x07ff;
-	if (ep_type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS
-			|| ep_type == LIBUSB_TRANSFER_TYPE_INTERRUPT)
-		r *= (1 + ((val >> 11) & 3));
+	/* If the device isn't a SuperSpeed device or retrieving the SS endpoint didn't worked. */
+	if (speed != LIBUSB_SPEED_SUPER || r < 0) {
+		val = ep->wMaxPacketSize;
+		ep_type = (enum libusb_transfer_type) (ep->bmAttributes & 0x3);
+
+		r = val & 0x07ff;
+		if (ep_type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS
+		    || ep_type == LIBUSB_TRANSFER_TYPE_INTERRUPT)
+			r *= (1 + ((val >> 11) & 3));
+	}
 
 out:
 	libusb_free_config_descriptor(config);

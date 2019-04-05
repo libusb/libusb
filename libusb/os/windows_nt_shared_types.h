@@ -97,6 +97,7 @@ struct winusb_device_priv {
 		int sub_api;
 		int8_t nb_endpoints; // and a set of endpoint addresses (USB_MAXENDPOINTS)
 		uint8_t *endpoint;
+		int current_altsetting;
 		bool restricted_functionality;  // indicates if the interface functionality is restricted
 						// by Windows (eg. HID keyboards or mice cannot do R/W)
 	} usb_interface[USB_MAXINTERFACES];
@@ -134,5 +135,13 @@ struct winusb_transfer_priv {
 	uint8_t *hid_buffer; // 1 byte extended data buffer, required for HID
 	uint8_t *hid_dest;   // transfer buffer destination, required for HID
 	size_t hid_expected_size;
+
+	// For isochronous transfers with LibUSBk driver:
 	void *iso_context;
+
+	// For isochronous transfers with Microsoft WinUSB driver:
+	void *isoch_buffer_handle; // The isoch_buffer_handle to free at the end of the transfer
+	BOOL iso_break_stream;	// Whether the isoch. stream was to be continued in the last call of libusb_submit_transfer.
+							// As we this structure is zeroed out upon initialization, we need to use inverse logic here.
+	libusb_transfer_cb_fn iso_user_callback; // Original transfer callback of the user. Might be used for isochronous transfers.
 };
