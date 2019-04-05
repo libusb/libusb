@@ -505,6 +505,60 @@ typedef BOOL (WINAPI *WinUsb_WritePipe_t)(
 	LPOVERLAPPED Overlapped
 );
 
+typedef PVOID WINUSB_ISOCH_BUFFER_HANDLE, *PWINUSB_ISOCH_BUFFER_HANDLE;
+
+typedef BOOL (WINAPI *WinUsb_RegisterIsochBuffer_t)(
+	WINUSB_INTERFACE_HANDLE InterfaceHandle,
+	UCHAR PipeID,
+	PVOID Buffer,
+	ULONG BufferLength,
+	PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle
+);
+
+typedef BOOL (WINAPI *WinUsb_UnregisterIsochBuffer_t)(
+	WINUSB_ISOCH_BUFFER_HANDLE BufferHandle
+);
+
+typedef BOOL (WINAPI *WinUsb_WriteIsochPipeAsap_t)(
+	WINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
+	ULONG Offset,
+	ULONG Length,
+	BOOL ContinueStream,
+	LPOVERLAPPED Overlapped
+);
+
+typedef LONG USBD_STATUS;
+typedef struct {
+	ULONG Offset;
+	ULONG Length;
+	USBD_STATUS Status;
+} USBD_ISO_PACKET_DESCRIPTOR, *PUSBD_ISO_PACKET_DESCRIPTOR;
+
+typedef BOOL (WINAPI *WinUsb_ReadIsochPipeAsap_t)(
+	PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
+	ULONG Offset,
+	ULONG Length,
+	BOOL ContinueStream,
+	ULONG NumberOfPackets,
+	PUSBD_ISO_PACKET_DESCRIPTOR IsoPacketDescriptors,
+	LPOVERLAPPED Overlapped
+);
+
+typedef struct {
+	USBD_PIPE_TYPE PipeType;
+	UCHAR PipeId;
+	USHORT MaximumPacketSize;
+	UCHAR Interval;
+	ULONG MaximumBytesPerInterval;
+} WINUSB_PIPE_INFORMATION_EX, *PWINUSB_PIPE_INFORMATION_EX;
+
+typedef BOOL (WINAPI *WinUsb_QueryPipeEx_t)(
+	WINUSB_INTERFACE_HANDLE InterfaceHandle,
+	UCHAR AlternateInterfaceHandle,
+	UCHAR PipeIndex,
+	PWINUSB_PIPE_INFORMATION_EX PipeInformationEx
+);
+
 /* /!\ These must match the ones from the official libusbk.h */
 typedef enum _KUSB_FNID {
 	KUSB_FNID_Init,
@@ -616,8 +670,17 @@ struct winusb_interface {
 	WinUsb_SetCurrentAlternateSetting_t SetCurrentAlternateSetting;
 	WinUsb_SetPipePolicy_t SetPipePolicy;
 	WinUsb_WritePipe_t WritePipe;
+
+	// Isochoronous functions for LibUSBk sub api:
 	WinUsb_IsoReadPipe_t IsoReadPipe;
 	WinUsb_IsoWritePipe_t IsoWritePipe;
+
+	// Isochronous functions for Microsoft WinUSB sub api (native WinUSB):
+	WinUsb_RegisterIsochBuffer_t RegisterIsochBuffer;
+	WinUsb_UnregisterIsochBuffer_t UnregisterIsochBuffer;
+	WinUsb_WriteIsochPipeAsap_t WriteIsochPipeAsap;
+	WinUsb_ReadIsochPipeAsap_t ReadIsochPipeAsap;
+	WinUsb_QueryPipeEx_t QueryPipeEx;
 };
 
 /* hid.dll interface */
