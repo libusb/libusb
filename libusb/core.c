@@ -2365,6 +2365,7 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 {
 	struct libusb_device *dev, *next;
 	struct timeval tv = { 0, 0 };
+	int destroying_default_context = 0;
 
 	usbi_dbg("");
 	USBI_GET_CONTEXT(ctx);
@@ -2379,9 +2380,18 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 			return;
 		}
 		usbi_dbg("destroying default context");
-		usbi_default_context = NULL;
-	}
-	usbi_mutex_static_unlock(&default_context_lock);
+
+		/*
+		 * Setting this flag without unlocking the default context, as
+		 * we are actually destroying the default context.
+		 * usbi_default_context is not set to NULL yet, as all activities
+		 * would only stop after usbi_backend->exit() returns.
+		 */
+		destroying_default_context = 1;
+	} else {
+		// Unlock default context, as we're not modifying it.
+		usbi_mutex_static_unlock(&default_context_lock);
+  }
 
 	usbi_mutex_static_lock(&active_contexts_lock);
 	list_del (&ctx->list);
@@ -2425,6 +2435,11 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
 	usbi_mutex_destroy(&ctx->hotplug_cbs_lock);
 	free(ctx);
+
+	if (destroying_default_context) {
+		usbi_default_context = NULL;
+		usbi_mutex_static_unlock(&default_context_lock);
+	}
 }
 
 /** \ingroup libusb_misc
