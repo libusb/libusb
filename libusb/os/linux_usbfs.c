@@ -2716,7 +2716,7 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 {
 	struct linux_device_handle_priv *hpriv = _device_handle_priv(handle);
 	int r;
-	struct usbfs_urb *urb;
+	struct usbfs_urb *urb = NULL;
 	struct usbi_transfer *itransfer;
 	struct libusb_transfer *transfer;
 
