@@ -1337,6 +1337,27 @@ static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 }
 
 #if !defined(USE_UDEV)
+static int is_device_present(libusb_device *dev)
+{
+	struct linux_device_priv *priv = _device_priv(dev);
+	char dev_path[PATH_MAX];
+	uint8_t busnum, devaddr;
+	libusb_context *ctx = DEVICE_CTX(dev);
+	int ret = 0;
+
+	if (!priv || !priv->sysfs_dir || !ctx)
+		return 0;
+
+	ret = linux_get_device_address (DEVICE_CTX(dev), 0, &busnum, &devaddr, NULL, priv->sysfs_dir, -1);
+
+	/* The Device could have been unplugged */
+	if (ret != LIBUSB_SUCCESS)
+		return 0;
+
+	/* There is a device. We check whether it is a new device on the same port */
+	return ((busnum == dev->bus_number) && (devaddr == dev->device_address));
+}
+
 static int sysfs_get_device_list(struct libusb_context *ctx)
 {
 	DIR *devices = opendir(SYSFS_DEVICE_PATH);
@@ -1390,6 +1411,66 @@ static int linux_default_scan_devices (struct libusb_context *ctx)
 	else
 		return usbfs_get_device_list(ctx);
 }
+#endif
+
+#if !defined(USE_UDEV) && !defined(__ANDROID__)
+
+static int linux_get_device_list(struct libusb_context *ctx,
+	struct discovered_devs **discdevs)
+{
+	int r = LIBUSB_SUCCESS;
+	struct libusb_device *dev, *tmp;
+
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	/* find, unref and detach the disappeared devices */
+	list_for_each_entry_safe(dev, tmp, &ctx->usb_devs, list, struct libusb_device) {
+		if (!is_device_present(dev)) {
+			usbi_unref_device(dev);
+			usbi_mutex_lock(&dev->lock);
+			dev->attached = 0;
+			usbi_mutex_unlock(&dev->lock);
+		}
+	}
+
+	/* clean up device list */
+	list_for_each_entry_safe(dev, tmp, &ctx->usb_devs, list, struct libusb_device) {
+		if (!dev->attached) {
+			if (dev->refcnt)
+				usbi_warn(ctx, "device %d.%d in use but unplugged",
+					dev->bus_number,
+					dev->device_address);
+			else
+				usbi_dbg("device %d.%d unplugged",
+					dev->bus_number,
+					dev->device_address);
+
+			list_del(&dev->list);
+			if (usbi_backend.destroy_device)
+				usbi_backend.destroy_device(dev);
+			usbi_mutex_destroy(&dev->lock);
+			free(dev);
+		}
+	}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
+
+	/* scan to get any newly added devices */
+	r = linux_scan_devices(ctx);
+	if (r != LIBUSB_SUCCESS)
+		return r;
+
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device) {
+		*discdevs = discovered_devs_append(*discdevs, dev);
+		if (!*discdevs) {
+			r = LIBUSB_ERROR_NO_MEM;
+			break;
+		}
+	}
+
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
+	return r;
+}
+
 #endif
 
 static int initialize_handle(struct libusb_device_handle *handle, int fd)
@@ -2854,7 +2935,11 @@ const struct usbi_os_backend usbi_backend = {
 	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
 	.init = op_init,
 	.exit = op_exit,
+#if defined(USE_UDEV) || defined(__ANDROID__)
 	.get_device_list = NULL,
+#else
+	.get_device_list = linux_get_device_list,
+#endif
 	.hotplug_poll = op_hotplug_poll,
 	.get_device_descriptor = op_get_device_descriptor,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
