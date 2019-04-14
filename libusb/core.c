@@ -2356,6 +2356,19 @@ err_unlock:
 	return r;
 }
 
+void usbi_unref_device(libusb_device *dev) {
+	if (!dev)
+		return;
+
+	usbi_mutex_lock(&dev->lock);
+	if (dev->refcnt)
+		--dev->refcnt;
+	usbi_mutex_unlock(&dev->lock);
+
+	if (dev->parent_dev)
+		usbi_unref_device(dev->parent_dev);
+}
+
 /** \ingroup libusb_lib
  * Deinitialize libusb. Should be called after closing all open devices and
  * before your application terminates.
@@ -2412,18 +2425,38 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 		if (list_empty(&ctx->open_devs))
 			libusb_handle_events_timeout(ctx, &tv);
 
-		usbi_mutex_lock(&ctx->usb_devs_lock);
-		list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
-			list_del(&dev->list);
-			libusb_unref_device(dev);
-		}
-		usbi_mutex_unlock(&ctx->usb_devs_lock);
 	}
 
-	/* a few sanity checks. don't bother with locking because unless
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+
+	/* unref on all device paths */
+	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device) {
+		usbi_unref_device(dev);
+	}
+
+	/* check any leaking. We should have 0 for each of device at this point */
+	list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
+		if (dev->refcnt)
+			usbi_warn(ctx,
+					"device was leaked (bus %d device %d refcnt %d)",
+					dev->bus_number,
+					dev->device_address,
+					dev->refcnt);
+	}
+
+	list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
+		list_del(&dev->list);
+		if (usbi_backend.destroy_device)
+			usbi_backend.destroy_device(dev);
+		usbi_mutex_destroy(&dev->lock);
+		free(dev);
+	}
+
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
+
+	/* sanity checks. don't bother with locking because unless
 	 * there is an application bug, nobody will be accessing these. */
-	if (!list_empty(&ctx->usb_devs))
-		usbi_warn(ctx, "some libusb_devices were leaked");
+
 	if (!list_empty(&ctx->open_devs))
 		usbi_warn(ctx, "application left some devices open");
 

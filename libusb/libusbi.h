@@ -568,6 +568,12 @@ void usbi_disconnect_device (struct libusb_device *dev);
 int usbi_signal_event(struct libusb_context *ctx);
 int usbi_clear_event(struct libusb_context *ctx);
 
+/* unlike the exported API version, libusbi_unref_device()
+ * only unref device without destroying device. It is used
+ * only when the API version is not suitable.
+ */
+void usbi_unref_device(libusb_device *dev);
+
 /* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
 #if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) ||\
 	defined(OS_HAIKU) || defined(OS_SUNOS)
