@@ -666,7 +666,7 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 	close(fd);
 	if (r < 0) {
 		usbi_err(DEVICE_CTX(dev),
-			"read bConfigurationValue failed ret=%d errno=%d", r, errno);
+			"read bConfigurationValue failed ret=%zd errno=%d", r, errno);
 		return LIBUSB_ERROR_IO;
 	} else if (r == 0) {
 		usbi_dbg("device unconfigured");
@@ -1006,7 +1006,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		fd = wrapped_fd;
 		r = lseek(fd, 0, SEEK_SET);
 		if (r < 0) {
-			usbi_err(ctx, "seek failed ret=%d errno=%d", r, errno);
+			usbi_err(ctx, "seek failed ret=%zd errno=%d", r, errno);
 			return LIBUSB_ERROR_IO;
 		}
 	}
@@ -1220,7 +1220,7 @@ void linux_device_disconnected(uint8_t busnum, uint8_t devaddr)
 			usbi_disconnect_device (dev);
 			libusb_unref_device(dev);
 		} else {
-			usbi_dbg("device not found for session %x", session_id);
+			usbi_dbg("device not found for session %lx", session_id);
 		}
 	}
 	usbi_mutex_static_unlock(&active_contexts_lock);
@@ -2430,7 +2430,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 			unsigned char *target = transfer->buffer + itransfer->transferred;
 			usbi_dbg("received %d bytes of surplus data", urb->actual_length);
 			if (urb->buffer != target) {
-				usbi_dbg("moving surplus data from offset %d to offset %d",
+				usbi_dbg("moving surplus data from offset %zd to offset %zd",
 					(unsigned char *) urb->buffer - transfer->buffer,
 					target - transfer->buffer);
 				memmove(target, urb->buffer, urb->actual_length);

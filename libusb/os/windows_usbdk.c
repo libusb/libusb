@@ -207,7 +207,7 @@ static int usbdk_get_session_id_for_device(struct libusb_context *ctx,
 	char dev_identity[ARRAYSIZE(id->DeviceID) + ARRAYSIZE(id->InstanceID) + 1];
 
 	if (snprintf(dev_identity, sizeof(dev_identity), "%S%S", id->DeviceID, id->InstanceID) == -1) {
-		usbi_warn(ctx, "cannot form device identity", id->DeviceID);
+		usbi_warn(ctx, "cannot form device identity");
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
 

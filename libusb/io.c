@@ -2162,7 +2162,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	if (tv->tv_usec % 1000)
 		timeout_ms++;
 
-	usbi_dbg("poll() %d fds with timeout in %dms", nfds, timeout_ms);
+	usbi_dbg("poll() %d fds with timeout in %dms", (int)nfds, timeout_ms);
 	r = usbi_poll(fds, nfds, timeout_ms);
 	usbi_dbg("poll() returned %d", r);
 	if (r == 0) {
