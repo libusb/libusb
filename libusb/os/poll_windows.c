@@ -119,7 +119,7 @@ struct winfd usbi_create_fd(void)
 	return wfd;
 }
 
-int usbi_inc_fds_ref(struct pollfd *fds, unsigned int nfds)
+void usbi_inc_fds_ref(struct pollfd *fds, unsigned int nfds)
 {
 	int n;
 	usbi_mutex_static_lock(&fd_table_lock);
@@ -129,7 +129,7 @@ int usbi_inc_fds_ref(struct pollfd *fds, unsigned int nfds)
 	usbi_mutex_static_unlock(&fd_table_lock);
 }
 
-int usbi_dec_fds_ref(struct pollfd *fds, unsigned int nfds)
+void usbi_dec_fds_ref(struct pollfd *fds, unsigned int nfds)
 {
 	int n;
 	struct file_descriptor *fd;
