@@ -408,8 +408,8 @@ static void darwin_hotplug_poll (void)
   /* not sure if 1 ms will be too long/short but it should work ok */
   mach_timespec_t timeout = {.tv_sec = 0, .tv_nsec = 1000000ul};
 
-  /* since a kernel thread may nodify the IOInterators used for
-   * hotplug notidication we can't just clear the iterators.
+  /* since a kernel thread may notify the IOIterators used for
+   * hotplug notification we can't just clear the iterators.
    * instead just wait until all IOService providers are quiet */
   (void) IOKitWaitQuiet (kIOMasterPortDefault, &timeout);
 }
