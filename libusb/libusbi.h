@@ -47,7 +47,7 @@
 #else
 #define PTR_ALIGNED __declspec(align(4))
 #endif
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && (__GNUC__ >= 3)
 #define PTR_ALIGNED __attribute__((aligned(sizeof(void *))))
 #else
 #define PTR_ALIGNED
