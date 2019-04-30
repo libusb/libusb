@@ -25,6 +25,7 @@ typedef enum {
 	B_USB_RAW_COMMAND_GET_INTERFACE_DESCRIPTOR_ETC,
 	B_USB_RAW_COMMAND_GET_ENDPOINT_DESCRIPTOR_ETC,
 	B_USB_RAW_COMMAND_GET_GENERIC_DESCRIPTOR_ETC,
+	B_USB_RAW_COMMAND_GET_CONFIGURATION_DESCRIPTOR_ETC,
 
 	B_USB_RAW_COMMAND_SET_CONFIGURATION = 0x3000,
 	B_USB_RAW_COMMAND_SET_FEATURE,
@@ -73,6 +74,13 @@ typedef union {
 		usb_configuration_descriptor *descriptor;
 		uint32 config_index;
 	} config;
+
+	struct {
+		status_t status;
+		usb_configuration_descriptor *descriptor;
+		uint32 config_index;
+		size_t length;
+	} config_etc;
 
 	struct {
 		status_t status;

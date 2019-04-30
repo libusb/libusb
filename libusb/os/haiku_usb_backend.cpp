@@ -310,6 +310,23 @@ USBDeviceHandle::SetAltSetting(int inumber, int alt)
 }
 
 
+int
+USBDevice::ClearHalt(int endpoint)
+{
+	usb_raw_command command;
+	command.control.request_type = USB_REQTYPE_ENDPOINT_OUT;
+	command.control.request = USB_REQUEST_CLEAR_FEATURE;
+	command.control.value = USB_FEATURE_ENDPOINT_HALT;
+	command.control.index = endpoint;
+	command.control.length = 0;
+
+	if (ioctl(fRawFD, B_USB_RAW_COMMAND_CONTROL_TRANSFER, &command, sizeof(command)) ||
+			command.control.status != B_USB_RAW_STATUS_SUCCESS) {
+		return _errno_to_libusb(command.control.status);
+	}
+}
+
+
 USBDevice::USBDevice(const char *path)
 	:
 	fPath(NULL),
@@ -458,18 +475,17 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 		}
 		fConfigToIndex[tmp_config.configuration_value] = i;
 		fConfigurationDescriptors[i] = new(std::nothrow) unsigned char[tmp_config.total_length];
-		command.control.request_type = 128;
-		command.control.request = 6;
-		command.control.value = (2 << 8) | i;
-		command.control.index = 0;
-		command.control.length = tmp_config.total_length;
-		command.control.data = fConfigurationDescriptors[i];
-		if (ioctl(fRawFD, B_USB_RAW_COMMAND_CONTROL_TRANSFER, &command, sizeof(command)) ||
-				command.control.status!=B_USB_RAW_STATUS_SUCCESS) {
+
+		command.config_etc.descriptor = (usb_configuration_descriptor*)fConfigurationDescriptors[i];
+		command.config_etc.length = tmp_config.total_length;
+		command.config_etc.config_index = i;
+		if (ioctl(fRawFD, B_USB_COMMAND_GET_CONFIGURATION_DESCRIPTOR_ETC, &command, sizeof(command)) ||
+				command.config_etc.status != B_USB_RAW_STATUS_SUCCESS) {
 			usbi_err(NULL, "failed retrieving full configuration descriptor");
 			close(fRawFD);
 			return B_ERROR;
 		}
+
 		for (int j = 0; j < tmp_config.number_interfaces; j++) {
 			command.alternate.config_index = i;
 			command.alternate.interface_index = j;

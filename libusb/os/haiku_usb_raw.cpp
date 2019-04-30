@@ -128,6 +128,20 @@ haiku_set_altsetting(struct libusb_device_handle *dev_handle, int interface_numb
 }
 
 static int
+haiku_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint)
+{
+	USBDeviceHandle *handle = *((USBDeviceHandle **)dev_handle->os_priv);
+	return handle->ClearHalt(endpoint);
+}
+
+static int
+haiku_reset_device(struct libusb_device_handle *dev_handle)
+{
+	/* TODO */
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+static int
 haiku_release_interface(struct libusb_device_handle *dev_handle, int interface_number)
 {
 	USBDeviceHandle *handle = *((USBDeviceHandle **)dev_handle->os_priv);
@@ -218,8 +232,8 @@ const struct usbi_os_backend usbi_backend = {
 	.release_interface = haiku_release_interface,
 
 	.set_interface_altsetting = haiku_set_altsetting,
-	.clear_halt = NULL,
-	.reset_device = NULL,
+	.clear_halt = haiku_clear_halt,
+	.reset_device = haiku_reset_device,
 
 	.alloc_streams = NULL,
 	.free_streams = NULL,

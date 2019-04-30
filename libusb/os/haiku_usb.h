@@ -69,6 +69,7 @@ public:
 	int			ReleaseInterface(int);
 	int			SetConfiguration(int);
 	int			SetAltSetting(int, int);
+	int			ClearHalt(int);
 	status_t		SubmitTransfer(struct usbi_transfer *);
 	status_t		CancelTransfer(USBTransfer *);
 	bool			InitCheck();
