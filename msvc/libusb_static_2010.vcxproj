@@ -38,8 +38,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
-    <IntDir>$(SolutionDir)..\$(Platform)\$(Configuration)\lib\$(TargetName)\</IntDir>
-    <OutDir>$(SolutionDir)..\$(Platform)\$(Configuration)\lib\</OutDir>
+    <IntDir>$(ProjectDir)..\$(Platform)\$(Configuration)\lib\$(TargetName)\</IntDir>
+    <OutDir>$(ProjectDir)..\$(Platform)\$(Configuration)\lib\</OutDir>
     <TargetName>libusb-1.0</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup>
