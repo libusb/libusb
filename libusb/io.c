@@ -31,6 +31,7 @@
 #include <sys/time.h>
 #endif
 #ifdef USBI_TIMERFD_AVAILABLE
+#include <unistd.h>
 #include <sys/timerfd.h>
 #endif
 
