@@ -38,8 +38,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
-    <IntDir>$(SolutionDir)..\$(Platform)\$(Configuration)\lib\$(ProjectName)\</IntDir>
-    <OutDir>$(SolutionDir)..\$(Platform)\$(Configuration)\lib\</OutDir>
+    <IntDir>$(ProjectDir)..\$(Platform)\$(Configuration)\lib\$(ProjectName)\</IntDir>
+    <OutDir>$(ProjectDir)..\$(Platform)\$(Configuration)\lib\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
