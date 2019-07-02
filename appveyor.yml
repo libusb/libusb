@@ -1,41 +1,45 @@
-version: 1.0.{build}
+image: Visual Studio 2017
+
+platform: 
+  - x64
+
 configuration:
-- Debug
-- Release
-platform:
-- x64
-- Win32
-build:
-  project: msvc\libusb_2013.sln
-  parallel: true
-  verbosity: detailed
+  - Debug
+  - Release
+
 environment:
-  matrix:
-  - libusb_2015: msvc\libusb_2015.sln
-    libusb_2013: msvc\libusb_2013.sln
-    libusb_2012: msvc\libusb_2012.sln
-    libusb_2010: msvc\libusb_2010.sln
+  CTEST_OUTPUT_ON_FAILURE: True
+  QT_VERSION: 5.12
+  QT_COMPILED: msvc2017
+  MSVC_VERSION: 15
+  
 install:
+  # Fetch and setup conan
+  - set PATH=%PATH%;%PYTHON%/Scripts/
+  - pip.exe --quiet install conan
+  - conan remote add barco https://barcohc.jfrog.io/barcohc/api/conan/barco
+  - conan user -p %CONAN_API_KEY% -r barco conan
 
-- cmd: >-
-    rem Copying libusb to cygwin home directory
+  # Install Ninja
+  - set NINJA_URL="https://github.com/ninja-build/ninja/releases/download/v1.6.0/ninja-win.zip"
+  - appveyor DownloadFile %NINJA_URL% -FileName ninja.zip
+  - 7z x ninja.zip -oC:\projects\deps\ninja > nul
+  - del ninja.zip
+  - set PATH=C:\projects\deps\ninja;%PATH%
 
-    xcopy /S C:\projects\libusb C:\cygwin\home\appveyor\
-
-    rem Copying libusb to MinGW home directory
-
-    xcopy /S C:\projects\libusb C:\msys64\home\appveyor\
-
+before_build:
+  - cd /D %APPVEYOR_BUILD_FOLDER%
+  - mkdir build
+  - cd build
+  # full path is used for CMAKE_MODULE_PATH, %APPVEYOR_BUILD_FOLDER% has back slashes and is not supported in CMAKE command
+  - cmake -G "CodeBlocks - Ninja" -DCMAKE_BUILD_TYPE=%configuration% -DPRIVATE_TESTS_ENABLED=ON ..
+  
 build_script:
-- cmd: >-
-    msbuild %libusb_2015% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  - cmake --build . --target all --config %configuration%
 
-    msbuild %libusb_2013% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+test_script:
+   - cmake --build . --target test
 
-    msbuild %libusb_2012% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-
-    msvc/appveyor.bat
-
-    appveyor_minGW.bat
-
-    appveyor_cygwin.bat
+after_test:
+  - cd /D %APPVEYOR_BUILD_FOLDER%
+  - conan.build.cmd
