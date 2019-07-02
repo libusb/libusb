@@ -47,14 +47,17 @@ list(APPEND ${TARGET_NAME}_SOURCES
 )
 endif(WIN32)
 
+
 add_library(${TARGET_NAME} SHARED
     ${${TARGET_NAME}_SOURCES}
 )
+
 set_target_properties(${TARGET_NAME}
     PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    OUTPUT_NAME libusb-1.0
     PUBLIC_HEADER ${${TARGET_NAME}_PUBLIC_HEADERS}
 )
 
@@ -66,7 +69,7 @@ include(CMakePackageConfigHelpers)
 configure_package_config_file(
   ${CMAKE_CURRENT_LIST_DIR}/LibUsbconfig.cmake.in
   ${CMAKE_BINARY_DIR}/LibUsbConfig.cmake
-  INSTALL_DESTINATION lib/cmake/LibUsb
+  INSTALL_DESTINATION lib/cmake/${TARGET_NAME}
   PATH_VARS
 )
 
@@ -76,21 +79,21 @@ write_basic_package_version_file(
   COMPATIBILITY SameMajorVersion
 )
 
-install(FILES ${CMAKE_BINARY_DIR}/${TARGET_NAME}Config.cmake
-              ${CMAKE_BINARY_DIR}/${TARGET_NAME}ConfigVersion.cmake
+install(FILES ${CMAKE_BINARY_DIR}/LibUsbConfig.cmake
+              ${CMAKE_BINARY_DIR}/LibUsbConfigVersion.cmake
         DESTINATION lib/cmake/${TARGET_NAME}
 )
 
 install(TARGETS ${TARGET_NAME}
-        EXPORT ${TARGET_NAME}Targets
+        EXPORT LibUsbTargets
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
         RUNTIME DESTINATION bin
         PUBLIC_HEADER DESTINATION include
 )
 
-install(EXPORT ${TARGET_NAME}Targets
-  FILE ${TARGET_NAME}Targets.cmake
+install(EXPORT LibUsbTargets
+  FILE LibUsbTargets.cmake
   NAMESPACE ${TARGET_NAME}::
   DESTINATION lib/cmake/${TARGET_NAME}
 )
