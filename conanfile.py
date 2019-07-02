@@ -1,6 +1,6 @@
 from conans import ConanFile, CMake
 
-class libusbConan(ConanFile):
+class LibUsbConan(ConanFile):
     name = "libusb"
     license = "GNU Lesser General Public License v2.1"
     url = "https://libusb.info/"
@@ -21,4 +21,4 @@ class libusbConan(ConanFile):
 #         nothing to do here. All is handled by cmake.install() above.
         
     def package_info(self):
-        self.cpp_info.libs = ["libusb"]
+        self.cpp_info.libs = ["LibUsb"]

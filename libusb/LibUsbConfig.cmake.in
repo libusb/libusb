@@ -1,0 +1,7 @@
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+get_filename_component(PACKAGE_PREFIX_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../" ABSOLUTE)
+
+include("${CMAKE_CURRENT_LIST_DIR}/LibUsbTargets.cmake")
+include_directories(${PACKAGE_PREFIX_DIR}/include)
