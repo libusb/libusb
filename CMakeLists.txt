@@ -18,6 +18,11 @@ if (CONAN)
                     BUILD missing)
 endif()
 
+# TO REMOVE: libusb uses non-safe function calls
+if(MSVC)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
+
 ENABLE_TESTING()
 
 add_subdirectory(libusb)

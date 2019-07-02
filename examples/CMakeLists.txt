@@ -13,7 +13,9 @@ add_libusb_example(hotplugtest hotplugtest.c)
 # building the getopt libaray
 include(CheckIncludeFiles)
 CHECK_INCLUDE_FILES(string.h HAVE_STRING_H)
-add_definitions(-DHAVE_STRING_H HAVE_STRING_H)
+if(HAVE_STRING_H)
+    add_definitions(-DHAVE_STRING_H)
+endif(HAVE_STRING_H)
 add_library(getopt STATIC
     getopt/getopt.c
     getopt/getopt1.c
