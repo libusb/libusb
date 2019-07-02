@@ -1,4 +1,4 @@
-set(TARGET_NAME libusb-1.0)
+set(TARGET_NAME LibUsb)
 
 set(${TARGET_NAME}_SOURCES
     core.c
@@ -49,22 +49,49 @@ endif(WIN32)
 
 add_library(${TARGET_NAME} SHARED
     ${${TARGET_NAME}_SOURCES}
-    ${${TARGET_NAME}_PUBLIC_HEADERS}
-    ${${TARGET_NAME}_PRIVATE_HEADERS}
 )
 set_target_properties(${TARGET_NAME}
     PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    PUBLIC_HEADER ${${TARGET_NAME}_PUBLIC_HEADERS}
 )
 
 target_include_directories(${TARGET_NAME} PRIVATE "../msvc")
 target_include_directories(${TARGET_NAME} PRIVATE ".")
 
+# Installing and exporting
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+  ${CMAKE_CURRENT_LIST_DIR}/LibUsbconfig.cmake.in
+  ${CMAKE_BINARY_DIR}/LibUsbConfig.cmake
+  INSTALL_DESTINATION lib/cmake/LibUsb
+  PATH_VARS
+)
+
+write_basic_package_version_file(
+  ${CMAKE_BINARY_DIR}/LibUsbConfigVersion.cmake
+  VERSION 1.0.22.0
+  COMPATIBILITY SameMajorVersion
+)
+
+install(FILES ${CMAKE_BINARY_DIR}/${TARGET_NAME}Config.cmake
+              ${CMAKE_BINARY_DIR}/${TARGET_NAME}ConfigVersion.cmake
+        DESTINATION lib/cmake/${TARGET_NAME}
+)
+
 install(TARGETS ${TARGET_NAME}
+        EXPORT ${TARGET_NAME}Targets
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
         RUNTIME DESTINATION bin
+        PUBLIC_HEADER DESTINATION include
 )
-install(FILES ${${TARGET_NAME}_PUBLIC_HEADERS} DESTINATION inlcude)
+
+install(EXPORT ${TARGET_NAME}Targets
+  FILE ${TARGET_NAME}Targets.cmake
+  NAMESPACE ${TARGET_NAME}::
+  DESTINATION lib/cmake/${TARGET_NAME}
+)
+

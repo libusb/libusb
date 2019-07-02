@@ -4062,3 +4062,20 @@ static int composite_copy_transfer_data(int sub_api, struct usbi_transfer *itran
 	return priv->usb_interface[current_interface].apib->
 		copy_transfer_data(priv->usb_interface[current_interface].sub_api, itransfer, io_size);
 }
+
+DEFAULT_VISIBILITY struct libusb_device *LIBUSB_CALL libusb_get_device_by_dbcc_name(libusb_context *ctx, const char *dbcc_name)
+{
+    struct libusb_device *pDevice = NULL;
+    char *device_path = sanitize_path(dbcc_name);
+    if (!device_path) {
+        usbi_err(ctx, "Could not sanitize path: %s", dbcc_name);
+        return pDevice;
+    }
+	usbi_dbg("Found device path: %s", device_path);
+    const int session_id = htab_hash(device_path);
+	usbi_dbg("With session id: %d", session_id);
+    free(device_path);
+    pDevice = usbi_get_device_by_session_id(ctx, session_id);
+	usbi_dbg("Device found? %d", pDevice != NULL);
+    return pDevice;
+}
