@@ -17,7 +17,7 @@ install:
   # Fetch and setup conan
   - set PATH=%PATH%;%PYTHON%/Scripts/
   - pip.exe --quiet install conan
-  - conan remote add barco https://barcohc.jfrog.io/barcohc/api/conan/barco
+  - conan remote add barco %CONAN_URL%
   - conan user -p %CONAN_API_KEY% -r barco conan
 
   # Install Ninja
@@ -26,6 +26,9 @@ install:
   - 7z x ninja.zip -oC:\projects\deps\ninja > nul
   - del ninja.zip
   - set PATH=C:\projects\deps\ninja;%PATH%
+  
+  # Visual Studio's compiler information
+  - call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
 
 before_build:
   - cd /D %APPVEYOR_BUILD_FOLDER%

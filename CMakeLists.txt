@@ -13,9 +13,9 @@ if (CONAN)
 
     include(${CMAKE_BINARY_DIR}/conan.cmake)
 
-    # conan_cmake_run(CONANFILE conanfile.py
-    #                 BASIC_SETUP CMAKE_TARGETS KEEP_RPATHS
-    #                 BUILD missing)
+    conan_cmake_run(CONANFILE conanfile.py
+                    BASIC_SETUP CMAKE_TARGETS KEEP_RPATHS
+                    BUILD missing)
 endif()
 
 ENABLE_TESTING()
