@@ -283,7 +283,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 	for (;;) {
 		if (!pSetupDiEnumDeviceInfo(dev_info, *_index, dev_info_data)) {
 			if (GetLastError() != ERROR_NO_MORE_ITEMS) {
-				usbi_err(ctx, "Could not obtain device info data for %s index %u: %s",
+				usbi_err(ctx, "Could not obtain device info data for %s index %lu: %s",
 					guid_to_string(guid), *_index, windows_error_str(0));
 				return LIBUSB_ERROR_OTHER;
 			}
@@ -299,7 +299,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 			break;
 
 		if (GetLastError() != ERROR_NO_MORE_ITEMS) {
-			usbi_err(ctx, "Could not obtain interface data for %s devInst %X: %s",
+			usbi_err(ctx, "Could not obtain interface data for %s devInst %lX: %s",
 				guid_to_string(guid), dev_info_data->DevInst, windows_error_str(0));
 			return LIBUSB_ERROR_OTHER;
 		}
@@ -311,7 +311,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 	if (!pSetupDiGetDeviceInterfaceDetailA(dev_info, &dev_interface_data, NULL, 0, &size, NULL)) {
 		// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
 		if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-			usbi_err(ctx, "could not access interface data (dummy) for %s devInst %X: %s",
+			usbi_err(ctx, "could not access interface data (dummy) for %s devInst %lX: %s",
 				guid_to_string(guid), dev_info_data->DevInst, windows_error_str(0));
 			return LIBUSB_ERROR_OTHER;
 		}
@@ -322,7 +322,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 
 	dev_interface_details = malloc(size);
 	if (dev_interface_details == NULL) {
-		usbi_err(ctx, "could not allocate interface data for %s devInst %X",
+		usbi_err(ctx, "could not allocate interface data for %s devInst %lX",
 			guid_to_string(guid), dev_info_data->DevInst);
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -330,7 +330,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 	dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_A);
 	if (!pSetupDiGetDeviceInterfaceDetailA(dev_info, &dev_interface_data,
 		dev_interface_details, size, NULL, NULL)) {
-		usbi_err(ctx, "could not access interface data (actual) for %s devInst %X: %s",
+		usbi_err(ctx, "could not access interface data (actual) for %s devInst %lX: %s",
 			guid_to_string(guid), dev_info_data->DevInst, windows_error_str(0));
 		free(dev_interface_details);
 		return LIBUSB_ERROR_OTHER;
@@ -340,7 +340,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 	free(dev_interface_details);
 
 	if (*dev_interface_path == NULL) {
-		usbi_err(ctx, "could not allocate interface path for %s devInst %X",
+		usbi_err(ctx, "could not allocate interface path for %s devInst %lX",
 			guid_to_string(guid), dev_info_data->DevInst);
 		return LIBUSB_ERROR_NO_MEM;
 	}
@@ -1251,7 +1251,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 
 			// Read the Device ID path
 			if (!pSetupDiGetDeviceInstanceIdA(*dev_info, &dev_info_data, dev_id, sizeof(dev_id), NULL)) {
-				usbi_warn(ctx, "could not read the device instance ID for devInst %X, skipping",
+				usbi_warn(ctx, "could not read the device instance ID for devInst %lX, skipping",
 					  dev_info_data.DevInst);
 				continue;
 			}
@@ -2567,7 +2567,7 @@ static enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_ST
 		case 0xC0007000: /* USBD_STATUS_DEVICE_GONE */
 			return LIBUSB_TRANSFER_NO_DEVICE;
 		default:
-			usbi_dbg("USBD_STATUS 0x%08x translated to LIBUSB_TRANSFER_ERROR", status);
+			usbi_dbg("USBD_STATUS 0x%08lx translated to LIBUSB_TRANSFER_ERROR", status);
 			return LIBUSB_TRANSFER_ERROR;
 		}
 	}
