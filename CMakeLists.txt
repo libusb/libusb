@@ -25,10 +25,6 @@ endif()
 
 ENABLE_TESTING()
 
-if(CMAKE_COMPILER_IS_GNUCXX)
-    add_definitions(-std=gnu++0x)
-endif()
-
 add_subdirectory(libusb)
 add_subdirectory(examples)
 add_subdirectory(tests)
