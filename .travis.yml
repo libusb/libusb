@@ -27,6 +27,7 @@ matrix:
 
 install:
   # Configure to use our own Debian mirror.
+  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 10C56D0DE9977759; fi
   - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-add-repository "deb https://${BIN_USER}:${BIN_PASSWORD}@barcohc.jfrog.io/barcohc/AptUbuntuToolchain/ xenial main"; fi
   - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1E9377A2BA9EF27F; fi
   - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then travis_retry sudo apt-get -qq update; fi
