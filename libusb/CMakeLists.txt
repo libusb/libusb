@@ -74,15 +74,18 @@ add_library(${TARGET_NAME} SHARED
 
 if(WIN32)
     target_include_directories(${TARGET_NAME} PRIVATE "../msvc")
+    set(TARGET_OUTPUT_NAME "libusb")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     target_include_directories(${TARGET_NAME} PRIVATE "../xcode")
     target_link_libraries(${TARGET_NAME} "objc")
     target_link_libraries(${TARGET_NAME} "-framework IOKit")
     target_link_libraries(${TARGET_NAME} "-framework CoreFoundation")
+    set(TARGET_OUTPUT_NAME "usb")  # Linux and mac likes to prefix lib to libraries
 else(WIN32)
     target_include_directories(${TARGET_NAME} PRIVATE "../android")
     target_link_libraries(${TARGET_NAME} "udev")
     target_link_libraries(${TARGET_NAME} "pthread")
+    set(TARGET_OUTPUT_NAME "usb") # Linux and mac likes to prefix lib to libraries
 endif(WIN32)
 
 
@@ -91,7 +94,7 @@ set_target_properties(${TARGET_NAME}
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-    OUTPUT_NAME libusb-1.0
+    OUTPUT_NAME "${TARGET_OUTPUT_NAME}-1.0"
     PUBLIC_HEADER ${${TARGET_NAME}_PUBLIC_HEADERS}
 )
 
