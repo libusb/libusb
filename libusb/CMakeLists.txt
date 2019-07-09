@@ -81,6 +81,8 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     target_link_libraries(${TARGET_NAME} "-framework CoreFoundation")
 else(WIN32)
     target_include_directories(${TARGET_NAME} PRIVATE "../android")
+    target_link_libraries(${TARGET_NAME} "udev")
+    target_link_libraries(${TARGET_NAME} "pthread")
 endif(WIN32)
 
 
