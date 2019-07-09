@@ -101,8 +101,8 @@ script:
     # Create and upload a conan package for barco_1.0.22
     if [ "${TRAVIS_BRANCH}" == "barco_1.0.22" ]; then
       export PROJECT_NAME=`echo $TRAVIS_REPO_SLUG | cut -d / -f2`
-      conan create ${TRAVIS_BUILD_DIR} ${PROJECT_NAME}/barco_1.0.22.0@barco/healthcare -s build_type=${BUILD_TYPE}
-      conan upload --remote barco --all --force ${PROJECT_NAME}/barco_1.0.22.0@barco/healthcare
+      conan create ${TRAVIS_BUILD_DIR} ${PROJECT_NAME}/1.0.22.0@barco/healthcare -s build_type=${BUILD_TYPE}
+      conan upload --remote barco --all --force ${PROJECT_NAME}/1.0.22.0@barco/healthcare
     fi
   - |
     # Create and upload a conan package for a release
