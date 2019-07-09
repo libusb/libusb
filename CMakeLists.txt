@@ -26,7 +26,7 @@ endif()
 ENABLE_TESTING()
 
 if(CMAKE_COMPILER_IS_GNUCXX)
-    set(COMPILER_FLAGS "-std=c++11")
+    add_definitions(-std=gnu++0x)
 endif()
 
 add_subdirectory(libusb)
