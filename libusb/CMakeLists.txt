@@ -71,7 +71,6 @@ set_target_properties(${TARGET_NAME}
     PUBLIC_HEADER ${${TARGET_NAME}_PUBLIC_HEADERS}
 )
 
-target_include_directories(${TARGET_NAME} PRIVATE "../msvc")
 target_include_directories(${TARGET_NAME} PRIVATE ".")
 
 # Installing and exporting
