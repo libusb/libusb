@@ -5,7 +5,7 @@ macro(add_libusb_test TARGET_NAME TARGET_SOURCES)
     set_target_properties(${TARGET_NAME}
         PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     )
-    add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME} WORKING_DIRECTORY bin ${ARGN})
+    add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME} WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 endmacro(add_libusb_test)
 
 # Stress
