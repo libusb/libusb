@@ -21,30 +21,40 @@ set(${TARGET_NAME}_PRIVATE_HEADERS
 
 # Windows
 if(WIN32)
-list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
-    os/poll_windows.h
-    os/threads_windows.h
-    os/windows_common.h
-    os/windows_nt_common.h
-    os/windows_nt_shared_types.h
-    os/windows_usbdk.h
-    os/windows_winusb.h
-)
-list(APPEND ${TARGET_NAME}_SOURCES
-    os/poll_windows.c
-    os/threads_windows.c
-    os/windows_nt_common.c
-    os/windows_usbdk.c
-    os/windows_winusb.c
-    libusb-1.0.rc
-    libusb-1.0.def
-)
-# Linux/MacOS
-else()
-list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
-)
-list(APPEND ${TARGET_NAME}_SOURCES
-)
+    list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
+        os/poll_windows.h
+        os/threads_windows.h
+        os/windows_common.h
+        os/windows_nt_common.h
+        os/windows_nt_shared_types.h
+        os/windows_usbdk.h
+        os/windows_winusb.h
+    )
+    list(APPEND ${TARGET_NAME}_SOURCES
+        os/poll_windows.c
+        os/threads_windows.c
+        os/windows_nt_common.c
+        os/windows_usbdk.c
+        os/windows_winusb.c
+        libusb-1.0.rc
+        libusb-1.0.def
+    )
+elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # MACOSX_BUNDLE
+    list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
+        darwin_usb.h
+    )
+    list(APPEND ${TARGET_NAME}_SOURCES
+        darwin_usb.c
+    )
+else(WIN32) # Linux
+    list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
+        linux_usbfs.h
+    )
+    list(APPEND ${TARGET_NAME}_SOURCES
+        linux_udev.c
+        linux_netlink.c
+        linux_usbfs.c
+    )
 endif(WIN32)
 
 

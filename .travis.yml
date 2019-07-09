@@ -1,51 +1,131 @@
 language: c
+sudo: required
+dist: xenial
+
+os:
+  - linux
+  - osx
+  
+compiler:
+  - clang
+  - gcc
+
+env: 
+  global:
+    - CTEST_OUTPUT_ON_FAILURE=True
+
+  matrix:
+    - BUILD_TYPE=Debug
+    - BUILD_TYPE=Release
 
 matrix:
-    include:
-        - os: linux
-          dist: trusty
-          sudo: required
-          compiler: gcc
-        - os: linux
-          dist: trusty
-          sudo: required
-          compiler: clang
-        - os: osx
-          osx_image: xcode8
-          compiler: gcc
-        - os: osx
-          osx_image: xcode8
-          compiler: clang
-        - os: osx
-          osx_image: xcode7.1
-          compiler: gcc
-        - os: osx
-          osx_image: xcode7.1
-          compiler: clang
-        - os: osx
-          osx_image: beta-xcode6.2
-          compiler: gcc
-        - os: osx
-          osx_image: beta-xcode6.2
-          compiler: clang
+  exclude:
+    - os: linux
+      compiler: clang
+    - os: osx
+      compiler: gcc
 
-addons:
-    apt:
-        packages:
-            - autoconf
-            - automake
-            - libtool
-            - m4
-            - libudev-dev
-        sources:
-            - ubuntu-toolchain-r-test
+cache:
+  directories:
+    - /usr/local/opt/qt
+    - /opt/qt512
 
-before_install:
-    # brew upgrade sets the return code to 1 if the latest version is already installed. the true command
-    # is used to reset the return code to 0.
-    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; brew upgrade automake libtool ; true; fi
+install:
+  # Configure to use our own Debian mirror.
+  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-add-repository "deb https://${BIN_USER}:${BIN_PASSWORD}@barcohc.jfrog.io/barcohc/AptQt59/ trusty main"; fi
+  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 10C56D0DE9977759; fi
+  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-add-repository "deb https://${BIN_USER}:${BIN_PASSWORD}@barcohc.jfrog.io/barcohc/AptUbuntuToolchain/ trusty main"; fi
+  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1E9377A2BA9EF27F; fi
+  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then travis_retry sudo apt-get -qq update; fi
+
+  # Update Ruby
+  - |
+    if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
+      brew install ruby
+      gem update --system
+    fi
+
+  # Install a recent Ninja
+  - |
+    # Install Ninja
+    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
+      travis_retry sudo apt-get -qq install ninja-build
+    else
+      HOMEBREW_NO_AUTO_UPDATE=1 brew install ninja
+    fi
+
+  # Install GCC 6
+  - |
+    # Install GCC
+    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
+      sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+      sudo apt-get -qq update
+      travis_retry sudo apt-get -qq install gcc-6 g++-6
+      sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-6 90
+      sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-6 90
+    fi
+    
+  # Use Python 3.7.1
+  - |
+    # Use Python 3.7.1
+    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
+      pyenv global 3.7.1
+    fi
+
+  # Install conan
+  - |
+    # Install conan
+    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
+      sudo pip --quiet install conan
+    else
+      brew install conan
+    fi
+  - conan remote add barco ${CONAN_URL}
+  - conan user -p ${CONAN_API_KEY} -r barco ${CONAN_USER}
+
+  # Install Qt5.12
+  - |
+    # Install Qt
+    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
+      if [[ ! -f /opt/qt512/bin/qmake ]]; then
+        travis_retry sudo apt-get -qq install qt512tools qt512websockets mesa-common-dev
+      fi    
+      export QTDIR="/opt/qt512"
+      export PATH="$QTDIR/bin:$PATH"
+      qt512-env.sh
+    else
+      if [[ ! -f /usr/local/opt/qt/bin/qmake ]]; then
+        # install Qt 5.12.3 because 5.13 from Travis Mac image causes compile errors in Qt code
+        brew install https://raw.githubusercontent.com/Homebrew/homebrew-core/65a45a9e/Formula/qt.rb
+      fi
+      export QTDIR="/usr/local/opt/qt"
+      export PATH="$QTDIR/bin:$PATH"
+    fi
+  
+  # Install buildtools
+  - |
+    # Install buildtools
+    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
+      sudo apt-get -qq install gcovr lcov cppcheck valgrind
+      sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-6 90
+    else
+      brew install gcovr lcov cppcheck
+    fi
+    
+before_script:
+  - mkdir -p /tmp/build
+  - cd /tmp/build
+  - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCODE_COVERAGE=ON -DPRIVATE_TESTS_ENABLED=ON -G Ninja ${TRAVIS_BUILD_DIR}
 
 script:
-    - ./autogen.sh && make clean && make
-    - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./travis-autogen.sh --disable-udev && make clean && make ; fi
-    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cd Xcode && xcodebuild -project libusb.xcodeproj ; fi
+  - cmake --build . --target all || travis_terminate 1;
+  - cmake --build . --target test || travis_terminate 1;
+
+    # Create and upload a conan package for a release
+    if [ -n "$TRAVIS_TAG" ]; then
+      export TAG=`echo ${TRAVIS_TAG} | sed "s/[vV]//g"`
+      export PROJECT_NAME=`echo $TRAVIS_REPO_SLUG | cut -d / -f2`
+      conan create ${TRAVIS_BUILD_DIR} ${PROJECT_NAME}/${TAG}@barco/healthcare -s build_type=${BUILD_TYPE}
+      conan upload --remote barco --all ${PROJECT_NAME}/${TAG}@barco/healthcare
+    fi
+
