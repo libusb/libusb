@@ -12,6 +12,7 @@ set(${TARGET_NAME}_SOURCES
 set(${TARGET_NAME}_PUBLIC_HEADERS
     libusb.h
 )
+
 set(${TARGET_NAME}_PRIVATE_HEADERS
     hotplug.h
     libusbi.h
@@ -39,9 +40,7 @@ if(WIN32)
         libusb-1.0.rc
         libusb-1.0.def
     )
-    target_include_directories(${TARGET_NAME} PRIVATE "../msvc")
-    
-elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # MACOSX_BUNDLE
+elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # Mac
     list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
         os/darwin_usb.h
         os/poll_posix.h
@@ -52,7 +51,6 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # MACOSX_BUNDLE
         os/poll_posix.c
         os/threads_posix.c
     )
-    target_include_directories(${TARGET_NAME} PRIVATE "../xcode")
 else(WIN32) # Linux
     list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
         os/linux_usbfs.h
@@ -66,13 +64,21 @@ else(WIN32) # Linux
         os/poll_posix.c
         os/threads_posix.c
     )
-    target_include_directories(${TARGET_NAME} PRIVATE "../android")
 endif(WIN32)
 
 
 add_library(${TARGET_NAME} SHARED
     ${${TARGET_NAME}_SOURCES}
 )
+
+if(WIN32)
+    target_include_directories(${TARGET_NAME} PRIVATE "../msvc")
+elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    target_include_directories(${TARGET_NAME} PRIVATE "../xcode")
+else(WIN32)
+    target_include_directories(${TARGET_NAME} PRIVATE "../android")
+endif(WIN32)
+
 
 set_target_properties(${TARGET_NAME}
     PROPERTIES
