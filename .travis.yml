@@ -91,7 +91,7 @@ before_script:
 script:
   - cmake --build . --target all || travis_terminate 1;
   - cmake --build . --target test || travis_terminate 1;
-
+  - |
     # Create and upload a conan package for a release
     if [ -n "$TRAVIS_TAG" ]; then
       export TAG=`echo ${TRAVIS_TAG} | sed "s/[vV]//g"`
