@@ -970,7 +970,7 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
  * function and make sure that you only access the parent before issuing
  * \ref libusb_free_device_list(). The reason is that libusb currently does
  * not maintain a permanent list of device instances, and therefore can
- * only guarantee that parents are fully instantiated within a 
+ * only guarantee that parents are fully instantiated within a
  * libusb_get_device_list() - libusb_free_device_list() block.
  */
 DEFAULT_VISIBILITY
@@ -987,6 +987,28 @@ libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev)
 uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 {
 	return dev->device_address;
+}
+
+/** \ingroup libusb_dev
+ * Get a platform id string of the device on the bus it is connected to.
+ *
+ * Linux:   udev_device_new_from_subsystem_sysname(,"usb",id);
+ * macOS:   IORegistryEntryFromPath(,id)
+ * Windows: CM_Locate_DevNodeA(,id,)
+ *
+ * \param dev a device
+ * \param data a buffer to hold the string
+ * \param length the length of the buffer
+ * \returns the device address
+ */
+int API_EXPORTED libusb_get_platform_device_id(libusb_device *dev, char *data, int length)
+{
+	int ret = LIBUSB_ERROR_NOT_SUPPORTED;
+
+	if (usbi_backend.get_platform_device_id)
+		ret = usbi_backend.get_platform_device_id(dev, data, length);
+
+	return ret;
 }
 
 /** \ingroup libusb_dev

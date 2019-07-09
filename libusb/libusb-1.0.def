@@ -84,6 +84,8 @@ EXPORTS
   libusb_get_next_timeout@8 = libusb_get_next_timeout
   libusb_get_parent
   libusb_get_parent@4 = libusb_get_parent
+  libusb_get_platform_device_id
+  libusb_get_platform_device_id@12 = libusb_get_platform_device_id
   libusb_get_pollfds
   libusb_get_pollfds@4 = libusb_get_pollfds
   libusb_get_port_number

@@ -104,6 +104,7 @@ const struct usbi_os_backend usbi_backend = {
 	obsd_get_active_config_descriptor,
 	obsd_get_config_descriptor,
 	NULL,				/* get_config_descriptor_by_value() */
+	NULL,				/* get_platform_device_id() */
 
 	obsd_get_configuration,
 	obsd_set_configuration,

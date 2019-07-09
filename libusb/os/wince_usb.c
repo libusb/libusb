@@ -851,6 +851,7 @@ const struct usbi_os_backend usbi_backend = {
 	wince_get_active_config_descriptor,
 	wince_get_config_descriptor,
 	NULL,				/* get_config_descriptor_by_value() */
+	NULL,				/* get_platform_device_id() */
 
 	wince_get_configuration,
 	wince_set_configuration,
