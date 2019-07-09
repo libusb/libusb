@@ -92,12 +92,16 @@ before_script:
 
 script:
   - cmake --build . --target all || travis_terminate 1;
-  - cmake --build . --target test || travis_terminate 1;
+  # Linux cannot run tests. It will fail to init libusb because USB Hubs don't exist
+  - |
+    if [[ "${TRAVIS_OS_NAME}" != "linux" ]]; then
+        cmake --build . --target test || travis_terminate 1;
+    fi
   - |
     # Create and upload a conan package for barco_1.0.22
     if [ "${TRAVIS_BRANCH}" == "barco_1.0.22" ]; then
-      conan create ${TRAVIS_BUILD_DIR} ${PROJECT_NAME}/barco_1.0.22@barco/healthcare -s build_type=${BUILD_TYPE}
-      conan upload --remote barco --all --force ${PROJECT_NAME}/barco_1.0.22@barco/healthcare
+      conan create ${TRAVIS_BUILD_DIR} ${PROJECT_NAME}/barco_1.0.22.0@barco/healthcare -s build_type=${BUILD_TYPE}
+      conan upload --remote barco --all --force ${PROJECT_NAME}/barco_1.0.22.0@barco/healthcare
     fi
   - |
     # Create and upload a conan package for a release
