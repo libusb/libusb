@@ -41,19 +41,19 @@ if(WIN32)
     )
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # MACOSX_BUNDLE
     list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
-        darwin_usb.h
+        os/darwin_usb.h
     )
     list(APPEND ${TARGET_NAME}_SOURCES
-        darwin_usb.c
+        os/darwin_usb.c
     )
 else(WIN32) # Linux
     list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
-        linux_usbfs.h
+        os/linux_usbfs.h
     )
     list(APPEND ${TARGET_NAME}_SOURCES
-        linux_udev.c
-        linux_netlink.c
-        linux_usbfs.c
+        os/linux_udev.c
+        os/linux_netlink.c
+        os/linux_usbfs.c
     )
 endif(WIN32)
 
