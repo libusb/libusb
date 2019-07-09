@@ -64,6 +64,7 @@ else(WIN32) # Linux
         os/poll_posix.c
         os/threads_posix.c
     )
+    add_definitions(-D_GNU_SOURCE)
 endif(WIN32)
 
 
@@ -75,6 +76,9 @@ if(WIN32)
     target_include_directories(${TARGET_NAME} PRIVATE "../msvc")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     target_include_directories(${TARGET_NAME} PRIVATE "../xcode")
+    target_link_libraries(${TARGET_NAME} "objc")
+    target_link_libraries(${TARGET_NAME} "-framework IOKit")
+    target_link_libraries(${TARGET_NAME} "-framework CoreFoundation")
 else(WIN32)
     target_include_directories(${TARGET_NAME} PRIVATE "../android")
 endif(WIN32)
