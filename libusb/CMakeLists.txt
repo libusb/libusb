@@ -39,22 +39,34 @@ if(WIN32)
         libusb-1.0.rc
         libusb-1.0.def
     )
+    target_include_directories(${TARGET_NAME} PRIVATE "../msvc")
+    
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # MACOSX_BUNDLE
     list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
         os/darwin_usb.h
+        os/poll_posix.h
+        os/threads_posix.h
     )
     list(APPEND ${TARGET_NAME}_SOURCES
         os/darwin_usb.c
+        os/poll_posix.c
+        os/threads_posix.c
     )
+    target_include_directories(${TARGET_NAME} PRIVATE "../xcode")
 else(WIN32) # Linux
     list(APPEND ${TARGET_NAME}_PRIVATE_HEADERS
         os/linux_usbfs.h
+        os/poll_posix.h
+        os/threads_posix.h
     )
     list(APPEND ${TARGET_NAME}_SOURCES
         os/linux_udev.c
         os/linux_netlink.c
         os/linux_usbfs.c
+        os/poll_posix.c
+        os/threads_posix.c
     )
+    target_include_directories(${TARGET_NAME} PRIVATE "../android")
 endif(WIN32)
 
 
@@ -76,7 +88,7 @@ target_include_directories(${TARGET_NAME} PRIVATE ".")
 # Installing and exporting
 include(CMakePackageConfigHelpers)
 configure_package_config_file(
-  ${CMAKE_CURRENT_LIST_DIR}/LibUsbconfig.cmake.in
+  ${CMAKE_CURRENT_LIST_DIR}/LibUsbConfig.cmake.in
   ${CMAKE_BINARY_DIR}/LibUsbConfig.cmake
   INSTALL_DESTINATION lib/cmake/${TARGET_NAME}
   PATH_VARS
