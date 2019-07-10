@@ -10,7 +10,11 @@ class LibUsbConan(ConanFile):
     default_options = ""
     generators = "cmake"
     exports_sources = "*", "!build/*"
-        
+    
+    def config_options(self):
+        if self.settings.compiler == 'gcc' and float(self.settings.compiler.version.value) >= 5.1:
+            self.settings.compiler.libcxx = 'libstdc++11'
+            
     def build(self):
         cmake = CMake(self)
         cmake.configure(source_folder=".")
