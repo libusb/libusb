@@ -58,7 +58,6 @@ else(WIN32) # Linux
         os/threads_posix.h
     )
     list(APPEND ${TARGET_NAME}_SOURCES
-        os/linux_udev.c
         os/linux_netlink.c
         os/linux_usbfs.c
         os/poll_posix.c
@@ -83,7 +82,6 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(TARGET_OUTPUT_NAME "usb")  # Linux and mac likes to prefix lib to libraries
 else(WIN32)
     target_include_directories(${TARGET_NAME} PRIVATE "../android")
-    target_link_libraries(${TARGET_NAME} "udev")
     target_link_libraries(${TARGET_NAME} "pthread")
     set(TARGET_OUTPUT_NAME "usb") # Linux and mac likes to prefix lib to libraries
 endif(WIN32)

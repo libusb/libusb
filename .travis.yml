@@ -80,7 +80,7 @@ install:
   - |
     # Install buildtools
     if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-      sudo apt-get -qq install gcovr lcov cppcheck valgrind libudev-dev
+      sudo apt-get -qq install gcovr lcov cppcheck valgrind
     else
       brew install gcovr lcov cppcheck
     fi
