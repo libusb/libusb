@@ -285,7 +285,7 @@ obsd_get_active_config_descriptor(struct libusb_device *dev,
 
 	len = MIN(len, UGETW(ucd->wTotalLength));
 
-	usbi_dbg("len %d", len);
+	usbi_dbg("len %zu", len);
 
 	memcpy(buf, dpriv->cdesc, len);
 
@@ -310,7 +310,7 @@ obsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 	udf.udf_size = len;
 	udf.udf_data = buf;
 
-	usbi_dbg("index %d, len %d", udf.udf_config_index, len);
+	usbi_dbg("index %d, len %zu", udf.udf_config_index, len);
 
 	if (ioctl(fd, USB_DEVICE_GET_FDESC, &udf) < 0) {
 		err = errno;
