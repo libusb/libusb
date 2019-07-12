@@ -54,7 +54,32 @@ struct file_descriptor {
 };
 
 static usbi_mutex_static_t fd_table_lock = USBI_MUTEX_INITIALIZER;
-static struct file_descriptor *fd_table[MAX_FDS];
+
+static struct file_descriptor **fd_table;
+static size_t fd_count;
+static size_t fd_size;
+#define INC_FDS_EACH 256
+
+static void usbi_dec_fd_table()
+{
+	fd_count--;
+	if (fd_count == 0) {
+		free(fd_table);
+		fd_table = NULL;
+	}
+}
+
+static void smart_realloc_fd_table_space(int inc)
+{
+	if (fd_count + inc > fd_size) {
+		struct file_descriptor **p = (struct file_descriptor *)realloc(fd_table, (fd_size + INC_FDS_EACH) * sizeof(struct file_descriptor *));
+		if (p != NULL) {
+			memset(p + fd_size, 0, INC_FDS_EACH * sizeof(struct file_descriptor *));
+			fd_size += INC_FDS_EACH;
+			fd_table = p;
+		}
+	}
+}
 
 static struct file_descriptor *create_fd(enum fd_type type)
 {
@@ -101,15 +126,19 @@ struct winfd usbi_create_fd(void)
 		return INVALID_WINFD;
 
 	usbi_mutex_static_lock(&fd_table_lock);
-	for (wfd.fd = 0; wfd.fd < MAX_FDS; wfd.fd++) {
+
+	smart_realloc_fd_table_space(1);
+
+	for (wfd.fd = 0; wfd.fd < fd_size; wfd.fd++) {
 		if (fd_table[wfd.fd] != NULL)
 			continue;
 		fd_table[wfd.fd] = fd;
+		fd_count++;
 		break;
 	}
 	usbi_mutex_static_unlock(&fd_table_lock);
 
-	if (wfd.fd == MAX_FDS) {
+	if (wfd.fd == fd_size) {
 		free_fd(fd);
 		return INVALID_WINFD;
 	}
@@ -138,7 +167,8 @@ void usbi_dec_fds_ref(struct pollfd *fds, unsigned int nfds)
 	for (n = 0; n < nfds; ++n) {
 		fd = fd_table[fds[n].fd];
 		fd->refcount--;
-		if (fd->refcount == 0)
+		//FD_TYPE_PIPE map fd to two _fd
+		if (fd->refcount == 0 || (fd->refcount == 1 && fd->type == FD_TYPE_PIPE))
 		{
 			if (fd->type == FD_TYPE_PIPE) {
 				// InternalHigh is our reference count
@@ -150,6 +180,7 @@ void usbi_dec_fds_ref(struct pollfd *fds, unsigned int nfds)
 				free_fd(fd);
 			}
 			fd_table[fds[n].fd] = NULL;
+			usbi_dec_fd_table();
 		}
 	}
 	usbi_mutex_static_unlock(&fd_table_lock);
@@ -176,7 +207,7 @@ static int check_pollfds(struct pollfd *fds, unsigned int nfds,
 			continue;
 		}
 
-		if ((fds[n].fd >= 0) && (fds[n].fd < MAX_FDS))
+		if ((fds[n].fd >= 0) && (fds[n].fd < fd_size))
 			fd = fd_table[fds[n].fd];
 		else
 			fd = NULL;
@@ -243,14 +274,16 @@ int usbi_close(int _fd)
 {
 	struct file_descriptor *fd;
 
-	if (_fd < 0 || _fd >= MAX_FDS)
+	if (_fd < 0 || _fd >= fd_size)
 		goto err_badfd;
 
 	usbi_mutex_static_lock(&fd_table_lock);
 	fd = fd_table[_fd];
 	fd->refcount--;
-	if(fd->refcount==0)
+	//FD_TYPE_PIPE map fd to two _fd
+	if(fd->refcount==0 || (fd->refcount == 1 && fd->type == FD_TYPE_PIPE))
 	{	fd_table[_fd] = NULL;
+		usbi_dec_fd_table();
 
 		if (fd->type == FD_TYPE_PIPE) {
 			// InternalHigh is our reference count
@@ -298,7 +331,9 @@ int usbi_pipe(int filedes[2])
 
 	usbi_mutex_static_lock(&fd_table_lock);
 	do {
-		for (i = 0; i < MAX_FDS; i++) {
+		smart_realloc_fd_table_space(2);
+
+		for (i = 0; i < fd_size; i++) {
 			if (fd_table[i] != NULL)
 				continue;
 			if (r_fd == -1) {
@@ -309,16 +344,20 @@ int usbi_pipe(int filedes[2])
 			}
 		}
 
-		if (i == MAX_FDS)
+		if (i == fd_size)
 			break;
 
 		fd_table[r_fd] = fd;
 		fd_table[w_fd] = fd;
 
+		fd->refcount++; //this fd reference twice for r and w.
+
+		fd_count += 2;
+
 	} while (0);
 	usbi_mutex_static_unlock(&fd_table_lock);
 
-	if (i == MAX_FDS) {
+	if (i == fd_size) {
 		free_fd(fd);
 		errno = EMFILE;
 		return -1;
@@ -339,7 +378,7 @@ ssize_t usbi_write(int fd, const void *buf, size_t count)
 
 	UNUSED(buf);
 
-	if (fd < 0 || fd >= MAX_FDS)
+	if (fd < 0 || fd >= fd_size)
 		goto err_out;
 
 	if (count != sizeof(unsigned char)) {
@@ -377,7 +416,7 @@ ssize_t usbi_read(int fd, void *buf, size_t count)
 
 	UNUSED(buf);
 
-	if (fd < 0 || fd >= MAX_FDS)
+	if (fd < 0 || fd >= fd_size)
 		goto err_out;
 
 	if (count != sizeof(unsigned char)) {
