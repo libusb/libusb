@@ -519,8 +519,6 @@ obsd_handle_transfer_completion(struct usbi_transfer *itransfer)
 int
 obsd_clock_gettime(int clkid, struct timespec *tp)
 {
-	usbi_dbg("clock %d", clkid);
-
 	if (clkid == USBI_CLOCK_REALTIME)
 		return clock_gettime(CLOCK_REALTIME, tp);
 
