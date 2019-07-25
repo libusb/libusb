@@ -58,7 +58,7 @@ else(WIN32) # Linux
         os/threads_posix.h
     )
     list(APPEND ${TARGET_NAME}_SOURCES
-        os/linux_netlink.c
+        os/linux_udev.c
         os/linux_usbfs.c
         os/poll_posix.c
         os/threads_posix.c
@@ -81,6 +81,22 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     target_link_libraries(${TARGET_NAME} "-framework CoreFoundation")
     set(TARGET_OUTPUT_NAME "usb")  # Linux and mac likes to prefix lib to libraries
 else(WIN32)
+    FIND_PATH(
+        UDEV_INCLUDE_DIR
+        libudev.h
+        /usr/include
+        /usr/local/include
+    )
+    FIND_LIBRARY(
+        UDEV_LIBRARIES
+        NAMES udev libudev
+        PATHS
+            /usr/lib
+            /usr/local/lib
+    )
+    add_definitions(-DUSE_UDEV)
+    target_include_directories(${TARGET_NAME} SYSTEM PRIVATE ${UDEV_INCLUDES_DIR})
+    target_link_libraries(${TARGET_NAME} ${UDEV_LIBRARIES})
     target_include_directories(${TARGET_NAME} PRIVATE "../android")
     target_link_libraries(${TARGET_NAME} "pthread")
     set(TARGET_OUTPUT_NAME "usb") # Linux and mac likes to prefix lib to libraries

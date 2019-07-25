@@ -80,7 +80,7 @@ install:
   - |
     # Install buildtools
     if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-      sudo apt-get -qq install gcovr lcov cppcheck valgrind
+      sudo apt-get -qq install gcovr lcov cppcheck valgrind libudev-dev
     else
       brew install gcovr lcov cppcheck
     fi
@@ -88,15 +88,11 @@ install:
 before_script:
   - mkdir -p /tmp/build
   - cd /tmp/build
-  - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCODE_COVERAGE=ON -DPRIVATE_TESTS_ENABLED=ON -G Ninja ${TRAVIS_BUILD_DIR}
+  - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -G Ninja ${TRAVIS_BUILD_DIR}
 
 script:
   - cmake --build . --target all || travis_terminate 1;
-  # Linux cannot run tests. It will fail to init libusb because USB Hubs don't exist
-  - |
-    if [[ "${TRAVIS_OS_NAME}" != "linux" ]]; then
-      cmake --build . --target test || travis_terminate 1;
-    fi
+  - cmake --build . --target test || travis_terminate 1;
   - |
     # Create and upload a conan package for barco_1.0.22
     if [ "${TRAVIS_BRANCH}" == "barco_1.0.22" ]; then
