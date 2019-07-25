@@ -14,7 +14,12 @@ class LibUsbConan(ConanFile):
     def config_options(self):
         if self.settings.compiler == 'gcc' and float(self.settings.compiler.version.value) >= 5.1:
             self.settings.compiler.libcxx = 'libstdc++11'
-            
+
+    def system_requirements(self):
+        if os_info.is_linux:
+            installer = SystemPackageTool()
+            installer.install("libudev-dev")
+
     def build(self):
         cmake = CMake(self)
         cmake.configure(source_folder=".")
