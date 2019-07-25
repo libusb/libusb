@@ -1,4 +1,5 @@
 from conans import ConanFile, CMake
+from conans.tools import os_info, SystemPackageTool
 
 class LibUsbConan(ConanFile):
     name = "libusb"
