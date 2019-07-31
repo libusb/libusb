@@ -4071,11 +4071,19 @@ DEFAULT_VISIBILITY struct libusb_device *LIBUSB_CALL libusb_get_device_by_dbcc_n
         usbi_err(ctx, "Could not sanitize path: %s", dbcc_name);
         return pDevice;
     }
-	usbi_dbg("Found device path: %s", device_path);
-    const int session_id = htab_hash(device_path);
-	usbi_dbg("With session id: %d", session_id);
-    free(device_path);
-    pDevice = usbi_get_device_by_session_id(ctx, session_id);
-	usbi_dbg("Device found? %d", pDevice != NULL);
+
+    struct libusb_device *dev;
+
+    usbi_mutex_lock(&ctx->usb_devs_lock);
+    list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device)
+    {
+        struct winusb_device_priv *winUsb = _device_priv(dev);
+        if (strcmp(winUsb->path, device_path) == 0) {
+            pDevice = libusb_ref_device(dev);
+            break;
+        }
+    }
+    usbi_mutex_unlock(&ctx->usb_devs_lock);
+
     return pDevice;
 }
