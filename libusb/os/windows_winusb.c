@@ -4115,8 +4115,17 @@ static int composite_open(int sub_api, struct libusb_device_handle *dev_handle)
 		}
 	}
 
-	if (available[SUB_API_MAX]) // HID driver
+	if (available[SUB_API_MAX]) { // HID driver
 		r = hid_open(SUB_API_NOTSET, dev_handle);
+
+		// On Windows 10 version 1903 (OS Build 18362) and later Windows blocks attempts to
+		// open HID devices with a U2F usage unless running as administrator. We ignore this
+		// failure and proceed without the HID device opened.
+		if (r == LIBUSB_ERROR_ACCESS) {
+			usbi_dbg("ignoring access denied error while opening HID interface of composite device");
+			r = LIBUSB_SUCCESS;
+		}
+	}
 
 	return r;
 }
