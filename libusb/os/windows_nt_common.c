@@ -470,7 +470,8 @@ static void get_windows_version(void)
 	case 0x61: windows_version = WINDOWS_7;	    w = (ws ? "7" : "2008_R2");	  break;
 	case 0x62: windows_version = WINDOWS_8;	    w = (ws ? "8" : "2012");	  break;
 	case 0x63: windows_version = WINDOWS_8_1;   w = (ws ? "8.1" : "2012_R2"); break;
-	case 0x64: windows_version = WINDOWS_10;    w = (ws ? "10" : "2016");	  break;
+	case 0x64: // Early Windows 10 Insider Previews and Windows Server 2017 Technical Preview 1 used version 6.4
+	case 0xA0: windows_version = WINDOWS_10;    w = (ws ? "10" : "2016");	  break;
 	default:
 		if (version < 0x50) {
 			return;
