@@ -23,7 +23,7 @@ AC_INIT([libusb],[LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO[]LIBUSB_RC],[libusb
 # http://sourceware.org/autobook/autobook/autobook_91.html
 lt_current=2
 lt_revision=0
-lt_age=1
+lt_age=2
 LTLDFLAGS="-version-info ${lt_current}:${lt_revision}:${lt_age}"
 
 AM_INIT_AUTOMAKE
