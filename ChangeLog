@@ -1,10 +1,11 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2019-04-05: v1.0.23 (in progress)
+2019-08-09: v1.0.23 (in progress)
 * Add German translation (#446)
 * Add Hungarian translation (#493)
 * Android: Improved support for Android
+* BSD: Remove infinite recursion in OpenBSD backend
 * configure.ac: Fix detection of clock_gettime library (#439)
 * Darwin(macOS): Switch from using ResetDevice to USBDeviceReEnumerate (#455)
 * Darwin(macOS): Remove code that changed the device class used (#428)
