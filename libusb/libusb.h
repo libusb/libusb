@@ -1328,7 +1328,7 @@ const struct libusb_version * LIBUSB_CALL libusb_get_version(void);
 int LIBUSB_CALL libusb_has_capability(uint32_t capability);
 const char * LIBUSB_CALL libusb_error_name(int errcode);
 int LIBUSB_CALL libusb_setlocale(const char *locale);
-const char * LIBUSB_CALL libusb_strerror(enum libusb_error errcode);
+const char * LIBUSB_CALL libusb_strerror(int errcode);
 
 ssize_t LIBUSB_CALL libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);

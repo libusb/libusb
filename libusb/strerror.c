@@ -220,7 +220,7 @@ int API_EXPORTED libusb_setlocale(const char *locale)
  * \param errcode the error code whose description is desired
  * \returns a short description of the error code in UTF-8 encoding
  */
-DEFAULT_VISIBILITY const char* LIBUSB_CALL libusb_strerror(enum libusb_error errcode)
+DEFAULT_VISIBILITY const char* LIBUSB_CALL libusb_strerror(int errcode)
 {
 	int errcode_index = -errcode;
 
