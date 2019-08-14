@@ -1,6 +1,9 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * Synchronous I/O functions for libusb
  * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
+ * Copyright © 2019 Nathan Hjelm <hjelmn@cs.unm.edu>
+ * Copyright © 2019 Google LLC. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -56,6 +59,11 @@ static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
 				 libusb_error_name(r));
 			libusb_cancel_transfer(transfer);
 			continue;
+		}
+		if (NULL == transfer->dev_handle) {
+			/* transfer completion after libusb_close() */
+			transfer->status = LIBUSB_ERROR_NO_DEVICE;
+			*completed = 1;
 		}
 	}
 }
