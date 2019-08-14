@@ -2,6 +2,8 @@
  * Internal header for libusb
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
+ * Copyright © 2019 Nathan Hjelm <hjelmn@cs.umm.edu>
+ * Copyright © 2019 Google LLC. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -365,6 +367,9 @@ struct libusb_context {
 	/* list and count of poll fds and an array of poll fd structures that is
 	 * (re)allocated as necessary prior to polling. Protected by event_data_lock. */
 	struct list_head ipollfds;
+        /* list of pollfds that have been removed. keeps track of pollfd changes
+         * between the poll call and */
+        struct list_head removed_ipollfds;
 	struct pollfd *pollfds;
 	POLL_NFDS_TYPE pollfds_cnt;
 
