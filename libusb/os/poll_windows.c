@@ -71,8 +71,8 @@ static void usbi_dec_fd_table()
 
 static void smart_realloc_fd_table_space(int inc)
 {
-	if (fd_count + inc > fd_size) {
-		struct file_descriptor **p = (struct file_descriptor *)realloc(fd_table, (fd_size + INC_FDS_EACH) * sizeof(struct file_descriptor *));
+	if (fd_table == NULL || fd_count + inc > fd_size) {
+		struct file_descriptor **p = (struct file_descriptor **)realloc(fd_table, (fd_size + INC_FDS_EACH) * sizeof(struct file_descriptor *));
 		if (p != NULL) {
 			memset(p + fd_size, 0, INC_FDS_EACH * sizeof(struct file_descriptor *));
 			fd_size += INC_FDS_EACH;
