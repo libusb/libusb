@@ -605,6 +605,7 @@ static int windows_init(struct libusb_context *ctx)
 	char sem_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
 	int r = LIBUSB_ERROR_OTHER;
 	bool winusb_backend_init = false;
+	bool usbdk_backend_init = false;
 
 	sprintf(sem_name, "libusb_init%08X", (unsigned int)(GetCurrentProcessId() & 0xFFFFFFFF));
 	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
@@ -653,6 +654,7 @@ static int windows_init(struct libusb_context *ctx)
 		if (r == LIBUSB_SUCCESS) {
 			usbi_dbg("UsbDk backend is available");
 			usbdk_available = true;
+			usbdk_backend_init = true;
 		} else {
 			usbi_info(ctx, "UsbDk backend is not available");
 			// Do not report this as an error
@@ -669,6 +671,8 @@ init_exit: // Holds semaphore here
 	if ((init_count == 1) && (r != LIBUSB_SUCCESS)) { // First init failed?
 		if (winusb_backend_init)
 			winusb_backend.exit(ctx);
+		if (usbdk_backend_init)
+			usbdk_backend.exit(ctx);
 		htab_destroy();
 		windows_destroy_clock();
 		windows_exit_dlls();
