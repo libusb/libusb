@@ -65,6 +65,7 @@ static void usbi_dec_fd_table()
 	fd_count--;
 	if (fd_count == 0) {
 		free(fd_table);
+		fd_size = 0;
 		fd_table = NULL;
 	}
 }
