@@ -1153,9 +1153,32 @@ out:
 DEFAULT_VISIBILITY
 libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev)
 {
+	libusb_context *ctx;
+
+	if (!dev)
+		return NULL;
+
+	/* NOTE There is still a data race on the device and thus on the contexts
+	 * mutex */
+	ctx = dev->ctx;
+	/* Per context there can only be one ref or unref happening at the same time
+	 * NOTE There is still a data race on the device and thus on the contexts
+	 * mutex */
+	usbi_mutex_lock(&ctx->ref_devs_lock);
+
+	/* If the ref count is 0 the device has already been freed, don't touch it
+	 * again
+	 * NOTE This may be a read after free */
+	if (dev->refcnt <= 0) {
+		usbi_mutex_unlock(&ctx->ref_devs_lock);
+		return NULL;
+	}
+
 	usbi_mutex_lock(&dev->lock);
 	dev->refcnt++;
 	usbi_mutex_unlock(&dev->lock);
+
+	usbi_mutex_unlock(&ctx->ref_devs_lock);
 	return dev;
 }
 
@@ -1166,10 +1189,27 @@ libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev)
  */
 void API_EXPORTED libusb_unref_device(libusb_device *dev)
 {
+	libusb_context *ctx;
 	int refcnt;
 
 	if (!dev)
 		return;
+
+	/* NOTE There is still a data race on the device and thus on the contexts
+	 * mutex */
+	ctx = dev->ctx;
+	/* Per context there can only be one ref or unref happening at the same time
+	 * NOTE There is still a data race on the device and thus on the contexts
+	 * mutex */
+	usbi_mutex_lock(&ctx->ref_devs_lock);
+
+	/* If the ref count is 0 the device has already been freed, don't touch it
+	 * again
+	 * NOTE This may be a read after free */
+	if (dev->refcnt <= 0) {
+		usbi_mutex_unlock(&ctx->ref_devs_lock);
+		return;
+	}
 
 	usbi_mutex_lock(&dev->lock);
 	refcnt = --dev->refcnt;
@@ -1191,6 +1231,7 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 		usbi_mutex_destroy(&dev->lock);
 		free(dev);
 	}
+	usbi_mutex_unlock(&ctx->ref_devs_lock);
 }
 
 /*
@@ -2295,6 +2336,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 
 	usbi_mutex_init(&ctx->usb_devs_lock);
 	usbi_mutex_init(&ctx->open_devs_lock);
+	usbi_mutex_init(&ctx->ref_devs_lock);
 	usbi_mutex_init(&ctx->hotplug_cbs_lock);
 	list_init(&ctx->usb_devs);
 	list_init(&ctx->open_devs);
@@ -2347,6 +2389,7 @@ err_free_ctx:
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
 
 	usbi_mutex_destroy(&ctx->open_devs_lock);
+	usbi_mutex_destroy(&ctx->ref_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
 	usbi_mutex_destroy(&ctx->hotplug_cbs_lock);
 
@@ -2432,6 +2475,7 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 		usbi_backend.exit(ctx);
 
 	usbi_mutex_destroy(&ctx->open_devs_lock);
+	usbi_mutex_destroy(&ctx->ref_devs_lock);
 	usbi_mutex_destroy(&ctx->usb_devs_lock);
 	usbi_mutex_destroy(&ctx->hotplug_cbs_lock);
 	free(ctx);

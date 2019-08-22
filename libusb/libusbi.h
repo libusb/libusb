@@ -318,6 +318,9 @@ struct libusb_context {
 	 */
 	struct list_head open_devs;
 	usbi_mutex_t open_devs_lock;
+	/* A mutex used to guarante that only one device will be refed or unrefed at
+	 * a time */
+	usbi_mutex_t ref_devs_lock;
 
 	/* A list of registered hotplug callbacks */
 	struct list_head hotplug_cbs;
