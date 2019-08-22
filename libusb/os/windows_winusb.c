@@ -955,9 +955,9 @@ static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id
 	unsigned long session_id;
 	DEVINST child_devinst;
 
-	if (CM_Get_Child(&child_devinst, devinst, 0) != CR_SUCCESS) {
-		usbi_err(ctx, "could not get child devinst for '%s'", dev_id);
-		return LIBUSB_ERROR_OTHER;
+	if ((CM_Get_Child(&child_devinst, devinst, 0)) != CR_SUCCESS) {
+		usbi_warn(ctx, "could not get child devinst for '%s'", dev_id);
+		return LIBUSB_SUCCESS;
 	}
 
 	session_id = (unsigned long)child_devinst;
@@ -2421,11 +2421,11 @@ static int get_valid_interface(struct libusb_device_handle *dev_handle, int api_
 */
 static int check_valid_interface(struct libusb_device_handle *dev_handle, unsigned short interface, int api_id)
 {
-	if (interface >= USB_MAXINTERFACES)
-		return -1;
-
 	struct winusb_device_handle_priv *handle_priv = _device_handle_priv(dev_handle);
 	struct winusb_device_priv *priv = _device_priv(dev_handle->dev);
+
+	if (interface >= USB_MAXINTERFACES)
+		return -1;
 
 	if ((api_id < USB_API_WINUSBX) || (api_id > USB_API_HID)) {
 		usbi_dbg("unsupported API ID");

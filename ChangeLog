@@ -1,12 +1,15 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2019-08-09: v1.0.23 (in progress)
+2019-08-14: v1.0.23 (in progress)
 * Add German translation (#446)
 * Add Hungarian translation (#493)
 * Android: Improved support for Android
 * BSD: Remove infinite recursion in OpenBSD backend
 * configure.ac: Fix detection of clock_gettime library (#439)
+* Core: abandon synchronous transfers when device closure is detected.
+* Core: fix error in handling the removal of file descriptors while handling
+  events.
 * Darwin(macOS): Switch from using ResetDevice to USBDeviceReEnumerate (#455)
 * Darwin(macOS): Remove code that changed the device class used (#428)
 * Darwin(macOS): Reduce hotplug timeout to 1ms (from 5s)

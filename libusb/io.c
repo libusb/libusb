@@ -3,6 +3,8 @@
  * I/O functions for libusb
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
+ * Copyright © 2019 Nathan Hjelm <hjelmn@cs.umm.edu>
+ * Copyright © 2019 Google LLC. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -1130,6 +1132,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	usbi_tls_key_create(&ctx->event_handling_key);
 	list_init(&ctx->flying_transfers);
 	list_init(&ctx->ipollfds);
+	list_init(&ctx->removed_ipollfds);
 	list_init(&ctx->hotplug_msgs);
 	list_init(&ctx->completed_transfers);
 
@@ -1178,6 +1181,15 @@ err:
 	return r;
 }
 
+static void cleanup_removed_pollfds(struct libusb_context *ctx)
+{
+	struct usbi_pollfd *ipollfd, *tmp;
+	list_for_each_entry_safe(ipollfd, tmp, &ctx->removed_ipollfds, list, struct usbi_pollfd) {
+		list_del(&ipollfd->list);
+		free(ipollfd);
+	}
+}
+
 void usbi_io_exit(struct libusb_context *ctx)
 {
 	usbi_remove_pollfd(ctx, ctx->event_pipe[0]);
@@ -1196,6 +1208,7 @@ void usbi_io_exit(struct libusb_context *ctx)
 	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_tls_key_delete(ctx->event_handling_key);
 	free(ctx->pollfds);
+	cleanup_removed_pollfds(ctx);
 }
 
 static int calculate_timeout(struct usbi_transfer *transfer)
@@ -2120,6 +2133,8 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	/* only reallocate the poll fds when the list of poll fds has been modified
 	 * since the last poll, otherwise reuse them to save the additional overhead */
 	usbi_mutex_lock(&ctx->event_data_lock);
+	/* clean up removed poll fds */
+	cleanup_removed_pollfds(ctx);
 	if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED) {
 		usbi_dbg("poll fds modified, reallocating");
 
@@ -2280,6 +2295,20 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 			goto done;
 	}
 #endif
+
+	list_for_each_entry(ipollfd, &ctx->removed_ipollfds, list, struct usbi_pollfd) {
+		for (i = internal_nfds ; i < nfds ; ++i) {
+			if (ipollfd->pollfd.fd == fds[i].fd) {
+				/* pollfd was removed between the creation of the fd
+				 * array and here. remove any triggered revent as
+				 * it is no longer relevant */
+				usbi_dbg("pollfd %d was removed. ignoring raised events",
+					 fds[i].fd);
+				fds[i].revents = 0;
+				break;
+			}
+		}
+	}
 
 	r = usbi_backend.handle_events(ctx, fds + internal_nfds, nfds - internal_nfds, r);
 	if (r)
@@ -2712,10 +2741,11 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
 	}
 
 	list_del(&ipollfd->list);
+	list_add_tail(&ipollfd->list, &ctx->removed_ipollfds);
 	ctx->pollfds_cnt--;
 	usbi_fd_notification(ctx);
 	usbi_mutex_unlock(&ctx->event_data_lock);
-	free(ipollfd);
+
 	if (ctx->fd_removed_cb)
 		ctx->fd_removed_cb(fd, ctx->fd_cb_user_data);
 }
