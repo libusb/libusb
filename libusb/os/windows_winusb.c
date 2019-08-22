@@ -440,11 +440,30 @@ err_exit:
 	return NULL;
 }
 
+/* First examine the given list for a device with the session id, then fall
+ * back to the contexts device list */
+static struct libusb_device *windows_get_recent_device_by_session_id(
+	struct libusb_context *const ctx,
+	struct libusb_device *const *const recent_dev,
+	unsigned long long const recent_devs, unsigned long const session_id)
+{
+	unsigned long long i;
+	for (i = 0; i < recent_devs; ++i) {
+		if (session_id == recent_dev[i]->session_data) {
+			return libusb_ref_device(recent_dev[i]);
+		}
+	}
+	return usbi_get_device_by_session_id(ctx, session_id);
+}
+
 /*
  * Returns the first known ancestor of a device
  */
-static struct libusb_device *get_ancestor(struct libusb_context *ctx,
-	DEVINST devinst, PDEVINST _parent_devinst)
+static struct libusb_device *
+get_ancestor(struct libusb_context *ctx,
+						 struct libusb_device *const *const recent_dev,
+						 unsigned long long const recent_devs, DEVINST devinst,
+						 PDEVINST _parent_devinst)
 {
 	struct libusb_device *dev = NULL;
 	DEVINST parent_devinst;
@@ -453,7 +472,8 @@ static struct libusb_device *get_ancestor(struct libusb_context *ctx,
 		if (CM_Get_Parent(&parent_devinst, devinst, 0) != CR_SUCCESS)
 			break;
 		devinst = parent_devinst;
-		dev = usbi_get_device_by_session_id(ctx, (unsigned long)devinst);
+		dev = windows_get_recent_device_by_session_id(ctx, recent_dev, recent_devs,
+																									(unsigned long)devinst);
 	}
 
 	if ((dev != NULL) && (_parent_devinst != NULL))
@@ -785,8 +805,11 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 /*
  * Populate a libusb device structure
  */
-static int init_device(struct libusb_device *dev, struct libusb_device *parent_dev,
-	uint8_t port_number, DEVINST devinst)
+static int init_device(struct libusb_device *const *const recent_dev,
+											 unsigned long long const recent_devs,
+											 struct libusb_device *dev,
+											 struct libusb_device *parent_dev, uint8_t port_number,
+											 DEVINST devinst)
 {
 	struct libusb_context *ctx;
 	struct libusb_device *tmp_dev;
@@ -816,7 +839,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		// Calculate depth and fetch bus number
 		bus_number = parent_dev->bus_number;
 		if (bus_number == 0) {
-			tmp_dev = get_ancestor(ctx, devinst, &devinst);
+			tmp_dev = get_ancestor(ctx, recent_dev, recent_devs, devinst, &devinst);
 			if (tmp_dev != parent_dev) {
 				usbi_err(ctx, "program assertion failed - first ancestor is not parent");
 				return LIBUSB_ERROR_NOT_FOUND;
@@ -824,7 +847,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			libusb_unref_device(tmp_dev);
 
 			for (depth = 1; bus_number == 0; depth++) {
-				tmp_dev = get_ancestor(ctx, devinst, &devinst);
+				tmp_dev = get_ancestor(ctx, recent_dev, recent_devs, devinst, &devinst);
 				if (tmp_dev->bus_number != 0) {
 					bus_number = tmp_dev->bus_number;
 					depth += _device_priv(tmp_dev)->depth;
@@ -947,8 +970,11 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	return LIBUSB_SUCCESS;
 }
 
-static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id,
-	uint8_t bus_number, DEVINST devinst)
+static int enumerate_hcd_root_hub(struct libusb_context *ctx,
+																	struct libusb_device *const *const recent_dev,
+																	unsigned long long const recent_devs,
+																	const char *dev_id, uint8_t bus_number,
+																	DEVINST devinst)
 {
 	struct libusb_device *dev;
 	struct winusb_device_priv *priv;
@@ -961,7 +987,8 @@ static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id
 	}
 
 	session_id = (unsigned long)child_devinst;
-	dev = usbi_get_device_by_session_id(ctx, session_id);
+	dev = windows_get_recent_device_by_session_id(ctx, recent_dev, recent_devs,
+																								session_id);
 	if (dev == NULL) {
 		usbi_err(ctx, "program assertion failed - HCD '%s' child not found", dev_id);
 		return LIBUSB_ERROR_NO_DEVICE;
@@ -1378,10 +1405,12 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 
 			// Find parent device (for the passes that need it)
 			if (pass >= GEN_PASS) {
-				parent_dev = get_ancestor(ctx, dev_info_data.DevInst, NULL);
+				parent_dev =
+					get_ancestor(ctx, unref_list, unref_cur, dev_info_data.DevInst, NULL);
 				if (parent_dev == NULL) {
 					// Root hubs will not have a parent
-					dev = usbi_get_device_by_session_id(ctx, (unsigned long)dev_info_data.DevInst);
+					dev = windows_get_recent_device_by_session_id(
+						ctx, unref_list, unref_cur, (unsigned long)dev_info_data.DevInst);
 					if (dev != NULL) {
 						priv = _device_priv(dev);
 						if (priv->root_hub)
@@ -1405,7 +1434,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 			if ((pass <= GEN_PASS) && (pass != HCD_PASS)) {	// For subsequent passes, we'll lookup the parent
 				// These are the passes that create "new" devices
 				session_id = (unsigned long)dev_info_data.DevInst;
-				dev = usbi_get_device_by_session_id(ctx, session_id);
+				dev = windows_get_recent_device_by_session_id(ctx, unref_list,
+																											unref_cur, session_id);
 				if (dev == NULL) {
 				alloc_device:
 					usbi_dbg("allocating new device for session [%lX]", session_id);
@@ -1480,7 +1510,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				}
 				break;
 			case HCD_PASS:
-				r = enumerate_hcd_root_hub(ctx, dev_id, (uint8_t)(i + 1), dev_info_data.DevInst);
+				r = enumerate_hcd_root_hub(ctx, unref_list, unref_cur, dev_id,
+																	 (uint8_t)(i + 1), dev_info_data.DevInst);
 				break;
 			case GEN_PASS:
 				// The SPDRP_ADDRESS for USB devices is the device port number on the hub
@@ -1488,7 +1519,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				if (!pSetupDiGetDeviceRegistryPropertyA(*dev_info, &dev_info_data, SPDRP_ADDRESS,
 						NULL, (PBYTE)&port_nr, sizeof(port_nr), &size) || (size != sizeof(port_nr)))
 					usbi_warn(ctx, "could not retrieve port number for device '%s': %s", dev_id, windows_error_str(0));
-				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_info_data.DevInst);
+				r = init_device(unref_list, unref_cur, dev, parent_dev,
+												(uint8_t)port_nr, dev_info_data.DevInst);
 				if (r == LIBUSB_SUCCESS) {
 					// Append device to the list of discovered devices
 					discdevs = discovered_devs_append(*_discdevs, dev);
