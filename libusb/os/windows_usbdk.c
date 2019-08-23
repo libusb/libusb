@@ -241,6 +241,8 @@ static void usbdk_exit(struct libusb_context *ctx)
 static int usbdk_get_session_id_for_device(struct libusb_context *ctx,
 	PUSB_DK_DEVICE_ID id, unsigned long *session_id)
 {
+	// NOTE change usbdk_get_session_id_from_path too
+
 	char dev_identity[ARRAYSIZE(id->DeviceID) + ARRAYSIZE(id->InstanceID) + 1];
 
 	if (snprintf(dev_identity, sizeof(dev_identity), "%S%S", id->DeviceID, id->InstanceID) == -1) {
@@ -252,6 +254,63 @@ static int usbdk_get_session_id_for_device(struct libusb_context *ctx,
 
 	return LIBUSB_SUCCESS;
 }
+
+static int usbdk_get_session_id_from_path(TCHAR const *const path,
+																					unsigned long *session_id)
+{
+	TCHAR const *pos = path;
+	unsigned i = 0;
+	unsigned sep = 0;
+	char dev_identity[ARRAYSIZE(((PUSB_DK_DEVICE_ID)NULL)->DeviceID) +
+										ARRAYSIZE(((PUSB_DK_DEVICE_ID)NULL)->InstanceID) + 1];
+
+	// \\\\?\\USB#VID_1409&PID_8000#4102997464#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+	// to
+	//        USB\\VID_8087&PID_80084102997464
+
+	if ('\\' == pos[0] && '\\' == pos[1]) {
+		pos += 4;
+	}
+	for (;; ++pos, ++i) {
+		if (*pos == '#' || *pos == '\\') {
+			if (sep == 2) {
+				dev_identity[i] = '\0';
+				break;
+			}
+			if (sep == 1) {
+				--i;
+			} else {
+				dev_identity[i] = '\\';
+			}
+			++sep;
+		} else {
+			dev_identity[i] = (char)*pos;
+		}
+
+		if (*pos == '\0') {
+			break;
+		}
+	}
+	usbi_dbg("%s<>%s", path, dev_identity);
+	*session_id = htab_hash(dev_identity);
+	return LIBUSB_SUCCESS;
+}
+
+/* First examine the given list for a device with the session id, then fall
+ * back to the contexts device list */
+static struct libusb_device *usbdk_get_recent_device_by_session_id(
+	struct libusb_context *const ctx,
+	struct	discovered_devs  *const  disc_devs, unsigned long const session_id)
+{
+	unsigned long long i;
+	for (i = 0; disc_devs && i < disc_devs->len; ++i) {
+		if (session_id == disc_devs->devices[i]->session_data) {
+			return libusb_ref_device(disc_devs->devices[i]);
+		}
+	}
+	return usbi_get_device_by_session_id(ctx, session_id);
+}
+
 
 static void usbdk_release_config_descriptors(struct usbdk_device_priv *p, uint8_t count)
 {
@@ -459,7 +518,7 @@ static int usbdk_get_device_list(struct libusb_context *ctx, struct discovered_d
 		if (usbdk_get_session_id_for_device(ctx, &devices[i].ID, &session_id))
 			continue;
 
-		dev = usbi_get_device_by_session_id(ctx, session_id);
+		dev = usbdk_get_recent_device_by_session_id(ctx, discdevs, session_id);
 		if (dev == NULL) {
 			dev = usbi_alloc_device(ctx, session_id);
 			if (dev == NULL) {
@@ -963,12 +1022,76 @@ static int usbdk_get_device_driver(struct libusb_device *device, char *driver,
 	return drv ? (int)strnlen(drv, MAX_PATH_LENGTH) : 0;
 }
 
+static void usbdk_enumerate_device(struct libusb_context *ctx,
+																	 TCHAR const *const device_path)
+{
+	unsigned long new_device_id;
+	unsigned long device_id=0;
+	ULONG i, dev_number;
+	PUSB_DK_DEVICE_INFO devices;
+	struct libusb_device *dev = NULL;
+
+	usbdk_get_session_id_from_path(device_path, &new_device_id);
+
+	if (!usbdk_helper.GetDevicesList(&devices, &dev_number))
+		return;
+
+	for (i = 0; i < dev_number; ++i) {
+		usbdk_get_session_id_for_device(ctx, &devices[i].ID, &device_id);
+		if (new_device_id == device_id) {
+			break;
+		}
+	}
+
+	dev = usbi_get_device_by_session_id(ctx, device_id);
+
+	if (dev == NULL) {
+		dev = usbi_alloc_device(ctx, device_id);
+		if (dev == NULL) {
+			usbi_err(ctx, "failed to allocate a new device structure");
+			return;
+		}
+
+		usbdk_device_init(dev, &devices[i]);
+		if (usbdk_device_priv_init(ctx, dev, &devices[i]) != LIBUSB_SUCCESS) {
+			libusb_unref_device(dev);
+			return;
+		}
+
+		usbi_connect_device(dev);
+	} else {
+		usbi_err(ctx, "Device wasn't new: %s", device_path);
+		libusb_unref_device(dev);
+	}
+}
+
+static void usbdk_disconnect_device(struct libusb_context *ctx,
+																		TCHAR const *const device_path)
+{
+	unsigned long new_device_id;
+	struct libusb_device *dev = NULL;
+
+	usbdk_get_session_id_from_path(device_path, &new_device_id);
+
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_for_each_entry (dev, &ctx->usb_devs, list, struct libusb_device)
+		if (dev->session_data == new_device_id) {
+			libusb_ref_device(dev);
+			usbi_disconnect_device(dev);
+			libusb_unref_device(dev);
+			break;
+		}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
+}
+
 const struct windows_backend usbdk_backend = {
 	usbdk_init,
 	usbdk_exit,
 	usbdk_get_device_list,
 	usbdk_open,
 	usbdk_close,
+	usbdk_enumerate_device,
+	usbdk_disconnect_device,
 	usbdk_get_device_driver,
 	usbdk_get_device_descriptor,
 	usbdk_get_active_config_descriptor,

@@ -614,7 +614,7 @@ libusb_free_device_list(list, 1);
  * itself. */
 #define DISCOVERED_DEVICES_SIZE_STEP 8
 
-static struct discovered_devs *discovered_devs_alloc(void)
+struct discovered_devs *usbi_discovered_devs_alloc(void)
 {
 	struct discovered_devs *ret =
 		malloc(sizeof(*ret) + (sizeof(void *) * DISCOVERED_DEVICES_SIZE_STEP));
@@ -626,7 +626,7 @@ static struct discovered_devs *discovered_devs_alloc(void)
 	return ret;
 }
 
-static void discovered_devs_free(struct discovered_devs *discdevs)
+void usbi_discovered_devs_free(struct discovered_devs *discdevs)
 {
 	size_t i;
 
@@ -660,7 +660,7 @@ struct discovered_devs *discovered_devs_append(
 	new_discdevs = realloc(discdevs,
 		sizeof(*discdevs) + (sizeof(void *) * capacity));
 	if (!new_discdevs) {
-		discovered_devs_free(discdevs);
+		usbi_discovered_devs_free(discdevs);
 		return NULL;
 	}
 
@@ -807,7 +807,7 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list)
 {
-	struct discovered_devs *discdevs = discovered_devs_alloc();
+	struct discovered_devs *discdevs = usbi_discovered_devs_alloc();
 	struct libusb_device **ret;
 	int r = 0;
 	ssize_t i, len;
@@ -861,7 +861,7 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 
 out:
 	if (discdevs)
-		discovered_devs_free(discdevs);
+		usbi_discovered_devs_free(discdevs);
 	return len;
 }
 

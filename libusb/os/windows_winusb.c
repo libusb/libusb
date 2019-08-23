@@ -842,6 +842,7 @@ static int init_device(struct libusb_device *const *const recent_dev,
 			tmp_dev = get_ancestor(ctx, recent_dev, recent_devs, devinst, &devinst);
 			if (tmp_dev != parent_dev) {
 				usbi_err(ctx, "program assertion failed - first ancestor is not parent");
+				libusb_unref_device(tmp_dev);
 				return LIBUSB_ERROR_NOT_FOUND;
 			}
 			libusb_unref_device(tmp_dev);
@@ -867,6 +868,7 @@ static int init_device(struct libusb_device *const *const recent_dev,
 		dev->port_number = port_number;
 		dev->parent_dev = parent_dev;
 		priv->depth = depth;
+		libusb_ref_device(parent_dev);
 
 		hub_handle = CreateFileA(parent_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
 				     0, NULL);
@@ -1161,8 +1163,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	unsigned int pass, i, j;
 	char enumerator[16];
 	char dev_id[MAX_PATH_LENGTH];
-	struct libusb_device *dev, *parent_dev;
-	struct winusb_device_priv *priv, *parent_priv;
+	struct libusb_device *dev = NULL, *parent_dev = NULL;
+	struct winusb_device_priv *priv = NULL, *parent_priv = NULL;
 	char *dev_interface_path = NULL;
 	char const *dev_driver = NULL;
 	unsigned long session_id;
@@ -1250,6 +1252,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 			// NB: this is always executed before breaking the loop
 			safe_free(dev_interface_path);
 			priv = parent_priv = NULL;
+			if (parent_dev) {
+				libusb_unref_device(parent_dev);
+			}
 			dev = parent_dev = NULL;
 			dev_driver = NULL;
 
@@ -1425,7 +1430,6 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				parent_priv = _device_priv(parent_dev);
 				// virtual USB devices are also listed during GEN - don't process these yet
 				if ((pass == GEN_PASS) && (parent_priv->apib->id != USB_API_HUB)) {
-					libusb_unref_device(parent_dev);
 					continue;
 				}
 			}
@@ -1556,7 +1560,6 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						break;
 					}
 				}
-				libusb_unref_device(parent_dev);
 				break;
 			}
 		}
@@ -1957,6 +1960,72 @@ static int winusb_get_device_driver(struct libusb_device *device, char *driver,
 	return drv ? (int)strnlen(drv, MAX_PATH_LENGTH) : 0;
 }
 
+static bool is_same_device_path(char const *const a, TCHAR const *const b)
+{
+	int i;
+	if (!a || !b) {
+		return false;
+	}
+
+	// usbi_dbg("comparing %s <> %s", a,b);
+
+	for (i = 0;; ++i) {
+		if (tolower((int)a[i]) == tolower((int)b[i]) ||
+				(('#' == a[i] && '\\' == b[i]) || ('#' == b[i] && '\\' == a[i])) ||
+				(('?' == a[i] && '.' == b[i]) || ('?' == b[i] && '.' == a[i]))) {
+			if ('\0' == a[i]) {
+				return true;
+			}
+			continue;
+		} else {
+			return false;
+		}
+	}
+}
+
+static void winusb_enumerate_device(struct libusb_context *ctx,
+																		TCHAR const *const device_path)
+{
+	ssize_t i, len;
+	struct libusb_device *dev = NULL;
+
+	struct discovered_devs *disc_devs = usbi_discovered_devs_alloc();
+	if (NULL == disc_devs) {
+		return;
+	}
+
+	// FIXME it is horrible to enumerate everything, but I'm not confident to kill this Behemoth
+	if (LIBUSB_SUCCESS == winusb_get_device_list(ctx, &disc_devs)) {
+		len = disc_devs->len;
+		for (i = 0; i < len; i++) {
+			dev = disc_devs->devices[i];
+			if (is_same_device_path(_device_priv(dev)->path, device_path)) {
+				libusb_ref_device(dev);
+				usbi_connect_device(dev);
+				break;
+			}
+		}
+	}
+	usbi_discovered_devs_free(disc_devs);
+}
+
+static void winusb_disconnect_device(struct libusb_context *ctx,
+																		 TCHAR const *const device_path)
+{
+	libusb_device *dev;
+
+	// FIXME it is horrible to string search but the session_id was chosen somewhat poorly
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_for_each_entry (dev, &ctx->usb_devs, list, struct libusb_device)
+		if (is_same_device_path(_device_priv(dev)->path, device_path)) {
+			libusb_ref_device(dev);
+			usbi_disconnect_device(dev);
+			libusb_unref_device(dev);
+			break;
+		}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
+}
+
 // NB: MSVC6 does not support named initializers.
 const struct windows_backend winusb_backend = {
 	winusb_init,
@@ -1964,6 +2033,8 @@ const struct windows_backend winusb_backend = {
 	winusb_get_device_list,
 	winusb_open,
 	winusb_close,
+	winusb_enumerate_device,
+	winusb_disconnect_device,
 	winusb_get_device_driver,
 	winusb_get_device_descriptor,
 	winusb_get_active_config_descriptor,

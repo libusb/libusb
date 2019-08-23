@@ -54,6 +54,8 @@ struct windows_backend {
 		struct discovered_devs **discdevs);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
+	void (*enumerate_device)(struct libusb_context *ctx, TCHAR const *device_path);
+	void (*disconnect_device)(struct libusb_context *ctx, TCHAR const *device_path);
 	int (*get_device_driver)(struct libusb_device *device, char *driver,
 													 int size);
 	int (*get_device_descriptor)(struct libusb_device *device, unsigned char *buffer);

@@ -608,6 +608,9 @@ struct discovered_devs {
 	struct libusb_device *devices[ZERO_SIZED_ARRAY];
 };
 
+struct discovered_devs *usbi_discovered_devs_alloc(void);
+void usbi_discovered_devs_free(struct discovered_devs *discdevs);
+
 struct discovered_devs *discovered_devs_append(
 	struct discovered_devs *discdevs, struct libusb_device *dev);
 

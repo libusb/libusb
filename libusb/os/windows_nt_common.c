@@ -29,6 +29,7 @@
 #include <inttypes.h>
 #include <process.h>
 #include <stdio.h>
+#include <dbt.h>
 
 #include "libusbi.h"
 #include "windows_common.h"
@@ -55,6 +56,12 @@ struct timer_request {
 	struct timespec *tp;
 	HANDLE event;
 };
+
+// Event thread
+static HANDLE event_thread = NULL;
+static DWORD event_thread_id = 0;
+static HWND event_window = NULL;
+usbi_mutex_t event_lock;
 
 // Timer thread
 static HANDLE timer_thread = NULL;
@@ -618,6 +625,264 @@ static void windows_handle_callback(const struct windows_backend *backend,
 	}
 }
 
+static void windows_hotplug_enumerate(TCHAR const *device_path)
+{
+	struct libusb_context *ctx;
+
+	usbi_mutex_static_lock(&active_contexts_lock);
+	list_for_each_entry (ctx, &active_contexts_list, list,
+											 struct libusb_context) {
+		_context_priv(ctx)->backend->enumerate_device(ctx, device_path);
+	}
+	usbi_mutex_static_unlock(&active_contexts_lock);
+}
+
+static void windows_device_disconnected(TCHAR const *device_path)
+{
+	struct libusb_context *ctx;
+
+	usbi_mutex_static_lock(&active_contexts_lock);
+	list_for_each_entry (ctx, &active_contexts_list, list,
+											 struct libusb_context) {
+		_context_priv(ctx)->backend->disconnect_device(ctx, device_path);
+	}
+	usbi_mutex_static_unlock(&active_contexts_lock);
+}
+
+static bool windows_setup_event_filter(HWND window, GUID const guid, unsigned i)
+{
+	HDEVNOTIFY devNotify;
+	DEV_BROADCAST_DEVICEINTERFACE filter;
+	ZeroMemory(&filter, sizeof(filter));
+
+	filter.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
+	filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+	filter.dbcc_classguid = guid;
+
+	devNotify = RegisterDeviceNotification(window, &filter, DEVICE_NOTIFY_WINDOW_HANDLE);
+	if (NULL == devNotify) {
+		usbi_err(NULL, "Failed to create filter");
+		return false;
+	}
+	SetWindowLongPtr(window, i * sizeof(LONG_PTR), (LONG_PTR)devNotify);
+	return true;
+}
+
+static bool windows_create_event_filter(HWND window)
+{
+	// NOTE adjust space in windows_event_window_setup if new filter are added
+	// Setup filter for the events we want to get notified about
+
+	if (!windows_setup_event_filter(window, GUID_DEVINTERFACE_USB_HOST_CONTROLLER, 0)) {
+		return false;
+	}
+	if (!windows_setup_event_filter(window, GUID_DEVINTERFACE_USB_HUB, 1)) {
+		return false;
+	}
+	if (!windows_setup_event_filter(window, GUID_DEVINTERFACE_USB_DEVICE, 2)) {
+		return false;
+	}
+	if (!windows_setup_event_filter(window, GUID_DEVINTERFACE_LIBUSB0_FILTER, 3)) {
+		return false;
+	}
+	return true;
+}
+
+static LRESULT
+windows_event_message_handler(HWND hWnd, UINT uMsg, WPARAM wParam,
+															LPARAM lParam)
+{
+	PDEV_BROADCAST_DEVICEINTERFACE lpdbv;
+
+	switch (uMsg) {
+	case WM_NCCREATE:
+		// NOTE before window creation
+		return true;
+	case WM_CREATE:
+		// NOTE the actual creation of the window
+		if (!windows_create_event_filter(hWnd)) {
+			return -1;
+		}
+		break;
+	case WM_DEVICECHANGE: {
+		lpdbv = (PDEV_BROADCAST_DEVICEINTERFACE)lParam;
+
+		if (lpdbv->dbcc_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
+			usbi_mutex_lock(&event_lock);
+			switch (wParam) {
+			case DBT_DEVICEARRIVAL: {
+				usbi_dbg("Device arrived %s", lpdbv->dbcc_name);
+				windows_hotplug_enumerate(lpdbv->dbcc_name);
+				break;
+			}
+			case DBT_DEVICEREMOVECOMPLETE: {
+				usbi_dbg("Device removed %s", lpdbv->dbcc_name);
+				windows_device_disconnected(lpdbv->dbcc_name);
+				break;
+			}
+			default:
+				break;
+			}
+			usbi_mutex_unlock(&event_lock);
+		}
+		return true;
+	}
+	default:
+		// NOTE don't care ...
+		break;
+	}
+	return 0L;
+}
+
+// Window class name for the non-visible window for windows events
+#define LIBUSB_EVENT_CLASS "LIBUSB_EVENT_CLASS"
+
+static int windows_event_window_setup(void)
+{
+	WNDCLASSEX wx;
+	ZeroMemory(&wx, sizeof(wx));
+
+	wx.cbSize = sizeof(WNDCLASSEX);
+	wx.lpfnWndProc = (WNDPROC)windows_event_message_handler;
+	wx.hInstance = (HINSTANCE)GetModuleHandle(NULL);
+	wx.style = CS_HREDRAW | CS_VREDRAW;
+	wx.hInstance = GetModuleHandle(NULL);
+	wx.hbrBackground = (HBRUSH)(COLOR_WINDOW);
+	wx.lpszClassName = _T(LIBUSB_EVENT_CLASS);
+	wx.cbWndExtra = 4 * sizeof(LONG_PTR); // NOTE adjust if new filter are added
+
+	if (!RegisterClassEx(&wx)) {
+		usbi_err(NULL, "Failed to register event window class");
+		return LIBUSB_ERROR_NO_MEM;
+	}
+	if (NULL == (event_window =
+								 CreateWindow(_T(LIBUSB_EVENT_CLASS), _T("DeviceNotificationWindow"),
+															WS_ICONIC, 0, 0, CW_USEDEFAULT, 0, HWND_MESSAGE,
+															NULL, GetModuleHandle(NULL), NULL))) {
+		usbi_err(NULL, "Failed to create event window");
+		return LIBUSB_ERROR_NO_MEM;
+	}
+	SetWindowLongPtr(event_window, 0 * sizeof(LONG_PTR), (LONG_PTR)NULL);
+	SetWindowLongPtr(event_window, 1 * sizeof(LONG_PTR), (LONG_PTR)NULL);
+	SetWindowLongPtr(event_window, 2 * sizeof(LONG_PTR), (LONG_PTR)NULL);
+	SetWindowLongPtr(event_window, 3 * sizeof(LONG_PTR), (LONG_PTR)NULL);
+
+	return LIBUSB_SUCCESS;
+}
+
+static void windows_destroy_event_window(void)
+{
+	UnregisterDeviceNotification((HDEVNOTIFY)GetWindowLongPtr(event_window, sizeof(LONG_PTR)));
+	DestroyWindow(event_window);
+	event_window = NULL;
+	UnregisterClass(_T(LIBUSB_EVENT_CLASS), (HINSTANCE)GetModuleHandle(NULL));
+}
+
+static unsigned __stdcall windows_event_thread_main(void *param)
+{
+	int r;
+	int msg_ret = 0;
+	MSG msg;
+
+	if (LIBUSB_SUCCESS != (r = windows_event_window_setup())) {
+		return r;
+	}
+
+	// Signal windows_start_event_monitor() that we're ready to service requests
+	if (!SetEvent((HANDLE)param))
+		usbi_dbg("SetEvent failed for timer init event: %s", windows_error_str(0));
+
+	while ((msg_ret = pGetMessageA(&msg, event_window, 0, 0)) != 0) {
+		if (msg_ret == -1) {
+			r = LIBUSB_ERROR_OTHER;
+			goto cleanup;
+		} else {
+			switch (msg.message) {
+			case WM_TIMER_REQUEST:
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+				break;
+			case WM_TIMER_EXIT:
+				goto cleanup;
+			}
+		}
+	}
+
+cleanup:
+	UnregisterDeviceNotification((HDEVNOTIFY *)GetWindowLongPtr(event_window, sizeof(LONG_PTR)));
+	windows_destroy_event_window();
+	return r;
+}
+
+static int windows_start_event_monitor(void)
+{
+	HANDLE event;
+
+	event = CreateEvent(NULL, FALSE, FALSE, NULL);
+	if (event == NULL) {
+		usbi_err(NULL, "could not create event: %s", windows_error_str(0));
+		return LIBUSB_ERROR_NO_MEM;
+	}
+
+	event_thread =
+		(HANDLE)_beginthreadex(NULL, 0, windows_event_thread_main, (void *)event, 0,
+													 (unsigned int *)&event_thread_id);
+	if (event_thread == NULL) {
+		usbi_err(NULL, "unable to create event thread - aborting");
+		return LIBUSB_ERROR_NO_MEM;
+	}
+	// Wait for timer thread to init before continuing.
+	if (WaitForSingleObject(event, INFINITE) != WAIT_OBJECT_0) {
+		usbi_err(NULL, "failed to wait for event thread to become ready - aborting");
+		CloseHandle(event);
+		return LIBUSB_ERROR_OTHER;
+	}
+	CloseHandle(event);
+	return LIBUSB_SUCCESS;
+}
+
+static void windows_destroy_event_monitor(void)
+{
+	if (event_thread) {
+		// actually the signal to quit the thread.
+		if (!PostMessageA(event_window, WM_TIMER_EXIT, 0, 0) ||
+				(WaitForSingleObject(event_thread, INFINITE) != WAIT_OBJECT_0)) {
+			usbi_dbg("could not wait for timer thread to quit");
+			TerminateThread(event_thread, 1);
+			// shouldn't happen, but we're destroying
+			// all objects it might have held anyway.
+		}
+		CloseHandle(event_thread);
+		event_thread = NULL;
+		event_thread_id = 0;
+	}
+}
+
+static int windows_scan_devices(struct libusb_context *ctx)
+{
+	ssize_t i, len;
+	struct libusb_device *dev = NULL;
+
+	struct discovered_devs *disc_devs = usbi_discovered_devs_alloc();
+	if (NULL == disc_devs) {
+		return LIBUSB_ERROR_NO_MEM;
+	}
+
+	usbi_mutex_lock(&event_lock);
+	if (LIBUSB_SUCCESS == _context_priv(ctx)->backend->get_device_list(ctx, &disc_devs)) {
+		len = disc_devs->len;
+		for (i = 0; i < len; i++) {
+			dev = disc_devs->devices[i];
+			libusb_ref_device(dev);
+			usbi_connect_device(dev);
+		}
+	}
+	usbi_mutex_unlock(&event_lock);
+	usbi_discovered_devs_free(disc_devs);
+
+	return LIBUSB_SUCCESS;
+}
+
 static int windows_init(struct libusb_context *ctx)
 {
 	struct windows_context_priv *priv = _context_priv(ctx);
@@ -680,12 +945,28 @@ static int windows_init(struct libusb_context *ctx)
 			// Do not report this as an error
 			r = LIBUSB_SUCCESS;
 		}
+
+		r = usbi_mutex_init(&event_lock);
+		if (LIBUSB_SUCCESS != r) {
+			goto init_exit;
+		}
+
+		r = windows_start_event_monitor();
+		if (LIBUSB_SUCCESS != r) {
+			goto init_exit;
+		}
+	} else if (!event_thread) {
+		r = LIBUSB_ERROR_OTHER;
+		goto init_exit;
 	}
 
 	// By default, new contexts will use the WinUSB backend
 	priv->backend = &winusb_backend;
 
-	r = LIBUSB_SUCCESS;
+	r = windows_scan_devices(ctx);
+	if (LIBUSB_SUCCESS != r) {
+		goto init_exit;
+	}
 
 init_exit: // Holds semaphore here
 	if ((init_count == 1) && (r != LIBUSB_SUCCESS)) { // First init failed?
@@ -696,6 +977,7 @@ init_exit: // Holds semaphore here
 		htab_destroy();
 		windows_destroy_clock();
 		windows_exit_dlls();
+		usbi_mutex_destroy(&event_lock);
 		--init_count;
 	}
 
@@ -730,6 +1012,8 @@ static void windows_exit(struct libusb_context *ctx)
 		}
 		winusb_backend.exit(ctx);
 		htab_destroy();
+		windows_destroy_event_monitor();
+		usbi_mutex_destroy(&event_lock);
 		windows_destroy_clock();
 		windows_exit_dlls();
 	}
@@ -738,32 +1022,78 @@ static void windows_exit(struct libusb_context *ctx)
 	CloseHandle(semaphore);
 }
 
-static int windows_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
+static int windows_set_option(struct libusb_context *ctx,
+															enum libusb_option option, va_list ap)
 {
 	struct windows_context_priv *priv = _context_priv(ctx);
+	struct libusb_device *dev = NULL;
+	struct libusb_device *n = NULL;
+	unsigned nums = 0;
+	int r = LIBUSB_SUCCESS;
 
 	UNUSED(ap);
 
 	switch (option) {
 	case LIBUSB_OPTION_USE_USBDK:
 		if (usbdk_available) {
+			usbi_mutex_lock(&ctx->events_lock);
+			usbi_mutex_lock(&ctx->usb_devs_lock);
+
+			usbi_mutex_lock(&ctx->open_devs_lock);
+			list_for_each_entry (dev, &ctx->open_devs, list, struct libusb_device) {
+				++nums;
+			}
+			usbi_mutex_unlock(&ctx->open_devs_lock);
+			
+			if (0 != nums) {
+				usbi_err(ctx, "Tried to switch the backend while using devices!");
+				r = LIBUSB_ERROR_OTHER;
+				goto backend_exit;
+			}
+			list_for_each_entry (dev, &ctx->hotplug_msgs, list,
+													 struct libusb_device) {
+				++nums;
+			}
+			if (0 != nums) {
+				usbi_err(ctx, "Tried to switch the backend while there are events for it!");
+				r = LIBUSB_ERROR_OTHER;
+				goto backend_exit;
+			}
 			usbi_dbg("switching context %p to use UsbDk backend", ctx);
+
+			// FIXME This is horrible, but these events may not be sent to the user
+			ctx->hotplug_msgs.next = NULL;
+			ctx->hotplug_msgs.prev = NULL;
+
+			list_for_each_entry_safe (dev, n, &ctx->usb_devs, list,
+																struct libusb_device) {
+				libusb_ref_device(dev);
+				usbi_disconnect_device(dev);
+				libusb_unref_device(dev);
+			}
 			priv->backend = &usbdk_backend;
+			windows_scan_devices(ctx);
+
+			list_init(&ctx->hotplug_msgs);
+
+		backend_exit:
+			usbi_mutex_unlock(&ctx->usb_devs_lock);
+			usbi_mutex_unlock(&ctx->events_lock);
+			return r;
 		} else {
 			usbi_err(ctx, "UsbDk backend not available");
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
-		return LIBUSB_SUCCESS;
 	default:
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
-
 }
 
-static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **discdevs)
+static void windows_hotplug_poll(void)
 {
-	struct windows_context_priv *priv = _context_priv(ctx);
-	return priv->backend->get_device_list(ctx, discdevs);
+	Sleep(10); // Wait 10ms - this is by no means good but similar to darwin
+	usbi_mutex_lock(&event_lock);
+	usbi_mutex_unlock(&event_lock);
 }
 
 static int windows_open(struct libusb_device_handle *dev_handle)
@@ -1004,8 +1334,8 @@ const struct usbi_os_backend usbi_backend = {
 	windows_init,
 	windows_exit,
 	windows_set_option,
-	windows_get_device_list,
-	NULL,	/* hotplug_poll */
+	NULL,	/* get_device_list */
+	windows_hotplug_poll,
 	NULL,	/* wrap_sys_device */
 	windows_open,
 	windows_close,
