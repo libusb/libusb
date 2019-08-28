@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2019-08-14: v1.0.23 (in progress)
+2019-08-28: v1.0.23
 * Add German translation (#446)
 * Add Hungarian translation (#493)
 * Android: Improved support for Android
