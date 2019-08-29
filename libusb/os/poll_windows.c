@@ -60,7 +60,7 @@ static size_t fd_count;
 static size_t fd_size;
 #define INC_FDS_EACH 256
 
-static void usbi_dec_fd_table()
+static void usbi_dec_fd_table(void)
 {
 	fd_count--;
 	if (fd_count == 0) {
