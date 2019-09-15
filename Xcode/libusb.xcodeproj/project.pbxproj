@@ -567,7 +567,7 @@
 		008FBF281628B79300BC5BE2 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0450;
+				LastUpgradeCheck = 1030;
 				ORGANIZATIONNAME = libusb;
 				TargetAttributes = {
 					006AD41B1C8C5A90007F8C6A = {
@@ -577,10 +577,11 @@
 			};
 			buildConfigurationList = 008FBF2B1628B79300BC5BE2 /* Build configuration list for PBXProject "libusb" */;
 			compatibilityVersion = "Xcode 3.1";
-			developmentRegion = English;
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				Base,
 			);
 			mainGroup = 008FBF261628B79300BC5BE2;
 			productRefGroup = 008FBF321628B79300BC5BE2 /* Products */;
@@ -736,6 +737,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -744,6 +746,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -752,6 +755,18 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				ONLY_ACTIVE_ARCH = YES;
 			};
 			name = Debug;
 		};
@@ -759,6 +774,16 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
 			};
 			name = Release;
 		};
@@ -766,6 +791,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8616417E63007E0579 /* libusb_debug.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 			};
 			name = Debug;
 		};
@@ -773,6 +799,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8916417EA6007E0579 /* libusb_release.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 			};
 			name = Release;
 		};
@@ -780,6 +807,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -788,6 +816,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -796,6 +825,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -804,6 +834,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -812,6 +843,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -820,6 +852,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -828,6 +861,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -836,6 +870,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -844,6 +879,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -852,6 +888,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -859,6 +896,7 @@
 		008FC0341628BC9400BC5BE2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -866,6 +904,7 @@
 		008FC0351628BC9400BC5BE2 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -880,6 +919,7 @@
 				006AD4211C8C5A90007F8C6A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		008FBF2B1628B79300BC5BE2 /* Build configuration list for PBXProject "libusb" */ = {
 			isa = XCConfigurationList;
