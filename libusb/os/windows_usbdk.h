@@ -101,3 +101,17 @@ typedef BOOL (__cdecl *USBDK_RESET_DEVICE)(
 typedef HANDLE (__cdecl *USBDK_GET_REDIRECTOR_SYSTEM_HANDLE)(
 	HANDLE DeviceHandle
 );
+
+/* SetupAPI dependencies */
+DLL_DECLARE_HANDLE(SetupAPI);
+DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, SetupDiEnumDeviceInfo,
+													(HDEVINFO, DWORD, PSP_DEVINFO_DATA));
+DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceInstanceIdW,
+													(HDEVINFO, PSP_DEVINFO_DATA, PWSTR, DWORD, PDWORD));
+DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, SetupDiDestroyDeviceInfoList,
+													(HDEVINFO));
+DLL_DECLARE_FUNC_PREFIXED(WINAPI, HDEVINFO, p, SetupDiGetClassDevsW,
+													(GUID const *, PCWSTR, HWND, DWORD));
+DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, SetupDiGetDeviceRegistryPropertyA,
+													(HDEVINFO, PSP_DEVINFO_DATA, DWORD, PDWORD, PBYTE,
+													 DWORD, PDWORD));

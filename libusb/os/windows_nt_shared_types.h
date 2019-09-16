@@ -80,6 +80,7 @@ struct usbdk_device_priv {
 	HANDLE redirector_handle;
 	HANDLE system_handle;
 	uint8_t active_configuration;
+	char *driver;
 };
 
 struct winusb_device_priv {
@@ -104,6 +105,7 @@ struct winusb_device_priv {
 	struct hid_device_priv *hid;
 	USB_DEVICE_DESCRIPTOR dev_descriptor;
 	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptor; // list of pointers to the cached config descriptors
+	const char *driver;
 };
 
 struct usbdk_device_handle_priv {

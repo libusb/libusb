@@ -24,6 +24,8 @@
 
 #include <config.h>
 
+#include <windows.h>
+#include <tchar.h>
 #include <inttypes.h>
 #include <process.h>
 #include <stdio.h>
@@ -68,6 +70,24 @@ DLL_DECLARE_HANDLE(User32);
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, GetMessageA, (LPMSG, HWND, UINT, UINT));
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, PeekMessageA, (LPMSG, HWND, UINT, UINT, UINT));
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, PostThreadMessageA, (DWORD, UINT, WPARAM, LPARAM));
+
+
+// http://msdn.microsoft.com/en-us/library/ff545978.aspx
+// http://msdn.microsoft.com/en-us/library/ff545972.aspx
+// http://msdn.microsoft.com/en-us/library/ff545982.aspx
+#ifndef GUID_DEVINTERFACE_USB_HOST_CONTROLLER
+GUID const GUID_DEVINTERFACE_USB_HOST_CONTROLLER = {0x3ABF6F2D, 0x71C4, 0x462A, {0x8A, 0x92, 0x1E, 0x68, 0x61, 0xE6, 0xAF, 0x27}};
+#endif
+#ifndef GUID_DEVINTERFACE_USB_DEVICE
+GUID const GUID_DEVINTERFACE_USB_DEVICE = {0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED}};
+#endif
+#ifndef GUID_DEVINTERFACE_USB_HUB
+GUID const GUID_DEVINTERFACE_USB_HUB = {0xF18A0E88, 0xC30C, 0x11D0, {0x88, 0x15, 0x00, 0xA0, 0xC9, 0x06, 0xBE, 0xD8}};
+#endif
+#ifndef GUID_DEVINTERFACE_LIBUSB0_FILTER
+GUID const GUID_DEVINTERFACE_LIBUSB0_FILTER = {0xF9F3FF14, 0xAE21, 0x48A0, {0x8A, 0x25, 0x80, 0x11, 0xA7, 0xA9, 0x31, 0xD9}};
+#endif
+
 
 static unsigned __stdcall windows_clock_gettime_threaded(void *param);
 
@@ -970,6 +990,13 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 	}
 }
 
+static int windows_get_device_driver(struct libusb_device *const device,
+																		 char *driver, int size)
+{
+	struct windows_context_priv const *const priv = _context_priv(device->ctx);
+	return priv->backend->get_device_driver(device, driver, size);
+}
+
 // NB: MSVC6 does not support named initializers.
 const struct usbi_os_backend usbi_backend = {
 	"Windows",
@@ -982,6 +1009,7 @@ const struct usbi_os_backend usbi_backend = {
 	NULL,	/* wrap_sys_device */
 	windows_open,
 	windows_close,
+	windows_get_device_driver,
 	windows_get_device_descriptor,
 	windows_get_active_config_descriptor,
 	windows_get_config_descriptor,

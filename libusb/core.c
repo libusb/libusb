@@ -918,6 +918,25 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
 }
 
 /** \ingroup libusb_dev
+ * Get the name of the driver that a device is used with.
+ *
+ * The function will write the maximum number of characters possible into the
+ * buffer while terminating the string correctly.
+ * \param dev a device
+ * \param driver buffer to write the driver name into
+ * \param size of the buffer to write the driver name into
+ * \returns the required buffer size to write the complete driver name
+ * 					(inclusive termination) or LIBUSB_ERROR_NOT_SUPPORTED.
+ */
+int API_EXPORTED libusb_get_driver(libusb_device *dev, char *driver, int size)
+{
+	if (usbi_backend.get_device_driver) {
+		return usbi_backend.get_device_driver(dev, driver, size);
+	}
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+/** \ingroup libusb_dev
  * Get the list of all port numbers from root for the specified device
  *
  * Since version 1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102

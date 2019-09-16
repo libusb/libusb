@@ -992,7 +992,8 @@ static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id
 
 // Returns the api type, or 0 if not found/unsupported
 static void get_api_type(struct libusb_context *ctx, HDEVINFO *dev_info,
-	SP_DEVINFO_DATA *dev_info_data, int *api, int *sub_api)
+												 SP_DEVINFO_DATA *dev_info_data, int *api, int *sub_api,
+												 const char **const driver)
 {
 	// Precedence for filter drivers vs driver is in the order of this array
 	struct driver_lookup lookup[3] = {
@@ -1036,6 +1037,7 @@ static void get_api_type(struct libusb_context *ctx, HDEVINFO *dev_info,
 					(i != USB_API_WINUSBX) ? usb_api_backend[i].designation : usb_api_backend[i].driver_name_list[j]);
 				*api = i;
 				*sub_api = j;
+				*driver = usb_api_backend[*api].driver_name_list[j];
 				return;
 			}
 		}
@@ -1135,6 +1137,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	struct libusb_device *dev, *parent_dev;
 	struct winusb_device_priv *priv, *parent_priv;
 	char *dev_interface_path = NULL;
+	char const *dev_driver = NULL;
 	unsigned long session_id;
 	DWORD size, port_nr, reg_type, install_state;
 	HKEY key;
@@ -1221,6 +1224,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 			safe_free(dev_interface_path);
 			priv = parent_priv = NULL;
 			dev = parent_dev = NULL;
+			dev_driver = NULL;
 
 			// Safe loop: end of loop conditions
 			if (r != LIBUSB_SUCCESS)
@@ -1368,7 +1372,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						dev_id, (unsigned int)install_state);
 					continue;
 				}
-				get_api_type(ctx, dev_info, &dev_info_data, &api, &sub_api);
+				get_api_type(ctx, dev_info, &dev_info_data, &api, &sub_api, &dev_driver);
 				break;
 			}
 
@@ -1453,6 +1457,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				dev_interface_path = NULL;
 				priv->apib = &usb_api_backend[api];
 				priv->sub_api = sub_api;
+				priv->driver = dev_driver;
 				switch (api) {
 				case USB_API_COMPOSITE:
 				case USB_API_HUB:
@@ -1907,6 +1912,19 @@ static void winusb_get_overlapped_result(struct usbi_transfer *itransfer,
 	}
 }
 
+static int winusb_get_device_driver(struct libusb_device *device, char *driver,
+																		int size)
+{
+	char const *const drv = _device_priv(device)->driver;
+	if (size > 0 && driver) {
+		driver[0] = '\0';
+		if (drv) {
+			strncat(driver, drv, size - 1);
+		}
+	}
+	return drv ? (int)strnlen(drv, MAX_PATH_LENGTH) : 0;
+}
+
 // NB: MSVC6 does not support named initializers.
 const struct windows_backend winusb_backend = {
 	winusb_init,
@@ -1914,6 +1932,7 @@ const struct windows_backend winusb_backend = {
 	winusb_get_device_list,
 	winusb_open,
 	winusb_close,
+	winusb_get_device_driver,
 	winusb_get_device_descriptor,
 	winusb_get_active_config_descriptor,
 	winusb_get_config_descriptor,

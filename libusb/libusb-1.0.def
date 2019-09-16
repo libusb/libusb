@@ -62,6 +62,8 @@ EXPORTS
   libusb_get_config_descriptor@12 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value
   libusb_get_config_descriptor_by_value@12 = libusb_get_config_descriptor_by_value
+  libusb_get_driver
+  libusb_get_driver@12 = libusb_get_driver
   libusb_get_configuration
   libusb_get_configuration@8 = libusb_get_configuration
   libusb_get_container_id_descriptor

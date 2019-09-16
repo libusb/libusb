@@ -54,6 +54,8 @@ struct windows_backend {
 		struct discovered_devs **discdevs);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
+	int (*get_device_driver)(struct libusb_device *device, char *driver,
+													 int size);
 	int (*get_device_descriptor)(struct libusb_device *device, unsigned char *buffer);
 	int (*get_active_config_descriptor)(struct libusb_device *device,
 		unsigned char *buffer, size_t len);
@@ -107,4 +109,20 @@ void windows_force_sync_completion(OVERLAPPED *overlapped, ULONG size);
 
 #if defined(ENABLE_LOGGING)
 const char *windows_error_str(DWORD error_code);
+#endif
+
+// http://msdn.microsoft.com/en-us/library/ff545978.aspx
+// http://msdn.microsoft.com/en-us/library/ff545972.aspx
+// http://msdn.microsoft.com/en-us/library/ff545982.aspx
+#ifndef GUID_DEVINTERFACE_USB_HOST_CONTROLLER
+extern GUID const GUID_DEVINTERFACE_USB_HOST_CONTROLLER;
+#endif
+#ifndef GUID_DEVINTERFACE_USB_DEVICE
+extern GUID const GUID_DEVINTERFACE_USB_DEVICE;
+#endif
+#ifndef GUID_DEVINTERFACE_USB_HUB
+extern GUID const GUID_DEVINTERFACE_USB_HUB;
+#endif
+#ifndef GUID_DEVINTERFACE_LIBUSB0_FILTER
+extern GUID const GUID_DEVINTERFACE_LIBUSB0_FILTER;
 #endif

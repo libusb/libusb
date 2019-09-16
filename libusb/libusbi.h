@@ -786,6 +786,21 @@ struct usbi_os_backend {
 	 */
 	void (*close)(struct libusb_device_handle *dev_handle);
 
+	/* Obtains the driver string for the device.
+	 *
+	 * Possible values "WinUSB", "libusb0" and "libusbK" - other values  may be
+	 * possible too.
+	 *
+	 * The function will write the maximum number of characters possible into the
+	 * buffer while terminating the string correctly.
+	 *
+	 * This function will do no lockup of itself - that is done at device
+	 * detection time, because of that this function should be called after the
+	 * given device was set up.
+	 */
+	int (*get_device_driver)(struct libusb_device *device, char *driver,
+													 int size);
+
 	/* Retrieve the device descriptor from a device.
 	 *
 	 * The descriptor should be retrieved from memory, NOT via bus I/O to the

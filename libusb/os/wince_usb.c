@@ -847,6 +847,7 @@ const struct usbi_os_backend usbi_backend = {
 	wince_open,
 	wince_close,
 
+	NULL,				/* wince_get_device_driver */,
 	wince_get_device_descriptor,
 	wince_get_active_config_descriptor,
 	wince_get_config_descriptor,

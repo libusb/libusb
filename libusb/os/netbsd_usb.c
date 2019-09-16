@@ -97,6 +97,7 @@ const struct usbi_os_backend usbi_backend = {
 	netbsd_open,
 	netbsd_close,
 
+	NULL,				/* netbsd_get_device_driver */,
 	netbsd_get_device_descriptor,
 	netbsd_get_active_config_descriptor,
 	netbsd_get_config_descriptor,

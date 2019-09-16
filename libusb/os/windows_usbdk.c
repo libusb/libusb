@@ -25,11 +25,20 @@
 
 #include <windows.h>
 #include <stdio.h>
+#include <setupapi.h>
+#include <wctype.h>
+#include <wchar.h>
 
 #include "libusbi.h"
 #include "windows_common.h"
 #include "windows_nt_common.h"
 #include "windows_usbdk.h"
+
+#define MAX_PATH_LENGTH		128
+// Missing from MSVC6 setupapi.h
+#ifndef SPDRP_ADDRESS
+#define SPDRP_ADDRESS		28
+#endif
 
 #if !defined(STATUS_SUCCESS)
 typedef LONG NTSTATUS;
@@ -170,10 +179,37 @@ error_unload:
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
+/*
+ * SetupAPI DLL functions
+ */
+static BOOL init_dlls(void)
+{
+	// Needed to get the driver name
+	DLL_GET_HANDLE(SetupAPI);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiEnumDeviceInfo, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetDeviceInstanceIdW, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiDestroyDeviceInfoList, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetClassDevsW, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetDeviceRegistryPropertyA, TRUE);
+
+	return TRUE;
+}
+
+static void exit_dlls(void)
+{
+	DLL_FREE_HANDLE(SetupAPI);
+}
+
 static int usbdk_init(struct libusb_context *ctx)
 {
 	SC_HANDLE managerHandle;
 	SC_HANDLE serviceHandle;
+
+	// Load DLL imports
+	if (!init_dlls()) {
+		usbi_err(ctx, "could not resolve DLL functions");
+		return LIBUSB_ERROR_OTHER;
+	}
 
 	managerHandle = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
 	if (managerHandle == NULL) {
@@ -198,6 +234,7 @@ static int usbdk_init(struct libusb_context *ctx)
 static void usbdk_exit(struct libusb_context *ctx)
 {
 	UNUSED(ctx);
+	exit_dlls();
 	unload_usbdk_helper_dll();
 }
 
@@ -254,12 +291,120 @@ static int usbdk_cache_config_descriptors(struct libusb_context *ctx,
 	return LIBUSB_SUCCESS;
 }
 
-static inline int usbdk_device_priv_init(struct libusb_context *ctx, struct libusb_device *dev, PUSB_DK_DEVICE_INFO info)
+char *device_driver(struct libusb_context *ctx, HDEVINFO devInfo,
+										SP_DEVINFO_DATA devInfoData)
 {
+	DWORD size;
+	char *tmp;
+
+	if (!pSetupDiGetDeviceRegistryPropertyA(devInfo, &devInfoData, SPDRP_SERVICE,
+																					NULL, NULL, 0, &size)) {
+		// NOTE we do not care - we only want to know the size
+	}
+	tmp = (char *)malloc(size);
+	if (NULL != tmp) {
+		if (!pSetupDiGetDeviceRegistryPropertyA(devInfo, &devInfoData,
+																						SPDRP_SERVICE, NULL, (BYTE *)tmp,
+																						size, &size)) {
+			free(tmp);
+			usbi_err(ctx, "Failed to obtain driver");
+			return NULL;
+		}
+	}
+	return tmp;
+}
+
+char *obtain_device_driver(struct libusb_context *ctx,
+													 wchar_t const *const device_id)
+{
+	wchar_t *instance_id = NULL;
+	SP_DEVINFO_DATA devInfoData;
+	HDEVINFO devInfo = INVALID_HANDLE_VALUE;
+	DWORD size = 0;
+	char *ret = NULL;
+	int n;
+
+	usbi_dbg("Obtaining driver for %S", device_id);
+
+	devInfo = pSetupDiGetClassDevsW(&GUID_DEVINTERFACE_USB_DEVICE, device_id, NULL,
+																	DIGCF_DEVICEINTERFACE);
+	if (devInfo == INVALID_HANDLE_VALUE) {
+		usbi_err(ctx, "Failed to get DEVINFO for %S", device_id);
+		return NULL;
+	}
+
+	for (n = 0;; n++) {
+		safe_free(instance_id);
+
+		if (NULL != ret) {
+			break;
+		}
+
+		devInfoData.cbSize = sizeof(devInfoData);
+		if (!pSetupDiEnumDeviceInfo(devInfo, n, &devInfoData)) {
+			break;
+		}
+
+		if (!pSetupDiGetDeviceInstanceIdW(devInfo, &devInfoData, NULL, 0, &size)) {
+			// NOTE we do not care - we only want to know the size
+		}
+		instance_id = (wchar_t *)malloc(sizeof(wchar_t) * size);
+		if (instance_id == NULL) {
+			goto cleanup;
+		}
+		if (!pSetupDiGetDeviceInstanceIdW(devInfo, &devInfoData, instance_id, size,
+																			NULL)) {
+			usbi_err(ctx, "Failed to get instance ID");
+			continue;
+		} else if (0 == wcscmp(device_id, instance_id)) {
+			ret = device_driver(ctx, devInfo, devInfoData);
+			continue;
+		}
+	}
+
+cleanup:
+	pSetupDiDestroyDeviceInfoList(devInfo);
+	return ret;
+}
+
+void copy_sanitized(wchar_t *to, wchar_t const *const from)
+{
+	int i;
+
+	for (i = 0; from[i] != L'\0'; ++i) {
+		if (from[i] == L'#') {
+			to[i] = L'\\';
+		} else {
+			to[i] = (wchar_t)towupper((wint_t)from[i]);
+		}
+	}
+}
+
+static inline int usbdk_device_priv_init(struct libusb_context *ctx,
+																				 struct libusb_device *dev,
+																				 PUSB_DK_DEVICE_INFO info)
+{
+	unsigned long long dev_id_len, ins_id_len, path_len;
+	wchar_t *path;
 	struct usbdk_device_priv *p = _usbdk_device_priv(dev);
 
 	p->info = *info;
 	p->active_configuration = 0;
+
+	dev_id_len = wcslen(info->ID.DeviceID);
+	ins_id_len = wcslen(info->ID.InstanceID);
+	path_len = dev_id_len + 1 /* # */ + ins_id_len + 1 /* \0 */;
+	assert(path_len < SIZE_MAX);
+	path = (wchar_t *)malloc((size_t)(sizeof(wchar_t) * path_len));
+
+	copy_sanitized(path, info->ID.DeviceID);
+	path[dev_id_len] = L'\\';
+	copy_sanitized(path + dev_id_len + 1, info->ID.InstanceID);
+	path[path_len - 1] = L'\0';
+
+	p->driver = obtain_device_driver(ctx, path);
+
+	free(path);
 
 	return usbdk_cache_config_descriptors(ctx, p, info);
 }
@@ -490,6 +635,8 @@ static void usbdk_destroy_device(struct libusb_device *dev)
 
 	if (p->config_descriptors != NULL)
 		usbdk_release_config_descriptors(p, p->info.DeviceDescriptor.bNumConfigurations);
+    if (p->driver != NULL)
+        free(p->driver);
 }
 
 static void usbdk_clear_transfer_priv(struct usbi_transfer *itransfer)
@@ -803,12 +950,26 @@ static void usbdk_get_overlapped_result(struct usbi_transfer *itransfer, DWORD *
 	}
 }
 
+static int usbdk_get_device_driver(struct libusb_device *device, char *driver,
+																	 int size)
+{
+	char const *const drv = _usbdk_device_priv(device)->driver;
+	if (size > 0 && driver) {
+		driver[0] = '\0';
+		if (drv) {
+			strncat(driver, drv, size - 1);
+		}
+	}
+	return drv ? (int)strnlen(drv, MAX_PATH_LENGTH) : 0;
+}
+
 const struct windows_backend usbdk_backend = {
 	usbdk_init,
 	usbdk_exit,
 	usbdk_get_device_list,
 	usbdk_open,
 	usbdk_close,
+	usbdk_get_device_driver,
 	usbdk_get_device_descriptor,
 	usbdk_get_active_config_descriptor,
 	usbdk_get_config_descriptor,

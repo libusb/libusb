@@ -1376,6 +1376,7 @@ int LIBUSB_CALL libusb_get_container_id_descriptor(struct libusb_context *ctx,
 void LIBUSB_CALL libusb_free_container_id_descriptor(
 	struct libusb_container_id_descriptor *container_id);
 uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev);
+int LIBUSB_CALL libusb_get_driver(libusb_device *dev, char* driver, int size);
 uint8_t LIBUSB_CALL libusb_get_port_number(libusb_device *dev);
 int LIBUSB_CALL libusb_get_port_numbers(libusb_device *dev, uint8_t* port_numbers, int port_numbers_len);
 LIBUSB_DEPRECATED_FOR(libusb_get_port_numbers)
