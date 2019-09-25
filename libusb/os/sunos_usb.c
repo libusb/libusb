@@ -21,7 +21,6 @@
 
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/list.h>
 #include <sys/stat.h>
 #include <strings.h>
 #include <errno.h>
@@ -46,11 +45,13 @@
 #define UPDATEDRV_PATH	"/usr/sbin/update_drv"
 #define UPDATEDRV	"update_drv"
 
-typedef list_t string_list_t;
-typedef struct string_node {
-	char		*string;
-	list_node_t	link;
-} string_node_t;
+#define	DEFAULT_LISTSIZE	6
+
+typedef struct {
+	int	nargs;
+	int	listsize;
+	char	**string;
+} string_list_t;
 
 /*
  * Backend functions
@@ -259,10 +260,14 @@ sunos_new_string_list(void)
 {
 	string_list_t *list;
 
-	list = calloc(1, sizeof(*list));
-	if (list != NULL)
-		list_create(list, sizeof(string_node_t),
-			    offsetof(string_node_t, link));
+	list = calloc(1, sizeof (string_list_t));
+	if (list == NULL)
+		return (NULL);
+	list->string = calloc(DEFAULT_LISTSIZE, sizeof (char *));
+	if (list->string == NULL)
+		return (NULL);
+	list->nargs = 0;
+	list->listsize = DEFAULT_LISTSIZE;
 
 	return (list);
 }
@@ -270,19 +275,22 @@ sunos_new_string_list(void)
 static int
 sunos_append_to_string_list(string_list_t *list, const char *arg)
 {
-	string_node_t *np;
+	char	*str = strdup(arg);
 
-	np = calloc(1, sizeof(*np));
-	if (!np)
+	if (str == NULL)
 		return (-1);
 
-	np->string = strdup(arg);
-	if (!np->string) {
-		free(np);
-		return (-1);
+	if ((list->nargs + 1) == list->listsize) { /* +1 is for NULL */
+		char	**tmp = realloc(list->string,
+		    sizeof (char *) * (list->listsize + 1));
+		if (tmp == NULL) {
+			free(str);
+			return (-1);
+		}
+		list->string = tmp;
+		list->string[list->listsize++] = NULL;
 	}
-
-	list_insert_tail(list, np);
+	list->string[list->nargs++] = str;
 
 	return (0);
 }
@@ -290,36 +298,20 @@ sunos_append_to_string_list(string_list_t *list, const char *arg)
 static void
 sunos_free_string_list(string_list_t *list)
 {
-	string_node_t *np;
+	int	i;
 
-	while ((np = list_remove_head(list)) != NULL) {
-		free(np->string);
-		free(np);
+	for (i = 0; i < list->nargs; i++) {
+		free(list->string[i]);
 	}
 
+	free(list->string);
 	free(list);
 }
 
 static char **
 sunos_build_argv_list(string_list_t *list)
 {
-	char **argv_list;
-	string_node_t *np;
-	int n;
-
-	n = 1; /* Start at 1 for NULL terminator */
-	for (np = list_head(list); np != NULL; np = list_next(list, np))
-		n++;
-
-	argv_list = calloc(n, sizeof(char *));
-	if (argv_list == NULL)
-		return NULL;
-
-	n = 0;
-	for (np = list_head(list); np != NULL; np = list_next(list, np))
-		argv_list[n++] = np->string;
-
-	return (argv_list);
+	return (list->string);
 }
 
 
@@ -363,8 +355,6 @@ sunos_exec_command(struct libusb_context *ctx, const char *path,
 		usbi_err(ctx, "fork failed: errno %d (%s)", errno, strerror(errno));
 		exit_status = -1;
 	}
-
-	free(argv_list);
 
 	return (exit_status);
 }
