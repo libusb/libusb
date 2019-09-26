@@ -411,8 +411,9 @@ sunos_detach_kernel_driver(struct libusb_device_handle *dev_handle,
 	if (r)
 		usbi_warn(HANDLE_CTX(dev_handle), "one or more ioctls failed");
 
-	snprintf(path_arg, sizeof(path_arg), "^usb/%x.%x", dpriv->dev_descr.idVendor,
-	    dpriv->dev_descr.idProduct);
+	snprintf(path_arg, sizeof(path_arg), "^usb/%x.%x",
+	    libusb_le16_to_cpu(dpriv->dev_descr.idVendor),
+	    libusb_le16_to_cpu(dpriv->dev_descr.idProduct));
 	sunos_physpath_to_devlink(dpriv->phypath, path_arg, &dpriv->ugenpath);
 
 	if (access(dpriv->ugenpath, F_OK) == -1) {
@@ -526,7 +527,9 @@ sunos_fill_in_dev_info(di_node_t node, struct libusb_device *dev)
 	phypath = di_devfs_path(node);
 	if (phypath) {
 		dpriv->phypath = strdup(phypath);
-		snprintf(match_str, sizeof(match_str), "^usb/%x.%x", dpriv->dev_descr.idVendor, dpriv->dev_descr.idProduct);
+		snprintf(match_str, sizeof(match_str), "^usb/%x.%x",
+		    libusb_le16_to_cpu(dpriv->dev_descr.idVendor),
+		    libusb_le16_to_cpu(dpriv->dev_descr.idProduct));
 		usbi_dbg("match is %s", match_str);
 		sunos_physpath_to_devlink(dpriv->phypath, match_str,  &dpriv->ugenpath);
 		di_devfs_path_free(phypath);
@@ -557,7 +560,9 @@ sunos_fill_in_dev_info(di_node_t node, struct libusb_device *dev)
 	}
 
 	usbi_dbg("vid=%x pid=%x, path=%s, bus_nmber=0x%x, port_number=%d, "
-	    "speed=%d", dpriv->dev_descr.idVendor, dpriv->dev_descr.idProduct,
+	    "speed=%d",
+	    libusb_le16_to_cpu(dpriv->dev_descr.idVendor),
+	    libusb_le16_to_cpu(dpriv->dev_descr.idProduct),
 	    dpriv->phypath, dev->bus_number, dev->port_number, dev->speed);
 
 	return (LIBUSB_SUCCESS);
