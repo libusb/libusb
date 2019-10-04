@@ -562,6 +562,8 @@ static int linux_scan_devices(struct libusb_context *ctx)
 	ret = linux_udev_scan_devices(ctx);
 #elif !defined(__ANDROID__)
 	ret = linux_default_scan_devices(ctx);
+#else
+#error "linux_scan_devices not implemented for this config"
 #endif
 
 	usbi_mutex_static_unlock(&linux_hotplug_lock);
@@ -575,6 +577,8 @@ static void op_hotplug_poll(void)
 	linux_udev_hotplug_poll();
 #elif !defined(__ANDROID__)
 	linux_netlink_hotplug_poll();
+#else
+#error "op_hotplug_poll not implemented for this config"
 #endif
 }
 
