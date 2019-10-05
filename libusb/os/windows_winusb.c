@@ -149,17 +149,22 @@ static char *sanitize_path(const char *path)
 	size_t j, size;
 	char *ret_path;
 	size_t add_root = 0;
+	int sharp_flag = 0;
 
 	if (path == NULL)
 		return NULL;
 
 	size = strlen(path) + 1;
 
-	// Microsoft indiscriminately uses '\\?\', '\\.\', '##?#" or "##.#" for root prefixes.
+	// Microsoft indiscriminately uses "\\?\", "\\.\", "##?#" or "##.#" for root prefixes.
 	if (!((size > 3) && (((path[0] == '\\') && (path[1] == '\\') && (path[3] == '\\'))
 			|| ((path[0] == '#') && (path[1] == '#') && (path[3] == '#'))))) {
 		add_root = sizeof(root_prefix);
 		size += add_root;
+
+		if (path[0] == '#') {
+			sharp_flag = 1;
+		}
 	}
 
 	ret_path = malloc(size);
@@ -171,10 +176,10 @@ static char *sanitize_path(const char *path)
 	// Ensure consistency with root prefix
 	memcpy(ret_path, root_prefix, sizeof(root_prefix));
 
-	// Same goes for '\' and '#' after the root prefix. Ensure '#' is used
+	// Same goes for '\' and '#' after the root prefix. If root prefix start with '#' then replace any '\' by '#'
 	for (j = sizeof(root_prefix); j < size; j++) {
 		ret_path[j] = (char)toupper((int)ret_path[j]); // Fix case too
-		if (ret_path[j] == '\\')
+		if (sharp_flag && ret_path[j] == '\\')
 			ret_path[j] = '#';
 	}
 
