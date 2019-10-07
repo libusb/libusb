@@ -2301,14 +2301,6 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	list_init(&ctx->hotplug_cbs);
 	ctx->next_hotplug_cb_handle = 1;
 
-	usbi_mutex_static_lock(&active_contexts_lock);
-	if (first_init) {
-		first_init = 0;
-		list_init (&active_contexts_list);
-	}
-	list_add (&ctx->list, &active_contexts_list);
-	usbi_mutex_static_unlock(&active_contexts_lock);
-
 	if (usbi_backend.init) {
 		r = usbi_backend.init(ctx);
 		if (r)
@@ -2319,6 +2311,13 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	if (r < 0)
 		goto err_backend_exit;
 
+	usbi_mutex_static_lock(&active_contexts_lock);
+	if (first_init) {
+		first_init = 0;
+		list_init (&active_contexts_list);
+	}
+	list_add (&ctx->list, &active_contexts_list);
+	usbi_mutex_static_unlock(&active_contexts_lock);
 	usbi_mutex_static_unlock(&default_context_lock);
 
 	if (context)
