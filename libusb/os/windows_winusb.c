@@ -192,6 +192,8 @@ static BOOL init_dlls(void)
 
 	// Prefixed to avoid conflict with header files
 	DLL_GET_HANDLE(AdvAPI32);
+	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegOpenKeyExA, TRUE);
+	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegQueryValueExA, TRUE);
 	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegQueryValueExW, TRUE);
 	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegCloseKey, TRUE);
 
@@ -1117,6 +1119,132 @@ static int set_hid_interface(struct libusb_context *ctx, struct libusb_device *d
 	return LIBUSB_SUCCESS;
 }
 
+static char* strstre(char* hay, char* const needle)
+{
+	if (NULL == (hay = strstr(hay, needle)))
+	{
+		return hay;
+	}
+	return hay + strlen(needle);
+}
+
+static int construct_regkey(char* const key, unsigned const keylen, char const* const id)
+{
+	char const key_prefix[] = "SYSTEM\\CurrentControlSet\\Enum\\USB\\";
+	unsigned keypos = 0;
+	unsigned i = 0;
+	bool once = true;
+
+	key[0] = '\0';
+	strncat(key, key_prefix, keylen - 1);
+	keypos = (sizeof key_prefix) - 1;
+
+	// eg. SYSTEM\CurrentControlSet\Enum\USB\VID_4242&PID_1313\1509F48EB861
+	for (;;)
+	{
+		if (keypos >= keylen)
+		{
+			return LIBUSB_ERROR_NO_MEM;
+		}
+		else if (id[i] == '\0')
+		{
+			break;
+		}
+
+		if (id[i] == '#')
+		{
+			if (once)
+			{
+				key[keypos] = '\\';
+				once = false;
+			}
+			else
+			{
+				break;
+			}
+		}
+		else
+		{
+			key[keypos] = id[i];
+		}
+		++keypos;
+		++i;
+	}
+	key[keypos] = '\0';
+	return LIBUSB_SUCCESS;
+}
+
+static int get_port_from_registry(struct libusb_context* const ctx, char const* const id, DWORD* port_nr)
+{
+	char key[MAX_KEY_LENGTH];
+	char val[MAX_PATH_LENGTH];
+	DWORD vallen = MAX_PATH_LENGTH;
+	char* port;
+	char* port_end;
+	HKEY hkey;
+	LSTATUS reg_r;
+
+	construct_regkey(key, MAX_KEY_LENGTH, id);
+
+	if (ERROR_SUCCESS == pRegOpenKeyExA(HKEY_LOCAL_MACHINE, key, 0, KEY_QUERY_VALUE, &hkey))
+	{
+		reg_r = pRegQueryValueExA(hkey, "LocationInformation", NULL, NULL, (LPBYTE) val, &vallen);
+		pRegCloseKey(hkey);
+	}
+	else
+	{
+		usbi_warn(ctx, "Failed to open registry for key '%s'", key);
+		return LIBUSB_ERROR_NO_DEVICE;
+	}
+
+	// Eg. Port_#0016.Hub_#0003
+	if (ERROR_SUCCESS != reg_r || NULL == (port = strstre(val, "Port_#")))
+	{
+		return LIBUSB_ERROR_NO_DEVICE;
+	}
+	port_end = port + 4;
+	*port_nr = strtol(port, &port_end, 10);
+	return LIBUSB_SUCCESS;
+}
+
+static int get_address(struct libusb_context* const ctx,
+											 HDEVINFO dev_info,
+											 SP_DEVINFO_DATA dev_info_data,
+											 char const* const dev_id_path,
+											 DWORD* port_nr)
+{
+	DWORD size;
+
+	if (!pSetupDiGetDeviceRegistryPropertyA(dev_info, &dev_info_data, SPDRP_ADDRESS, NULL, (BYTE*) port_nr, 4, &size)
+			|| size != 4)
+	{
+		return LIBUSB_ERROR_NO_DEVICE;
+	}
+	return LIBUSB_SUCCESS;
+}
+
+static int get_port(struct libusb_context* const ctx,
+										HDEVINFO dev_info,
+										SP_DEVINFO_DATA dev_info_data,
+										char* const dev_id_path,
+										DWORD* port_nr)
+{
+	char const* const prefix = strstre(dev_id_path, "USB\\");
+	if (NULL != prefix)
+	{
+		if (LIBUSB_SUCCESS != get_port_from_registry(ctx, prefix, port_nr))
+		{
+			usbi_warn(ctx, "could not retrieve port number via registry, trying fallback for device %s", dev_id_path);
+			return get_address(ctx, dev_info, dev_info_data, dev_id_path, port_nr);
+		}
+		return LIBUSB_SUCCESS;
+	}
+	else
+	{
+		return get_address(ctx, dev_info, dev_info_data, dev_id_path, port_nr);
+	}
+}
+
 /*
  * get_device_list: libusb backend device enumeration function
  */
@@ -1480,8 +1608,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 			case GEN_PASS:
 				// The SPDRP_ADDRESS for USB devices is the device port number on the hub
 				port_nr = 0;
-				if (!pSetupDiGetDeviceRegistryPropertyA(*dev_info, &dev_info_data, SPDRP_ADDRESS,
-						NULL, (PBYTE)&port_nr, sizeof(port_nr), &size) || (size != sizeof(port_nr)))
+				if (LIBUSB_SUCCESS != get_port(ctx, dev_info, dev_info_data, dev_id, &port_nr))
 					usbi_warn(ctx, "could not retrieve port number for device '%s': %s", dev_id, windows_error_str(0));
 				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_info_data.DevInst);
 				if (r == LIBUSB_SUCCESS) {
