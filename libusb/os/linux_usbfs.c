@@ -560,7 +560,7 @@ static int linux_scan_devices(struct libusb_context *ctx)
 
 #if defined(USE_UDEV)
 	ret = linux_udev_scan_devices(ctx);
-#elif !defined(__ANDROID__)
+#else
 	ret = linux_default_scan_devices(ctx);
 #endif
 
