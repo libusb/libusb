@@ -1988,9 +1988,20 @@ static void winusb_enumerate_device(struct libusb_context *ctx,
 {
 	ssize_t i, len;
 	struct libusb_device *dev = NULL;
+	struct discovered_devs *disc_devs = NULL;
 
-	struct discovered_devs *disc_devs = usbi_discovered_devs_alloc();
+	// NOTE In case that the device is already known do not try to reenumerate it - this can happen in combination with
+	//      windows_scan_devices
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_for_each_entry (dev, &ctx->usb_devs, list, struct libusb_device)
+		if (is_same_device_path(_device_priv(dev)->path, device_path)) {
+			usbi_mutex_unlock(&ctx->usb_devs_lock);
+			return;
+		}
+
+	disc_devs = usbi_discovered_devs_alloc();
 	if (NULL == disc_devs) {
+		usbi_mutex_unlock(&ctx->usb_devs_lock);
 		return;
 	}
 
@@ -2006,6 +2017,7 @@ static void winusb_enumerate_device(struct libusb_context *ctx,
 			}
 		}
 	}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
 	usbi_discovered_devs_free(disc_devs);
 }
 

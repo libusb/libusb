@@ -1033,8 +1033,19 @@ static void usbdk_enumerate_device(struct libusb_context *ctx,
 
 	usbdk_get_session_id_from_path(device_path, &new_device_id);
 
-	if (!usbdk_helper.GetDevicesList(&devices, &dev_number))
+	// NOTE In case that the device is already known do not try to reenumerate it - this can happen in combination with
+	//      windows_scan_devices
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device)
+		if (dev->session_data == new_device_id) {
+			usbi_mutex_unlock(&ctx->usb_devs_lock);
+			return;
+		}
+
+	if (!usbdk_helper.GetDevicesList(&devices, &dev_number)) {
+		usbi_mutex_unlock(&ctx->usb_devs_lock);
 		return;
+	}
 
 	for (i = 0; i < dev_number; ++i) {
 		usbdk_get_session_id_for_device(ctx, &devices[i].ID, &device_id);
@@ -1043,26 +1054,22 @@ static void usbdk_enumerate_device(struct libusb_context *ctx,
 		}
 	}
 
-	dev = usbi_get_device_by_session_id(ctx, device_id);
-
+	dev = usbi_alloc_device(ctx, device_id);
 	if (dev == NULL) {
-		dev = usbi_alloc_device(ctx, device_id);
-		if (dev == NULL) {
-			usbi_err(ctx, "failed to allocate a new device structure");
-			return;
-		}
-
-		usbdk_device_init(dev, &devices[i]);
-		if (usbdk_device_priv_init(ctx, dev, &devices[i]) != LIBUSB_SUCCESS) {
-			libusb_unref_device(dev);
-			return;
-		}
-
-		usbi_connect_device(dev);
-	} else {
-		usbi_err(ctx, "Device wasn't new: %s", device_path);
-		libusb_unref_device(dev);
+		usbi_err(ctx, "failed to allocate a new device structure");
+		usbi_mutex_unlock(&ctx->usb_devs_lock);
+		return;
 	}
+
+	usbdk_device_init(dev, &devices[i]);
+	if (usbdk_device_priv_init(ctx, dev, &devices[i]) != LIBUSB_SUCCESS) {
+		libusb_unref_device(dev);
+		usbi_mutex_unlock(&ctx->usb_devs_lock);
+		return;
+	}
+
+	usbi_connect_device(dev);
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
 }
 
 static void usbdk_disconnect_device(struct libusb_context *ctx,

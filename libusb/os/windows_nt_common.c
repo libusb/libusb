@@ -860,6 +860,7 @@ static void windows_destroy_event_monitor(void)
 
 static int windows_scan_devices(struct libusb_context *ctx)
 {
+	int found;
 	ssize_t i, len;
 	struct libusb_device *dev = NULL;
 
@@ -869,14 +870,24 @@ static int windows_scan_devices(struct libusb_context *ctx)
 	}
 
 	usbi_mutex_lock(&event_lock);
+	usbi_mutex_lock(&ctx->usb_devs_lock);
 	if (LIBUSB_SUCCESS == _context_priv(ctx)->backend->get_device_list(ctx, &disc_devs)) {
 		len = disc_devs->len;
 		for (i = 0; i < len; i++) {
-			dev = disc_devs->devices[i];
-			libusb_ref_device(dev);
-			usbi_connect_device(dev);
+			found = 0;
+			list_for_each_entry (dev, &ctx->usb_devs, list, struct libusb_device)
+				if (dev->session_data == disc_devs->devices[i]->session_data) {
+					found = 1;
+					break;
+				}
+			if(!found) {
+				dev = disc_devs->devices[i];
+				libusb_ref_device(dev);
+				usbi_connect_device(dev);
+			}
 		}
 	}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
 	usbi_mutex_unlock(&event_lock);
 	usbi_discovered_devs_free(disc_devs);
 
