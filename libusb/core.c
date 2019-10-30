@@ -442,6 +442,7 @@ if (cfg != desired)
   * - libusb_unlock_event_waiters()
   * - libusb_unref_device()
   * - libusb_wait_for_event()
+  * - libusb_wrap_sys_device()
   *
   * \section Structures
   * - libusb_bos_descriptor
