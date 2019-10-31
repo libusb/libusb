@@ -225,10 +225,6 @@ static int check_pollfds(struct pollfd *fds, unsigned int nfds,
 			fds[n].revents = fds[n].events;
 			nready++;
 		} else if (wait_handles != NULL) {
-			if (*nb_wait_handles == MAXIMUM_WAIT_OBJECTS) {
-				usbi_warn(NULL, "too many HANDLEs to wait on");
-				continue;
-			}
 			wait_handles[*nb_wait_handles] = fd->overlapped.hEvent;
 			(*nb_wait_handles)++;
 		}
@@ -238,6 +234,108 @@ static int check_pollfds(struct pollfd *fds, unsigned int nfds,
 
 	return nready;
 }
+
+#define EXT_TIMEOUT WAIT_OBJECT_0
+
+struct ExThreadData
+{
+	HANDLE notifyevents;
+
+	HANDLE thread;
+	HANDLE wait_event[MAXIMUM_WAIT_OBJECTS];
+	int nEvents;
+	DWORD ret_wait;
+	volatile int bexit;
+};
+
+static DWORD __stdcall WaitThread(LPVOID lpThreadParameter)
+{
+	struct ExThreadData *p = (struct ExThreadData *)lpThreadParameter;
+	int ret = WaitForMultipleObjects(p->nEvents, p->wait_event, FALSE, INFINITE);
+	p->ret_wait = ret;
+	p->bexit = true;
+	SetEvent(p->notifyevents);
+	return 0;
+}
+
+static DWORD ExtendWaitForMultipleObjects(
+	DWORD        nCount,
+	const HANDLE *lpHandles,
+	BOOL         bWaitAll,
+	DWORD        dwMilliseconds
+)
+{
+	DWORD ret;
+	int i = 0;
+	int nThreads = 0;
+	struct ExThreadData *pThread;
+	int size;
+	HANDLE notify_event;
+
+	if (nCount <= MAXIMUM_WAIT_OBJECTS) {
+		ret = WaitForMultipleObjects(nCount, lpHandles, bWaitAll, dwMilliseconds);
+		if (ret == WAIT_TIMEOUT)
+			return EXT_TIMEOUT;
+
+		if (ret < WAIT_OBJECT_0 + nCount)
+			return ret + 1;
+
+		return ret;
+	}
+
+	nThreads = (nCount + MAXIMUM_WAIT_OBJECTS - 2) / (MAXIMUM_WAIT_OBJECTS - 1);
+
+	notify_event = CreateEvent(NULL, FALSE, FALSE, NULL);
+	if (notify_event == NULL) {
+		usbi_err(NULL, "Create Event failure");
+		return WAIT_FAILED;
+	}
+
+	pThread = malloc(sizeof(struct ExThreadData) * nThreads);
+
+	if (pThread == NULL) {
+		usbi_err(NULL, "Out of memory");
+		CloseHandle(notify_event);
+		return WAIT_FAILED;
+	}
+
+	for (i = 0; i < nThreads; i++)
+	{
+		pThread[i].wait_event[0] = CreateEvent(NULL, TRUE, FALSE, NULL);
+		pThread[i].notifyevents = notify_event;
+
+		size = nCount - i * (MAXIMUM_WAIT_OBJECTS - 1);
+		if (size >= (MAXIMUM_WAIT_OBJECTS - 1))
+			size = (MAXIMUM_WAIT_OBJECTS - 1);
+
+		memcpy(pThread[i].wait_event + 1, lpHandles + i * (MAXIMUM_WAIT_OBJECTS - 1), size * sizeof(HANDLE));
+
+		pThread[i].nEvents = size + 1;
+
+		pThread[i].bexit = 0;
+
+		pThread[i].thread = CreateThread(NULL, 0, WaitThread, pThread+i, 0, NULL);
+	}
+
+	ret = WaitForSingleObject(notify_event, INFINITE);
+
+	for (i = 0; i < nThreads; i++)
+	{
+		SetEvent(pThread[i].wait_event[0]);
+		while (pThread[i].bexit == 0); //wait for thread exist;
+
+		if (pThread[i].ret_wait != WAIT_OBJECT_0)
+			ret = pThread[i].ret_wait + i * (MAXIMUM_WAIT_OBJECTS - 1);
+
+		CloseHandle(pThread[i].wait_event[0]);
+	}
+
+	CloseHandle(notify_event);
+	free(pThread);
+
+	return ret ;
+}
+
 /*
  * POSIX poll equivalent, using Windows OVERLAPPED
  * Currently, this function only accepts one of POLLIN or POLLOUT per fd
@@ -245,26 +343,34 @@ static int check_pollfds(struct pollfd *fds, unsigned int nfds,
  */
 int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 {
-	HANDLE wait_handles[MAXIMUM_WAIT_OBJECTS];
+	HANDLE *wait_handles;
 	DWORD nb_wait_handles = 0;
 	DWORD ret;
 	int nready;
+
+	wait_handles = malloc(nfds * sizeof(HANDLE));
+	if (!wait_handles)
+	{
+		usbi_err(NULL, "Out of memory");
+		return -1;
+	}
 
 	nready = check_pollfds(fds, nfds, wait_handles, &nb_wait_handles);
 
 	// If nothing was triggered, wait on all fds that require it
 	if ((nready == 0) && (nb_wait_handles != 0) && (timeout != 0)) {
-		ret = WaitForMultipleObjects(nb_wait_handles, wait_handles,
+		ret = ExtendWaitForMultipleObjects(nb_wait_handles, wait_handles,
 			FALSE, (timeout < 0) ? INFINITE : (DWORD)timeout);
-		if (ret < (WAIT_OBJECT_0 + nb_wait_handles)) {
+		if (ret != EXT_TIMEOUT && ret <= (WAIT_OBJECT_0 + nb_wait_handles)) {
 			nready = check_pollfds(fds, nfds, NULL, NULL);
-		} else if (ret != WAIT_TIMEOUT) {
+		} else if (ret != EXT_TIMEOUT) {
 			if (ret == WAIT_FAILED)
 				usbi_err(NULL, "WaitForMultipleObjects failed: %u", (unsigned int)GetLastError());
 			nready = -1;
 		}
 	}
 
+	free(wait_handles);
 	return nready;
 }
 
