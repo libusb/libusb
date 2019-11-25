@@ -1049,7 +1049,11 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	}
 
 	if (sysfs_dir && sysfs_can_relate_devices)
+	{
+		if (fd != wrapped_fd)
+			close(fd);
 		return LIBUSB_SUCCESS;
+	}
 
 	/* cache active config */
 	if (wrapped_fd < 0)
