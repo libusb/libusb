@@ -560,7 +560,7 @@ static int linux_scan_devices(struct libusb_context *ctx)
 
 #if defined(USE_UDEV)
 	ret = linux_udev_scan_devices(ctx);
-#elif !defined(__ANDROID__)
+#else
 	ret = linux_default_scan_devices(ctx);
 #endif
 
@@ -1049,7 +1049,11 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	}
 
 	if (sysfs_dir && sysfs_can_relate_devices)
+	{
+		if (fd != wrapped_fd)
+			close(fd);
 		return LIBUSB_SUCCESS;
+	}
 
 	/* cache active config */
 	if (wrapped_fd < 0)
@@ -2075,6 +2079,8 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 		if (r < 0) {
 			if (errno == ENODEV) {
 				r = LIBUSB_ERROR_NO_DEVICE;
+			} else if (errno == ENOMEM) {
+				r = LIBUSB_ERROR_NO_MEM;
 			} else {
 				usbi_err(TRANSFER_CTX(transfer),
 					"submiturb failed error %d errno=%d", r, errno);

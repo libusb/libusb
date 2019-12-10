@@ -13,6 +13,7 @@
 			buildPhases = (
 			);
 			dependencies = (
+				008A23DE236C8619004854AA /* PBXTargetDependency */,
 				006AD4281C8C5BBC007F8C6A /* PBXTargetDependency */,
 				008FC0371628BC9A00BC5BE2 /* PBXTargetDependency */,
 				008FC0391628BC9A00BC5BE2 /* PBXTargetDependency */,
@@ -30,6 +31,9 @@
 		006AD4241C8C5AAE007F8C6A /* hotplugtest.c in Sources */ = {isa = PBXBuildFile; fileRef = 006AD4231C8C5AAE007F8C6A /* hotplugtest.c */; };
 		006AD4251C8C5AC4007F8C6A /* hotplugtest.c in Sources */ = {isa = PBXBuildFile; fileRef = 006AD4231C8C5AAE007F8C6A /* hotplugtest.c */; };
 		006AD4261C8C5AD9007F8C6A /* libusb-1.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */; };
+		008A23DA236C85AF004854AA /* stress.c in Sources */ = {isa = PBXBuildFile; fileRef = 008A23C6236C8445004854AA /* stress.c */; };
+		008A23DB236C85AF004854AA /* testlib.c in Sources */ = {isa = PBXBuildFile; fileRef = 008A23CB236C849A004854AA /* testlib.c */; };
+		008A23DC236C85BD004854AA /* libusb-1.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */; };
 		008FBF861628B7E800BC5BE2 /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBF541628B7E800BC5BE2 /* core.c */; };
 		008FBF871628B7E800BC5BE2 /* descriptor.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBF551628B7E800BC5BE2 /* descriptor.c */; };
 		008FBF881628B7E800BC5BE2 /* io.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBF561628B7E800BC5BE2 /* io.c */; };
@@ -71,6 +75,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 006AD41B1C8C5A90007F8C6A;
 			remoteInfo = hotplugtest;
+		};
+		008A23DD236C8619004854AA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 008FBF281628B79300BC5BE2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 008A23D2236C8594004854AA;
+			remoteInfo = stress;
 		};
 		008FC0361628BC9A00BC5BE2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -161,6 +172,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
+		008A23D1236C8594004854AA /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 		008FBFBB1628B9FE00BC5BE2 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -211,6 +231,10 @@
 /* Begin PBXFileReference section */
 		006AD41C1C8C5A90007F8C6A /* hotplugtest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = hotplugtest; sourceTree = BUILT_PRODUCTS_DIR; };
 		006AD4231C8C5AAE007F8C6A /* hotplugtest.c */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = hotplugtest.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
+		008A23C6236C8445004854AA /* stress.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = stress.c; sourceTree = "<group>"; };
+		008A23CA236C849A004854AA /* libusb_testlib.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = libusb_testlib.h; sourceTree = "<group>"; };
+		008A23CB236C849A004854AA /* testlib.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = testlib.c; sourceTree = "<group>"; };
+		008A23D3236C8594004854AA /* stress */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = stress; sourceTree = BUILT_PRODUCTS_DIR; };
 		008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = "libusb-1.0.0.dylib"; sourceTree = BUILT_PRODUCTS_DIR; };
 		008FBF541628B7E800BC5BE2 /* core.c */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = core.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		008FBF551628B7E800BC5BE2 /* descriptor.c */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = descriptor.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
@@ -259,6 +283,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				006AD4261C8C5AD9007F8C6A /* libusb-1.0.0.dylib in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		008A23D0236C8594004854AA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				008A23DC236C85BD004854AA /* libusb-1.0.0.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -315,6 +347,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		001B1F09236C836000F231DC /* tests */ = {
+			isa = PBXGroup;
+			children = (
+				008A23CA236C849A004854AA /* libusb_testlib.h */,
+				008A23C6236C8445004854AA /* stress.c */,
+				008A23CB236C849A004854AA /* testlib.c */,
+			);
+			name = tests;
+			path = ../tests;
+			sourceTree = "<group>";
+		};
+		008A23C8236C8475004854AA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		008FBF261628B79300BC5BE2 = {
 			isa = PBXGroup;
 			children = (
@@ -322,8 +372,10 @@
 				008FBFA41628B84200BC5BE2 /* config.h */,
 				008FBF3B1628B7E800BC5BE2 /* libusb */,
 				008FBFC81628BA0E00BC5BE2 /* examples */,
+				001B1F09236C836000F231DC /* tests */,
 				1443EE8A16419057007E0579 /* Apple */,
 				008FBF321628B79300BC5BE2 /* Products */,
+				008A23C8236C8475004854AA /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -337,6 +389,7 @@
 				008FC0151628BC0300BC5BE2 /* fxload */,
 				008FC0261628BC6B00BC5BE2 /* listdevs */,
 				006AD41C1C8C5A90007F8C6A /* hotplugtest */,
+				008A23D3236C8594004854AA /* stress */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -454,6 +507,23 @@
 			productReference = 006AD41C1C8C5A90007F8C6A /* hotplugtest */;
 			productType = "com.apple.product-type.tool";
 		};
+		008A23D2236C8594004854AA /* stress */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 008A23D7236C8594004854AA /* Build configuration list for PBXNativeTarget "stress" */;
+			buildPhases = (
+				008A23CF236C8594004854AA /* Sources */,
+				008A23D0236C8594004854AA /* Frameworks */,
+				008A23D1236C8594004854AA /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = stress;
+			productName = stress;
+			productReference = 008A23D3236C8594004854AA /* stress */;
+			productType = "com.apple.product-type.tool";
+		};
 		008FBF301628B79300BC5BE2 /* libusb */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 008FBF351628B79300BC5BE2 /* Build configuration list for PBXNativeTarget "libusb" */;
@@ -567,11 +637,14 @@
 		008FBF281628B79300BC5BE2 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 1030;
+				LastUpgradeCheck = 1120;
 				ORGANIZATIONNAME = libusb;
 				TargetAttributes = {
 					006AD41B1C8C5A90007F8C6A = {
 						CreatedOnToolsVersion = 7.2.1;
+					};
+					008A23D2236C8594004854AA = {
+						CreatedOnToolsVersion = 11.2;
 					};
 				};
 			};
@@ -595,6 +668,7 @@
 				008FC0141628BC0300BC5BE2 /* fxload */,
 				008FC0251628BC6B00BC5BE2 /* listdevs */,
 				006AD41B1C8C5A90007F8C6A /* hotplugtest */,
+				008A23D2236C8594004854AA /* stress */,
 				008FC0321628BC9400BC5BE2 /* all */,
 			);
 		};
@@ -606,6 +680,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				006AD4251C8C5AC4007F8C6A /* hotplugtest.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		008A23CF236C8594004854AA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				008A23DA236C85AF004854AA /* stress.c in Sources */,
+				008A23DB236C85AF004854AA /* testlib.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -675,6 +758,11 @@
 			target = 006AD41B1C8C5A90007F8C6A /* hotplugtest */;
 			targetProxy = 006AD4271C8C5BBC007F8C6A /* PBXContainerItemProxy */;
 		};
+		008A23DE236C8619004854AA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 008A23D2236C8594004854AA /* stress */;
+			targetProxy = 008A23DD236C8619004854AA /* PBXContainerItemProxy */;
+		};
 		008FC0371628BC9A00BC5BE2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 008FBF301628B79300BC5BE2 /* libusb */;
@@ -738,6 +826,7 @@
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -747,6 +836,59 @@
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		008A23D8236C8594004854AA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_STYLE = Automatic;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		008A23D9236C8594004854AA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_STYLE = Automatic;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -808,6 +950,7 @@
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -817,6 +960,7 @@
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -826,6 +970,7 @@
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -835,6 +980,7 @@
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -844,6 +990,7 @@
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -853,6 +1000,7 @@
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -862,6 +1010,7 @@
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -871,6 +1020,7 @@
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -880,6 +1030,7 @@
 			baseConfigurationReference = 1443EE8516417E63007E0579 /* debug.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -889,6 +1040,7 @@
 			baseConfigurationReference = 1443EE8816417E63007E0579 /* release.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_IDENTITY = "-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -917,6 +1069,15 @@
 			buildConfigurations = (
 				006AD4201C8C5A90007F8C6A /* Debug */,
 				006AD4211C8C5A90007F8C6A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		008A23D7236C8594004854AA /* Build configuration list for PBXNativeTarget "stress" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				008A23D8236C8594004854AA /* Debug */,
+				008A23D9236C8594004854AA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

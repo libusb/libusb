@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <sys/usb/usba.h>
 #include <sys/pci.h>
+#include <inttypes.h>
 
 #include "libusbi.h"
 #include "sunos_usb.h"
@@ -201,7 +202,7 @@ sunos_usb_ioctl(struct libusb_device *dev, int cmd)
 	iocdata.c_nodename = "hub";
 	iocdata.c_unitaddr = end;
 	iocdata.cpyout_buf = &devctl_ap_state;
-	usbi_dbg("%p, %d", iocdata.nvl_user, iocdata.nvl_usersz);
+	usbi_dbg("%p, %" PRIuPTR, iocdata.nvl_user, iocdata.nvl_usersz);
 
 	errno = 0;
 	if (ioctl(fd, DEVCTL_AP_GETSTATE, &iocdata) == -1) {
@@ -607,7 +608,7 @@ sunos_add_devices(di_devlink_t link, void *arg)
 
 	usbi_dbg("device bus address=%s:%x, name:%s",
 	    di_bus_addr(myself), bus_number, di_node_name(dn));
-	usbi_dbg("session id org:%lx", session_id);
+	usbi_dbg("session id org:%" PRIx64, session_id);
 
 	/* dn is the usb device */
 	for (dn = di_child_node(myself); dn != DI_NODE_NIL; dn = di_sibling_node(dn)) {
@@ -624,7 +625,7 @@ sunos_add_devices(di_devlink_t link, void *arg)
 		}
 
 		sid = (session_id << 8) | (addr_prop[0] & 0xff) ;
-		usbi_dbg("session id %lx", sid);
+		usbi_dbg("session id %" PRIX64, sid);
 
 		dev = usbi_get_device_by_session_id(nargs->ctx, sid);
 		if (dev == NULL) {
@@ -661,7 +662,8 @@ sunos_add_devices(di_devlink_t link, void *arg)
 		 */
 		libusb_unref_device(dev);
 
-		usbi_dbg("Device %s %s id=0x%llx, devcount:%d, bdf=%x",
+		usbi_dbg("Device %s %s id=0x%" PRIx64 ", devcount:%" PRIuPTR
+		    ", bdf=%" PRIx64,
 		    devpriv->ugenpath, di_devfs_path(dn), (uint64_t)sid,
 		    (*nargs->discdevs)->len, bdf);
 	}
@@ -732,7 +734,7 @@ sunos_get_device_list(struct libusb_context * ctx,
 	di_fini(root_node);
 	di_devlink_fini(&devlink_hdl);
 
-	usbi_dbg("%d devices", (*discdevs)->len);
+	usbi_dbg("%" PRIuPTR " devices", (*discdevs)->len);
 
 	return ((*discdevs)->len);
 }
@@ -1081,7 +1083,7 @@ sunos_get_active_config_descriptor(struct libusb_device *dev,
 	len = MIN(len, libusb_le16_to_cpu(cfg->wTotalLength));
 	memcpy(buf, dpriv->raw_cfgdescr, len);
 	*host_endian = 0;
-	usbi_dbg("path:%s len %d", dpriv->phypath, len);
+	usbi_dbg("path:%s len %" PRIuPTR, dpriv->phypath, len);
 
 	return (len);
 }
@@ -1278,7 +1280,7 @@ usb_do_io(int fd, int stat_fd, char *data, size_t size, int flag, int *status)
 	int error;
 	int ret = -1;
 
-	usbi_dbg("usb_do_io(): datafd=%d statfd=%d size=0x%x flag=%s",
+	usbi_dbg("usb_do_io(): datafd=%d statfd=%d size=0x%" PRIxPTR " flag=%s",
 	    fd, stat_fd, size, flag? "WRITE":"READ");
 
 	switch (flag) {
