@@ -563,6 +563,7 @@ static void windows_transfer_callback(const struct windows_backend *backend,
 		status = LIBUSB_TRANSFER_CANCELLED;
 		break;
 	case ERROR_FILE_NOT_FOUND:
+	case ERROR_DEVICE_NOT_CONNECTED:
 		usbi_dbg("detected device removed");
 		status = LIBUSB_TRANSFER_NO_DEVICE;
 		break;
