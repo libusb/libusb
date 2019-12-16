@@ -34,6 +34,19 @@ typedef struct USB_CONFIGURATION_DESCRIPTOR {
 
 #include <poppack.h>
 
+// https://msdn.microsoft.com/en-us/library/windows/hardware/ff539136(v=vs.85).aspx
+typedef LONG USBD_STATUS;
+
+#define USBD_STATUS_SUCCESS(Status) ((USBD_STATUS) (Status) >= 0)
+#define USBD_STATUS_PENDING(Status) ((ULONG) (Status) >> 30 == 1)
+#define USBD_STATUS_ERROR(Status)   ((USBD_STATUS) (Status) < 0)
+#define USBD_STATUS_STALL_PID       ((USBD_STATUS) 0xC0000004)
+#define USBD_STATUS_ENDPOINT_HALTED ((USBD_STATUS) 0xC0000030)
+#define USBD_STATUS_BAD_START_FRAME ((USBD_STATUS) 0xC0000a00)
+#define USBD_STATUS_TIMEOUT         ((USBD_STATUS) 0xC0006000)
+#define USBD_STATUS_DEVICE_GONE     ((USBD_STATUS) 0xC0007000)
+#define USBD_STATUS_CANCELED        ((USBD_STATUS) 0xC0010000)
+
 #define MAX_DEVICE_ID_LEN	200
 
 typedef struct USB_DK_DEVICE_ID {
