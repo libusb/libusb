@@ -44,18 +44,6 @@ typedef LONG NTSTATUS;
 #define STATUS_REQUEST_CANCELED		((NTSTATUS)0xC0000703L)
 #endif
 
-#if !defined(USBD_SUCCESS)
-typedef LONG USBD_STATUS;
-#define USBD_SUCCESS(Status)		((USBD_STATUS) (Status) >= 0)
-#define USBD_PENDING(Status)		((ULONG) (Status) >> 30 == 1)
-#define USBD_ERROR(Status)		((USBD_STATUS) (Status) < 0)
-#define USBD_STATUS_STALL_PID		((USBD_STATUS) 0xc0000004)
-#define USBD_STATUS_ENDPOINT_HALTED	((USBD_STATUS) 0xc0000030)
-#define USBD_STATUS_BAD_START_FRAME	((USBD_STATUS) 0xc0000a00)
-#define USBD_STATUS_TIMEOUT		((USBD_STATUS) 0xc0006000)
-#define USBD_STATUS_CANCELED		((USBD_STATUS) 0xc0010000)
-#endif
-
 static inline struct usbdk_device_priv *_usbdk_device_priv(struct libusb_device *dev)
 {
 	return (struct usbdk_device_priv *)dev->os_priv;

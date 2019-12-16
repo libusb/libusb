@@ -2552,27 +2552,21 @@ static int winusbx_set_interface_altsetting(int sub_api, struct libusb_device_ha
 
 static enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS status)
 {
-	/* Based on https://msdn.microsoft.com/en-us/library/windows/hardware/ff539136(v=vs.85).aspx :
-	* USBD_STATUS have the most significant 4 bits indicating overall status and the rest gives the details. */
-	switch (status >> 28) {
-	case 0x00: /* USBD_STATUS_SUCCESS */
+	if (USBD_SUCCESS(status))
 		return LIBUSB_TRANSFER_COMPLETED;
-	case 0x01: /* USBD_STATUS_PENDING */
-		return LIBUSB_TRANSFER_COMPLETED;
-	default: /* USBD_STATUS_ERROR */
-		switch (status & 0x0fffffff) {
-		case 0xC0006000: /* USBD_STATUS_TIMEOUT */
-			return LIBUSB_TRANSFER_TIMED_OUT;
-		case 0xC0010000: /* USBD_STATUS_CANCELED */
-			return LIBUSB_TRANSFER_CANCELLED;
-		case 0xC0000030: /* USBD_STATUS_ENDPOINT_HALTED */
-			return LIBUSB_TRANSFER_STALL;
-		case 0xC0007000: /* USBD_STATUS_DEVICE_GONE */
-			return LIBUSB_TRANSFER_NO_DEVICE;
-		default:
-			usbi_dbg("USBD_STATUS 0x%08lx translated to LIBUSB_TRANSFER_ERROR", status);
-			return LIBUSB_TRANSFER_ERROR;
-		}
+
+	switch (status) {
+	case USBD_STATUS_TIMEOUT:
+		return LIBUSB_TRANSFER_TIMED_OUT;
+	case USBD_STATUS_CANCELED:
+		return LIBUSB_TRANSFER_CANCELLED;
+	case USBD_STATUS_ENDPOINT_HALTED:
+		return LIBUSB_TRANSFER_STALL;
+	case USBD_STATUS_DEVICE_GONE:
+		return LIBUSB_TRANSFER_NO_DEVICE;
+	default:
+		usbi_dbg("USBD_STATUS 0x%08lx translated to LIBUSB_TRANSFER_ERROR", status);
+		return LIBUSB_TRANSFER_ERROR;
 	}
 }
 
