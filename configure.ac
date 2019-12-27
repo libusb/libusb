@@ -100,7 +100,9 @@ case $host in
 	threads=posix
 	;;
 *)
-	AC_MSG_ERROR([unsupported operating system $host])
+	AC_MSG_RESULT([Null])
+	backend="null"
+	threads="posix"
 esac
 
 case $backend in
@@ -186,6 +188,14 @@ haiku)
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
+null)
+	AC_DEFINE(OS_NULL, 1, [Null backend])
+	AC_SUBST(OS_NULL)
+	THREAD_CFLAGS="-pthread"
+	LIBS="-pthread"
+	AC_CHECK_HEADERS([poll.h])
+	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
+	;;
 esac
 
 AC_SUBST(LIBS)
@@ -197,6 +207,7 @@ AM_CONDITIONAL(OS_SUNOS, test "x$backend" = xsunos)
 AM_CONDITIONAL(OS_NETBSD, test "x$backend" = xnetbsd)
 AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
 AM_CONDITIONAL(OS_HAIKU, test "x$backend" = xhaiku)
+AM_CONDITIONAL(OS_NULL, test "x$backend" = xnull)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
 AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = xyes)
 AM_CONDITIONAL(USE_UDEV, test "x$enable_udev" = xyes)
