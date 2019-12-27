@@ -575,7 +575,7 @@ int usbi_clear_event(struct libusb_context *ctx);
 
 /* Internal abstraction for poll (needs struct usbi_transfer on Windows) */
 #if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) ||\
-	defined(OS_HAIKU) || defined(OS_SUNOS)
+	defined(OS_HAIKU) || defined(OS_SUNOS) || defined(OS_NULL)
 #include <unistd.h>
 #include "os/poll_posix.h"
 #elif defined(OS_WINDOWS) || defined(OS_WINCE)
