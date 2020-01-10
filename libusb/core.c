@@ -813,7 +813,7 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 	int r = 0;
 	ssize_t i, len;
 	USBI_GET_CONTEXT(ctx);
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	if (!discdevs)
 		return LIBUSB_ERROR_NO_MEM;
@@ -1493,7 +1493,7 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 
 	if (!dev_handle)
 		return;
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	ctx = HANDLE_CTX(dev_handle);
 	handling_events = usbi_handling_events(ctx);
@@ -1576,7 +1576,7 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev_handle,
 {
 	int r = LIBUSB_ERROR_NOT_SUPPORTED;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 	if (usbi_backend.get_configuration)
 		r = usbi_backend.get_configuration(dev_handle, config);
 
@@ -1844,7 +1844,7 @@ int API_EXPORTED libusb_clear_halt(libusb_device_handle *dev_handle,
  */
 int API_EXPORTED libusb_reset_device(libusb_device_handle *dev_handle)
 {
-	usbi_dbg("");
+	usbi_dbg(" ");
 	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
@@ -2368,7 +2368,7 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	struct timeval tv = { 0, 0 };
 	int destroying_default_context = 0;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 	USBI_GET_CONTEXT(ctx);
 
 	/* if working with default context, only actually do the deinitialization
