@@ -543,7 +543,7 @@ int usbi_device_cache_descriptor(libusb_device *dev)
 int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
 	struct libusb_device_descriptor *desc)
 {
-	usbi_dbg("");
+	usbi_dbg(" ");
 	memcpy((unsigned char *) desc, (unsigned char *) &dev->device_descriptor,
 	       sizeof (dev->device_descriptor));
 	return 0;

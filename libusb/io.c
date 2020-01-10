@@ -1330,7 +1330,7 @@ static int disarm_timerfd(struct libusb_context *ctx)
 	const struct itimerspec disarm_timer = { { 0, 0 }, { 0, 0 } };
 	int r;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 	r = timerfd_settime(ctx->timerfd, 0, &disarm_timer, NULL);
 	if (r < 0)
 		return LIBUSB_ERROR_OTHER;
@@ -1912,7 +1912,7 @@ void API_EXPORTED libusb_interrupt_event_handler(libusb_context *ctx)
 	int pending_events;
 	USBI_GET_CONTEXT(ctx);
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 	usbi_mutex_lock(&ctx->event_data_lock);
 
 	pending_events = usbi_pending_events(ctx);
