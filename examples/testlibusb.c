@@ -178,40 +178,29 @@ static void print_device(libusb_device *dev)
 		return;
 	}
 
-	printf("Dev (bus %u, device %u): ",
-	       libusb_get_bus_number(dev), libusb_get_device_address(dev));
+	printf("Dev (bus %u, device %u): %04X - %04X\n",
+	       libusb_get_bus_number(dev), libusb_get_device_address(dev),
+	       desc.idVendor, desc.idProduct);
 
 	ret = libusb_open(dev, &handle);
 	if (LIBUSB_SUCCESS == ret) {
-		if (desc.iManufacturer)
+		if (desc.iManufacturer) {
 			ret = libusb_get_string_descriptor_ascii(handle, desc.iManufacturer, string, sizeof(string));
-		else
-			ret = LIBUSB_ERROR_NOT_FOUND;
+			if (ret > 0)
+				printf("  Manufacturer:              %s\n", string);
+		}
 
-		if (ret > 0)
-			printf("%s - ", string);
-		else
-			printf("%04X - ", desc.idVendor);
-
-		if (desc.iProduct)
+		if (desc.iProduct) {
 			ret = libusb_get_string_descriptor_ascii(handle, desc.iProduct, string, sizeof(string));
-		else
-			ret = LIBUSB_ERROR_NOT_FOUND;
+			if (ret > 0)
+				printf("  Product:                   %s\n", string);
+		}
 
-		if (ret > 0)
-			printf("%s\n", string);
-		else
-			printf("%04X\n", desc.idProduct);
-
-		if (desc.iSerialNumber && verbose)
+		if (desc.iSerialNumber && verbose) {
 			ret = libusb_get_string_descriptor_ascii(handle, desc.iSerialNumber, string, sizeof(string));
-		else
-			ret = LIBUSB_ERROR_NOT_FOUND;
-
-		if (ret > 0)
-			printf("  Serial Number: %s\n", string);
-	} else {
-		printf("%04X - %04X\n", desc.idVendor, desc.idProduct);
+			if (ret > 0)
+				printf("  Serial Number:             %s\n", string);
+		}
 	}
 
 	if (verbose) {
