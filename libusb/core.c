@@ -2305,7 +2305,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	usbi_mutex_static_lock(&active_contexts_lock);
 	if (first_init) {
 		first_init = 0;
-		list_init (&active_contexts_list);
+		list_init(&active_contexts_list);
 	}
 	list_add (&ctx->list, &active_contexts_list);
 	usbi_mutex_static_unlock(&active_contexts_lock);
@@ -2337,7 +2337,7 @@ err_free_ctx:
 	}
 
 	usbi_mutex_static_lock(&active_contexts_lock);
-	list_del (&ctx->list);
+	list_del(&ctx->list);
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
 	usbi_mutex_lock(&ctx->usb_devs_lock);
@@ -2375,6 +2375,12 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	 * if we're the last user */
 	usbi_mutex_static_lock(&default_context_lock);
 	if (ctx == usbi_default_context) {
+		if (!usbi_default_context) {
+			usbi_dbg("no default context, not initialized?");
+			usbi_mutex_static_unlock(&default_context_lock);
+			return;
+		}
+
 		if (--default_context_refcnt > 0) {
 			usbi_dbg("not destroying default context");
 			usbi_mutex_static_unlock(&default_context_lock);
@@ -2390,12 +2396,12 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 		 */
 		destroying_default_context = 1;
 	} else {
-		// Unlock default context, as we're not modifying it.
+		/* Unlock default context, as we're not modifying it. */
 		usbi_mutex_static_unlock(&default_context_lock);
-  }
+	}
 
 	usbi_mutex_static_lock(&active_contexts_lock);
-	list_del (&ctx->list);
+	list_del(&ctx->list);
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
 	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
