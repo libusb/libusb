@@ -1121,8 +1121,8 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 		goto out;
 	}
 
-	speed = libusb_get_device_speed( dev );
-	if (speed == LIBUSB_SPEED_SUPER) {
+	speed = libusb_get_device_speed(dev);
+	if (speed >= LIBUSB_SPEED_SUPER) {
 		r = libusb_get_ss_endpoint_companion_descriptor(dev->ctx, ep, &ss_ep_cmp);
 		if (r == LIBUSB_SUCCESS) {
 			r = ss_ep_cmp->wBytesPerInterval;
@@ -1131,7 +1131,7 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 	}
 
 	/* If the device isn't a SuperSpeed device or retrieving the SS endpoint didn't worked. */
-	if (speed != LIBUSB_SPEED_SUPER || r < 0) {
+	if (speed < LIBUSB_SPEED_SUPER || r < 0) {
 		val = ep->wMaxPacketSize;
 		ep_type = (enum libusb_transfer_type) (ep->bmAttributes & 0x3);
 
