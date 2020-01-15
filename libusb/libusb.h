@@ -1121,7 +1121,8 @@ typedef struct libusb_device libusb_device;
 typedef struct libusb_device_handle libusb_device_handle;
 
 /** \ingroup libusb_dev
- * Speed codes. Indicates the speed at which the device is operating.
+ * Speed codes. Indicates the speed at which the device is operating. Specifically
+ * it is the speed of the lane (e.g. SuperSpeedPlus Gen2x2 has 2 lanes).
  */
 enum libusb_speed {
 	/** The OS doesn't report or know the device speed. */
@@ -1635,6 +1636,8 @@ int LIBUSB_CALL libusb_get_port_path(libusb_context *ctx, libusb_device *dev, ui
 libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *dev);
 int LIBUSB_CALL libusb_get_device_speed(libusb_device *dev);
+int LIBUSB_CALL libusb_get_device_num_rx_lanes(libusb_device *dev);
+int LIBUSB_CALL libusb_get_device_num_tx_lanes(libusb_device *dev);
 int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint);
 int LIBUSB_CALL libusb_get_max_iso_packet_size(libusb_device *dev,
