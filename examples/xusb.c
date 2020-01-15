@@ -808,6 +808,21 @@ static void print_device_cap(struct libusb_bos_dev_capability_descriptor *dev_ca
 	}
 }
 
+static const char* usb_speed_name(int speed, int num_rx_lanes, int num_tx_lanes)
+{
+	const char* const speed_name[6] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
+		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)", "10000 Mbit/s (USB SuperSpeedPlus)" };
+	const char* const speed_name_x2[2] = { "10000 Mbit/s (USB SuperSpeedPlus Gen1x2)", "20000 Mbit/s (USB SuperSpeedPlus Gen2x2)" };
+
+	if (num_rx_lanes == 2 && num_tx_lanes == 2) {
+		if ((speed<4) || (speed>5)) speed=0;
+		else return speed_name_x2[speed - 4];
+	}
+
+	if ((speed<0) || (speed>5)) speed=0;
+	return speed_name[speed];
+}
+
 static int test_device(uint16_t vid, uint16_t pid)
 {
 	libusb_device_handle *handle;
@@ -817,10 +832,10 @@ static int test_device(uint16_t vid, uint16_t pid)
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
+	int num_rx_lanes, num_tx_lanes;
 	int iface, nb_ifaces, first_iface = -1;
 	struct libusb_device_descriptor dev_desc;
-	const char* const speed_name[6] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
-		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)", "10000 Mbit/s (USB SuperSpeedPlus)" };
+
 	char string[128];
 	uint8_t string_index[3];	// indexes of the string descriptors
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
@@ -846,9 +861,16 @@ static int test_device(uint16_t vid, uint16_t pid)
 			}
 			printf(" (from root hub)\n");
 		}
+		num_rx_lanes = libusb_get_device_num_rx_lanes(dev);
+		if (num_rx_lanes > 0) {
+			printf("      num rx_lanes: %d\n", num_rx_lanes);
+		}
+		num_tx_lanes = libusb_get_device_num_tx_lanes(dev);
+		if (num_tx_lanes > 0) {
+			printf("      num tx_lanes: %d\n", num_tx_lanes);
+		}
 		r = libusb_get_device_speed(dev);
-		if ((r<0) || (r>5)) r=0;
-		printf("             speed: %s\n", speed_name[r]);
+		printf("             speed: %s\n", usb_speed_name(r, num_rx_lanes, num_tx_lanes));
 	}
 
 	printf("\nReading device descriptor:\n");
