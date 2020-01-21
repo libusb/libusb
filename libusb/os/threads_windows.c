@@ -29,12 +29,6 @@ struct usbi_cond_perthread {
 	HANDLE event;
 };
 
-void usbi_mutex_static_lock(usbi_mutex_static_t *mutex)
-{
-	while (InterlockedExchange(mutex, 1L) == 1L)
-		SleepEx(0, TRUE);
-}
-
 void usbi_cond_init(usbi_cond_t *cond)
 {
 	list_init(&cond->waiters);

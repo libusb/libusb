@@ -38,7 +38,6 @@
 
 #include "libusbi.h"
 #include "windows_common.h"
-#include "windows_nt_common.h"
 #include "windows_winusb.h"
 
 #define HANDLE_VALID(h) (((h) != NULL) && ((h) != INVALID_HANDLE_VALUE))
@@ -111,7 +110,7 @@ static struct winusb_interface WinUSBX[SUB_API_MAX];
 	do {						\
 		if (sub_api == SUB_API_NOTSET)		\
 			sub_api = priv->sub_api;	\
-		if (!WinUSBX[sub_api].initialized) 	\
+		if (!WinUSBX[sub_api].initialized)	\
 			return LIBUSB_ERROR_ACCESS;	\
 	} while (0)
 

@@ -4,6 +4,7 @@
  * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2012 Pete Batard <pete@akeo.ie>
  * Copyright © 2012-2018 Nathan Hjelm <hjelmn@cs.unm.edu>
+ * Copyright © 2014-2020 Chris Dickens <christopher.a.dickens@gmail.com>
  * For more information, please visit: http://libusb.info
  *
  * This library is free software; you can redistribute it and/or
@@ -29,37 +30,18 @@
 #if !defined(__cplusplus)
 #define inline __inline
 #endif
-/* ssize_t is also not available (copy/paste from MinGW) */
-#ifndef _SSIZE_T_DEFINED
-#define _SSIZE_T_DEFINED
-#undef ssize_t
-#ifdef _WIN64
-  typedef __int64 ssize_t;
-#else
-  typedef int ssize_t;
-#endif /* _WIN64 */
-#endif /* _SSIZE_T_DEFINED */
+/* ssize_t is also not available */
+#include <basetsd.h>
+typedef SSIZE_T ssize_t;
 #endif /* _MSC_VER */
 
-/* stdint.h is not available on older MSVC */
-#if defined(_MSC_VER) && (_MSC_VER < 1600) && (!defined(_STDINT)) && (!defined(_STDINT_H))
-typedef unsigned __int8   uint8_t;
-typedef unsigned __int16  uint16_t;
-typedef unsigned __int32  uint32_t;
-#else
+#include <limits.h>
 #include <stdint.h>
-#endif
-
-#if !defined(_WIN32_WCE)
 #include <sys/types.h>
-#endif
-
 #if defined(__linux__) || defined(__APPLE__) || defined(__CYGWIN__) || defined(__HAIKU__) || defined(__GLIBC__)
 #include <sys/time.h>
 #endif
-
 #include <time.h>
-#include <limits.h>
 
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
 #define ZERO_SIZED_ARRAY		/* [] - valid C99 code */
@@ -72,7 +54,7 @@ typedef unsigned __int32  uint32_t;
  * libusb_config_descriptor has an 'interface' member
  * As this can be problematic if you include windows.h after libusb.h
  * in your sources, we force windows.h to be included first. */
-#if defined(_WIN32) || defined(__CYGWIN__) || defined(_WIN32_WCE)
+#if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
 #if defined(interface)
 #undef interface
@@ -123,7 +105,7 @@ typedef unsigned __int32  uint32_t;
  * return type, before the function name. See internal documentation for
  * API_EXPORTED.
  */
-#if defined(_WIN32) || defined(__CYGWIN__) || defined(_WIN32_WCE)
+#if defined(_WIN32) || defined(__CYGWIN__)
 #define LIBUSB_CALL WINAPI
 #else
 #define LIBUSB_CALL

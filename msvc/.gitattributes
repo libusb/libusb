@@ -1,0 +1,4 @@
+*.sln           eol=crlf
+*.vcxproj       eol=crlf
+ddk_build.cmd   eol=crlf
+*_sources       eol=crlf

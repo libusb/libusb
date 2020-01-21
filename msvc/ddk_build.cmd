@@ -1,5 +1,5 @@
 @echo off
-::# default builds static library. 
+::# default builds static library.
 ::# you can pass the following arguments (case insensitive):
 ::# - "DLL" to build a DLL instead of a static library
 ::# - "/MT" to build a static library compatible with MSVC's /MT option (LIBCMT vs MSVCRT)

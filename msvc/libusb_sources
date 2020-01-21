@@ -37,7 +37,7 @@ SOURCES=..\core.c \
 	..\strerror.c \
 	..\sync.c \
 	threads_windows.c \
-	windows_nt_common.c \
+	windows_common.c \
 	windows_usbdk.c \
 	windows_winusb.c \
 	..\libusb-1.0.rc

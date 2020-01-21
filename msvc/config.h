@@ -5,6 +5,11 @@
 #error "Please make sure the msvc/ directory is removed from your build path."
 #endif
 
+/* Visual Studio 2013 or later is required */
+#if (_MSC_VER < 1800)
+#error "Visual Studio 2013 or later is required."
+#endif
+
 /* Visual Studio 2015 and later defines timespec */
 #if (_MSC_VER >= 1900)
 #define _TIMESPEC_DEFINED 1
@@ -41,11 +46,8 @@
 /* type of second poll() argument */
 #define POLL_NFDS_TYPE unsigned int
 
-/* Windows/WinCE backend */
-#if defined(_WIN32_WCE)
-#define OS_WINCE 1
-#define HAVE_MISSING_H
-#else
-#define OS_WINDOWS 1
+/* Define to 1 if you have the <sys/types.h> header file.  */
 #define HAVE_SYS_TYPES_H 1
-#endif
+
+/* Windows backend */
+#define OS_WINDOWS 1

@@ -28,7 +28,6 @@
 
 #include "libusbi.h"
 #include "windows_common.h"
-#include "windows_nt_common.h"
 #include "windows_usbdk.h"
 
 #if !defined(STATUS_SUCCESS)

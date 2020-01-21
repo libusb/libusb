@@ -34,9 +34,6 @@
 #ifdef HAVE_POLL_H
 #include <poll.h>
 #endif
-#ifdef HAVE_MISSING_H
-#include <missing.h>
-#endif
 
 #include "libusb.h"
 #include "version.h"
@@ -202,7 +199,7 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 
 #define TIMESPEC_IS_SET(ts) ((ts)->tv_sec != 0 || (ts)->tv_nsec != 0)
 
-#if defined(_WIN32) || defined(__CYGWIN__) || defined(_WIN32_WCE)
+#if defined(OS_WINDOWS)
 #define TIMEVAL_TV_SEC_TYPE	long
 #else
 #define TIMEVAL_TV_SEC_TYPE	time_t
@@ -233,35 +230,12 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, va_list args) USBI_PRINTFLIKE(4, 0);
 
-#if !defined(_MSC_VER) || (_MSC_VER >= 1400)
-
 #define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __FUNCTION__, __VA_ARGS__)
 
 #define usbi_err(ctx, ...) _usbi_log(ctx, LIBUSB_LOG_LEVEL_ERROR, __VA_ARGS__)
 #define usbi_warn(ctx, ...) _usbi_log(ctx, LIBUSB_LOG_LEVEL_WARNING, __VA_ARGS__)
 #define usbi_info(ctx, ...) _usbi_log(ctx, LIBUSB_LOG_LEVEL_INFO, __VA_ARGS__)
 #define usbi_dbg(...) _usbi_log(NULL, LIBUSB_LOG_LEVEL_DEBUG, __VA_ARGS__)
-
-#else /* !defined(_MSC_VER) || (_MSC_VER >= 1400) */
-
-#define LOG_BODY(ctxt, level)				\
-{							\
-	va_list args;					\
-	va_start(args, format);				\
-	usbi_log_v(ctxt, level, "", format, args);	\
-	va_end(args);					\
-}
-
-static inline void usbi_err(struct libusb_context *ctx, const char *format, ...)
-	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_ERROR)
-static inline void usbi_warn(struct libusb_context *ctx, const char *format, ...)
-	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_WARNING)
-static inline void usbi_info(struct libusb_context *ctx, const char *format, ...)
-	LOG_BODY(ctx, LIBUSB_LOG_LEVEL_INFO)
-static inline void usbi_dbg(const char *format, ...)
-	LOG_BODY(NULL, LIBUSB_LOG_LEVEL_DEBUG)
-
-#endif /* !defined(_MSC_VER) || (_MSC_VER >= 1400) */
 
 #else /* ENABLE_LOGGING */
 
@@ -292,7 +266,7 @@ static inline void usbi_dbg(const char *format, ...)
 /* Internal abstraction for thread synchronization */
 #if defined(THREADS_POSIX)
 #include "os/threads_posix.h"
-#elif defined(OS_WINDOWS) || defined(OS_WINCE)
+#elif defined(OS_WINDOWS)
 #include "os/threads_windows.h"
 #endif
 
@@ -578,7 +552,7 @@ int usbi_clear_event(struct libusb_context *ctx);
 	defined(OS_HAIKU) || defined(OS_SUNOS) || defined(OS_NULL)
 #include <unistd.h>
 #include "os/poll_posix.h"
-#elif defined(OS_WINDOWS) || defined(OS_WINCE)
+#elif defined(OS_WINDOWS)
 #include "os/poll_windows.h"
 #endif
 

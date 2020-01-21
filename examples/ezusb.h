@@ -20,23 +20,15 @@
  *    along with this program; if not, write to the Free Software
  *    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
-#if !defined(_MSC_VER)
-#include <stdbool.h>
-#else
+
+#if defined(_MSC_VER)
 #define __attribute__(x)
-#if !defined(bool)
-#define bool int
-#endif
-#if !defined(true)
-#define true (1 == 1)
-#endif
-#if !defined(false)
-#define false (!true)
-#endif
 #if defined(_PREFAST_)
 #pragma warning(disable:28193)
 #endif
 #endif
+
+#include <stdbool.h>
 
 #define FX_TYPE_UNDEFINED  -1
 #define FX_TYPE_AN21       0	/* Original AnchorChips parts */
@@ -59,7 +51,7 @@
 extern "C" {
 #endif
 
-/* 
+/*
  * Automatically identified devices (VID, PID, type, designation).
  * TODO: Could use some validation. Also where's the FX2?
  */

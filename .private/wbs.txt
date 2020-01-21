@@ -27,7 +27,7 @@ o Visual Studio:
 o WDK/DDK:
   - The following is an example of a sources files that you can use to compile
     a libusb 1.0 based console application. In this sample ..\libusb\ is the
-    directory where you would have copied libusb.h as well as the relevant 
+    directory where you would have copied libusb.h as well as the relevant
     libusb-1.0.lib
 
 	TARGETNAME=your_app

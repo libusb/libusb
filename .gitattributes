@@ -1,11 +1,7 @@
-*.sh            eol=lf
 *.ac            eol=lf
 *.am            eol=lf
-*.dsw           eol=crlf
-*.dsp           eol=crlf whitespace=space-before-tab
-*.sln           eol=crlf
-*.vcproj        eol=crlf
-*.vcxproj*      eol=crlf
+*.bat           eol=crlf
+*.sh            eol=lf
 .gitattributes  export-ignore
 .gitignore      export-ignore
 INSTALL_WIN.txt eol=crlf

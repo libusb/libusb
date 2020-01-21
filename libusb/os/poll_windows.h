@@ -33,10 +33,6 @@
 #define STATUS_REPARSE ((LONG)0x00000104L)
 #endif
 #define STATUS_COMPLETED_SYNCHRONOUSLY	STATUS_REPARSE
-#if defined(_WIN32_WCE)
-// WinCE doesn't have a HasOverlappedIoCompleted() macro, so attempt to emulate it
-#define HasOverlappedIoCompleted(lpOverlapped) (((DWORD)(lpOverlapped)->Internal) != STATUS_PENDING)
-#endif
 #define HasOverlappedIoCompletedSync(lpOverlapped)	(((DWORD)(lpOverlapped)->Internal) == STATUS_COMPLETED_SYNCHRONOUSLY)
 
 #define DUMMY_HANDLE ((HANDLE)(LONG_PTR)-2)

@@ -30,7 +30,8 @@
 
 #include "libusbi.h"
 #include "windows_common.h"
-#include "windows_nt_common.h"
+
+#define EPOCH_TIME	UINT64_C(116444736000000000)	// 1970.01.01 00:00:000 in MS Filetime
 
 // Public
 BOOL (WINAPI *pCancelIoEx)(HANDLE, LPOVERLAPPED);
@@ -78,7 +79,7 @@ static unsigned __stdcall windows_clock_gettime_threaded(void *param);
 #if defined(ENABLE_LOGGING)
 const char *windows_error_str(DWORD error_code)
 {
-	static char err_string[ERR_BUFFER_SIZE];
+	static char err_string[256];
 
 	DWORD size;
 	int len;
@@ -104,15 +105,15 @@ const char *windows_error_str(DWORD error_code)
 
 	size = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
 			NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-			&err_string[len], ERR_BUFFER_SIZE - len, NULL);
+			&err_string[len], sizeof(err_string) - len, NULL);
 	if (size == 0) {
 		DWORD format_error = GetLastError();
 		if (format_error)
-			snprintf(err_string, ERR_BUFFER_SIZE,
+			snprintf(err_string, sizeof(err_string),
 				"Windows error code %u (FormatMessage error code %u)",
 				(unsigned int)error_code, (unsigned int)format_error);
 		else
-			snprintf(err_string, ERR_BUFFER_SIZE, "Unknown error code %u", (unsigned int)error_code);
+			snprintf(err_string, sizeof(err_string), "Unknown error code %u", (unsigned int)error_code);
 	} else {
 		// Remove CRLF from end of message, if present
 		size_t pos = len + size - 2;

@@ -2,9 +2,10 @@
  * Windows backend common header for libusb 1.0
  *
  * This file brings together header code common between
- * the desktop Windows and Windows CE backends.
+ * the desktop Windows backends.
  * Copyright © 2012-2013 RealVNC Ltd.
  * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
+ * Copyright © 2014-2020 Chris Dickens <christopher.a.dickens@gmail.com>
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
  * Major code testing contribution by Xiaofan Chen
@@ -24,20 +25,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#pragma once
+#ifndef LIBUSB_WINDOWS_COMMON_H
+#define LIBUSB_WINDOWS_COMMON_H
 
-// Windows API default is uppercase - ugh!
-#if !defined(bool)
-#define bool BOOL
-#endif
-#if !defined(true)
-#define true TRUE
-#endif
-#if !defined(false)
-#define false FALSE
-#endif
-
-#define EPOCH_TIME	UINT64_C(116444736000000000)	// 1970.01.01 00:00:000 in MS Filetime
+#include <stdbool.h>
 
 #if defined(__CYGWIN__ )
 #define _stricmp strcasecmp
@@ -48,22 +39,11 @@
 
 #define safe_free(p) do {if (p != NULL) {free((void *)p); p = NULL;}} while (0)
 
-#ifndef ARRAYSIZE
-#define ARRAYSIZE(A) (sizeof(A)/sizeof((A)[0]))
-#endif
-
-#define ERR_BUFFER_SIZE	256
-
 /*
  * API macros - leveraged from libusb-win32 1.x
  */
-#ifndef _WIN32_WCE
 #define DLL_STRINGIFY(s) #s
 #define DLL_LOAD_LIBRARY(name) LoadLibraryA(DLL_STRINGIFY(name))
-#else
-#define DLL_STRINGIFY(s) L#s
-#define DLL_LOAD_LIBRARY(name) LoadLibrary(DLL_STRINGIFY(name))
-#endif
 
 /*
  * Macros for handling DLL themselves
@@ -87,7 +67,6 @@
 			DLL_HANDLE_NAME(name) = NULL;		\
 		}						\
 	} while (0)
-
 
 /*
  * Macros for handling functions within a DLL
@@ -126,3 +105,242 @@
 	DLL_LOAD_FUNC_PREFIXNAME(dll, name, name, ret_on_failure)
 #define DLL_LOAD_FUNC_PREFIXED(dll, prefix, name, ret_on_failure)	\
 	DLL_LOAD_FUNC_PREFIXNAME(dll, prefix##name, name, ret_on_failure)
+
+// https://msdn.microsoft.com/en-us/library/windows/hardware/ff539136(v=vs.85).aspx
+#if !defined(USBD_SUCCESS)
+typedef LONG USBD_STATUS;
+
+#define USBD_SUCCESS(Status)		((USBD_STATUS)(Status) >= 0)
+
+#define USBD_STATUS_ENDPOINT_HALTED	((USBD_STATUS)0xC0000030L)
+#define USBD_STATUS_TIMEOUT		((USBD_STATUS)0xC0006000L)
+#define USBD_STATUS_DEVICE_GONE		((USBD_STATUS)0xC0007000L)
+#define USBD_STATUS_CANCELED		((USBD_STATUS)0xC0010000L)
+#endif
+
+/* Windows versions */
+enum windows_version {
+	WINDOWS_UNDEFINED,
+	WINDOWS_2000,
+	WINDOWS_XP,
+	WINDOWS_2003,	// Also XP x64
+	WINDOWS_VISTA,
+	WINDOWS_7,
+	WINDOWS_8,
+	WINDOWS_8_1,
+	WINDOWS_10,
+	WINDOWS_11_OR_LATER
+};
+
+extern enum windows_version windows_version;
+
+/* This call is only available from Vista */
+extern BOOL (WINAPI *pCancelIoEx)(HANDLE, LPOVERLAPPED);
+
+#include <pshpack1.h>
+
+typedef struct USB_DEVICE_DESCRIPTOR {
+	UCHAR  bLength;
+	UCHAR  bDescriptorType;
+	USHORT bcdUSB;
+	UCHAR  bDeviceClass;
+	UCHAR  bDeviceSubClass;
+	UCHAR  bDeviceProtocol;
+	UCHAR  bMaxPacketSize0;
+	USHORT idVendor;
+	USHORT idProduct;
+	USHORT bcdDevice;
+	UCHAR  iManufacturer;
+	UCHAR  iProduct;
+	UCHAR  iSerialNumber;
+	UCHAR  bNumConfigurations;
+} USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESCRIPTOR;
+
+typedef struct USB_CONFIGURATION_DESCRIPTOR {
+	UCHAR  bLength;
+	UCHAR  bDescriptorType;
+	USHORT wTotalLength;
+	UCHAR  bNumInterfaces;
+	UCHAR  bConfigurationValue;
+	UCHAR  iConfiguration;
+	UCHAR  bmAttributes;
+	UCHAR  MaxPower;
+} USB_CONFIGURATION_DESCRIPTOR, *PUSB_CONFIGURATION_DESCRIPTOR;
+
+#include <poppack.h>
+
+#define MAX_DEVICE_ID_LEN	200
+
+typedef struct USB_DK_DEVICE_ID {
+	WCHAR DeviceID[MAX_DEVICE_ID_LEN];
+	WCHAR InstanceID[MAX_DEVICE_ID_LEN];
+} USB_DK_DEVICE_ID, *PUSB_DK_DEVICE_ID;
+
+typedef struct USB_DK_DEVICE_INFO {
+	USB_DK_DEVICE_ID ID;
+	ULONG64 FilterID;
+	ULONG64 Port;
+	ULONG64 Speed;
+	USB_DEVICE_DESCRIPTOR DeviceDescriptor;
+} USB_DK_DEVICE_INFO, *PUSB_DK_DEVICE_INFO;
+
+typedef struct USB_DK_ISO_TRANSFER_RESULT {
+	ULONG64 ActualLength;
+	ULONG64 TransferResult;
+} USB_DK_ISO_TRANSFER_RESULT, *PUSB_DK_ISO_TRANSFER_RESULT;
+
+typedef struct USB_DK_GEN_TRANSFER_RESULT {
+	ULONG64 BytesTransferred;
+	ULONG64 UsbdStatus; // USBD_STATUS code
+} USB_DK_GEN_TRANSFER_RESULT, *PUSB_DK_GEN_TRANSFER_RESULT;
+
+typedef struct USB_DK_TRANSFER_RESULT {
+	USB_DK_GEN_TRANSFER_RESULT GenResult;
+	PVOID64 IsochronousResultsArray; // array of USB_DK_ISO_TRANSFER_RESULT
+} USB_DK_TRANSFER_RESULT, *PUSB_DK_TRANSFER_RESULT;
+
+typedef struct USB_DK_TRANSFER_REQUEST {
+	ULONG64 EndpointAddress;
+	PVOID64 Buffer;
+	ULONG64 BufferLength;
+	ULONG64 TransferType;
+	ULONG64 IsochronousPacketsArraySize;
+	PVOID64 IsochronousPacketsArray;
+	USB_DK_TRANSFER_RESULT Result;
+} USB_DK_TRANSFER_REQUEST, *PUSB_DK_TRANSFER_REQUEST;
+
+struct usbdk_device_priv {
+	USB_DK_DEVICE_INFO info;
+	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptors;
+	HANDLE redirector_handle;
+	HANDLE system_handle;
+	uint8_t active_configuration;
+};
+
+struct winusb_device_priv {
+	bool initialized;
+	bool root_hub;
+	uint8_t active_config;
+	uint8_t depth; // distance to HCD
+	const struct windows_usb_api_backend *apib;
+	char *dev_id;
+	char *path;  // device interface path
+	int sub_api; // for WinUSB-like APIs
+	struct {
+		char *path; // each interface needs a device interface path,
+		const struct windows_usb_api_backend *apib; // an API backend (multiple drivers support),
+		int sub_api;
+		int8_t nb_endpoints; // and a set of endpoint addresses (USB_MAXENDPOINTS)
+		uint8_t *endpoint;
+		int current_altsetting;
+		bool restricted_functionality;  // indicates if the interface functionality is restricted
+						// by Windows (eg. HID keyboards or mice cannot do R/W)
+	} usb_interface[USB_MAXINTERFACES];
+	struct hid_device_priv *hid;
+	USB_DEVICE_DESCRIPTOR dev_descriptor;
+	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptor; // list of pointers to the cached config descriptors
+};
+
+struct usbdk_device_handle_priv {
+	// Not currently used
+	char dummy;
+};
+
+struct winusb_device_handle_priv {
+	int active_interface;
+	struct {
+		HANDLE dev_handle; // WinUSB needs an extra handle for the file
+		HANDLE api_handle; // used by the API to communicate with the device
+	} interface_handle[USB_MAXINTERFACES];
+	int autoclaim_count[USB_MAXINTERFACES]; // For auto-release
+};
+
+struct usbdk_transfer_priv {
+	USB_DK_TRANSFER_REQUEST request;
+	struct winfd pollable_fd;
+	HANDLE system_handle;
+	PULONG64 IsochronousPacketsArray;
+	PUSB_DK_ISO_TRANSFER_RESULT IsochronousResultsArray;
+};
+
+struct winusb_transfer_priv {
+	struct winfd pollable_fd;
+	HANDLE handle;
+	uint8_t interface_number;
+	uint8_t *hid_buffer; // 1 byte extended data buffer, required for HID
+	uint8_t *hid_dest;   // transfer buffer destination, required for HID
+	size_t hid_expected_size;
+
+	// For isochronous transfers with LibUSBk driver:
+	void *iso_context;
+
+	// For isochronous transfers with Microsoft WinUSB driver:
+	void *isoch_buffer_handle; // The isoch_buffer_handle to free at the end of the transfer
+	BOOL iso_break_stream;	// Whether the isoch. stream was to be continued in the last call of libusb_submit_transfer.
+							// As we this structure is zeroed out upon initialization, we need to use inverse logic here.
+	libusb_transfer_cb_fn iso_user_callback; // Original transfer callback of the user. Might be used for isochronous transfers.
+};
+
+struct windows_backend {
+	int (*init)(struct libusb_context *ctx);
+	void (*exit)(struct libusb_context *ctx);
+	int (*get_device_list)(struct libusb_context *ctx,
+		struct discovered_devs **discdevs);
+	int (*open)(struct libusb_device_handle *dev_handle);
+	void (*close)(struct libusb_device_handle *dev_handle);
+	int (*get_device_descriptor)(struct libusb_device *device, unsigned char *buffer);
+	int (*get_active_config_descriptor)(struct libusb_device *device,
+		unsigned char *buffer, size_t len);
+	int (*get_config_descriptor)(struct libusb_device *device,
+		uint8_t config_index, unsigned char *buffer, size_t len);
+	int (*get_config_descriptor_by_value)(struct libusb_device *device,
+		uint8_t bConfigurationValue, unsigned char **buffer);
+	int (*get_configuration)(struct libusb_device_handle *dev_handle, int *config);
+	int (*set_configuration)(struct libusb_device_handle *dev_handle, int config);
+	int (*claim_interface)(struct libusb_device_handle *dev_handle, int interface_number);
+	int (*release_interface)(struct libusb_device_handle *dev_handle, int interface_number);
+	int (*set_interface_altsetting)(struct libusb_device_handle *dev_handle,
+		int interface_number, int altsetting);
+	int (*clear_halt)(struct libusb_device_handle *dev_handle,
+		unsigned char endpoint);
+	int (*reset_device)(struct libusb_device_handle *dev_handle);
+	void (*destroy_device)(struct libusb_device *dev);
+	int (*submit_transfer)(struct usbi_transfer *itransfer);
+	int (*cancel_transfer)(struct usbi_transfer *itransfer);
+	void (*clear_transfer_priv)(struct usbi_transfer *itransfer);
+	int (*copy_transfer_data)(struct usbi_transfer *itransfer, uint32_t io_size);
+	int (*get_transfer_fd)(struct usbi_transfer *itransfer);
+	void (*get_overlapped_result)(struct usbi_transfer *itransfer,
+		DWORD *io_result, DWORD *io_size);
+};
+
+struct windows_context_priv {
+	const struct windows_backend *backend;
+};
+
+union windows_device_priv {
+	struct usbdk_device_priv usbdk_priv;
+	struct winusb_device_priv winusb_priv;
+};
+
+union windows_device_handle_priv {
+	struct usbdk_device_handle_priv usbdk_priv;
+	struct winusb_device_handle_priv winusb_priv;
+};
+
+union windows_transfer_priv {
+	struct usbdk_transfer_priv usbdk_priv;
+	struct winusb_transfer_priv winusb_priv;
+};
+
+extern const struct windows_backend usbdk_backend;
+extern const struct windows_backend winusb_backend;
+
+unsigned long htab_hash(const char *str);
+void windows_force_sync_completion(OVERLAPPED *overlapped, ULONG size);
+
+#if defined(ENABLE_LOGGING)
+const char *windows_error_str(DWORD error_code);
+#endif
+
+#endif
