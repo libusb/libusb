@@ -45,6 +45,7 @@ doc/html
 *.opt
 Debug
 Release
+*.db
 *.user
 *.suo
 *.sdf

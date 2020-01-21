@@ -26,8 +26,7 @@ C_DEFINES=$(C_DEFINES) $(LIBUSB_DEFINES) /DDDKBUILD
 #  an older compiler than other objects; rebuild old objects and libraries"
 USER_C_FLAGS=/GL-
 
-TARGETLIBS=$(SDK_LIB_PATH)\advapi32.lib \
-           $(SDK_LIB_PATH)\kernel32.lib
+TARGETLIBS=$(SDK_LIB_PATH)\kernel32.lib
 
 SOURCES=..\core.c \
 	..\descriptor.c \

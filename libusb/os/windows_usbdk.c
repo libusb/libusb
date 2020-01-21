@@ -157,29 +157,65 @@ error_unload:
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
+typedef SC_HANDLE (WINAPI *POPENSCMANAGERA)(LPCSTR, LPCSTR, DWORD);
+typedef SC_HANDLE (WINAPI *POPENSERVICEA)(SC_HANDLE, LPCSTR, DWORD);
+typedef BOOL (WINAPI *PCLOSESERVICEHANDLE)(SC_HANDLE);
+
 static int usbdk_init(struct libusb_context *ctx)
 {
+	POPENSCMANAGERA pOpenSCManagerA;
+	POPENSERVICEA pOpenServiceA;
+	PCLOSESERVICEHANDLE pCloseServiceHandle;
 	SC_HANDLE managerHandle;
 	SC_HANDLE serviceHandle;
+	HMODULE h;
 
-	managerHandle = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
-	if (managerHandle == NULL) {
-		usbi_warn(ctx, "failed to open service control manager: %s", windows_error_str(0));
+	h = LoadLibraryA("Advapi32");
+	if (h == NULL) {
+		usbi_warn(ctx, "failed to open Advapi32\n");
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	serviceHandle = OpenServiceA(managerHandle, "UsbDk", GENERIC_READ);
-	CloseServiceHandle(managerHandle);
+	pOpenSCManagerA = (POPENSCMANAGERA)GetProcAddress(h, "OpenSCManagerA");
+	if (pOpenSCManagerA == NULL) {
+		usbi_warn(ctx, "failed to find %s in Advapi32\n", "OpenSCManagerA");
+		goto error_free_library;
+	}
+	pOpenServiceA = (POPENSERVICEA)GetProcAddress(h, "OpenServiceA");
+	if (pOpenServiceA == NULL) {
+		usbi_warn(ctx, "failed to find %s in Advapi32\n", "OpenServiceA");
+		goto error_free_library;
+	}
+	pCloseServiceHandle = (PCLOSESERVICEHANDLE)GetProcAddress(h, "CloseServiceHandle");
+	if (pCloseServiceHandle == NULL) {
+		usbi_warn(ctx, "failed to find %s in Advapi32\n", "CloseServiceHandle");
+		goto error_free_library;
+	}
+
+	managerHandle = pOpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
+	if (managerHandle == NULL) {
+		usbi_warn(ctx, "failed to open service control manager: %s", windows_error_str(0));
+		goto error_free_library;
+	}
+
+	serviceHandle = pOpenServiceA(managerHandle, "UsbDk", GENERIC_READ);
+	pCloseServiceHandle(managerHandle);
 
 	if (serviceHandle == NULL) {
 		if (GetLastError() != ERROR_SERVICE_DOES_NOT_EXIST)
 			usbi_warn(ctx, "failed to open UsbDk service: %s", windows_error_str(0));
+		FreeLibrary(h);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
-	CloseServiceHandle(serviceHandle);
+	pCloseServiceHandle(serviceHandle);
+	FreeLibrary(h);
 
 	return load_usbdk_helper_dll(ctx);
+
+error_free_library:
+	FreeLibrary(h);
+	return LIBUSB_ERROR_OTHER;
 }
 
 static void usbdk_exit(struct libusb_context *ctx)
