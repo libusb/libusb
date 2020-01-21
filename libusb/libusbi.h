@@ -410,6 +410,8 @@ struct libusb_device {
 	uint8_t device_address;
 	uint8_t num_configurations;
 	enum libusb_speed speed;
+	uint8_t num_rx_lanes;
+	uint8_t num_tx_lanes;
 
 	struct list_head list;
 	unsigned long session_data;

@@ -81,6 +81,12 @@ static const char *usbfs_path = NULL;
 /* use usbdev*.* device names in /dev instead of the usbfs bus directories */
 static int usbdev_names = 0;
 
+/* Linux 4.18 adds support for reporting USB 3.2 rx_lanes and tx_lanes. Before
+ * that version we assume rx_lanes = 1 and tx_lanes = 1. At version 4.18 or
+ * later we read the rx_lanes and tx_lanes from the usbfs.
+ */
+static unsigned int usbfs_supports_num_lanes = -1;
+
 /* Linux has changed the maximum length of an individual isochronous packet
  * over time.  Initially this limit was 1,023 bytes, but Linux 2.6.18
  * (commit 3612242e527eb47ee4756b5350f8bdf791aa5ede) increased this value to
@@ -441,6 +447,11 @@ static int op_init(struct libusb_context *ctx)
 
 	if (get_kernel_version(ctx, &kversion) < 0)
 		return LIBUSB_ERROR_OTHER;
+
+	if (usbfs_supports_num_lanes == -1) {
+		/* usbfs supports tx_lanes and rx_lanes from 4.18 */
+		usbfs_supports_num_lanes = kernel_version_ge(&kversion,4,18,0);
+	}
 
 	if (supports_flag_cloexec == -1) {
 		/* O_CLOEXEC flag available from Linux 2.6.23 */
@@ -970,7 +981,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	struct linux_device_priv *priv = _device_priv(dev);
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	int descriptors_size = 512; /* Begin with a 1024 byte alloc */
-	int fd, speed;
+	int fd, speed, num_rx_lanes, num_tx_lanes;
 	ssize_t r;
 
 	dev->bus_number = busnum;
@@ -994,6 +1005,23 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 			default:
 				usbi_warn(DEVICE_CTX(dev), "Unknown device speed: %d Mbps", speed);
 			}
+		}
+
+		/* Note requires kernel version >= 4.18 for {rx, tx}_lanes support */
+		if (usbfs_supports_num_lanes) {
+			num_rx_lanes = __read_sysfs_attr(DEVICE_CTX(dev), sysfs_dir, "rx_lanes");
+			if (num_rx_lanes >= 0) {
+				dev->num_rx_lanes = num_rx_lanes;
+			}
+
+			num_tx_lanes = __read_sysfs_attr(DEVICE_CTX(dev), sysfs_dir, "tx_lanes");
+			if (num_tx_lanes >= 0) {
+				dev->num_tx_lanes = num_tx_lanes;
+			}
+		} else {
+			/* Default to 1 lane only if we don't expect the attr to work */
+			dev->num_rx_lanes = 1;
+			dev->num_tx_lanes = 1;
 		}
 	}
 

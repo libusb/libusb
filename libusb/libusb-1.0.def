@@ -76,6 +76,10 @@ EXPORTS
   libusb_get_device_list@8 = libusb_get_device_list
   libusb_get_device_speed
   libusb_get_device_speed@4 = libusb_get_device_speed
+  libusb_get_device_num_rx_lanes
+  libusb_get_device_num_rx_lanes@4 = libusb_get_device_num_rx_lanes
+  libusb_get_device_num_tx_lanes
+  libusb_get_device_num_tx_lanes@4 = libusb_get_device_num_tx_lanes
   libusb_get_max_iso_packet_size
   libusb_get_max_iso_packet_size@8 = libusb_get_max_iso_packet_size
   libusb_get_max_packet_size

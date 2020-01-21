@@ -1096,14 +1096,47 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
     (*(priv->dev->device))->GetDeviceSpeed (priv->dev->device, &devSpeed);
 
     switch (devSpeed) {
-    case kUSBDeviceSpeedLow: dev->speed = LIBUSB_SPEED_LOW; break;
-    case kUSBDeviceSpeedFull: dev->speed = LIBUSB_SPEED_FULL; break;
-    case kUSBDeviceSpeedHigh: dev->speed = LIBUSB_SPEED_HIGH; break;
+    case kUSBDeviceSpeedLow: {
+      dev->speed = LIBUSB_SPEED_LOW;
+      dev->num_rx_lanes = 1;
+      dev->num_tx_lanes = 1;
+      break;
+    }
+    case kUSBDeviceSpeedFull: {
+      dev->speed = LIBUSB_SPEED_FULL;
+      dev->num_rx_lanes = 1;
+      dev->num_tx_lanes = 1;
+      break;
+    }
+    case kUSBDeviceSpeedHigh: {
+      dev->speed = LIBUSB_SPEED_HIGH;
+      dev->num_rx_lanes = 1;
+      dev->num_tx_lanes = 1;
+      break;
+    }
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 1070
-    case kUSBDeviceSpeedSuper: dev->speed = LIBUSB_SPEED_SUPER; break;
+    case kUSBDeviceSpeedSuper: {
+      dev->speed = LIBUSB_SPEED_SUPER;
+      dev->num_rx_lanes = 1;
+      dev->num_tx_lanes = 1;
+      break;
+    }
 #endif
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101200
-    case kUSBDeviceSpeedSuperPlus: dev->speed = LIBUSB_SPEED_SUPER_PLUS; break;
+    case kUSBDeviceSpeedSuperPlus: {
+      dev->speed = LIBUSB_SPEED_SUPER_PLUS;
+      dev->num_rx_lanes = 1;
+      dev->num_tx_lanes = 1;
+      break;
+    }
+#endif
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101500
+    case kUSBDeviceSpeedSuperPlusBy2: {
+      dev->speed = LIBUSB_SPEED_SUPER_PLUS;
+      dev->num_rx_lanes = 2;
+      dev->num_tx_lanes = 2;
+      break;
+    }
 #endif
     default:
       usbi_warn (ctx, "Got unknown device speed %d", devSpeed);

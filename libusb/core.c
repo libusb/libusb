@@ -695,6 +695,8 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	dev->refcnt = 1;
 	dev->session_data = session_id;
 	dev->speed = LIBUSB_SPEED_UNKNOWN;
+	dev->num_rx_lanes = 0;
+	dev->num_tx_lanes = 0;
 
 	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
 		usbi_connect_device (dev);
@@ -999,6 +1001,30 @@ uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 int API_EXPORTED libusb_get_device_speed(libusb_device *dev)
 {
 	return dev->speed;
+}
+
+/** \ingroup libusb_dev
+ * Get the number of receive (rx) lanes for a device.
+ * e.g. a SuperSpeedPlus Gen2x2 device has 2 rx lanes.
+ * \param dev a device
+ * \returns the number of rx lanes, where 0 means that the OS doesn't know or
+ * doesn't support returning the number of rx lanes.
+ */
+int API_EXPORTED libusb_get_device_num_rx_lanes(libusb_device *dev)
+{
+	return dev->num_rx_lanes;
+}
+
+/** \ingroup libusb_dev
+ * Get the number of transmit (tx) lanes for a device.
+ * e.g. a SuperSpeedPlus Gen2x2 device has 2 tx lanes.
+ * \param dev a device
+ * \returns the number of tx lanes, where 0 means that the OS doesn't know or
+ * doesn't support returning the number of tx lanes.
+ */
+int API_EXPORTED libusb_get_device_num_tx_lanes(libusb_device *dev)
+{
+	return dev->num_tx_lanes;
 }
 
 static const struct libusb_endpoint_descriptor *find_endpoint(
