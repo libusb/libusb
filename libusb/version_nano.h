@@ -1,1 +1,1 @@
-#define LIBUSB_NANO 11430
+#define LIBUSB_NANO 11431
