@@ -91,7 +91,11 @@ extern "C" {
 #define USBI_LOG_LINE_END	"\n"
 
 /* The following is used to silence warnings for unused variables */
-#define UNUSED(var)		do { (void)(var); } while(0)
+#if defined(UNREFERENCED_PARAMETER)
+#define UNUSED(var)	UNREFERENCED_PARAMETER(var)
+#else
+#define UNUSED(var)	do { (void)(var); } while(0)
+#endif
 
 #if !defined(ARRAYSIZE)
 #define ARRAYSIZE(array) (sizeof(array) / sizeof(array[0]))
