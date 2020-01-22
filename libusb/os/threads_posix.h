@@ -22,9 +22,6 @@
 #define LIBUSB_THREADS_POSIX_H
 
 #include <pthread.h>
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
 
 #define USBI_MUTEX_INITIALIZER	PTHREAD_MUTEX_INITIALIZER
 typedef pthread_mutex_t usbi_mutex_static_t;
@@ -64,9 +61,9 @@ static inline void usbi_cond_init(pthread_cond_t *cond)
 {
 	(void)pthread_cond_init(cond, NULL);
 }
-static inline int usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
+static inline void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
 {
-	return pthread_cond_wait(cond, mutex);
+	(void)pthread_cond_wait(cond, mutex);
 }
 int usbi_cond_timedwait(usbi_cond_t *cond,
 	usbi_mutex_t *mutex, const struct timeval *tv);

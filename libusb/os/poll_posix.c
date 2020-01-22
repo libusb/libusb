@@ -18,14 +18,11 @@
  *
  */
 
-#include <config.h>
-
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <stdlib.h>
-
 #include "libusbi.h"
+
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 int usbi_pipe(int pipefd[2])
 {

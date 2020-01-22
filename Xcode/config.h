@@ -6,9 +6,6 @@
 /* Message logging */
 #define ENABLE_LOGGING 1
 
-/* Define to 1 if you have the <poll.h> header file. */
-#define HAVE_POLL_H 1
-
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define HAVE_SYS_TIME_H 1
 

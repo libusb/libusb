@@ -21,12 +21,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  */
-#pragma once
 
-#if defined(_MSC_VER)
-// disable /W4 MSVC warnings that are benign
-#pragma warning(disable:4127) // conditional expression is constant
-#endif
+#ifndef LIBUSB_POLL_WINDOWS_H
+#define LIBUSB_POLL_WINDOWS_H
 
 // Handle synchronous completion through the overlapped structure
 #if !defined(STATUS_REPARSE)	// reuse the REPARSE status code
@@ -37,12 +34,12 @@
 
 #define DUMMY_HANDLE ((HANDLE)(LONG_PTR)-2)
 
-#define POLLIN      0x0001    /* There is data to read */
-#define POLLPRI     0x0002    /* There is urgent data to read */
-#define POLLOUT     0x0004    /* Writing now will not block */
-#define POLLERR     0x0008    /* Error condition */
-#define POLLHUP     0x0010    /* Hung up */
-#define POLLNVAL    0x0020    /* Invalid request: fd not open */
+#define POLLIN		0x0001	/* There is data to read */
+#define POLLPRI		0x0002	/* There is urgent data to read */
+#define POLLOUT		0x0004	/* Writing now will not block */
+#define POLLERR		0x0008	/* Error condition */
+#define POLLHUP		0x0010	/* Hung up */
+#define POLLNVAL	0x0020	/* Invalid request: fd not open */
 
 struct pollfd {
 	int fd;		/* file descriptor */
@@ -68,24 +65,23 @@ int usbi_close(int fd);
 /*
  * Timeval operations
  */
-#if defined(DDKBUILD)
-#include <winsock.h>	// defines timeval functions on DDK
-#endif
-
 #if !defined(TIMESPEC_TO_TIMEVAL)
-#define TIMESPEC_TO_TIMEVAL(tv, ts) {                   \
-	(tv)->tv_sec = (long)(ts)->tv_sec;                  \
-	(tv)->tv_usec = (long)(ts)->tv_nsec / 1000;         \
-}
+#define TIMESPEC_TO_TIMEVAL(tv, ts)				\
+do {								\
+	(tv)->tv_sec = (long)(ts)->tv_sec;			\
+	(tv)->tv_usec = (long)(ts)->tv_nsec / 1000;		\
+} while (0)
 #endif
 #if !defined(timersub)
-#define timersub(a, b, result)                          \
-do {                                                    \
-	(result)->tv_sec = (a)->tv_sec - (b)->tv_sec;       \
-	(result)->tv_usec = (a)->tv_usec - (b)->tv_usec;    \
-	if ((result)->tv_usec < 0) {                        \
-		--(result)->tv_sec;                             \
-		(result)->tv_usec += 1000000;                   \
-	}                                                   \
+#define timersub(a, b, result)					\
+do {								\
+	(result)->tv_sec = (a)->tv_sec - (b)->tv_sec;		\
+	(result)->tv_usec = (a)->tv_usec - (b)->tv_usec;	\
+	if ((result)->tv_usec < 0) {				\
+		--(result)->tv_sec;				\
+		(result)->tv_usec += 1000000;			\
+	}							\
 } while (0)
+#endif
+
 #endif

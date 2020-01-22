@@ -64,7 +64,7 @@ struct timespec {
 	long tv_sec;
 	long tv_nsec;
 };
-#endif /* HAVE_STRUCT_TIMESPEC | _TIMESPEC_DEFINED */
+#endif /* HAVE_STRUCT_TIMESPEC || _TIMESPEC_DEFINED */
 
 // We *were* getting ETIMEDOUT from pthread.h:
 #ifndef ETIMEDOUT

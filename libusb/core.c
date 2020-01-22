@@ -20,29 +20,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "config.h"
-
-#include <errno.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
-#ifdef HAVE_SYSLOG_H
-#include <syslog.h>
-#endif
+#include "libusbi.h"
+#include "hotplug.h"
 
 #ifdef __ANDROID__
 #include <android/log.h>
 #endif
-
-#include "libusbi.h"
-#include "hotplug.h"
+#include <stdio.h>
+#include <string.h>
+#ifdef HAVE_SYSLOG_H
+#include <syslog.h>
+#endif
 
 struct libusb_context *usbi_default_context = NULL;
 static const struct libusb_version libusb_version_internal =

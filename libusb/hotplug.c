@@ -19,17 +19,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
-
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
-#include <assert.h>
-
 #include "libusbi.h"
 #include "hotplug.h"
 
@@ -48,7 +37,7 @@
  * Version 1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102, has added support
  * for hotplug events on <b>some</b> platforms (you should test if your platform
  * supports hotplug notification by calling \ref libusb_has_capability() with
- * parameter \ref LIBUSB_CAP_HAS_HOTPLUG). 
+ * parameter \ref LIBUSB_CAP_HAS_HOTPLUG).
  *
  * This interface allows you to request notification for the arrival and departure
  * of matching USB devices.

@@ -20,27 +20,16 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
-
-#include <assert.h>
-#include <ctype.h>
-#include <dirent.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <poll.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/utsname.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <libudev.h>
-
 #include "libusbi.h"
 #include "linux_usbfs.h"
+
+#include <errno.h>
+#include <fcntl.h>
+#include <libudev.h>
+#include <poll.h>
+#include <pthread.h>
+#include <string.h>
+#include <unistd.h>
 
 /* udev context */
 static struct udev *udev_ctx = NULL;

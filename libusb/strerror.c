@@ -17,22 +17,18 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
+#include "libusbi.h"
 
-#include <locale.h>
-#include <stdlib.h>
 #include <string.h>
-#if defined(HAVE_STRINGS_H)
+#ifdef HAVE_STRINGS_H
 #include <strings.h>
 #endif
-
-#include "libusbi.h"
 
 #if defined(_MSC_VER)
 #define strncasecmp _strnicmp
 #endif
 
-static size_t usbi_locale = 0;
+static size_t usbi_locale;
 
 /** \ingroup libusb_misc
  * How to add a new \ref libusb_strerror() translation:

@@ -19,8 +19,6 @@
 #pragma warning(disable:4200)
 /* Disable: warning C4324: structure was padded due to __declspec(align()) */
 #pragma warning(disable:4324)
-/* Disable: warning C6258: Using TerminateThread does not allow proper thread clean up */
-#pragma warning(disable:6258)
 /* Disable: warning C4996: 'GetVersionA': was declared deprecated */
 #pragma warning(disable:4996)
 
@@ -34,20 +32,17 @@
 /* Default visibility */
 #define DEFAULT_VISIBILITY /**/
 
-/* Enable global message logging */
-#define ENABLE_LOGGING 1
-
 /* Uncomment to start with debug message logging enabled */
 // #define ENABLE_DEBUG_LOGGING 1
 
-/* Uncomment to enabling logging to system log */
-// #define USE_SYSTEM_LOGGING_FACILITY
+/* Message logging */
+#define ENABLE_LOGGING 1
+
+/* Windows backend */
+#define OS_WINDOWS 1
 
 /* type of second poll() argument */
 #define POLL_NFDS_TYPE unsigned int
 
-/* Define to 1 if you have the <sys/types.h> header file.  */
-#define HAVE_SYS_TYPES_H 1
-
-/* Windows backend */
-#define OS_WINDOWS 1
+/* Uncomment to enabling output to system log */
+// #define USE_SYSTEM_LOGGING_FACILITY

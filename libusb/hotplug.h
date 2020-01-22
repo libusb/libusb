@@ -92,8 +92,8 @@ struct libusb_hotplug_message {
 
 void usbi_hotplug_deregister(struct libusb_context *ctx, int forced);
 void usbi_hotplug_match(struct libusb_context *ctx, struct libusb_device *dev,
-			libusb_hotplug_event event);
+	libusb_hotplug_event event);
 void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device *dev,
-			libusb_hotplug_event event);
+	libusb_hotplug_event event);
 
 #endif

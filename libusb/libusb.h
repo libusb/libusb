@@ -1941,9 +1941,7 @@ typedef enum {
  *                       returning 1 will cause this callback to be deregistered
  */
 typedef int (LIBUSB_CALL *libusb_hotplug_callback_fn)(libusb_context *ctx,
-						libusb_device *device,
-						libusb_hotplug_event event,
-						void *user_data);
+	libusb_device *device, libusb_hotplug_event event, void *user_data);
 
 /** \ingroup libusb_hotplug
  * Register a hotplug callback function
@@ -1980,13 +1978,10 @@ typedef int (LIBUSB_CALL *libusb_hotplug_callback_fn)(libusb_context *ctx,
  * \returns LIBUSB_SUCCESS on success LIBUSB_ERROR code on failure
  */
 int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
-						libusb_hotplug_event events,
-						libusb_hotplug_flag flags,
-						int vendor_id, int product_id,
-						int dev_class,
-						libusb_hotplug_callback_fn cb_fn,
-						void *user_data,
-						libusb_hotplug_callback_handle *callback_handle);
+	libusb_hotplug_event events, libusb_hotplug_flag flags,
+	int vendor_id, int product_id, int dev_class,
+	libusb_hotplug_callback_fn cb_fn, void *user_data,
+	libusb_hotplug_callback_handle *callback_handle);
 
 /** \ingroup libusb_hotplug
  * Deregisters a hotplug callback.
@@ -2000,7 +1995,7 @@ int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
  * \param[in] callback_handle the handle of the callback to deregister
  */
 void LIBUSB_CALL libusb_hotplug_deregister_callback(libusb_context *ctx,
-						libusb_hotplug_callback_handle callback_handle);
+	libusb_hotplug_callback_handle callback_handle);
 
 /** \ingroup libusb_hotplug
  * Gets the user_data associated with a hotplug callback.
@@ -2011,7 +2006,7 @@ void LIBUSB_CALL libusb_hotplug_deregister_callback(libusb_context *ctx,
  * \param[in] callback_handle the handle of the callback to get the user_data of
  */
 void * LIBUSB_CALL libusb_hotplug_get_user_data(struct libusb_context *ctx,
-						libusb_hotplug_callback_handle callback_handle);
+	libusb_hotplug_callback_handle callback_handle);
 
 /** \ingroup libusb_lib
  * Available option values for libusb_set_option().

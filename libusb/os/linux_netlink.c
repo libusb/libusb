@@ -21,27 +21,21 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
+#include "libusbi.h"
+#include "linux_usbfs.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <pthread.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
 
 #ifdef HAVE_ASM_TYPES_H
 #include <asm/types.h>
 #endif
-
-#include <sys/socket.h>
 #include <linux/netlink.h>
-
-#include "libusbi.h"
-#include "linux_usbfs.h"
+#include <sys/socket.h>
 
 #define NL_GROUP_KERNEL 1
 

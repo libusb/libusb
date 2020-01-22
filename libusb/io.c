@@ -21,24 +21,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
-
-#include <assert.h>
-#include <errno.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
-#ifdef USBI_TIMERFD_AVAILABLE
-#include <unistd.h>
-#include <sys/timerfd.h>
-#endif
-
 #include "libusbi.h"
 #include "hotplug.h"
+
+#include <errno.h>
+#ifdef USBI_TIMERFD_AVAILABLE
+#include <sys/timerfd.h>
+#include <unistd.h>
+#endif
 
 /**
  * \page libusb_io Synchronous and asynchronous device I/O
