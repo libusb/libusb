@@ -44,28 +44,6 @@ static bool usbdk_available = false;
 static uint64_t hires_ticks_to_ps;
 static uint64_t hires_frequency;
 
-#define TIMER_REQUEST_RETRY_MS	100
-#define WM_TIMER_REQUEST	(WM_USER + 1)
-#define WM_TIMER_EXIT		(WM_USER + 2)
-
-// used for monotonic clock_gettime()
-struct timer_request {
-	struct timespec *tp;
-	HANDLE event;
-};
-
-// Timer thread
-static HANDLE timer_thread = NULL;
-static DWORD timer_thread_id = 0;
-
-/* User32 dependencies */
-DLL_DECLARE_HANDLE(User32);
-DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, GetMessageA, (LPMSG, HWND, UINT, UINT));
-DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, PeekMessageA, (LPMSG, HWND, UINT, UINT, UINT));
-DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, PostThreadMessageA, (DWORD, UINT, WPARAM, LPARAM));
-
-static unsigned __stdcall windows_clock_gettime_threaded(void *param);
-
 /*
 * Converts a windows error to human readable string
 * uses retval as errorcode, or, if 0, use GetLastError()
@@ -279,99 +257,19 @@ void windows_force_sync_completion(OVERLAPPED *overlapped, ULONG size)
 	SetEvent(overlapped->hEvent);
 }
 
-static BOOL windows_init_dlls(void)
+static void windows_init_clock(void)
 {
-	DLL_GET_HANDLE(User32);
-	DLL_LOAD_FUNC_PREFIXED(User32, p, GetMessageA, TRUE);
-	DLL_LOAD_FUNC_PREFIXED(User32, p, PeekMessageA, TRUE);
-	DLL_LOAD_FUNC_PREFIXED(User32, p, PostThreadMessageA, TRUE);
-
-	return TRUE;
-}
-
-static void windows_exit_dlls(void)
-{
-	DLL_FREE_HANDLE(User32);
-}
-
-static bool windows_init_clock(struct libusb_context *ctx)
-{
-	DWORD_PTR affinity, dummy;
-	HANDLE event;
 	LARGE_INTEGER li_frequency;
-	int i;
 
-	if (QueryPerformanceFrequency(&li_frequency)) {
-		// The hires frequency can go as high as 4 GHz, so we'll use a conversion
-		// to picoseconds to compute the tv_nsecs part in clock_gettime
-		hires_frequency = li_frequency.QuadPart;
-		hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency;
-		usbi_dbg("hires timer available (Frequency: %"PRIu64" Hz)", hires_frequency);
+	// Microsoft says that the QueryPerformanceFrequency() and
+	// QueryPerformanceCounter() functions always succeed on XP and later
+	QueryPerformanceFrequency(&li_frequency);
 
-		// Because QueryPerformanceCounter might report different values when
-		// running on different cores, we create a separate thread for the timer
-		// calls, which we glue to the first available core always to prevent timing discrepancies.
-		if (!GetProcessAffinityMask(GetCurrentProcess(), &affinity, &dummy) || (affinity == 0)) {
-			usbi_err(ctx, "could not get process affinity: %s", windows_error_str(0));
-			return false;
-		}
-
-		// The process affinity mask is a bitmask where each set bit represents a core on
-		// which this process is allowed to run, so we find the first set bit
-		for (i = 0; !(affinity & (DWORD_PTR)(1 << i)); i++);
-		affinity = (DWORD_PTR)(1 << i);
-
-		usbi_dbg("timer thread will run on core #%d", i);
-
-		event = CreateEvent(NULL, FALSE, FALSE, NULL);
-		if (event == NULL) {
-			usbi_err(ctx, "could not create event: %s", windows_error_str(0));
-			return false;
-		}
-
-		timer_thread = (HANDLE)_beginthreadex(NULL, 0, windows_clock_gettime_threaded, (void *)event,
-				0, (unsigned int *)&timer_thread_id);
-		if (timer_thread == NULL) {
-			usbi_err(ctx, "unable to create timer thread - aborting");
-			CloseHandle(event);
-			return false;
-		}
-
-		if (!SetThreadAffinityMask(timer_thread, affinity))
-			usbi_warn(ctx, "unable to set timer thread affinity, timer discrepancies may arise");
-
-		// Wait for timer thread to init before continuing.
-		if (WaitForSingleObject(event, INFINITE) != WAIT_OBJECT_0) {
-			usbi_err(ctx, "failed to wait for timer thread to become ready - aborting");
-			CloseHandle(event);
-			return false;
-		}
-
-		CloseHandle(event);
-	} else {
-		usbi_dbg("no hires timer available on this platform");
-		hires_frequency = 0;
-		hires_ticks_to_ps = UINT64_C(0);
-	}
-
-	return true;
-}
-
-static void windows_destroy_clock(void)
-{
-	if (timer_thread) {
-		// actually the signal to quit the thread.
-		if (!pPostThreadMessageA(timer_thread_id, WM_TIMER_EXIT, 0, 0)
-				|| (WaitForSingleObject(timer_thread, INFINITE) != WAIT_OBJECT_0)) {
-			usbi_dbg("could not wait for timer thread to quit");
-			TerminateThread(timer_thread, 1);
-			// shouldn't happen, but we're destroying
-			// all objects it might have held anyway.
-		}
-		CloseHandle(timer_thread);
-		timer_thread = NULL;
-		timer_thread_id = 0;
-	}
+	// The hires frequency can go as high as 4 GHz, so we'll use a conversion
+	// to picoseconds to compute the tv_nsecs part in clock_gettime
+	hires_frequency = li_frequency.QuadPart;
+	hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency;
+	usbi_dbg("hires timer frequency: %"PRIu64" Hz", hires_frequency);
 }
 
 /* Windows version detection */
@@ -478,50 +376,6 @@ static void get_windows_version(void)
 		usbi_dbg("Windows %s %s", w, arch);
 }
 
-/*
-* Monotonic and real time functions
-*/
-static unsigned __stdcall windows_clock_gettime_threaded(void *param)
-{
-	struct timer_request *request;
-	LARGE_INTEGER hires_counter;
-	MSG msg;
-
-	// The following call will create this thread's message queue
-	// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms644946.aspx
-	pPeekMessageA(&msg, NULL, WM_USER, WM_USER, PM_NOREMOVE);
-
-	// Signal windows_init_clock() that we're ready to service requests
-	if (!SetEvent((HANDLE)param))
-		usbi_dbg("SetEvent failed for timer init event: %s", windows_error_str(0));
-	param = NULL;
-
-	// Main loop - wait for requests
-	while (1) {
-		if (pGetMessageA(&msg, NULL, WM_TIMER_REQUEST, WM_TIMER_EXIT) == -1) {
-			usbi_err(NULL, "GetMessage failed for timer thread: %s", windows_error_str(0));
-			return 1;
-		}
-
-		switch (msg.message) {
-		case WM_TIMER_REQUEST:
-			// Requests to this thread are for hires always
-			// Microsoft says that this function always succeeds on XP and later
-			// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms644904.aspx
-			request = (struct timer_request *)msg.lParam;
-			QueryPerformanceCounter(&hires_counter);
-			request->tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
-			request->tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency) / 1000) * hires_ticks_to_ps);
-			if (!SetEvent(request->event))
-				usbi_err(NULL, "SetEvent failed for timer request: %s", windows_error_str(0));
-			break;
-		case WM_TIMER_EXIT:
-			usbi_dbg("timer thread quitting");
-			return 0;
-		}
-	}
-}
-
 static void windows_transfer_callback(const struct windows_backend *backend,
 	struct usbi_transfer *itransfer, DWORD io_result, DWORD io_size)
 {
@@ -612,12 +466,6 @@ static int windows_init(struct libusb_context *ctx)
 	// NB: concurrent usage supposes that init calls are equally balanced with
 	// exit calls. If init is called more than exit, we will not exit properly
 	if (++init_count == 1) { // First init?
-		// Load DLL imports
-		if (!windows_init_dlls()) {
-			usbi_err(ctx, "could not resolve DLL functions");
-			goto init_exit;
-		}
-
 		get_windows_version();
 
 		if (windows_version == WINDOWS_UNDEFINED) {
@@ -626,8 +474,7 @@ static int windows_init(struct libusb_context *ctx)
 			goto init_exit;
 		}
 
-		if (!windows_init_clock(ctx))
-			goto init_exit;
+		windows_init_clock();
 
 		if (!htab_create(ctx))
 			goto init_exit;
@@ -658,8 +505,6 @@ init_exit: // Holds semaphore here
 		if (winusb_backend_init)
 			winusb_backend.exit(ctx);
 		htab_destroy();
-		windows_destroy_clock();
-		windows_exit_dlls();
 		--init_count;
 	}
 
@@ -694,8 +539,6 @@ static void windows_exit(struct libusb_context *ctx)
 		}
 		winusb_backend.exit(ctx);
 		htab_destroy();
-		windows_destroy_clock();
-		windows_exit_dlls();
 	}
 
 	ReleaseSemaphore(semaphore, 1, NULL); // increase count back to 1
@@ -897,45 +740,25 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 
 static int windows_clock_gettime(int clk_id, struct timespec *tp)
 {
-	struct timer_request request;
+	LARGE_INTEGER hires_counter;
 #if !defined(_MSC_VER) || (_MSC_VER < 1900)
 	FILETIME filetime;
 	ULARGE_INTEGER rtime;
 #endif
-	DWORD r;
 
 	switch (clk_id) {
 	case USBI_CLOCK_MONOTONIC:
-		if (timer_thread) {
-			request.tp = tp;
-			request.event = CreateEvent(NULL, FALSE, FALSE, NULL);
-			if (request.event == NULL)
-				return LIBUSB_ERROR_NO_MEM;
-
-			if (!pPostThreadMessageA(timer_thread_id, WM_TIMER_REQUEST, 0, (LPARAM)&request)) {
-				usbi_err(NULL, "PostThreadMessage failed for timer thread: %s", windows_error_str(0));
-				CloseHandle(request.event);
-				return LIBUSB_ERROR_OTHER;
-			}
-
-			do {
-				r = WaitForSingleObject(request.event, TIMER_REQUEST_RETRY_MS);
-				if (r == WAIT_TIMEOUT)
-					usbi_dbg("could not obtain a timer value within reasonable timeframe - too much load?");
-				else if (r == WAIT_FAILED)
-					usbi_err(NULL, "WaitForSingleObject failed: %s", windows_error_str(0));
-			} while (r == WAIT_TIMEOUT);
-			CloseHandle(request.event);
-
-			if (r == WAIT_OBJECT_0)
-				return LIBUSB_SUCCESS;
-			else
-				return LIBUSB_ERROR_OTHER;
+		if (hires_frequency) {
+			QueryPerformanceCounter(&hires_counter);
+			tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
+			tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency) * hires_ticks_to_ps) / UINT64_C(1000));
+			return LIBUSB_SUCCESS;
 		}
 		// Fall through and return real-time if monotonic was not detected @ timer init
 	case USBI_CLOCK_REALTIME:
 #if defined(_MSC_VER) && (_MSC_VER >= 1900)
-		timespec_get(tp, TIME_UTC);
+		if (!timespec_get(tp, TIME_UTC))
+			return LIBUSB_ERROR_OTHER;
 #else
 		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
 		// with a predef epoch time to have an epoch that starts at 1970.01.01 00:00
