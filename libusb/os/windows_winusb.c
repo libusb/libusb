@@ -3354,7 +3354,7 @@ static int _hid_get_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 		usbi_dbg("program assertion failed: hid_buffer is not NULL");
 
 	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
-		usbi_dbg("invalid size (%zu)", *size);
+		usbi_dbg("invalid size ("PRIuPTR")", (uintptr_t)*size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
@@ -3433,7 +3433,7 @@ static int _hid_set_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 		usbi_dbg("program assertion failed: hid_buffer is not NULL");
 
 	if ((*size == 0) || (*size > max_report_size)) {
-		usbi_dbg("invalid size (%zu)", *size);
+		usbi_dbg("invalid size ("PRIuPTR")", (uintptr_t)*size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
@@ -3633,7 +3633,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 		size[1] = capabilities.NumberOutputValueCaps;
 		size[2] = capabilities.NumberFeatureValueCaps;
 		for (j = HidP_Input; j <= HidP_Feature; j++) {
-			usbi_dbg("%u HID %s report value(s) found", (unsigned int)size[j], type[j]);
+			usbi_dbg("%lu HID %s report value(s) found", size[j], type[j]);
 			priv->hid->uses_report_ids[j] = false;
 			if (size[j] > 0) {
 				value_caps = calloc(size[j], sizeof(HIDP_VALUE_CAPS));
