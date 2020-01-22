@@ -2100,7 +2100,6 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	POLL_NFDS_TYPE nfds = 0;
 	POLL_NFDS_TYPE internal_nfds;
 	struct pollfd *fds = NULL;
-	int i = -1;
 	int timeout_ms;
 
 	/* prevent attempts to recursively handle events (e.g. calling into
@@ -2136,6 +2135,8 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	/* clean up removed poll fds */
 	cleanup_removed_pollfds(ctx);
 	if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED) {
+		int i = 0;
+
 		usbi_dbg("poll fds modified, reallocating");
 
 		free(ctx->pollfds);
@@ -2154,9 +2155,9 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 		list_for_each_entry(ipollfd, &ctx->ipollfds, list, struct usbi_pollfd) {
 			struct libusb_pollfd *pollfd = &ipollfd->pollfd;
-			i++;
 			ctx->pollfds[i].fd = pollfd->fd;
 			ctx->pollfds[i].events = pollfd->events;
+			i++;
 		}
 
 		/* reset the flag now that we have the updated list */
@@ -2169,7 +2170,6 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	}
 	fds = ctx->pollfds;
 	nfds = ctx->pollfds_cnt;
-	usbi_inc_fds_ref(fds, nfds);
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
 	timeout_ms = (int)(tv->tv_sec * 1000) + (tv->tv_usec / 1000);
@@ -2297,14 +2297,16 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 #endif
 
 	list_for_each_entry(ipollfd, &ctx->removed_ipollfds, list, struct usbi_pollfd) {
-		for (i = internal_nfds ; i < nfds ; ++i) {
-			if (ipollfd->pollfd.fd == fds[i].fd) {
+		POLL_NFDS_TYPE n;
+
+		for (n = internal_nfds ; n < nfds ; n++) {
+			if (ipollfd->pollfd.fd == fds[n].fd) {
 				/* pollfd was removed between the creation of the fd
 				 * array and here. remove any triggered revent as
 				 * it is no longer relevant */
 				usbi_dbg("pollfd %d was removed. ignoring raised events",
-					 fds[i].fd);
-				fds[i].revents = 0;
+					 fds[n].fd);
+				fds[n].revents = 0;
 				break;
 			}
 		}
@@ -2316,7 +2318,6 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 done:
 	usbi_end_event_handling(ctx);
-	usbi_dec_fds_ref(fds, nfds);
 	return r;
 }
 

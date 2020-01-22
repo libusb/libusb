@@ -65,9 +65,6 @@ ssize_t usbi_write(int fd, const void *buf, size_t count);
 ssize_t usbi_read(int fd, void *buf, size_t count);
 int usbi_close(int fd);
 
-void usbi_inc_fds_ref(struct pollfd *fds, unsigned int nfds);
-void usbi_dec_fds_ref(struct pollfd *fds, unsigned int nfds);
-
 /*
  * Timeval operations
  */

@@ -38,6 +38,8 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <intrin.h>
+#include <malloc.h>
 #include <stdlib.h>
 
 #include "libusbi.h"
@@ -49,42 +51,31 @@ const struct winfd INVALID_WINFD = { -1, NULL };
 // private data
 struct file_descriptor {
 	enum fd_type { FD_TYPE_PIPE, FD_TYPE_TRANSFER } type;
+	LONG refcount;
 	OVERLAPPED overlapped;
-	int refcount;
 };
 
 static usbi_mutex_static_t fd_table_lock = USBI_MUTEX_INITIALIZER;
 
+#define BITS_PER_BYTE			8
+#define BITMAP_BITS_PER_WORD		(sizeof(unsigned long) * BITS_PER_BYTE)
+#define FD_TABLE_INCR_SIZE		64
+
 static struct file_descriptor **fd_table;
-static size_t fd_count;
-static size_t fd_size;
-#define INC_FDS_EACH 256
+static unsigned long *fd_table_bitmap;
+static unsigned int fd_table_size;
+static unsigned int fd_count;
 
-static void usbi_dec_fd_table(void)
-{
-	fd_count--;
-	if (fd_count == 0) {
-		free(fd_table);
-		fd_size = 0;
-		fd_table = NULL;
-	}
-}
+#define return_with_errno(err)		\
+	do {				\
+		errno = (err);		\
+		return -1;		\
+	} while (0)
 
-static void smart_realloc_fd_table_space(int inc)
-{
-	if (fd_table == NULL || fd_count + inc > fd_size) {
-		struct file_descriptor **p = (struct file_descriptor **)realloc(fd_table, (fd_size + INC_FDS_EACH) * sizeof(struct file_descriptor *));
-		if (p != NULL) {
-			memset(p + fd_size, 0, INC_FDS_EACH * sizeof(struct file_descriptor *));
-			fd_size += INC_FDS_EACH;
-			fd_table = p;
-		}
-	}
-}
-
-static struct file_descriptor *create_fd(enum fd_type type)
+static struct file_descriptor *alloc_fd(enum fd_type type, LONG refcount)
 {
 	struct file_descriptor *fd = calloc(1, sizeof(*fd));
+
 	if (fd == NULL)
 		return NULL;
 	fd->overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -93,14 +84,90 @@ static struct file_descriptor *create_fd(enum fd_type type)
 		return NULL;
 	}
 	fd->type = type;
-	fd->refcount = 1;
+	fd->refcount = refcount;
 	return fd;
 }
 
-static void free_fd(struct file_descriptor *fd)
+static struct file_descriptor *get_fd(unsigned int _fd, bool ref)
 {
-	CloseHandle(fd->overlapped.hEvent);
-	free(fd);
+	struct file_descriptor *fd = NULL;
+
+	if (_fd < fd_table_size)
+		fd = fd_table[_fd];
+	if (fd != NULL && ref)
+		InterlockedIncrement(&fd->refcount);
+
+	return fd;
+}
+
+static void put_fd(struct file_descriptor *fd)
+{
+	if (InterlockedDecrement(&fd->refcount) == 0L) {
+		CloseHandle(fd->overlapped.hEvent);
+		free(fd);
+	}
+}
+
+static int install_fd(struct file_descriptor *fd)
+{
+	unsigned int n;
+
+	if (fd_count == fd_table_size) {
+		struct file_descriptor **new_table;
+		unsigned long* new_bitmap;
+
+		// Need to expand the fd table and bitmap
+		new_table = realloc(fd_table, (fd_table_size + FD_TABLE_INCR_SIZE) * sizeof(*new_table));
+		if (new_table == NULL)
+			return -ENOMEM;
+		memset(new_table + fd_table_size, 0, FD_TABLE_INCR_SIZE * sizeof(*new_table));
+		fd_table = new_table;
+
+		new_bitmap = realloc(fd_table_bitmap, (fd_table_size + FD_TABLE_INCR_SIZE) / BITS_PER_BYTE);
+		if (new_bitmap == NULL)
+			return -ENOMEM;
+		memset(new_bitmap + (fd_table_size / BITMAP_BITS_PER_WORD), 0, FD_TABLE_INCR_SIZE / BITS_PER_BYTE);
+		fd_table_bitmap = new_bitmap;
+
+		fd_table_size += FD_TABLE_INCR_SIZE;
+		assert(fd_table_size < (unsigned int)INT_MAX);
+	}
+
+	for (n = 0; n < fd_table_size; n += BITMAP_BITS_PER_WORD) {
+		unsigned int idx = n / BITMAP_BITS_PER_WORD;
+		unsigned long mask, pos;
+
+		mask = ~fd_table_bitmap[idx];
+		if (mask == 0UL)
+			continue;
+
+		assert(_BitScanForward(&pos, mask));
+		fd_table_bitmap[idx] |= 1UL << pos;
+		n += pos;
+		break;
+	}
+
+	assert(n < fd_table_size);
+	assert(fd_table[n] == NULL);
+	fd_table[n] = fd;
+	fd_count++;
+
+	return n;
+}
+
+static void remove_fd(unsigned int pos)
+{
+	assert(fd_table[pos] != NULL);
+	fd_table[pos] = NULL;
+	fd_table_bitmap[pos / BITMAP_BITS_PER_WORD] &= ~(1UL << (pos % BITMAP_BITS_PER_WORD));
+	fd_count--;
+	if (fd_count == 0) {
+		free(fd_table);
+		free(fd_table_bitmap);
+		fd_table = NULL;
+		fd_table_bitmap = NULL;
+		fd_table_size = 0;
+	}
 }
 
 /*
@@ -122,25 +189,16 @@ struct winfd usbi_create_fd(void)
 	struct file_descriptor *fd;
 	struct winfd wfd;
 
-	fd = create_fd(FD_TYPE_TRANSFER);
+	fd = alloc_fd(FD_TYPE_TRANSFER, 1);
 	if (fd == NULL)
 		return INVALID_WINFD;
 
 	usbi_mutex_static_lock(&fd_table_lock);
-
-	smart_realloc_fd_table_space(1);
-
-	for (wfd.fd = 0; wfd.fd < fd_size; wfd.fd++) {
-		if (fd_table[wfd.fd] != NULL)
-			continue;
-		fd_table[wfd.fd] = fd;
-		fd_count++;
-		break;
-	}
+	wfd.fd = install_fd(fd);
 	usbi_mutex_static_unlock(&fd_table_lock);
 
-	if (wfd.fd == fd_size) {
-		free_fd(fd);
+	if (wfd.fd < 0) {
+		put_fd(fd);
 		return INVALID_WINFD;
 	}
 
@@ -149,191 +207,126 @@ struct winfd usbi_create_fd(void)
 	return wfd;
 }
 
-void usbi_inc_fds_ref(struct pollfd *fds, unsigned int nfds)
-{
-	int n;
-	usbi_mutex_static_lock(&fd_table_lock);
-	for (n = 0; n < nfds; ++n) {
-		fd_table[fds[n].fd]->refcount++;
-	}
-	usbi_mutex_static_unlock(&fd_table_lock);
-}
-
-void usbi_dec_fds_ref(struct pollfd *fds, unsigned int nfds)
-{
-	int n;
-	struct file_descriptor *fd;
-
-	usbi_mutex_static_lock(&fd_table_lock);
-	for (n = 0; n < nfds; ++n) {
-		fd = fd_table[fds[n].fd];
-		fd->refcount--;
-		//FD_TYPE_PIPE map fd to two _fd
-		if (fd->refcount == 0 || (fd->refcount == 1 && fd->type == FD_TYPE_PIPE))
-		{
-			if (fd->type == FD_TYPE_PIPE) {
-				// InternalHigh is our reference count
-				fd->overlapped.InternalHigh--;
-				if (fd->overlapped.InternalHigh == 0)
-					free_fd(fd);
-			}
-			else {
-				free_fd(fd);
-			}
-			fd_table[fds[n].fd] = NULL;
-			usbi_dec_fd_table();
-		}
-	}
-	usbi_mutex_static_unlock(&fd_table_lock);
-}
-
-
-static int check_pollfds(struct pollfd *fds, unsigned int nfds,
-	HANDLE *wait_handles, DWORD *nb_wait_handles)
-{
-	struct file_descriptor *fd;
-	unsigned int n;
-	int nready = 0;
-
-	usbi_mutex_static_lock(&fd_table_lock);
-
-	for (n = 0; n < nfds; ++n) {
-		fds[n].revents = 0;
-
-		// Keep it simple - only allow either POLLIN *or* POLLOUT
-		assert((fds[n].events == POLLIN) || (fds[n].events == POLLOUT));
-		if ((fds[n].events != POLLIN) && (fds[n].events != POLLOUT)) {
-			fds[n].revents = POLLNVAL;
-			nready++;
-			continue;
-		}
-
-		if ((fds[n].fd >= 0) && (fds[n].fd < fd_size))
-			fd = fd_table[fds[n].fd];
-		else
-			fd = NULL;
-
-		assert(fd != NULL);
-		if (fd == NULL) {
-			fds[n].revents = POLLNVAL;
-			nready++;
-			continue;
-		}
-
-		if (HasOverlappedIoCompleted(&fd->overlapped)
-				&& (WaitForSingleObject(fd->overlapped.hEvent, 0) == WAIT_OBJECT_0)) {
-			fds[n].revents = fds[n].events;
-			nready++;
-		} else if (wait_handles != NULL) {
-			wait_handles[*nb_wait_handles] = fd->overlapped.hEvent;
-			(*nb_wait_handles)++;
-		}
-	}
-
-	usbi_mutex_static_unlock(&fd_table_lock);
-
-	return nready;
-}
-
-#define EXT_TIMEOUT WAIT_OBJECT_0
-
-struct ExThreadData
-{
-	HANDLE notifyevents;
-
+struct wait_thread_data {
 	HANDLE thread;
-	HANDLE wait_event[MAXIMUM_WAIT_OBJECTS];
-	int nEvents;
-	DWORD ret_wait;
-	volatile int bexit;
+	HANDLE handles[MAXIMUM_WAIT_OBJECTS];
+	DWORD num_handles;
+	DWORD error;
 };
 
-static DWORD __stdcall WaitThread(LPVOID lpThreadParameter)
+static DWORD WINAPI WaitThread(LPVOID lpParam)
 {
-	struct ExThreadData *p = (struct ExThreadData *)lpThreadParameter;
-	int ret = WaitForMultipleObjects(p->nEvents, p->wait_event, FALSE, INFINITE);
-	p->ret_wait = ret;
-	p->bexit = true;
-	SetEvent(p->notifyevents);
+	struct wait_thread_data *thread_data = lpParam;
+	HANDLE notify_event = thread_data->handles[0];
+	DWORD status;
+
+	status = WaitForMultipleObjects(thread_data->num_handles, thread_data->handles, FALSE, INFINITE);
+	if ((status >= WAIT_OBJECT_0) && (status < (WAIT_OBJECT_0 + thread_data->num_handles))) {
+		if (status > WAIT_OBJECT_0) {
+			// This will wake up all the other waiting threads
+			SetEvent(notify_event);
+		}
+		thread_data->error = 0;
+	} else {
+		assert(status == WAIT_FAILED);
+		thread_data->error = (status == WAIT_FAILED) ? GetLastError() : ERROR_CAN_NOT_COMPLETE;
+	}
+
 	return 0;
 }
 
-static DWORD ExtendWaitForMultipleObjects(
-	DWORD        nCount,
-	const HANDLE *lpHandles,
-	BOOL         bWaitAll,
-	DWORD        dwMilliseconds
-)
+static DWORD poll_wait(const HANDLE *wait_handles, DWORD num_wait_handles, DWORD timeout)
 {
-	DWORD ret;
-	int i = 0;
-	int nThreads = 0;
-	struct ExThreadData *pThread;
-	int size;
+	struct wait_thread_data *thread_data;
 	HANDLE notify_event;
+	HANDLE* handles;
+	int n, num_threads;
+	DWORD error, status;
 
-	if (nCount <= MAXIMUM_WAIT_OBJECTS) {
-		ret = WaitForMultipleObjects(nCount, lpHandles, bWaitAll, dwMilliseconds);
-		if (ret == WAIT_TIMEOUT)
-			return EXT_TIMEOUT;
+	if (num_wait_handles <= MAXIMUM_WAIT_OBJECTS)
+		return WaitForMultipleObjects(num_wait_handles, wait_handles, FALSE, timeout);
 
-		if (ret < WAIT_OBJECT_0 + nCount)
-			return ret + 1;
-
-		return ret;
-	}
-
-	nThreads = (nCount + MAXIMUM_WAIT_OBJECTS - 2) / (MAXIMUM_WAIT_OBJECTS - 1);
-
+	// To wait on more than MAXIMUM_WAIT_OBJECTS, each thread (including the
+	// current thread) will wait on an event and (MAXIMUM_WAIT_OBJECTS - 1)
+	// HANDLEs.  The event is shared amongst all threads so that any thread
+	// that returns from a WaitForMultipleObjects() call will set the event
+	// and wake up all the other threads.
 	notify_event = CreateEvent(NULL, FALSE, FALSE, NULL);
-	if (notify_event == NULL) {
-		usbi_err(NULL, "Create Event failure");
+	if (notify_event == NULL)
 		return WAIT_FAILED;
-	}
 
-	pThread = malloc(sizeof(struct ExThreadData) * nThreads);
-
-	if (pThread == NULL) {
-		usbi_err(NULL, "Out of memory");
+	num_threads = 1 + (num_wait_handles - MAXIMUM_WAIT_OBJECTS - 1) / (MAXIMUM_WAIT_OBJECTS - 1);
+	thread_data = malloc(num_threads * sizeof(*thread_data));
+	if (thread_data == NULL) {
 		CloseHandle(notify_event);
+		SetLastError(ERROR_OUTOFMEMORY);
 		return WAIT_FAILED;
 	}
 
-	for (i = 0; i < nThreads; i++)
-	{
-		pThread[i].wait_event[0] = CreateEvent(NULL, TRUE, FALSE, NULL);
-		pThread[i].notifyevents = notify_event;
+	handles = _alloca(MAXIMUM_WAIT_OBJECTS * sizeof(HANDLE));
+	handles[0] = notify_event;
+	memcpy(handles + 1, wait_handles, (MAXIMUM_WAIT_OBJECTS - 1) * sizeof(HANDLE));
+	wait_handles += MAXIMUM_WAIT_OBJECTS - 1;
+	num_wait_handles -= MAXIMUM_WAIT_OBJECTS - 1;
 
-		size = nCount - i * (MAXIMUM_WAIT_OBJECTS - 1);
-		if (size >= (MAXIMUM_WAIT_OBJECTS - 1))
-			size = (MAXIMUM_WAIT_OBJECTS - 1);
+	for (n = 0; n < num_threads; n++) {
+		DWORD copy_size = MIN(num_wait_handles, MAXIMUM_WAIT_OBJECTS - 1);
 
-		memcpy(pThread[i].wait_event + 1, lpHandles + i * (MAXIMUM_WAIT_OBJECTS - 1), size * sizeof(HANDLE));
+		thread_data[n].handles[0] = notify_event;
+		memcpy(thread_data[n].handles + 1, wait_handles, copy_size * sizeof(HANDLE));
+		thread_data[n].num_handles = copy_size + 1;
 
-		pThread[i].nEvents = size + 1;
+		// Create the thread that will wait on these HANDLEs
+		thread_data[n].thread = CreateThread(NULL, 0, WaitThread, &thread_data[n], 0, NULL);
+		if (thread_data[n].thread == NULL) {
+			thread_data[n].error = GetLastError();
+			SetEvent(notify_event);
+			num_threads = n + 1;
+			break;
+		}
 
-		pThread[i].bexit = 0;
-
-		pThread[i].thread = CreateThread(NULL, 0, WaitThread, pThread+i, 0, NULL);
+		wait_handles += copy_size;
+		num_wait_handles -= copy_size;
 	}
 
-	ret = WaitForSingleObject(notify_event, INFINITE);
-
-	for (i = 0; i < nThreads; i++)
-	{
-		SetEvent(pThread[i].wait_event[0]);
-		while (pThread[i].bexit == 0); //wait for thread exist;
-
-		if (pThread[i].ret_wait != WAIT_OBJECT_0)
-			ret = pThread[i].ret_wait + i * (MAXIMUM_WAIT_OBJECTS - 1);
-
-		CloseHandle(pThread[i].wait_event[0]);
+	status = WaitForMultipleObjects(MAXIMUM_WAIT_OBJECTS, handles, FALSE, timeout);
+	if ((status >= WAIT_OBJECT_0) && (status < (WAIT_OBJECT_0 + MAXIMUM_WAIT_OBJECTS))) {
+		if (status > WAIT_OBJECT_0) {
+			// Wake up all the waiting threads
+			SetEvent(notify_event);
+			status = WAIT_OBJECT_0;
+		}
+		error = 0;
+	} else if (status == WAIT_TIMEOUT) {
+		// Wake up all the waiting threads
+		SetEvent(notify_event);
+		error = 0;
+	} else {
+		assert(status == WAIT_FAILED);
+		error = (status == WAIT_FAILED) ? GetLastError() : ERROR_CAN_NOT_COMPLETE;
 	}
+
+	for (n = 0; n < num_threads; n++) {
+		if (thread_data[n].thread != NULL) {
+			if (WaitForSingleObject(thread_data[n].thread, INFINITE) != WAIT_OBJECT_0)
+				usbi_err(NULL, "WaitForSingleObject() failed: %lu", GetLastError());
+			CloseHandle(thread_data[n].thread);
+		}
+		if (thread_data[n].error) {
+			usbi_err(NULL, "wait thread %d had error %lu\n", n, thread_data[n].error);
+			error = thread_data[n].error;
+			status = WAIT_FAILED;
+		}
+	}
+
+	free(thread_data);
 
 	CloseHandle(notify_event);
-	free(pThread);
 
-	return ret ;
+	if (status == WAIT_FAILED)
+		SetLastError(error);
+
+	return status;
 }
 
 /*
@@ -343,34 +336,95 @@ static DWORD ExtendWaitForMultipleObjects(
  */
 int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 {
-	HANDLE *wait_handles;
-	DWORD nb_wait_handles = 0;
-	DWORD ret;
+	struct file_descriptor **fds_array;
+	HANDLE *handles_array;
+	struct file_descriptor *fd;
+	unsigned int n;
 	int nready;
 
-	wait_handles = malloc(nfds * sizeof(HANDLE));
-	if (!wait_handles)
-	{
-		usbi_err(NULL, "Out of memory");
-		return -1;
+	if (nfds <= MAXIMUM_WAIT_OBJECTS) {
+		fds_array = _alloca(nfds * sizeof(*fds_array));
+		handles_array = _alloca(nfds * sizeof(*handles_array));
+	} else {
+		fds_array = malloc(nfds * sizeof(*fds_array));
+		if (fds_array == NULL)
+			return_with_errno(ENOMEM);
+		handles_array = malloc(nfds * sizeof(*handles_array));
+		if (handles_array == NULL) {
+			free(fds_array);
+			return_with_errno(ENOMEM);
+		}
 	}
 
-	nready = check_pollfds(fds, nfds, wait_handles, &nb_wait_handles);
+	usbi_mutex_static_lock(&fd_table_lock);
+	for (n = 0; n < nfds; n++) {
+		struct pollfd *pfd = &fds[n];
 
-	// If nothing was triggered, wait on all fds that require it
-	if ((nready == 0) && (nb_wait_handles != 0) && (timeout != 0)) {
-		ret = ExtendWaitForMultipleObjects(nb_wait_handles, wait_handles,
-			FALSE, (timeout < 0) ? INFINITE : (DWORD)timeout);
-		if (ret != EXT_TIMEOUT && ret <= (WAIT_OBJECT_0 + nb_wait_handles)) {
-			nready = check_pollfds(fds, nfds, NULL, NULL);
-		} else if (ret != EXT_TIMEOUT) {
-			if (ret == WAIT_FAILED)
-				usbi_err(NULL, "WaitForMultipleObjects failed: %u", (unsigned int)GetLastError());
+		// Keep it simple - only allow either POLLIN *or* POLLOUT
+		assert((pfd->events == POLLIN) || (pfd->events == POLLOUT));
+		if ((pfd->events != POLLIN) && (pfd->events != POLLOUT)) {
+			fds_array[n] = NULL;
+			continue;
+		}
+
+		// All file descriptors must be valid
+		fd = get_fd(pfd->fd, true);
+		assert(fd != NULL);
+		if (fd == NULL) {
+			fds_array[n] = NULL;
+			continue;
+		}
+
+		// We hold a reference to fd for the duration of usbi_poll()
+		fds_array[n] = fd;
+		handles_array[n] = fd->overlapped.hEvent;
+	}
+	usbi_mutex_static_unlock(&fd_table_lock);
+
+	nready = 0;
+	while (nready == 0) {
+		DWORD ret;
+
+		// Check all fds for events
+		for (n = 0; n < nfds; n++) {
+			fd = fds_array[n];
+			if (fd == NULL) {
+				fds[n].revents = POLLNVAL;
+				nready++;
+			} else if (HasOverlappedIoCompleted(&fd->overlapped) &&
+					(WaitForSingleObject(fd->overlapped.hEvent, 0) == WAIT_OBJECT_0)) {
+				fds[n].revents = fds[n].events;
+				nready++;
+			} else {
+				fds[n].revents = 0;
+			}
+		}
+
+		if ((nready != 0) || (timeout == 0))
+			break;
+
+		// Wait for any of the events to trigger
+		ret = poll_wait(handles_array, nfds, (timeout < 0) ? INFINITE : (DWORD)timeout);
+		if (ret == WAIT_TIMEOUT) {
+			assert(timeout > 0);
+			timeout = 0;
+		} else if (ret == WAIT_FAILED) {
+			usbi_err(NULL, "WaitForMultipleObjects failed: %lu", GetLastError());
+			errno = EIO;
 			nready = -1;
 		}
 	}
 
-	free(wait_handles);
+	for (n = 0; n < nfds; n++) {
+		if (fds_array[n] != NULL)
+			put_fd(fds_array[n]);
+	}
+
+	if (nfds > MAXIMUM_WAIT_OBJECTS) {
+		free(handles_array);
+		free(fds_array);
+	}
+
 	return nready;
 }
 
@@ -381,37 +435,18 @@ int usbi_close(int _fd)
 {
 	struct file_descriptor *fd;
 
-	if (_fd < 0 || _fd >= fd_size)
-		goto err_badfd;
-
 	usbi_mutex_static_lock(&fd_table_lock);
-	fd = fd_table[_fd];
-	fd->refcount--;
-	//FD_TYPE_PIPE map fd to two _fd
-	if(fd->refcount==0 || (fd->refcount == 1 && fd->type == FD_TYPE_PIPE))
-	{	fd_table[_fd] = NULL;
-		usbi_dec_fd_table();
-
-		if (fd->type == FD_TYPE_PIPE) {
-			// InternalHigh is our reference count
-			fd->overlapped.InternalHigh--;
-			if (fd->overlapped.InternalHigh == 0)
-				free_fd(fd);
-		}
-		else {
-			free_fd(fd);
-		}
-	}
+	fd = get_fd(_fd, false);
+	if (fd != NULL)
+		remove_fd(_fd);
 	usbi_mutex_static_unlock(&fd_table_lock);
 
 	if (fd == NULL)
-		goto err_badfd;
+		return_with_errno(EBADF);
+
+	put_fd(fd);
 
 	return 0;
-
-err_badfd:
-	errno = EBADF;
-	return -1;
 }
 
 /*
@@ -423,51 +458,33 @@ err_badfd:
 int usbi_pipe(int filedes[2])
 {
 	struct file_descriptor *fd;
-	int r_fd = -1, w_fd = -1;
-	int i;
+	int r_fd, w_fd;
+	int error = 0;
 
-	fd = create_fd(FD_TYPE_PIPE);
-	if (fd == NULL) {
-		errno = ENOMEM;
-		return -1;
-	}
+	fd = alloc_fd(FD_TYPE_PIPE, 2);
+	if (fd == NULL)
+		return_with_errno(ENOMEM);
 
-	// Use InternalHigh as a reference count
 	fd->overlapped.Internal = STATUS_PENDING;
-	fd->overlapped.InternalHigh = 2;
 
 	usbi_mutex_static_lock(&fd_table_lock);
-	do {
-		smart_realloc_fd_table_space(2);
-
-		for (i = 0; i < fd_size; i++) {
-			if (fd_table[i] != NULL)
-				continue;
-			if (r_fd == -1) {
-				r_fd = i;
-			} else if (w_fd == -1) {
-				w_fd = i;
-				break;
-			}
+	r_fd = install_fd(fd);
+	if (r_fd >= 0) {
+		w_fd = install_fd(fd);
+		if (w_fd < 0) {
+			remove_fd(r_fd);
+			error = w_fd;
 		}
-
-		if (i == fd_size)
-			break;
-
-		fd_table[r_fd] = fd;
-		fd_table[w_fd] = fd;
-
-		fd->refcount++; //this fd reference twice for r and w.
-
-		fd_count += 2;
-
-	} while (0);
+	} else {
+		error = r_fd;
+		w_fd = -1; // Keep compiler happy
+	}
 	usbi_mutex_static_unlock(&fd_table_lock);
 
-	if (i == fd_size) {
-		free_fd(fd);
-		errno = EMFILE;
-		return -1;
+	if (error) {
+		CloseHandle(fd->overlapped.hEvent);
+		free(fd);
+		return_with_errno(error);
 	}
 
 	filedes[0] = r_fd;
@@ -479,75 +496,61 @@ int usbi_pipe(int filedes[2])
 /*
  * synchronous write for fake "pipe" signaling
  */
-ssize_t usbi_write(int fd, const void *buf, size_t count)
+ssize_t usbi_write(int _fd, const void *buf, size_t count)
 {
-	int error = EBADF;
+	struct file_descriptor *fd;
 
 	UNUSED(buf);
 
-	if (fd < 0 || fd >= fd_size)
-		goto err_out;
-
 	if (count != sizeof(unsigned char)) {
 		usbi_err(NULL, "this function should only used for signaling");
-		error = EINVAL;
-		goto err_out;
+		return_with_errno(EINVAL);
 	}
 
 	usbi_mutex_static_lock(&fd_table_lock);
-	if ((fd_table[fd] != NULL) && (fd_table[fd]->type == FD_TYPE_PIPE)) {
-		assert(fd_table[fd]->overlapped.Internal == STATUS_PENDING);
-		assert(fd_table[fd]->overlapped.InternalHigh == 2);
-		fd_table[fd]->overlapped.Internal = STATUS_WAIT_0;
-		SetEvent(fd_table[fd]->overlapped.hEvent);
-		error = 0;
+	fd = get_fd(_fd, false);
+	if (fd && fd->type == FD_TYPE_PIPE) {
+		assert(fd->overlapped.Internal == STATUS_PENDING);
+		fd->overlapped.Internal = STATUS_WAIT_0;
+		SetEvent(fd->overlapped.hEvent);
+	} else {
+		fd = NULL;
 	}
 	usbi_mutex_static_unlock(&fd_table_lock);
 
-	if (error)
-		goto err_out;
+	if (fd == NULL)
+		return_with_errno(EBADF);
 
 	return sizeof(unsigned char);
-
-err_out:
-	errno = error;
-	return -1;
 }
 
 /*
  * synchronous read for fake "pipe" signaling
  */
-ssize_t usbi_read(int fd, void *buf, size_t count)
+ssize_t usbi_read(int _fd, void *buf, size_t count)
 {
-	int error = EBADF;
+	struct file_descriptor *fd;
 
 	UNUSED(buf);
 
-	if (fd < 0 || fd >= fd_size)
-		goto err_out;
-
 	if (count != sizeof(unsigned char)) {
 		usbi_err(NULL, "this function should only used for signaling");
-		error = EINVAL;
-		goto err_out;
+		return_with_errno(EINVAL);
 	}
 
 	usbi_mutex_static_lock(&fd_table_lock);
-	if ((fd_table[fd] != NULL) && (fd_table[fd]->type == FD_TYPE_PIPE)) {
-		assert(fd_table[fd]->overlapped.Internal == STATUS_WAIT_0);
-		assert(fd_table[fd]->overlapped.InternalHigh == 2);
-		fd_table[fd]->overlapped.Internal = STATUS_PENDING;
-		ResetEvent(fd_table[fd]->overlapped.hEvent);
-		error = 0;
+	fd = get_fd(_fd, false);
+	if (fd && fd->type == FD_TYPE_PIPE) {
+		assert(fd->overlapped.Internal == STATUS_WAIT_0);
+		fd->overlapped.Internal = STATUS_PENDING;
+		ResetEvent(fd->overlapped.hEvent);
+	} else {
+		fd = NULL;
 	}
 	usbi_mutex_static_unlock(&fd_table_lock);
 
-	if (error)
-		goto err_out;
+	if (fd == NULL)
+		return_with_errno(EBADF);
 
 	return sizeof(unsigned char);
-
-err_out:
-	errno = error;
-	return -1;
 }
