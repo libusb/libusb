@@ -68,12 +68,12 @@ static int set_fd_cloexec_nb(int fd, int socktype)
 	if (!(socktype & SOCK_CLOEXEC)) {
 		flags = fcntl(fd, F_GETFD);
 		if (flags == -1) {
-			usbi_err(NULL, "failed to get netlink fd flags (%d)", errno);
+			usbi_err(NULL, "failed to get netlink fd flags, errno=%d", errno);
 			return -1;
 		}
 
 		if (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1) {
-			usbi_err(NULL, "failed to set netlink fd flags (%d)", errno);
+			usbi_err(NULL, "failed to set netlink fd flags, errno=%d", errno);
 			return -1;
 		}
 	}
@@ -83,12 +83,12 @@ static int set_fd_cloexec_nb(int fd, int socktype)
 	if (!(socktype & SOCK_NONBLOCK)) {
 		flags = fcntl(fd, F_GETFL);
 		if (flags == -1) {
-			usbi_err(NULL, "failed to get netlink fd status flags (%d)", errno);
+			usbi_err(NULL, "failed to get netlink fd status flags, errno=%d", errno);
 			return -1;
 		}
 
 		if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-			usbi_err(NULL, "failed to set netlink fd status flags (%d)", errno);
+			usbi_err(NULL, "failed to set netlink fd status flags, errno=%d", errno);
 			return -1;
 		}
 	}
@@ -111,7 +111,7 @@ int linux_netlink_start_event_monitor(void)
 	}
 
 	if (linux_netlink_socket == -1) {
-		usbi_err(NULL, "failed to create netlink socket (%d)", errno);
+		usbi_err(NULL, "failed to create netlink socket, errno=%d", errno);
 		goto err;
 	}
 
@@ -121,13 +121,13 @@ int linux_netlink_start_event_monitor(void)
 
 	ret = bind(linux_netlink_socket, (struct sockaddr *)&sa_nl, sizeof(sa_nl));
 	if (ret == -1) {
-		usbi_err(NULL, "failed to bind netlink socket (%d)", errno);
+		usbi_err(NULL, "failed to bind netlink socket, errno=%d", errno);
 		goto err_close_socket;
 	}
 
 	ret = setsockopt(linux_netlink_socket, SOL_SOCKET, SO_PASSCRED, &opt, sizeof(opt));
 	if (ret == -1) {
-		usbi_err(NULL, "failed to set netlink socket SO_PASSCRED option (%d)", errno);
+		usbi_err(NULL, "failed to set netlink socket SO_PASSCRED option, errno=%d", errno);
 		goto err_close_socket;
 	}
 
@@ -314,7 +314,7 @@ static int linux_netlink_read_message(void)
 	len = recvmsg(linux_netlink_socket, &msg, 0);
 	if (len == -1) {
 		if (errno != EAGAIN && errno != EINTR)
-			usbi_err(NULL, "error receiving message from netlink (%d)", errno);
+			usbi_err(NULL, "error receiving message from netlink, errno=%d", errno);
 		return -1;
 	}
 

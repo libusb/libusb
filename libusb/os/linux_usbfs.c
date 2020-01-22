@@ -368,7 +368,7 @@ static clockid_t find_monotonic_clock(void)
 	r = clock_gettime(CLOCK_MONOTONIC, &ts);
 	if (r == 0)
 		return CLOCK_MONOTONIC;
-	usbi_dbg("monotonic clock doesn't work, errno %d", errno);
+	usbi_dbg("monotonic clock doesn't work, errno=%d", errno);
 #endif
 
 	return CLOCK_REALTIME;
@@ -381,7 +381,7 @@ static int get_kernel_version(struct libusb_context *ctx,
 	int atoms;
 
 	if (uname(&uts) < 0) {
-		usbi_err(ctx, "uname failed, errno %d", errno);
+		usbi_err(ctx, "uname failed, errno=%d", errno);
 		return -1;
 	}
 
@@ -589,7 +589,7 @@ static int _open_sysfs_attr(struct libusb_device *dev, const char *attr)
 	fd = _open(filename, O_RDONLY);
 	if (fd < 0) {
 		usbi_err(DEVICE_CTX(dev),
-			"open %s failed ret=%d errno=%d", filename, fd, errno);
+			"open %s failed, errno=%d", filename, errno);
 		return LIBUSB_ERROR_IO;
 	}
 
@@ -613,13 +613,13 @@ static int __read_sysfs_attr(struct libusb_context *ctx,
 			   disconnected (see trac ticket #70). */
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
-		usbi_err(ctx, "open %s failed errno=%d", filename, errno);
+		usbi_err(ctx, "open %s failed, errno=%d", filename, errno);
 		return LIBUSB_ERROR_IO;
 	}
 
 	f = fdopen(fd, "r");
 	if (f == NULL) {
-		usbi_err(ctx, "fdopen %s failed errno=%d", filename, errno);
+		usbi_err(ctx, "fdopen %s failed, errno=%d", filename, errno);
 		close(fd);
 		return LIBUSB_ERROR_OTHER;
 	}
@@ -666,7 +666,7 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 	close(fd);
 	if (r < 0) {
 		usbi_err(DEVICE_CTX(dev),
-			"read bConfigurationValue failed ret=%zd errno=%d", r, errno);
+			"read bConfigurationValue failed, errno=%d", errno);
 		return LIBUSB_ERROR_IO;
 	} else if (r == 0) {
 		usbi_dbg("device unconfigured");
@@ -1006,7 +1006,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		fd = wrapped_fd;
 		r = lseek(fd, 0, SEEK_SET);
 		if (r < 0) {
-			usbi_err(ctx, "seek failed ret=%zd errno=%d", r, errno);
+			usbi_err(ctx, "lseek failed, errno=%d", errno);
 			return LIBUSB_ERROR_IO;
 		}
 	}
@@ -1030,8 +1030,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		r = read(fd, priv->descriptors + priv->descriptors_len,
 			 descriptors_size - priv->descriptors_len);
 		if (r < 0) {
-			usbi_err(ctx, "read descriptor failed ret=%d errno=%d",
-				 fd, errno);
+			usbi_err(ctx, "read descriptor failed, errno=%d", errno);
 			if (fd != wrapped_fd)
 				close(fd);
 			return LIBUSB_ERROR_IO;
@@ -1280,7 +1279,7 @@ static int usbfs_get_device_list(struct libusb_context *ctx)
 	int r = 0;
 
 	if (!buses) {
-		usbi_err(ctx, "opendir buses failed errno=%d", errno);
+		usbi_err(ctx, "opendir buses failed, errno=%d", errno);
 		return LIBUSB_ERROR_IO;
 	}
 
@@ -1342,7 +1341,7 @@ static int sysfs_get_device_list(struct libusb_context *ctx)
 	int num_enumerated = 0;
 
 	if (!devices) {
-		usbi_err(ctx, "opendir devices failed errno=%d", errno);
+		usbi_err(ctx, "opendir devices failed, errno=%d", errno);
 		return LIBUSB_ERROR_IO;
 	}
 
@@ -1736,7 +1735,7 @@ static unsigned char *op_dev_mem_alloc(struct libusb_device_handle *handle,
 	unsigned char *buffer = (unsigned char *)mmap(NULL, len,
 		PROT_READ | PROT_WRITE, MAP_SHARED, hpriv->fd, 0);
 	if (buffer == MAP_FAILED) {
-		usbi_err(HANDLE_CTX(handle), "alloc dev mem failed errno %d",
+		usbi_err(HANDLE_CTX(handle), "alloc dev mem failed, errno=%d",
 			errno);
 		return NULL;
 	}
@@ -1747,7 +1746,7 @@ static int op_dev_mem_free(struct libusb_device_handle *handle,
 	unsigned char *buffer, size_t len)
 {
 	if (munmap(buffer, len) != 0) {
-		usbi_err(HANDLE_CTX(handle), "free dev mem failed errno %d",
+		usbi_err(HANDLE_CTX(handle), "free dev mem failed, errno=%d",
 			errno);
 		return LIBUSB_ERROR_OTHER;
 	} else {

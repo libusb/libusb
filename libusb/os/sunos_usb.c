@@ -35,7 +35,6 @@
 #include <sys/nvpair.h>
 #include <sys/devctl.h>
 #include <sys/usb/clients/ugen/usb_ugen.h>
-#include <errno.h>
 #include <sys/usb/usba.h>
 #include <sys/pci.h>
 #include <inttypes.h>
@@ -186,7 +185,7 @@ sunos_usb_ioctl(struct libusb_device *dev, int cmd)
 
 	fd = open(path_arg, O_RDONLY);
 	if (fd < 0) {
-		usbi_err(DEVICE_CTX(dev), "open failed: %d (%s)", errno, strerror(errno));
+		usbi_err(DEVICE_CTX(dev), "open failed: errno %d (%s)", errno, strerror(errno));
 		nvlist_free(nvlist);
 		free(hubpath);
 		return (-1);
@@ -710,13 +709,13 @@ sunos_get_device_list(struct libusb_context * ctx,
 	args.discdevs = discdevs;
 	args.last_ugenpath = NULL;
 	if ((root_node = di_init("/", DINFOCPYALL)) == DI_NODE_NIL) {
-		usbi_dbg("di_int() failed: %s", strerror(errno));
+		usbi_dbg("di_int() failed: errno %d (%s)", errno, strerror(errno));
 		return (LIBUSB_ERROR_IO);
 	}
 
 	if ((devlink_hdl = di_devlink_init(NULL, 0)) == NULL) {
 		di_fini(root_node);
-		usbi_dbg("di_devlink_init() failed: %s", strerror(errno));
+		usbi_dbg("di_devlink_init() failed: errno %d (%s)", errno, strerror(errno));
 
 		return (LIBUSB_ERROR_IO);
 	}
@@ -725,7 +724,7 @@ sunos_get_device_list(struct libusb_context * ctx,
 	/* walk each node to find USB devices */
 	if (di_walk_node(root_node, DI_WALK_SIBFIRST, &args,
 	    sunos_walk_minor_node_link) == -1) {
-		usbi_dbg("di_walk_node() failed: %s", strerror(errno));
+		usbi_dbg("di_walk_node() failed: errno %d (%s)", errno, strerror(errno));
 		di_fini(root_node);
 
 		return (LIBUSB_ERROR_IO);
@@ -917,7 +916,7 @@ sunos_check_device_and_status_open(struct libusb_device_handle *hdl,
 	}
 	/* Open the xfer endpoint first */
 	if ((fd = open(filename, mode)) == -1) {
-		usbi_dbg("can't open %s: %d(%s)", filename, errno,
+		usbi_dbg("can't open %s: errno %d (%s)", filename, errno,
 		    strerror(errno));
 
 		return (errno);
@@ -938,16 +937,16 @@ sunos_check_device_and_status_open(struct libusb_device_handle *hdl,
 
 		/* Open the status endpoint with RDWR */
 		if ((fdstat = open(statfilename, O_RDWR)) == -1) {
-			usbi_dbg("can't open %s RDWR: %d",
-				statfilename, errno);
+			usbi_dbg("can't open %s RDWR: errno %d (%s)",
+				statfilename, errno, strerror(errno));
 
 			return (errno);
 		} else {
 			count = write(fdstat, &control, sizeof (control));
 			if (count != 1) {
 				/* this should have worked */
-				usbi_dbg("can't write to %s: %d",
-					statfilename, errno);
+				usbi_dbg("can't write to %s: errno %d (%s)",
+					statfilename, errno, strerror(errno));
 				(void) close(fdstat);
 
 				return (errno);
@@ -955,7 +954,8 @@ sunos_check_device_and_status_open(struct libusb_device_handle *hdl,
 		}
 	} else {
 		if ((fdstat = open(statfilename, O_RDONLY)) == -1) {
-			usbi_dbg("can't open %s: %d", statfilename, errno);
+			usbi_dbg("can't open %s: errno %d (%s)", statfilename, errno,
+				strerror(errno));
 
 			return (errno);
 		}
@@ -963,8 +963,8 @@ sunos_check_device_and_status_open(struct libusb_device_handle *hdl,
 
 	/* Re-open the xfer endpoint */
 	if ((fd = open(filename, mode)) == -1) {
-		usbi_dbg("can't open %s: %d(%s)", filename, errno,
-		    strerror(errno));
+		usbi_dbg("can't open %s: errno %d (%s)", filename, errno,
+			strerror(errno));
 		(void) close(fdstat);
 
 		return (errno);
@@ -1059,7 +1059,8 @@ sunos_get_active_config_descriptor(struct libusb_device *dev,
 	 * has ever been changed through setCfg.
 	 */
 	if ((node = di_init(dpriv->phypath, DINFOCPYALL)) == DI_NODE_NIL) {
-		usbi_dbg("di_int() failed: %s", strerror(errno));
+		usbi_dbg("di_int() failed: errno %d (%s)", errno,
+			strerror(errno));
 		return (LIBUSB_ERROR_IO);
 	}
 	proplen = di_prop_lookup_bytes(DDI_DEV_T_ANY, node,
@@ -1301,12 +1302,12 @@ usb_do_io(int fd, int stat_fd, char *data, size_t size, int flag, int *status)
 	if (ret < 0) {
 		int save_errno = errno;
 
-		usbi_dbg("TID=%x io %s errno=%d(%s) ret=%d", pthread_self(),
-		    flag?"WRITE":"READ", errno, strerror(errno), ret);
+		usbi_dbg("TID=%x io %s errno %d (%s)", pthread_self(),
+		    flag?"WRITE":"READ", errno, strerror(errno));
 
 		/* sunos_usb_get_status will do a read and overwrite errno */
 		error = sunos_usb_get_status(stat_fd);
-		usbi_dbg("io status=%d errno=%d(%s)", error,
+		usbi_dbg("io status=%d errno %d (%s)", error,
 			save_errno, strerror(save_errno));
 
 		if (status) {

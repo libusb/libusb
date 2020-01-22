@@ -1156,8 +1156,7 @@ int usbi_io_init(struct libusb_context *ctx)
 		if (r < 0)
 			goto err_close_timerfd;
 	} else {
-		usbi_dbg("timerfd not available (code %d error %d)", ctx->timerfd, errno);
-		ctx->timerfd = -1;
+		usbi_dbg("timerfd not available, errno=%d", errno);
 	}
 #endif
 
@@ -1435,7 +1434,7 @@ out:
 			USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)->timeout);
 		r = timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &it, NULL);
 		if (r < 0) {
-			usbi_warn(ctx, "failed to arm first timerfd (errno %d)", errno);
+			usbi_warn(ctx, "failed to arm first timerfd, errno=%d", errno);
 			r = LIBUSB_ERROR_OTHER;
 		}
 	}
@@ -2188,7 +2187,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		r = LIBUSB_ERROR_INTERRUPTED;
 		goto done;
 	} else if (r < 0) {
-		usbi_err(ctx, "poll failed %d err=%d", r, errno);
+		usbi_err(ctx, "poll failed, errno=%d", errno);
 		r = LIBUSB_ERROR_IO;
 		goto done;
 	}
