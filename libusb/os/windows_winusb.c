@@ -2100,8 +2100,8 @@ static int winusbx_init(struct libusb_context *ctx)
 
 		if (WinUSBX[i].Initialize != NULL) {
 			WinUSBX[i].initialized = true;
-			// Assume driver supports CancelIoEx() if it is available
-			WinUSBX[i].CancelIoEx_supported = (pCancelIoEx != NULL);
+			// Assume driver supports CancelIoEx()
+			WinUSBX[i].CancelIoEx_supported = true;
 			usbi_dbg("initalized sub API %s", winusbx_driver_names[i]);
 		} else {
 			usbi_warn(ctx, "Failed to initalize sub API %s", winusbx_driver_names[i]);
@@ -2926,7 +2926,7 @@ static int winusbx_abort_transfers(int sub_api, struct usbi_transfer *itransfer)
 	if (WinUSBX[sub_api].CancelIoEx_supported) {
 		// Try to use CancelIoEx if available to cancel just a single transfer
 		handle = handle_priv->interface_handle[current_interface].dev_handle;
-		if (pCancelIoEx(handle, transfer_priv->pollable_fd.overlapped))
+		if (CancelIoEx(handle, transfer_priv->pollable_fd.overlapped))
 			return LIBUSB_SUCCESS;
 		else if (GetLastError() == ERROR_NOT_FOUND)
 			return LIBUSB_ERROR_NOT_FOUND;
@@ -3978,16 +3978,11 @@ static int hid_abort_transfers(int sub_api, struct usbi_transfer *itransfer)
 
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 
-	if (pCancelIoEx != NULL) {
-		// Use CancelIoEx if available to cancel just a single transfer
-		if (pCancelIoEx(hid_handle, transfer_priv->pollable_fd.overlapped))
+	// Use CancelIoEx to cancel just a single transfer
+	if (CancelIoEx(hid_handle, transfer_priv->pollable_fd.overlapped))
 			return LIBUSB_SUCCESS;
-	} else {
-		if (CancelIo(hid_handle))
-			return LIBUSB_SUCCESS;
-	}
 
-	usbi_warn(ctx, "cancel failed: %s", windows_error_str(0));
+	usbi_warn(ctx, "CancelIoEx failed: %s", windows_error_str(0));
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 

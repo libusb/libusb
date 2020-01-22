@@ -178,8 +178,7 @@ windows)
 	LIBS=""
 	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
 	AC_DEFINE([POLL_NFDS_TYPE],[unsigned int],[type of second poll() argument])
-	AC_DEFINE([WINVER], 0x0501, [Oldest Windows version supported])
-	AC_DEFINE([_WIN32_WINNT], 0x0501, [Oldest Windows version supported])
+	AC_DEFINE([_WIN32_WINNT], [_WIN32_WINNT_VISTA], [Oldest Windows version supported (Vista)])
 	;;
 haiku)
 	AC_DEFINE(OS_HAIKU, 1, [Haiku backend])

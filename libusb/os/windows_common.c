@@ -34,7 +34,6 @@
 #define EPOCH_TIME	UINT64_C(116444736000000000)	// 1970.01.01 00:00:000 in MS Filetime
 
 // Public
-BOOL (WINAPI *pCancelIoEx)(HANDLE, LPOVERLAPPED);
 enum windows_version windows_version = WINDOWS_UNDEFINED;
 
  // Global variables for init/exit
@@ -58,11 +57,6 @@ struct timer_request {
 // Timer thread
 static HANDLE timer_thread = NULL;
 static DWORD timer_thread_id = 0;
-
-/* Kernel32 dependencies */
-DLL_DECLARE_HANDLE(Kernel32);
-/* This call is only available from XP SP2 */
-DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, IsWow64Process, (HANDLE, PBOOL));
 
 /* User32 dependencies */
 DLL_DECLARE_HANDLE(User32);
@@ -287,12 +281,6 @@ void windows_force_sync_completion(OVERLAPPED *overlapped, ULONG size)
 
 static BOOL windows_init_dlls(void)
 {
-	DLL_GET_HANDLE(Kernel32);
-	DLL_LOAD_FUNC_PREFIXED(Kernel32, p, IsWow64Process, FALSE);
-	pCancelIoEx = (BOOL (WINAPI *)(HANDLE, LPOVERLAPPED))
-		GetProcAddress(DLL_HANDLE_NAME(Kernel32), "CancelIoEx");
-	usbi_dbg("Will use CancelIo%s for I/O cancellation", pCancelIoEx ? "Ex" : "");
-
 	DLL_GET_HANDLE(User32);
 	DLL_LOAD_FUNC_PREFIXED(User32, p, GetMessageA, TRUE);
 	DLL_LOAD_FUNC_PREFIXED(User32, p, PeekMessageA, TRUE);
@@ -303,7 +291,6 @@ static BOOL windows_init_dlls(void)
 
 static void windows_exit_dlls(void)
 {
-	DLL_FREE_HANDLE(Kernel32);
 	DLL_FREE_HANDLE(User32);
 }
 
@@ -394,8 +381,7 @@ static BOOL is_x64(void)
 
 	// Detect if we're running a 32 or 64 bit system
 	if (sizeof(uintptr_t) < 8) {
-		if (pIsWow64Process != NULL)
-			pIsWow64Process(GetCurrentProcess(), &ret);
+		IsWow64Process(GetCurrentProcess(), &ret);
 	} else {
 		ret = TRUE;
 	}

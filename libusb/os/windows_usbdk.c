@@ -728,20 +728,12 @@ static int usbdk_abort_transfers(struct usbi_transfer *itransfer)
 	struct usbdk_transfer_priv *transfer_priv = _usbdk_transfer_priv(itransfer);
 	struct winfd *pollable_fd = &transfer_priv->pollable_fd;
 
-	if (pCancelIoEx != NULL) {
-		// Use CancelIoEx if available to cancel just a single transfer
-		if (!pCancelIoEx(priv->system_handle, pollable_fd->overlapped)) {
-			usbi_err(ctx, "CancelIoEx failed: %s", windows_error_str(0));
-			return LIBUSB_ERROR_NO_DEVICE;
-		}
-	} else {
-		if (!usbdk_helper.AbortPipe(priv->redirector_handle, transfer->endpoint)) {
-			usbi_err(ctx, "AbortPipe failed: %s", windows_error_str(0));
-			return LIBUSB_ERROR_NO_DEVICE;
-		}
-	}
+	// Use CancelIoEx to cancel just a single transfer
+	if (CancelIoEx(priv->system_handle, pollable_fd->overlapped))
+		return LIBUSB_SUCCESS;
 
-	return LIBUSB_SUCCESS;
+	usbi_warn(ctx, "CancelIoEx failed: %s", windows_error_str(0));
+	return LIBUSB_ERROR_NOT_FOUND;
 }
 
 static int usbdk_cancel_transfer(struct usbi_transfer *itransfer)

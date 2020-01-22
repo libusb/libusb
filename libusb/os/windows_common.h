@@ -134,9 +134,6 @@ enum windows_version {
 
 extern enum windows_version windows_version;
 
-/* This call is only available from Vista */
-extern BOOL (WINAPI *pCancelIoEx)(HANDLE, LPOVERLAPPED);
-
 #include <pshpack1.h>
 
 typedef struct USB_DEVICE_DESCRIPTOR {

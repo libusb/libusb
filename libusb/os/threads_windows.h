@@ -57,7 +57,7 @@ static inline void usbi_mutex_destroy(usbi_mutex_t *mutex)
 }
 
 // We *were* getting timespec from pthread.h:
-#if (!defined(HAVE_STRUCT_TIMESPEC) && !defined(_TIMESPEC_DEFINED))
+#if !defined(HAVE_STRUCT_TIMESPEC) && !defined(_TIMESPEC_DEFINED)
 #define HAVE_STRUCT_TIMESPEC 1
 #define _TIMESPEC_DEFINED 1
 struct timespec {
@@ -71,19 +71,25 @@ struct timespec {
 #define ETIMEDOUT	10060	/* This is the value in winsock.h. */
 #endif
 
-typedef struct usbi_cond {
-	// Every time a thread touches the CV, it winds up in one of these lists.
-	//   It stays there until the CV is destroyed, even if the thread terminates.
-	struct list_head waiters;
-	struct list_head not_waiting;
-} usbi_cond_t;
-
-void usbi_cond_init(usbi_cond_t *cond);
-int usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex);
+typedef CONDITION_VARIABLE usbi_cond_t;
+static inline void usbi_cond_init(usbi_cond_t *cond)
+{
+	InitializeConditionVariable(cond);
+}
+static inline void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
+{
+	(void)SleepConditionVariableCS(cond, mutex, INFINITE);
+}
 int usbi_cond_timedwait(usbi_cond_t *cond,
 	usbi_mutex_t *mutex, const struct timeval *tv);
-void usbi_cond_broadcast(usbi_cond_t *cond);
-void usbi_cond_destroy(usbi_cond_t *cond);
+static inline void usbi_cond_broadcast(usbi_cond_t *cond)
+{
+	WakeAllConditionVariable(cond);
+}
+static inline void usbi_cond_destroy(usbi_cond_t *cond)
+{
+	UNUSED(cond);
+}
 
 typedef DWORD usbi_tls_key_t;
 static inline void usbi_tls_key_create(usbi_tls_key_t *key)
