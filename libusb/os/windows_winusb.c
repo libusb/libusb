@@ -3354,7 +3354,7 @@ static int _hid_get_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 		usbi_dbg("program assertion failed: hid_buffer is not NULL");
 
 	if ((*size == 0) || (*size > MAX_HID_REPORT_SIZE)) {
-		usbi_dbg("invalid size ("PRIuPTR")", (uintptr_t)*size);
+		usbi_dbg("invalid size (%"PRIuPTR")", (uintptr_t)*size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
@@ -3433,7 +3433,7 @@ static int _hid_set_report(struct hid_device_priv *dev, HANDLE hid_handle, int i
 		usbi_dbg("program assertion failed: hid_buffer is not NULL");
 
 	if ((*size == 0) || (*size > max_report_size)) {
-		usbi_dbg("invalid size ("PRIuPTR")", (uintptr_t)*size);
+		usbi_dbg("invalid size (%"PRIuPTR")", (uintptr_t)*size);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
