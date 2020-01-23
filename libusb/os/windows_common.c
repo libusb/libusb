@@ -678,12 +678,6 @@ static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 	return priv->backend->cancel_transfer(itransfer);
 }
 
-static void windows_clear_transfer_priv(struct usbi_transfer *itransfer)
-{
-	struct windows_context_priv *priv = _context_priv(ITRANSFER_CTX(itransfer));
-	priv->backend->clear_transfer_priv(itransfer);
-}
-
 static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready)
 {
 	struct windows_context_priv *priv = _context_priv(ctx);
@@ -810,7 +804,7 @@ const struct usbi_os_backend usbi_backend = {
 	windows_destroy_device,
 	windows_submit_transfer,
 	windows_cancel_transfer,
-	windows_clear_transfer_priv,
+	NULL,	/* clear_transfer_priv */
 	windows_handle_events,
 	NULL,	/* handle_transfer_completion */
 	windows_clock_gettime,

@@ -79,7 +79,6 @@ static int sunos_reset_device(struct libusb_device_handle *);
 static void sunos_destroy_device(struct libusb_device *);
 static int sunos_submit_transfer(struct usbi_transfer *);
 static int sunos_cancel_transfer(struct usbi_transfer *);
-static void sunos_clear_transfer_priv(struct usbi_transfer *);
 static int sunos_handle_transfer_completion(struct usbi_transfer *);
 static int sunos_clock_gettime(int, struct timespec *);
 static int sunos_kernel_driver_active(struct libusb_device_handle *, int interface);
@@ -244,16 +243,6 @@ sunos_kernel_driver_active(struct libusb_device_handle *dev, int interface)
  */
 static int _errno_to_libusb(int);
 static int sunos_usb_get_status(int fd);
-
-static int sunos_init(struct libusb_context *ctx)
-{
-	return (LIBUSB_SUCCESS);
-}
-
-static void sunos_exit(struct libusb_context *ctx)
-{
-	usbi_dbg("");
-}
 
 static string_list_t *
 sunos_new_string_list(void)
@@ -1511,14 +1500,6 @@ sunos_cancel_transfer(struct usbi_transfer *itransfer)
 	return (ret);
 }
 
-void
-sunos_clear_transfer_priv(struct usbi_transfer *itransfer)
-{
-	usbi_dbg("");
-
-	/* Nothing to do */
-}
-
 int
 sunos_handle_transfer_completion(struct usbi_transfer *itransfer)
 {
@@ -1670,33 +1651,25 @@ static clockid_t op_get_timerfd_clockid(void)
 const struct usbi_os_backend usbi_backend = {
         .name = "Solaris",
         .caps = 0,
-        .init = sunos_init,
-        .exit = sunos_exit,
         .get_device_list = sunos_get_device_list,
         .get_device_descriptor = sunos_get_device_descriptor,
         .get_active_config_descriptor = sunos_get_active_config_descriptor,
         .get_config_descriptor = sunos_get_config_descriptor,
-        .hotplug_poll = NULL,
         .open = sunos_open,
         .close = sunos_close,
         .get_configuration = sunos_get_configuration,
         .set_configuration = sunos_set_configuration,
-
         .claim_interface = sunos_claim_interface,
         .release_interface = sunos_release_interface,
         .set_interface_altsetting = sunos_set_interface_altsetting,
         .clear_halt = sunos_clear_halt,
         .reset_device = sunos_reset_device, /* TODO */
-        .alloc_streams = NULL,
-        .free_streams = NULL,
         .kernel_driver_active = sunos_kernel_driver_active,
         .detach_kernel_driver = sunos_detach_kernel_driver,
         .attach_kernel_driver = sunos_attach_kernel_driver,
         .destroy_device = sunos_destroy_device,
         .submit_transfer = sunos_submit_transfer,
         .cancel_transfer = sunos_cancel_transfer,
-	.handle_events = NULL,
-        .clear_transfer_priv = sunos_clear_transfer_priv,
         .handle_transfer_completion = sunos_handle_transfer_completion,
         .clock_gettime = sunos_clock_gettime,
 #ifdef USBI_TIMERFD_AVAILABLE

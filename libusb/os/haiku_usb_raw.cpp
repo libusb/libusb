@@ -165,14 +165,6 @@ haiku_cancel_transfer(struct usbi_transfer *itransfer)
 	return fDeviceHandle->CancelTransfer(*((USBTransfer **)usbi_transfer_get_os_priv(itransfer)));
 }
 
-static void
-haiku_clear_transfer_priv(struct usbi_transfer *itransfer)
-{
-	USBTransfer *transfer = *((USBTransfer **)usbi_transfer_get_os_priv(itransfer));
-	delete transfer;
-	*((USBTransfer **)usbi_transfer_get_os_priv(itransfer)) = NULL;
-}
-
 static int
 haiku_handle_transfer_completion(struct usbi_transfer *itransfer)
 {
@@ -214,20 +206,15 @@ const struct usbi_os_backend usbi_backend = {
 	.caps = 0,
 	.init = haiku_init,
 	.exit = haiku_exit,
-	.set_option = NULL,
-	.get_device_list = NULL,
-	.hotplug_poll = NULL,
-	.wrap_sys_device = NULL,
 	.open = haiku_open,
 	.close = haiku_close,
+
 	.get_device_descriptor = haiku_get_device_descriptor,
 	.get_active_config_descriptor = haiku_get_active_config_descriptor,
 	.get_config_descriptor = haiku_get_config_descriptor,
-	.get_config_descriptor_by_value = NULL,
 
-
-	.get_configuration = NULL,
 	.set_configuration = haiku_set_configuration,
+
 	.claim_interface = haiku_claim_interface,
 	.release_interface = haiku_release_interface,
 
@@ -235,32 +222,13 @@ const struct usbi_os_backend usbi_backend = {
 	.clear_halt = haiku_clear_halt,
 	.reset_device = haiku_reset_device,
 
-	.alloc_streams = NULL,
-	.free_streams = NULL,
-
-	.dev_mem_alloc = NULL,
-	.dev_mem_free = NULL,
-
-	.kernel_driver_active = NULL,
-	.detach_kernel_driver = NULL,
-	.attach_kernel_driver = NULL,
-
-	.destroy_device = NULL,
-
 	.submit_transfer = haiku_submit_transfer,
 	.cancel_transfer = haiku_cancel_transfer,
-	.clear_transfer_priv = haiku_clear_transfer_priv,
 
-	.handle_events = NULL,
 	.handle_transfer_completion = haiku_handle_transfer_completion,
 
 	.clock_gettime = haiku_clock_gettime,
 
-#ifdef USBI_TIMERFD_AVAILABLE
-	.get_timerfd_clockid = NULL,
-#endif
-
-	.context_priv_size = 0,
 	.device_priv_size = sizeof(USBDevice *),
 	.device_handle_priv_size = sizeof(USBDeviceHandle *),
 	.transfer_priv_size = sizeof(USBTransfer *),

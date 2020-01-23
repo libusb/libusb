@@ -2852,7 +2852,6 @@ const struct usbi_os_backend usbi_backend = {
 	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
 	.init = op_init,
 	.exit = op_exit,
-	.get_device_list = NULL,
 	.hotplug_poll = op_hotplug_poll,
 	.get_device_descriptor = op_get_device_descriptor,
 	.get_active_config_descriptor = op_get_active_config_descriptor,

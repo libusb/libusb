@@ -73,7 +73,6 @@ static void obsd_destroy_device(struct libusb_device *);
 
 static int obsd_submit_transfer(struct usbi_transfer *);
 static int obsd_cancel_transfer(struct usbi_transfer *);
-static void obsd_clear_transfer_priv(struct usbi_transfer *);
 static int obsd_handle_transfer_completion(struct usbi_transfer *);
 static int obsd_clock_gettime(int, struct timespec *);
 
@@ -112,11 +111,11 @@ const struct usbi_os_backend usbi_backend = {
 
 	.submit_transfer = obsd_submit_transfer,
 	.cancel_transfer = obsd_cancel_transfer,
-	.clear_transfer_priv = obsd_clear_transfer_priv,
 
 	.handle_transfer_completion = obsd_handle_transfer_completion,
 
 	.clock_gettime = obsd_clock_gettime,
+
 	.device_priv_size = sizeof(struct device_priv),
 	.device_handle_priv_size = sizeof(struct handle_priv),
 };
@@ -500,14 +499,6 @@ obsd_cancel_transfer(struct usbi_transfer *itransfer)
 	usbi_dbg("");
 
 	return (LIBUSB_ERROR_NOT_SUPPORTED);
-}
-
-void
-obsd_clear_transfer_priv(struct usbi_transfer *itransfer)
-{
-	usbi_dbg("");
-
-	/* Nothing to do */
 }
 
 int

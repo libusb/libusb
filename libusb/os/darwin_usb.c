@@ -1715,19 +1715,6 @@ static int darwin_kernel_driver_active(struct libusb_device_handle *dev_handle, 
   return 0;
 }
 
-/* attaching/detaching kernel drivers is not currently supported (maybe in the future?) */
-static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle, int interface) {
-  UNUSED(dev_handle);
-  UNUSED(interface);
-  return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
-static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, int interface) {
-  UNUSED(dev_handle);
-  UNUSED(interface);
-  return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
 static void darwin_destroy_device(struct libusb_device *dev) {
   struct darwin_device_priv *dpriv = (struct darwin_device_priv *) dev->os_priv;
 
@@ -2058,16 +2045,6 @@ static int darwin_cancel_transfer(struct usbi_transfer *itransfer) {
   }
 }
 
-static void darwin_clear_transfer_priv (struct usbi_transfer *itransfer) {
-  struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-  struct darwin_transfer_priv *tpriv = usbi_transfer_get_os_priv(itransfer);
-
-  if (transfer->type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS && tpriv->isoc_framelist) {
-    free (tpriv->isoc_framelist);
-    tpriv->isoc_framelist = NULL;
-  }
-}
-
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0) {
   struct usbi_transfer *itransfer = (struct usbi_transfer *)refcon;
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
@@ -2252,7 +2229,6 @@ const struct usbi_os_backend usbi_backend = {
         .caps = 0,
         .init = darwin_init,
         .exit = darwin_exit,
-        .get_device_list = NULL, /* not needed */
         .get_device_descriptor = darwin_get_device_descriptor,
         .get_active_config_descriptor = darwin_get_active_config_descriptor,
         .get_config_descriptor = darwin_get_config_descriptor,
@@ -2275,14 +2251,11 @@ const struct usbi_os_backend usbi_backend = {
 #endif
 
         .kernel_driver_active = darwin_kernel_driver_active,
-        .detach_kernel_driver = darwin_detach_kernel_driver,
-        .attach_kernel_driver = darwin_attach_kernel_driver,
 
         .destroy_device = darwin_destroy_device,
 
         .submit_transfer = darwin_submit_transfer,
         .cancel_transfer = darwin_cancel_transfer,
-        .clear_transfer_priv = darwin_clear_transfer_priv,
 
         .handle_transfer_completion = darwin_handle_transfer_completion,
 
