@@ -130,7 +130,7 @@ netbsd_get_device_list(struct libusb_context * ctx,
 	char devnode[16];
 	int fd, err, i;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	/* Only ugen(4) is supported */
 	for (i = 0; i < USB_MAX_DEVICES; i++) {
@@ -231,7 +231,7 @@ netbsd_get_device_descriptor(struct libusb_device *dev, unsigned char *buf,
 {
 	struct device_priv *dpriv = (struct device_priv *)dev->os_priv;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	memcpy(buf, &dpriv->ddesc, DEVICE_DESC_LENGTH);
 
@@ -302,7 +302,7 @@ netbsd_get_configuration(struct libusb_device_handle *handle, int *config)
 {
 	struct device_priv *dpriv = (struct device_priv *)handle->dev->os_priv;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	if (ioctl(dpriv->fd, USB_GET_CONFIG, config) < 0)
 		return _errno_to_libusb(errno);
@@ -376,7 +376,7 @@ netbsd_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 	struct device_priv *dpriv = (struct device_priv *)handle->dev->os_priv;
 	struct usb_ctl_request req;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	req.ucr_request.bmRequestType = UT_WRITE_ENDPOINT;
 	req.ucr_request.bRequest = UR_CLEAR_FEATURE;
@@ -393,7 +393,7 @@ netbsd_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 int
 netbsd_reset_device(struct libusb_device_handle *handle)
 {
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	return (LIBUSB_ERROR_NOT_SUPPORTED);
 }
@@ -403,7 +403,7 @@ netbsd_destroy_device(struct libusb_device *dev)
 {
 	struct device_priv *dpriv = (struct device_priv *)dev->os_priv;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	free(dpriv->cdesc);
 }
@@ -415,7 +415,7 @@ netbsd_submit_transfer(struct usbi_transfer *itransfer)
 	struct handle_priv *hpriv;
 	int err = 0;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	hpriv = (struct handle_priv *)transfer->dev_handle->os_priv;
@@ -457,7 +457,7 @@ netbsd_submit_transfer(struct usbi_transfer *itransfer)
 int
 netbsd_cancel_transfer(struct usbi_transfer *itransfer)
 {
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	return (LIBUSB_ERROR_NOT_SUPPORTED);
 }
@@ -471,8 +471,6 @@ netbsd_handle_transfer_completion(struct usbi_transfer *itransfer)
 int
 netbsd_clock_gettime(int clkid, struct timespec *tp)
 {
-	usbi_dbg("clock %d", clkid);
-
 	if (clkid == USBI_CLOCK_REALTIME)
 		return clock_gettime(CLOCK_REALTIME, tp);
 

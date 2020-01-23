@@ -1003,7 +1003,7 @@ sunos_close(struct libusb_device_handle *handle)
 	sunos_dev_handle_priv_t *hpriv;
 	sunos_dev_priv_t *dpriv;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 	if (!handle) {
 		return;
 	}
@@ -1235,7 +1235,7 @@ sunos_do_async_io(struct libusb_transfer *transfer)
 	uint8_t ep;
 	struct sunos_transfer_priv *tpriv;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	tpriv = usbi_transfer_get_os_priv(LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer));
 	hpriv = (sunos_dev_handle_priv_t *)transfer->dev_handle->os_priv;
@@ -1400,7 +1400,7 @@ sunos_clear_halt(struct libusb_device_handle *handle, uint8_t endpoint)
 int
 sunos_reset_device(struct libusb_device_handle *handle)
 {
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	return (LIBUSB_ERROR_NOT_SUPPORTED);
 }

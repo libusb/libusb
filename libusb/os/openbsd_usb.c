@@ -138,7 +138,7 @@ obsd_get_device_list(struct libusb_context * ctx,
 	char *udevname;
 	int fd, addr, i, j;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	for (i = 0; i < 8; i++) {
 		snprintf(busnode, sizeof(busnode), USBDEV "%d", i);
@@ -266,7 +266,7 @@ obsd_get_device_descriptor(struct libusb_device *dev, unsigned char *buf,
 {
 	struct device_priv *dpriv = (struct device_priv *)dev->os_priv;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	memcpy(buf, &dpriv->ddesc, DEVICE_DESC_LENGTH);
 
@@ -409,7 +409,7 @@ obsd_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 	if ((fd = _bus_open(handle->dev->bus_number)) < 0)
 		return _errno_to_libusb(errno);
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	req.ucr_addr = handle->dev->device_address;
 	req.ucr_request.bmRequestType = UT_WRITE_ENDPOINT;
@@ -431,7 +431,7 @@ obsd_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 int
 obsd_reset_device(struct libusb_device_handle *handle)
 {
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	return (LIBUSB_ERROR_NOT_SUPPORTED);
 }
@@ -441,7 +441,7 @@ obsd_destroy_device(struct libusb_device *dev)
 {
 	struct device_priv *dpriv = (struct device_priv *)dev->os_priv;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	free(dpriv->cdesc);
 	free(dpriv->devname);
@@ -454,7 +454,7 @@ obsd_submit_transfer(struct usbi_transfer *itransfer)
 	struct handle_priv *hpriv;
 	int err = 0;
 
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	hpriv = (struct handle_priv *)transfer->dev_handle->os_priv;
@@ -496,7 +496,7 @@ obsd_submit_transfer(struct usbi_transfer *itransfer)
 int
 obsd_cancel_transfer(struct usbi_transfer *itransfer)
 {
-	usbi_dbg("");
+	usbi_dbg(" ");
 
 	return (LIBUSB_ERROR_NOT_SUPPORTED);
 }
