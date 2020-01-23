@@ -76,17 +76,16 @@
 #endif
 
 /* Internal abstraction for poll */
-#if defined(OS_LINUX) || defined(OS_DARWIN) || defined(OS_OPENBSD) || defined(OS_NETBSD) || \
-	defined(OS_HAIKU) || defined(OS_SUNOS) || defined(OS_NULL)
+#if defined(POLL_POSIX)
 #include "os/poll_posix.h"
-#elif defined(OS_WINDOWS)
+#elif defined(POLL_WINDOWS)
 #include "os/poll_windows.h"
 #endif
 
 /* Internal abstraction for thread synchronization */
 #if defined(THREADS_POSIX)
 #include "os/threads_posix.h"
-#elif defined(OS_WINDOWS)
+#elif defined(THREADS_WINDOWS)
 #include "os/threads_windows.h"
 #endif
 
@@ -351,7 +350,7 @@ struct libusb_context {
          * between the poll call and */
         struct list_head removed_ipollfds;
 	struct pollfd *pollfds;
-	POLL_NFDS_TYPE pollfds_cnt;
+	usbi_nfds_t pollfds_cnt;
 
 	/* A list of pending hotplug messages. Protected by event_data_lock. */
 	struct list_head hotplug_msgs;
@@ -359,7 +358,7 @@ struct libusb_context {
 	/* A list of pending completed transfers. Protected by event_data_lock. */
 	struct list_head completed_transfers;
 
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 	/* used for timeout handling, if supported by OS.
 	 * this timerfd is maintained to trigger on the next pending timeout */
 	int timerfd;
@@ -396,7 +395,7 @@ enum usbi_event_flags {
 	((ctx)->event_flags || (ctx)->device_close \
 	 || !list_empty(&(ctx)->hotplug_msgs) || !list_empty(&(ctx)->completed_transfers))
 
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 #define usbi_using_timerfd(ctx) ((ctx)->timerfd >= 0)
 #else
 #define usbi_using_timerfd(ctx) (0)
@@ -1105,7 +1104,7 @@ struct usbi_os_backend {
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */
 	int (*handle_events)(struct libusb_context *ctx,
-		struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready);
+		struct pollfd *fds, usbi_nfds_t nfds, int num_ready);
 
 	/* Handle transfer completion. Optional.
 	 *
@@ -1142,7 +1141,7 @@ struct usbi_os_backend {
 	 */
 	int (*clock_gettime)(int clkid, struct timespec *tp);
 
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 	/* clock ID of the clock that should be used for timerfd */
 	clockid_t (*get_timerfd_clockid)(void);
 #endif

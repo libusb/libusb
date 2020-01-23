@@ -41,8 +41,11 @@
 /* Windows backend */
 #define OS_WINDOWS 1
 
-/* type of second poll() argument */
-#define POLL_NFDS_TYPE unsigned int
+/* Use Windows poll() implementation */
+#define POLL_WINDOWS 1
+
+/* Use Windows Threads */
+#define THREADS_WINDOWS 1
 
 /* Uncomment to enabling output to system log */
 // #define USE_SYSTEM_LOGGING_FACILITY

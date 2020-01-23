@@ -678,12 +678,12 @@ static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 	return priv->backend->cancel_transfer(itransfer);
 }
 
-static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready)
+static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, usbi_nfds_t nfds, int num_ready)
 {
 	struct windows_context_priv *priv = _context_priv(ctx);
 	struct usbi_transfer *itransfer;
 	DWORD io_size, io_result;
-	POLL_NFDS_TYPE i;
+	usbi_nfds_t i;
 	bool found;
 	int transfer_fd;
 	int r = LIBUSB_SUCCESS;

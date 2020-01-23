@@ -334,12 +334,12 @@ static DWORD poll_wait(const HANDLE *wait_handles, DWORD num_wait_handles, DWORD
  * Currently, this function only accepts one of POLLIN or POLLOUT per fd
  * (but you can create multiple fds from the same handle for read and write)
  */
-int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
+int usbi_poll(struct pollfd *fds, usbi_nfds_t nfds, int timeout)
 {
 	struct file_descriptor **fds_array;
 	HANDLE *handles_array;
 	struct file_descriptor *fd;
-	unsigned int n;
+	usbi_nfds_t n;
 	int nready;
 
 	if (nfds <= MAXIMUM_WAIT_OBJECTS) {

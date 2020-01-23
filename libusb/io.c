@@ -25,7 +25,7 @@
 #include "hotplug.h"
 
 #include <errno.h>
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 #include <sys/timerfd.h>
 #include <unistd.h>
 #endif
@@ -1137,7 +1137,7 @@ int usbi_io_init(struct libusb_context *ctx)
 	if (r < 0)
 		goto err_close_pipe;
 
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 	ctx->timerfd = timerfd_create(usbi_backend.get_timerfd_clockid(),
 		TFD_NONBLOCK | TFD_CLOEXEC);
 	if (ctx->timerfd >= 0) {
@@ -1152,7 +1152,7 @@ int usbi_io_init(struct libusb_context *ctx)
 
 	return 0;
 
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 err_close_timerfd:
 	close(ctx->timerfd);
 	usbi_remove_pollfd(ctx, ctx->event_pipe[0]);
@@ -1184,7 +1184,7 @@ void usbi_io_exit(struct libusb_context *ctx)
 	usbi_remove_pollfd(ctx, ctx->event_pipe[0]);
 	usbi_close(ctx->event_pipe[0]);
 	usbi_close(ctx->event_pipe[1]);
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 	if (usbi_using_timerfd(ctx)) {
 		usbi_remove_pollfd(ctx, ctx->timerfd);
 		close(ctx->timerfd);
@@ -1313,7 +1313,7 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 	free(itransfer);
 }
 
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 static int disarm_timerfd(struct libusb_context *ctx)
 {
 	const struct itimerspec disarm_timer = { { 0, 0 }, { 0, 0 } };
@@ -1414,7 +1414,7 @@ static int add_to_flying_list(struct usbi_transfer *transfer)
 	/* otherwise we need to be inserted at the end */
 	list_add_tail(&transfer->list, &ctx->flying_transfers);
 out:
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 	if (first && usbi_using_timerfd(ctx) && timerisset(timeout)) {
 		/* if this transfer has the lowest timeout of all active transfers,
 		 * rearm the timerfd with this transfer's timeout */
@@ -2059,7 +2059,7 @@ static int handle_timeouts(struct libusb_context *ctx)
 	return r;
 }
 
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 static int handle_timerfd_trigger(struct libusb_context *ctx)
 {
 	int r;
@@ -2086,8 +2086,8 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 {
 	int r;
 	struct usbi_pollfd *ipollfd;
-	POLL_NFDS_TYPE nfds = 0;
-	POLL_NFDS_TYPE internal_nfds;
+	usbi_nfds_t nfds = 0;
+	usbi_nfds_t internal_nfds;
 	struct pollfd *fds = NULL;
 	int timeout_ms;
 
@@ -2266,7 +2266,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 			goto done;
 	}
 
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 	/* on timerfd configurations, fds[1] is the timerfd */
 	if (usbi_using_timerfd(ctx) && fds[1].revents) {
 		/* timerfd indicates that a timeout has expired */
@@ -2286,7 +2286,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 #endif
 
 	list_for_each_entry(ipollfd, &ctx->removed_ipollfds, list, struct usbi_pollfd) {
-		POLL_NFDS_TYPE n;
+		usbi_nfds_t n;
 
 		for (n = internal_nfds ; n < nfds ; n++) {
 			if (ipollfd->pollfd.fd == fds[n].fd) {
@@ -2546,7 +2546,7 @@ int API_EXPORTED libusb_handle_events_locked(libusb_context *ctx,
  */
 int API_EXPORTED libusb_pollfds_handle_timeouts(libusb_context *ctx)
 {
-#if defined(USBI_TIMERFD_AVAILABLE)
+#ifdef HAVE_TIMERFD
 	USBI_GET_CONTEXT(ctx);
 	return usbi_using_timerfd(ctx);
 #else

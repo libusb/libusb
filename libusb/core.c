@@ -28,19 +28,19 @@
 #endif
 #include <stdio.h>
 #include <string.h>
-#ifdef HAVE_SYSLOG_H
+#ifdef HAVE_SYSLOG
 #include <syslog.h>
 #endif
 
-struct libusb_context *usbi_default_context = NULL;
+struct libusb_context *usbi_default_context;
 static const struct libusb_version libusb_version_internal =
 	{ LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO,
 	  LIBUSB_RC, "http://libusb.info" };
-static int default_context_refcnt = 0;
+static int default_context_refcnt;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
-static struct timespec timestamp_origin = { 0, 0 };
-#ifndef USE_SYSTEM_LOGGING_FACILITY
-static libusb_log_cb log_handler = NULL;
+static struct timespec timestamp_origin;
+#if defined(ENABLE_LOGGING) && !defined(USE_SYSTEM_LOGGING_FACILITY)
+static libusb_log_cb log_handler;
 #endif
 
 usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
@@ -2130,22 +2130,23 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 void API_EXPORTED libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb,
 	int mode)
 {
+#if defined(ENABLE_LOGGING) && (!defined(ENABLE_DEBUG_LOGGING) || !defined(USE_SYSTEM_LOGGING_FACILITY))
 #if !defined(USE_SYSTEM_LOGGING_FACILITY)
-	if (mode & LIBUSB_LOG_CB_GLOBAL) {
+	if (mode & LIBUSB_LOG_CB_GLOBAL)
 		log_handler = cb;
-	}
 #endif
-#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
+#if !defined(ENABLE_DEBUG_LOGGING)
 	if (mode & LIBUSB_LOG_CB_CONTEXT) {
 		USBI_GET_CONTEXT(ctx);
 		ctx->log_handler = cb;
 	}
 #else
 	UNUSED(ctx);
-#if defined(USE_SYSTEM_LOGGING_FACILITY)
+#endif
+#else
+	UNUSED(ctx);
 	UNUSED(cb);
 	UNUSED(mode);
-#endif
 #endif
 }
 
@@ -2506,7 +2507,7 @@ int usbi_vsnprintf(char *str, size_t size, const char *format, va_list ap)
 static void usbi_log_str(enum libusb_log_level level, const char *str)
 {
 #if defined(USE_SYSTEM_LOGGING_FACILITY)
-#if defined(OS_WINDOWS) || defined(OS_WINCE)
+#if defined(OS_WINDOWS)
 #if !defined(UNICODE)
 	OutputDebugStringA(str);
 #else
@@ -2524,7 +2525,7 @@ static void usbi_log_str(enum libusb_log_level level, const char *str)
 	case LIBUSB_LOG_LEVEL_DEBUG: priority = ANDROID_LOG_DEBUG; break;
 	}
 	__android_log_write(priority, "libusb", str);
-#elif defined(HAVE_SYSLOG_FUNC)
+#elif defined(HAVE_SYSLOG)
 	int syslog_level = LOG_INFO;
 	switch (level) {
 	case LIBUSB_LOG_LEVEL_NONE: return;

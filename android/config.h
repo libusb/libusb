@@ -29,14 +29,20 @@
 /* Define to 1 if you have the <asm/types.h> header file. */
 #define HAVE_ASM_TYPES_H 1
 
+/* Define to 1 if the system has the type `nfds_t'. */
+#define HAVE_NFDS_T 1
+
+/* Define to 1 if you have the `pipe2' function. */
+#define HAVE_PIPE2 1
+
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define HAVE_SYS_TIME_H 1
 
 /* Linux backend */
 #define OS_LINUX 1
 
-/* type of second poll() argument */
-#define POLL_NFDS_TYPE nfds_t
+/* Use POSIX poll() implementation */
+#define POLL_POSIX 1
 
 /* Use POSIX Threads */
 #define THREADS_POSIX 1

@@ -41,6 +41,8 @@
 #define POLLHUP		0x0010	/* Hung up */
 #define POLLNVAL	0x0020	/* Invalid request: fd not open */
 
+typedef unsigned int usbi_nfds_t;
+
 struct pollfd {
 	int fd;		/* file descriptor */
 	short events;	/* requested events */
@@ -57,7 +59,7 @@ extern const struct winfd INVALID_WINFD;
 struct winfd usbi_create_fd(void);
 
 int usbi_pipe(int pipefd[2]);
-int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout);
+int usbi_poll(struct pollfd *fds, usbi_nfds_t nfds, int timeout);
 ssize_t usbi_write(int fd, const void *buf, size_t count);
 ssize_t usbi_read(int fd, void *buf, size_t count);
 int usbi_close(int fd);

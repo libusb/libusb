@@ -145,7 +145,7 @@ static int linux_scan_devices(struct libusb_context *ctx);
 static int sysfs_scan_device(struct libusb_context *ctx, const char *devname);
 static int detach_kernel_driver_and_claim(struct libusb_device_handle *, int);
 
-#if !defined(USE_UDEV)
+#if !defined(HAVE_LIBUDEV)
 static int linux_default_scan_devices (struct libusb_context *ctx);
 #endif
 
@@ -344,7 +344,7 @@ static const char *find_usbfs_path(void)
  * simply assume /dev/bus/usb rather then making libusb_init fail.
  * Make the same assumption for Android where SELinux policies might block us
  * from reading /dev on newer devices. */
-#if defined(USE_UDEV) || defined(__ANDROID__)
+#if defined(HAVE_LIBUDEV) || defined(__ANDROID__)
 	if (ret == NULL)
 		ret = "/dev/bus/usb";
 #endif
@@ -532,7 +532,7 @@ static void op_exit(struct libusb_context *ctx)
 
 static int linux_start_event_monitor(void)
 {
-#if defined(USE_UDEV)
+#if defined(HAVE_LIBUDEV)
 	return linux_udev_start_event_monitor();
 #elif !defined(__ANDROID__)
 	return linux_netlink_start_event_monitor();
@@ -543,7 +543,7 @@ static int linux_start_event_monitor(void)
 
 static int linux_stop_event_monitor(void)
 {
-#if defined(USE_UDEV)
+#if defined(HAVE_LIBUDEV)
 	return linux_udev_stop_event_monitor();
 #elif !defined(__ANDROID__)
 	return linux_netlink_stop_event_monitor();
@@ -558,7 +558,7 @@ static int linux_scan_devices(struct libusb_context *ctx)
 
 	usbi_mutex_static_lock(&linux_hotplug_lock);
 
-#if defined(USE_UDEV)
+#if defined(HAVE_LIBUDEV)
 	ret = linux_udev_scan_devices(ctx);
 #else
 	ret = linux_default_scan_devices(ctx);
@@ -571,7 +571,7 @@ static int linux_scan_devices(struct libusb_context *ctx)
 
 static void op_hotplug_poll(void)
 {
-#if defined(USE_UDEV)
+#if defined(HAVE_LIBUDEV)
 	linux_udev_hotplug_poll();
 #elif !defined(__ANDROID__)
 	linux_netlink_hotplug_poll();
@@ -1229,7 +1229,7 @@ void linux_device_disconnected(uint8_t busnum, uint8_t devaddr)
 	usbi_mutex_static_unlock(&active_contexts_lock);
 }
 
-#if !defined(USE_UDEV)
+#if !defined(HAVE_LIBUDEV)
 /* open a bus directory and adds all discovered devices to the context */
 static int usbfs_scan_busdir(struct libusb_context *ctx, uint8_t busnum)
 {
@@ -1332,7 +1332,7 @@ static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 		devname);
 }
 
-#if !defined(USE_UDEV)
+#if !defined(HAVE_LIBUDEV)
 static int sysfs_get_device_list(struct libusb_context *ctx)
 {
 	DIR *devices = opendir(SYSFS_DEVICE_PATH);
@@ -2760,14 +2760,14 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 }
 
 static int op_handle_events(struct libusb_context *ctx,
-	struct pollfd *fds, POLL_NFDS_TYPE nfds, int num_ready)
+	struct pollfd *fds, usbi_nfds_t nfds, int num_ready)
 {
+	usbi_nfds_t n;
 	int r;
-	unsigned int i = 0;
 
 	usbi_mutex_lock(&ctx->open_devs_lock);
-	for (i = 0; i < nfds && num_ready > 0; i++) {
-		struct pollfd *pollfd = &fds[i];
+	for (n = 0; n < nfds && num_ready > 0; n++) {
+		struct pollfd *pollfd = &fds[n];
 		struct libusb_device_handle *handle;
 		struct linux_device_handle_priv *hpriv = NULL;
 
@@ -2839,7 +2839,7 @@ static int op_clock_gettime(int clk_id, struct timespec *tp)
   }
 }
 
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 static clockid_t op_get_timerfd_clockid(void)
 {
 	return monotonic_clkid;
@@ -2890,7 +2890,7 @@ const struct usbi_os_backend usbi_backend = {
 
 	.clock_gettime = op_clock_gettime,
 
-#ifdef USBI_TIMERFD_AVAILABLE
+#ifdef HAVE_TIMERFD
 	.get_timerfd_clockid = op_get_timerfd_clockid,
 #endif
 

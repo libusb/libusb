@@ -4,6 +4,12 @@
 #include <poll.h>
 #include <unistd.h>
 
+#ifdef HAVE_NFDS_T
+typedef nfds_t usbi_nfds_t;
+#else
+typedef unsigned int usbi_nfds_t;
+#endif
+
 #define usbi_write	write
 #define usbi_read	read
 #define usbi_close	close
