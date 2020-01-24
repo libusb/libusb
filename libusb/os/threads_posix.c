@@ -52,22 +52,30 @@ int usbi_cond_timedwait(pthread_cond_t *cond,
 
 int usbi_get_tid(void)
 {
-	int ret;
+#ifdef HAVE_CC_THREAD_LOCAL
+	static _Thread_local int tid;
+
+	if (tid)
+		return tid;
+#else
+	int tid;
+#endif
+
 #if defined(__ANDROID__)
-	ret = gettid();
+	tid = gettid();
 #elif defined(__linux__)
-	ret = syscall(SYS_gettid);
+	tid = syscall(SYS_gettid);
 #elif defined(__OpenBSD__)
 	/* The following only works with OpenBSD > 5.1 as it requires
 	   real thread support. For 5.1 and earlier, -1 is returned. */
-	ret = syscall(SYS_getthrid);
+	tid = syscall(SYS_getthrid);
 #elif defined(__APPLE__)
-	ret = (int)pthread_mach_thread_np(pthread_self());
+	tid = (int)pthread_mach_thread_np(pthread_self());
 #elif defined(__CYGWIN__)
-	ret = GetCurrentThreadId();
+	tid = GetCurrentThreadId();
 #else
-	ret = -1;
+	tid = -1;
 #endif
 /* TODO: NetBSD thread ID support */
-	return ret;
+	return tid;
 }
