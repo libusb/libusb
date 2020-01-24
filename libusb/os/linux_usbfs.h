@@ -27,23 +27,12 @@
 
 struct usbfs_ctrltransfer {
 	/* keep in sync with usbdevice_fs.h:usbdevfs_ctrltransfer */
-	uint8_t  bmRequestType;
-	uint8_t  bRequest;
-	uint16_t wValue;
-	uint16_t wIndex;
-	uint16_t wLength;
-
-	uint32_t timeout;	/* in milliseconds */
-
-	/* pointer to data */
-	void *data;
-};
-
-struct usbfs_bulktransfer {
-	/* keep in sync with usbdevice_fs.h:usbdevfs_bulktransfer */
-	unsigned int ep;
-	unsigned int len;
-	unsigned int timeout;	/* in milliseconds */
+	__u8 bmRequestType;
+	__u8 bRequest;
+	__u16 wValue;
+	__u16 wIndex;
+	__u16 wLength;
+	__u32 timeout;	/* in milliseconds */
 
 	/* pointer to data */
 	void *data;
@@ -55,7 +44,7 @@ struct usbfs_setinterface {
 	unsigned int altsetting;
 };
 
-#define USBFS_MAXDRIVERNAME 255
+#define USBFS_MAXDRIVERNAME		255
 
 struct usbfs_getdriver {
 	unsigned int interface;
@@ -63,17 +52,15 @@ struct usbfs_getdriver {
 };
 
 #define USBFS_URB_SHORT_NOT_OK		0x01
-#define USBFS_URB_ISO_ASAP			0x02
+#define USBFS_URB_ISO_ASAP		0x02
 #define USBFS_URB_BULK_CONTINUATION	0x04
 #define USBFS_URB_QUEUE_BULK		0x10
 #define USBFS_URB_ZERO_PACKET		0x40
 
-enum usbfs_urb_type {
-	USBFS_URB_TYPE_ISO = 0,
-	USBFS_URB_TYPE_INTERRUPT = 1,
-	USBFS_URB_TYPE_CONTROL = 2,
-	USBFS_URB_TYPE_BULK = 3,
-};
+#define USBFS_URB_TYPE_ISO		0
+#define USBFS_URB_TYPE_INTERRUPT	1
+#define USBFS_URB_TYPE_CONTROL		2
+#define USBFS_URB_TYPE_BULK		3
 
 struct usbfs_iso_packet_desc {
 	unsigned int length;
@@ -117,16 +104,11 @@ struct usbfs_ioctl {
 	void *data;	/* param buffer (in, or out) */
 };
 
-struct usbfs_hub_portinfo {
-	unsigned char numports;
-	unsigned char port[127];	/* port to device num mapping */
-};
-
-#define USBFS_CAP_ZERO_PACKET		0x01
-#define USBFS_CAP_BULK_CONTINUATION	0x02
-#define USBFS_CAP_NO_PACKET_SIZE_LIM	0x04
-#define USBFS_CAP_BULK_SCATTER_GATHER	0x08
-#define USBFS_CAP_REAP_AFTER_DISCONNECT	0x10
+#define USBFS_CAP_ZERO_PACKET			0x01
+#define USBFS_CAP_BULK_CONTINUATION		0x02
+#define USBFS_CAP_NO_PACKET_SIZE_LIM		0x04
+#define USBFS_CAP_BULK_SCATTER_GATHER		0x08
+#define USBFS_CAP_REAP_AFTER_DISCONNECT		0x10
 
 #define USBFS_DISCONNECT_CLAIM_IF_DRIVER	0x01
 #define USBFS_DISCONNECT_CLAIM_EXCEPT_DRIVER	0x02
@@ -143,27 +125,21 @@ struct usbfs_streams {
 	unsigned char eps[0];
 };
 
-#define IOCTL_USBFS_CONTROL	_IOWR('U', 0, struct usbfs_ctrltransfer)
-#define IOCTL_USBFS_BULK		_IOWR('U', 2, struct usbfs_bulktransfer)
-#define IOCTL_USBFS_RESETEP	_IOR('U', 3, unsigned int)
-#define IOCTL_USBFS_SETINTF	_IOR('U', 4, struct usbfs_setinterface)
-#define IOCTL_USBFS_SETCONFIG	_IOR('U', 5, unsigned int)
-#define IOCTL_USBFS_GETDRIVER	_IOW('U', 8, struct usbfs_getdriver)
-#define IOCTL_USBFS_SUBMITURB	_IOR('U', 10, struct usbfs_urb)
-#define IOCTL_USBFS_DISCARDURB	_IO('U', 11)
-#define IOCTL_USBFS_REAPURB	_IOW('U', 12, void *)
+#define IOCTL_USBFS_CONTROL		_IOWR('U', 0, struct usbfs_ctrltransfer)
+#define IOCTL_USBFS_SETINTERFACE	_IOR('U', 4, struct usbfs_setinterface)
+#define IOCTL_USBFS_SETCONFIGURATION	_IOR('U', 5, unsigned int)
+#define IOCTL_USBFS_GETDRIVER		_IOW('U', 8, struct usbfs_getdriver)
+#define IOCTL_USBFS_SUBMITURB		_IOR('U', 10, struct usbfs_urb)
+#define IOCTL_USBFS_DISCARDURB		_IO('U', 11)
 #define IOCTL_USBFS_REAPURBNDELAY	_IOW('U', 13, void *)
-#define IOCTL_USBFS_CLAIMINTF	_IOR('U', 15, unsigned int)
-#define IOCTL_USBFS_RELEASEINTF	_IOR('U', 16, unsigned int)
-#define IOCTL_USBFS_CONNECTINFO	_IOW('U', 17, struct usbfs_connectinfo)
-#define IOCTL_USBFS_IOCTL         _IOWR('U', 18, struct usbfs_ioctl)
-#define IOCTL_USBFS_HUB_PORTINFO	_IOR('U', 19, struct usbfs_hub_portinfo)
+#define IOCTL_USBFS_CLAIMINTERFACE	_IOR('U', 15, unsigned int)
+#define IOCTL_USBFS_RELEASEINTERFACE	_IOR('U', 16, unsigned int)
+#define IOCTL_USBFS_CONNECTINFO		_IOW('U', 17, struct usbfs_connectinfo)
+#define IOCTL_USBFS_IOCTL		_IOWR('U', 18, struct usbfs_ioctl)
 #define IOCTL_USBFS_RESET		_IO('U', 20)
-#define IOCTL_USBFS_CLEAR_HALT	_IOR('U', 21, unsigned int)
-#define IOCTL_USBFS_DISCONNECT	_IO('U', 22)
-#define IOCTL_USBFS_CONNECT	_IO('U', 23)
-#define IOCTL_USBFS_CLAIM_PORT	_IOR('U', 24, unsigned int)
-#define IOCTL_USBFS_RELEASE_PORT	_IOR('U', 25, unsigned int)
+#define IOCTL_USBFS_CLEAR_HALT		_IOR('U', 21, unsigned int)
+#define IOCTL_USBFS_DISCONNECT		_IO('U', 22)
+#define IOCTL_USBFS_CONNECT		_IO('U', 23)
 #define IOCTL_USBFS_GET_CAPABILITIES	_IOR('U', 26, __u32)
 #define IOCTL_USBFS_DISCONNECT_CLAIM	_IOR('U', 27, struct usbfs_disconnect_claim)
 #define IOCTL_USBFS_ALLOC_STREAMS	_IOR('U', 28, struct usbfs_streams)
@@ -171,7 +147,7 @@ struct usbfs_streams {
 
 extern usbi_mutex_static_t linux_hotplug_lock;
 
-#if defined(HAVE_LIBUDEV)
+#ifdef HAVE_LIBUDEV
 int linux_udev_start_event_monitor(void);
 int linux_udev_stop_event_monitor(void);
 int linux_udev_scan_devices(struct libusb_context *ctx);
@@ -182,10 +158,39 @@ int linux_netlink_stop_event_monitor(void);
 void linux_netlink_hotplug_poll(void);
 #endif
 
+static inline int linux_start_event_monitor(void)
+{
+#if defined(HAVE_LIBUDEV)
+	return linux_udev_start_event_monitor();
+#elif !defined(__ANDROID__)
+	return linux_netlink_start_event_monitor();
+#else
+	return LIBUSB_SUCCESS;
+#endif
+}
+
+static inline void linux_stop_event_monitor(void)
+{
+#if defined(HAVE_LIBUDEV)
+	linux_udev_stop_event_monitor();
+#elif !defined(__ANDROID__)
+	linux_netlink_stop_event_monitor();
+#endif
+}
+
+static inline void linux_hotplug_poll(void)
+{
+#if defined(HAVE_LIBUDEV)
+	linux_udev_hotplug_poll();
+#elif !defined(__ANDROID__)
+	linux_netlink_hotplug_poll();
+#endif
+}
+
 void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_name);
 void linux_device_disconnected(uint8_t busnum, uint8_t devaddr);
 
-int linux_get_device_address (struct libusb_context *ctx, int detached,
+int linux_get_device_address(struct libusb_context *ctx, int detached,
 	uint8_t *busnum, uint8_t *devaddr, const char *dev_node,
 	const char *sys_name, int fd);
 int linux_enumerate_device(struct libusb_context *ctx,
