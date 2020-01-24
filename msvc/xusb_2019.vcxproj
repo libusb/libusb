@@ -91,7 +91,7 @@
     <ClCompile Include="..\examples\xusb.c" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include=".\libusb_static_2017.vcxproj">
+    <ProjectReference Include=".\libusb_static_2019.vcxproj">
       <Project>{349ee8f9-7d25-4909-aaf5-ff3fade72187}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
