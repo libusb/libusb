@@ -800,11 +800,13 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 	struct libusb_device **ret;
 	int r = 0;
 	ssize_t i, len;
-	USBI_GET_CONTEXT(ctx);
+
 	usbi_dbg(" ");
 
 	if (!discdevs)
 		return LIBUSB_ERROR_NO_MEM;
+
+	ctx = usbi_get_context(ctx);
 
 	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
 		/* backend provides hotplug support */
@@ -1254,9 +1256,10 @@ int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
 	struct libusb_device_handle *_dev_handle;
 	size_t priv_size = usbi_backend.device_handle_priv_size;
 	int r;
+
 	usbi_dbg("wrap_sys_device %p", (void *)sys_dev);
 
-	USBI_GET_CONTEXT(ctx);
+	ctx = usbi_get_context(ctx);
 
 	if (!usbi_backend.wrap_sys_device)
 		return LIBUSB_ERROR_NOT_SUPPORTED;
@@ -2095,7 +2098,7 @@ int API_EXPORTED libusb_set_auto_detach_kernel_driver(
 void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 {
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-	USBI_GET_CONTEXT(ctx);
+	ctx = usbi_get_context(ctx);
 	if (!ctx->debug_fixed) {
 		level = CLAMP(level, LIBUSB_LOG_LEVEL_NONE, LIBUSB_LOG_LEVEL_DEBUG);
 		ctx->debug = (enum libusb_log_level)level;
@@ -2137,7 +2140,7 @@ void API_EXPORTED libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb,
 #endif
 #if !defined(ENABLE_DEBUG_LOGGING)
 	if (mode & LIBUSB_LOG_CB_CONTEXT) {
-		USBI_GET_CONTEXT(ctx);
+		ctx = usbi_get_context(ctx);
 		ctx->log_handler = cb;
 	}
 #else
@@ -2175,7 +2178,7 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 	int arg, r = LIBUSB_SUCCESS;
 	va_list ap;
 
-	USBI_GET_CONTEXT(ctx);
+	ctx = usbi_get_context(ctx);
 
 	va_start(ap, option);
 	switch (option) {
@@ -2358,7 +2361,8 @@ void API_EXPORTED libusb_exit(struct libusb_context *ctx)
 	int destroying_default_context = 0;
 
 	usbi_dbg(" ");
-	USBI_GET_CONTEXT(ctx);
+
+	ctx = usbi_get_context(ctx);
 
 	/* if working with default context, only actually do the deinitialization
 	 * if we're the last user */
@@ -2564,7 +2568,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 #else
 	enum libusb_log_level ctx_level = LIBUSB_LOG_LEVEL_NONE;
 
-	USBI_GET_CONTEXT(ctx);
+	ctx = usbi_get_context(ctx);
 	if (ctx)
 		ctx_level = ctx->debug;
 	else

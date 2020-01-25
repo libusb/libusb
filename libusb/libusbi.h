@@ -234,6 +234,7 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 #ifdef ENABLE_LOGGING
 
 #if defined(_MSC_VER) && (_MSC_VER < 1900)
+#include <stdio.h>
 #define snprintf usbi_snprintf
 #define vsnprintf usbi_vsnprintf
 int usbi_snprintf(char *dst, size_t size, const char *format, ...);
@@ -262,12 +263,6 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 #define usbi_dbg(...)		do {} while (0)
 
 #endif /* ENABLE_LOGGING */
-
-#define USBI_GET_CONTEXT(ctx)				\
-	do {						\
-		if (!(ctx))				\
-			(ctx) = usbi_default_context;	\
-	} while(0)
 
 #define DEVICE_CTX(dev)		((dev)->ctx)
 #define HANDLE_CTX(handle)	(DEVICE_CTX((handle)->dev))
@@ -369,6 +364,13 @@ struct libusb_context {
 	PTR_ALIGNED unsigned char os_priv[ZERO_SIZED_ARRAY];
 };
 
+extern struct libusb_context *usbi_default_context;
+
+static inline struct libusb_context *usbi_get_context(struct libusb_context *ctx)
+{
+	return ctx ? ctx : usbi_default_context;
+}
+
 enum usbi_event_flags {
 	/* The list of pollfds has been modified */
 	USBI_EVENT_POLLFDS_MODIFIED = 1U << 0,
@@ -381,25 +383,39 @@ enum usbi_event_flags {
 };
 
 /* Macros for managing event handling state */
-#define usbi_handling_events(ctx) \
-	(usbi_tls_key_get((ctx)->event_handling_key) != NULL)
+static inline int usbi_handling_events(struct libusb_context *ctx)
+{
+	return usbi_tls_key_get(ctx->event_handling_key) != NULL;
+}
 
-#define usbi_start_event_handling(ctx) \
-	usbi_tls_key_set((ctx)->event_handling_key, ctx)
+static inline void usbi_start_event_handling(struct libusb_context *ctx)
+{
+	usbi_tls_key_set(ctx->event_handling_key, ctx);
+}
 
-#define usbi_end_event_handling(ctx) \
-	usbi_tls_key_set((ctx)->event_handling_key, NULL)
+static inline void usbi_end_event_handling(struct libusb_context *ctx)
+{
+	usbi_tls_key_set(ctx->event_handling_key, NULL);
+}
 
-/* Update the following macro if new event sources are added */
-#define usbi_pending_events(ctx) \
-	((ctx)->event_flags || (ctx)->device_close \
-	 || !list_empty(&(ctx)->hotplug_msgs) || !list_empty(&(ctx)->completed_transfers))
+/* Update the following function if new event sources are added */
+static inline int usbi_pending_events(struct libusb_context *ctx)
+{
+	return ctx->event_flags ||
+	       ctx->device_close ||
+	       !list_empty(&ctx->hotplug_msgs) ||
+	       !list_empty(&ctx->completed_transfers);
+}
 
+static inline int usbi_using_timerfd(struct libusb_context *ctx)
+{
 #ifdef HAVE_TIMERFD
-#define usbi_using_timerfd(ctx) ((ctx)->timerfd >= 0)
+	return ctx->timerfd >= 0);
 #else
-#define usbi_using_timerfd(ctx) (0)
+	UNUSED(ctx);
+	return 0;
 #endif
+}
 
 struct libusb_device {
 	/* lock protects refcnt, everything else is finalized at initialization
@@ -1172,8 +1188,6 @@ extern const struct usbi_os_backend usbi_backend;
 
 extern struct list_head active_contexts_list;
 extern usbi_mutex_static_t active_contexts_lock;
-
-extern struct libusb_context *usbi_default_context;
 
 #ifdef __cplusplus
 }

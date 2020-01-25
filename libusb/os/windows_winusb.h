@@ -27,12 +27,8 @@
 
 #if defined(_MSC_VER)
 // disable /W4 MSVC warnings that are benign
-#pragma warning(disable:4100)  // unreferenced formal parameter
-#pragma warning(disable:4127)  // conditional expression is constant
 #pragma warning(disable:4201)  // nameless struct/union
 #pragma warning(disable:4214)  // bit field types other than int
-#pragma warning(disable:4996)  // deprecated API calls
-#pragma warning(disable:28159) // more deprecated API calls
 #endif
 
 // Missing from MSVC6 setupapi.h

@@ -243,7 +243,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
 
-	USBI_GET_CONTEXT(ctx);
+	ctx = usbi_get_context(ctx);
 
 	new_callback = calloc(1, sizeof(*new_callback));
 	if (!new_callback) {
@@ -319,9 +319,9 @@ void API_EXPORTED libusb_hotplug_deregister_callback(struct libusb_context *ctx,
 		return;
 	}
 
-	USBI_GET_CONTEXT(ctx);
-
 	usbi_dbg("deregister hotplug cb %d", callback_handle);
+
+	ctx = usbi_get_context(ctx);
 
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 	list_for_each_entry(hotplug_cb, &ctx->hotplug_cbs, list, struct libusb_hotplug_callback) {
@@ -357,9 +357,9 @@ void * LIBUSB_CALL libusb_hotplug_get_user_data(struct libusb_context *ctx,
 		return NULL;
 	}
 
-	USBI_GET_CONTEXT(ctx);
-
 	usbi_dbg("get hotplug user data %d", callback_handle);
+
+	ctx = usbi_get_context(ctx);
 
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 	list_for_each_entry(hotplug_cb, &ctx->hotplug_cbs, list, struct libusb_hotplug_callback) {

@@ -21,6 +21,8 @@
 #ifndef LIBUSB_THREADS_WINDOWS_H
 #define LIBUSB_THREADS_WINDOWS_H
 
+#include <errno.h>
+
 #define USBI_MUTEX_INITIALIZER	0L
 typedef LONG usbi_mutex_static_t;
 static inline void usbi_mutex_static_lock(usbi_mutex_static_t *mutex)

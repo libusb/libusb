@@ -34,16 +34,14 @@
  * with a fake pipe. The read/write functions are only meant to be used in that
  * context.
  */
-#include <config.h>
 
-#include <assert.h>
+#include "libusbi.h"
+
 #include <errno.h>
 #include <intrin.h>
 #include <malloc.h>
+#include <stdbool.h>
 #include <stdlib.h>
-
-#include "libusbi.h"
-#include "windows_common.h"
 
 // public fd data
 const struct winfd INVALID_WINFD = { -1, NULL };
@@ -135,7 +133,7 @@ static int install_fd(struct file_descriptor *fd)
 
 	for (n = 0; n < fd_table_size; n += BITMAP_BITS_PER_WORD) {
 		unsigned int idx = n / BITMAP_BITS_PER_WORD;
-		unsigned long mask, pos;
+		unsigned long mask, pos = 0UL;
 
 		mask = ~fd_table_bitmap[idx];
 		if (mask == 0UL)

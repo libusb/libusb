@@ -21,8 +21,6 @@
 
 #include "libusbi.h"
 
-#include <errno.h>
-
 int usbi_cond_timedwait(usbi_cond_t *cond,
 	usbi_mutex_t *mutex, const struct timeval *tv)
 {

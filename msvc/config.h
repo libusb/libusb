@@ -15,11 +15,13 @@
 #define _TIMESPEC_DEFINED 1
 #endif
 
+/* Disable: warning C4127: conditional expression is constant */
+#pragma warning(disable:4127)
 /* Disable: warning C4200: nonstandard extension used : zero-sized array in struct/union */
 #pragma warning(disable:4200)
 /* Disable: warning C4324: structure was padded due to __declspec(align()) */
 #pragma warning(disable:4324)
-/* Disable: warning C4996: 'GetVersionA': was declared deprecated */
+/* Disable: warning C4996: 'GetVersionExA': was declared deprecated */
 #pragma warning(disable:4996)
 
 #if defined(_PREFAST_)
