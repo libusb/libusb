@@ -410,7 +410,7 @@ static inline int usbi_pending_events(struct libusb_context *ctx)
 static inline int usbi_using_timerfd(struct libusb_context *ctx)
 {
 #ifdef HAVE_TIMERFD
-	return ctx->timerfd >= 0);
+	return ctx->timerfd >= 0;
 #else
 	UNUSED(ctx);
 	return 0;
