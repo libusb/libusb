@@ -30,6 +30,23 @@
 
 #include <stdbool.h>
 
+/*
+ * Workaround for the mess that exists with the DWORD and ULONG types.
+ * Visual Studio unconditionally defines these types as 'unsigned long'
+ * and a long is always 32-bits, even on 64-bit builds. GCC on the other
+ * hand varies the width of a long, matching it to the build. To make
+ * matters worse, the platform headers for these GCC builds define a
+ * DWORD/ULONG to be 'unsigned long' on 32-bit builds and 'unsigned int'
+ * on 64-bit builds. This creates a great deal of warnings for compilers
+ * that support printf format checking since it will never actually be
+ * an unsigned long.
+ */
+#if defined(_MSC_VER)
+#define ULONG_CAST(x)	(x)
+#else
+#define ULONG_CAST(x)	((unsigned long)(x))
+#endif
+
 #if defined(__CYGWIN__ )
 #define _stricmp strcasecmp
 #define _strdup strdup

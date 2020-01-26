@@ -59,7 +59,7 @@ const char *windows_error_str(DWORD error_code)
 	if (error_code == 0)
 		error_code = GetLastError();
 
-	len = sprintf(err_string, "[%lu] ", error_code);
+	len = sprintf(err_string, "[%lu] ", ULONG_CAST(error_code));
 
 	// Translate codes returned by SetupAPI. The ones we are dealing with are either
 	// in 0x0000xxxx or 0xE000xxxx and can be distinguished from standard error codes.
@@ -83,9 +83,10 @@ const char *windows_error_str(DWORD error_code)
 		if (format_error)
 			snprintf(err_string, sizeof(err_string),
 				"Windows error code %lu (FormatMessage error code %lu)",
-				error_code, format_error);
+				ULONG_CAST(error_code), ULONG_CAST(format_error));
 		else
-			snprintf(err_string, sizeof(err_string), "Unknown error code %lu", error_code);
+			snprintf(err_string, sizeof(err_string), "Unknown error code %lu",
+				ULONG_CAST(error_code));
 	} else {
 		// Remove CRLF from end of message, if present
 		size_t pos = len + size - 2;
@@ -381,7 +382,8 @@ static void windows_transfer_callback(const struct windows_backend *backend,
 {
 	int status, istatus;
 
-	usbi_dbg("handling I/O completion with errcode %lu, size %lu", io_result, io_size);
+	usbi_dbg("handling I/O completion with errcode %lu, size %lu",
+		ULONG_CAST(io_result), ULONG_CAST(io_size));
 
 	switch (io_result) {
 	case NO_ERROR:
@@ -409,7 +411,8 @@ static void windows_transfer_callback(const struct windows_backend *backend,
 		status = LIBUSB_TRANSFER_NO_DEVICE;
 		break;
 	default:
-		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %lu: %s", io_result, windows_error_str(io_result));
+		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %lu: %s",
+			ULONG_CAST(io_result), windows_error_str(io_result));
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	}

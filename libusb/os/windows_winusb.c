@@ -283,7 +283,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 		if (!pSetupDiEnumDeviceInfo(dev_info, *_index, dev_info_data)) {
 			if (GetLastError() != ERROR_NO_MORE_ITEMS) {
 				usbi_err(ctx, "Could not obtain device info data for %s index %lu: %s",
-					guid_to_string(guid), *_index, windows_error_str(0));
+					guid_to_string(guid), ULONG_CAST(*_index), windows_error_str(0));
 				return LIBUSB_ERROR_OTHER;
 			}
 
@@ -299,7 +299,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 
 		if (GetLastError() != ERROR_NO_MORE_ITEMS) {
 			usbi_err(ctx, "Could not obtain interface data for %s devInst %lX: %s",
-				guid_to_string(guid), dev_info_data->DevInst, windows_error_str(0));
+				guid_to_string(guid), ULONG_CAST(dev_info_data->DevInst), windows_error_str(0));
 			return LIBUSB_ERROR_OTHER;
 		}
 
@@ -311,7 +311,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 		// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
 		if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
 			usbi_err(ctx, "could not access interface data (dummy) for %s devInst %lX: %s",
-				guid_to_string(guid), dev_info_data->DevInst, windows_error_str(0));
+				guid_to_string(guid), ULONG_CAST(dev_info_data->DevInst), windows_error_str(0));
 			return LIBUSB_ERROR_OTHER;
 		}
 	} else {
@@ -322,7 +322,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 	dev_interface_details = malloc(size);
 	if (dev_interface_details == NULL) {
 		usbi_err(ctx, "could not allocate interface data for %s devInst %lX",
-			guid_to_string(guid), dev_info_data->DevInst);
+			guid_to_string(guid), ULONG_CAST(dev_info_data->DevInst));
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
@@ -330,7 +330,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 	if (!pSetupDiGetDeviceInterfaceDetailA(dev_info, &dev_interface_data,
 		dev_interface_details, size, NULL, NULL)) {
 		usbi_err(ctx, "could not access interface data (actual) for %s devInst %lX: %s",
-			guid_to_string(guid), dev_info_data->DevInst, windows_error_str(0));
+			guid_to_string(guid), ULONG_CAST(dev_info_data->DevInst), windows_error_str(0));
 		free(dev_interface_details);
 		return LIBUSB_ERROR_OTHER;
 	}
@@ -340,7 +340,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 
 	if (*dev_interface_path == NULL) {
 		usbi_err(ctx, "could not allocate interface path for %s devInst %lX",
-			guid_to_string(guid), dev_info_data->DevInst);
+			guid_to_string(guid), ULONG_CAST(dev_info_data->DevInst));
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
@@ -1256,7 +1256,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 			// Read the Device ID path
 			if (!pSetupDiGetDeviceInstanceIdA(*dev_info, &dev_info_data, dev_id, sizeof(dev_id), NULL)) {
 				usbi_warn(ctx, "could not read the device instance ID for devInst %lX, skipping",
-					  dev_info_data.DevInst);
+					  ULONG_CAST(dev_info_data.DevInst));
 				continue;
 			}
 
@@ -1365,8 +1365,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					usbi_warn(ctx, "could not detect installation state of driver for '%s': %s",
 						dev_id, windows_error_str(0));
 				} else if (install_state != 0) {
-					usbi_warn(ctx, "driver for device '%s' is reporting an issue (code: %u) - skipping",
-						dev_id, (unsigned int)install_state);
+					usbi_warn(ctx, "driver for device '%s' is reporting an issue (code: %lu) - skipping",
+						dev_id, ULONG_CAST(install_state));
 					continue;
 				}
 				get_api_type(dev_info, &dev_info_data, &api, &sub_api);
@@ -2566,7 +2566,7 @@ static enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_ST
 	case USBD_STATUS_DEVICE_GONE:
 		return LIBUSB_TRANSFER_NO_DEVICE;
 	default:
-		usbi_dbg("USBD_STATUS 0x%08lx translated to LIBUSB_TRANSFER_ERROR", status);
+		usbi_dbg("USBD_STATUS 0x%08lx translated to LIBUSB_TRANSFER_ERROR", ULONG_CAST(status));
 		return LIBUSB_TRANSFER_ERROR;
 	}
 }
@@ -3648,7 +3648,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 		size[1] = capabilities.NumberOutputValueCaps;
 		size[2] = capabilities.NumberFeatureValueCaps;
 		for (j = HidP_Input; j <= HidP_Feature; j++) {
-			usbi_dbg("%lu HID %s report value(s) found", size[j], type[j]);
+			usbi_dbg("%lu HID %s report value(s) found", ULONG_CAST(size[j]), type[j]);
 			priv->hid->uses_report_ids[j] = false;
 			if (size[j] > 0) {
 				value_caps = calloc(size[j], sizeof(HIDP_VALUE_CAPS));
