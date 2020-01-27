@@ -5,6 +5,7 @@
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  * Copyright © 2013 Nathan Hjelm <hjelmn@mac.com>
  * Copyright © 2012-2013 Hans de Goede <hdegoede@redhat.com>
+ * Copyright © 2020 Chris Dickens <christopher.a.dickens@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,27 +22,20 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
+#include "libusbi.h"
+#include "linux_usbfs.h"
 
 #include <alloca.h>
-#include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/utsname.h>
-#include <time.h>
-
-#include "libusbi.h"
-#include "linux_usbfs.h"
+#include <sys/vfs.h>
 
 /* sysfs vs usbfs:
  * opening a usbfs node causes the device to be resumed, so we attempt to
@@ -88,50 +82,14 @@ static int usbdev_names = 0;
  * (commit 3612242e527eb47ee4756b5350f8bdf791aa5ede) increased this value to
  * 8,192 bytes to support higher bandwidth devices.  Linux 3.10
  * (commit e2e2f0ea1c935edcf53feb4c4c8fdb4f86d57dd9) further increased this
- * value to 49,152 bytes to support super speed devices.
+ * value to 49,152 bytes to support super speed devices.  Linux 5.2
+ * (commit 8a1dbc8d91d3d1602282c7e6b4222c7759c916fa) even further increased
+ * this value to 98,304 bytes to support super speed plus devices.
  */
 static unsigned int max_iso_packet_len = 0;
 
-/* Linux 2.6.23 adds support for O_CLOEXEC when opening files, which marks the
- * close-on-exec flag in the underlying file descriptor. */
-static int supports_flag_cloexec = -1;
-
-/* Linux 2.6.32 adds support for a bulk continuation URB flag. this basically
- * allows us to mark URBs as being part of a specific logical transfer when
- * we submit them to the kernel. then, on any error except a cancellation, all
- * URBs within that transfer will be cancelled and no more URBs will be
- * accepted for the transfer, meaning that no more data can creep in.
- *
- * The BULK_CONTINUATION flag must be set on all URBs within a bulk transfer
- * (in either direction) except the first.
- * For IN transfers, we must also set SHORT_NOT_OK on all URBs except the
- * last; it means that the kernel should treat a short reply as an error.
- * For OUT transfers, SHORT_NOT_OK must not be set. it isn't needed (OUT
- * transfers can't be short unless there's already some sort of error), and
- * setting this flag is disallowed (a kernel with USB debugging enabled will
- * reject such URBs).
- */
-static int supports_flag_bulk_continuation = -1;
-
-/* Linux 2.6.31 fixes support for the zero length packet URB flag. This
- * allows us to mark URBs that should be followed by a zero length data
- * packet, which can be required by device- or class-specific protocols.
- */
-static int supports_flag_zero_packet = -1;
-
-/* clock ID for monotonic clock, as not all clock sources are available on all
- * systems. appropriate choice made at initialization time. */
-static clockid_t monotonic_clkid = -1;
-
-/* Linux 2.6.22 (commit 83f7d958eab2fbc6b159ee92bf1493924e1d0f72) adds a busnum
- * to sysfs, so we can relate devices. This also implies that we can read
- * the active configuration through bConfigurationValue */
-static int sysfs_can_relate_devices = -1;
-
-/* Linux 2.6.26 (commit 217a9081d8e69026186067711131b77f0ce219ed) adds all
- * config descriptors (rather then just the active config) to the sysfs
- * descriptors file, so from then on we can use them. */
-static int sysfs_has_descriptors = -1;
+/* is sysfs available (mounted) ? */
+static int sysfs_available = -1;
 
 /* how many times have we initted (and not exited) ? */
 static int init_count = 0;
@@ -158,7 +116,7 @@ struct linux_device_priv {
 	char *sysfs_dir;
 	unsigned char *descriptors;
 	int descriptors_len;
-	int active_config; /* cache val for !sysfs_can_relate_devices  */
+	int active_config; /* cache val for !sysfs_available  */
 };
 
 struct linux_device_handle_priv {
@@ -199,16 +157,6 @@ struct linux_transfer_priv {
 	int iso_packet_offset;
 };
 
-static int __open(const char *path, int flags)
-{
-#if defined(O_CLOEXEC)
-	if (supports_flag_cloexec)
-		return open(path, flags | O_CLOEXEC);
-	else
-#endif
-		return open(path, flags);
-}
-
 static int get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
@@ -222,7 +170,7 @@ static int get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 		sprintf(path, USB_DEVTMPFS_PATH "/%03u/%03u",
 			dev->bus_number, dev->device_address);
 
-	fd = __open(path, mode);
+	fd = open(path, mode | O_CLOEXEC);
 	if (fd != -1)
 		return fd; /* Success */
 
@@ -236,7 +184,7 @@ static int get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 		/* Wait 10ms for USB device path creation.*/
 		nanosleep(&delay_ts, NULL);
 
-		fd = __open(path, mode);
+		fd = open(path, mode | O_CLOEXEC);
 		if (fd != -1)
 			return fd; /* Success */
 	}
@@ -267,7 +215,7 @@ static struct linux_device_handle_priv *_device_handle_priv(
 
 /* check dirent for a /dev/usbdev%d.%d name
  * optionally return bus/device on success */
-static int _is_usbdev_entry(const char *name, uint8_t *bus_p, uint8_t *dev_p)
+static int is_usbdev_entry(const char *name, uint8_t *bus_p, uint8_t *dev_p)
 {
 	int busnum, devnum;
 
@@ -286,59 +234,48 @@ static int _is_usbdev_entry(const char *name, uint8_t *bus_p, uint8_t *dev_p)
 	return 1;
 }
 
-static int check_usb_vfs(const char *dirname)
-{
-	DIR *dir;
-	struct dirent *entry;
-	int found = 0;
-
-	dir = opendir(dirname);
-	if (!dir)
-		return 0;
-
-	while ((entry = readdir(dir))) {
-		if (entry->d_name[0] == '.')
-			continue;
-
-		/* We assume if we find any files that it must be the right place */
-		found = 1;
-		break;
-	}
-
-	closedir(dir);
-	return found;
-}
-
 static const char *find_usbfs_path(void)
 {
-	const char *path = "/dev/bus/usb";
-	const char *ret = NULL;
+	const char *path;
+	DIR *dir;
+	struct dirent *entry;
 
-	if (check_usb_vfs(path)) {
-		ret = path;
-	} else {
-		path = "/proc/bus/usb";
-		if (check_usb_vfs(path))
-			ret = path;
+	path = USB_DEVTMPFS_PATH;
+	dir = opendir(path);
+	if (dir) {
+		while ((entry = readdir(dir))) {
+			if (entry->d_name[0] == '.')
+				continue;
+
+			/* We assume if we find any files that it must be the right place */
+			break;
+		}
+
+		closedir(dir);
+
+		if (entry)
+			return path;
 	}
 
-	/* look for /dev/usbdev*.* if the normal places fail */
-	if (!ret) {
-		struct dirent *entry;
-		DIR *dir;
+	/* look for /dev/usbdev*.* if the normal place fails */
+	path = USBDEV_PATH;
+	dir = opendir(path);
+	if (dir) {
+		while ((entry = readdir(dir))) {
+			if (entry->d_name[0] == '.')
+				continue;
 
-		path = "/dev";
-		dir = opendir(path);
-		if (dir) {
-			while ((entry = readdir(dir))) {
-				if (_is_usbdev_entry(entry->d_name, NULL, NULL)) {
-					/* found one; that's enough */
-					ret = path;
-					usbdev_names = 1;
-					break;
-				}
+			if (is_usbdev_entry(entry->d_name, NULL, NULL)) {
+				/* found one; that's enough */
+				break;
 			}
-			closedir(dir);
+		}
+
+		closedir(dir);
+
+		if (entry) {
+			usbdev_names = 1;
+			return path;
 		}
 	}
 
@@ -348,33 +285,10 @@ static const char *find_usbfs_path(void)
  * Make the same assumption for Android where SELinux policies might block us
  * from reading /dev on newer devices. */
 #if defined(HAVE_LIBUDEV) || defined(__ANDROID__)
-	if (!ret)
-		ret = "/dev/bus/usb";
+	return USB_DEVTMPFS_PATH;
+#else
+	return NULL;
 #endif
-
-	if (ret)
-		usbi_dbg("found usbfs at %s", ret);
-
-	return ret;
-}
-
-/* the monotonic clock is not usable on all systems (e.g. embedded ones often
- * seem to lack it). fall back to REALTIME if we have to. */
-static clockid_t find_monotonic_clock(void)
-{
-#ifdef CLOCK_MONOTONIC
-	struct timespec ts;
-	int r;
-
-	/* Linux 2.6.28 adds CLOCK_MONOTONIC_RAW but we don't use it
-	 * because it's not available through timerfd */
-	r = clock_gettime(CLOCK_MONOTONIC, &ts);
-	if (r == 0)
-		return CLOCK_MONOTONIC;
-	usbi_dbg("monotonic clock doesn't work, errno=%d", errno);
-#endif
-
-	return CLOCK_REALTIME;
 }
 
 static int get_kernel_version(struct libusb_context *ctx,
@@ -426,76 +340,50 @@ static int kernel_version_ge(const struct kernel_version *ver,
 static int op_init(struct libusb_context *ctx)
 {
 	struct kernel_version kversion;
-	struct stat statbuf;
+	const char *usbfs_path;
 	int r;
-
-	if (!find_usbfs_path()) {
-		usbi_err(ctx, "could not find usbfs");
-		return LIBUSB_ERROR_OTHER;
-	}
-
-	if (monotonic_clkid == -1)
-		monotonic_clkid = find_monotonic_clock();
 
 	if (get_kernel_version(ctx, &kversion) < 0)
 		return LIBUSB_ERROR_OTHER;
 
-	if (supports_flag_cloexec == -1) {
-		/* O_CLOEXEC flag available from Linux 2.6.23 */
-		supports_flag_cloexec = kernel_version_ge(&kversion, 2, 6, 23);
+	if (!kernel_version_ge(&kversion, 2, 6, 32)) {
+		usbi_err(ctx, "kernel version is too old (reported as %d.%d.%d)",
+			 kversion.major, kversion.minor,
+			 kversion.sublevel != -1 ? kversion.sublevel : 0);
+		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
 
-	if (supports_flag_bulk_continuation == -1) {
-		/* bulk continuation URB flag available from Linux 2.6.32 */
-		supports_flag_bulk_continuation = kernel_version_ge(&kversion,2,6,32);
+	usbfs_path = find_usbfs_path();
+	if (!usbfs_path) {
+		usbi_err(ctx, "could not find usbfs");
+		return LIBUSB_ERROR_OTHER;
 	}
 
-	if (supports_flag_bulk_continuation)
-		usbi_dbg("bulk continuation flag supported");
-
-	if (supports_flag_zero_packet == -1) {
-		/* zero length packet URB flag fixed since Linux 2.6.31 */
-		supports_flag_zero_packet = kernel_version_ge(&kversion, 2, 6, 31);
-	}
-
-	if (supports_flag_zero_packet)
-		usbi_dbg("zero length packet flag supported");
+	usbi_dbg("found usbfs at %s", usbfs_path);
 
 	if (!max_iso_packet_len) {
-		if (kernel_version_ge(&kversion, 3, 10, 0))
+		if (kernel_version_ge(&kversion, 5, 2, 0))
+			max_iso_packet_len = 98304;
+		else if (kernel_version_ge(&kversion, 3, 10, 0))
 			max_iso_packet_len = 49152;
-		else if (kernel_version_ge(&kversion, 2, 6, 18))
-			max_iso_packet_len = 8192;
 		else
-			max_iso_packet_len = 1023;
+			max_iso_packet_len = 8192;
 	}
 
 	usbi_dbg("max iso packet length is (likely) %u bytes", max_iso_packet_len);
 
-	if (sysfs_has_descriptors == -1) {
-		/* sysfs descriptors has all descriptors since Linux 2.6.26 */
-		sysfs_has_descriptors = kernel_version_ge(&kversion, 2, 6, 26);
-	}
+	if (sysfs_available == -1) {
+		struct statfs statfsbuf;
 
-	if (sysfs_can_relate_devices == -1) {
-		/* sysfs has busnum since Linux 2.6.22 */
-		sysfs_can_relate_devices = kernel_version_ge(&kversion, 2, 6, 22);
-	}
-
-	if (sysfs_can_relate_devices || sysfs_has_descriptors) {
-		r = stat(SYSFS_DEVICE_PATH, &statbuf);
-		if (r < 0 || !S_ISDIR(statbuf.st_mode)) {
+		r = statfs(SYSFS_MOUNT_PATH, &statfsbuf);
+		if (r == 0 && statfsbuf.f_type == SYSFS_MAGIC) {
+			usbi_dbg("sysfs is available");
+			sysfs_available = 1;
+		} else {
 			usbi_warn(ctx, "sysfs not mounted");
-			sysfs_can_relate_devices = 0;
-			sysfs_has_descriptors = 0;
+			sysfs_available = 0;
 		}
 	}
-
-	if (sysfs_can_relate_devices)
-		usbi_dbg("sysfs can relate devices");
-
-	if (sysfs_has_descriptors)
-		usbi_dbg("sysfs has complete descriptors");
 
 	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	r = LIBUSB_SUCCESS;
@@ -558,7 +446,7 @@ static int open_sysfs_attr(struct libusb_context *ctx,
 	int fd;
 
 	snprintf(filename, sizeof(filename), SYSFS_DEVICE_PATH "/%s/%s", sysfs_dir, attr);
-	fd = __open(filename, O_RDONLY);
+	fd = open(filename, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		if (errno == ENOENT) {
 			/* File doesn't exist. Assume the device has been
@@ -644,7 +532,7 @@ static int op_get_device_descriptor(struct libusb_device *dev,
 {
 	struct linux_device_priv *priv = _device_priv(dev);
 
-	*host_endian = (priv->sysfs_dir && sysfs_has_descriptors) ? 0 : 1;
+	*host_endian = priv->sysfs_dir != NULL;
 	memcpy(buffer, priv->descriptors, DEVICE_DESC_LENGTH);
 
 	return 0;
@@ -689,7 +577,7 @@ int linux_get_device_address(struct libusb_context *ctx, int detached,
 	usbi_dbg("getting address for device: %s detached: %d", sys_name, detached);
 	/* can't use sysfs to read the bus and device number if the
 	 * device has been detached */
-	if (!sysfs_can_relate_devices || detached || !sys_name) {
+	if (!sysfs_available || detached || !sys_name) {
 		if (!dev_node && fd >= 0) {
 			char *fd_path = alloca(PATH_MAX);
 			char proc_path[32];
@@ -709,8 +597,6 @@ int linux_get_device_address(struct libusb_context *ctx, int detached,
 		/* will this work with all supported kernel versions? */
 		if (!strncmp(dev_node, "/dev/bus/usb", 12))
 			sscanf(dev_node, "/dev/bus/usb/%hhu/%hhu", busnum, devaddr);
-		else if (!strncmp(dev_node, "/proc/bus/usb", 13))
-			sscanf(dev_node, "/proc/bus/usb/%hhu/%hhu", busnum, devaddr);
 		else
 			return LIBUSB_ERROR_OTHER;
 
@@ -790,7 +676,7 @@ static int seek_to_next_config(struct libusb_device *dev,
 	 * config descriptor with verified bLength fields, with descriptors
 	 * with an invalid bLength removed.
 	 */
-	if (priv->sysfs_dir && sysfs_has_descriptors) {
+	if (priv->sysfs_dir) {
 		int next = seek_to_next_descriptor(ctx, LIBUSB_DT_CONFIG, buffer, size);
 
 		if (next == LIBUSB_ERROR_NOT_FOUND)
@@ -855,7 +741,7 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 	int r, config;
 	unsigned char *config_desc;
 
-	if (priv->sysfs_dir && sysfs_can_relate_devices) {
+	if (priv->sysfs_dir) {
 		r = sysfs_get_active_config(dev, &config);
 		if (r < 0)
 			return r;
@@ -981,7 +867,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	}
 
 	/* cache descriptors in memory */
-	if (sysfs_dir && sysfs_has_descriptors) {
+	if (sysfs_dir) {
 		fd = open_sysfs_attr(ctx, sysfs_dir, "descriptors");
 	} else if (wrapped_fd < 0) {
 		fd = get_usbfs_fd(dev, O_RDONLY, 0);
@@ -1005,7 +891,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 			return LIBUSB_ERROR_NO_MEM;
 		}
 		/* usbfs has holes in the file */
-		if (!(sysfs_dir && sysfs_has_descriptors)) {
+		if (!sysfs_dir) {
 			memset(priv->descriptors + priv->descriptors_len,
 			       0, descriptors_size - priv->descriptors_len);
 		}
@@ -1028,7 +914,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		return LIBUSB_ERROR_IO;
 	}
 
-	if (sysfs_dir && sysfs_can_relate_devices)
+	if (sysfs_dir)
 		return LIBUSB_SUCCESS;
 
 	/* cache active config */
@@ -1285,7 +1171,7 @@ static int usbfs_get_device_list(struct libusb_context *ctx)
 			continue;
 
 		if (usbdev_names) {
-			if (!_is_usbdev_entry(entry->d_name, &busnum, &devaddr))
+			if (!is_usbdev_entry(entry->d_name, &busnum, &devaddr))
 				continue;
 
 			r = linux_enumerate_device(ctx, busnum, devaddr, NULL);
@@ -1352,13 +1238,8 @@ static int linux_default_scan_devices(struct libusb_context *ctx)
 	 * sysfs is preferable, because if we use usbfs we end up resuming
 	 * any autosuspended USB devices. however, sysfs is not available
 	 * everywhere, so we need a usbfs fallback too.
-	 *
-	 * as described in the "sysfs vs usbfs" comment at the top of this
-	 * file, sometimes we have sysfs but not enough information to
-	 * relate sysfs devices to usbfs nodes.  op_init() determines the
-	 * adequacy of sysfs and sets sysfs_can_relate_devices.
 	 */
-	if (sysfs_can_relate_devices != 0)
+	if (sysfs_available)
 		return sysfs_get_device_list(ctx);
 	else
 		return usbfs_get_device_list(ctx);
@@ -1378,11 +1259,7 @@ static int initialize_handle(struct libusb_device_handle *handle, int fd)
 			usbi_dbg("getcap not available");
 		else
 			usbi_err(HANDLE_CTX(handle), "getcap failed, errno=%d", errno);
-		hpriv->caps = 0;
-		if (supports_flag_zero_packet)
-			hpriv->caps |= USBFS_CAP_ZERO_PACKET;
-		if (supports_flag_bulk_continuation)
-			hpriv->caps |= USBFS_CAP_BULK_CONTINUATION;
+		hpriv->caps = USBFS_CAP_BULK_CONTINUATION;
 	}
 
 	return usbi_add_pollfd(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
@@ -1482,7 +1359,7 @@ static int op_get_configuration(struct libusb_device_handle *handle,
 	struct linux_device_priv *priv = _device_priv(handle->dev);
 	int r;
 
-	if (priv->sysfs_dir && sysfs_can_relate_devices) {
+	if (priv->sysfs_dir) {
 		r = sysfs_get_active_config(handle->dev, config);
 	} else {
 		r = usbfs_get_active_config(handle->dev, _device_handle_priv(handle)->fd);
@@ -1942,10 +1819,6 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	int last_urb_partial = 0;
 	int r;
 	int i;
-
-	if (is_out && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET) &&
-			!(dpriv->caps & USBFS_CAP_ZERO_PACKET))
-		return LIBUSB_ERROR_NOT_SUPPORTED;
 
 	/*
 	 * Older versions of usbfs place a 16kb limit on bulk URBs. We work
@@ -2794,21 +2667,13 @@ static int op_clock_gettime(int clk_id, struct timespec *tp)
 {
 	switch (clk_id) {
 	case USBI_CLOCK_MONOTONIC:
-		return clock_gettime(monotonic_clkid, tp);
+		return clock_gettime(CLOCK_MONOTONIC, tp);
 	case USBI_CLOCK_REALTIME:
 		return clock_gettime(CLOCK_REALTIME, tp);
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;
-  }
+	}
 }
-
-#ifdef HAVE_TIMERFD
-static clockid_t op_get_timerfd_clockid(void)
-{
-	return monotonic_clkid;
-
-}
-#endif
 
 const struct usbi_os_backend usbi_backend = {
 	.name = "Linux usbfs",
@@ -2852,10 +2717,6 @@ const struct usbi_os_backend usbi_backend = {
 	.handle_events = op_handle_events,
 
 	.clock_gettime = op_clock_gettime,
-
-#ifdef HAVE_TIMERFD
-	.get_timerfd_clockid = op_get_timerfd_clockid,
-#endif
 
 	.device_priv_size = sizeof(struct linux_device_priv),
 	.device_handle_priv_size = sizeof(struct linux_device_handle_priv),

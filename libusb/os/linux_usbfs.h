@@ -21,9 +21,11 @@
 #ifndef LIBUSB_USBFS_H
 #define LIBUSB_USBFS_H
 
+#include <linux/magic.h>
 #include <linux/types.h>
 
-#define SYSFS_DEVICE_PATH "/sys/bus/usb/devices"
+#define SYSFS_MOUNT_PATH	"/sys"
+#define SYSFS_DEVICE_PATH	SYSFS_MOUNT_PATH "/bus/usb/devices"
 
 struct usbfs_ctrltransfer {
 	/* keep in sync with usbdevice_fs.h:usbdevfs_ctrltransfer */

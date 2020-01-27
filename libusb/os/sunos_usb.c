@@ -1641,13 +1641,6 @@ sunos_usb_get_status(int fd)
 	return (status);
 }
 
-#ifdef HAVE_TIMERFD
-static clockid_t op_get_timerfd_clockid(void)
-{
-       return CLOCK_MONOTONIC;
-}
-#endif
-
 const struct usbi_os_backend usbi_backend = {
         .name = "Solaris",
         .caps = 0,
@@ -1672,9 +1665,6 @@ const struct usbi_os_backend usbi_backend = {
         .cancel_transfer = sunos_cancel_transfer,
         .handle_transfer_completion = sunos_handle_transfer_completion,
         .clock_gettime = sunos_clock_gettime,
-#ifdef HAVE_TIMERFD
-        .get_timerfd_clockid = op_get_timerfd_clockid,
-#endif
         .device_priv_size = sizeof(sunos_dev_priv_t),
         .device_handle_priv_size = sizeof(sunos_dev_handle_priv_t),
         .transfer_priv_size = sizeof(sunos_xfer_priv_t),

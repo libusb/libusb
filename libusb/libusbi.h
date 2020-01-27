@@ -1157,11 +1157,6 @@ struct usbi_os_backend {
 	 */
 	int (*clock_gettime)(int clkid, struct timespec *tp);
 
-#ifdef HAVE_TIMERFD
-	/* clock ID of the clock that should be used for timerfd */
-	clockid_t (*get_timerfd_clockid)(void);
-#endif
-
 	/* Number of bytes to reserve for per-context private backend data.
 	 * This private data area is accessible through the "os_priv" field of
 	 * struct libusb_context. */
