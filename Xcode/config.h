@@ -1,5 +1,12 @@
 /* config.h.  Manually generated for Xcode.  */
 
+/* On 10.12 and later, use newly available clock_*() functions */
+#include <AvailabilityMacros.h>
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+/* Define to 1 if you have the `clock_gettime' function. */
+#define HAVE_CLOCK_GETTIME 1
+#endif
+
 /* Default visibility */
 #define DEFAULT_VISIBILITY /**/
 

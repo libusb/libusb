@@ -454,10 +454,24 @@ struct libusb_device_handle {
 	int auto_detach_kernel_driver;
 };
 
-enum {
-	USBI_CLOCK_MONOTONIC,
-	USBI_CLOCK_REALTIME
-};
+#ifdef HAVE_CLOCK_GETTIME
+#define USBI_CLOCK_REALTIME	CLOCK_REALTIME
+#define USBI_CLOCK_MONOTONIC	CLOCK_MONOTONIC
+#define usbi_clock_gettime	clock_gettime
+#else
+/* If the platform doesn't provide the clock_gettime() function, the backend
+ * must provide its own implementation.  Two clocks must be supported by the
+ * backend: USBI_CLOCK_REALTIME, and USBI_CLOCK_MONOTONIC.
+ *
+ * Description of clocks:
+ *   USBI_CLOCK_REALTIME:  clock returns time since system epoch.
+ *   USBI_CLOCK_MONOTONIC: clock returns time since unspecified start time
+ *			   (usually boot).
+ */
+#define USBI_CLOCK_REALTIME	0
+#define USBI_CLOCK_MONOTONIC	1
+int usbi_clock_gettime(int clk_id, struct timespec *tp);
+#endif
 
 /* in-memory transfer layout:
  *
@@ -1157,16 +1171,6 @@ struct usbi_os_backend {
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */
 	int (*handle_transfer_completion)(struct usbi_transfer *itransfer);
-
-	/* Get time from specified clock. At least two clocks must be implemented
-	   by the backend: USBI_CLOCK_REALTIME, and USBI_CLOCK_MONOTONIC.
-
-	   Description of clocks:
-	     USBI_CLOCK_REALTIME : clock returns time since system epoch.
-	     USBI_CLOCK_MONOTONIC: clock returns time since unspecified start
-	                             time (usually boot).
-	 */
-	int (*clock_gettime)(int clkid, struct timespec *tp);
 
 	/* Number of bytes to reserve for per-context private backend data.
 	 * This private data area is accessible by calling

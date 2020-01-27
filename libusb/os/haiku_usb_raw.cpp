@@ -193,16 +193,6 @@ haiku_handle_transfer_completion(struct usbi_transfer *itransfer)
 	return usbi_handle_transfer_completion(itransfer, status);
 }
 
-static int
-haiku_clock_gettime(int clkid, struct timespec *tp)
-{
-	if (clkid == USBI_CLOCK_REALTIME)
-		return clock_gettime(CLOCK_REALTIME, tp);
-	if (clkid == USBI_CLOCK_MONOTONIC)
-		return clock_gettime(CLOCK_MONOTONIC, tp);
-	return LIBUSB_ERROR_INVALID_PARAM;
-}
-
 const struct usbi_os_backend usbi_backend = {
 	.name = "Haiku usbfs",
 	.caps = 0,
@@ -228,8 +218,6 @@ const struct usbi_os_backend usbi_backend = {
 	.cancel_transfer = haiku_cancel_transfer,
 
 	.handle_transfer_completion = haiku_handle_transfer_completion,
-
-	.clock_gettime = haiku_clock_gettime,
 
 	.device_priv_size = sizeof(USBDevice *),
 	.device_handle_priv_size = sizeof(USBDeviceHandle *),
