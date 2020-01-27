@@ -2246,7 +2246,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	usbi_mutex_static_lock(&default_context_lock);
 
 	if (!timestamp_origin.tv_sec) {
-		usbi_backend.clock_gettime(USBI_CLOCK_REALTIME, &timestamp_origin);
+		usbi_clock_gettime(USBI_CLOCK_REALTIME, &timestamp_origin);
 	}
 
 	if (!context && usbi_default_context) {
@@ -2578,7 +2578,7 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	global_debug = (ctx_level == LIBUSB_LOG_LEVEL_DEBUG);
 #endif
 
-	usbi_backend.clock_gettime(USBI_CLOCK_REALTIME, &now);
+	usbi_clock_gettime(USBI_CLOCK_REALTIME, &now);
 	if ((global_debug) && (!has_debug_header_been_displayed)) {
 		has_debug_header_been_displayed = 1;
 		usbi_log_str(LIBUSB_LOG_LEVEL_DEBUG, "[timestamp] [threadID] facility level [function call] <message>" USBI_LOG_LINE_END);

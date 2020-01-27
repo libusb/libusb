@@ -74,7 +74,6 @@ static void obsd_destroy_device(struct libusb_device *);
 static int obsd_submit_transfer(struct usbi_transfer *);
 static int obsd_cancel_transfer(struct usbi_transfer *);
 static int obsd_handle_transfer_completion(struct usbi_transfer *);
-static int obsd_clock_gettime(int, struct timespec *);
 
 /*
  * Private functions
@@ -113,8 +112,6 @@ const struct usbi_os_backend usbi_backend = {
 	.cancel_transfer = obsd_cancel_transfer,
 
 	.handle_transfer_completion = obsd_handle_transfer_completion,
-
-	.clock_gettime = obsd_clock_gettime,
 
 	.device_priv_size = sizeof(struct device_priv),
 	.device_handle_priv_size = sizeof(struct handle_priv),
@@ -505,18 +502,6 @@ int
 obsd_handle_transfer_completion(struct usbi_transfer *itransfer)
 {
 	return usbi_handle_transfer_completion(itransfer, LIBUSB_TRANSFER_COMPLETED);
-}
-
-int
-obsd_clock_gettime(int clkid, struct timespec *tp)
-{
-	if (clkid == USBI_CLOCK_REALTIME)
-		return clock_gettime(CLOCK_REALTIME, tp);
-
-	if (clkid == USBI_CLOCK_MONOTONIC)
-		return clock_gettime(CLOCK_MONOTONIC, tp);
-
-	return (LIBUSB_ERROR_INVALID_PARAM);
 }
 
 int

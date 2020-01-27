@@ -215,6 +215,15 @@ fi
 dnl headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 
+dnl the clock_gettime() function needs certain clock IDs defined
+AC_CHECK_FUNCS([clock_gettime], [have_clock_gettime=yes], [have_clockgettime=no])
+if test "x$have_clock_gettime" = xyes; then
+	AC_CHECK_DECL([CLOCK_REALTIME], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_REALTIME])], [[#include <time.h>]])
+	AC_CHECK_DECL([CLOCK_MONOTONIC], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_MONOTONIC])], [[#include <time.h>]])
+elif test "x$backend" != xdarwin && test "x$backend" != xwindows; then
+       AC_MSG_ERROR([clock_gettime() is required on this platform])
+fi
+
 dnl timerfd support
 if test "x$backend" = xlinux || test "x$backend" = xsunos; then
 	AC_ARG_ENABLE([timerfd],

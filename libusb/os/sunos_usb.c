@@ -80,7 +80,6 @@ static void sunos_destroy_device(struct libusb_device *);
 static int sunos_submit_transfer(struct usbi_transfer *);
 static int sunos_cancel_transfer(struct usbi_transfer *);
 static int sunos_handle_transfer_completion(struct usbi_transfer *);
-static int sunos_clock_gettime(int, struct timespec *);
 static int sunos_kernel_driver_active(struct libusb_device_handle *, int interface);
 static int sunos_detach_kernel_driver (struct libusb_device_handle *dev, int interface_number);
 static int sunos_attach_kernel_driver (struct libusb_device_handle *dev, int interface_number);
@@ -1505,18 +1504,6 @@ sunos_handle_transfer_completion(struct usbi_transfer *itransfer)
 }
 
 int
-sunos_clock_gettime(int clkid, struct timespec *tp)
-{
-	if (clkid == USBI_CLOCK_REALTIME)
-		return clock_gettime(CLOCK_REALTIME, tp);
-
-	if (clkid == USBI_CLOCK_MONOTONIC)
-		return clock_gettime(CLOCK_MONOTONIC, tp);
-
-	return (LIBUSB_ERROR_INVALID_PARAM);
-}
-
-int
 _errno_to_libusb(int err)
 {
 	usbi_dbg("error: %s (%d)", strerror(err), err);
@@ -1662,7 +1649,6 @@ const struct usbi_os_backend usbi_backend = {
         .submit_transfer = sunos_submit_transfer,
         .cancel_transfer = sunos_cancel_transfer,
         .handle_transfer_completion = sunos_handle_transfer_completion,
-        .clock_gettime = sunos_clock_gettime,
         .device_priv_size = sizeof(sunos_dev_priv_t),
         .device_handle_priv_size = sizeof(sunos_dev_handle_priv_t),
         .transfer_priv_size = sizeof(sunos_xfer_priv_t),

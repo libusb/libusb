@@ -106,19 +106,6 @@ null_cancel_transfer(struct usbi_transfer *itransfer)
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int
-null_clock_gettime(int clkid, struct timespec *tp)
-{
-	switch (clkid) {
-	case USBI_CLOCK_MONOTONIC:
-		return clock_gettime(CLOCK_REALTIME, tp);
-	case USBI_CLOCK_REALTIME:
-		return clock_gettime(CLOCK_REALTIME, tp);
-	default:
-		return LIBUSB_ERROR_INVALID_PARAM;
-	}
-}
-
 const struct usbi_os_backend usbi_backend = {
 	.name = "Null backend",
 	.caps = 0,
@@ -136,5 +123,4 @@ const struct usbi_os_backend usbi_backend = {
 	.reset_device = null_reset_device,
 	.submit_transfer = null_submit_transfer,
 	.cancel_transfer = null_cancel_transfer,
-	.clock_gettime = null_clock_gettime,
 };

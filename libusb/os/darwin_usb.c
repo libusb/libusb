@@ -47,13 +47,6 @@
   #include <objc/objc-auto.h>
 #endif
 
-/* On 10.12 and later, use newly available clock_*() functions */
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-#define OSX_USE_CLOCK_GETTIME 1
-#else
-#define OSX_USE_CLOCK_GETTIME 0
-#endif
-
 #include "darwin_usb.h"
 
 static pthread_mutex_t libusb_darwin_init_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -63,7 +56,7 @@ static int init_count = 0;
 static pthread_mutex_t libusb_darwin_at_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  libusb_darwin_at_cond = PTHREAD_COND_INITIALIZER;
 
-#if !OSX_USE_CLOCK_GETTIME
+#if !defined(HAVE_CLOCK_GETTIME)
 static clock_serv_t clock_realtime;
 static clock_serv_t clock_monotonic;
 #endif
@@ -585,7 +578,7 @@ static int darwin_init(struct libusb_context *ctx) {
   first_init = (1 == ++init_count);
 
   do {
-#if !OSX_USE_CLOCK_GETTIME
+#if !defined(HAVE_CLOCK_GETTIME)
     if (first_init) {
       /* create the clocks that will be used if clock_gettime() is not available */
       host_name_port_t host_self;
@@ -624,7 +617,7 @@ static int darwin_init(struct libusb_context *ctx) {
   } while (0);
 
   if (LIBUSB_SUCCESS != rc) {
-#if !OSX_USE_CLOCK_GETTIME
+#if !defined(HAVE_CLOCK_GETTIME)
     if (first_init) {
       mach_port_deallocate(mach_task_self(), clock_realtime);
       mach_port_deallocate(mach_task_self(), clock_monotonic);
@@ -653,7 +646,7 @@ static void darwin_exit (struct libusb_context *ctx) {
     pthread_mutex_unlock (&libusb_darwin_at_mutex);
     pthread_join (libusb_darwin_at, NULL);
 
-#if !OSX_USE_CLOCK_GETTIME
+#if !defined(HAVE_CLOCK_GETTIME)
     mach_port_deallocate(mach_task_self(), clock_realtime);
     mach_port_deallocate(mach_task_self(), clock_monotonic);
 #endif
@@ -2174,8 +2167,8 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
   return usbi_handle_transfer_completion (itransfer, darwin_transfer_status (itransfer, tpriv->result));
 }
 
-static int darwin_clock_gettime(int clk_id, struct timespec *tp) {
-#if !OSX_USE_CLOCK_GETTIME
+#if !defined(HAVE_CLOCK_GETTIME)
+int usbi_clock_gettime(int clk_id, struct timespec *tp) {
   mach_timespec_t sys_time;
   clock_serv_t clock_ref;
 
@@ -2198,17 +2191,8 @@ static int darwin_clock_gettime(int clk_id, struct timespec *tp) {
   tp->tv_nsec = sys_time.tv_nsec;
 
   return LIBUSB_SUCCESS;
-#else
-  switch (clk_id) {
-  case USBI_CLOCK_MONOTONIC:
-    return clock_gettime(CLOCK_MONOTONIC, tp);
-  case USBI_CLOCK_REALTIME:
-    return clock_gettime(CLOCK_REALTIME, tp);
-  default:
-    return LIBUSB_ERROR_INVALID_PARAM;
-  }
-#endif
 }
+#endif
 
 #if InterfaceVersion >= 550
 static int darwin_alloc_streams (struct libusb_device_handle *dev_handle, uint32_t num_streams, unsigned char *endpoints,
@@ -2303,8 +2287,6 @@ const struct usbi_os_backend usbi_backend = {
         .cancel_transfer = darwin_cancel_transfer,
 
         .handle_transfer_completion = darwin_handle_transfer_completion,
-
-        .clock_gettime = darwin_clock_gettime,
 
         .device_priv_size = sizeof(struct darwin_device_priv),
         .device_handle_priv_size = sizeof(struct darwin_device_handle_priv),

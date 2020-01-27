@@ -42,9 +42,11 @@ enum windows_version windows_version = WINDOWS_UNDEFINED;
 static unsigned int init_count;
 static bool usbdk_available;
 
+#if !defined(HAVE_CLOCK_GETTIME)
 // Global variables for clock_gettime mechanism
 static uint64_t hires_ticks_to_ps;
 static uint64_t hires_frequency;
+#endif
 
 /*
 * Converts a windows error to human readable string
@@ -277,6 +279,7 @@ void windows_force_sync_completion(OVERLAPPED *overlapped, ULONG size)
 
 static void windows_init_clock(void)
 {
+#if !defined(HAVE_CLOCK_GETTIME)
 	LARGE_INTEGER li_frequency;
 
 	// Microsoft says that the QueryPerformanceFrequency() and
@@ -288,6 +291,7 @@ static void windows_init_clock(void)
 	hires_frequency = li_frequency.QuadPart;
 	hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency;
 	usbi_dbg("hires timer frequency: %"PRIu64" Hz", hires_frequency);
+#endif
 }
 
 /* Windows version detection */
@@ -810,7 +814,8 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 	return r;
 }
 
-static int windows_clock_gettime(int clk_id, struct timespec *tp)
+#if !defined(HAVE_CLOCK_GETTIME)
+int usbi_clock_gettime(int clk_id, struct timespec *tp)
 {
 	LARGE_INTEGER hires_counter;
 #if !defined(_MSC_VER) || (_MSC_VER < 1900)
@@ -848,6 +853,7 @@ static int windows_clock_gettime(int clk_id, struct timespec *tp)
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 }
+#endif
 
 // NB: MSVC6 does not support named initializers.
 const struct usbi_os_backend usbi_backend = {
@@ -885,7 +891,6 @@ const struct usbi_os_backend usbi_backend = {
 	NULL,	/* clear_transfer_priv */
 	windows_handle_events,
 	NULL,	/* handle_transfer_completion */
-	windows_clock_gettime,
 	sizeof(struct windows_context_priv),
 	sizeof(union windows_device_priv),
 	sizeof(union windows_device_handle_priv),
