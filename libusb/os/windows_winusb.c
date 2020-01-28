@@ -2472,7 +2472,7 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 	struct winusb_transfer_priv *transfer_priv = usbi_transfer_get_os_priv(itransfer);
 	struct winusb_device_handle_priv *handle_priv = _device_handle_priv(transfer->dev_handle);
 	PWINUSB_SETUP_PACKET setup = (PWINUSB_SETUP_PACKET)transfer->buffer;
-	ULONG size;
+	ULONG size, transferred;
 	HANDLE winusb_handle;
 	OVERLAPPED *overlapped;
 	int current_interface;
@@ -2510,13 +2510,13 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 		}
 		windows_force_sync_completion(overlapped, 0);
 	} else {
-		if (!WinUSBX[sub_api].ControlTransfer(winusb_handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, overlapped)) {
+		if (!WinUSBX[sub_api].ControlTransfer(winusb_handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, &transferred, overlapped)) {
 			if (GetLastError() != ERROR_IO_PENDING) {
 				usbi_warn(ctx, "ControlTransfer failed: %s", windows_error_str(0));
 				return LIBUSB_ERROR_IO;
 			}
 		} else {
-			windows_force_sync_completion(overlapped, size);
+			windows_force_sync_completion(overlapped, transferred);
 		}
 	}
 
