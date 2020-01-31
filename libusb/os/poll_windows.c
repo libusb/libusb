@@ -135,12 +135,14 @@ static int install_fd(struct file_descriptor *fd)
 	for (n = 0; n < fd_table_size; n += BITMAP_BITS_PER_WORD) {
 		unsigned int idx = n / BITMAP_BITS_PER_WORD;
 		ULONG mask, pos = 0U;
+		unsigned char nonzero;
 
 		mask = ~fd_table_bitmap[idx];
 		if (mask == 0U)
 			continue;
 
-		assert(_BitScanForward(&pos, mask));
+		nonzero = _BitScanForward(&pos, mask);
+		assert(nonzero);
 		fd_table_bitmap[idx] |= 1U << pos;
 		n += pos;
 		break;
