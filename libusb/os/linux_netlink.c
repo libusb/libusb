@@ -365,6 +365,13 @@ static void *linux_netlink_event_thread_main(void *arg)
 
 	UNUSED(arg);
 
+#if defined(HAVE_PTHREAD_SETNAME_NP)
+	r = pthread_setname_np(pthread_self(), "libusb_event");
+	if (r) {
+		usbi_warn(NULL, "failed to set hotplug event thread name, errno=%d", r);
+	}
+#endif
+
 	usbi_dbg("netlink event thread entering");
 
 	while ((r = poll(fds, 2, -1)) >= 0 || errno == EINTR) {
