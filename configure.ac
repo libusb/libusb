@@ -143,6 +143,7 @@ linux)
 		THREAD_CFLAGS="-pthread"
 		LIBS="${LIBS} -pthread"
 	fi
+	AC_CHECK_FUNCS([pthread_setname_np])
 	;;
 netbsd)
 	AC_DEFINE([OS_NETBSD], [1], [NetBSD backend])
