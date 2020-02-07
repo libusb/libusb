@@ -33,12 +33,14 @@
 
 #define EPOCH_TIME	UINT64_C(116444736000000000)	// 1970.01.01 00:00:000 in MS Filetime
 
+#define STATUS_SUCCESS	((ULONG_PTR)0UL)
+
 // Public
 enum windows_version windows_version = WINDOWS_UNDEFINED;
 
  // Global variables for init/exit
-static unsigned int init_count = 0;
-static bool usbdk_available = false;
+static unsigned int init_count;
+static bool usbdk_available;
 
 // Global variables for clock_gettime mechanism
 static uint64_t hires_ticks_to_ps;
@@ -114,7 +116,7 @@ typedef struct htab_entry {
 	char *str;
 } htab_entry;
 
-static htab_entry *htab_table = NULL;
+static htab_entry *htab_table;
 static usbi_mutex_t htab_mutex;
 static unsigned long htab_filled;
 
@@ -125,7 +127,7 @@ static unsigned long htab_filled;
 static bool htab_create(struct libusb_context *ctx)
 {
 	if (htab_table != NULL) {
-		usbi_err(ctx, "hash table already allocated");
+		usbi_err(ctx, "program assertion falied - hash table already allocated");
 		return true;
 	}
 
@@ -173,7 +175,7 @@ unsigned long htab_hash(const char *str)
 {
 	unsigned long hval, hval2;
 	unsigned long idx;
-	unsigned long r = 5381;
+	unsigned long r = 5381UL;
 	int c;
 	const char *sz = str;
 
@@ -204,7 +206,7 @@ unsigned long htab_hash(const char *str)
 		usbi_dbg("hash collision ('%s' vs '%s')", str, htab_table[idx].str);
 
 		// Second hash function, as suggested in [Knuth]
-		hval2 = 1 + hval % (HTAB_SIZE - 2);
+		hval2 = 1UL + hval % (HTAB_SIZE - 2);
 
 		do {
 			// Because size is prime this guarantees to step through all available indexes
@@ -228,14 +230,14 @@ unsigned long htab_hash(const char *str)
 	// If the table is full return an error
 	if (htab_filled >= HTAB_SIZE) {
 		usbi_err(NULL, "hash table is full (%lu entries)", HTAB_SIZE);
-		idx = 0;
+		idx = 0UL;
 		goto out_unlock;
 	}
 
 	htab_table[idx].str = _strdup(str);
 	if (htab_table[idx].str == NULL) {
 		usbi_err(NULL, "could not duplicate string for hash table");
-		idx = 0;
+		idx = 0UL;
 		goto out_unlock;
 	}
 
@@ -248,13 +250,33 @@ out_unlock:
 	return idx;
 }
 
+enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS status)
+{
+	if (USBD_SUCCESS(status))
+		return LIBUSB_TRANSFER_COMPLETED;
+
+	switch (status) {
+	case USBD_STATUS_TIMEOUT:
+		return LIBUSB_TRANSFER_TIMED_OUT;
+	case USBD_STATUS_CANCELED:
+		return LIBUSB_TRANSFER_CANCELLED;
+	case USBD_STATUS_ENDPOINT_HALTED:
+		return LIBUSB_TRANSFER_STALL;
+	case USBD_STATUS_DEVICE_GONE:
+		return LIBUSB_TRANSFER_NO_DEVICE;
+	default:
+		usbi_dbg("USBD_STATUS 0x%08lx translated to LIBUSB_TRANSFER_ERROR", ULONG_CAST(status));
+		return LIBUSB_TRANSFER_ERROR;
+	}
+}
+
 /*
 * Make a transfer complete synchronously
 */
 void windows_force_sync_completion(OVERLAPPED *overlapped, ULONG size)
 {
-	overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
-	overlapped->InternalHigh = size;
+	overlapped->Internal = (ULONG_PTR)STATUS_SUCCESS;
+	overlapped->InternalHigh = (ULONG_PTR)size;
 	SetEvent(overlapped->hEvent);
 }
 
@@ -294,7 +316,7 @@ static void get_windows_version(void)
 	const char *arch, *w = NULL;
 	unsigned major, minor, version;
 	ULONGLONG major_equal, minor_equal;
-	BOOL ws;
+	bool ws;
 
 	windows_version = WINDOWS_UNDEFINED;
 
@@ -378,16 +400,17 @@ static void get_windows_version(void)
 }
 
 static void windows_transfer_callback(const struct windows_backend *backend,
-	struct usbi_transfer *itransfer, DWORD io_result, DWORD io_size)
+	struct usbi_transfer *itransfer, DWORD error, DWORD bytes_transferred)
 {
-	int status, istatus;
+	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	enum libusb_transfer_status status, istatus;
 
-	usbi_dbg("handling I/O completion with errcode %lu, size %lu",
-		ULONG_CAST(io_result), ULONG_CAST(io_size));
+	usbi_dbg("handling I/O completion with errcode %lu, length %lu",
+		ULONG_CAST(error), ULONG_CAST(bytes_transferred));
 
-	switch (io_result) {
+	switch (error) {
 	case NO_ERROR:
-		status = backend->copy_transfer_data(itransfer, (uint32_t)io_size);
+		status = backend->copy_transfer_data(itransfer, bytes_transferred);
 		break;
 	case ERROR_GEN_FAILURE:
 		usbi_dbg("detected endpoint stall");
@@ -398,9 +421,9 @@ static void windows_transfer_callback(const struct windows_backend *backend,
 		status = LIBUSB_TRANSFER_TIMED_OUT;
 		break;
 	case ERROR_OPERATION_ABORTED:
-		istatus = backend->copy_transfer_data(itransfer, (uint32_t)io_size);
+		istatus = backend->copy_transfer_data(itransfer, bytes_transferred);
 		if (istatus != LIBUSB_TRANSFER_COMPLETED)
-			usbi_dbg("Failed to copy partial data in aborted operation: %d", istatus);
+			usbi_dbg("failed to copy partial data in aborted operation: %d", (int)istatus);
 
 		usbi_dbg("detected operation aborted");
 		status = LIBUSB_TRANSFER_CANCELLED;
@@ -412,57 +435,45 @@ static void windows_transfer_callback(const struct windows_backend *backend,
 		break;
 	default:
 		usbi_err(ITRANSFER_CTX(itransfer), "detected I/O error %lu: %s",
-			ULONG_CAST(io_result), windows_error_str(io_result));
+			ULONG_CAST(error), windows_error_str(error));
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	}
-	backend->clear_transfer_priv(itransfer);	// Cancel polling
+
+	// Cancel polling
+	usbi_close(transfer_priv->pollable_fd.fd);
+	transfer_priv->pollable_fd = INVALID_WINFD;
+	transfer_priv->handle = NULL;
+
+	// Backend-specific cleanup
+	backend->clear_transfer_priv(itransfer);
+
 	if (status == LIBUSB_TRANSFER_CANCELLED)
 		usbi_handle_transfer_cancellation(itransfer);
 	else
-		usbi_handle_transfer_completion(itransfer, (enum libusb_transfer_status)status);
-}
-
-static void windows_handle_callback(const struct windows_backend *backend,
-	struct usbi_transfer *itransfer, DWORD io_result, DWORD io_size)
-{
-	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-
-	switch (transfer->type) {
-	case LIBUSB_TRANSFER_TYPE_CONTROL:
-	case LIBUSB_TRANSFER_TYPE_BULK:
-	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
-	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-		windows_transfer_callback(backend, itransfer, io_result, io_size);
-		break;
-	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
-		usbi_warn(ITRANSFER_CTX(itransfer), "bulk stream transfers are not yet supported on this platform");
-		break;
-	default:
-		usbi_err(ITRANSFER_CTX(itransfer), "unknown endpoint type %d", transfer->type);
-	}
+		usbi_handle_transfer_completion(itransfer, status);
 }
 
 static int windows_init(struct libusb_context *ctx)
 {
 	struct windows_context_priv *priv = _context_priv(ctx);
-	HANDLE semaphore;
-	char sem_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
+	char mutex_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
+	HANDLE mutex;
 	int r = LIBUSB_ERROR_OTHER;
 	bool winusb_backend_init = false;
 
-	sprintf(sem_name, "libusb_init%08X", (unsigned int)(GetCurrentProcessId() & 0xFFFFFFFF));
-	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
-	if (semaphore == NULL) {
-		usbi_err(ctx, "could not create semaphore: %s", windows_error_str(0));
+	sprintf(mutex_name, "libusb_init%08X", (unsigned int)(GetCurrentProcessId() & 0xFFFFFFFFU));
+	mutex = CreateMutexA(NULL, FALSE, mutex_name);
+	if (mutex == NULL) {
+		usbi_err(ctx, "could not create mutex: %s", windows_error_str(0));
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	// A successful wait brings our semaphore count to 0 (unsignaled)
-	// => any concurent wait stalls until the semaphore's release
-	if (WaitForSingleObject(semaphore, INFINITE) != WAIT_OBJECT_0) {
-		usbi_err(ctx, "failure to access semaphore: %s", windows_error_str(0));
-		CloseHandle(semaphore);
+	// A successful wait gives this thread ownership of the mutex
+	// => any concurent wait stalls until the mutex is released
+	if (WaitForSingleObject(mutex, INFINITE) != WAIT_OBJECT_0) {
+		usbi_err(ctx, "failure to access mutex: %s", windows_error_str(0));
+		CloseHandle(mutex);
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
@@ -511,26 +522,26 @@ init_exit: // Holds semaphore here
 		--init_count;
 	}
 
-	ReleaseSemaphore(semaphore, 1, NULL); // increase count back to 1
-	CloseHandle(semaphore);
+	ReleaseMutex(mutex);
+	CloseHandle(mutex);
 	return r;
 }
 
 static void windows_exit(struct libusb_context *ctx)
 {
-	HANDLE semaphore;
-	char sem_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
-	UNUSED(ctx);
+	char mutex_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
+	HANDLE mutex;
 
-	sprintf(sem_name, "libusb_init%08lX", (GetCurrentProcessId() & 0xFFFFFFFFUL));
-	semaphore = CreateSemaphoreA(NULL, 1, 1, sem_name);
-	if (semaphore == NULL)
+	sprintf(mutex_name, "libusb_init%08lX", (GetCurrentProcessId() & 0xFFFFFFFFU));
+	mutex = CreateMutexA(NULL, FALSE, mutex_name);
+	if (mutex == NULL)
 		return;
 
-	// A successful wait brings our semaphore count to 0 (unsignaled)
-	// => any concurent wait stalls until the semaphore release
-	if (WaitForSingleObject(semaphore, INFINITE) != WAIT_OBJECT_0) {
-		CloseHandle(semaphore);
+	// A successful wait gives this thread ownership of the mutex
+	// => any concurent wait stalls until the mutex is released
+	if (WaitForSingleObject(mutex, INFINITE) != WAIT_OBJECT_0) {
+		usbi_err(ctx, "failed to access mutex: %s", windows_error_str(0));
+		CloseHandle(mutex);
 		return;
 	}
 
@@ -544,8 +555,8 @@ static void windows_exit(struct libusb_context *ctx)
 		htab_destroy();
 	}
 
-	ReleaseSemaphore(semaphore, 1, NULL); // increase count back to 1
-	CloseHandle(semaphore);
+	ReleaseMutex(mutex);
+	CloseHandle(mutex);
 }
 
 static int windows_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
@@ -567,7 +578,6 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 	default:
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
-
 }
 
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **discdevs)
@@ -671,29 +681,103 @@ static void windows_destroy_device(struct libusb_device *dev)
 
 static int windows_submit_transfer(struct usbi_transfer *itransfer)
 {
-	struct windows_context_priv *priv = _context_priv(ITRANSFER_CTX(itransfer));
-	return priv->backend->submit_transfer(itransfer);
+	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct libusb_context *ctx = TRANSFER_CTX(transfer);
+	struct windows_context_priv *priv = _context_priv(ctx);
+	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	short events;
+	int r;
+
+	switch (transfer->type) {
+	case LIBUSB_TRANSFER_TYPE_CONTROL:
+		events = (transfer->buffer[0] & LIBUSB_ENDPOINT_IN) ? POLLIN : POLLOUT;
+		break;
+	case LIBUSB_TRANSFER_TYPE_BULK:
+	case LIBUSB_TRANSFER_TYPE_INTERRUPT:
+	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
+		events = IS_XFERIN(transfer) ? POLLIN : POLLOUT;
+		break;
+	case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+		usbi_warn(ctx, "bulk stream transfers are not yet supported on this platform");
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	default:
+		usbi_err(ctx, "unknown endpoint type %d", transfer->type);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	// Because a Windows OVERLAPPED is used for poll emulation,
+	// a pollable fd is created and stored with each transfer
+	transfer_priv->pollable_fd = usbi_create_fd();
+	if (transfer_priv->pollable_fd.fd < 0) {
+		usbi_err(ctx, "failed to create pollable fd");
+		return LIBUSB_ERROR_NO_MEM;
+	}
+
+	if (transfer_priv->handle != NULL) {
+		usbi_err(ctx, "program assertion failed - transfer HANDLE is not NULL");
+		transfer_priv->handle = NULL;
+	}
+
+	r = priv->backend->submit_transfer(itransfer);
+	if (r != LIBUSB_SUCCESS) {
+		// Always call the backend's clear_transfer_priv() function on failure
+		priv->backend->clear_transfer_priv(itransfer);
+		// Release the pollable fd since it won't be used
+		usbi_close(transfer_priv->pollable_fd.fd);
+		transfer_priv->pollable_fd = INVALID_WINFD;
+		transfer_priv->handle = NULL;
+		return r;
+	}
+
+	// The backend should set the HANDLE used for each submitted transfer
+	// by calling set_transfer_priv_handle()
+	if (transfer_priv->handle == NULL)
+		usbi_err(ctx, "program assertion failed - transfer HANDLE is NULL after transfer was submitted");
+
+	// We don't want to start monitoring the pollable fd before the transfer
+	// has been submitted, so start monitoring it now.  Note that if the
+	// usbi_add_pollfd() function fails, the user will never get notified
+	// that the transfer has completed.  We don't attempt any cleanup if this
+	// happens because the transfer is already in progress and could even have
+	// completed
+	if (usbi_add_pollfd(ctx, transfer_priv->pollable_fd.fd, events))
+		usbi_err(ctx, "failed to add pollable fd %d for transfer %p",
+			transfer_priv->pollable_fd.fd, transfer);
+
+	return r;
 }
 
 static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 {
 	struct windows_context_priv *priv = _context_priv(ITRANSFER_CTX(itransfer));
-	return priv->backend->cancel_transfer(itransfer);
+	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+
+	// Try CancelIoEx() on the transfer
+	// If that fails, fall back to the backend's cancel_transfer()
+	// function if it is available
+	if (CancelIoEx(transfer_priv->handle, transfer_priv->pollable_fd.overlapped))
+		return LIBUSB_SUCCESS;
+	else if (GetLastError() == ERROR_NOT_FOUND)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	if (priv->backend->cancel_transfer)
+		return priv->backend->cancel_transfer(itransfer);
+
+	usbi_warn(ITRANSFER_CTX(itransfer), "cancellation not supported for this transfer's driver");
+	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, usbi_nfds_t nfds, int num_ready)
 {
 	struct windows_context_priv *priv = _context_priv(ctx);
 	struct usbi_transfer *itransfer;
-	DWORD io_size, io_result;
+	struct windows_transfer_priv *transfer_priv;
+	DWORD result, bytes_transferred;
 	usbi_nfds_t i;
-	bool found;
-	int transfer_fd;
 	int r = LIBUSB_SUCCESS;
 
 	usbi_mutex_lock(&ctx->open_devs_lock);
 	for (i = 0; i < nfds && num_ready > 0; i++) {
-
 		usbi_dbg("checking fd %d with revents = %04x", fds[i].fd, fds[i].revents);
 
 		if (!fds[i].revents)
@@ -701,34 +785,30 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 
 		num_ready--;
 
-		// Because a Windows OVERLAPPED is used for poll emulation,
-		// a pollable fd is created and stored with each transfer
-		found = false;
-		transfer_fd = -1;
+		transfer_priv = NULL;
 		usbi_mutex_lock(&ctx->flying_transfers_lock);
 		list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
-			transfer_fd = priv->backend->get_transfer_fd(itransfer);
-			if (transfer_fd == fds[i].fd) {
-				found = true;
+			transfer_priv = get_transfer_priv(itransfer);
+			if (transfer_priv->pollable_fd.fd == fds[i].fd)
 				break;
-			}
+			transfer_priv = NULL;
 		}
 		usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
-		if (found) {
-			priv->backend->get_overlapped_result(itransfer, &io_result, &io_size);
-
-			usbi_remove_pollfd(ctx, transfer_fd);
-
-			// let handle_callback free the event using the transfer wfd
-			// If you don't use the transfer wfd, you run a risk of trying to free a
-			// newly allocated wfd that took the place of the one from the transfer.
-			windows_handle_callback(priv->backend, itransfer, io_result, io_size);
-		} else {
+		if (transfer_priv == NULL) {
 			usbi_err(ctx, "could not find a matching transfer for fd %d", fds[i].fd);
 			r = LIBUSB_ERROR_NOT_FOUND;
 			break;
 		}
+
+		usbi_remove_pollfd(ctx, transfer_priv->pollable_fd.fd);
+
+		if (GetOverlappedResult(transfer_priv->handle, transfer_priv->pollable_fd.overlapped, &bytes_transferred, FALSE))
+			result = NO_ERROR;
+		else
+			result = GetLastError();
+
+		windows_transfer_callback(priv->backend, itransfer, result, bytes_transferred);
 	}
 	usbi_mutex_unlock(&ctx->open_devs_lock);
 
@@ -814,5 +894,5 @@ const struct usbi_os_backend usbi_backend = {
 	sizeof(struct windows_context_priv),
 	sizeof(union windows_device_priv),
 	sizeof(union windows_device_handle_priv),
-	sizeof(union windows_transfer_priv),
+	sizeof(struct windows_transfer_priv),
 };

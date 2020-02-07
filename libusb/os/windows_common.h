@@ -68,13 +68,13 @@
 #define DLL_HANDLE_NAME(name) __dll_##name##_handle
 
 #define DLL_DECLARE_HANDLE(name)				\
-	static HMODULE DLL_HANDLE_NAME(name) = NULL
+	static HMODULE DLL_HANDLE_NAME(name)
 
 #define DLL_GET_HANDLE(name)					\
 	do {							\
 		DLL_HANDLE_NAME(name) = DLL_LOAD_LIBRARY(name);	\
 		if (!DLL_HANDLE_NAME(name))			\
-			return FALSE;				\
+			return false;				\
 	} while (0)
 
 #define DLL_FREE_HANDLE(name)					\
@@ -92,7 +92,7 @@
 
 #define DLL_DECLARE_FUNC_PREFIXNAME(api, ret, prefixname, name, args)	\
 	typedef ret (api * DLL_FUNC_NAME(name))args;			\
-	static DLL_FUNC_NAME(name) prefixname = NULL
+	static DLL_FUNC_NAME(name) prefixname
 
 #define DLL_DECLARE_FUNC(api, ret, name, args)				\
 	DLL_DECLARE_FUNC_PREFIXNAME(api, ret, name, name, args)
@@ -115,7 +115,7 @@
 		if (prefixname)						\
 			break;						\
 		if (ret_on_failure)					\
-			return FALSE;					\
+			return false;					\
 	} while (0)
 
 #define DLL_LOAD_FUNC(dll, name, ret_on_failure)			\
@@ -271,16 +271,13 @@ struct winusb_device_handle_priv {
 
 struct usbdk_transfer_priv {
 	USB_DK_TRANSFER_REQUEST request;
-	struct winfd pollable_fd;
-	HANDLE system_handle;
 	PULONG64 IsochronousPacketsArray;
 	PUSB_DK_ISO_TRANSFER_RESULT IsochronousResultsArray;
 };
 
 struct winusb_transfer_priv {
-	struct winfd pollable_fd;
-	HANDLE handle;
 	uint8_t interface_number;
+
 	uint8_t *hid_buffer; // 1 byte extended data buffer, required for HID
 	uint8_t *hid_dest;   // transfer buffer destination, required for HID
 	size_t hid_expected_size;
@@ -322,10 +319,7 @@ struct windows_backend {
 	int (*submit_transfer)(struct usbi_transfer *itransfer);
 	int (*cancel_transfer)(struct usbi_transfer *itransfer);
 	void (*clear_transfer_priv)(struct usbi_transfer *itransfer);
-	int (*copy_transfer_data)(struct usbi_transfer *itransfer, uint32_t io_size);
-	int (*get_transfer_fd)(struct usbi_transfer *itransfer);
-	void (*get_overlapped_result)(struct usbi_transfer *itransfer,
-		DWORD *io_result, DWORD *io_size);
+	enum libusb_transfer_status (*copy_transfer_data)(struct usbi_transfer *itransfer, DWORD length);
 };
 
 struct windows_context_priv {
@@ -342,15 +336,49 @@ union windows_device_handle_priv {
 	struct winusb_device_handle_priv winusb_priv;
 };
 
-union windows_transfer_priv {
-	struct usbdk_transfer_priv usbdk_priv;
-	struct winusb_transfer_priv winusb_priv;
+struct windows_transfer_priv {
+	struct winfd pollable_fd;
+	HANDLE handle;
+	union {
+		struct usbdk_transfer_priv usbdk_priv;
+		struct winusb_transfer_priv winusb_priv;
+	};
 };
+
+static inline struct windows_transfer_priv *get_transfer_priv(struct usbi_transfer *itransfer)
+{
+	return (struct windows_transfer_priv *)usbi_transfer_get_os_priv(itransfer);
+}
+
+static inline OVERLAPPED *get_transfer_priv_overlapped(struct usbi_transfer *itransfer)
+{
+	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	return transfer_priv->pollable_fd.overlapped;
+}
+
+static inline void set_transfer_priv_handle(struct usbi_transfer *itransfer, HANDLE handle)
+{
+	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	transfer_priv->handle = handle;
+}
+
+static inline struct usbdk_transfer_priv *get_usbdk_transfer_priv(struct usbi_transfer *itransfer)
+{
+	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	return &transfer_priv->usbdk_priv;
+}
+
+static inline struct winusb_transfer_priv *get_winusb_transfer_priv(struct usbi_transfer *itransfer)
+{
+	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	return &transfer_priv->winusb_priv;
+}
 
 extern const struct windows_backend usbdk_backend;
 extern const struct windows_backend winusb_backend;
 
 unsigned long htab_hash(const char *str);
+enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS status);
 void windows_force_sync_completion(OVERLAPPED *overlapped, ULONG size);
 
 #if defined(ENABLE_LOGGING)

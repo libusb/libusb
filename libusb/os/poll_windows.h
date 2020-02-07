@@ -25,13 +25,6 @@
 #ifndef LIBUSB_POLL_WINDOWS_H
 #define LIBUSB_POLL_WINDOWS_H
 
-// Handle synchronous completion through the overlapped structure
-#if !defined(STATUS_REPARSE)	// reuse the REPARSE status code
-#define STATUS_REPARSE ((LONG)0x00000104L)
-#endif
-#define STATUS_COMPLETED_SYNCHRONOUSLY	STATUS_REPARSE
-#define HasOverlappedIoCompletedSync(lpOverlapped)	(((DWORD)(lpOverlapped)->Internal) == STATUS_COMPLETED_SYNCHRONOUSLY)
-
 #define DUMMY_HANDLE ((HANDLE)(LONG_PTR)-2)
 
 #define POLLIN		0x0001	/* There is data to read */

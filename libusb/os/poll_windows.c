@@ -392,8 +392,7 @@ int usbi_poll(struct pollfd *fds, usbi_nfds_t nfds, int timeout)
 			if (fd == NULL) {
 				fds[n].revents = POLLNVAL;
 				nready++;
-			} else if (HasOverlappedIoCompleted(&fd->overlapped) &&
-					(WaitForSingleObject(fd->overlapped.hEvent, 0) == WAIT_OBJECT_0)) {
+			} else if (HasOverlappedIoCompleted(&fd->overlapped)) {
 				fds[n].revents = fds[n].events;
 				nready++;
 			} else {
