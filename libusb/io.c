@@ -1257,23 +1257,25 @@ DEFAULT_VISIBILITY
 struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	int iso_packets)
 {
-	struct libusb_transfer *transfer;
-	size_t os_alloc_size;
+	size_t priv_size;
 	size_t alloc_size;
+	unsigned char *ptr;
 	struct usbi_transfer *itransfer;
+	struct libusb_transfer *transfer;
 
 	assert(iso_packets >= 0);
 
-	os_alloc_size = usbi_backend.transfer_priv_size;
-	alloc_size = sizeof(struct usbi_transfer)
-		+ sizeof(struct libusb_transfer)
-		+ (sizeof(struct libusb_iso_packet_descriptor) * (size_t)iso_packets)
-		+ os_alloc_size;
-	itransfer = calloc(1, alloc_size);
-	if (!itransfer)
+	priv_size = PTR_ALIGN(usbi_backend.transfer_priv_size);
+	alloc_size = priv_size
+		+ sizeof(struct usbi_transfer)
+		+ (sizeof(struct libusb_iso_packet_descriptor) * (size_t)iso_packets);
+	ptr = calloc(1, alloc_size);
+	if (!ptr)
 		return NULL;
 
+	itransfer = (struct usbi_transfer *)(ptr + priv_size);
 	itransfer->num_iso_packets = iso_packets;
+	itransfer->os_priv = ptr;
 	usbi_mutex_init(&itransfer->lock);
 	transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	usbi_dbg("transfer %p", transfer);
@@ -1300,6 +1302,9 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 {
 	struct usbi_transfer *itransfer;
+	size_t priv_size;
+	unsigned char *ptr;
+
 	if (!transfer)
 		return;
 
@@ -1309,7 +1314,11 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 
 	itransfer = LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	usbi_mutex_destroy(&itransfer->lock);
-	free(itransfer);
+
+	priv_size = PTR_ALIGN(usbi_backend.transfer_priv_size);
+	ptr = (unsigned char *)itransfer - priv_size;
+	assert(ptr == itransfer->os_priv);
+	free(ptr);
 }
 
 #ifdef HAVE_TIMERFD

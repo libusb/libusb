@@ -37,6 +37,9 @@
 #include "libusb.h"
 #include "version.h"
 
+#define container_of(ptr, type, member) \
+	((type *)((uintptr_t)(ptr) - (uintptr_t)offsetof(type, member)))
+
 #ifndef ARRAYSIZE
 #define ARRAYSIZE(array) (sizeof(array) / sizeof(array[0]))
 #endif
@@ -60,6 +63,10 @@
 #else
 #define UNUSED(var)	do { (void)(var); } while(0)
 #endif
+
+/* Macro to align a value up to the next multiple of the size of a pointer */
+#define PTR_ALIGN(v) \
+	(((v) + (sizeof(void *) - 1)) & ~(sizeof(void *) - 1))
 
 /* Attribute to ensure that a structure member is aligned to a natural
  * pointer alignment. Used for os_priv member. */
@@ -137,7 +144,7 @@ struct list_head {
  *  member - the list_head element in "type"
  */
 #define list_entry(ptr, type, member) \
-	((type *)((uintptr_t)(ptr) - (uintptr_t)offsetof(type, member)))
+	container_of(ptr, type, member)
 
 #define list_first_entry(ptr, type, member) \
 	list_entry((ptr)->next, type, member)
@@ -460,15 +467,12 @@ enum {
 
 /* in-memory transfer layout:
  *
- * 1. struct usbi_transfer
- * 2. struct libusb_transfer (which includes iso packets) [variable size]
- * 3. os private data [variable size]
+ * 1. os private data
+ * 2. struct usbi_transfer
+ * 3. struct libusb_transfer (which includes iso packets) [variable size]
  *
  * from a libusb_transfer, you can get the usbi_transfer by rewinding the
  * appropriate number of bytes.
- * the usbi_transfer includes the number of allocated packets, so you can
- * determine the size of the transfer and hence the start and length of the
- * OS-private data.
  */
 
 struct usbi_transfer {
@@ -478,8 +482,8 @@ struct usbi_transfer {
 	struct timeval timeout;
 	int transferred;
 	uint32_t stream_id;
-	uint8_t state_flags;   /* Protected by usbi_transfer->lock */
-	uint8_t timeout_flags; /* Protected by the flying_stransfers_lock */
+	uint32_t state_flags;   /* Protected by usbi_transfer->lock */
+	uint32_t timeout_flags; /* Protected by the flying_stransfers_lock */
 
 	/* this lock is held during libusb_submit_transfer() and
 	 * libusb_cancel_transfer() (allowing the OS backend to prevent duplicate
@@ -491,6 +495,10 @@ struct usbi_transfer {
 	 * Note paths taking both this and the flying_transfers_lock must
 	 * always take the flying_transfers_lock first */
 	usbi_mutex_t lock;
+
+	void *os_priv;
+
+	struct libusb_transfer libusb_transfer;
 };
 
 enum usbi_transfer_state_flags {
@@ -516,22 +524,14 @@ enum usbi_transfer_timeout_flags {
 };
 
 #define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)			\
-	((struct libusb_transfer *)(((unsigned char *)(itransfer))	\
-		+ sizeof(struct usbi_transfer)))
+	(&(itransfer)->libusb_transfer)
 #define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)			\
-	((struct usbi_transfer *)(((unsigned char *)(transfer))		\
-		- sizeof(struct usbi_transfer)))
+	container_of(transfer, struct usbi_transfer, libusb_transfer)
 
 static inline void *usbi_transfer_get_os_priv(struct usbi_transfer *itransfer)
 {
-	assert(itransfer->num_iso_packets >= 0);
-	return ((unsigned char *)itransfer) + sizeof(struct usbi_transfer)
-		+ sizeof(struct libusb_transfer)
-		+ ((size_t)itransfer->num_iso_packets
-			* sizeof(struct libusb_iso_packet_descriptor));
+	return itransfer->os_priv;
 }
-
-/* bus structures */
 
 /* All standard descriptors have these 2 fields in common */
 struct usb_descriptor_header {
@@ -1169,7 +1169,7 @@ struct usbi_os_backend {
 
 	/* Number of bytes to reserve for per-handle private backend data.
 	 * This private data area is accessible through the "os_priv" field of
-	 * struct libusb_device. */
+	 * struct libusb_device_handle. */
 	size_t device_handle_priv_size;
 
 	/* Number of bytes to reserve for per-transfer private backend data.
