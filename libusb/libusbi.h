@@ -267,8 +267,8 @@ void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 #define DEVICE_CTX(dev)		((dev)->ctx)
 #define HANDLE_CTX(handle)	(DEVICE_CTX((handle)->dev))
 #define TRANSFER_CTX(transfer)	(HANDLE_CTX((transfer)->dev_handle))
-#define ITRANSFER_CTX(transfer) \
-	(TRANSFER_CTX(USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)))
+#define ITRANSFER_CTX(itransfer) \
+	(TRANSFER_CTX(USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)))
 
 #define IS_EPIN(ep)		(0 != ((ep) & LIBUSB_ENDPOINT_IN))
 #define IS_EPOUT(ep)		(!IS_EPIN(ep))
@@ -515,19 +515,19 @@ enum usbi_transfer_timeout_flags {
 	USBI_TRANSFER_TIMED_OUT = 1U << 2,
 };
 
-#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(transfer)			\
-	((struct libusb_transfer *)(((unsigned char *)(transfer))	\
+#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)			\
+	((struct libusb_transfer *)(((unsigned char *)(itransfer))	\
 		+ sizeof(struct usbi_transfer)))
 #define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)			\
 	((struct usbi_transfer *)(((unsigned char *)(transfer))		\
 		- sizeof(struct usbi_transfer)))
 
-static inline void *usbi_transfer_get_os_priv(struct usbi_transfer *transfer)
+static inline void *usbi_transfer_get_os_priv(struct usbi_transfer *itransfer)
 {
-	assert(transfer->num_iso_packets >= 0);
-	return ((unsigned char *)transfer) + sizeof(struct usbi_transfer)
+	assert(itransfer->num_iso_packets >= 0);
+	return ((unsigned char *)itransfer) + sizeof(struct usbi_transfer)
 		+ sizeof(struct libusb_transfer)
-		+ ((size_t)transfer->num_iso_packets
+		+ ((size_t)itransfer->num_iso_packets
 			* sizeof(struct libusb_iso_packet_descriptor));
 }
 
@@ -553,8 +553,8 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle);
 
 int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
-int usbi_handle_transfer_cancellation(struct usbi_transfer *transfer);
-void usbi_signal_transfer_completion(struct usbi_transfer *transfer);
+int usbi_handle_transfer_cancellation(struct usbi_transfer *itransfer);
+void usbi_signal_transfer_completion(struct usbi_transfer *itransfer);
 
 int usbi_parse_descriptor(const unsigned char *source, const char *descriptor,
 	void *dest, int host_endian);
