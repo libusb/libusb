@@ -667,7 +667,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	unsigned long session_id)
 {
 	size_t priv_size = usbi_backend.device_priv_size;
-	struct libusb_device *dev = calloc(1, sizeof(*dev) + priv_size);
+	struct libusb_device *dev = calloc(1, PTR_ALIGN(sizeof(*dev)) + priv_size);
 	int r;
 
 	if (!dev)
@@ -1264,7 +1264,7 @@ int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
 	if (!usbi_backend.wrap_sys_device)
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 
-	_dev_handle = malloc(sizeof(*_dev_handle) + priv_size);
+	_dev_handle = calloc(1, PTR_ALIGN(sizeof(*_dev_handle)) + priv_size);
 	if (!_dev_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1273,11 +1273,6 @@ int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
 		free(_dev_handle);
 		return LIBUSB_ERROR_OTHER;
 	}
-
-	_dev_handle->dev = NULL;
-	_dev_handle->auto_detach_kernel_driver = 0;
-	_dev_handle->claimed_interfaces = 0;
-	memset(&_dev_handle->os_priv, 0, priv_size);
 
 	r = usbi_backend.wrap_sys_device(ctx, _dev_handle, sys_dev);
 	if (r < 0) {
@@ -1327,7 +1322,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
 
-	_dev_handle = malloc(sizeof(*_dev_handle) + priv_size);
+	_dev_handle = calloc(1, PTR_ALIGN(sizeof(*_dev_handle)) + priv_size);
 	if (!_dev_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1338,9 +1333,6 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	}
 
 	_dev_handle->dev = libusb_ref_device(dev);
-	_dev_handle->auto_detach_kernel_driver = 0;
-	_dev_handle->claimed_interfaces = 0;
-	memset(&_dev_handle->os_priv, 0, priv_size);
 
 	r = usbi_backend.open(_dev_handle);
 	if (r < 0) {
@@ -2264,7 +2256,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 		return 0;
 	}
 
-	ctx = calloc(1, sizeof(*ctx) + priv_size);
+	ctx = calloc(1, PTR_ALIGN(sizeof(*ctx)) + priv_size);
 	if (!ctx) {
 		r = LIBUSB_ERROR_NO_MEM;
 		goto err_unlock;

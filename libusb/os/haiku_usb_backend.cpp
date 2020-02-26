@@ -201,7 +201,7 @@ status_t
 USBDeviceHandle::SubmitTransfer(struct usbi_transfer *itransfer)
 {
 	USBTransfer *transfer = new USBTransfer(itransfer, fUSBDevice);
-	*((USBTransfer **)usbi_transfer_get_os_priv(itransfer)) = transfer;
+	*((USBTransfer **)usbi_get_transfer_priv(itransfer)) = transfer;
 	BAutolock locker(fTransfersLock);
 	fTransfers.AddItem(transfer);
 	release_sem(fTransfersSem);

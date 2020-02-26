@@ -100,11 +100,6 @@ const char *windows_error_str(DWORD error_code)
 }
 #endif
 
-static inline struct windows_context_priv *_context_priv(struct libusb_context *ctx)
-{
-	return (struct windows_context_priv *)ctx->os_priv;
-}
-
 /* Hash table functions - modified From glibc 2.3.2:
    [Aho,Sethi,Ullman] Compilers: Principles, Techniques and Tools, 1986
    [Knuth]            The Art of Computer Programming, part 3 (6.4)  */
@@ -402,7 +397,7 @@ static void get_windows_version(void)
 static void windows_transfer_callback(const struct windows_backend *backend,
 	struct usbi_transfer *itransfer, DWORD error, DWORD bytes_transferred)
 {
-	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	enum libusb_transfer_status status, istatus;
 
 	usbi_dbg("handling I/O completion with errcode %lu, length %lu",
@@ -456,7 +451,7 @@ static void windows_transfer_callback(const struct windows_backend *backend,
 
 static int windows_init(struct libusb_context *ctx)
 {
-	struct windows_context_priv *priv = _context_priv(ctx);
+	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
 	char mutex_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
 	HANDLE mutex;
 	int r = LIBUSB_ERROR_OTHER;
@@ -561,7 +556,7 @@ static void windows_exit(struct libusb_context *ctx)
 
 static int windows_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
 {
-	struct windows_context_priv *priv = _context_priv(ctx);
+	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
 
 	UNUSED(ap);
 
@@ -582,26 +577,26 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **discdevs)
 {
-	struct windows_context_priv *priv = _context_priv(ctx);
+	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
 	return priv->backend->get_device_list(ctx, discdevs);
 }
 
 static int windows_open(struct libusb_device_handle *dev_handle)
 {
-	struct windows_context_priv *priv = _context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->open(dev_handle);
 }
 
 static void windows_close(struct libusb_device_handle *dev_handle)
 {
-	struct windows_context_priv *priv = _context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	priv->backend->close(dev_handle);
 }
 
 static int windows_get_device_descriptor(struct libusb_device *dev,
 	unsigned char *buffer, int *host_endian)
 {
-	struct windows_context_priv *priv = _context_priv(DEVICE_CTX(dev));
+	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
 	*host_endian = 0;
 	return priv->backend->get_device_descriptor(dev, buffer);
 }
@@ -609,7 +604,7 @@ static int windows_get_device_descriptor(struct libusb_device *dev,
 static int windows_get_active_config_descriptor(struct libusb_device *dev,
 	unsigned char *buffer, size_t len, int *host_endian)
 {
-	struct windows_context_priv *priv = _context_priv(DEVICE_CTX(dev));
+	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
 	*host_endian = 0;
 	return priv->backend->get_active_config_descriptor(dev, buffer, len);
 }
@@ -617,7 +612,7 @@ static int windows_get_active_config_descriptor(struct libusb_device *dev,
 static int windows_get_config_descriptor(struct libusb_device *dev,
 	uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
 {
-	struct windows_context_priv *priv = _context_priv(DEVICE_CTX(dev));
+	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
 	*host_endian = 0;
 	return priv->backend->get_config_descriptor(dev, config_index, buffer, len);
 }
@@ -625,57 +620,57 @@ static int windows_get_config_descriptor(struct libusb_device *dev,
 static int windows_get_config_descriptor_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, unsigned char **buffer, int *host_endian)
 {
-	struct windows_context_priv *priv = _context_priv(DEVICE_CTX(dev));
+	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
 	*host_endian = 0;
 	return priv->backend->get_config_descriptor_by_value(dev, bConfigurationValue, buffer);
 }
 
 static int windows_get_configuration(struct libusb_device_handle *dev_handle, int *config)
 {
-	struct windows_context_priv *priv = _context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->get_configuration(dev_handle, config);
 }
 
 static int windows_set_configuration(struct libusb_device_handle *dev_handle, int config)
 {
-	struct windows_context_priv *priv = _context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->set_configuration(dev_handle, config);
 }
 
 static int windows_claim_interface(struct libusb_device_handle *dev_handle, int interface_number)
 {
-	struct windows_context_priv *priv = _context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->claim_interface(dev_handle, interface_number);
 }
 
 static int windows_release_interface(struct libusb_device_handle *dev_handle, int interface_number)
 {
-	struct windows_context_priv *priv = _context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->release_interface(dev_handle, interface_number);
 }
 
 static int windows_set_interface_altsetting(struct libusb_device_handle *dev_handle,
 	int interface_number, int altsetting)
 {
-	struct windows_context_priv *priv = _context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->set_interface_altsetting(dev_handle, interface_number, altsetting);
 }
 
 static int windows_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint)
 {
-	struct windows_context_priv *priv = _context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->clear_halt(dev_handle, endpoint);
 }
 
 static int windows_reset_device(struct libusb_device_handle *dev_handle)
 {
-	struct windows_context_priv *priv = _context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->reset_device(dev_handle);
 }
 
 static void windows_destroy_device(struct libusb_device *dev)
 {
-	struct windows_context_priv *priv = _context_priv(DEVICE_CTX(dev));
+	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
 	priv->backend->destroy_device(dev);
 }
 
@@ -683,8 +678,8 @@ static int windows_submit_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_context *ctx = TRANSFER_CTX(transfer);
-	struct windows_context_priv *priv = _context_priv(ctx);
-	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
+	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	short events;
 	int r;
 
@@ -749,8 +744,8 @@ static int windows_submit_transfer(struct usbi_transfer *itransfer)
 
 static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 {
-	struct windows_context_priv *priv = _context_priv(ITRANSFER_CTX(itransfer));
-	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	struct windows_context_priv *priv = usbi_get_context_priv(ITRANSFER_CTX(itransfer));
+	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 
 	// Try CancelIoEx() on the transfer
 	// If that fails, fall back to the backend's cancel_transfer()
@@ -769,7 +764,7 @@ static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 
 static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds, usbi_nfds_t nfds, int num_ready)
 {
-	struct windows_context_priv *priv = _context_priv(ctx);
+	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
 	struct usbi_transfer *itransfer;
 	struct windows_transfer_priv *transfer_priv;
 	DWORD result, bytes_transferred;
@@ -788,7 +783,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 		transfer_priv = NULL;
 		usbi_mutex_lock(&ctx->flying_transfers_lock);
 		list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
-			transfer_priv = get_transfer_priv(itransfer);
+			transfer_priv = usbi_get_transfer_priv(itransfer);
 			if (transfer_priv->pollable_fd.fd == fds[i].fd)
 				break;
 			transfer_priv = NULL;

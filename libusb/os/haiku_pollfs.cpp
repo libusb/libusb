@@ -110,7 +110,7 @@ WatchedEntry::WatchedEntry(BMessenger *messenger, entry_ref *ref)
 					usbi_dbg("device allocation failed");
 					continue;
 				}
-				*((USBDevice **)dev->os_priv) = fDevice;
+				*((USBDevice **)usbi_get_device_priv(dev)) = fDevice;
 
 				// Calculate pseudo-device-address
 				int addr, tmp;

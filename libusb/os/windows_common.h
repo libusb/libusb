@@ -345,32 +345,27 @@ struct windows_transfer_priv {
 	};
 };
 
-static inline struct windows_transfer_priv *get_transfer_priv(struct usbi_transfer *itransfer)
-{
-	return (struct windows_transfer_priv *)usbi_transfer_get_os_priv(itransfer);
-}
-
 static inline OVERLAPPED *get_transfer_priv_overlapped(struct usbi_transfer *itransfer)
 {
-	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	return transfer_priv->pollable_fd.overlapped;
 }
 
 static inline void set_transfer_priv_handle(struct usbi_transfer *itransfer, HANDLE handle)
 {
-	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	transfer_priv->handle = handle;
 }
 
 static inline struct usbdk_transfer_priv *get_usbdk_transfer_priv(struct usbi_transfer *itransfer)
 {
-	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	return &transfer_priv->usbdk_priv;
 }
 
 static inline struct winusb_transfer_priv *get_winusb_transfer_priv(struct usbi_transfer *itransfer)
 {
-	struct windows_transfer_priv *transfer_priv = get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	return &transfer_priv->winusb_priv;
 }
 

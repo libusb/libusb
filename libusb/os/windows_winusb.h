@@ -199,52 +199,41 @@ struct hid_device_priv {
 	uint8_t string_index[3]; // man, prod, ser
 };
 
-static inline struct winusb_device_priv *_device_priv(struct libusb_device *dev)
-{
-	return (struct winusb_device_priv *)dev->os_priv;
-}
-
 static inline struct winusb_device_priv *winusb_device_priv_init(struct libusb_device *dev)
 {
-	struct winusb_device_priv *p = _device_priv(dev);
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
 	int i;
 
-	p->apib = &usb_api_backend[USB_API_UNSUPPORTED];
-	p->sub_api = SUB_API_NOTSET;
+	priv->apib = &usb_api_backend[USB_API_UNSUPPORTED];
+	priv->sub_api = SUB_API_NOTSET;
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
-		p->usb_interface[i].apib = &usb_api_backend[USB_API_UNSUPPORTED];
-		p->usb_interface[i].sub_api = SUB_API_NOTSET;
+		priv->usb_interface[i].apib = &usb_api_backend[USB_API_UNSUPPORTED];
+		priv->usb_interface[i].sub_api = SUB_API_NOTSET;
 	}
 
-	return p;
+	return priv;
 }
 
 static inline void winusb_device_priv_release(struct libusb_device *dev)
 {
-	struct winusb_device_priv *p = _device_priv(dev);
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
 	int i;
 
-	free(p->dev_id);
-	free(p->path);
-	if ((dev->num_configurations > 0) && (p->config_descriptor != NULL)) {
+	free(priv->dev_id);
+	free(priv->path);
+	if ((dev->num_configurations > 0) && (priv->config_descriptor != NULL)) {
 		for (i = 0; i < dev->num_configurations; i++) {
-			if (p->config_descriptor[i] == NULL)
+			if (priv->config_descriptor[i] == NULL)
 				continue;
-			free((UCHAR *)p->config_descriptor[i] - USB_DESCRIPTOR_REQUEST_SIZE);
+			free((UCHAR *)priv->config_descriptor[i] - USB_DESCRIPTOR_REQUEST_SIZE);
 		}
 	}
-	free(p->config_descriptor);
-	free(p->hid);
+	free(priv->config_descriptor);
+	free(priv->hid);
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
-		free(p->usb_interface[i].path);
-		free(p->usb_interface[i].endpoint);
+		free(priv->usb_interface[i].path);
+		free(priv->usb_interface[i].endpoint);
 	}
-}
-
-static inline struct winusb_device_handle_priv *_device_handle_priv(
-	struct libusb_device_handle *handle)
-{
-	return (struct winusb_device_handle_priv *)handle->os_priv;
 }
 
 // used to match a device driver (including filter drivers) against a supported API

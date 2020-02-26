@@ -51,7 +51,7 @@ haiku_exit(struct libusb_context *ctx)
 static int
 haiku_open(struct libusb_device_handle *dev_handle)
 {
-	USBDevice *dev = *((USBDevice **)dev_handle->dev->os_priv);
+	USBDevice *dev = *((USBDevice **)usbi_get_device_priv(dev_handle->dev));
 	USBDeviceHandle *handle = new(std::nothrow) USBDeviceHandle(dev);
 	if (handle == NULL)
 		return LIBUSB_ERROR_NO_MEM;
@@ -59,24 +59,25 @@ haiku_open(struct libusb_device_handle *dev_handle)
 		delete handle;
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
-	*((USBDeviceHandle **)dev_handle->os_priv) = handle;
+	*((USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle)) = handle;
 	return LIBUSB_SUCCESS;
 }
 
 static void
 haiku_close(struct libusb_device_handle *dev_handle)
 {
-	USBDeviceHandle *handle = *((USBDeviceHandle **)dev_handle->os_priv);
+	USBDeviceHandle **pHandle = (USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle);
+	USBDeviceHandle *handle = *pHandle;
 	if (handle == NULL)
 		return;
 	delete handle;
-	*((USBDeviceHandle **)dev_handle->os_priv) = NULL;
+	*pHandle = NULL;
 }
 
 static int
 haiku_get_device_descriptor(struct libusb_device *device, unsigned char *buffer, int *host_endian)
 {
-	USBDevice *dev = *((USBDevice **)device->os_priv);
+	USBDevice *dev = *((USBDevice **)usbi_get_device_priv(device));
 	memcpy(buffer, dev->Descriptor(), DEVICE_DESC_LENGTH);
 	*host_endian = 0;
 	return LIBUSB_SUCCESS;
@@ -85,14 +86,14 @@ haiku_get_device_descriptor(struct libusb_device *device, unsigned char *buffer,
 static int
 haiku_get_active_config_descriptor(struct libusb_device *device, unsigned char *buffer, size_t len, int *host_endian)
 {
-	USBDevice *dev = *((USBDevice **)device->os_priv);
+	USBDevice *dev = *((USBDevice **)usbi_get_device_priv(device));
 	return haiku_get_config_descriptor(device, dev->ActiveConfigurationIndex(), buffer, len, host_endian);
 }
 
 static int
 haiku_get_config_descriptor(struct libusb_device *device, uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
 {
-	USBDevice *dev = *((USBDevice **)device->os_priv);
+	USBDevice *dev = *((USBDevice **)usbi_get_device_priv(device));
 	const usb_configuration_descriptor *config = dev->ConfigurationDescriptor(config_index);
 	if (config == NULL) {
 		usbi_err(DEVICE_CTX(device), "failed getting configuration descriptor");
@@ -109,28 +110,28 @@ haiku_get_config_descriptor(struct libusb_device *device, uint8_t config_index, 
 static int
 haiku_set_configuration(struct libusb_device_handle *dev_handle, int config)
 {
-	USBDeviceHandle *handle= *((USBDeviceHandle **)dev_handle->os_priv);
+	USBDeviceHandle *handle= *((USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle));
 	return handle->SetConfiguration(config);
 }
 
 static int
 haiku_claim_interface(struct libusb_device_handle *dev_handle, int interface_number)
 {
-	USBDeviceHandle *handle = *((USBDeviceHandle **)dev_handle->os_priv);
+	USBDeviceHandle *handle = *((USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle));
 	return handle->ClaimInterface(interface_number);
 }
 
 static int
 haiku_set_altsetting(struct libusb_device_handle *dev_handle, int interface_number, int altsetting)
 {
-	USBDeviceHandle *handle = *((USBDeviceHandle **)dev_handle->os_priv);
+	USBDeviceHandle *handle = *((USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle));
 	return handle->SetAltSetting(interface_number, altsetting);
 }
 
 static int
 haiku_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint)
 {
-	USBDeviceHandle *handle = *((USBDeviceHandle **)dev_handle->os_priv);
+	USBDeviceHandle *handle = *((USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle));
 	return handle->ClearHalt(endpoint);
 }
 
@@ -144,7 +145,7 @@ haiku_reset_device(struct libusb_device_handle *dev_handle)
 static int
 haiku_release_interface(struct libusb_device_handle *dev_handle, int interface_number)
 {
-	USBDeviceHandle *handle = *((USBDeviceHandle **)dev_handle->os_priv);
+	USBDeviceHandle *handle = *((USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle));
 	haiku_set_altsetting(dev_handle,interface_number, 0);
 	return handle->ReleaseInterface(interface_number);
 }
@@ -153,7 +154,7 @@ static int
 haiku_submit_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *fLibusbTransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	USBDeviceHandle *fDeviceHandle = *((USBDeviceHandle **)fLibusbTransfer->dev_handle->os_priv);
+	USBDeviceHandle *fDeviceHandle = *((USBDeviceHandle **)usbi_get_device_handle_priv(fLibusbTransfer->dev_handle));
 	return fDeviceHandle->SubmitTransfer(itransfer);
 }
 
@@ -161,19 +162,20 @@ static int
 haiku_cancel_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *fLibusbTransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	USBDeviceHandle *fDeviceHandle = *((USBDeviceHandle **)fLibusbTransfer->dev_handle->os_priv);
-	return fDeviceHandle->CancelTransfer(*((USBTransfer **)usbi_transfer_get_os_priv(itransfer)));
+	USBDeviceHandle *fDeviceHandle = *((USBDeviceHandle **)usbi_get_device_handle_priv(fLibusbTransfer->dev_handle));
+	return fDeviceHandle->CancelTransfer(*((USBTransfer **)usbi_get_transfer_priv(itransfer)));
 }
 
 static int
 haiku_handle_transfer_completion(struct usbi_transfer *itransfer)
 {
-	USBTransfer *transfer = *((USBTransfer **)usbi_transfer_get_os_priv(itransfer));
+	USBTransfer **pTransfer = (USBTransfer **)usbi_get_transfer_priv(itransfer);
+	USBTransfer *transfer = *pTransfer;
 
 	usbi_mutex_lock(&itransfer->lock);
 	if (transfer->IsCancelled()) {
 		delete transfer;
-		*((USBTransfer **)usbi_transfer_get_os_priv(itransfer)) = NULL;
+		*pTransfer = NULL;
 		usbi_mutex_unlock(&itransfer->lock);
 		if (itransfer->transferred < 0)
 			itransfer->transferred = 0;
@@ -186,7 +188,7 @@ haiku_handle_transfer_completion(struct usbi_transfer *itransfer)
 		itransfer->transferred = 0;
 	}
 	delete transfer;
-	*((USBTransfer **)usbi_transfer_get_os_priv(itransfer)) = NULL;
+	*pTransfer = NULL;
 	usbi_mutex_unlock(&itransfer->lock);
 	return usbi_handle_transfer_completion(itransfer, status);
 }

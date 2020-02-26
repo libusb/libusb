@@ -68,20 +68,6 @@
 #define PTR_ALIGN(v) \
 	(((v) + (sizeof(void *) - 1)) & ~(sizeof(void *) - 1))
 
-/* Attribute to ensure that a structure member is aligned to a natural
- * pointer alignment. Used for os_priv member. */
-#if defined(_MSC_VER)
-#if defined(_WIN64)
-#define PTR_ALIGNED __declspec(align(8))
-#else
-#define PTR_ALIGNED __declspec(align(4))
-#endif
-#elif defined(__GNUC__) && (__GNUC__ >= 3)
-#define PTR_ALIGNED __attribute__((aligned(sizeof(void *))))
-#else
-#define PTR_ALIGNED
-#endif
-
 /* Internal abstraction for poll */
 #if defined(POLL_POSIX)
 #include "os/poll_posix.h"
@@ -367,8 +353,6 @@ struct libusb_context {
 #endif
 
 	struct list_head list;
-
-	PTR_ALIGNED unsigned char os_priv[ZERO_SIZED_ARRAY];
 };
 
 extern struct libusb_context *usbi_default_context;
@@ -444,8 +428,6 @@ struct libusb_device {
 
 	struct libusb_device_descriptor device_descriptor;
 	int attached;
-
-	PTR_ALIGNED unsigned char os_priv[ZERO_SIZED_ARRAY];
 };
 
 struct libusb_device_handle {
@@ -456,8 +438,6 @@ struct libusb_device_handle {
 	struct list_head list;
 	struct libusb_device *dev;
 	int auto_detach_kernel_driver;
-
-	PTR_ALIGNED unsigned char os_priv[ZERO_SIZED_ARRAY];
 };
 
 enum {
@@ -496,7 +476,7 @@ struct usbi_transfer {
 	 * always take the flying_transfers_lock first */
 	usbi_mutex_t lock;
 
-	void *os_priv;
+	void *priv;
 
 	struct libusb_transfer libusb_transfer;
 };
@@ -527,11 +507,6 @@ enum usbi_transfer_timeout_flags {
 	(&(itransfer)->libusb_transfer)
 #define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)			\
 	container_of(transfer, struct usbi_transfer, libusb_transfer)
-
-static inline void *usbi_transfer_get_os_priv(struct usbi_transfer *itransfer)
-{
-	return itransfer->os_priv;
-}
 
 /* All standard descriptors have these 2 fields in common */
 struct usb_descriptor_header {
@@ -577,6 +552,28 @@ struct usbi_pollfd {
 
 int usbi_add_pollfd(struct libusb_context *ctx, int fd, short events);
 void usbi_remove_pollfd(struct libusb_context *ctx, int fd);
+
+/* accessor functions for structure private data */
+
+static inline void *usbi_get_context_priv(struct libusb_context *ctx)
+{
+	return (unsigned char *)ctx + PTR_ALIGN(sizeof(*ctx));
+}
+
+static inline void *usbi_get_device_priv(struct libusb_device *dev)
+{
+	return (unsigned char *)dev + PTR_ALIGN(sizeof(*dev));
+}
+
+static inline void *usbi_get_device_handle_priv(struct libusb_device_handle *dev_handle)
+{
+	return (unsigned char *)dev_handle + PTR_ALIGN(sizeof(*dev_handle));
+}
+
+static inline void *usbi_get_transfer_priv(struct usbi_transfer *itransfer)
+{
+	return itransfer->priv;
+}
 
 /* device discovery */
 
@@ -1158,23 +1155,26 @@ struct usbi_os_backend {
 	int (*clock_gettime)(int clkid, struct timespec *tp);
 
 	/* Number of bytes to reserve for per-context private backend data.
-	 * This private data area is accessible through the "os_priv" field of
-	 * struct libusb_context. */
+	 * This private data area is accessible by calling
+	 * usbi_get_context_priv() on the libusb_context instance.
+	 */
 	size_t context_priv_size;
 
 	/* Number of bytes to reserve for per-device private backend data.
-	 * This private data area is accessible through the "os_priv" field of
-	 * struct libusb_device. */
+	 * This private data area is accessible by calling
+	 * usbi_get_device_priv() on the libusb_device instance.
+	 */
 	size_t device_priv_size;
 
 	/* Number of bytes to reserve for per-handle private backend data.
-	 * This private data area is accessible through the "os_priv" field of
-	 * struct libusb_device_handle. */
+	 * This private data area is accessible by calling
+	 * usbi_get_device_handle_priv() on the libusb_device_handle instance.
+	 */
 	size_t device_handle_priv_size;
 
 	/* Number of bytes to reserve for per-transfer private backend data.
 	 * This private data area is accessible by calling
-	 * usbi_transfer_get_os_priv() on the appropriate usbi_transfer instance.
+	 * usbi_get_transfer_priv() on the usbi_transfer instance.
 	 */
 	size_t transfer_priv_size;
 };

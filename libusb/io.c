@@ -1275,7 +1275,7 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 
 	itransfer = (struct usbi_transfer *)(ptr + priv_size);
 	itransfer->num_iso_packets = iso_packets;
-	itransfer->os_priv = ptr;
+	itransfer->priv = ptr;
 	usbi_mutex_init(&itransfer->lock);
 	transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	usbi_dbg("transfer %p", transfer);
@@ -1317,7 +1317,7 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 
 	priv_size = PTR_ALIGN(usbi_backend.transfer_priv_size);
 	ptr = (unsigned char *)itransfer - priv_size;
-	assert(ptr == itransfer->os_priv);
+	assert(ptr == itransfer->priv);
 	free(ptr);
 }
 
