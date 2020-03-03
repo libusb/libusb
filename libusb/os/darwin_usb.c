@@ -47,23 +47,6 @@
   #include <objc/objc-auto.h>
 #endif
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-/* Apple deprecated the darwin atomics in 10.12 in favor of C11 atomics */
-#include <stdatomic.h>
-#define libusb_darwin_atomic_fetch_add(x, y) atomic_fetch_add(x, y)
-
-_Atomic int32_t initCount = ATOMIC_VAR_INIT(0);
-#else
-/* use darwin atomics if the target is older than 10.12 */
-#include <libkern/OSAtomic.h>
-
-/* OSAtomicAdd32Barrier returns the new value */
-#define libusb_darwin_atomic_fetch_add(x, y) (OSAtomicAdd32Barrier(y, x) - y)
-
-static volatile int32_t initCount = 0;
-
-#endif
-
 /* On 10.12 and later, use newly available clock_*() functions */
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 #define OSX_USE_CLOCK_GETTIME 1
@@ -73,6 +56,9 @@ static volatile int32_t initCount = 0;
 
 #include "darwin_usb.h"
 
+static pthread_mutex_t libusb_darwin_init_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int init_count = 0;
+
 /* async event thread */
 static pthread_mutex_t libusb_darwin_at_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  libusb_darwin_at_cond = PTHREAD_COND_INITIALIZER;
@@ -81,6 +67,8 @@ static pthread_cond_t  libusb_darwin_at_cond = PTHREAD_COND_INITIALIZER;
 static clock_serv_t clock_realtime;
 static clock_serv_t clock_monotonic;
 #endif
+
+#define LIBUSB_DARWIN_STARTUP_FAILURE ((CFRunLoopRef) -1)
 
 static CFRunLoopRef libusb_darwin_acfl = NULL; /* event cf loop */
 static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for event cf loop */
@@ -453,10 +441,20 @@ static void darwin_clear_iterator (io_iterator_t iter) {
     IOObjectRelease (device);
 }
 
+static void darwin_fail_startup(void) {
+  pthread_mutex_lock (&libusb_darwin_at_mutex);
+  libusb_darwin_acfl = LIBUSB_DARWIN_STARTUP_FAILURE;
+  pthread_cond_signal (&libusb_darwin_at_cond);
+  pthread_mutex_unlock (&libusb_darwin_at_mutex);
+  pthread_exit (NULL);
+}
+
 static void *darwin_event_thread_main (void *arg0) {
   IOReturn kresult;
   struct libusb_context *ctx = (struct libusb_context *)arg0;
   CFRunLoopRef runloop;
+  CFRunLoopSourceRef libusb_shutdown_cfsource;
+  CFRunLoopSourceContext libusb_shutdown_cfsourcectx;
 
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
   /* Set this thread's name, so it can be seen in the debugger
@@ -475,7 +473,6 @@ static void *darwin_event_thread_main (void *arg0) {
 #endif
 
   /* hotplug (device arrival/removal) sources */
-  CFRunLoopSourceContext libusb_shutdown_cfsourcectx;
   CFRunLoopSourceRef     libusb_notification_cfsource;
   io_notification_port_t libusb_notification_port;
   io_iterator_t          libusb_rem_device_iterator;
@@ -490,8 +487,8 @@ static void *darwin_event_thread_main (void *arg0) {
   memset(&libusb_shutdown_cfsourcectx, 0, sizeof(libusb_shutdown_cfsourcectx));
   libusb_shutdown_cfsourcectx.info = runloop;
   libusb_shutdown_cfsourcectx.perform = (void (*)(void *))CFRunLoopStop;
-  libusb_darwin_acfls = CFRunLoopSourceCreate(NULL, 0, &libusb_shutdown_cfsourcectx);
-  CFRunLoopAddSource(runloop, libusb_darwin_acfls, kCFRunLoopDefaultMode);
+  libusb_shutdown_cfsource = CFRunLoopSourceCreate(NULL, 0, &libusb_shutdown_cfsourcectx);
+  CFRunLoopAddSource(runloop, libusb_shutdown_cfsource, kCFRunLoopDefaultMode);
 
   /* add the notification port to the run loop */
   libusb_notification_port     = IONotificationPortCreate (kIOMasterPortDefault);
@@ -506,8 +503,9 @@ static void *darwin_event_thread_main (void *arg0) {
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "could not add hotplug event source: %s", darwin_error_str (kresult));
-
-    pthread_exit (NULL);
+    CFRelease (libusb_shutdown_cfsource);
+    CFRelease (runloop);
+    darwin_fail_startup ();
   }
 
   /* create notifications for attached devices */
@@ -518,8 +516,9 @@ static void *darwin_event_thread_main (void *arg0) {
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "could not add hotplug event source: %s", darwin_error_str (kresult));
-
-    pthread_exit (NULL);
+    CFRelease (libusb_shutdown_cfsource);
+    CFRelease (runloop);
+    darwin_fail_startup ();
   }
 
   /* arm notifiers */
@@ -531,6 +530,7 @@ static void *darwin_event_thread_main (void *arg0) {
   /* signal the main thread that the hotplug runloop has been created. */
   pthread_mutex_lock (&libusb_darwin_at_mutex);
   libusb_darwin_acfl = runloop;
+  libusb_darwin_acfls = libusb_shutdown_cfsource;
   pthread_cond_signal (&libusb_darwin_at_cond);
   pthread_mutex_unlock (&libusb_darwin_at_mutex);
 
@@ -539,11 +539,18 @@ static void *darwin_event_thread_main (void *arg0) {
 
   usbi_dbg ("darwin event thread exiting");
 
+  /* signal the main thread that the hotplug runloop has finished. */
+  pthread_mutex_lock (&libusb_darwin_at_mutex);
+  libusb_darwin_acfls = NULL;
+  libusb_darwin_acfl = NULL;
+  pthread_cond_signal (&libusb_darwin_at_cond);
+  pthread_mutex_unlock (&libusb_darwin_at_mutex);
+
   /* remove the notification cfsource */
   CFRunLoopRemoveSource(runloop, libusb_notification_cfsource, kCFRunLoopDefaultMode);
 
   /* remove the shutdown cfsource */
-  CFRunLoopRemoveSource(runloop, libusb_darwin_acfls, kCFRunLoopDefaultMode);
+  CFRunLoopRemoveSource(runloop, libusb_shutdown_cfsource, kCFRunLoopDefaultMode);
 
   /* delete notification port */
   IONotificationPortDestroy (libusb_notification_port);
@@ -552,11 +559,8 @@ static void *darwin_event_thread_main (void *arg0) {
   IOObjectRelease (libusb_rem_device_iterator);
   IOObjectRelease (libusb_add_device_iterator);
 
-  CFRelease (libusb_darwin_acfls);
+  CFRelease (libusb_shutdown_cfsource);
   CFRelease (runloop);
-
-  libusb_darwin_acfls = NULL;
-  libusb_darwin_acfl = NULL;
 
   pthread_exit (NULL);
 }
@@ -573,48 +577,89 @@ static void __attribute__((destructor)) _darwin_finalize(void) {
 }
 
 static int darwin_init(struct libusb_context *ctx) {
+  bool first_init;
   int rc;
 
-  rc = darwin_scan_devices (ctx);
-  if (LIBUSB_SUCCESS != rc) {
-    return rc;
-  }
+  pthread_mutex_lock (&libusb_darwin_init_mutex);
 
-  if (libusb_darwin_atomic_fetch_add (&initCount, 1) == 0) {
+  first_init = (1 == ++init_count);
+
+  do {
 #if !OSX_USE_CLOCK_GETTIME
-    /* create the clocks that will be used if clock_gettime() is not available */
-    host_name_port_t host_self;
+    if (first_init) {
+      /* create the clocks that will be used if clock_gettime() is not available */
+      host_name_port_t host_self;
 
-    host_self = mach_host_self();
-    host_get_clock_service(host_self, CALENDAR_CLOCK, &clock_realtime);
-    host_get_clock_service(host_self, SYSTEM_CLOCK, &clock_monotonic);
-    mach_port_deallocate(mach_task_self(), host_self);
+      host_self = mach_host_self();
+      host_get_clock_service(host_self, CALENDAR_CLOCK, &clock_realtime);
+      host_get_clock_service(host_self, SYSTEM_CLOCK, &clock_monotonic);
+      mach_port_deallocate(mach_task_self(), host_self);
+    }
 #endif
 
-    pthread_create (&libusb_darwin_at, NULL, darwin_event_thread_main, ctx);
+    rc = darwin_scan_devices (ctx);
+    if (LIBUSB_SUCCESS != rc)
+      break;
 
-    pthread_mutex_lock (&libusb_darwin_at_mutex);
-    while (!libusb_darwin_acfl)
-      pthread_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
-    pthread_mutex_unlock (&libusb_darwin_at_mutex);
+    if (first_init) {
+      rc = pthread_create (&libusb_darwin_at, NULL, darwin_event_thread_main, ctx);
+      if (0 != rc) {
+        usbi_err (ctx, "could not create event thread, error %d", rc);
+        rc = LIBUSB_ERROR_OTHER;
+        break;
+      }
+
+      pthread_mutex_lock (&libusb_darwin_at_mutex);
+      while (!libusb_darwin_acfl)
+        pthread_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
+      if (libusb_darwin_acfl == LIBUSB_DARWIN_STARTUP_FAILURE) {
+        libusb_darwin_acfl = NULL;
+        rc = LIBUSB_ERROR_OTHER;
+      }
+      pthread_mutex_unlock (&libusb_darwin_at_mutex);
+
+      if (0 != rc)
+        pthread_join (libusb_darwin_at, NULL);
+    }
+  } while (0);
+
+  if (LIBUSB_SUCCESS != rc) {
+#if !OSX_USE_CLOCK_GETTIME
+    if (first_init) {
+      mach_port_deallocate(mach_task_self(), clock_realtime);
+      mach_port_deallocate(mach_task_self(), clock_monotonic);
+    }
+#endif
+    --init_count;
   }
+
+  pthread_mutex_unlock (&libusb_darwin_init_mutex);
 
   return rc;
 }
 
 static void darwin_exit (struct libusb_context *ctx) {
   UNUSED(ctx);
-  if (libusb_darwin_atomic_fetch_add (&initCount, -1) == 1) {
+
+  pthread_mutex_lock (&libusb_darwin_init_mutex);
+
+  if (0 == --init_count) {
+    /* stop the event runloop and wait for the thread to terminate. */
+    pthread_mutex_lock (&libusb_darwin_at_mutex);
+    CFRunLoopSourceSignal (libusb_darwin_acfls);
+    CFRunLoopWakeUp (libusb_darwin_acfl);
+    while (libusb_darwin_acfl)
+      pthread_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
+    pthread_mutex_unlock (&libusb_darwin_at_mutex);
+    pthread_join (libusb_darwin_at, NULL);
+
 #if !OSX_USE_CLOCK_GETTIME
     mach_port_deallocate(mach_task_self(), clock_realtime);
     mach_port_deallocate(mach_task_self(), clock_monotonic);
 #endif
-
-    /* stop the event runloop and wait for the thread to terminate. */
-    CFRunLoopSourceSignal(libusb_darwin_acfls);
-    CFRunLoopWakeUp (libusb_darwin_acfl);
-    pthread_join (libusb_darwin_at, NULL);
   }
+
+  pthread_mutex_unlock (&libusb_darwin_init_mutex);
 }
 
 static int darwin_get_device_descriptor(struct libusb_device *dev, unsigned char *buffer, int *host_endian) {
