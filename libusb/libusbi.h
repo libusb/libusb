@@ -207,7 +207,21 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 	return ret;
 }
 
-#define TIMESPEC_IS_SET(ts) ((ts)->tv_sec != 0 || (ts)->tv_nsec != 0)
+#define TIMESPEC_IS_SET(ts)	((ts)->tv_sec || (ts)->tv_nsec)
+#define TIMESPEC_CLEAR(ts)	(ts)->tv_sec = (ts)->tv_nsec = 0
+#define TIMESPEC_CMP(a, b, CMP) 					\
+	(((a)->tv_sec == (b)->tv_sec)					\
+	 ? ((a)->tv_nsec CMP (b)->tv_nsec)				\
+	 : ((a)->tv_sec CMP (b)->tv_sec))
+#define TIMESPEC_SUB(a, b, result)					\
+	do {								\
+		(result)->tv_sec = (a)->tv_sec - (b)->tv_sec;		\
+		(result)->tv_nsec = (a)->tv_nsec - (b)->tv_nsec;	\
+		if ((result)->tv_nsec < 0L) {				\
+			--(result)->tv_sec;				\
+			(result)->tv_nsec += 1000000000L;		\
+		}							\
+	} while (0)
 
 #if defined(OS_WINDOWS)
 #define TIMEVAL_TV_SEC_TYPE	long
@@ -459,7 +473,7 @@ struct usbi_transfer {
 	int num_iso_packets;
 	struct list_head list;
 	struct list_head completed_list;
-	struct timeval timeout;
+	struct timespec timeout;
 	int transferred;
 	uint32_t stream_id;
 	uint32_t state_flags;   /* Protected by usbi_transfer->lock */

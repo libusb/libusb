@@ -1202,31 +1202,28 @@ void usbi_io_exit(struct libusb_context *ctx)
 static int calculate_timeout(struct usbi_transfer *itransfer)
 {
 	int r;
-	struct timespec current_time;
 	unsigned int timeout =
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)->timeout;
 
 	if (!timeout) {
-		timerclear(&itransfer->timeout);
+		TIMESPEC_CLEAR(&itransfer->timeout);
 		return 0;
 	}
 
-	r = usbi_backend.clock_gettime(USBI_CLOCK_MONOTONIC, &current_time);
+	r = usbi_backend.clock_gettime(USBI_CLOCK_MONOTONIC, &itransfer->timeout);
 	if (r < 0) {
 		usbi_err(ITRANSFER_CTX(itransfer),
 			"failed to read monotonic clock, errno=%d", errno);
 		return r;
 	}
 
-	current_time.tv_sec += timeout / 1000;
-	current_time.tv_nsec += (timeout % 1000) * 1000000;
-
-	while (current_time.tv_nsec >= 1000000000) {
-		current_time.tv_nsec -= 1000000000;
-		current_time.tv_sec++;
+	itransfer->timeout.tv_sec += timeout / 1000U;
+	itransfer->timeout.tv_nsec += (timeout % 1000U) * 1000000L;
+	if (itransfer->timeout.tv_nsec >= 1000000000L) {
+		++itransfer->timeout.tv_sec;
+		itransfer->timeout.tv_nsec -= 1000000000L;
 	}
 
-	TIMESPEC_TO_TIMEVAL(&itransfer->timeout, &current_time);
 	return 0;
 }
 
@@ -1345,19 +1342,19 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 	struct usbi_transfer *itransfer;
 
 	list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
-		struct timeval *cur_tv = &itransfer->timeout;
+		struct timespec *cur_ts = &itransfer->timeout;
 
 		/* if we've reached transfers of infinite timeout, then we have no
 		 * arming to do */
-		if (!timerisset(cur_tv))
+		if (!TIMESPEC_IS_SET(cur_ts))
 			goto disarm;
 
 		/* act on first transfer that has not already been handled */
 		if (!(itransfer->timeout_flags & (USBI_TRANSFER_TIMEOUT_HANDLED | USBI_TRANSFER_OS_HANDLES_TIMEOUT))) {
 			int r;
 			const struct itimerspec it = { {0, 0},
-				{ cur_tv->tv_sec, cur_tv->tv_usec * 1000 } };
-			usbi_dbg("next timeout originally %dms", USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)->timeout);
+				{ cur_ts->tv_sec, cur_ts->tv_nsec } };
+			usbi_dbg("next timeout originally %ums", USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)->timeout);
 			r = timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &it, NULL);
 			if (r < 0)
 				return LIBUSB_ERROR_OTHER;
@@ -1382,7 +1379,7 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 static int add_to_flying_list(struct usbi_transfer *itransfer)
 {
 	struct usbi_transfer *cur;
-	struct timeval *timeout = &itransfer->timeout;
+	struct timespec *timeout = &itransfer->timeout;
 	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
 	int r;
 	int first = 1;
@@ -1398,7 +1395,7 @@ static int add_to_flying_list(struct usbi_transfer *itransfer)
 	}
 
 	/* if we have infinite timeout, append to end of list */
-	if (!timerisset(timeout)) {
+	if (!TIMESPEC_IS_SET(timeout)) {
 		list_add_tail(&itransfer->list, &ctx->flying_transfers);
 		/* first is irrelevant in this case */
 		goto out;
@@ -1407,11 +1404,9 @@ static int add_to_flying_list(struct usbi_transfer *itransfer)
 	/* otherwise, find appropriate place in list */
 	list_for_each_entry(cur, &ctx->flying_transfers, list, struct usbi_transfer) {
 		/* find first timeout that occurs after the transfer in question */
-		struct timeval *cur_tv = &cur->timeout;
+		struct timespec *cur_ts = &cur->timeout;
 
-		if (!timerisset(cur_tv) || (cur_tv->tv_sec > timeout->tv_sec) ||
-				(cur_tv->tv_sec == timeout->tv_sec &&
-					cur_tv->tv_usec > timeout->tv_usec)) {
+		if (!TIMESPEC_IS_SET(cur_ts) || TIMESPEC_CMP(cur_ts, timeout, >)) {
 			list_add_tail(&itransfer->list, &cur->list);
 			goto out;
 		}
@@ -1423,12 +1418,12 @@ static int add_to_flying_list(struct usbi_transfer *itransfer)
 	list_add_tail(&itransfer->list, &ctx->flying_transfers);
 out:
 #ifdef HAVE_TIMERFD
-	if (first && usbi_using_timerfd(ctx) && timerisset(timeout)) {
+	if (first && usbi_using_timerfd(ctx) && TIMESPEC_IS_SET(timeout)) {
 		/* if this transfer has the lowest timeout of all active transfers,
 		 * rearm the timerfd with this transfer's timeout */
 		const struct itimerspec it = { {0, 0},
-			{ timeout->tv_sec, timeout->tv_usec * 1000 } };
-		usbi_dbg("arm timerfd for timeout in %dms (first in line)",
+			{ timeout->tv_sec, timeout->tv_nsec } };
+		usbi_dbg("arm timerfd for timeout in %ums (first in line)",
 			USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)->timeout);
 		r = timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &it, NULL);
 		if (r < 0) {
@@ -1457,7 +1452,7 @@ static int remove_from_flying_list(struct usbi_transfer *itransfer)
 	int r = 0;
 
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
-	rearm_timerfd = (timerisset(&itransfer->timeout) &&
+	rearm_timerfd = (TIMESPEC_IS_SET(&itransfer->timeout) &&
 		list_first_entry(&ctx->flying_transfers, struct usbi_transfer, list) == itransfer);
 	list_del(&itransfer->list);
 	if (usbi_using_timerfd(ctx) && rearm_timerfd)
@@ -2022,27 +2017,24 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 static int handle_timeouts_locked(struct libusb_context *ctx)
 {
 	int r;
-	struct timespec systime_ts;
-	struct timeval systime;
+	struct timespec systime;
 	struct usbi_transfer *itransfer;
 
 	if (list_empty(&ctx->flying_transfers))
 		return 0;
 
 	/* get current time */
-	r = usbi_backend.clock_gettime(USBI_CLOCK_MONOTONIC, &systime_ts);
+	r = usbi_backend.clock_gettime(USBI_CLOCK_MONOTONIC, &systime);
 	if (r < 0)
 		return r;
-
-	TIMESPEC_TO_TIMEVAL(&systime, &systime_ts);
 
 	/* iterate through flying transfers list, finding all transfers that
 	 * have expired timeouts */
 	list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
-		struct timeval *cur_tv = &itransfer->timeout;
+		struct timespec *cur_ts = &itransfer->timeout;
 
 		/* if we've reached transfers of infinite timeout, we're all done */
-		if (!timerisset(cur_tv))
+		if (!TIMESPEC_IS_SET(cur_ts))
 			return 0;
 
 		/* ignore timeouts we've already handled */
@@ -2050,9 +2042,7 @@ static int handle_timeouts_locked(struct libusb_context *ctx)
 			continue;
 
 		/* if transfer has non-expired timeout, nothing more to do */
-		if ((cur_tv->tv_sec > systime.tv_sec) ||
-				(cur_tv->tv_sec == systime.tv_sec &&
-					cur_tv->tv_usec > systime.tv_usec))
+		if (TIMESPEC_CMP(cur_ts, &systime, >))
 			return 0;
 
 		/* otherwise, we've got an expired timeout to handle */
@@ -2600,9 +2590,8 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	struct timeval *tv)
 {
 	struct usbi_transfer *itransfer;
-	struct timespec cur_ts;
-	struct timeval cur_tv;
-	struct timeval next_timeout = { 0, 0 };
+	struct timespec systime;
+	struct timespec next_timeout = { 0, 0 };
 	int r;
 
 	ctx = usbi_get_context(ctx);
@@ -2622,7 +2611,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 			continue;
 
 		/* if we've reached transfers of infinte timeout, we're done looking */
-		if (!timerisset(&itransfer->timeout))
+		if (!TIMESPEC_IS_SET(&itransfer->timeout))
 			break;
 
 		next_timeout = itransfer->timeout;
@@ -2630,23 +2619,23 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	}
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
-	if (!timerisset(&next_timeout)) {
+	if (!TIMESPEC_IS_SET(&next_timeout)) {
 		usbi_dbg("no URB with timeout or all handled by OS; no timeout!");
 		return 0;
 	}
 
-	r = usbi_backend.clock_gettime(USBI_CLOCK_MONOTONIC, &cur_ts);
+	r = usbi_backend.clock_gettime(USBI_CLOCK_MONOTONIC, &systime);
 	if (r < 0) {
 		usbi_err(ctx, "failed to read monotonic clock, errno=%d", errno);
 		return 0;
 	}
-	TIMESPEC_TO_TIMEVAL(&cur_tv, &cur_ts);
 
-	if (!timercmp(&cur_tv, &next_timeout, <)) {
+	if (!TIMESPEC_CMP(&systime, &next_timeout, <)) {
 		usbi_dbg("first timeout already expired");
 		timerclear(tv);
 	} else {
-		timersub(&next_timeout, &cur_tv, tv);
+		TIMESPEC_SUB(&next_timeout, &systime, &next_timeout);
+		TIMESPEC_TO_TIMEVAL(tv, &next_timeout);
 		usbi_dbg("next timeout in %ld.%06lds", (long)tv->tv_sec, (long)tv->tv_usec);
 	}
 

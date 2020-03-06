@@ -57,19 +57,4 @@ ssize_t usbi_write(int fd, const void *buf, size_t count);
 ssize_t usbi_read(int fd, void *buf, size_t count);
 int usbi_close(int fd);
 
-/*
- * Timeval operations
- */
-#if !defined(timersub)
-#define timersub(a, b, result)						\
-	do {								\
-		(result)->tv_sec = (a)->tv_sec - (b)->tv_sec;		\
-		(result)->tv_usec = (a)->tv_usec - (b)->tv_usec;	\
-		if ((result)->tv_usec < 0L) {				\
-			--(result)->tv_sec;				\
-			(result)->tv_usec += 1000000L;			\
-		}							\
-	} while (0)
-#endif
-
 #endif
