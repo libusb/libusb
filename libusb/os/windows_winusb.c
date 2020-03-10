@@ -1038,7 +1038,7 @@ static int set_composite_interface(struct libusb_context *ctx, struct libusb_dev
 	// devices will have only MI_00 & MI_03 for instance), we retrieve the actual
 	// interface number from the path's MI value
 	mi_str = strstr(device_id, "MI_");
-	if ((mi_str != NULL) && isdigit(mi_str[3]) && isdigit(mi_str[4])) {
+	if ((mi_str != NULL) && isdigit((unsigned char)mi_str[3]) && isdigit((unsigned char)mi_str[4])) {
 		interface_number = ((mi_str[3] - '0') * 10) + (mi_str[4] - '0');
 	} else {
 		usbi_warn(ctx, "failure to read interface number for %s, using default value", device_id);

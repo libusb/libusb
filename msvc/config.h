@@ -19,6 +19,8 @@
 #pragma warning(disable:4127)
 /* Disable: warning C4200: nonstandard extension used : zero-sized array in struct/union */
 #pragma warning(disable:4200)
+/* Disable: warning C4201: nonstandard extension used : nameless struct/union */
+#pragma warning(disable:4201)
 /* Disable: warning C4324: structure was padded due to __declspec(align()) */
 #pragma warning(disable:4324)
 /* Disable: warning C4996: 'GetVersionExA': was declared deprecated */

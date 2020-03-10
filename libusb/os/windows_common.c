@@ -457,7 +457,7 @@ static int windows_init(struct libusb_context *ctx)
 	int r = LIBUSB_ERROR_OTHER;
 	bool winusb_backend_init = false;
 
-	sprintf(mutex_name, "libusb_init%08X", (unsigned int)(GetCurrentProcessId() & 0xFFFFFFFFU));
+	sprintf(mutex_name, "libusb_init%08lX", ULONG_CAST(GetCurrentProcessId() & 0xFFFFFFFFU));
 	mutex = CreateMutexA(NULL, FALSE, mutex_name);
 	if (mutex == NULL) {
 		usbi_err(ctx, "could not create mutex: %s", windows_error_str(0));
@@ -527,7 +527,7 @@ static void windows_exit(struct libusb_context *ctx)
 	char mutex_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
 	HANDLE mutex;
 
-	sprintf(mutex_name, "libusb_init%08lX", (GetCurrentProcessId() & 0xFFFFFFFFU));
+	sprintf(mutex_name, "libusb_init%08lX", ULONG_CAST(GetCurrentProcessId() & 0xFFFFFFFFU));
 	mutex = CreateMutexA(NULL, FALSE, mutex_name);
 	if (mutex == NULL)
 		return;

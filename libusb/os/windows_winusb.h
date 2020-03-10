@@ -27,7 +27,6 @@
 
 #if defined(_MSC_VER)
 // disable /W4 MSVC warnings that are benign
-#pragma warning(disable:4201)  // nameless struct/union
 #pragma warning(disable:4214)  // bit field types other than int
 #endif
 
