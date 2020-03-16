@@ -220,8 +220,8 @@ static inline void winusb_device_priv_release(struct libusb_device *dev)
 
 	free(priv->dev_id);
 	free(priv->path);
-	if ((dev->num_configurations > 0) && (priv->config_descriptor != NULL)) {
-		for (i = 0; i < dev->num_configurations; i++) {
+	if ((priv->dev_descriptor.bNumConfigurations > 0) && (priv->config_descriptor != NULL)) {
+		for (i = 0; i < priv->dev_descriptor.bNumConfigurations; i++) {
 			if (priv->config_descriptor[i] == NULL)
 				continue;
 			free((UCHAR *)priv->config_descriptor[i] - USB_DESCRIPTOR_REQUEST_SIZE);

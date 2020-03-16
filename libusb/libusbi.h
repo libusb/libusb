@@ -429,12 +429,11 @@ struct libusb_device {
 	int refcnt;
 
 	struct libusb_context *ctx;
+	struct libusb_device *parent_dev;
 
 	uint8_t bus_number;
 	uint8_t port_number;
-	struct libusb_device* parent_dev;
 	uint8_t device_address;
-	uint8_t num_configurations;
 	enum libusb_speed speed;
 
 	struct list_head list;

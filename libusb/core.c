@@ -746,10 +746,10 @@ int usbi_sanitize_device(struct libusb_device *dev)
 	if (num_configurations > USB_MAXCONFIG) {
 		usbi_err(DEVICE_CTX(dev), "too many configurations");
 		return LIBUSB_ERROR_IO;
-	} else if (0 == num_configurations)
+	} else if (0 == num_configurations) {
 		usbi_dbg("zero configurations, maybe an unauthorized device");
+	}
 
-	dev->num_configurations = num_configurations;
 	return 0;
 }
 
@@ -1636,6 +1636,8 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
 	int configuration)
 {
 	usbi_dbg("configuration %d", configuration);
+	if (configuration < -1 || configuration > UINT8_MAX)
+		return LIBUSB_ERROR_INVALID_PARAM;
 	return usbi_backend.set_configuration(dev_handle, configuration);
 }
 
@@ -1673,7 +1675,7 @@ int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
 	int r = 0;
 
 	usbi_dbg("interface %d", interface_number);
-	if (interface_number >= USB_MAXINTERFACES)
+	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	if (!dev_handle->dev->attached)
@@ -1717,7 +1719,7 @@ int API_EXPORTED libusb_release_interface(libusb_device_handle *dev_handle,
 	int r;
 
 	usbi_dbg("interface %d", interface_number);
-	if (interface_number >= USB_MAXINTERFACES)
+	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	usbi_mutex_lock(&dev_handle->lock);
@@ -1761,7 +1763,9 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_hand
 {
 	usbi_dbg("interface %d altsetting %d",
 		interface_number, alternate_setting);
-	if (interface_number >= USB_MAXINTERFACES)
+	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
+		return LIBUSB_ERROR_INVALID_PARAM;
+	if (alternate_setting < 0 || alternate_setting > UINT8_MAX)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	usbi_mutex_lock(&dev_handle->lock);
@@ -1858,7 +1862,10 @@ int API_EXPORTED libusb_reset_device(libusb_device_handle *dev_handle)
 int API_EXPORTED libusb_alloc_streams(libusb_device_handle *dev_handle,
 	uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
 {
-	usbi_dbg("streams %u eps %d", (unsigned) num_streams, num_endpoints);
+	usbi_dbg("streams %u eps %d", (unsigned)num_streams, num_endpoints);
+
+	if (!num_streams || !endpoints || num_endpoints <= 0)
+		return LIBUSB_ERROR_INVALID_PARAM;
 
 	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
@@ -1886,6 +1893,9 @@ int API_EXPORTED libusb_free_streams(libusb_device_handle *dev_handle,
 	unsigned char *endpoints, int num_endpoints)
 {
 	usbi_dbg("eps %d", num_endpoints);
+
+	if (!endpoints || num_endpoints <= 0)
+		return LIBUSB_ERROR_INVALID_PARAM;
 
 	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
@@ -1973,6 +1983,9 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev_handle,
 {
 	usbi_dbg("interface %d", interface_number);
 
+	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
 	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
@@ -2008,6 +2021,9 @@ int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
 {
 	usbi_dbg("interface %d", interface_number);
 
+	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
 	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
@@ -2041,6 +2057,9 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
 	int interface_number)
 {
 	usbi_dbg("interface %d", interface_number);
+
+	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
+		return LIBUSB_ERROR_INVALID_PARAM;
 
 	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;

@@ -97,7 +97,7 @@ haiku_get_config_descriptor(struct libusb_device *device, uint8_t config_index, 
 	const usb_configuration_descriptor *config = dev->ConfigurationDescriptor(config_index);
 	if (config == NULL) {
 		usbi_err(DEVICE_CTX(device), "failed getting configuration descriptor");
-		return LIBUSB_ERROR_INVALID_PARAM;
+		return LIBUSB_ERROR_IO;
 	}
 	if (len > config->total_length) {
 		len = config->total_length;

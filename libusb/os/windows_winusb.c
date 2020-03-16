@@ -681,27 +681,28 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
 	DWORD size, ret_size;
-	uint8_t i;
+	uint8_t i, num_configurations;
 
 	USB_CONFIGURATION_DESCRIPTOR_SHORT cd_buf_short; // dummy request
 	PUSB_DESCRIPTOR_REQUEST cd_buf_actual = NULL;    // actual request
 	PUSB_CONFIGURATION_DESCRIPTOR cd_data;
 
-	if (dev->num_configurations == 0)
+	num_configurations = priv->dev_descriptor.bNumConfigurations;
+	if (num_configurations == 0)
 		return;
 
 	assert(sizeof(USB_DESCRIPTOR_REQUEST) == USB_DESCRIPTOR_REQUEST_SIZE);
 
-	priv->config_descriptor = calloc(dev->num_configurations, sizeof(PUSB_CONFIGURATION_DESCRIPTOR));
+	priv->config_descriptor = calloc(num_configurations, sizeof(PUSB_CONFIGURATION_DESCRIPTOR));
 	if (priv->config_descriptor == NULL) {
 		usbi_err(ctx, "could not allocate configuration descriptor array for '%s'", priv->dev_id);
 		return;
 	}
 
-	for (i = 0; i <= dev->num_configurations; i++) {
+	for (i = 0; i <= num_configurations; i++) {
 		safe_free(cd_buf_actual);
 
-		if (i == dev->num_configurations)
+		if (i == num_configurations)
 			break;
 
 		size = sizeof(cd_buf_short);
@@ -860,13 +861,12 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			}
 
 			memcpy(&priv->dev_descriptor, &(conn_info.DeviceDescriptor), sizeof(USB_DEVICE_DESCRIPTOR));
-			dev->num_configurations = conn_info.DeviceDescriptor.bNumConfigurations;
 			priv->active_config = conn_info.CurrentConfigurationValue;
 			if (priv->active_config == 0) {
 				usbi_dbg("0x%x:0x%x found %u configurations (not configured)",
 					priv->dev_descriptor.idVendor,
 					priv->dev_descriptor.idProduct,
-					dev->num_configurations);
+					priv->dev_descriptor.bNumConfigurations);
 				SleepEx(50, TRUE);
 			}
 		} while (priv->active_config == 0 && --ginfotimeout >= 0);
@@ -876,10 +876,10 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 				"forcing current configuration to 1",
 				priv->dev_descriptor.idVendor,
 				priv->dev_descriptor.idProduct,
-				dev->num_configurations);
+				priv->dev_descriptor.bNumConfigurations);
 			priv->active_config = 1;
 		} else {
-			usbi_dbg("found %u configurations (current config: %u)", dev->num_configurations, priv->active_config);
+			usbi_dbg("found %u configurations (current config: %u)", priv->dev_descriptor.bNumConfigurations, priv->active_config);
 		}
 
 		// Cache as many config descriptors as we can
@@ -957,7 +957,6 @@ static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id
 		usbi_dbg("assigning HCD '%s' bus number %u", dev_id, bus_number);
 		priv = usbi_get_device_priv(dev);
 		dev->bus_number = bus_number;
-		dev->num_configurations = 1;
 		priv->dev_descriptor.bLength = LIBUSB_DT_DEVICE_SIZE;
 		priv->dev_descriptor.bDescriptorType = LIBUSB_DT_DEVICE;
 		priv->dev_descriptor.bDeviceClass = LIBUSB_CLASS_HUB;
@@ -1543,10 +1542,6 @@ static int winusb_get_config_descriptor(struct libusb_device *dev, uint8_t confi
 	PUSB_CONFIGURATION_DESCRIPTOR config_header;
 	size_t size;
 
-	// config index is zero based
-	if (config_index >= dev->num_configurations)
-		return LIBUSB_ERROR_INVALID_PARAM;
-
 	if ((priv->config_descriptor == NULL) || (priv->config_descriptor[config_index] == NULL))
 		return LIBUSB_ERROR_NOT_FOUND;
 
@@ -1567,7 +1562,7 @@ static int winusb_get_config_descriptor_by_value(struct libusb_device *dev, uint
 	if (priv->config_descriptor == NULL)
 		return LIBUSB_ERROR_NOT_FOUND;
 
-	for (index = 0; index < dev->num_configurations; index++) {
+	for (index = 0; index < dev->device_descriptor.bNumConfigurations; index++) {
 		config_header = priv->config_descriptor[index];
 		if (config_header == NULL)
 			continue;
@@ -1640,9 +1635,6 @@ static int winusb_set_configuration(struct libusb_device_handle *dev_handle, int
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 	int r = LIBUSB_SUCCESS;
-
-	if (config >= USB_MAXCONFIG)
-		return LIBUSB_ERROR_INVALID_PARAM;
 
 	r = libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_OUT |
 		LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_DEVICE,
@@ -2477,9 +2469,6 @@ static int winusbx_set_interface_altsetting(int sub_api, struct libusb_device_ha
 	HANDLE winusb_handle;
 
 	CHECK_WINUSBX_AVAILABLE(sub_api);
-
-	if (altsetting > 255)
-		return LIBUSB_ERROR_INVALID_PARAM;
 
 	winusb_handle = handle_priv->interface_handle[iface].api_handle;
 	if (!HANDLE_VALID(winusb_handle)) {
@@ -3592,9 +3581,6 @@ static int hid_set_interface_altsetting(int sub_api, struct libusb_device_handle
 
 	CHECK_HID_AVAILABLE;
 
-	if (altsetting > 255)
-		return LIBUSB_ERROR_INVALID_PARAM;
-
 	if (altsetting != 0) {
 		usbi_err(HANDLE_CTX(dev_handle), "set interface altsetting not supported for altsetting >0");
 		return LIBUSB_ERROR_NOT_SUPPORTED;
@@ -3615,7 +3601,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 	OVERLAPPED *overlapped;
 	int current_interface, config;
 	size_t size;
-	int r = LIBUSB_ERROR_INVALID_PARAM;
+	int r;
 
 	UNUSED(sub_api);
 	CHECK_HID_AVAILABLE;

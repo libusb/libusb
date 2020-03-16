@@ -1109,8 +1109,8 @@ sunos_set_configuration(struct libusb_device_handle *handle, int config)
 	if (dpriv->ugenpath == NULL)
 		return (LIBUSB_ERROR_NOT_SUPPORTED);
 
-	if (config < 1 || config > dpriv->dev_descr.bNumConfigurations)
-		return (LIBUSB_ERROR_INVALID_PARAM);
+	if (config < 1)
+		return (LIBUSB_ERROR_NOT_SUPPORTED);
 
 	dpriv->cfgvalue = config;
 	hpriv->config_index = config - 1;
@@ -1122,9 +1122,6 @@ int
 sunos_claim_interface(struct libusb_device_handle *handle, int iface)
 {
 	usbi_dbg("iface %d", iface);
-	if (iface < 0) {
-		return (LIBUSB_ERROR_INVALID_PARAM);
-	}
 
 	return (LIBUSB_SUCCESS);
 }
@@ -1135,9 +1132,6 @@ sunos_release_interface(struct libusb_device_handle *handle, int iface)
 	sunos_dev_handle_priv_t *hpriv = usbi_get_device_handle_priv(handle);
 
 	usbi_dbg("iface %d", iface);
-	if (iface < 0) {
-		return (LIBUSB_ERROR_INVALID_PARAM);
-	}
 
 	/* XXX: can we release it? */
 	hpriv->altsetting[iface] = 0;
@@ -1154,9 +1148,6 @@ sunos_set_interface_altsetting(struct libusb_device_handle *handle, int iface,
 
 	usbi_dbg("iface %d, setting %d", iface, altsetting);
 
-	if (iface < 0 || altsetting < 0) {
-		return (LIBUSB_ERROR_INVALID_PARAM);
-	}
 	if (dpriv->ugenpath == NULL)
 		return (LIBUSB_ERROR_NOT_FOUND);
 

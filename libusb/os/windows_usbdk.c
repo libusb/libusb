@@ -286,7 +286,6 @@ static void usbdk_device_init(libusb_device *dev, PUSB_DK_DEVICE_INFO info)
 	// Addresses in libusb are 1-based
 	dev->device_address = (uint8_t)(info->Port + 1);
 
-	dev->num_configurations = info->DeviceDescriptor.bNumConfigurations;
 	memcpy(&dev->device_descriptor, &info->DeviceDescriptor, LIBUSB_DT_DEVICE_SIZE);
 
 	switch (info->Speed) {
@@ -373,9 +372,6 @@ static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config
 	PUSB_CONFIGURATION_DESCRIPTOR config_header;
 	size_t size;
 
-	if (config_index >= dev->num_configurations)
-		return LIBUSB_ERROR_INVALID_PARAM;
-
 	config_header = (PUSB_CONFIGURATION_DESCRIPTOR)priv->config_descriptors[config_index];
 
 	size = min(config_header->wTotalLength, len);
@@ -390,7 +386,7 @@ static int usbdk_get_config_descriptor_by_value(struct libusb_device *dev, uint8
 	PUSB_CONFIGURATION_DESCRIPTOR config_header;
 	uint8_t index;
 
-	for (index = 0; index < dev->num_configurations; index++) {
+	for (index = 0; index < dev->device_descriptor.bNumConfigurations; index++) {
 		config_header = priv->config_descriptors[index];
 		if (config_header->bConfigurationValue == bConfigurationValue) {
 			*buffer = (unsigned char *)priv->config_descriptors[index];

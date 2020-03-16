@@ -1261,6 +1261,8 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	struct libusb_transfer *transfer;
 
 	assert(iso_packets >= 0);
+	if (iso_packets < 0)
+		return NULL;
 
 	priv_size = PTR_ALIGN(usbi_backend.transfer_priv_size);
 	alloc_size = priv_size
