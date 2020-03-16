@@ -2182,7 +2182,8 @@ int usbi_clock_gettime(int clk_id, struct timespec *tp) {
     clock_ref = clock_monotonic;
     break;
   default:
-    return LIBUSB_ERROR_INVALID_PARAM;
+    errno = EINVAL;
+    return -1;
   }
 
   clock_get_time (clock_ref, &sys_time);
@@ -2190,7 +2191,7 @@ int usbi_clock_gettime(int clk_id, struct timespec *tp) {
   tp->tv_sec  = sys_time.tv_sec;
   tp->tv_nsec = sys_time.tv_nsec;
 
-  return LIBUSB_SUCCESS;
+  return 0;
 }
 #endif
 

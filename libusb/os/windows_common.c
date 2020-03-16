@@ -24,6 +24,7 @@
 
 #include <config.h>
 
+#include <errno.h>
 #include <inttypes.h>
 #include <process.h>
 #include <stdio.h>
@@ -829,13 +830,15 @@ int usbi_clock_gettime(int clk_id, struct timespec *tp)
 			QueryPerformanceCounter(&hires_counter);
 			tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
 			tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency) * hires_ticks_to_ps) / UINT64_C(1000));
-			return LIBUSB_SUCCESS;
+			return 0;
 		}
 		// Fall through and return real-time if monotonic was not detected @ timer init
 	case USBI_CLOCK_REALTIME:
 #if defined(_MSC_VER) && (_MSC_VER >= 1900)
-		if (!timespec_get(tp, TIME_UTC))
-			return LIBUSB_ERROR_OTHER;
+		if (!timespec_get(tp, TIME_UTC)) {
+			errno = EIO;
+			return -1;
+		}
 #else
 		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
 		// with a predef epoch time to have an epoch that starts at 1970.01.01 00:00
@@ -848,9 +851,10 @@ int usbi_clock_gettime(int clk_id, struct timespec *tp)
 		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
 		tp->tv_nsec = (long)((rtime.QuadPart % 10000000) * 100);
 #endif
-		return LIBUSB_SUCCESS;
+		return 0;
 	default:
-		return LIBUSB_ERROR_INVALID_PARAM;
+		errno = EINVAL;
+		return -1;
 	}
 }
 #endif

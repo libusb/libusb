@@ -1214,7 +1214,7 @@ static int calculate_timeout(struct usbi_transfer *itransfer)
 	if (r < 0) {
 		usbi_err(ITRANSFER_CTX(itransfer),
 			"failed to read monotonic clock, errno=%d", errno);
-		return r;
+		return LIBUSB_ERROR_OTHER;
 	}
 
 	itransfer->timeout.tv_sec += timeout / 1000U;
@@ -2027,8 +2027,10 @@ static int handle_timeouts_locked(struct libusb_context *ctx)
 
 	/* get current time */
 	r = usbi_clock_gettime(USBI_CLOCK_MONOTONIC, &systime);
-	if (r < 0)
-		return r;
+	if (r < 0) {
+		usbi_err(ctx, "failed to read monotonic clock, errno=%d", errno);
+		return LIBUSB_ERROR_OTHER;
+	}
 
 	/* iterate through flying transfers list, finding all transfers that
 	 * have expired timeouts */
