@@ -75,7 +75,6 @@ static int sunos_release_interface(struct libusb_device_handle *, int);
 static int sunos_set_interface_altsetting(struct libusb_device_handle *,
     int, int);
 static int sunos_clear_halt(struct libusb_device_handle *, uint8_t);
-static int sunos_reset_device(struct libusb_device_handle *);
 static void sunos_destroy_device(struct libusb_device *);
 static int sunos_submit_transfer(struct usbi_transfer *);
 static int sunos_cancel_transfer(struct usbi_transfer *);
@@ -1385,14 +1384,6 @@ sunos_clear_halt(struct libusb_device_handle *handle, uint8_t endpoint)
 	return (ret);
 }
 
-int
-sunos_reset_device(struct libusb_device_handle *handle)
-{
-	usbi_dbg(" ");
-
-	return (LIBUSB_ERROR_NOT_SUPPORTED);
-}
-
 void
 sunos_destroy_device(struct libusb_device *dev)
 {
@@ -1632,7 +1623,6 @@ const struct usbi_os_backend usbi_backend = {
         .release_interface = sunos_release_interface,
         .set_interface_altsetting = sunos_set_interface_altsetting,
         .clear_halt = sunos_clear_halt,
-        .reset_device = sunos_reset_device, /* TODO */
         .kernel_driver_active = sunos_kernel_driver_active,
         .detach_kernel_driver = sunos_detach_kernel_driver,
         .attach_kernel_driver = sunos_attach_kernel_driver,

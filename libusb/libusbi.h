@@ -984,7 +984,7 @@ struct usbi_os_backend {
 	int (*clear_halt)(struct libusb_device_handle *dev_handle,
 		unsigned char endpoint);
 
-	/* Perform a USB port reset to reinitialize a device.
+	/* Perform a USB port reset to reinitialize a device. Optional.
 	 *
 	 * If possible, the device handle should still be usable after the reset
 	 * completes, assuming that the device descriptors did not change during

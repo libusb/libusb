@@ -1835,7 +1835,10 @@ int API_EXPORTED libusb_reset_device(libusb_device_handle *dev_handle)
 	if (!dev_handle->dev->attached)
 		return LIBUSB_ERROR_NO_DEVICE;
 
-	return usbi_backend.reset_device(dev_handle);
+	if (usbi_backend.reset_device)
+		return usbi_backend.reset_device(dev_handle);
+	else
+		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 /** \ingroup libusb_asyncio

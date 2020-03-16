@@ -68,7 +68,6 @@ static int netbsd_release_interface(struct libusb_device_handle *, int);
 static int netbsd_set_interface_altsetting(struct libusb_device_handle *, int,
     int);
 static int netbsd_clear_halt(struct libusb_device_handle *, unsigned char);
-static int netbsd_reset_device(struct libusb_device_handle *);
 static void netbsd_destroy_device(struct libusb_device *);
 
 static int netbsd_submit_transfer(struct usbi_transfer *);
@@ -103,7 +102,6 @@ const struct usbi_os_backend usbi_backend = {
 
 	.set_interface_altsetting = netbsd_set_interface_altsetting,
 	.clear_halt = netbsd_clear_halt,
-	.reset_device = netbsd_reset_device,
 
 	.destroy_device = netbsd_destroy_device,
 
@@ -385,14 +383,6 @@ netbsd_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 		return _errno_to_libusb(errno);
 
 	return (LIBUSB_SUCCESS);
-}
-
-int
-netbsd_reset_device(struct libusb_device_handle *handle)
-{
-	usbi_dbg(" ");
-
-	return (LIBUSB_ERROR_NOT_SUPPORTED);
 }
 
 void

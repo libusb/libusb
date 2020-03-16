@@ -89,12 +89,6 @@ null_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 }
 
 static int
-null_reset_device(struct libusb_device_handle *handle)
-{
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
-static int
 null_submit_transfer(struct usbi_transfer *itransfer)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
@@ -120,7 +114,6 @@ const struct usbi_os_backend usbi_backend = {
 	.release_interface = null_release_interface,
 	.set_interface_altsetting = null_set_interface_altsetting,
 	.clear_halt = null_clear_halt,
-	.reset_device = null_reset_device,
 	.submit_transfer = null_submit_transfer,
 	.cancel_transfer = null_cancel_transfer,
 };

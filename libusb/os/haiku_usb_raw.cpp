@@ -136,13 +136,6 @@ haiku_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint
 }
 
 static int
-haiku_reset_device(struct libusb_device_handle *dev_handle)
-{
-	/* TODO */
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
-static int
 haiku_release_interface(struct libusb_device_handle *dev_handle, int interface_number)
 {
 	USBDeviceHandle *handle = *((USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle));
@@ -212,7 +205,6 @@ const struct usbi_os_backend usbi_backend = {
 
 	.set_interface_altsetting = haiku_set_altsetting,
 	.clear_halt = haiku_clear_halt,
-	.reset_device = haiku_reset_device,
 
 	.submit_transfer = haiku_submit_transfer,
 	.cancel_transfer = haiku_cancel_transfer,
