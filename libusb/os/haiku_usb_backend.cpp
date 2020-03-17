@@ -215,7 +215,7 @@ USBDeviceHandle::CancelTransfer(USBTransfer *transfer)
 	fTransfersLock.Lock();
 	bool removed = fTransfers.RemoveItem(transfer);
 	fTransfersLock.Unlock();
-	if(removed)
+	if (removed)
 		usbi_signal_transfer_completion(transfer->UsbiTransfer());
 	return LIBUSB_SUCCESS;
 }
@@ -242,7 +242,7 @@ USBDeviceHandle::~USBDeviceHandle()
 {
 	if (fRawFD > 0)
 		close(fRawFD);
-	for(int i = 0; i < 32; i++) {
+	for (int i = 0; i < 32; i++) {
 		if (fClaimedInterfaces & (1U << i))
 			ReleaseInterface(i);
 	}
@@ -269,10 +269,10 @@ USBDeviceHandle::ReleaseInterface(int inumber)
 }
 
 int
-USBDeviceHandle::SetConfiguration(int config)
+USBDeviceHandle::SetConfiguration(uint8 config)
 {
 	int config_index = fUSBDevice->CheckInterfacesFree(config);
-	if(config_index == LIBUSB_ERROR_BUSY || config_index == LIBUSB_ERROR_NOT_FOUND)
+	if (config_index == LIBUSB_ERROR_BUSY || config_index == LIBUSB_ERROR_NOT_FOUND)
 		return config_index;
 	usb_raw_command command;
 	command.config.config_index = config_index;
@@ -280,7 +280,7 @@ USBDeviceHandle::SetConfiguration(int config)
 			command.config.status != B_USB_RAW_STATUS_SUCCESS) {
 		return _errno_to_libusb(command.config.status);
 	}
-	fUSBDevice->SetActiveConfiguration(config_index);
+	fUSBDevice->SetActiveConfiguration((uint8)config_index);
 	return LIBUSB_SUCCESS;
 }
 
@@ -309,9 +309,8 @@ USBDeviceHandle::SetAltSetting(int inumber, int alt)
 	return LIBUSB_SUCCESS;
 }
 
-
 int
-USBDevice::ClearHalt(int endpoint)
+USBDeviceHandle::ClearHalt(uint8 endpoint)
 {
 	usb_raw_command command;
 	command.control.request_type = USB_REQTYPE_ENDPOINT_OUT;
@@ -324,6 +323,7 @@ USBDevice::ClearHalt(int endpoint)
 			command.control.status != B_USB_RAW_STATUS_SUCCESS) {
 		return _errno_to_libusb(command.control.status);
 	}
+	return LIBUSB_SUCCESS;
 }
 
 
@@ -345,7 +345,7 @@ USBDevice::~USBDevice()
 {
 	free(fPath);
 	if (fConfigurationDescriptors) {
-		for(int i = 0; i < fDeviceDescriptor.num_configurations; i++) {
+		for (uint8 i = 0; i < fDeviceDescriptor.num_configurations; i++) {
 			if (fConfigurationDescriptors[i])
 				delete fConfigurationDescriptors[i];
 		}
@@ -382,7 +382,7 @@ USBDevice::Descriptor() const
 }
 
 const usb_configuration_descriptor *
-USBDevice::ConfigurationDescriptor(uint32 index) const
+USBDevice::ConfigurationDescriptor(uint8 index) const
 {
 	if (index > CountConfigurations())
 		return NULL;
@@ -395,7 +395,7 @@ USBDevice::ActiveConfiguration() const
 	return (usb_configuration_descriptor *) fConfigurationDescriptors[fActiveConfiguration];
 }
 
-int
+uint8
 USBDevice::ActiveConfigurationIndex() const
 {
 	return fActiveConfiguration;
@@ -418,20 +418,19 @@ int USBDevice::ReleaseInterface(int interface)
 }
 
 int
-USBDevice::CheckInterfacesFree(int config)
+USBDevice::CheckInterfacesFree(uint8 config)
 {
 	if (fConfigToIndex.count(config) == 0)
 		return LIBUSB_ERROR_NOT_FOUND;
 	if (fClaimedInterfaces == 0)
-		return fConfigToIndex[(uint8)config];
+		return fConfigToIndex[config];
 	return LIBUSB_ERROR_BUSY;
 }
 
-int
-USBDevice::SetActiveConfiguration(int config_index)
+void
+USBDevice::SetActiveConfiguration(uint8 config_index)
 {
 	fActiveConfiguration = config_index;
-	return LIBUSB_SUCCESS;
 }
 
 uint8
@@ -463,7 +462,7 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 	fConfigurationDescriptors = new(std::nothrow) unsigned char *[fDeviceDescriptor.num_configurations];
 	fEndpointToIndex = new(std::nothrow) map<uint8,uint8> [fDeviceDescriptor.num_configurations];
 	fEndpointToInterface = new(std::nothrow) map<uint8,uint8> [fDeviceDescriptor.num_configurations];
-	for (int i = 0; i < fDeviceDescriptor.num_configurations; i++) {
+	for (uint8 i = 0; i < fDeviceDescriptor.num_configurations; i++) {
 		usb_configuration_descriptor tmp_config;
 		command.config.descriptor = &tmp_config;
 		command.config.config_index = i;
@@ -479,14 +478,14 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 		command.config_etc.descriptor = (usb_configuration_descriptor*)fConfigurationDescriptors[i];
 		command.config_etc.length = tmp_config.total_length;
 		command.config_etc.config_index = i;
-		if (ioctl(fRawFD, B_USB_COMMAND_GET_CONFIGURATION_DESCRIPTOR_ETC, &command, sizeof(command)) ||
+		if (ioctl(fRawFD, B_USB_RAW_COMMAND_GET_CONFIGURATION_DESCRIPTOR_ETC, &command, sizeof(command)) ||
 				command.config_etc.status != B_USB_RAW_STATUS_SUCCESS) {
 			usbi_err(NULL, "failed retrieving full configuration descriptor");
 			close(fRawFD);
 			return B_ERROR;
 		}
 
-		for (int j = 0; j < tmp_config.number_interfaces; j++) {
+		for (uint8 j = 0; j < tmp_config.number_interfaces; j++) {
 			command.alternate.config_index = i;
 			command.alternate.interface_index = j;
 			if (ioctl(fRawFD, B_USB_RAW_COMMAND_GET_ALT_INTERFACE_COUNT, &command, sizeof(command)) ||
@@ -495,8 +494,8 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 				close(fRawFD);
 				return B_ERROR;
 			}
-			int num_alternate = command.alternate.alternate_info;
-			for (int k = 0; k < num_alternate; k++) {
+			uint8 num_alternate = (uint8)command.alternate.alternate_info;
+			for (uint8 k = 0; k < num_alternate; k++) {
 				usb_interface_descriptor tmp_interface;
 				command.interface_etc.config_index = i;
 				command.interface_etc.interface_index = j;
@@ -508,7 +507,7 @@ USBDevice::Initialise()		//Do we need more error checking, etc? How to report?
 					close(fRawFD);
 					return B_ERROR;
 				}
-				for (int l = 0; l < tmp_interface.num_endpoints; l++) {
+				for (uint8 l = 0; l < tmp_interface.num_endpoints; l++) {
 					usb_endpoint_descriptor tmp_endpoint;
 					command.endpoint_etc.config_index = i;
 					command.endpoint_etc.interface_index = j;

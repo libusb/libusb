@@ -38,22 +38,22 @@ public:
 	const char*				Location() const;
 	uint8					CountConfigurations() const;
 	const usb_device_descriptor*		Descriptor() const;
-	const usb_configuration_descriptor*	ConfigurationDescriptor(uint32) const;
+	const usb_configuration_descriptor*	ConfigurationDescriptor(uint8) const;
 	const usb_configuration_descriptor*	ActiveConfiguration() const;
 	uint8					EndpointToIndex(uint8) const;
 	uint8					EndpointToInterface(uint8) const;
 	int					ClaimInterface(int);
 	int					ReleaseInterface(int);
-	int					CheckInterfacesFree(int);
-	int					SetActiveConfiguration(int);
-	int					ActiveConfigurationIndex() const;
+	int					CheckInterfacesFree(uint8);
+	void					SetActiveConfiguration(uint8);
+	uint8					ActiveConfigurationIndex() const;
 	bool					InitCheck();
 private:
 	int					Initialise();
 	unsigned int				fClaimedInterfaces;	// Max Interfaces can be 32. Using a bitmask
 	usb_device_descriptor			fDeviceDescriptor;
 	unsigned char**				fConfigurationDescriptors;
-	int					fActiveConfiguration;
+	uint8					fActiveConfiguration;
 	char*					fPath;
 	map<uint8,uint8>			fConfigToIndex;
 	map<uint8,uint8>*			fEndpointToIndex;
@@ -67,9 +67,9 @@ public:
 	virtual			~USBDeviceHandle();
 	int			ClaimInterface(int);
 	int			ReleaseInterface(int);
-	int			SetConfiguration(int);
+	int			SetConfiguration(uint8);
 	int			SetAltSetting(int, int);
-	int			ClearHalt(int);
+	int			ClearHalt(uint8);
 	status_t		SubmitTransfer(struct usbi_transfer *);
 	status_t		CancelTransfer(USBTransfer *);
 	bool			InitCheck();
