@@ -61,11 +61,11 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\examples\getopt\getopt.c" />
-    <ClCompile Include="..\examples\getopt\getopt1.c" />
+    <ClCompile Include=".\getopt\getopt.c" />
+    <ClCompile Include=".\getopt\getopt1.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\examples\getopt\getopt.h" />
+    <ClInclude Include=".\getopt\getopt.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
