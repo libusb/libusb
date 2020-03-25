@@ -93,7 +93,7 @@ if CREATE_IMPORT_LIB
 all-local: .libs/libusb-1.0.dll.a
 # Rebuild the import lib from the .def so that MS and MinGW DLLs can be interchanged
 .libs/libusb-1.0.dll.a: libusb-1.0.def libusb-1.0.la
-	$(AM_V_GEN)$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $(srcdir)/$< --dllname libusb-1.0.dll --output-lib $@
+	$(AM_V_GEN)$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $< --dllname libusb-1.0.dll --output-lib $@
 endif
 endif
 
