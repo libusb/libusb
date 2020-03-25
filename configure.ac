@@ -15,7 +15,7 @@ LU_DEFINE_VERSION_ATOM([LIBUSB_MINOR])
 LU_DEFINE_VERSION_ATOM([LIBUSB_MICRO])
 LU_DEFINE_VERSION_RC_ATOM([LIBUSB_RC])
 
-AC_INIT([libusb],[LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO[]LIBUSB_RC],[libusb-devel@lists.sourceforge.net],[libusb],[http://libusb.info])
+AC_INIT([libusb-1.0], [LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO[]LIBUSB_RC], [libusb-devel@lists.sourceforge.net], [libusb-1.0], [http://libusb.info])
 
 dnl Library versioning
 dnl These numbers should be tweaked on every release. Read carefully:
@@ -103,7 +103,7 @@ case $host in
 	backend=windows
 	poll=windows
 	threads=windows
-	create_import_lib=yes
+	test "x$enable_shared" = xyes && create_import_lib=yes
 	AM_CFLAGS="${AM_CFLAGS} -fno-omit-frame-pointer"
 	;;
 *)
@@ -362,6 +362,9 @@ AM_CFLAGS="${AM_CFLAGS} -Wall -Wundef -Wunused -Wstrict-prototypes -Werror-impli
 
 AC_SUBST(AM_CFLAGS)
 AC_SUBST(LTLDFLAGS)
+
+dnl set name of html output directory for doxygen
+AC_SUBST(DOXYGEN_HTMLDIR, [api-1.0])
 
 AC_CONFIG_FILES([libusb-1.0.pc])
 AC_CONFIG_FILES([Makefile])

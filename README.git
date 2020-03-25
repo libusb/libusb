@@ -33,9 +33,9 @@ public account on github, if you don't have one already, and then fork a new
 libusb repository under this account from https://github.com/libusb/libusb.
 
 Then you can create a git branch for your work, that we will be able to better
-reference and test. 
+reference and test.
 
 We also suggest that, if you are planning to bring in a large development, you
 try to involve the libusb community early by letting the mailing list know, as
-you may find that other people might be eager to help you out. 
+you may find that other people might be eager to help you out.
 See http://mailing-list.libusb.info for details on how to join the mailing list.

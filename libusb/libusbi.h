@@ -35,7 +35,6 @@
 #endif
 
 #include "libusb.h"
-#include "version.h"
 
 #define container_of(ptr, type, member) \
 	((type *)((uintptr_t)(ptr) - (uintptr_t)offsetof(type, member)))
@@ -209,7 +208,7 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 
 #define TIMESPEC_IS_SET(ts)	((ts)->tv_sec || (ts)->tv_nsec)
 #define TIMESPEC_CLEAR(ts)	(ts)->tv_sec = (ts)->tv_nsec = 0
-#define TIMESPEC_CMP(a, b, CMP) 					\
+#define TIMESPEC_CMP(a, b, CMP)						\
 	(((a)->tv_sec == (b)->tv_sec)					\
 	 ? ((a)->tv_nsec CMP (b)->tv_nsec)				\
 	 : ((a)->tv_sec CMP (b)->tv_sec))

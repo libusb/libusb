@@ -2,6 +2,7 @@
 .libs
 Makefile
 Makefile.in
+!doc/Makefile.in
 *.la
 *.lo
 *.o
@@ -39,7 +40,7 @@ examples/testlibusb
 tests/stress
 *.exe
 *.pc
-doc/html
+doc/api-1.0
 *.plg
 *.ncb
 *.opt

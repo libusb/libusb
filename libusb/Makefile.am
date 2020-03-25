@@ -1,5 +1,3 @@
-all: libusb-1.0.la libusb-1.0.dll
-
 AUTOMAKE_OPTIONS = subdir-objects
 
 lib_LTLIBRARIES = libusb-1.0.la
@@ -87,22 +85,22 @@ if OS_WINDOWS
 OS_SRC = $(OS_WINDOWS_SRC)
 
 .rc.lo:
-	$(AM_V_GEN)$(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=RC --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
+	$(AM_V_GEN)$(LIBTOOL) $(AM_V_lt) --tag=RC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
 
-libusb-1.0.rc: version.h version_nano.h
-endif
+libusb-1.0.lo: libusb-1.0.rc version.h version_nano.h
 
-libusb-1.0.dll: libusb-1.0.def libusb-1.0.la
 if CREATE_IMPORT_LIB
+all-local: .libs/libusb-1.0.dll.a
 # Rebuild the import lib from the .def so that MS and MinGW DLLs can be interchanged
-	$(AM_V_GEN)$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $(srcdir)/libusb-1.0.def --dllname $@ --output-lib .libs/$@.a
+.libs/libusb-1.0.dll.a: libusb-1.0.def libusb-1.0.la
+	$(AM_V_GEN)$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $(srcdir)/$< --dllname libusb-1.0.dll --output-lib $@
+endif
 endif
 
 libusb_1_0_la_CFLAGS = $(AM_CFLAGS)
 libusb_1_0_la_LDFLAGS = $(LTLDFLAGS)
-libusb_1_0_la_SOURCES = libusbi.h libusb.h version.h version_nano.h \
+libusb_1_0_la_SOURCES = libusbi.h version.h version_nano.h \
 	core.c descriptor.c hotplug.h hotplug.c io.c strerror.c sync.c \
 	$(POLL_SRC) $(THREADS_SRC) $(OS_SRC)
 
-hdrdir = $(includedir)/libusb-1.0
-hdr_HEADERS = libusb.h
+pkginclude_HEADERS = libusb.h

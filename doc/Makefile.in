@@ -1,0 +1,22 @@
+LIBUSB_SRC_DIR = @top_srcdir@/libusb
+EXCLUDED_FILES = hotplug.h libusbi.h version.h version_nano.h
+LIBUSB_SRC = $(wildcard $(LIBUSB_SRC_DIR)/*.c) $(wildcard $(LIBUSB_SRC_DIR)/*.h)
+LIBUSB_DOC_SRC = $(filter-out $(addprefix $(LIBUSB_SRC_DIR)/,$(EXCLUDED_FILES)),$(LIBUSB_SRC))
+
+docs: @DOXYGEN_HTMLDIR@
+
+@DOXYGEN_HTMLDIR@: doxygen.cfg libusb.png $(LIBUSB_DOC_SRC)
+	doxygen $<
+
+docs-upload: sfurl = web.sourceforge.net:/home/project-web/libusb/htdocs
+docs-upload: @DOXYGEN_HTMLDIR@
+	if [ -z "$$SF_USER" ]; then \
+		rsync -rv --delete $< $(sfurl); \
+	else \
+		rsync -rv --delete $< $$SF_USER@$(sfurl); \
+	fi
+
+clean:
+	rm -rf @DOXYGEN_HTMLDIR@
+
+.PHONY: clean docs docs-upload

@@ -1,11 +1,11 @@
 # libusb
 
 [![Build Status](https://travis-ci.org/libusb/libusb.svg?branch=master)](https://travis-ci.org/libusb/libusb)
-[![Build status](https://ci.appveyor.com/api/projects/status/xvrfam94jii4a6lw?svg=true)](https://ci.appveyor.com/project/LudovicRousseau/libusb)
+[![Build Status](https://ci.appveyor.com/api/projects/status/xvrfam94jii4a6lw?svg=true)](https://ci.appveyor.com/project/LudovicRousseau/libusb)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/2180/badge.svg)](https://scan.coverity.com/projects/libusb-libusb)
 
 libusb is a library for USB device access from Linux, macOS,
-Windows, OpenBSD/NetBSD and Haiku userspace.
+Windows, OpenBSD/NetBSD, Haiku and Solaris userspace.
 It is written in C (Haiku backend in C++) and licensed under the GNU
 Lesser General Public License version 2.1 or, at your option, any later
 version (see [COPYING](COPYING)).

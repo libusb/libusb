@@ -22,6 +22,7 @@
 
 #include "libusbi.h"
 #include "hotplug.h"
+#include "version.h"
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -943,7 +944,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 }
 
 /** \ingroup libusb_dev
- * Deprecated please use libusb_get_port_numbers instead.
+ * \deprecated Please use \ref libusb_get_port_numbers() instead.
  */
 int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
 	uint8_t* port_numbers, uint8_t port_numbers_len)
@@ -961,7 +962,7 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
  * function and make sure that you only access the parent before issuing
  * \ref libusb_free_device_list(). The reason is that libusb currently does
  * not maintain a permanent list of device instances, and therefore can
- * only guarantee that parents are fully instantiated within a 
+ * only guarantee that parents are fully instantiated within a
  * libusb_get_device_list() - libusb_free_device_list() block.
  */
 DEFAULT_VISIBILITY
