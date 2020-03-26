@@ -1,34 +1,72 @@
 version: 1.0.{build}
-image: Visual Studio 2015
-configuration:
-- Debug
-- Release
+image:
+  - Visual Studio 2013
+  - Visual Studio 2015
+  - Visual Studio 2017
+  - Visual Studio 2019
 platform:
-- x64
-- Win32
+  - Win32
+  - x64
+configuration:
+  - Debug
+  - Release
+clone_depth: 1
 build:
-  project: msvc\libusb_2015.sln
   parallel: true
-  verbosity: detailed
-environment:
-  matrix:
-  - libusb_2015: msvc\libusb_2015.sln
-    libusb_2013: msvc\libusb_2013.sln
-install:
-- cmd: >-
-    rem Copying libusb to cygwin home directory
+for:
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2013
+    build:
+      project: msvc\libusb_2013.sln
 
-    xcopy /S C:\projects\libusb C:\cygwin\home\appveyor\
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2015
+          configuration: Debug
+    build:
+      project: msvc\libusb_2015.sln
 
-    rem Copying libusb to MinGW home directory
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2015
+          platform: Win32
+          configuration: Release
+    install:
+      - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\msys64\home\appveyor\libusb
+      - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\cygwin\home\appveyor\libusb
+    build_script:
+      - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb_2015.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+      - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\appveyor_build.sh" MinGW
+      - cmd: C:\cygwin\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\appveyor_build.sh" cygwin
 
-    xcopy /S C:\projects\libusb C:\msys64\home\appveyor\
-build_script:
-- cmd: >-
-    msbuild %libusb_2015% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2015
+          platform: x64
+          configuration: Release
+    install:
+      - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\msys64\home\appveyor\libusb
+      - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\cygwin64\home\appveyor\libusb
+    build_script:
+      - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb_2015.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+      - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\appveyor_build.sh" MinGW
+      - cmd: C:\cygwin64\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\appveyor_build.sh" cygwin
 
-    msbuild %libusb_2013% /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2017
+    build:
+      project: msvc\libusb_2017.sln
 
-    appveyor_minGW.bat
-
-    appveyor_cygwin.bat
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2019
+    build:
+      project: msvc\libusb_2019.sln
