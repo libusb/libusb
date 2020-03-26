@@ -67,7 +67,7 @@ static CFRunLoopRef libusb_darwin_acfl = NULL; /* event cf loop */
 static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for event cf loop */
 
 static usbi_mutex_t darwin_cached_devices_lock = PTHREAD_MUTEX_INITIALIZER;
-static struct list_head darwin_cached_devices = {&darwin_cached_devices, &darwin_cached_devices};
+static struct list_head darwin_cached_devices;
 static const char *darwin_device_class = kIOUSBDeviceClassName;
 
 #define DARWIN_CACHED_DEVICE(a) (((struct darwin_device_priv *)usbi_get_device_priv((a)))->dev)
@@ -559,14 +559,14 @@ static void *darwin_event_thread_main (void *arg0) {
 }
 
 /* cleanup function to destroy cached devices */
-static void __attribute__((destructor)) _darwin_finalize(void) {
+static void darwin_cleanup_devices(void) {
   struct darwin_cached_device *dev, *next;
 
-  usbi_mutex_lock(&darwin_cached_devices_lock);
   list_for_each_entry_safe(dev, next, &darwin_cached_devices, list, struct darwin_cached_device) {
     darwin_deref_cached_device(dev);
   }
-  usbi_mutex_unlock(&darwin_cached_devices_lock);
+
+  darwin_cached_devices.prev = darwin_cached_devices.next = NULL;
 }
 
 static int darwin_init(struct libusb_context *ctx) {
@@ -578,8 +578,11 @@ static int darwin_init(struct libusb_context *ctx) {
   first_init = (1 == ++init_count);
 
   do {
-#if !defined(HAVE_CLOCK_GETTIME)
     if (first_init) {
+      assert (NULL == darwin_cached_devices.next);
+      list_init (&darwin_cached_devices);
+
+#if !defined(HAVE_CLOCK_GETTIME)
       /* create the clocks that will be used if clock_gettime() is not available */
       host_name_port_t host_self;
 
@@ -587,8 +590,8 @@ static int darwin_init(struct libusb_context *ctx) {
       host_get_clock_service(host_self, CALENDAR_CLOCK, &clock_realtime);
       host_get_clock_service(host_self, SYSTEM_CLOCK, &clock_monotonic);
       mach_port_deallocate(mach_task_self(), host_self);
-    }
 #endif
+    }
 
     rc = darwin_scan_devices (ctx);
     if (LIBUSB_SUCCESS != rc)
@@ -617,12 +620,13 @@ static int darwin_init(struct libusb_context *ctx) {
   } while (0);
 
   if (LIBUSB_SUCCESS != rc) {
-#if !defined(HAVE_CLOCK_GETTIME)
     if (first_init) {
+      darwin_cleanup_devices ();
+#if !defined(HAVE_CLOCK_GETTIME)
       mach_port_deallocate(mach_task_self(), clock_realtime);
       mach_port_deallocate(mach_task_self(), clock_monotonic);
-    }
 #endif
+    }
     --init_count;
   }
 
@@ -645,6 +649,8 @@ static void darwin_exit (struct libusb_context *ctx) {
       pthread_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
     pthread_mutex_unlock (&libusb_darwin_at_mutex);
     pthread_join (libusb_darwin_at, NULL);
+
+    darwin_cleanup_devices ();
 
 #if !defined(HAVE_CLOCK_GETTIME)
     mach_port_deallocate(mach_task_self(), clock_realtime);
