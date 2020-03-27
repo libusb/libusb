@@ -29,6 +29,9 @@
 /* Define to 1 if you have the <asm/types.h> header file. */
 #define HAVE_ASM_TYPES_H 1
 
+/* Define to 1 if the compiler supports _Thread_local. */
+#define HAVE_CC_THREAD_LOCAL 1
+
 /* Define to 1 if the system has the type `nfds_t'. */
 #define HAVE_NFDS_T 1
 

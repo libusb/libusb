@@ -23,11 +23,19 @@
 
 #if defined(__ANDROID__)
 # include <unistd.h>
-#elif defined(__linux__) || defined(__OpenBSD__)
-# if defined(__OpenBSD__)
-#  define _BSD_SOURCE
-# endif
+#elif defined(__HAIKU__)
+# include <os/kernel/OS.h>
+#elif defined(__linux__)
 # include <sys/syscall.h>
+# include <unistd.h>
+#elif defined(__NetBSD__)
+# include <lwp.h>
+#elif defined(__OpenBSD__)
+# define _BSD_SOURCE
+# include <sys/syscall.h>
+# include <unistd.h>
+#elif defined(__sun__)
+# include <sys/lwp.h>
 #endif
 
 int usbi_cond_timedwait(pthread_cond_t *cond,
@@ -63,19 +71,41 @@ int usbi_get_tid(void)
 
 #if defined(__ANDROID__)
 	tid = gettid();
+#elif defined(__APPLE__)
+#ifdef HAVE_PTHREAD_THREADID_NP
+	uint64_t thread_id;
+
+	if (pthread_threadid_np(NULL, &thread_id) == 0)
+		tid = (int)thread_id;
+	else
+		tid = -1;
+#else
+	tid = (int)pthread_mach_thread_np(pthread_self());
+#endif
+#elif defined(__HAIKU__)
+	tid = get_pthread_thread_id(pthread_self());
 #elif defined(__linux__)
-	tid = syscall(SYS_gettid);
+	tid = (int)syscall(SYS_gettid);
+#elif defined(__NetBSD__)
+	tid = _lwp_self();
 #elif defined(__OpenBSD__)
 	/* The following only works with OpenBSD > 5.1 as it requires
-	   real thread support. For 5.1 and earlier, -1 is returned. */
+	 * real thread support. For 5.1 and earlier, -1 is returned. */
 	tid = syscall(SYS_getthrid);
-#elif defined(__APPLE__)
-	tid = (int)pthread_mach_thread_np(pthread_self());
-#elif defined(__CYGWIN__)
-	tid = GetCurrentThreadId();
+#elif defined(__sun__)
+	tid = _lwp_self();
+#elif defined(_WIN32)
+	tid = (int)GetCurrentThreadId();
 #else
 	tid = -1;
 #endif
-/* TODO: NetBSD thread ID support */
+
+	if (tid == -1) {
+		/* If we don't have a thread ID, at least return a unique
+		 * value that can be used to distinguish individual
+		 * threads. */
+		tid = (int)(intptr_t)pthread_self();
+	}
+
 	return tid;
 }

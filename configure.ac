@@ -117,6 +117,7 @@ esac
 case $backend in
 darwin)
 	AC_DEFINE([OS_DARWIN], [1], [Darwin backend])
+	AC_CHECK_FUNCS([pthread_threadid_np])
 	LIBS="-lobjc -Wl,-framework,IOKit -Wl,-framework,CoreFoundation"
 	LTLDFLAGS="${LTLDFLAGS} -Wl,-prebind"
 	;;
