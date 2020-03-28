@@ -33,18 +33,6 @@ OS_WINDOWS_SRC = libusb-1.0.def libusb-1.0.rc \
 		 os/windows_usbdk.h os/windows_usbdk.c \
 		 os/windows_winusb.h os/windows_winusb.c
 
-EXTRA_DIST = $(POSIX_POLL_SRC) $(POSIX_THREADS_SRC) \
-	$(WINDOWS_POLL_SRC) $(WINDOWS_THREADS_SRC) \
-	$(OS_DARWIN_SRC) \
-	$(OS_HAIKU_SRC) \
-	$(OS_LINUX_SRC) \
-	$(OS_NETBSD_SRC) \
-	$(OS_NULL_SRC) \
-	$(OS_OPENBSD_SRC) \
-	$(OS_SUNOS_SRC) \
-	$(OS_WINDOWS_SRC) \
-	os/linux_netlink.c os/linux_udev.c
-
 if OS_DARWIN
 OS_SRC = $(OS_DARWIN_SRC)
 AM_CFLAGS_EXT = -no-cpp-precomp
@@ -97,7 +85,6 @@ all-local: .libs/libusb-1.0.dll.a
 endif
 endif
 
-libusb_1_0_la_CFLAGS = $(AM_CFLAGS)
 libusb_1_0_la_LDFLAGS = $(LTLDFLAGS)
 libusb_1_0_la_SOURCES = libusbi.h version.h version_nano.h \
 	core.c descriptor.c hotplug.h hotplug.c io.c strerror.c sync.c \
