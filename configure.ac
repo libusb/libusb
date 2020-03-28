@@ -116,17 +116,14 @@ esac
 
 case $backend in
 darwin)
-	AC_DEFINE([OS_DARWIN], [1], [Darwin backend])
 	AC_CHECK_FUNCS([pthread_threadid_np])
 	LIBS="-lobjc -Wl,-framework,IOKit -Wl,-framework,CoreFoundation"
 	LTLDFLAGS="${LTLDFLAGS} -Wl,-prebind"
 	;;
 haiku)
-	AC_DEFINE([OS_HAIKU], [1], [Haiku backend])
 	LIBS="-lbe"
 	;;
 linux)
-	AC_DEFINE([OS_LINUX], [1], [Linux backend])
 	AC_SEARCH_LIBS([clock_gettime], [rt], [], [], [-pthread])
 	AC_ARG_ENABLE([udev],
 		[AC_HELP_STRING([--enable-udev], [use udev for device enumeration and hotplug support (recommended) [default=yes]])],
@@ -147,27 +144,22 @@ linux)
 	AC_CHECK_FUNCS([pthread_setname_np])
 	;;
 netbsd)
-	AC_DEFINE([OS_NETBSD], [1], [NetBSD backend])
 	THREAD_CFLAGS="-pthread"
 	LIBS="-pthread"
 	;;
 null)
-	AC_DEFINE([OS_NULL], [1], [Null backend])
 	THREAD_CFLAGS="-pthread"
 	LIBS="-pthread"
 	;;
 openbsd)
-	AC_DEFINE([OS_OPENBSD], [1], [OpenBSD backend])
 	THREAD_CFLAGS="-pthread"
 	LIBS="-pthread"
 	;;
 sunos)
-	AC_DEFINE([OS_SUNOS], [1], [SunOS backend])
 	THREAD_CFLAGS="-pthread"
 	LIBS="-pthread -ldevinfo"
 	;;
 windows)
-	AC_DEFINE([OS_WINDOWS], [1], [Windows backend])
 	AC_CHECK_TYPES([struct timespec], [], [], [[#include <time.h>]])
 	LIBS=""
 	LTLDFLAGS="${LTLDFLAGS} -avoid-version -Wl,--add-stdcall-alias"

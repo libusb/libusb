@@ -222,7 +222,7 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 		}							\
 	} while (0)
 
-#if defined(OS_WINDOWS)
+#if defined(_WIN32)
 #define TIMEVAL_TV_SEC_TYPE	long
 #else
 #define TIMEVAL_TV_SEC_TYPE	time_t

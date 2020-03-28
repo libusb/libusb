@@ -42,9 +42,6 @@
 /* Message logging */
 #define ENABLE_LOGGING 1
 
-/* Windows backend */
-#define OS_WINDOWS 1
-
 /* Use Windows poll() implementation */
 #define POLL_WINDOWS 1
 

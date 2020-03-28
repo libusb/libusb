@@ -2526,7 +2526,7 @@ int usbi_vsnprintf(char *str, size_t size, const char *format, va_list ap)
 static void usbi_log_str(enum libusb_log_level level, const char *str)
 {
 #if defined(USE_SYSTEM_LOGGING_FACILITY)
-#if defined(OS_WINDOWS)
+#if defined(_WIN32)
 #if !defined(UNICODE)
 	OutputDebugStringA(str);
 #else

@@ -29,9 +29,6 @@
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define HAVE_SYS_TIME_H 1
 
-/* Darwin backend */
-#define OS_DARWIN 1
-
 /* Use POSIX poll() implementation */
 #define POLL_POSIX 1
 
