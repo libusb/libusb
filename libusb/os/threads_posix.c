@@ -60,7 +60,7 @@ int usbi_cond_timedwait(pthread_cond_t *cond,
 
 int usbi_get_tid(void)
 {
-#ifdef HAVE_CC_THREAD_LOCAL
+#ifndef _WIN32
 	static _Thread_local int tid;
 
 	if (tid)

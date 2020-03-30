@@ -1,5 +1,9 @@
 AUTOMAKE_OPTIONS = subdir-objects
 
+AM_CFLAGS += -fvisibility=hidden $(THREAD_CFLAGS)
+AM_CXXFLAGS += -fvisibility=hidden $(THREAD_CFLAGS)
+AM_LDFLAGS = $(LT_LDFLAGS)
+
 lib_LTLIBRARIES = libusb-1.0.la
 
 POSIX_POLL_SRC = os/poll_posix.h os/poll_posix.c
@@ -35,7 +39,6 @@ OS_WINDOWS_SRC = libusb-1.0.def libusb-1.0.rc \
 
 if OS_DARWIN
 OS_SRC = $(OS_DARWIN_SRC)
-AM_CFLAGS_EXT = -no-cpp-precomp
 endif
 
 if OS_HAIKU
@@ -85,7 +88,6 @@ all-local: .libs/libusb-1.0.dll.a
 endif
 endif
 
-libusb_1_0_la_LDFLAGS = $(LTLDFLAGS)
 libusb_1_0_la_SOURCES = libusbi.h version.h version_nano.h \
 	core.c descriptor.c hotplug.h hotplug.c io.c strerror.c sync.c \
 	$(POLL_SRC) $(THREADS_SRC) $(OS_SRC)

@@ -164,7 +164,7 @@ static void print_device(libusb_device *dev)
 {
 	struct libusb_device_descriptor desc;
 	libusb_device_handle *handle = NULL;
-	char string[256];
+	unsigned char string[256];
 	int ret;
 	uint8_t i;
 
@@ -183,19 +183,19 @@ static void print_device(libusb_device *dev)
 		if (desc.iManufacturer) {
 			ret = libusb_get_string_descriptor_ascii(handle, desc.iManufacturer, string, sizeof(string));
 			if (ret > 0)
-				printf("  Manufacturer:              %s\n", string);
+				printf("  Manufacturer:              %s\n", (char *)string);
 		}
 
 		if (desc.iProduct) {
 			ret = libusb_get_string_descriptor_ascii(handle, desc.iProduct, string, sizeof(string));
 			if (ret > 0)
-				printf("  Product:                   %s\n", string);
+				printf("  Product:                   %s\n", (char *)string);
 		}
 
 		if (desc.iSerialNumber && verbose) {
 			ret = libusb_get_string_descriptor_ascii(handle, desc.iSerialNumber, string, sizeof(string));
 			if (ret > 0)
-				printf("  Serial Number:             %s\n", string);
+				printf("  Serial Number:             %s\n", (char *)string);
 		}
 	}
 

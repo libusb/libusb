@@ -10,6 +10,11 @@
 #error "Visual Studio 2013 or later is required."
 #endif
 
+/* Visual Studio 2013 does not support __func__ */
+#if (_MSC_VER < 1900)
+#define __func__ __FUNCTION__
+#endif
+
 /* Visual Studio 2015 and later defines timespec */
 #if (_MSC_VER >= 1900)
 #define _TIMESPEC_DEFINED 1
@@ -33,20 +38,20 @@
 #pragma warning(disable:28125)
 #endif
 
-/* Default visibility */
+/* Define to the attribute for default visibility. */
 #define DEFAULT_VISIBILITY /**/
 
-/* Uncomment to start with debug message logging enabled */
-// #define ENABLE_DEBUG_LOGGING 1
+/* Define to 1 to start with debug message logging enabled. */
+/* #undef ENABLE_DEBUG_LOGGING */
 
-/* Message logging */
+/* Define to 1 to enable message logging. */
 #define ENABLE_LOGGING 1
 
-/* Use Windows poll() implementation */
+/* Define to 1 if using the Windows poll() implementation. */
 #define POLL_WINDOWS 1
 
-/* Use Windows Threads */
+/* Define to 1 if using Windows threads. */
 #define THREADS_WINDOWS 1
 
-/* Uncomment to enabling output to system log */
-// #define USE_SYSTEM_LOGGING_FACILITY
+/* Define to 1 to output logging messages to the systemwide log. */
+/* #undef USE_SYSTEM_LOGGING_FACILITY */

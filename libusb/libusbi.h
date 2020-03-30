@@ -93,9 +93,9 @@
 /* Macro to decorate printf-like functions, in order to get
  * compiler warnings about format string mistakes.
  */
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 2)
+#ifndef _MSC_VER
 #define USBI_PRINTFLIKE(formatarg, firstvararg) \
-	__attribute__((__format__ (__printf__, formatarg, firstvararg)))
+	__attribute__ ((__format__ (__printf__, formatarg, firstvararg)))
 #else
 #define USBI_PRINTFLIKE(formatarg, firstvararg)
 #endif
@@ -254,7 +254,7 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, va_list args) USBI_PRINTFLIKE(4, 0);
 
-#define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __FUNCTION__, __VA_ARGS__)
+#define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __func__, __VA_ARGS__)
 
 #define usbi_err(ctx, ...)	_usbi_log(ctx, LIBUSB_LOG_LEVEL_ERROR, __VA_ARGS__)
 #define usbi_warn(ctx, ...)	_usbi_log(ctx, LIBUSB_LOG_LEVEL_WARNING, __VA_ARGS__)
