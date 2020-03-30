@@ -3,7 +3,7 @@
 #include <AvailabilityMacros.h>
 
 /* Define to the attribute for default visibility. */
-#define DEFAULT_VISIBILITY /**/
+#define DEFAULT_VISIBILITY __attribute__ ((visibility ("default")))
 
 /* Define to 1 to enable message logging. */
 #define ENABLE_LOGGING 1

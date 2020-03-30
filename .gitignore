@@ -56,7 +56,11 @@ Release
 *.orig
 .dirstamp
 .amend
+.DS_Store
+Xcode/build
+xcshareddata
 xcuserdata
 *.xcuserdatad
 *.xccheckout
 *.xcscmblueprint
+*.xcworkspace

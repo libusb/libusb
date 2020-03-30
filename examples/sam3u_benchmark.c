@@ -28,7 +28,7 @@
 #include <errno.h>
 #include <signal.h>
 
-#include <libusb.h>
+#include "libusb.h"
 
 
 #define EP_DATA_IN	0x82
@@ -125,15 +125,15 @@ static int benchmark_in(uint8_t ep)
 static void measure(void)
 {
 	struct timeval tv_stop;
-	unsigned int diff_msec;
+	unsigned long diff_msec;
 
 	gettimeofday(&tv_stop, NULL);
 
-	diff_msec = (tv_stop.tv_sec - tv_start.tv_sec)*1000;
-	diff_msec += (tv_stop.tv_usec - tv_start.tv_usec)/1000;
+	diff_msec = (tv_stop.tv_sec - tv_start.tv_sec) * 1000L;
+	diff_msec += (tv_stop.tv_usec - tv_start.tv_usec) / 1000L;
 
-	printf("%lu transfers (total %lu bytes) in %u miliseconds => %lu bytes/sec\n",
-		num_xfer, num_bytes, diff_msec, (num_bytes*1000)/diff_msec);
+	printf("%lu transfers (total %lu bytes) in %lu miliseconds => %lu bytes/sec\n",
+		num_xfer, num_bytes, diff_msec, (num_bytes * 1000L) / diff_msec);
 }
 
 static void sig_hdlr(int signum)
