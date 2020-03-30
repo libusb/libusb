@@ -18,6 +18,22 @@
 
 APP_ABI := all
 
+APP_CFLAGS := \
+  -std=gnu11 \
+  -Wall \
+  -Wextra \
+  -Wshadow \
+  -Wunused \
+  -Wwrite-strings \
+  -Werror=format-security \
+  -Werror=implicit-function-declaration \
+  -Werror=implicit-int \
+  -Werror=init-self \
+  -Werror=missing-prototypes \
+  -Werror=strict-prototypes \
+  -Werror=undef \
+  -Werror=unintialized
+
 # Workaround for MIPS toolchain linker being unable to find liblog dependency
 # of shared object in NDK versions at least up to r9.
 #

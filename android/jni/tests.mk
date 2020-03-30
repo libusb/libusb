@@ -16,41 +16,23 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 #
 
-LOCAL_PATH:= $(call my-dir)
-LIBUSB_ROOT_REL:= ../..
-LIBUSB_ROOT_ABS:= $(LOCAL_PATH)/../..
-
-# testlib
-
-include $(CLEAR_VARS)
-
-LOCAL_SRC_FILES := \
-  $(LIBUSB_ROOT_REL)/tests/testlib.c
-
-LOCAL_C_INCLUDES += \
-  $(LIBUSB_ROOT_ABS)/tests
-
-LOCAL_EXPORT_C_INCLUDES := \
-  $(LIBUSB_ROOT_ABS)/tests
-
-LOCAL_MODULE := testlib
-
-include $(BUILD_STATIC_LIBRARY)
-
+LOCAL_PATH := $(call my-dir)
+LIBUSB_ROOT_REL := ../..
+LIBUSB_ROOT_ABS := $(LOCAL_PATH)/../..
 
 # stress
 
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-  $(LIBUSB_ROOT_REL)/tests/stress.c
+  $(LIBUSB_ROOT_REL)/tests/stress.c \
+  $(LIBUSB_ROOT_REL)/tests/testlib.c
 
 LOCAL_C_INCLUDES += \
   $(LIBUSB_ROOT_ABS)
 
 LOCAL_SHARED_LIBRARIES += libusb1.0
-LOCAL_STATIC_LIBRARIES += testlib
 
-LOCAL_MODULE:= stress
+LOCAL_MODULE := stress
 
 include $(BUILD_EXECUTABLE)
