@@ -503,8 +503,6 @@ struct usbi_transfer {
 	usbi_mutex_t lock;
 
 	void *priv;
-
-	struct libusb_transfer libusb_transfer;
 };
 
 enum usbi_transfer_state_flags {
@@ -529,10 +527,14 @@ enum usbi_transfer_timeout_flags {
 	USBI_TRANSFER_TIMED_OUT = 1U << 2,
 };
 
-#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)			\
-	(&(itransfer)->libusb_transfer)
-#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)			\
-	container_of(transfer, struct usbi_transfer, libusb_transfer)
+#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)	\
+	((struct libusb_transfer *)			\
+	 ((unsigned char *)(itransfer)			\
+	  + PTR_ALIGN(sizeof(struct usbi_transfer))))
+#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)	\
+	((struct usbi_transfer *)			\
+	 ((unsigned char *)(transfer)			\
+	  - PTR_ALIGN(sizeof(struct usbi_transfer))))
 
 /* All standard descriptors have these 2 fields in common */
 struct usb_descriptor_header {

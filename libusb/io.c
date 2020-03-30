@@ -1267,6 +1267,7 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	priv_size = PTR_ALIGN(usbi_backend.transfer_priv_size);
 	alloc_size = priv_size
 		+ sizeof(struct usbi_transfer)
+		+ sizeof(struct libusb_transfer)
 		+ (sizeof(struct libusb_iso_packet_descriptor) * (size_t)iso_packets);
 	ptr = calloc(1, alloc_size);
 	if (!ptr)

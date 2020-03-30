@@ -971,6 +971,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 
 int main(int argc, char** argv)
 {
+	static char debug_env_str[] = "LIBUSB_DEBUG=4";	// LIBUSB_LOG_LEVEL_DEBUG
 	bool show_help = false;
 	bool debug_mode = false;
 	const struct libusb_version* version;
@@ -1098,7 +1099,7 @@ int main(int argc, char** argv)
 	// but since we can't call on libusb_set_option() before libusb_init(), we use the env variable method
 	old_dbg_str = getenv("LIBUSB_DEBUG");
 	if (debug_mode) {
-		if (putenv("LIBUSB_DEBUG=4") != 0)	// LIBUSB_LOG_LEVEL_DEBUG
+		if (putenv(debug_env_str) != 0)
 			printf("Unable to set debug level\n");
 	}
 

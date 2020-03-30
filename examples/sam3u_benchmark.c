@@ -146,7 +146,7 @@ static void sig_hdlr(int signum)
 	}
 }
 
-int main(int argc, char **argv)
+int main(void)
 {
 	int rc;
 	struct sigaction sigact;

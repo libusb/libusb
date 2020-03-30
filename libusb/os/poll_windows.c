@@ -222,7 +222,7 @@ static DWORD WINAPI WaitThread(LPVOID lpParam)
 	DWORD status;
 
 	status = WaitForMultipleObjects(thread_data->num_handles, thread_data->handles, FALSE, INFINITE);
-	if ((status >= WAIT_OBJECT_0) && (status < (WAIT_OBJECT_0 + thread_data->num_handles))) {
+	if (status < (WAIT_OBJECT_0 + thread_data->num_handles)) {
 		if (status > WAIT_OBJECT_0) {
 			// This will wake up all the other waiting threads
 			SetEvent(notify_event);
@@ -291,7 +291,7 @@ static DWORD poll_wait(const HANDLE *wait_handles, DWORD num_wait_handles, DWORD
 	}
 
 	status = WaitForMultipleObjects(MAXIMUM_WAIT_OBJECTS, handles, FALSE, timeout);
-	if ((status >= WAIT_OBJECT_0) && (status < (WAIT_OBJECT_0 + MAXIMUM_WAIT_OBJECTS))) {
+	if (status < (WAIT_OBJECT_0 + MAXIMUM_WAIT_OBJECTS)) {
 		if (status > WAIT_OBJECT_0) {
 			// Wake up all the waiting threads
 			SetEvent(notify_event);

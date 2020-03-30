@@ -565,7 +565,7 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 
 	UNUSED(ap);
 
-	switch (option) {
+	switch ((int)option) {
 	case LIBUSB_OPTION_USE_USBDK:
 		if (usbdk_available) {
 			usbi_dbg("switching context %p to use UsbDk backend", ctx);
@@ -832,7 +832,8 @@ int usbi_clock_gettime(int clk_id, struct timespec *tp)
 			tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency) * hires_ticks_to_ps) / UINT64_C(1000));
 			return 0;
 		}
-		// Fall through and return real-time if monotonic was not detected @ timer init
+		// Return real-time if monotonic was not detected @ timer init
+		// Fall through
 	case USBI_CLOCK_REALTIME:
 #if defined(_MSC_VER) && (_MSC_VER >= 1900)
 		if (!timespec_get(tp, TIME_UTC)) {

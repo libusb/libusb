@@ -318,10 +318,23 @@ AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" = xposix])
 AM_CONDITIONAL([THREADS_WINDOWS], [test "x$threads" = xwindows])
 AM_CONDITIONAL([USE_UDEV], [test "x$use_udev" = xyes])
 
-AM_CFLAGS="${AM_CFLAGS} -Wall -Wshadow -Wstrict-prototypes -Wundef -Wunused -Werror=implicit-function-declaration"
+EXTRA_CFLAGS=
+
+dnl The -Wcast-function-type warning causes a flurry of warnings when compiling
+dnl Windows with GCC 8 or later because of dynamically loaded functions
+if test "x$backend" = xwindows; then
+	saved_CFLAGS="${CFLAGS}"
+	CFLAGS="-Werror -Wcast-function-type"
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])],
+		[EXTRA_CFLAGS="-Wno-cast-function-type"],
+		[])
+	CFLAGS="${saved_CFLAGS}"
+fi
+
+AM_CFLAGS="${AM_CFLAGS} -Wall -Wextra -Wshadow -Wunused -Wwrite-strings -Werror=format-security -Werror=implicit-function-declaration -Werror=implicit-int -Werror=init-self -Werror=missing-prototypes -Werror=strict-prototypes -Werror=undef -Werror=uninitialized ${EXTRA_CFLAGS}"
 AC_SUBST(AM_CFLAGS)
 
-AM_CXXFLAGS="${AM_CFLAGS}"
+AM_CXXFLAGS="${AM_CFLAGS} -Wmissing-declarations"
 AC_SUBST(AM_CXXFLAGS)
 
 AC_SUBST(LT_LDFLAGS)

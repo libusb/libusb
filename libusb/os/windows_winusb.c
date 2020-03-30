@@ -1137,7 +1137,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	unsigned int guid_size = GUID_SIZE_STEP;
 	unsigned int nb_guids;
 	// Keep a list of PnP enumerator strings that are found
-	char *usb_enumerator[8] = { "USB" };
+	const char *usb_enumerator[8] = { "USB" };
 	unsigned int nb_usb_enumerators = 1;
 	unsigned int usb_enum_index = 0;
 	// Keep a list of newly allocated devs to unref
@@ -1518,7 +1518,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 
 	// Free any PnP enumerator strings
 	for (i = 1; i < nb_usb_enumerators; i++)
-		free(usb_enumerator[i]);
+		free((void *)usb_enumerator[i]);
 
 	// Unref newly allocated devs
 	for (i = 0; i < unref_cur; i++)
@@ -1835,12 +1835,44 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 	{
 		USB_API_UNSUPPORTED,
 		"Unsupported API",
-		// No supported operations
+		NULL,	/* driver_name_list */
+		0,	/* nb_driver_names */
+		NULL,	/* init */
+		NULL,	/* exit */
+		NULL,	/* open */
+		NULL,	/* close */
+		NULL,	/* configure_endpoints */
+		NULL,	/* claim_interface */
+		NULL,	/* set_interface_altsetting */
+		NULL,	/* release_interface */
+		NULL,	/* clear_halt */
+		NULL,	/* reset_device */
+		NULL,	/* submit_bulk_transfer */
+		NULL,	/* submit_iso_transfer */
+		NULL,	/* submit_control_transfer */
+		NULL,	/* cancel_transfer */
+		NULL,	/* copy_transfer_data */
 	},
 	{
 		USB_API_HUB,
 		"HUB API",
-		// No supported operations
+		NULL,	/* driver_name_list */
+		0,	/* nb_driver_names */
+		NULL,	/* init */
+		NULL,	/* exit */
+		NULL,	/* open */
+		NULL,	/* close */
+		NULL,	/* configure_endpoints */
+		NULL,	/* claim_interface */
+		NULL,	/* set_interface_altsetting */
+		NULL,	/* release_interface */
+		NULL,	/* clear_halt */
+		NULL,	/* reset_device */
+		NULL,	/* submit_bulk_transfer */
+		NULL,	/* submit_iso_transfer */
+		NULL,	/* submit_control_transfer */
+		NULL,	/* cancel_transfer */
+		NULL,	/* copy_transfer_data */
 	},
 	{
 		USB_API_COMPOSITE,
@@ -3990,7 +4022,8 @@ static int composite_submit_control_transfer(int sub_api, struct usbi_transfer *
 			libusb_free_config_descriptor(conf_desc);
 			break;
 		}
-		// Fall through if not able to determine interface
+		// No break if not able to determine interface
+		// Fall through
 	default:
 		iface = -1;
 		break;

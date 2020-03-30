@@ -48,6 +48,6 @@ addons:
             - ubuntu-toolchain-r-test
 
 script:
-    - ./autogen.sh && make clean && make
-    - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./travis-autogen.sh --disable-udev && make clean && make ; fi
+    - ./travis-autogen.sh && make -j4
+    - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then make clean && ./travis-autogen.sh --disable-udev && make -j4 ; fi
     - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cd Xcode && xcodebuild -project libusb.xcodeproj ; fi

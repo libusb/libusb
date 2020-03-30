@@ -131,7 +131,7 @@ err:
 int linux_udev_stop_event_monitor(void)
 {
 	char dummy = 1;
-	int r;
+	ssize_t r;
 
 	assert(udev_ctx != NULL);
 	assert(udev_monitor != NULL);
@@ -176,13 +176,15 @@ static void *linux_udev_event_thread_main(void *arg)
 		 .events = POLLIN},
 	};
 
+	UNUSED(arg);
+
 #if defined(HAVE_PTHREAD_SETNAME_NP)
 	r = pthread_setname_np(pthread_self(), "libusb_event");
 	if (r)
 		usbi_warn(NULL, "failed to set hotplug event thread name, error=%d", r);
 #endif
 
-	usbi_dbg("udev event thread entering.");
+	usbi_dbg("udev event thread entering");
 
 	while ((r = poll(fds, 2, -1)) >= 0 || errno == EINTR) {
 		if (r < 0) {
