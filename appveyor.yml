@@ -40,8 +40,8 @@ for:
       - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\cygwin\home\appveyor\libusb
     build_script:
       - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb_2015.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-      - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\appveyor_build.sh" MinGW
-      - cmd: C:\cygwin\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\appveyor_build.sh" cygwin
+      - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" MinGW
+      - cmd: C:\cygwin\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" cygwin
 
   -
     matrix:
@@ -54,8 +54,8 @@ for:
       - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\cygwin64\home\appveyor\libusb
     build_script:
       - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb_2015.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-      - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\appveyor_build.sh" MinGW
-      - cmd: C:\cygwin64\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\appveyor_build.sh" cygwin
+      - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" MinGW
+      - cmd: C:\cygwin64\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" cygwin
 
   -
     matrix:

@@ -10,15 +10,13 @@ elif [ "${buildsys}" == "MinGW-x64" ]; then
 	export PATH="/c/mingw-w64/x86_64-8.1.0-posix-seh-rt_v6-rev0/mingw64/bin:${PATH}"
 fi
 
-set -x
-
 builddir="build-${buildsys}"
 installdir="${PWD}/libusb-${buildsys}"
 
 cd libusb
+
+echo "Bootstrapping ..."
 ./bootstrap.sh
-mkdir "${builddir}"
-cd "${builddir}"
-../configure --prefix="${installdir}" --enable-examples-build --enable-tests-build
-make -j4
-make install
+echo ""
+
+exec .private/ci-build.sh --build-dir "${builddir}" --install -- "--prefix=${installdir}"
