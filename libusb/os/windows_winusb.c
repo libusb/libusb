@@ -313,46 +313,43 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 }
 
 /* For libusb0 filter */
-static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details_filter(struct libusb_context *ctx,
-	HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID *guid, unsigned _index, char *filter_path)
+static int get_interface_details_filter(struct libusb_context *ctx, HDEVINFO *dev_info,
+	DWORD _index, char *filter_path, char **dev_interface_path)
 {
+	const GUID *libusb0_guid = &GUID_DEVINTERFACE_LIBUSB0_FILTER;
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
-	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details;
+	PSP_DEVICE_INTERFACE_DETAIL_DATA_A dev_interface_details;
+	HKEY hkey_dev_interface;
 	DWORD size;
+	int err = LIBUSB_ERROR_OTHER;
 
-	if (_index == 0)
-		*dev_info = pSetupDiGetClassDevsA(guid, NULL, NULL, DIGCF_PRESENT|DIGCF_DEVICEINTERFACE);
-
-	if (dev_info_data != NULL) {
-		dev_info_data->cbSize = sizeof(SP_DEVINFO_DATA);
-		if (!pSetupDiEnumDeviceInfo(*dev_info, _index, dev_info_data)) {
-			if (GetLastError() != ERROR_NO_MORE_ITEMS)
-				usbi_err(ctx, "Could not obtain device info data for index %u: %s",
-					_index, windows_error_str(0));
-
-			pSetupDiDestroyDeviceInfoList(*dev_info);
-			*dev_info = INVALID_HANDLE_VALUE;
-			return NULL;
+	if (_index == 0) {
+		*dev_info = pSetupDiGetClassDevsA(libusb0_guid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+		if (*dev_info == INVALID_HANDLE_VALUE) {
+			usbi_err(ctx, "could not obtain device info set: %s", windows_error_str(0));
+			return LIBUSB_ERROR_OTHER;
 		}
 	}
 
 	dev_interface_data.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
-	if (!pSetupDiEnumDeviceInterfaces(*dev_info, NULL, guid, _index, &dev_interface_data)) {
-		if (GetLastError() != ERROR_NO_MORE_ITEMS)
-			usbi_err(ctx, "Could not obtain interface data for index %u: %s",
-				_index, windows_error_str(0));
+	if (!pSetupDiEnumDeviceInterfaces(*dev_info, NULL, libusb0_guid, _index, &dev_interface_data)) {
+		if (GetLastError() != ERROR_NO_MORE_ITEMS) {
+			usbi_err(ctx, "Could not obtain interface data for index %lu: %s",
+				ULONG_CAST(_index), windows_error_str(0));
+			goto err_exit;
+		}
 
 		pSetupDiDestroyDeviceInfoList(*dev_info);
 		*dev_info = INVALID_HANDLE_VALUE;
-		return NULL;
+		return LIBUSB_SUCCESS;
 	}
 
 	// Read interface data (dummy + actual) to access the device path
 	if (!pSetupDiGetDeviceInterfaceDetailA(*dev_info, &dev_interface_data, NULL, 0, &size, NULL)) {
 		// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
 		if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-			usbi_err(ctx, "could not access interface data (dummy) for index %u: %s",
-				_index, windows_error_str(0));
+			usbi_err(ctx, "could not access interface data (dummy) for index %lu: %s",
+				ULONG_CAST(_index), windows_error_str(0));
 			goto err_exit;
 		}
 	} else {
@@ -362,46 +359,60 @@ static SP_DEVICE_INTERFACE_DETAIL_DATA_A *get_interface_details_filter(struct li
 
 	dev_interface_details = malloc(size);
 	if (dev_interface_details == NULL) {
-		usbi_err(ctx, "could not allocate interface data for index %u", _index);
+		usbi_err(ctx, "could not allocate interface data for index %lu", ULONG_CAST(_index));
+		err = LIBUSB_ERROR_NO_MEM;
 		goto err_exit;
 	}
 
 	dev_interface_details->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_A);
-	if (!pSetupDiGetDeviceInterfaceDetailA(*dev_info, &dev_interface_data, dev_interface_details, size, &size, NULL))
-		usbi_err(ctx, "could not access interface data (actual) for index %u: %s",
-			_index, windows_error_str(0));
-
-	// [trobinso] lookup the libusb0 symbolic index.
-	if (dev_interface_details) {
-		HKEY hkey_device_interface = pSetupDiOpenDeviceInterfaceRegKey(*dev_info, &dev_interface_data, 0, KEY_READ);
-		if (hkey_device_interface != INVALID_HANDLE_VALUE) {
-			DWORD libusb0_symboliclink_index = 0;
-			DWORD value_length = sizeof(DWORD);
-			DWORD value_type = 0;
-			LONG status;
-
-			status = pRegQueryValueExW(hkey_device_interface, L"LUsb0", NULL, &value_type,
-				(LPBYTE)&libusb0_symboliclink_index, &value_length);
-			if (status == ERROR_SUCCESS) {
-				if (libusb0_symboliclink_index < 256) {
-					// libusb0.sys is connected to this device instance.
-					// If the the device interface guid is {F9F3FF14-AE21-48A0-8A25-8011A7A931D9} then it's a filter.
-					sprintf(filter_path, "\\\\.\\libusb0-%04u", (unsigned int)libusb0_symboliclink_index);
-					usbi_dbg("assigned libusb0 symbolic link %s", filter_path);
-				} else {
-					// libusb0.sys was connected to this device instance at one time; but not anymore.
-				}
-			}
-			pRegCloseKey(hkey_device_interface);
-		}
+	if (!pSetupDiGetDeviceInterfaceDetailA(*dev_info, &dev_interface_data, dev_interface_details, size, NULL, NULL)) {
+		usbi_err(ctx, "could not access interface data (actual) for index %lu: %s",
+			ULONG_CAST(_index), windows_error_str(0));
+		free(dev_interface_details);
+		goto err_exit;
 	}
 
-	return dev_interface_details;
+	*dev_interface_path = normalize_path(dev_interface_details->DevicePath);
+	free(dev_interface_details);
+
+	if (*dev_interface_path == NULL) {
+		usbi_err(ctx, "could not allocate interface path for index %lu", ULONG_CAST(_index));
+		err = LIBUSB_ERROR_NO_MEM;
+		goto err_exit;
+	}
+
+	// [trobinso] lookup the libusb0 symbolic index.
+	hkey_dev_interface = pSetupDiOpenDeviceInterfaceRegKey(*dev_info, &dev_interface_data, 0, KEY_READ);
+	if (hkey_dev_interface != INVALID_HANDLE_VALUE) {
+		DWORD libusb0_symboliclink_index = 0;
+		DWORD value_length = sizeof(DWORD);
+		LONG status;
+
+		status = pRegQueryValueExW(hkey_dev_interface, L"LUsb0", NULL, NULL,
+			(LPBYTE)&libusb0_symboliclink_index, &value_length);
+		if (status == ERROR_SUCCESS) {
+			if (libusb0_symboliclink_index < 256) {
+				// libusb0.sys is connected to this device instance.
+				// If the the device interface guid is {F9F3FF14-AE21-48A0-8A25-8011A7A931D9} then it's a filter.
+				sprintf(filter_path, "\\\\.\\libusb0-%04u", (unsigned int)libusb0_symboliclink_index);
+				usbi_dbg("assigned libusb0 symbolic link %s", filter_path);
+			} else {
+				// libusb0.sys was connected to this device instance at one time; but not anymore.
+			}
+		}
+		pRegCloseKey(hkey_dev_interface);
+	} else {
+		usbi_warn(ctx, "could not open device interface registry key for index %lu: %s",
+			ULONG_CAST(_index), windows_error_str(0));
+		// TODO: should this be an error?
+	}
+
+	return LIBUSB_SUCCESS;
 
 err_exit:
 	pSetupDiDestroyDeviceInfoList(*dev_info);
 	*dev_info = INVALID_HANDLE_VALUE;
-	return NULL;
+	return err;
 }
 
 /*
@@ -2214,15 +2225,14 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 	struct winusb_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 	bool is_using_usbccgp = (priv->apib->id == USB_API_COMPOSITE);
-	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
-	HDEVINFO dev_info = INVALID_HANDLE_VALUE;
-	SP_DEVINFO_DATA dev_info_data;
-	char *dev_path_no_guid;
+	HDEVINFO dev_info;
+	char *dev_interface_path = NULL;
+	char *dev_interface_path_guid_start;
 	char filter_path[] = "\\\\.\\libusb0-0000";
 	bool found_filter = false;
 	HANDLE file_handle, winusb_handle;
-	DWORD err;
-	int i;
+	DWORD err, _index;
+	int r;
 
 	CHECK_WINUSBX_AVAILABLE(sub_api);
 
@@ -2245,20 +2255,24 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 			default:
 				// it may be that we're using the libusb0 filter driver.
 				// TODO: can we move this whole business into the K/0 DLL?
-				for (i = 0; ; i++) {
-					safe_free(dev_interface_details);
-					safe_free(dev_path_no_guid);
+				r = LIBUSB_SUCCESS;
+				for (_index = 0; ; _index++) {
+					safe_free(dev_interface_path);
 
-					dev_interface_details = get_interface_details_filter(ctx, &dev_info, &dev_info_data, &GUID_DEVINTERFACE_LIBUSB0_FILTER, i, filter_path);
-					if ((found_filter) || (dev_interface_details == NULL))
+					if (found_filter)
+						break;
+
+					r = get_interface_details_filter(ctx, &dev_info, _index, filter_path, &dev_interface_path);
+					if ((r != LIBUSB_SUCCESS) || (dev_interface_path == NULL))
 						break;
 
 					// ignore GUID part
-					dev_path_no_guid = strtok(dev_interface_details->DevicePath, "{");
-					if (dev_path_no_guid == NULL)
+					dev_interface_path_guid_start = strchr(dev_interface_path, '{');
+					if (dev_interface_path_guid_start == NULL)
 						continue;
+					*dev_interface_path_guid_start = '\0';
 
-					if (strncmp(dev_path_no_guid, priv->usb_interface[iface].path, strlen(dev_path_no_guid)) == 0) {
+					if (strncmp(dev_interface_path, priv->usb_interface[iface].path, strlen(dev_interface_path)) == 0) {
 						file_handle = CreateFileA(filter_path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ,
 							NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 						if (file_handle != INVALID_HANDLE_VALUE) {
@@ -2276,7 +2290,8 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 						}
 					}
 				}
-				free(dev_interface_details);
+				if (r != LIBUSB_SUCCESS)
+					return r;
 				if (!found_filter) {
 					usbi_err(ctx, "could not access interface %d: %s", iface, windows_error_str(err));
 					return LIBUSB_ERROR_ACCESS;
