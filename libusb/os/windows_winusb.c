@@ -128,43 +128,19 @@ static const char *guid_to_string(const GUID *guid)
 #endif
 
 /*
- * Sanitize Microsoft's paths: convert to uppercase, add prefix and fix backslashes.
- * Return an allocated sanitized string or NULL on error.
+ * Normalize Microsoft's paths: return a duplicate of the given path
+ * with all characters converted to uppercase
  */
-static char *sanitize_path(const char *path)
+static char *normalize_path(const char *path)
 {
-	const char root_prefix[] = {'\\', '\\', '.', '\\'};
-	size_t j, size;
-	char *ret_path;
-	size_t add_root = 0;
+	char *ret_path = _strdup(path);
+	char *p;
 
-	if (path == NULL)
-		return NULL;
-
-	size = strlen(path) + 1;
-
-	// Microsoft indiscriminately uses '\\?\', '\\.\', '##?#" or "##.#" for root prefixes.
-	if (!((size > 3) && (((path[0] == '\\') && (path[1] == '\\') && (path[3] == '\\'))
-			|| ((path[0] == '#') && (path[1] == '#') && (path[3] == '#'))))) {
-		add_root = sizeof(root_prefix);
-		size += add_root;
-	}
-
-	ret_path = malloc(size);
 	if (ret_path == NULL)
 		return NULL;
 
-	strcpy(&ret_path[add_root], path);
-
-	// Ensure consistency with root prefix
-	memcpy(ret_path, root_prefix, sizeof(root_prefix));
-
-	// Same goes for '\' and '#' after the root prefix. Ensure '#' is used
-	for (j = sizeof(root_prefix); j < size; j++) {
-		ret_path[j] = (char)toupper((int)ret_path[j]); // Fix case too
-		if (ret_path[j] == '\\')
-			ret_path[j] = '#';
-	}
+	for (p = ret_path; *p != '\0'; p++)
+		*p = (char)toupper((unsigned char)*p);
 
 	return ret_path;
 }
@@ -324,7 +300,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	*dev_interface_path = sanitize_path(dev_interface_details->DevicePath);
+	*dev_interface_path = normalize_path(dev_interface_details->DevicePath);
 	free(dev_interface_details);
 
 	if (*dev_interface_path == NULL) {
@@ -2241,7 +2217,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 	SP_DEVICE_INTERFACE_DETAIL_DATA_A *dev_interface_details = NULL;
 	HDEVINFO dev_info = INVALID_HANDLE_VALUE;
 	SP_DEVINFO_DATA dev_info_data;
-	char *dev_path_no_guid = NULL;
+	char *dev_path_no_guid;
 	char filter_path[] = "\\\\.\\libusb0-0000";
 	bool found_filter = false;
 	HANDLE file_handle, winusb_handle;
@@ -2278,7 +2254,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 						break;
 
 					// ignore GUID part
-					dev_path_no_guid = sanitize_path(strtok(dev_interface_details->DevicePath, "{"));
+					dev_path_no_guid = strtok(dev_interface_details->DevicePath, "{");
 					if (dev_path_no_guid == NULL)
 						continue;
 
