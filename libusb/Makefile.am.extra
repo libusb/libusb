@@ -1,0 +1,26 @@
+AM_V_DLLTOOL = $(am__v_DLLTOOL_$(V))
+am__v_DLLTOOL_ = $(am__v_DLLTOOL_$(AM_DEFAULT_VERBOSITY))
+am__v_DLLTOOL_0 = @echo "  DLLTOOL " $@;
+am__v_DLLTOOL_1 = 
+
+AM_V_RC = $(am__v_RC_$(V))
+am__v_RC_ = $(am__v_RC_$(AM_DEFAULT_VERBOSITY))
+am__v_RC_0 = @echo "  RC      " $@;
+am__v_RC_1 = 
+
+LTRC = $(LIBTOOL) $(AM_V_lt) --tag=RC $(AM_LIBTOOLFLAGS) \
+       $(LIBTOOLFLAGS) --mode=compile $(RC) $(AM_RCFLAGS) \
+       $(RCFLAGS)
+
+RCPPARGS = \
+	--preprocessor-arg -MT \
+	--preprocessor-arg $@ \
+	--preprocessor-arg -MD \
+	--preprocessor-arg -MP \
+	--preprocessor-arg -MF \
+	--preprocessor-arg $$depbase.Tpo
+
+.rc.lo:
+	$(AM_V_RC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+	$(LTRC) $(RCPPARGS) -i $< -o $@ &&\
+	$(am__mv) $$depbase.Tpo $$depbase.Plo

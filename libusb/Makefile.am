@@ -75,16 +75,16 @@ endif
 if OS_WINDOWS
 OS_SRC = $(OS_WINDOWS_SRC)
 
-.rc.lo:
-	$(AM_V_GEN)$(LIBTOOL) $(AM_V_lt) --tag=RC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(RC) $(RCFLAGS) -i $< -o $@
+include Makefile.am.extra
 
-libusb-1.0.lo: libusb-1.0.rc version.h version_nano.h
+# Dependencies for compiling libusb-1.0.lo from libusb-1.0.rc
+-include ./$(DEPDIR)/libusb-1.0.Plo
 
 if CREATE_IMPORT_LIB
 all-local: .libs/libusb-1.0.dll.a
 # Rebuild the import lib from the .def so that MS and MinGW DLLs can be interchanged
 .libs/libusb-1.0.dll.a: libusb-1.0.def libusb-1.0.la
-	$(AM_V_GEN)$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $< --dllname libusb-1.0.dll --output-lib $@
+	$(AM_V_DLLTOOL)$(DLLTOOL) $(DLLTOOLFLAGS) --kill-at --input-def $< --dllname libusb-1.0.dll --output-lib $@
 endif
 endif
 
