@@ -467,6 +467,9 @@ _errno_to_libusb(int err)
 		return (LIBUSB_ERROR_NO_DEVICE);
 	case ENOMEM:
 		return (LIBUSB_ERROR_NO_MEM);
+	case EWOULDBLOCK:
+	case ETIMEDOUT:
+		return (LIBUSB_ERROR_TIMEOUT);
 	}
 
 	usbi_dbg("error: %s", strerror(err));
