@@ -32,7 +32,7 @@
 #include "libusb.h"
 #include "ezusb.h"
 
-#if !defined(_WIN32) || defined(__CYGWIN__ )
+#if !defined(_WIN32) || defined(__CYGWIN__)
 #include <syslog.h>
 static bool dosyslog = false;
 #include <strings.h>
@@ -55,7 +55,7 @@ void logerror(const char *format, ...)
 	va_list ap;
 	va_start(ap, format);
 
-#if !defined(_WIN32) || defined(__CYGWIN__ )
+#if !defined(_WIN32) || defined(__CYGWIN__)
 	if (dosyslog)
 		vsyslog(LOG_ERR, format, ap);
 	else

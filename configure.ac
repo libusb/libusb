@@ -38,6 +38,7 @@ LT_LDFLAGS="-version-info ${lt_current}:${lt_revision}:${lt_age} -no-undefined"
 
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
+EXTRA_CPPFLAGS=
 EXTRA_CFLAGS=
 
 dnl check for -std=gnu11 compiler support (optional)
@@ -192,6 +193,9 @@ sunos)
 windows)
 	AC_CHECK_TYPES([struct timespec], [], [], [[#include <time.h>]])
 	AC_DEFINE([_WIN32_WINNT], [_WIN32_WINNT_VISTA], [Define to the oldest supported Windows version.])
+	dnl Cygwin and MSYS compilers do not define _WIN32 as MinGW and MSVC do
+	dnl simplify checks for Windows compilation by ensuring it is always defined
+	EXTRA_CPPFLAGS="-D_WIN32"
 	LT_LDFLAGS="${LT_LDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
 	;;
 *)
@@ -327,6 +331,9 @@ if test "x$backend" = xwindows; then
 fi
 
 SHARED_CFLAGS="-Wall -Wextra -Wshadow -Wunused -Wwrite-strings -Werror=format-security -Werror=implicit-function-declaration -Werror=implicit-int -Werror=init-self -Werror=missing-prototypes -Werror=strict-prototypes -Werror=undef -Werror=uninitialized"
+
+AM_CPPFLAGS="${EXTRA_CPPFLAGS}"
+AC_SUBST(AM_CPPFLAGS)
 
 AM_CFLAGS="-std=${c_dialect}11 ${EXTRA_CFLAGS} ${SHARED_CFLAGS}"
 AC_SUBST(AM_CFLAGS)
