@@ -8,7 +8,7 @@ docs: @DOXYGEN_HTMLDIR@
 @DOXYGEN_HTMLDIR@: doxygen.cfg libusb.png $(LIBUSB_DOC_SRC)
 	doxygen $<
 
-docs-upload: sfurl = web.sourceforge.net:/home/project-web/libusb/htdocs
+sfurl = web.sourceforge.net:/home/project-web/libusb/htdocs
 docs-upload: @DOXYGEN_HTMLDIR@
 	if [ -z "$$SF_USER" ]; then \
 		rsync -rv --delete $< $(sfurl); \

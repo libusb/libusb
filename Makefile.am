@@ -35,9 +35,9 @@ dist-hook:
 	rm -f $(distdir)/README.orig
 	rm -f $(distdir)/msvc/.gitattributes
 
+reldir = .release/$(distdir)
+sfurl = frs.sourceforge.net:/home/frs/project/libusb/libusb-1.0
 .PHONY: dist-upload
-dist-upload: reldir = .release/$(distdir)
-dist-upload: sfurl = frs.sourceforge.net:/home/frs/project/libusb/libusb-1.0
 dist-upload: dist
 	rm -rf $(reldir)
 	mkdir -p $(reldir)
