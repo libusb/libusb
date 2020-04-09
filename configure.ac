@@ -153,10 +153,20 @@ fi
 
 if test "x$threads" = xposix; then
 	AC_DEFINE([THREADS_POSIX], [1], [Define to 1 if using POSIX threads.])
-	AC_SUBST(THREAD_CFLAGS, [-pthread])
+	dnl Some compilers do not support the '-pthread' option so check for it here
+	saved_CFLAGS="${CFLAGS}"
+	CFLAGS="-Wall -Werror -pthread"
+	AC_MSG_CHECKING([if $CC recognizes -pthread])
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])],
+		[AC_MSG_RESULT([yes])
+		 AC_SUBST(THREAD_CFLAGS, [-pthread])],
+		[AC_MSG_RESULT([no])])
+	CFLAGS="${saved_CFLAGS}"
 	dnl Android Linux and Darwin provide pthread functions directly in libc
 	dnl glibc also provides some pthread functions directly, so search for a thread-specific function
-	AC_SEARCH_LIBS([pthread_key_create], [pthread], [AC_SUBST(THREAD_LIBS, [-lpthread])], [], [])
+	AC_SEARCH_LIBS([pthread_create], [pthread],
+		[test "x$ac_cv_search_pthread_create" != "xnone required" && AC_SUBST(THREAD_LIBS, [-lpthread])],
+		[], [])
 elif test "x$threads" = xwindows; then
 	AC_DEFINE([THREADS_WINDOWS], [1], [Define to 1 if using Windows threads.])
 else
