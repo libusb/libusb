@@ -38,34 +38,31 @@ LT_LDFLAGS="-version-info ${lt_current}:${lt_revision}:${lt_age} -no-undefined"
 
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
+EXTRA_CFLAGS=
+
 dnl check for -std=gnu11 compiler support (optional)
-dnl note that we don't just check whether the compiler accepts '-std=x11'
+dnl note that we don't just check if the compiler accepts '-std=x11'
 dnl but also that it supports the _Thread_local keyword because some compilers
 dnl (e.g. gcc 4.8) accept the command line option but do not implement TLS
 saved_CFLAGS="${CFLAGS}"
 CFLAGS="-std=gnu11"
-AC_MSG_CHECKING([whether CC supports -std=gnu11])
+AC_MSG_CHECKING([if $CC supports -std=gnu11])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([_Thread_local int x;], [x = 42;])],
 	[AC_MSG_RESULT([yes])
-	 cc_supports_gnu11=yes],
+	 c_dialect=gnu],
 	[AC_MSG_RESULT([no])
-	 cc_supports_gnu11=])
-CFLAGS="${saved_CFLAGS}"
-
-if test "x$cc_supports_gnu11" = xyes; then
-	AM_CFLAGS="-std=gnu11"
-else
+	 c_dialect=])
+if test "x$c_dialect" != xgnu; then
 	dnl fallback check for -std=c11 compiler support (required)
-	saved_CFLAGS="${CFLAGS}"
 	CFLAGS="-std=c11"
-	AC_MSG_CHECKING([whether CC supports -std=c11])
+	AC_MSG_CHECKING([if $CC supports -std=c11])
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([_Thread_local int x;], [x = 42;])],
 		[AC_MSG_RESULT([yes])],
 		[AC_MSG_RESULT([no])
 		 AC_MSG_ERROR([compiler with C11 support is required to build libusb])])
-	CFLAGS="${saved_CFLAGS}"
-	AM_CFLAGS="-std=c11"
+	c_dialect=c
 fi
+CFLAGS="${saved_CFLAGS}"
 
 AC_DEFINE([_GNU_SOURCE], [1], [Enable GNU extensions.])
 AC_DEFINE([DEFAULT_VISIBILITY], [__attribute__ ((visibility ("default")))], [Define to the attribute for default visibility.])
@@ -131,7 +128,7 @@ case $host in
 	poll=windows
 	threads=windows
 	test "x$enable_shared" = xyes && create_import_lib=yes
-	AM_CFLAGS="${AM_CFLAGS} -fno-omit-frame-pointer"
+	EXTRA_CFLAGS="-fno-omit-frame-pointer"
 	;;
 *)
 	AC_MSG_RESULT([Null])
@@ -318,23 +315,23 @@ AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" = xposix])
 AM_CONDITIONAL([THREADS_WINDOWS], [test "x$threads" = xwindows])
 AM_CONDITIONAL([USE_UDEV], [test "x$use_udev" = xyes])
 
-EXTRA_CFLAGS=
-
 dnl The -Wcast-function-type warning causes a flurry of warnings when compiling
 dnl Windows with GCC 8 or later because of dynamically loaded functions
 if test "x$backend" = xwindows; then
 	saved_CFLAGS="${CFLAGS}"
 	CFLAGS="-Werror -Wcast-function-type"
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])],
-		[EXTRA_CFLAGS="-Wno-cast-function-type"],
+		[EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-cast-function-type"],
 		[])
 	CFLAGS="${saved_CFLAGS}"
 fi
 
-AM_CFLAGS="${AM_CFLAGS} -Wall -Wextra -Wshadow -Wunused -Wwrite-strings -Werror=format-security -Werror=implicit-function-declaration -Werror=implicit-int -Werror=init-self -Werror=missing-prototypes -Werror=strict-prototypes -Werror=undef -Werror=uninitialized ${EXTRA_CFLAGS}"
+SHARED_CFLAGS="-Wall -Wextra -Wshadow -Wunused -Wwrite-strings -Werror=format-security -Werror=implicit-function-declaration -Werror=implicit-int -Werror=init-self -Werror=missing-prototypes -Werror=strict-prototypes -Werror=undef -Werror=uninitialized"
+
+AM_CFLAGS="-std=${c_dialect}11 ${EXTRA_CFLAGS} ${SHARED_CFLAGS}"
 AC_SUBST(AM_CFLAGS)
 
-AM_CXXFLAGS="${AM_CFLAGS} -Wmissing-declarations"
+AM_CXXFLAGS="-std=${c_dialect}++11 ${EXTRA_CFLAGS} ${SHARED_CFLAGS} -Wmissing-declarations"
 AC_SUBST(AM_CXXFLAGS)
 
 AC_SUBST(LT_LDFLAGS)
