@@ -387,6 +387,7 @@ if (cfg != desired)
   * - libusb_get_port_number()
   * - libusb_get_port_numbers()
   * - libusb_get_port_path()
+  * - libusb_get_refcnt()
   * - libusb_get_ss_endpoint_companion_descriptor()
   * - libusb_get_ss_usb_device_capability_descriptor()
   * - libusb_get_string_descriptor()
@@ -1149,6 +1150,22 @@ libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev)
 	dev->refcnt++;
 	usbi_mutex_unlock(&dev->lock);
 	return dev;
+}
+
+/** \ingroup libusb_dev
+ * Get the reference count of a device.
+ * \param dev the device for which to get the reference count
+ * \returns the reference count
+ */
+int API_EXPORTED libusb_get_refcnt(libusb_device *dev)
+{
+	int refcnt;
+
+	usbi_mutex_lock(&dev->lock);
+	refcnt = dev->refcnt;
+	usbi_mutex_unlock(&dev->lock);
+
+	return refcnt;
 }
 
 /** \ingroup libusb_dev

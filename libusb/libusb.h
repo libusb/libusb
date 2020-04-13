@@ -933,7 +933,8 @@ typedef struct libusb_context libusb_context;
  * New devices presented by libusb_get_device_list() have a reference count of
  * 1, and libusb_free_device_list() can optionally decrease the reference count
  * on all devices in the list. libusb_open() adds another reference which is
- * later destroyed by libusb_close().
+ * later destroyed by libusb_close(). libusb_get_refcnt() can be used to
+ * retrieve the current reference count.
  */
 typedef struct libusb_device libusb_device;
 
@@ -1317,6 +1318,7 @@ ssize_t LIBUSB_CALL libusb_get_device_list(libusb_context *ctx,
 void LIBUSB_CALL libusb_free_device_list(libusb_device **list,
 	int unref_devices);
 libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev);
+int LIBUSB_CALL libusb_get_refcnt(libusb_device *dev);
 void LIBUSB_CALL libusb_unref_device(libusb_device *dev);
 
 int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
