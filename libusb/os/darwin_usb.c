@@ -68,7 +68,7 @@ static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for eve
 
 static usbi_mutex_t darwin_cached_devices_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct list_head darwin_cached_devices;
-static const char *darwin_device_class = kIOUSBDeviceClassName;
+static const char *darwin_device_class = "IOUSBDevice";
 
 #define DARWIN_CACHED_DEVICE(a) (((struct darwin_device_priv *)usbi_get_device_priv((a)))->dev)
 
