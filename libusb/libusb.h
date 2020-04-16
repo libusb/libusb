@@ -457,6 +457,61 @@ enum libusb_iso_usage_type {
 };
 
 /** \ingroup libusb_desc
+ * Supported speeds (wSpeedSupported) bitfield. Indicates what
+ * speeds the device supports.
+ */
+enum libusb_supported_speed {
+	/** Low speed operation supported (1.5MBit/s). */
+	LIBUSB_LOW_SPEED_OPERATION = 1,
+
+	/** Full speed operation supported (12MBit/s). */
+	LIBUSB_FULL_SPEED_OPERATION = 2,
+
+	/** High speed operation supported (480MBit/s). */
+	LIBUSB_HIGH_SPEED_OPERATION = 4,
+
+	/** Superspeed operation supported (5000MBit/s). */
+	LIBUSB_SUPER_SPEED_OPERATION = 8,
+};
+
+/** \ingroup libusb_desc
+ * Masks for the bits of the
+ * \ref libusb_usb_2_0_extension_descriptor::bmAttributes "bmAttributes" field
+ * of the USB 2.0 Extension descriptor.
+ */
+enum libusb_usb_2_0_extension_attributes {
+	/** Supports Link Power Management (LPM) */
+	LIBUSB_BM_LPM_SUPPORT = 2,
+};
+
+/** \ingroup libusb_desc
+ * Masks for the bits of the
+ * \ref libusb_ss_usb_device_capability_descriptor::bmAttributes "bmAttributes" field
+ * field of the SuperSpeed USB Device Capability descriptor.
+ */
+enum libusb_ss_usb_device_capability_attributes {
+	/** Supports Latency Tolerance Messages (LTM) */
+	LIBUSB_BM_LTM_SUPPORT = 2,
+};
+
+/** \ingroup libusb_desc
+ * USB capability types
+ */
+enum libusb_bos_type {
+	/** Wireless USB device capability */
+	LIBUSB_BT_WIRELESS_USB_DEVICE_CAPABILITY = 1,
+
+	/** USB 2.0 extensions */
+	LIBUSB_BT_USB_2_0_EXTENSION = 2,
+
+	/** SuperSpeed USB device capability */
+	LIBUSB_BT_SS_USB_DEVICE_CAPABILITY = 3,
+
+	/** Container ID type */
+	LIBUSB_BT_CONTAINER_ID = 4,
+};
+
+/** \ingroup libusb_desc
  * A structure representing the standard USB device descriptor. This
  * descriptor is documented in section 9.6.1 of the USB 3.0 specification.
  * All multiple-byte fields are represented in host-endian format.
@@ -964,61 +1019,6 @@ enum libusb_speed {
 
 	/** The device is operating at super speed plus (10000MBit/s). */
 	LIBUSB_SPEED_SUPER_PLUS = 5,
-};
-
-/** \ingroup libusb_dev
- * Supported speeds (wSpeedSupported) bitfield. Indicates what
- * speeds the device supports.
- */
-enum libusb_supported_speed {
-	/** Low speed operation supported (1.5MBit/s). */
-	LIBUSB_LOW_SPEED_OPERATION   = 1,
-
-	/** Full speed operation supported (12MBit/s). */
-	LIBUSB_FULL_SPEED_OPERATION  = 2,
-
-	/** High speed operation supported (480MBit/s). */
-	LIBUSB_HIGH_SPEED_OPERATION  = 4,
-
-	/** Superspeed operation supported (5000MBit/s). */
-	LIBUSB_SUPER_SPEED_OPERATION = 8,
-};
-
-/** \ingroup libusb_dev
- * Masks for the bits of the
- * \ref libusb_usb_2_0_extension_descriptor::bmAttributes "bmAttributes" field
- * of the USB 2.0 Extension descriptor.
- */
-enum libusb_usb_2_0_extension_attributes {
-	/** Supports Link Power Management (LPM) */
-	LIBUSB_BM_LPM_SUPPORT = 2,
-};
-
-/** \ingroup libusb_dev
- * Masks for the bits of the
- * \ref libusb_ss_usb_device_capability_descriptor::bmAttributes "bmAttributes" field
- * field of the SuperSpeed USB Device Capability descriptor.
- */
-enum libusb_ss_usb_device_capability_attributes {
-	/** Supports Latency Tolerance Messages (LTM) */
-	LIBUSB_BM_LTM_SUPPORT = 2,
-};
-
-/** \ingroup libusb_dev
- * USB capability types
- */
-enum libusb_bos_type {
-	/** Wireless USB device capability */
-	LIBUSB_BT_WIRELESS_USB_DEVICE_CAPABILITY	= 1,
-
-	/** USB 2.0 extensions */
-	LIBUSB_BT_USB_2_0_EXTENSION			= 2,
-
-	/** SuperSpeed USB device capability */
-	LIBUSB_BT_SS_USB_DEVICE_CAPABILITY		= 3,
-
-	/** Container ID type */
-	LIBUSB_BT_CONTAINER_ID				= 4,
 };
 
 /** \ingroup libusb_misc
