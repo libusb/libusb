@@ -319,21 +319,18 @@ enum libusb_endpoint_direction {
  * Endpoint transfer type. Values for bits 0:1 of the
  * \ref libusb_endpoint_descriptor::bmAttributes "endpoint attributes" field.
  */
-enum libusb_transfer_type {
+enum libusb_endpoint_transfer_type {
 	/** Control endpoint */
-	LIBUSB_TRANSFER_TYPE_CONTROL = 0,
+	LIBUSB_ENDPOINT_TRANSFER_TYPE_CONTROL = 0,
 
 	/** Isochronous endpoint */
-	LIBUSB_TRANSFER_TYPE_ISOCHRONOUS = 1,
+	LIBUSB_ENDPOINT_TRANSFER_TYPE_ISOCHRONOUS = 1,
 
 	/** Bulk endpoint */
-	LIBUSB_TRANSFER_TYPE_BULK = 2,
+	LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK = 2,
 
 	/** Interrupt endpoint */
-	LIBUSB_TRANSFER_TYPE_INTERRUPT = 3,
-
-	/** Stream endpoint */
-	LIBUSB_TRANSFER_TYPE_BULK_STREAM = 4,
+	LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT = 3,
 };
 
 /** \ingroup libusb_misc
@@ -529,17 +526,15 @@ struct libusb_endpoint_descriptor {
 
 	/** The address of the endpoint described by this descriptor. Bits 0:3 are
 	 * the endpoint number. Bits 4:6 are reserved. Bit 7 indicates direction,
-	 * see \ref libusb_endpoint_direction.
-	 */
+	 * see \ref libusb_endpoint_direction. */
 	uint8_t  bEndpointAddress;
 
 	/** Attributes which apply to the endpoint when it is configured using
 	 * the bConfigurationValue. Bits 0:1 determine the transfer type and
-	 * correspond to \ref libusb_transfer_type. Bits 2:3 are only used for
-	 * isochronous endpoints and correspond to \ref libusb_iso_sync_type.
+	 * correspond to \ref libusb_endpoint_transfer_type. Bits 2:3 are only used
+	 * for isochronous endpoints and correspond to \ref libusb_iso_sync_type.
 	 * Bits 4:5 are also only used for isochronous endpoints and correspond to
-	 * \ref libusb_iso_usage_type. Bits 6:7 are reserved.
-	 */
+	 * \ref libusb_iso_usage_type. Bits 6:7 are reserved. */
 	uint8_t  bmAttributes;
 
 	/** Maximum packet size this endpoint is capable of sending/receiving. */
@@ -1084,6 +1079,25 @@ enum libusb_error {
 #define LIBUSB_ERROR_COUNT 14
 
 /** \ingroup libusb_asyncio
+ * Transfer type */
+enum libusb_transfer_type {
+	/** Control transfer */
+	LIBUSB_TRANSFER_TYPE_CONTROL = 0U,
+
+	/** Isochronous transfer */
+	LIBUSB_TRANSFER_TYPE_ISOCHRONOUS = 1U,
+
+	/** Bulk transfer */
+	LIBUSB_TRANSFER_TYPE_BULK = 2U,
+
+	/** Interrupt transfer */
+	LIBUSB_TRANSFER_TYPE_INTERRUPT = 3U,
+
+	/** Bulk stream transfer */
+	LIBUSB_TRANSFER_TYPE_BULK_STREAM = 4U
+};
+
+/** \ingroup libusb_asyncio
  * Transfer status codes */
 enum libusb_transfer_status {
 	/** Transfer completed without error. Note that this does not indicate
@@ -1199,7 +1213,7 @@ struct libusb_transfer {
 	/** Address of the endpoint where this transfer will be sent. */
 	unsigned char endpoint;
 
-	/** Type of the endpoint from \ref libusb_transfer_type */
+	/** Type of the transfer from \ref libusb_transfer_type */
 	unsigned char type;
 
 	/** Timeout for this transfer in milliseconds. A value of 0 indicates no

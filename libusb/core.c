@@ -460,6 +460,7 @@ if (cfg != desired)
   * - \ref libusb_class_code
   * - \ref libusb_descriptor_type
   * - \ref libusb_endpoint_direction
+  * - \ref libusb_endpoint_transfer_type
   * - \ref libusb_error
   * - \ref libusb_iso_sync_type
   * - \ref libusb_iso_usage_type
@@ -1094,7 +1095,7 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 	struct libusb_config_descriptor *config;
 	const struct libusb_endpoint_descriptor *ep;
 	struct libusb_ss_endpoint_companion_descriptor *ss_ep_cmp;
-	enum libusb_transfer_type ep_type;
+	enum libusb_endpoint_transfer_type ep_type;
 	uint16_t val;
 	int r;
 	int speed;
@@ -1124,11 +1125,11 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 	/* If the device isn't a SuperSpeed device or retrieving the SS endpoint didn't worked. */
 	if (speed < LIBUSB_SPEED_SUPER || r < 0) {
 		val = ep->wMaxPacketSize;
-		ep_type = (enum libusb_transfer_type) (ep->bmAttributes & 0x3);
+		ep_type = (enum libusb_endpoint_transfer_type) (ep->bmAttributes & 0x3);
 
 		r = val & 0x07ff;
-		if (ep_type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS
-		    || ep_type == LIBUSB_TRANSFER_TYPE_INTERRUPT)
+		if (ep_type == LIBUSB_ENDPOINT_TRANSFER_TYPE_ISOCHRONOUS
+		    || ep_type == LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT)
 			r *= (1 + ((val >> 11) & 3));
 	}
 
