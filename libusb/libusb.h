@@ -72,6 +72,12 @@ typedef SSIZE_T ssize_t;
 #define LIBUSB_DEPRECATED_FOR(f)
 #endif /* __GNUC__ */
 
+#if defined(__GNUC__)
+#define LIBUSB_PACKED __attribute__ ((packed))
+#else
+#define LIBUSB_PACKED
+#endif /* __GNUC__ */
+
 /** \def LIBUSB_CALL
  * \ingroup libusb_misc
  * libusb's Windows calling convention.
@@ -895,6 +901,9 @@ struct libusb_container_id_descriptor {
 
 /** \ingroup libusb_asyncio
  * Setup packet for control transfers. */
+#if defined(_MSC_VER)
+#pragma pack(push, 1)
+#endif
 struct libusb_control_setup {
 	/** Request type. Bits 0:4 determine recipient, see
 	 * \ref libusb_request_recipient. Bits 5:6 determine type, see
@@ -919,7 +928,10 @@ struct libusb_control_setup {
 
 	/** Number of bytes to transfer */
 	uint16_t wLength;
-};
+} LIBUSB_PACKED;
+#if defined(_MSC_VER)
+#pragma pack(pop)
+#endif
 
 #define LIBUSB_CONTROL_SETUP_SIZE (sizeof(struct libusb_control_setup))
 
