@@ -38,7 +38,7 @@ typedef SSIZE_T ssize_t;
 #include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
-#if defined(__linux__) || defined(__APPLE__) || defined(__CYGWIN__) || defined(__HAIKU__) || defined(__GLIBC__)
+#if !defined(_MSC_VER)
 #include <sys/time.h>
 #endif
 #include <time.h>
