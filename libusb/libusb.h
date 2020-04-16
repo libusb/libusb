@@ -25,7 +25,7 @@
 #ifndef LIBUSB_H
 #define LIBUSB_H
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 /* on MS environments, the inline keyword is available in C++ only */
 #if !defined(__cplusplus)
 #define inline __inline
@@ -47,7 +47,7 @@ typedef SSIZE_T ssize_t;
 #define ZERO_SIZED_ARRAY		/* [] - valid C99 code */
 #else
 #define ZERO_SIZED_ARRAY	0	/* [0] - non-standard, but usually working code */
-#endif
+#endif /* __STDC_VERSION__ */
 
 /* 'interface' might be defined as a macro on Windows, so we need to
  * undefine it so as not to break the current libusb API, because
@@ -62,13 +62,12 @@ typedef SSIZE_T ssize_t;
 #if !defined(__CYGWIN__)
 #include <winsock.h>
 #endif
-#endif
+#endif /* _WIN32 || __CYGWIN__ */
 
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
-#define LIBUSB_DEPRECATED_FOR(f) \
-  __attribute__((deprecated("Use " #f " instead")))
-#elif __GNUC__ >= 3
-#define LIBUSB_DEPRECATED_FOR(f) __attribute__((deprecated))
+#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
+#define LIBUSB_DEPRECATED_FOR(f) __attribute__ ((deprecated ("Use " #f " instead")))
+#elif defined(__GNUC__) && (__GNUC__ >= 3)
+#define LIBUSB_DEPRECATED_FOR(f) __attribute__ ((deprecated))
 #else
 #define LIBUSB_DEPRECATED_FOR(f)
 #endif /* __GNUC__ */
@@ -109,7 +108,7 @@ typedef SSIZE_T ssize_t;
 #define LIBUSB_CALL WINAPI
 #else
 #define LIBUSB_CALL
-#endif
+#endif /* _WIN32 || __CYGWIN__ */
 
 /** \def LIBUSB_API_VERSION
  * \ingroup libusb_misc
@@ -136,7 +135,7 @@ typedef SSIZE_T ssize_t;
 /* The following is kept for compatibility, but will be deprecated in the future */
 #define LIBUSBX_API_VERSION LIBUSB_API_VERSION
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -2070,7 +2069,7 @@ enum libusb_option {
 
 int LIBUSB_CALL libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 }
 #endif
 
