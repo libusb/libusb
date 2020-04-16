@@ -1924,29 +1924,30 @@ typedef int libusb_hotplug_callback_handle;
  *
  * Since version 1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102
  *
- * Flags for hotplug events */
+ * Hotplug events */
 typedef enum {
-	/** Default value when not using any flags. */
-	LIBUSB_HOTPLUG_NO_FLAGS = 0U,
+	/** A device has been plugged in and is ready to use */
+	LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED = (1 << 0),
 
-	/** Arm the callback and fire it for all matching currently attached devices. */
-	LIBUSB_HOTPLUG_ENUMERATE = (1U << 0)
-} libusb_hotplug_flag;
+	/** A device has left and is no longer available.
+	 * It is the user's responsibility to call libusb_close on any handle associated with a disconnected device.
+	 * It is safe to call libusb_get_device_descriptor on a device that has left */
+	LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT = (1 << 1)
+} libusb_hotplug_event;
 
 /** \ingroup libusb_hotplug
  *
  * Since version 1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102
  *
- * Hotplug events */
+ * Hotplug flags */
 typedef enum {
-	/** A device has been plugged in and is ready to use */
-	LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED = (1U << 0),
+	/** Arm the callback and fire it for all matching currently attached devices. */
+	LIBUSB_HOTPLUG_ENUMERATE = (1 << 0)
+} libusb_hotplug_flag;
 
-	/** A device has left and is no longer available.
-	 * It is the user's responsibility to call libusb_close on any handle associated with a disconnected device.
-	 * It is safe to call libusb_get_device_descriptor on a device that has left */
-	LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT = (1U << 1)
-} libusb_hotplug_event;
+/** \ingroup libusb_hotplug
+ * Convenience macro when not using any flags */
+#define LIBUSB_HOTPLUG_NO_FLAGS 0
 
 /** \ingroup libusb_hotplug
  * Wildcard matching for hotplug events */
@@ -2000,9 +2001,10 @@ typedef int (LIBUSB_CALL *libusb_hotplug_callback_fn)(libusb_context *ctx,
  * Since version 1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102
  *
  * \param[in] ctx context to register this callback with
- * \param[in] events bitwise or of events that will trigger this callback. See \ref
- *            libusb_hotplug_event
- * \param[in] flags hotplug callback flags. See \ref libusb_hotplug_flag
+ * \param[in] events bitwise or of hotplug events that will trigger this callback.
+ *            See \ref libusb_hotplug_event
+ * \param[in] flags bitwise or of hotplug flags that affect registration.
+ *            See \ref libusb_hotplug_flag
  * \param[in] vendor_id the vendor id to match or \ref LIBUSB_HOTPLUG_MATCH_ANY
  * \param[in] product_id the product id to match or \ref LIBUSB_HOTPLUG_MATCH_ANY
  * \param[in] dev_class the device class to match or \ref LIBUSB_HOTPLUG_MATCH_ANY
@@ -2012,7 +2014,7 @@ typedef int (LIBUSB_CALL *libusb_hotplug_callback_fn)(libusb_context *ctx,
  * \returns LIBUSB_SUCCESS on success LIBUSB_ERROR code on failure
  */
 int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
-	libusb_hotplug_event events, libusb_hotplug_flag flags,
+	int events, int flags,
 	int vendor_id, int product_id, int dev_class,
 	libusb_hotplug_callback_fn cb_fn, void *user_data,
 	libusb_hotplug_callback_handle *callback_handle);
