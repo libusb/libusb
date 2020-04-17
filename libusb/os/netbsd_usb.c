@@ -228,7 +228,7 @@ netbsd_get_device_descriptor(struct libusb_device *dev, unsigned char *buf,
 
 	usbi_dbg(" ");
 
-	memcpy(buf, &dpriv->ddesc, DEVICE_DESC_LENGTH);
+	memcpy(buf, &dpriv->ddesc, LIBUSB_DT_DEVICE_SIZE);
 
 	*host_endian = 0;
 

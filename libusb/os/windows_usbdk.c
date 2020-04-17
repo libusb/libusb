@@ -361,7 +361,7 @@ static int usbdk_get_device_descriptor(struct libusb_device *dev, unsigned char 
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
 
-	memcpy(buffer, &priv->info.DeviceDescriptor, DEVICE_DESC_LENGTH);
+	memcpy(buffer, &priv->info.DeviceDescriptor, LIBUSB_DT_DEVICE_SIZE);
 
 	return LIBUSB_SUCCESS;
 }

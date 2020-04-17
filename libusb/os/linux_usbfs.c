@@ -522,7 +522,7 @@ static int op_get_device_descriptor(struct libusb_device *dev,
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
 
 	*host_endian = priv->sysfs_dir != NULL;
-	memcpy(buffer, priv->descriptors, DEVICE_DESC_LENGTH);
+	memcpy(buffer, priv->descriptors, LIBUSB_DT_DEVICE_SIZE);
 
 	return 0;
 }
@@ -706,8 +706,8 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 	*host_endian = 0;
 
 	/* Skip device header */
-	descriptors += DEVICE_DESC_LENGTH;
-	size -= DEVICE_DESC_LENGTH;
+	descriptors += LIBUSB_DT_DEVICE_SIZE;
+	size -= LIBUSB_DT_DEVICE_SIZE;
 
 	/* Seek till the config is found, or till "EOF" */
 	while (1) {
@@ -764,8 +764,8 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 	*host_endian = 0;
 
 	/* Skip device header */
-	descriptors += DEVICE_DESC_LENGTH;
-	size -= DEVICE_DESC_LENGTH;
+	descriptors += LIBUSB_DT_DEVICE_SIZE;
+	size -= LIBUSB_DT_DEVICE_SIZE;
 
 	/* Seek till the config is found, or till "EOF" */
 	for (i = 0; ; i++) {
@@ -900,7 +900,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	if (fd != wrapped_fd)
 		close(fd);
 
-	if (priv->descriptors_len < DEVICE_DESC_LENGTH) {
+	if (priv->descriptors_len < LIBUSB_DT_DEVICE_SIZE) {
 		usbi_err(ctx, "short descriptor read (%d)", priv->descriptors_len);
 		return LIBUSB_ERROR_IO;
 	}
@@ -918,10 +918,10 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		 * config. just assume the first one is active. */
 		usbi_warn(ctx, "Missing rw usbfs access; cannot determine "
 			       "active configuration descriptor");
-		if (priv->descriptors_len >= (DEVICE_DESC_LENGTH + LIBUSB_DT_CONFIG_SIZE)) {
+		if (priv->descriptors_len >= (LIBUSB_DT_DEVICE_SIZE + LIBUSB_DT_CONFIG_SIZE)) {
 			struct usbi_configuration_descriptor *config;
 
-			config = (struct usbi_configuration_descriptor *)(priv->descriptors + DEVICE_DESC_LENGTH);
+			config = (struct usbi_configuration_descriptor *)(priv->descriptors + LIBUSB_DT_DEVICE_SIZE);
 			priv->active_config = config->bConfigurationValue;
 		} else {
 			priv->active_config = -1; /* No config dt */

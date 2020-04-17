@@ -665,7 +665,7 @@ static int darwin_get_device_descriptor(struct libusb_device *dev, unsigned char
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
 
   /* return cached copy */
-  memmove (buffer, &(priv->dev_descriptor), DEVICE_DESC_LENGTH);
+  memmove (buffer, &(priv->dev_descriptor), LIBUSB_DT_DEVICE_SIZE);
 
   *host_endian = 0;
 

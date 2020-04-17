@@ -104,8 +104,6 @@
 extern "C" {
 #endif
 
-#define DEVICE_DESC_LENGTH	18
-
 #define USB_MAXENDPOINTS	32
 #define USB_MAXINTERFACES	32
 #define USB_MAXCONFIG		8
@@ -861,7 +859,7 @@ struct usbi_os_backend {
 	 * to retrieve it from a kernel interface (some Linux setups can do this)
 	 * still without generating bus I/O.
 	 *
-	 * This function is expected to write DEVICE_DESC_LENGTH (18) bytes into
+	 * This function is expected to write LIBUSB_DT_DEVICE_SIZE (18) bytes into
 	 * buffer, which is guaranteed to be big enough.
 	 *
 	 * This function is called when sanity-checking a device before adding

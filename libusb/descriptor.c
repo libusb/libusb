@@ -23,12 +23,7 @@
 
 #include <string.h>
 
-#define DESC_HEADER_LENGTH		2
-#define DEVICE_DESC_LENGTH		18
-#define CONFIG_DESC_LENGTH		9
-#define INTERFACE_DESC_LENGTH		9
-#define ENDPOINT_DESC_LENGTH		7
-#define ENDPOINT_AUDIO_DESC_LENGTH	9
+#define DESC_HEADER_LENGTH	2
 
 /** @defgroup libusb_desc USB descriptors
  * This page details how to examine the various standard USB descriptors
@@ -116,9 +111,9 @@ static int parse_endpoint(struct libusb_context *ctx,
 			  size, header->bLength);
 		return parsed;
 	}
-	if (header->bLength >= ENDPOINT_AUDIO_DESC_LENGTH)
+	if (header->bLength >= LIBUSB_DT_ENDPOINT_AUDIO_SIZE)
 		parse_descriptor(buffer, "bbbbwbbb", endpoint, host_endian);
-	else if (header->bLength >= ENDPOINT_DESC_LENGTH)
+	else if (header->bLength >= LIBUSB_DT_ENDPOINT_SIZE)
 		parse_descriptor(buffer, "bbbbwb", endpoint, host_endian);
 	else {
 		usbi_err(ctx, "invalid endpoint bLength (%d)", header->bLength);
@@ -217,7 +212,7 @@ static int parse_interface(libusb_context *ctx,
 
 	usb_interface->num_altsetting = 0;
 
-	while (size >= INTERFACE_DESC_LENGTH) {
+	while (size >= LIBUSB_DT_INTERFACE_SIZE) {
 		struct libusb_interface_descriptor *altsetting =
 			(struct libusb_interface_descriptor *) usb_interface->altsetting;
 		altsetting = usbi_reallocf(altsetting,
@@ -236,7 +231,7 @@ static int parse_interface(libusb_context *ctx,
 				 ifp->bDescriptorType, LIBUSB_DT_INTERFACE);
 			return parsed;
 		}
-		if (ifp->bLength < INTERFACE_DESC_LENGTH) {
+		if (ifp->bLength < LIBUSB_DT_INTERFACE_SIZE) {
 			usbi_err(ctx, "invalid interface bLength (%d)",
 				 ifp->bLength);
 			r = LIBUSB_ERROR_IO;

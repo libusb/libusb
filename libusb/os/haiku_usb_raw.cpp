@@ -78,7 +78,7 @@ static int
 haiku_get_device_descriptor(struct libusb_device *device, unsigned char *buffer, int *host_endian)
 {
 	USBDevice *dev = *((USBDevice **)usbi_get_device_priv(device));
-	memcpy(buffer, dev->Descriptor(), DEVICE_DESC_LENGTH);
+	memcpy(buffer, dev->Descriptor(), LIBUSB_DT_DEVICE_SIZE);
 	*host_endian = 0;
 	return LIBUSB_SUCCESS;
 }

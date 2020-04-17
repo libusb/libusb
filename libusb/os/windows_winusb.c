@@ -1519,7 +1519,7 @@ static int winusb_get_device_descriptor(struct libusb_device *dev, unsigned char
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
 
-	memcpy(buffer, &priv->dev_descriptor, DEVICE_DESC_LENGTH);
+	memcpy(buffer, &priv->dev_descriptor, LIBUSB_DT_DEVICE_SIZE);
 	return LIBUSB_SUCCESS;
 }
 
