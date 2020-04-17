@@ -30,41 +30,47 @@
  * for detected devices
  */
 
-static void parse_descriptor(const unsigned char *source, const char *descriptor, void *dest)
+#define READ_LE16(p) ((uint16_t)	\
+	(((uint16_t)((p)[1]) << 8) |	\
+	 ((uint16_t)((p)[0]))))
+
+#define READ_LE32(p) ((uint32_t)	\
+	(((uint32_t)((p)[3]) << 24) |	\
+	 ((uint32_t)((p)[2]) << 16) |	\
+	 ((uint32_t)((p)[1]) <<  8) |	\
+	 ((uint32_t)((p)[0]))))
+
+static void parse_descriptor(const void *source, const char *descriptor, void *dest)
 {
-	const unsigned char *sp = source;
-	unsigned char *dp = dest;
-	uint16_t w;
-	const char *cp;
-	uint32_t d;
+	const uint8_t *sp = source;
+	uint8_t *dp = dest;
+	char field_type;
 
-	for (cp = descriptor; *cp; cp++) {
-		switch (*cp) {
-			case 'b':	/* 8-bit byte */
-				*dp++ = *sp++;
-				break;
-			case 'w':	/* 16-bit word, convert from little endian to CPU */
-				dp += ((uintptr_t)dp & 1);	/* Align to word boundary */
+	while (*descriptor) {
+		field_type = *descriptor++;
+		switch (field_type) {
+		case 'b':	/* 8-bit byte */
+			*dp++ = *sp++;
+			break;
+		case 'w':	/* 16-bit word, convert from little endian to CPU */
+			dp += ((uintptr_t)dp & 1);	/* Align to word boundary */
 
-				w = (uint16_t)((sp[1] << 8) | sp[0]);
-				*((uint16_t *)dp) = w;
-				sp += 2;
-				dp += 2;
-				break;
-			case 'd':	/* 32-bit word, convert from little endian to CPU */
-				dp += ((uintptr_t)dp & 1);	/* Align to word boundary */
+			*((uint16_t *)dp) = READ_LE16(sp);
+			sp += 2;
+			dp += 2;
+			break;
+		case 'd':	/* 32-bit word, convert from little endian to CPU */
+			dp += ((uintptr_t)dp & 1);	/* Align to word boundary */
 
-				d = (uint32_t)((sp[3] << 24) | (sp[2] << 16) |
-							   (sp[1] << 8) | sp[0]);
-				*((uint32_t *)dp) = d;
-				sp += 4;
-				dp += 4;
-				break;
-			case 'u':	/* 16 byte UUID */
-				memcpy(dp, sp, 16);
-				sp += 16;
-				dp += 16;
-				break;
+			*((uint32_t *)dp) = READ_LE32(sp);
+			sp += 4;
+			dp += 4;
+			break;
+		case 'u':	/* 16 byte UUID */
+			memcpy(dp, sp, 16);
+			sp += 16;
+			dp += 16;
+			break;
 		}
 	}
 }
@@ -950,7 +956,7 @@ int API_EXPORTED libusb_get_usb_2_0_extension_descriptor(
 	if (!_usb_2_0_extension)
 		return LIBUSB_ERROR_NO_MEM;
 
-	parse_descriptor((unsigned char *)dev_cap, "bbbd", _usb_2_0_extension);
+	parse_descriptor(dev_cap, "bbbd", _usb_2_0_extension);
 
 	*usb_2_0_extension = _usb_2_0_extension;
 	return LIBUSB_SUCCESS;
@@ -1006,7 +1012,7 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
 	if (!_ss_usb_device_cap)
 		return LIBUSB_ERROR_NO_MEM;
 
-	parse_descriptor((unsigned char *)dev_cap, "bbbbwbbw", _ss_usb_device_cap);
+	parse_descriptor(dev_cap, "bbbbwbbw", _ss_usb_device_cap);
 
 	*ss_usb_device_cap = _ss_usb_device_cap;
 	return LIBUSB_SUCCESS;
@@ -1062,7 +1068,7 @@ int API_EXPORTED libusb_get_container_id_descriptor(struct libusb_context *ctx,
 	if (!_container_id)
 		return LIBUSB_ERROR_NO_MEM;
 
-	parse_descriptor((unsigned char *)dev_cap, "bbbbu", _container_id);
+	parse_descriptor(dev_cap, "bbbbu", _container_id);
 
 	*container_id = _container_id;
 	return LIBUSB_SUCCESS;
