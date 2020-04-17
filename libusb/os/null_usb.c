@@ -45,14 +45,14 @@ null_get_device_descriptor(struct libusb_device *dev, unsigned char *buf,
 
 static int
 null_get_active_config_descriptor(struct libusb_device *dev,
-    unsigned char *buf, size_t len, int *host_endian)
+    unsigned char *buf, size_t len)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static int
 null_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
-    unsigned char *buf, size_t len, int *host_endian)
+    unsigned char *buf, size_t len)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }

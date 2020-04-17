@@ -694,7 +694,7 @@ static int seek_to_next_config(struct libusb_device *dev,
 }
 
 static int op_get_config_descriptor_by_value(struct libusb_device *dev,
-	uint8_t value, unsigned char **buffer, int *host_endian)
+	uint8_t value, unsigned char **buffer)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
 	unsigned char *descriptors = priv->descriptors;
@@ -702,8 +702,6 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 	struct usbi_configuration_descriptor *config;
 
 	*buffer = NULL;
-	/* Unlike the device desc. config descs. are always in raw format */
-	*host_endian = 0;
 
 	/* Skip device header */
 	descriptors += LIBUSB_DT_DEVICE_SIZE;
@@ -726,7 +724,7 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 }
 
 static int op_get_active_config_descriptor(struct libusb_device *dev,
-	unsigned char *buffer, size_t len, int *host_endian)
+	unsigned char *buffer, size_t len)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
 	int r, config;
@@ -743,8 +741,7 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 	if (config == -1)
 		return LIBUSB_ERROR_NOT_FOUND;
 
-	r = op_get_config_descriptor_by_value(dev, config, &config_desc,
-					      host_endian);
+	r = op_get_config_descriptor_by_value(dev, config, &config_desc);
 	if (r < 0)
 		return r;
 
@@ -754,14 +751,11 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 }
 
 static int op_get_config_descriptor(struct libusb_device *dev,
-	uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
+	uint8_t config_index, unsigned char *buffer, size_t len)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
 	unsigned char *descriptors = priv->descriptors;
 	int i, r, size = priv->descriptors_len;
-
-	/* Unlike the device desc. config descs. are always in raw format */
-	*host_endian = 0;
 
 	/* Skip device header */
 	descriptors += LIBUSB_DT_DEVICE_SIZE;

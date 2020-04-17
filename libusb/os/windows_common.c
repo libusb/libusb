@@ -602,31 +602,27 @@ static int windows_get_device_descriptor(struct libusb_device *dev,
 	unsigned char *buffer, int *host_endian)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
-	*host_endian = 0;
 	return priv->backend->get_device_descriptor(dev, buffer);
 }
 
 static int windows_get_active_config_descriptor(struct libusb_device *dev,
-	unsigned char *buffer, size_t len, int *host_endian)
+	unsigned char *buffer, size_t len)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
-	*host_endian = 0;
 	return priv->backend->get_active_config_descriptor(dev, buffer, len);
 }
 
 static int windows_get_config_descriptor(struct libusb_device *dev,
-	uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian)
+	uint8_t config_index, unsigned char *buffer, size_t len)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
-	*host_endian = 0;
 	return priv->backend->get_config_descriptor(dev, config_index, buffer, len);
 }
 
 static int windows_get_config_descriptor_by_value(struct libusb_device *dev,
-	uint8_t bConfigurationValue, unsigned char **buffer, int *host_endian)
+	uint8_t bConfigurationValue, unsigned char **buffer)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
-	*host_endian = 0;
 	return priv->backend->get_config_descriptor_by_value(dev, bConfigurationValue, buffer);
 }
 

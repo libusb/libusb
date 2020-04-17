@@ -55,9 +55,9 @@ static void netbsd_close(struct libusb_device_handle *);
 static int netbsd_get_device_descriptor(struct libusb_device *, unsigned char *,
     int *);
 static int netbsd_get_active_config_descriptor(struct libusb_device *,
-    unsigned char *, size_t, int *);
+    unsigned char *, size_t);
 static int netbsd_get_config_descriptor(struct libusb_device *, uint8_t,
-    unsigned char *, size_t, int *);
+    unsigned char *, size_t);
 
 static int netbsd_get_configuration(struct libusb_device_handle *, int *);
 static int netbsd_set_configuration(struct libusb_device_handle *, int);
@@ -230,14 +230,12 @@ netbsd_get_device_descriptor(struct libusb_device *dev, unsigned char *buf,
 
 	memcpy(buf, &dpriv->ddesc, LIBUSB_DT_DEVICE_SIZE);
 
-	*host_endian = 0;
-
 	return (LIBUSB_SUCCESS);
 }
 
 int
 netbsd_get_active_config_descriptor(struct libusb_device *dev,
-    unsigned char *buf, size_t len, int *host_endian)
+    unsigned char *buf, size_t len)
 {
 	struct device_priv *dpriv = usbi_get_device_priv(dev);
 	usb_config_descriptor_t *ucd;
@@ -249,14 +247,12 @@ netbsd_get_active_config_descriptor(struct libusb_device *dev,
 
 	memcpy(buf, dpriv->cdesc, len);
 
-	*host_endian = 0;
-
 	return len;
 }
 
 int
 netbsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
-    unsigned char *buf, size_t len, int *host_endian)
+    unsigned char *buf, size_t len)
 {
 	struct device_priv *dpriv = usbi_get_device_priv(dev);
 	struct usb_full_desc ufd;
@@ -286,8 +282,6 @@ netbsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 
 	if (dpriv->fd < 0)
 		close(fd);
-
-	*host_endian = 0;
 
 	return len;
 }

@@ -887,8 +887,7 @@ struct usbi_os_backend {
 	 * return an error code.
 	 *
 	 * This function is expected to return the descriptor in bus-endian format
-	 * (LE). If it returns the multi-byte values in host-endian format,
-	 * set the host_endian output parameter to "1".
+	 * (LE).
 	 *
 	 * Return:
 	 * - 0 on success
@@ -896,7 +895,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*get_active_config_descriptor)(struct libusb_device *device,
-		unsigned char *buffer, size_t len, int *host_endian);
+		unsigned char *buffer, size_t len);
 
 	/* Get a specific configuration descriptor for a device.
 	 *
@@ -914,14 +913,12 @@ struct usbi_os_backend {
 	 * return an error code.
 	 *
 	 * This function is expected to return the descriptor in bus-endian format
-	 * (LE). If it returns the multi-byte values in host-endian format,
-	 * set the host_endian output parameter to "1".
+	 * (LE).
 	 *
 	 * Return the length read on success or a LIBUSB_ERROR code on failure.
 	 */
 	int (*get_config_descriptor)(struct libusb_device *device,
-		uint8_t config_index, unsigned char *buffer, size_t len,
-		int *host_endian);
+		uint8_t config_index, unsigned char *buffer, size_t len);
 
 	/* Like get_config_descriptor but then by bConfigurationValue instead
 	 * of by index.
@@ -936,8 +933,7 @@ struct usbi_os_backend {
 	 * or a LIBUSB_ERROR code on failure.
 	 */
 	int (*get_config_descriptor_by_value)(struct libusb_device *device,
-		uint8_t bConfigurationValue, unsigned char **buffer,
-		int *host_endian);
+		uint8_t bConfigurationValue, unsigned char **buffer);
 
 	/* Get the bConfigurationValue for the active configuration for a device.
 	 * Optional. This should only be implemented if you can retrieve it from

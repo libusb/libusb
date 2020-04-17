@@ -75,7 +75,7 @@ static const char *darwin_device_class = kIOUSBDeviceClassName;
 /* async event thread */
 static pthread_t libusb_darwin_at;
 
-static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian);
+static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len);
 static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int iface);
 static int darwin_release_interface(struct libusb_device_handle *dev_handle, int iface);
 static int darwin_reset_device(struct libusb_device_handle *dev_handle);
@@ -667,8 +667,6 @@ static int darwin_get_device_descriptor(struct libusb_device *dev, unsigned char
   /* return cached copy */
   memmove (buffer, &(priv->dev_descriptor), LIBUSB_DT_DEVICE_SIZE);
 
-  *host_endian = 0;
-
   return LIBUSB_SUCCESS;
 }
 
@@ -694,7 +692,7 @@ static int get_configuration_index (struct libusb_device *dev, int config_value)
   return LIBUSB_ERROR_NOT_FOUND;
 }
 
-static int darwin_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len, int *host_endian) {
+static int darwin_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len) {
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   int config_index;
 
@@ -706,10 +704,10 @@ static int darwin_get_active_config_descriptor(struct libusb_device *dev, unsign
     return config_index;
 
   assert(config_index >= 0 && config_index <= UINT8_MAX);
-  return darwin_get_config_descriptor (dev, (UInt8)config_index, buffer, len, host_endian);
+  return darwin_get_config_descriptor (dev, (UInt8)config_index, buffer, len);
 }
 
-static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len, int *host_endian) {
+static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len) {
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   IOUSBConfigurationDescriptorPtr desc;
   IOReturn kresult;
@@ -725,9 +723,6 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
       len = libusb_le16_to_cpu(desc->wTotalLength);
 
     memmove (buffer, desc, len);
-
-    /* GetConfigurationDescriptorPtr returns the descriptor in USB bus order */
-    *host_endian = 0;
   }
 
   ret = darwin_to_libusb (kresult);

@@ -55,9 +55,9 @@ static void obsd_close(struct libusb_device_handle *);
 static int obsd_get_device_descriptor(struct libusb_device *, unsigned char *,
     int *);
 static int obsd_get_active_config_descriptor(struct libusb_device *,
-    unsigned char *, size_t, int *);
+    unsigned char *, size_t);
 static int obsd_get_config_descriptor(struct libusb_device *, uint8_t,
-    unsigned char *, size_t, int *);
+    unsigned char *, size_t);
 
 static int obsd_get_configuration(struct libusb_device_handle *, int *);
 static int obsd_set_configuration(struct libusb_device_handle *, int);
@@ -265,14 +265,12 @@ obsd_get_device_descriptor(struct libusb_device *dev, unsigned char *buf,
 
 	memcpy(buf, &dpriv->ddesc, LIBUSB_DT_DEVICE_SIZE);
 
-	*host_endian = 0;
-
 	return (LIBUSB_SUCCESS);
 }
 
 int
 obsd_get_active_config_descriptor(struct libusb_device *dev,
-    unsigned char *buf, size_t len, int *host_endian)
+    unsigned char *buf, size_t len)
 {
 	struct device_priv *dpriv = usbi_get_device_priv(dev);
 	usb_config_descriptor_t *ucd = (usb_config_descriptor_t *)dpriv->cdesc;
@@ -283,14 +281,12 @@ obsd_get_active_config_descriptor(struct libusb_device *dev,
 
 	memcpy(buf, dpriv->cdesc, len);
 
-	*host_endian = 0;
-
 	return (len);
 }
 
 int
 obsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
-    unsigned char *buf, size_t len, int *host_endian)
+    unsigned char *buf, size_t len)
 {
 	struct usb_device_fdesc udf;
 	int fd, err;
@@ -312,8 +308,6 @@ obsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 		return _errno_to_libusb(err);
 	}
 	close(fd);
-
-	*host_endian = 0;
 
 	return (len);
 }
