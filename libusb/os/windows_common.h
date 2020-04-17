@@ -299,13 +299,13 @@ struct windows_backend {
 		struct discovered_devs **discdevs);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
-	int (*get_device_descriptor)(struct libusb_device *device, unsigned char *buffer);
+	int (*get_device_descriptor)(struct libusb_device *device, void *buffer);
 	int (*get_active_config_descriptor)(struct libusb_device *device,
-		unsigned char *buffer, size_t len);
+		void *buffer, size_t len);
 	int (*get_config_descriptor)(struct libusb_device *device,
-		uint8_t config_index, unsigned char *buffer, size_t len);
+		uint8_t config_index, void *buffer, size_t len);
 	int (*get_config_descriptor_by_value)(struct libusb_device *device,
-		uint8_t bConfigurationValue, unsigned char **buffer);
+		uint8_t bConfigurationValue, void **buffer);
 	int (*get_configuration)(struct libusb_device_handle *dev_handle, int *config);
 	int (*set_configuration)(struct libusb_device_handle *dev_handle, int config);
 	int (*claim_interface)(struct libusb_device_handle *dev_handle, int interface_number);

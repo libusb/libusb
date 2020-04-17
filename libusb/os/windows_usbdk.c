@@ -357,7 +357,7 @@ func_exit:
 	return r;
 }
 
-static int usbdk_get_device_descriptor(struct libusb_device *dev, unsigned char *buffer)
+static int usbdk_get_device_descriptor(struct libusb_device *dev, void *buffer)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
 
@@ -366,7 +366,7 @@ static int usbdk_get_device_descriptor(struct libusb_device *dev, unsigned char 
 	return LIBUSB_SUCCESS;
 }
 
-static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len)
+static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
 	PUSB_CONFIGURATION_DESCRIPTOR config_header;
@@ -380,7 +380,7 @@ static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config
 }
 
 static int usbdk_get_config_descriptor_by_value(struct libusb_device *dev, uint8_t bConfigurationValue,
-	unsigned char **buffer)
+	void **buffer)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
 	PUSB_CONFIGURATION_DESCRIPTOR config_header;
@@ -389,7 +389,7 @@ static int usbdk_get_config_descriptor_by_value(struct libusb_device *dev, uint8
 	for (index = 0; index < dev->device_descriptor.bNumConfigurations; index++) {
 		config_header = priv->config_descriptors[index];
 		if (config_header->bConfigurationValue == bConfigurationValue) {
-			*buffer = (unsigned char *)priv->config_descriptors[index];
+			*buffer = priv->config_descriptors[index];
 			return (int)config_header->wTotalLength;
 		}
 	}
@@ -397,7 +397,7 @@ static int usbdk_get_config_descriptor_by_value(struct libusb_device *dev, uint8
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
-static int usbdk_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len)
+static int usbdk_get_active_config_descriptor(struct libusb_device *dev, void *buffer, size_t len)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
 

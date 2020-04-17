@@ -517,7 +517,7 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 }
 
 static int op_get_device_descriptor(struct libusb_device *dev,
-	unsigned char *buffer, int *host_endian)
+	void *buffer, int *host_endian)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
 
@@ -694,7 +694,7 @@ static int seek_to_next_config(struct libusb_device *dev,
 }
 
 static int op_get_config_descriptor_by_value(struct libusb_device *dev,
-	uint8_t value, unsigned char **buffer)
+	uint8_t value, void **buffer)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
 	unsigned char *descriptors = priv->descriptors;
@@ -724,11 +724,11 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 }
 
 static int op_get_active_config_descriptor(struct libusb_device *dev,
-	unsigned char *buffer, size_t len)
+	void *buffer, size_t len)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
 	int r, config;
-	unsigned char *config_desc;
+	void *config_desc;
 
 	if (priv->sysfs_dir) {
 		r = sysfs_get_active_config(dev, &config);
@@ -751,7 +751,7 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 }
 
 static int op_get_config_descriptor(struct libusb_device *dev,
-	uint8_t config_index, unsigned char *buffer, size_t len)
+	uint8_t config_index, void *buffer, size_t len)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
 	unsigned char *descriptors = priv->descriptors;
@@ -1570,11 +1570,10 @@ static int op_free_streams(struct libusb_device_handle *handle,
 				endpoints, num_endpoints);
 }
 
-static unsigned char *op_dev_mem_alloc(struct libusb_device_handle *handle,
-	size_t len)
+static void *op_dev_mem_alloc(struct libusb_device_handle *handle, size_t len)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
-	unsigned char *buffer;
+	void *buffer;
 
 	buffer = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, hpriv->fd, 0);
 	if (buffer == MAP_FAILED) {
@@ -1584,8 +1583,8 @@ static unsigned char *op_dev_mem_alloc(struct libusb_device_handle *handle,
 	return buffer;
 }
 
-static int op_dev_mem_free(struct libusb_device_handle *handle,
-	unsigned char *buffer, size_t len)
+static int op_dev_mem_free(struct libusb_device_handle *handle, void *buffer,
+	size_t len)
 {
 	if (munmap(buffer, len) != 0) {
 		usbi_err(HANDLE_CTX(handle), "free dev mem failed, errno=%d", errno);

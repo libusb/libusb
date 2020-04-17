@@ -75,7 +75,7 @@ static const char *darwin_device_class = kIOUSBDeviceClassName;
 /* async event thread */
 static pthread_t libusb_darwin_at;
 
-static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len);
+static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len);
 static int darwin_claim_interface(struct libusb_device_handle *dev_handle, int iface);
 static int darwin_release_interface(struct libusb_device_handle *dev_handle, int iface);
 static int darwin_reset_device(struct libusb_device_handle *dev_handle);
@@ -661,7 +661,7 @@ static void darwin_exit (struct libusb_context *ctx) {
   pthread_mutex_unlock (&libusb_darwin_init_mutex);
 }
 
-static int darwin_get_device_descriptor(struct libusb_device *dev, unsigned char *buffer, int *host_endian) {
+static int darwin_get_device_descriptor(struct libusb_device *dev, void *buffer, int *host_endian) {
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
 
   /* return cached copy */
@@ -692,7 +692,7 @@ static int get_configuration_index (struct libusb_device *dev, int config_value)
   return LIBUSB_ERROR_NOT_FOUND;
 }
 
-static int darwin_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len) {
+static int darwin_get_active_config_descriptor(struct libusb_device *dev, void *buffer, size_t len) {
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   int config_index;
 
@@ -707,7 +707,7 @@ static int darwin_get_active_config_descriptor(struct libusb_device *dev, unsign
   return darwin_get_config_descriptor (dev, (UInt8)config_index, buffer, len);
 }
 
-static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len) {
+static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len) {
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   IOUSBConfigurationDescriptorPtr desc;
   IOReturn kresult;

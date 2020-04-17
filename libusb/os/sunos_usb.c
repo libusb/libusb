@@ -63,11 +63,11 @@ static int sunos_get_device_list(struct libusb_context *,
 static int sunos_open(struct libusb_device_handle *);
 static void sunos_close(struct libusb_device_handle *);
 static int sunos_get_device_descriptor(struct libusb_device *,
-    uint8_t *, int *);
+    void *, int *);
 static int sunos_get_active_config_descriptor(struct libusb_device *,
-    uint8_t *, size_t);
+    void *, size_t);
 static int sunos_get_config_descriptor(struct libusb_device *, uint8_t,
-    uint8_t *, size_t);
+    void *, size_t);
 static int sunos_get_configuration(struct libusb_device_handle *, int *);
 static int sunos_set_configuration(struct libusb_device_handle *, int);
 static int sunos_claim_interface(struct libusb_device_handle *, int);
@@ -1020,7 +1020,7 @@ sunos_close(struct libusb_device_handle *handle)
 }
 
 int
-sunos_get_device_descriptor(struct libusb_device *dev, uint8_t *buf,
+sunos_get_device_descriptor(struct libusb_device *dev, void *buf,
     int *host_endian)
 {
 	sunos_dev_priv_t *dpriv = usbi_get_device_priv(dev);
@@ -1032,7 +1032,7 @@ sunos_get_device_descriptor(struct libusb_device *dev, uint8_t *buf,
 
 int
 sunos_get_active_config_descriptor(struct libusb_device *dev,
-    uint8_t *buf, size_t len)
+    void *buf, size_t len)
 {
 	sunos_dev_priv_t *dpriv = usbi_get_device_priv(dev);
 	struct libusb_config_descriptor *cfg;
@@ -1076,7 +1076,7 @@ sunos_get_active_config_descriptor(struct libusb_device *dev,
 
 int
 sunos_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
-    uint8_t *buf, size_t len)
+    void *buf, size_t len)
 {
 	/* XXX */
 	return(sunos_get_active_config_descriptor(dev, buf, len));

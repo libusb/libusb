@@ -489,8 +489,7 @@ int usbi_device_cache_descriptor(libusb_device *dev)
 {
 	int r, host_endian = 0;
 
-	r = usbi_backend.get_device_descriptor(dev, (unsigned char *) &dev->device_descriptor,
-						&host_endian);
+	r = usbi_backend.get_device_descriptor(dev, &dev->device_descriptor, &host_endian);
 	if (r < 0)
 		return r;
 
@@ -669,9 +668,10 @@ int API_EXPORTED libusb_get_config_descriptor_by_value(libusb_device *dev,
 	uint8_t bConfigurationValue, struct libusb_config_descriptor **config)
 {
 	int r, idx;
-	unsigned char *buf = NULL;
 
 	if (usbi_backend.get_config_descriptor_by_value) {
+		void *buf;
+
 		r = usbi_backend.get_config_descriptor_by_value(dev,
 			bConfigurationValue, &buf);
 		if (r < 0)

@@ -872,8 +872,8 @@ struct usbi_os_backend {
 	 *
 	 * Return 0 on success or a LIBUSB_ERROR code on failure.
 	 */
-	int (*get_device_descriptor)(struct libusb_device *device,
-		unsigned char *buffer, int *host_endian);
+	int (*get_device_descriptor)(struct libusb_device *device, void *buffer,
+		int *host_endian);
 
 	/* Get the ACTIVE configuration descriptor for a device.
 	 *
@@ -895,7 +895,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*get_active_config_descriptor)(struct libusb_device *device,
-		unsigned char *buffer, size_t len);
+		void *buffer, size_t len);
 
 	/* Get a specific configuration descriptor for a device.
 	 *
@@ -918,7 +918,7 @@ struct usbi_os_backend {
 	 * Return the length read on success or a LIBUSB_ERROR code on failure.
 	 */
 	int (*get_config_descriptor)(struct libusb_device *device,
-		uint8_t config_index, unsigned char *buffer, size_t len);
+		uint8_t config_index, void *buffer, size_t len);
 
 	/* Like get_config_descriptor but then by bConfigurationValue instead
 	 * of by index.
@@ -933,7 +933,7 @@ struct usbi_os_backend {
 	 * or a LIBUSB_ERROR code on failure.
 	 */
 	int (*get_config_descriptor_by_value)(struct libusb_device *device,
-		uint8_t bConfigurationValue, unsigned char **buffer);
+		uint8_t bConfigurationValue, void **buffer);
 
 	/* Get the bConfigurationValue for the active configuration for a device.
 	 * Optional. This should only be implemented if you can retrieve it from
@@ -1067,12 +1067,11 @@ struct usbi_os_backend {
 	/* Allocate persistent DMA memory for the given device, suitable for
 	 * zerocopy. May return NULL on failure. Optional to implement.
 	 */
-	unsigned char *(*dev_mem_alloc)(struct libusb_device_handle *handle,
-		size_t len);
+	void *(*dev_mem_alloc)(struct libusb_device_handle *handle, size_t len);
 
 	/* Free memory allocated by dev_mem_alloc. */
-	int (*dev_mem_free)(struct libusb_device_handle *handle,
-		unsigned char *buffer, size_t len);
+	int (*dev_mem_free)(struct libusb_device_handle *handle, void *buffer,
+		size_t len);
 
 	/* Determine if a kernel driver is active on an interface. Optional.
 	 *

@@ -36,7 +36,7 @@ struct device_priv {
 	char *devname;				/* name of the ugen(4) node */
 	int fd;					/* device file descriptor */
 
-	unsigned char *cdesc;			/* active config descriptor */
+	usb_config_descriptor_t *cdesc;		/* active config descriptor */
 	usb_device_descriptor_t ddesc;		/* usb device descriptor */
 };
 
@@ -52,12 +52,12 @@ static int obsd_get_device_list(struct libusb_context *,
 static int obsd_open(struct libusb_device_handle *);
 static void obsd_close(struct libusb_device_handle *);
 
-static int obsd_get_device_descriptor(struct libusb_device *, unsigned char *,
+static int obsd_get_device_descriptor(struct libusb_device *, void *,
     int *);
 static int obsd_get_active_config_descriptor(struct libusb_device *,
-    unsigned char *, size_t);
+    void *, size_t);
 static int obsd_get_config_descriptor(struct libusb_device *, uint8_t,
-    unsigned char *, size_t);
+    void *, size_t);
 
 static int obsd_get_configuration(struct libusb_device_handle *, int *);
 static int obsd_set_configuration(struct libusb_device_handle *, int);
@@ -180,7 +180,6 @@ obsd_get_device_list(struct libusb_context * ctx,
 
 				dpriv = usbi_get_device_priv(dev);
 				dpriv->fd = -1;
-				dpriv->cdesc = NULL;
 				dpriv->devname = udevname;
 
 				dd.udd_bus = di.udi_bus;
@@ -256,7 +255,7 @@ obsd_close(struct libusb_device_handle *handle)
 }
 
 int
-obsd_get_device_descriptor(struct libusb_device *dev, unsigned char *buf,
+obsd_get_device_descriptor(struct libusb_device *dev, void *buf,
     int *host_endian)
 {
 	struct device_priv *dpriv = usbi_get_device_priv(dev);
@@ -270,12 +269,11 @@ obsd_get_device_descriptor(struct libusb_device *dev, unsigned char *buf,
 
 int
 obsd_get_active_config_descriptor(struct libusb_device *dev,
-    unsigned char *buf, size_t len)
+    void *buf, size_t len)
 {
 	struct device_priv *dpriv = usbi_get_device_priv(dev);
-	usb_config_descriptor_t *ucd = (usb_config_descriptor_t *)dpriv->cdesc;
 
-	len = MIN(len, UGETW(ucd->wTotalLength));
+	len = MIN(len, UGETW(dpriv->cdesc->wTotalLength));
 
 	usbi_dbg("len %zu", len);
 
@@ -286,7 +284,7 @@ obsd_get_active_config_descriptor(struct libusb_device *dev,
 
 int
 obsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
-    unsigned char *buf, size_t len)
+    void *buf, size_t len)
 {
 	struct usb_device_fdesc udf;
 	int fd, err;
@@ -316,9 +314,8 @@ int
 obsd_get_configuration(struct libusb_device_handle *handle, int *config)
 {
 	struct device_priv *dpriv = usbi_get_device_priv(handle->dev);
-	usb_config_descriptor_t *ucd = (usb_config_descriptor_t *)dpriv->cdesc;
 
-	*config = ucd->bConfigurationValue;
+	*config = dpriv->cdesc->bConfigurationValue;
 
 	usbi_dbg("bConfigurationValue %d", *config);
 
@@ -515,7 +512,7 @@ _cache_active_config_descriptor(struct libusb_device *dev)
 	struct device_priv *dpriv = usbi_get_device_priv(dev);
 	struct usb_device_cdesc udc;
 	struct usb_device_fdesc udf;
-	unsigned char* buf;
+	void *buf;
 	int fd, len, err;
 
 	if ((fd = _bus_open(dev->bus_number)) < 0)
@@ -535,7 +532,7 @@ _cache_active_config_descriptor(struct libusb_device *dev)
 	usbi_dbg("active bLength %d", udc.udc_desc.bLength);
 
 	len = UGETW(udc.udc_desc.wTotalLength);
-	buf = malloc(len);
+	buf = malloc((size_t)len);
 	if (buf == NULL)
 		return (LIBUSB_ERROR_NO_MEM);
 

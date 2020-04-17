@@ -1515,7 +1515,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	return r;
 }
 
-static int winusb_get_device_descriptor(struct libusb_device *dev, unsigned char *buffer)
+static int winusb_get_device_descriptor(struct libusb_device *dev, void *buffer)
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
 
@@ -1523,24 +1523,23 @@ static int winusb_get_device_descriptor(struct libusb_device *dev, unsigned char
 	return LIBUSB_SUCCESS;
 }
 
-static int winusb_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, unsigned char *buffer, size_t len)
+static int winusb_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len)
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
 	PUSB_CONFIGURATION_DESCRIPTOR config_header;
-	size_t size;
 
 	if ((priv->config_descriptor == NULL) || (priv->config_descriptor[config_index] == NULL))
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	config_header = priv->config_descriptor[config_index];
 
-	size = MIN(config_header->wTotalLength, len);
-	memcpy(buffer, priv->config_descriptor[config_index], size);
-	return (int)size;
+	len = MIN(len, config_header->wTotalLength);
+	memcpy(buffer, config_header, len);
+	return (int)len;
 }
 
 static int winusb_get_config_descriptor_by_value(struct libusb_device *dev, uint8_t bConfigurationValue,
-	unsigned char **buffer)
+	void **buffer)
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
 	PUSB_CONFIGURATION_DESCRIPTOR config_header;
@@ -1554,7 +1553,7 @@ static int winusb_get_config_descriptor_by_value(struct libusb_device *dev, uint
 		if (config_header == NULL)
 			continue;
 		if (config_header->bConfigurationValue == bConfigurationValue) {
-			*buffer = (unsigned char *)priv->config_descriptor[index];
+			*buffer = config_header;
 			return (int)config_header->wTotalLength;
 		}
 	}
@@ -1565,10 +1564,10 @@ static int winusb_get_config_descriptor_by_value(struct libusb_device *dev, uint
 /*
  * return the cached copy of the active config descriptor
  */
-static int winusb_get_active_config_descriptor(struct libusb_device *dev, unsigned char *buffer, size_t len)
+static int winusb_get_active_config_descriptor(struct libusb_device *dev, void *buffer, size_t len)
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
-	unsigned char *config_desc;
+	void *config_desc;
 	int r;
 
 	if (priv->active_config == 0)
@@ -1578,7 +1577,7 @@ static int winusb_get_active_config_descriptor(struct libusb_device *dev, unsign
 	if (r < 0)
 		return r;
 
-	len = MIN((size_t)r, len);
+	len = MIN(len, (size_t)r);
 	memcpy(buffer, config_desc, len);
 	return (int)len;
 }
