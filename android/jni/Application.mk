@@ -32,7 +32,7 @@ APP_CFLAGS := \
   -Werror=missing-prototypes \
   -Werror=strict-prototypes \
   -Werror=undef \
-  -Werror=unintialized
+  -Werror=uninitialized
 
 # Workaround for MIPS toolchain linker being unable to find liblog dependency
 # of shared object in NDK versions at least up to r9.
