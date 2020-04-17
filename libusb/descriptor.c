@@ -96,7 +96,7 @@ static int parse_endpoint(struct libusb_context *ctx,
 	struct libusb_endpoint_descriptor *endpoint, unsigned char *buffer,
 	int size, int host_endian)
 {
-	struct usb_descriptor_header header;
+	struct usbi_descriptor_header header;
 	unsigned char *extra;
 	unsigned char *begin;
 	int parsed = 0;
@@ -214,7 +214,7 @@ static int parse_interface(libusb_context *ctx,
 	int r;
 	int parsed = 0;
 	int interface_number = -1;
-	struct usb_descriptor_header header;
+	struct usbi_descriptor_header header;
 	struct libusb_interface_descriptor *ifp;
 	unsigned char *begin;
 
@@ -369,7 +369,7 @@ static int parse_configuration(struct libusb_context *ctx,
 {
 	int i;
 	int r;
-	struct usb_descriptor_header header;
+	struct usbi_descriptor_header header;
 	struct libusb_interface *usb_interface;
 
 	if (size < LIBUSB_DT_CONFIG_SIZE) {
@@ -750,7 +750,7 @@ int API_EXPORTED libusb_get_ss_endpoint_companion_descriptor(
 	const struct libusb_endpoint_descriptor *endpoint,
 	struct libusb_ss_endpoint_companion_descriptor **ep_comp)
 {
-	struct usb_descriptor_header header;
+	struct usbi_descriptor_header header;
 	int size = endpoint->extra_length;
 	const unsigned char *buffer = endpoint->extra;
 

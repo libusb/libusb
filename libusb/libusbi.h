@@ -536,11 +536,72 @@ enum usbi_transfer_timeout_flags {
 	 ((unsigned char *)(transfer)			\
 	  - PTR_ALIGN(sizeof(struct usbi_transfer))))
 
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
+
 /* All standard descriptors have these 2 fields in common */
-struct usb_descriptor_header {
-	uint8_t bLength;
-	uint8_t bDescriptorType;
-};
+struct usbi_descriptor_header {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+} LIBUSB_PACKED;
+
+struct usbi_device_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint16_t bcdUSB;
+	uint8_t  bDeviceClass;
+	uint8_t  bDeviceSubClass;
+	uint8_t  bDeviceProtocol;
+	uint8_t  bMaxPacketSize0;
+	uint16_t idVendor;
+	uint16_t idProduct;
+	uint16_t bcdDevice;
+	uint8_t  iManufacturer;
+	uint8_t  iProduct;
+	uint8_t  iSerialNumber;
+	uint8_t  bNumConfigurations;
+} LIBUSB_PACKED;
+
+struct usbi_configuration_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint16_t wTotalLength;
+	uint8_t  bNumInterfaces;
+	uint8_t  bConfigurationValue;
+	uint8_t  iConfiguration;
+	uint8_t  bmAttributes;
+	uint8_t  bMaxPower;
+} LIBUSB_PACKED;
+
+struct usbi_interface_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint8_t  bInterfaceNumber;
+	uint8_t  bAlternateSetting;
+	uint8_t  bNumEndpoints;
+	uint8_t  bInterfaceClass;
+	uint8_t  bInterfaceSubClass;
+	uint8_t  bInterfaceProtocol;
+	uint8_t  iInterface;
+} LIBUSB_PACKED;
+
+struct usbi_string_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint16_t wData[];
+} LIBUSB_PACKED;
+
+struct usbi_bos_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint16_t wTotalLength;
+	uint8_t  bNumDeviceCaps;
+} LIBUSB_PACKED;
+
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 
 /* shared data and functions */
 

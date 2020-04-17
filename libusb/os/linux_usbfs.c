@@ -613,7 +613,7 @@ int linux_get_device_address(struct libusb_context *ctx, int detached,
 static int seek_to_next_descriptor(struct libusb_context *ctx,
 	uint8_t descriptor_type, unsigned char *buffer, int size)
 {
-	struct usb_descriptor_header header;
+	struct usbi_descriptor_header header;
 	int i;
 
 	for (i = 0; size >= 0; i += header.bLength, size -= header.bLength) {
