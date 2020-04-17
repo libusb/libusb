@@ -26,6 +26,10 @@
 BRANCH_OFFSET=10000
 ################################################################################
 
+if [ -n "$LIBUSB_SKIP_NANO" ]; then
+  exit 0
+fi
+
 if [ "$BASH_VERSION" = '' ]; then
   TYPE_CMD="type git >/dev/null 2>&1"
 else
