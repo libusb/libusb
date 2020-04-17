@@ -620,8 +620,6 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 int usbi_handle_transfer_cancellation(struct usbi_transfer *itransfer);
 void usbi_signal_transfer_completion(struct usbi_transfer *itransfer);
 
-int usbi_parse_descriptor(const unsigned char *source, const char *descriptor,
-	void *dest, int host_endian);
 int usbi_device_cache_descriptor(libusb_device *dev);
 int usbi_get_config_index_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, int *idx);

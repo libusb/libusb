@@ -613,10 +613,10 @@ int linux_get_device_address(struct libusb_context *ctx, int detached,
 static int seek_to_next_descriptor(struct libusb_context *ctx,
 	uint8_t descriptor_type, unsigned char *buffer, int size)
 {
-	struct usbi_descriptor_header header;
+	struct usbi_descriptor_header *header;
 	int i;
 
-	for (i = 0; size >= 0; i += header.bLength, size -= header.bLength) {
+	for (i = 0; size >= 0; i += header->bLength, size -= header->bLength) {
 		if (size == 0)
 			return LIBUSB_ERROR_NOT_FOUND;
 
@@ -624,9 +624,9 @@ static int seek_to_next_descriptor(struct libusb_context *ctx,
 			usbi_err(ctx, "short descriptor read %d/2", size);
 			return LIBUSB_ERROR_IO;
 		}
-		usbi_parse_descriptor(buffer + i, "bb", &header, 0);
 
-		if (i && header.bDescriptorType == descriptor_type)
+		header = (struct usbi_descriptor_header *)(buffer + i);
+		if (i && header->bDescriptorType == descriptor_type)
 			return i;
 	}
 	usbi_err(ctx, "bLength overflow by %d bytes", -size);
@@ -639,7 +639,8 @@ static int seek_to_next_config(struct libusb_device *dev,
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
-	struct libusb_config_descriptor config;
+	struct usbi_configuration_descriptor *config;
+	uint16_t config_len;
 
 	if (size == 0)
 		return LIBUSB_ERROR_NOT_FOUND;
@@ -650,15 +651,16 @@ static int seek_to_next_config(struct libusb_device *dev,
 		return LIBUSB_ERROR_IO;
 	}
 
-	usbi_parse_descriptor(buffer, "bbwbbbbb", &config, 0);
-	if (config.bDescriptorType != LIBUSB_DT_CONFIG) {
+	config = (struct usbi_configuration_descriptor *)buffer;
+	if (config->bDescriptorType != LIBUSB_DT_CONFIG) {
 		usbi_err(ctx, "descriptor is not a config desc (type 0x%02x)",
-			 config.bDescriptorType);
+			 config->bDescriptorType);
 		return LIBUSB_ERROR_IO;
 	}
 
+	config_len = libusb_le16_to_cpu(config->wTotalLength);
 	/*
-	 * In usbfs the config descriptors are config.wTotalLength bytes apart,
+	 * In usbfs the config descriptors are wTotalLength bytes apart,
 	 * with any short reads from the device appearing as holes in the file.
 	 *
 	 * In sysfs wTotalLength is ignored, instead the kernel returns a
@@ -673,20 +675,20 @@ static int seek_to_next_config(struct libusb_device *dev,
 		if (next < 0)
 			return next;
 
-		if (next != config.wTotalLength)
+		if (next != config_len)
 			usbi_warn(ctx, "config length mismatch wTotalLength %u real %d",
-				  config.wTotalLength, next);
+				  config_len, next);
 		return next;
 	} else {
-		if (config.wTotalLength < LIBUSB_DT_CONFIG_SIZE) {
-			usbi_err(ctx, "invalid wTotalLength %u", config.wTotalLength);
+		if (config_len < LIBUSB_DT_CONFIG_SIZE) {
+			usbi_err(ctx, "invalid wTotalLength %u", config_len);
 			return LIBUSB_ERROR_IO;
-		} else if (config.wTotalLength > size) {
+		} else if (config_len > size) {
 			usbi_warn(ctx, "short descriptor read %d/%u",
-				  size, config.wTotalLength);
+				  size, config_len);
 			return size;
 		} else {
-			return config.wTotalLength;
+			return config_len;
 		}
 	}
 }
@@ -697,7 +699,7 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
 	unsigned char *descriptors = priv->descriptors;
 	int size = priv->descriptors_len;
-	struct libusb_config_descriptor *config;
+	struct usbi_configuration_descriptor *config;
 
 	*buffer = NULL;
 	/* Unlike the device desc. config descs. are always in raw format */
@@ -713,7 +715,7 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 
 		if (next < 0)
 			return next;
-		config = (struct libusb_config_descriptor *)descriptors;
+		config = (struct usbi_configuration_descriptor *)descriptors;
 		if (config->bConfigurationValue == value) {
 			*buffer = descriptors;
 			return next;
@@ -917,11 +919,10 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		usbi_warn(ctx, "Missing rw usbfs access; cannot determine "
 			       "active configuration descriptor");
 		if (priv->descriptors_len >= (DEVICE_DESC_LENGTH + LIBUSB_DT_CONFIG_SIZE)) {
-			struct libusb_config_descriptor config;
+			struct usbi_configuration_descriptor *config;
 
-			usbi_parse_descriptor(priv->descriptors + DEVICE_DESC_LENGTH,
-					      "bbwbbbbb", &config, 0);
-			priv->active_config = config.bConfigurationValue;
+			config = (struct usbi_configuration_descriptor *)(priv->descriptors + DEVICE_DESC_LENGTH);
+			priv->active_config = config->bConfigurationValue;
 		} else {
 			priv->active_config = -1; /* No config dt */
 		}
