@@ -1,6 +1,6 @@
 image: Visual Studio 2017
 
-platform: 
+platform:
   - x64
 
 configuration:
@@ -9,14 +9,14 @@ configuration:
 
 environment:
   CTEST_OUTPUT_ON_FAILURE: True
-  QT_VERSION: 5.12
-  QT_COMPILED: msvc2017
   MSVC_VERSION: 15
-  
+  PYTHON: "C:\\Python37-x64"
+  BUILD_NAME: master
+
 install:
   # Fetch and setup conan
   - set PATH=%PATH%;%PYTHON%/Scripts/
-  - pip.exe --quiet install conan
+  - "%PYTHON%\\python.exe -m pip --quiet install conan"
   - conan remote add barco %CONAN_URL%
   - conan user -p %CONAN_API_KEY% -r barco conan
 
@@ -31,18 +31,21 @@ install:
   - call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
 
 before_build:
-  - cd /D %APPVEYOR_BUILD_FOLDER%
-  - mkdir build
-  - cd build
-  # full path is used for CMAKE_MODULE_PATH, %APPVEYOR_BUILD_FOLDER% has back slashes and is not supported in CMAKE command
-  - cmake -G "CodeBlocks - Ninja" -DCMAKE_BUILD_TYPE=%configuration% -DPRIVATE_TESTS_ENABLED=ON ..
-  
-build_script:
-  - cmake --build . --target all --config %configuration%
+  - conan profile new default --detect
+  - conan profile update settings.compiler="Visual Studio" default
+  - conan profile update settings.compiler.version=%MSVC_VERSION% default
+  - if "%APPVEYOR_REPO_TAG%" == "true" (set BUILD_NAME=%APPVEYOR_REPO_TAG_NAME:v=%)
 
-test_script:
-   - cmake --build . --target test
+build_script:
+  - conan create --ignore-dirty %APPVEYOR_BUILD_FOLDER% %APPVEYOR_PROJECT_NAME%/%BUILD_NAME%@barco/healthcare -s build_type=%configuration%
 
 after_test:
-  - cd /D %APPVEYOR_BUILD_FOLDER%
-  - conan.build.cmd
+  - if "%APPVEYOR_REPO_BRANCH%" == "master" ( conan upload --remote barco --all --force %APPVEYOR_PROJECT_NAME%/%BUILD_NAME%@barco/healthcare )
+  - if "%APPVEYOR_REPO_TAG%" == "true" ( conan upload --remote barco --all %APPVEYOR_PROJECT_NAME%/%BUILD_NAME%@barco/healthcare )
+
+
+# uncomment following lines to be able to debug the appveyor image through RDP protocol when build finished
+# https://www.appveyor.com/docs/how-to/rdp-to-build-worker/
+# on_finish:
+#  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+

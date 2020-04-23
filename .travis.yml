@@ -12,7 +12,9 @@ compiler:
 
 env:
   global:
+    # Print output of failed unit test
     - CTEST_OUTPUT_ON_FAILURE=True
+    - BUILD_NAME=master
 
   matrix:
     - BUILD_TYPE=Debug
@@ -25,87 +27,48 @@ matrix:
     - os: osx
       compiler: gcc
 
+addons:
+  homebrew:
+    packages:
+    - ruby
+    - conan
+    - python3
+    - cmake
+    update: true
+  apt:
+    sources:
+    - sourceline: 'ppa:ubuntu-toolchain-r/test'
+    packages:
+    - ruby
+    - cppcheck
+    - gcc-6
+    - g++-6
+    - cmake
+
 install:
-  # Configure to use our own Debian mirror.
-  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-add-repository "deb https://${BIN_USER}:${BIN_PASSWORD}@barcohc.jfrog.io/barcohc/AptQt512/ xenial main"; fi
-  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 10C56D0DE9977759; fi
-  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-add-repository "deb https://${BIN_USER}:${BIN_PASSWORD}@barcohc.jfrog.io/barcohc/AptUbuntuToolchain/ xenial main"; fi
-  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1E9377A2BA9EF27F; fi
-  - if [[ "${TRAVIS_OS_NAME}" = "linux" ]]; then travis_retry sudo apt-get -qq update; fi
-  
-  # Update Ruby
   - |
-    if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
-      brew install ruby
-      gem update --system
-    fi
-
-  # Install a recent Ninja
-  - |
-    # Install Ninja
     if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-      travis_retry sudo apt-get -qq install ninja-build
-    else
-      HOMEBREW_NO_AUTO_UPDATE=1 brew install ninja
-    fi
-
-  # Install GCC 6
-  - |
-    # Install GCC
-    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-      travis_retry sudo apt-get install -qq gcc-6 g++-6
       sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-6 90
       sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-6 90
+      sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-6 90
+
+      pyenv global $(pyenv versions | tail -1)
     fi
 
-  # Use Python 3.7.1
-  - |
-    # Use Python 3.7.1
-    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-      pyenv global 3.7.1
-    fi
+  - export BARCOHC_BIN=https://${BIN_USER}:${BIN_PASSWORD}@barcohc.jfrog.io/barcohc
 
   # Install conan
-  - |
-    # Install conan
-    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-      pip --quiet install conan
-    else
-      brew install conan
-    fi
-  - conan remote add barco ${CONAN_URL}
-  - conan user -p ${CONAN_API_KEY} -r barco ${CONAN_USER}
-  
-  # Install buildtools
-  - |
-    # Install buildtools
-    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-      sudo apt-get -qq install gcovr lcov cppcheck valgrind libudev-dev
-    else
-      brew install gcovr lcov cppcheck
-    fi
-
-before_script:
-  - mkdir -p /tmp/build
-  - cd /tmp/build
-  - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -G Ninja ${TRAVIS_BUILD_DIR}
+  - pip3 install --quiet conan
+  - conan remote add barco https://barcohc.jfrog.io/barcohc/api/conan/barco
+  - conan user -p ${CONAN_API_KEY} -r barco conan
 
 script:
-  - cmake --build . --target all || travis_terminate 1;
-  - cmake --build . --target test || travis_terminate 1;
-  - |
-    # Create and upload a conan package for barco_1.0.23
-    if [ "${TRAVIS_BRANCH}" == "barco_1.0.23" ]; then
-      export PROJECT_NAME=`echo $TRAVIS_REPO_SLUG | cut -d / -f2`
-      conan create ${TRAVIS_BUILD_DIR} ${PROJECT_NAME}/1.0.23.0@barco/healthcare -s build_type=${BUILD_TYPE}
-      conan upload --remote barco --all --force ${PROJECT_NAME}/1.0.23.0@barco/healthcare
-    fi
+  - export PROJECT_NAME=`echo $TRAVIS_REPO_SLUG | cut -d / -f2`
+  - if [ -n "$TRAVIS_TAG" ]; then BUILD_NAME=`echo ${TRAVIS_TAG} | sed "s/[vV]//g"`; fi
+  - conan create ${TRAVIS_BUILD_DIR} ${PROJECT_NAME}/${BUILD_NAME}@barco/healthcare -s build_type=${BUILD_TYPE}
   - |
     # Create and upload a conan package for a release
-    if [ -n "$TRAVIS_TAG" ]; then
-      export TAG=`echo ${TRAVIS_TAG} | sed "s/[vV]//g"`
-      export PROJECT_NAME=`echo $TRAVIS_REPO_SLUG | cut -d / -f2`
-      conan create ${TRAVIS_BUILD_DIR} ${PROJECT_NAME}/${TAG}@barco/healthcare -s build_type=${BUILD_TYPE}
-      conan upload --remote barco --all ${PROJECT_NAME}/${TAG}@barco/healthcare
+    if [ -n "$TRAVIS_TAG" ] || [ "${TRAVIS_BRANCH}" == "master" ]; then
+      conan upload --remote barco --all ${PROJECT_NAME}/${BUILD_NAME}@barco/healthcare
     fi
 
