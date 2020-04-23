@@ -2081,6 +2081,9 @@ enum libusb_option {
 
 int LIBUSB_CALL libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);
 
+struct libusb_device *LIBUSB_CALL libusb_get_device_by_dbcc_name(libusb_context *ctx,
+                                                                 const char *dbcc_name);
+
 #if defined(__cplusplus)
 }
 #endif
