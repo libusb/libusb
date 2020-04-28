@@ -239,7 +239,7 @@ static inline void winusb_device_priv_release(struct libusb_device *dev)
 struct driver_lookup {
 	char list[MAX_KEY_LENGTH + 1]; // REG_MULTI_SZ list of services (driver) names
 	const DWORD reg_prop;          // SPDRP registry key to use to retrieve list
-	const char* designation;       // internal designation (for debug output)
+	const char *designation;       // internal designation (for debug output)
 };
 
 /*

@@ -315,7 +315,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 	return LIBUSB_SUCCESS;
 }
 
-void API_EXPORTED libusb_hotplug_deregister_callback(struct libusb_context *ctx,
+void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
 	libusb_hotplug_callback_handle callback_handle)
 {
 	struct libusb_hotplug_callback *hotplug_cb;
@@ -353,7 +353,7 @@ void API_EXPORTED libusb_hotplug_deregister_callback(struct libusb_context *ctx,
 }
 
 DEFAULT_VISIBILITY
-void * LIBUSB_CALL libusb_hotplug_get_user_data(struct libusb_context *ctx,
+void * LIBUSB_CALL libusb_hotplug_get_user_data(libusb_context *ctx,
 	libusb_hotplug_callback_handle callback_handle)
 {
 	struct libusb_hotplug_callback *hotplug_cb;

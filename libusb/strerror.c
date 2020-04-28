@@ -154,7 +154,7 @@ static const char * const (*usbi_error_strings)[LIBUSB_ERROR_COUNT] = &usbi_loca
  * used, and only 2 letter ISO 639-1 codes are accepted for it, such as "de".
  * The optional region, country_region or codeset parts are ignored. This
  * means that functions which return translatable strings will NOT honor the
- * specified encoding. 
+ * specified encoding.
  * All strings returned are encoded as UTF-8 strings.
  *
  * If libusb_setlocale() is not called, all messages will be in English.

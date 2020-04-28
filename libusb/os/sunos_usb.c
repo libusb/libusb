@@ -247,10 +247,10 @@ sunos_new_string_list(void)
 {
 	string_list_t *list;
 
-	list = calloc(1, sizeof (string_list_t));
+	list = calloc(1, sizeof(string_list_t));
 	if (list == NULL)
 		return (NULL);
-	list->string = calloc(DEFAULT_LISTSIZE, sizeof (char *));
+	list->string = calloc(DEFAULT_LISTSIZE, sizeof(char *));
 	if (list->string == NULL)
 		return (NULL);
 	list->nargs = 0;
@@ -269,7 +269,7 @@ sunos_append_to_string_list(string_list_t *list, const char *arg)
 
 	if ((list->nargs + 1) == list->listsize) { /* +1 is for NULL */
 		char	**tmp = realloc(list->string,
-		    sizeof (char *) * (list->listsize + 1));
+		    sizeof(char *) * (list->listsize + 1));
 		if (tmp == NULL) {
 			free(str);
 			return (-1);
@@ -864,17 +864,17 @@ sunos_check_device_and_status_open(struct libusb_device_handle *hdl,
 
 	/* create filename */
 	if (hpriv->config_index > 0) {
-		(void) snprintf(cfg_num, sizeof (cfg_num), "cfg%d",
+		(void) snprintf(cfg_num, sizeof(cfg_num), "cfg%d",
 		    hpriv->config_index + 1);
 	} else {
-		bzero(cfg_num, sizeof (cfg_num));
+		bzero(cfg_num, sizeof(cfg_num));
 	}
 
 	if (hpriv->altsetting[ifc] > 0) {
-		(void) snprintf(alt_num, sizeof (alt_num), ".%d",
+		(void) snprintf(alt_num, sizeof(alt_num), ".%d",
 		    hpriv->altsetting[ifc]);
 	} else {
-		bzero(alt_num, sizeof (alt_num));
+		bzero(alt_num, sizeof(alt_num));
 	}
 
 	(void) snprintf(filename, PATH_MAX, "%s/%sif%d%s%s%d",
@@ -929,7 +929,7 @@ sunos_check_device_and_status_open(struct libusb_device_handle *hdl,
 
 			return (errno);
 		} else {
-			count = write(fdstat, &control, sizeof (control));
+			count = write(fdstat, &control, sizeof(control));
 			if (count != 1) {
 				/* this should have worked */
 				usbi_dbg("can't write to %s: errno %d (%s)",
@@ -1228,7 +1228,7 @@ sunos_do_async_io(struct libusb_transfer *transfer)
 
 	tpriv->transfer = transfer;
 	aiocb = &tpriv->aiocb;
-	bzero(aiocb, sizeof (*aiocb));
+	bzero(aiocb, sizeof(*aiocb));
 	aiocb->aio_fildes = hpriv->eps[ep].datafd;
 	aiocb->aio_buf = transfer->buffer;
 	aiocb->aio_nbytes = transfer->length;
@@ -1517,8 +1517,8 @@ sunos_usb_get_status(int fd)
 
 	usbi_dbg("sunos_usb_get_status(): fd=%d", fd);
 
-	ret = read(fd, &status, sizeof (status));
-	if (ret == sizeof (status)) {
+	ret = read(fd, &status, sizeof(status));
+	if (ret == sizeof(status)) {
 		switch (status) {
 		case USB_LC_STAT_NOERROR:
 			usbi_dbg("No Error");

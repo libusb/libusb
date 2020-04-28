@@ -38,7 +38,7 @@ static int udev_control_pipe[2] = {-1, -1};
 static struct udev_monitor *udev_monitor = NULL;
 static pthread_t linux_event_thread;
 
-static void udev_hotplug_event(struct udev_device* udev_dev);
+static void udev_hotplug_event(struct udev_device *udev_dev);
 static void *linux_udev_event_thread_main(void *arg);
 
 int linux_udev_start_event_monitor(void)
@@ -168,7 +168,7 @@ static void *linux_udev_event_thread_main(void *arg)
 	char dummy;
 	int r;
 	ssize_t nb;
-	struct udev_device* udev_dev;
+	struct udev_device *udev_dev;
 	struct pollfd fds[] = {
 		{.fd = udev_control_pipe[0],
 		 .events = POLLIN},
@@ -232,10 +232,10 @@ static int udev_device_info(struct libusb_context *ctx, int detached,
 					dev_node, *sys_name, -1);
 }
 
-static void udev_hotplug_event(struct udev_device* udev_dev)
+static void udev_hotplug_event(struct udev_device *udev_dev)
 {
-	const char* udev_action;
-	const char* sys_name = NULL;
+	const char *udev_action;
+	const char *sys_name = NULL;
 	uint8_t busnum = 0, devaddr = 0;
 	int detached;
 	int r;
@@ -314,7 +314,7 @@ int linux_udev_scan_devices(struct libusb_context *ctx)
 
 void linux_udev_hotplug_poll(void)
 {
-	struct udev_device* udev_dev;
+	struct udev_device *udev_dev;
 
 	usbi_mutex_static_lock(&linux_hotplug_lock);
 	do {

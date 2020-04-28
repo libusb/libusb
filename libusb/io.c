@@ -2079,7 +2079,7 @@ static int handle_timerfd_trigger(struct libusb_context *ctx)
 	if (r < 0)
 		goto out;
 
-	/* arm for next timeout*/
+	/* arm for next timeout */
 	r = arm_timerfd_for_next_timeout(ctx);
 
 out:
@@ -2780,12 +2780,12 @@ const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 		goto out;
 
 	list_for_each_entry(ipollfd, &ctx->ipollfds, list, struct usbi_pollfd)
-		ret[i++] = (struct libusb_pollfd *) ipollfd;
+		ret[i++] = (struct libusb_pollfd *)ipollfd;
 	ret[ctx->pollfds_cnt] = NULL;
 
 out:
 	usbi_mutex_unlock(&ctx->event_data_lock);
-	return (const struct libusb_pollfd **) ret;
+	return (const struct libusb_pollfd **)ret;
 #else
 	usbi_err(ctx, "external polling of libusb's internal descriptors "\
 		"is not yet supported on Windows platforms");
@@ -2860,5 +2860,4 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 		usbi_mutex_unlock(&to_cancel->lock);
 		usbi_handle_transfer_completion(to_cancel, LIBUSB_TRANSFER_NO_DEVICE);
 	}
-
 }

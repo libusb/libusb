@@ -922,7 +922,7 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
  * \returns LIBUSB_ERROR_OVERFLOW if the array is too small
  */
 int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
-	uint8_t* port_numbers, int port_numbers_len)
+	uint8_t *port_numbers, int port_numbers_len)
 {
 	int i = port_numbers_len;
 	struct libusb_context *ctx = DEVICE_CTX(dev);
@@ -948,7 +948,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
  * \deprecated Please use \ref libusb_get_port_numbers() instead.
  */
 int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
-	uint8_t* port_numbers, uint8_t port_numbers_len)
+	uint8_t *port_numbers, uint8_t port_numbers_len)
 {
 	UNUSED(ctx);
 
@@ -2370,7 +2370,7 @@ err_unlock:
  * before your application terminates.
  * \param ctx the context to deinitialize, or NULL for the default context
  */
-void API_EXPORTED libusb_exit(struct libusb_context *ctx)
+void API_EXPORTED libusb_exit(libusb_context *ctx)
 {
 	struct libusb_device *dev, *next;
 	struct timeval tv = { 0, 0 };

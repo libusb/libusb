@@ -110,7 +110,7 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 	if (!transfer)
 		return LIBUSB_ERROR_NO_MEM;
 
-	buffer = (unsigned char*) malloc(LIBUSB_CONTROL_SETUP_SIZE + wLength);
+	buffer = malloc(LIBUSB_CONTROL_SETUP_SIZE + wLength);
 	if (!buffer) {
 		libusb_free_transfer(transfer);
 		return LIBUSB_ERROR_NO_MEM;
@@ -269,9 +269,9 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \returns LIBUSB_ERROR_BUSY if called from event handling context
  * \returns another LIBUSB_ERROR code on other failures
  */
-int API_EXPORTED libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
-	unsigned char endpoint, unsigned char *data, int length, int *transferred,
-	unsigned int timeout)
+int API_EXPORTED libusb_bulk_transfer(libusb_device_handle *dev_handle,
+	unsigned char endpoint, unsigned char *data, int length,
+	int *transferred, unsigned int timeout)
 {
 	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
 		transferred, timeout, LIBUSB_TRANSFER_TYPE_BULK);
@@ -321,9 +321,9 @@ int API_EXPORTED libusb_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \returns LIBUSB_ERROR_BUSY if called from event handling context
  * \returns another LIBUSB_ERROR code on other error
  */
-int API_EXPORTED libusb_interrupt_transfer(
-	struct libusb_device_handle *dev_handle, unsigned char endpoint,
-	unsigned char *data, int length, int *transferred, unsigned int timeout)
+int API_EXPORTED libusb_interrupt_transfer(libusb_device_handle *dev_handle,
+	unsigned char endpoint, unsigned char *data, int length,
+	int *transferred, unsigned int timeout)
 {
 	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
 		transferred, timeout, LIBUSB_TRANSFER_TYPE_INTERRUPT);

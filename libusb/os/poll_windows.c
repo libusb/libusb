@@ -113,7 +113,7 @@ static int install_fd(struct file_descriptor *fd)
 
 	if (fd_count == fd_table_size) {
 		struct file_descriptor **new_table;
-		unsigned long* new_bitmap;
+		unsigned long *new_bitmap;
 
 		// Need to expand the fd table and bitmap
 		new_table = realloc(fd_table, (fd_table_size + FD_TABLE_INCR_SIZE) * sizeof(*new_table));
@@ -240,7 +240,7 @@ static DWORD poll_wait(const HANDLE *wait_handles, DWORD num_wait_handles, DWORD
 {
 	struct wait_thread_data *thread_data;
 	HANDLE notify_event;
-	HANDLE* handles;
+	HANDLE *handles;
 	int n, num_threads;
 	DWORD error, status;
 

@@ -1064,7 +1064,7 @@ void linux_device_disconnected(uint8_t busnum, uint8_t devaddr)
 
 	usbi_mutex_static_lock(&active_contexts_lock);
 	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
-		dev = usbi_get_device_by_session_id (ctx, session_id);
+		dev = usbi_get_device_by_session_id(ctx, session_id);
 		if (dev) {
 			usbi_disconnect_device(dev);
 			libusb_unref_device(dev);
@@ -2272,7 +2272,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 			usbi_dbg("received %d bytes of surplus data", urb->actual_length);
 			if (urb->buffer != target) {
 				usbi_dbg("moving surplus data from offset %zu to offset %zu",
-					 (unsigned char *) urb->buffer - transfer->buffer,
+					 (unsigned char *)urb->buffer - transfer->buffer,
 					 target - transfer->buffer);
 				memmove(target, urb->buffer, urb->actual_length);
 			}
