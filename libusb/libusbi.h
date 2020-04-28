@@ -636,9 +636,6 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 int usbi_handle_transfer_cancellation(struct usbi_transfer *itransfer);
 void usbi_signal_transfer_completion(struct usbi_transfer *itransfer);
 
-int usbi_get_config_index_by_value(struct libusb_device *dev,
-	uint8_t bConfigurationValue, int *idx);
-
 void usbi_connect_device(struct libusb_device *dev);
 void usbi_disconnect_device(struct libusb_device *dev);
 

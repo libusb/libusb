@@ -598,35 +598,6 @@ int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 	return r;
 }
 
-/* iterate through all configurations, returning the index of the configuration
- * matching a specific bConfigurationValue in the idx output parameter, or -1
- * if the config was not found.
- * returns 0 on success or a LIBUSB_ERROR code
- */
-int usbi_get_config_index_by_value(struct libusb_device *dev,
-	uint8_t bConfigurationValue, int *idx)
-{
-	uint8_t i;
-
-	usbi_dbg("value %d", bConfigurationValue);
-	for (i = 0; i < dev->device_descriptor.bNumConfigurations; i++) {
-		unsigned char tmp[6];
-		int r = usbi_backend.get_config_descriptor(dev, i, tmp, sizeof(tmp));
-
-		if (r < 0) {
-			*idx = -1;
-			return r;
-		}
-		if (tmp[5] == bConfigurationValue) {
-			*idx = i;
-			return 0;
-		}
-	}
-
-	*idx = -1;
-	return 0;
-}
-
 /** \ingroup libusb_desc
  * Get a USB configuration descriptor with a specific bConfigurationValue.
  * This is a non-blocking function which does not involve any requests being
@@ -647,7 +618,8 @@ int usbi_get_config_index_by_value(struct libusb_device *dev,
 int API_EXPORTED libusb_get_config_descriptor_by_value(libusb_device *dev,
 	uint8_t bConfigurationValue, struct libusb_config_descriptor **config)
 {
-	int r, idx;
+	uint8_t idx;
+	int r;
 
 	if (usbi_backend.get_config_descriptor_by_value) {
 		void *buf;
@@ -659,13 +631,19 @@ int API_EXPORTED libusb_get_config_descriptor_by_value(libusb_device *dev,
 		return raw_desc_to_config(dev->ctx, buf, r, config);
 	}
 
-	r = usbi_get_config_index_by_value(dev, bConfigurationValue, &idx);
-	if (r < 0)
-		return r;
-	else if (idx == -1)
-		return LIBUSB_ERROR_NOT_FOUND;
-	else
-		return libusb_get_config_descriptor(dev, (uint8_t) idx, config);
+	usbi_dbg("value %u", bConfigurationValue);
+	for (idx = 0; idx < dev->device_descriptor.bNumConfigurations; idx++) {
+		unsigned char tmp[6];
+
+		r = usbi_backend.get_config_descriptor(dev, idx, tmp, sizeof(tmp));
+		if (r < 0)
+			return r;
+
+		if (tmp[5] == bConfigurationValue)
+			return libusb_get_config_descriptor(dev, idx, config);
+	}
+
+	return LIBUSB_ERROR_NOT_FOUND;
 }
 
 /** \ingroup libusb_desc
