@@ -224,7 +224,7 @@ typedef struct USB_DK_TRANSFER_REQUEST {
 } USB_DK_TRANSFER_REQUEST, *PUSB_DK_TRANSFER_REQUEST;
 
 struct usbdk_device_priv {
-	USB_DK_DEVICE_INFO info;
+	USB_DK_DEVICE_ID ID;
 	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptors;
 	HANDLE redirector_handle;
 	HANDLE system_handle;
@@ -251,7 +251,6 @@ struct winusb_device_priv {
 						// by Windows (eg. HID keyboards or mice cannot do R/W)
 	} usb_interface[USB_MAXINTERFACES];
 	struct hid_device_priv *hid;
-	USB_DEVICE_DESCRIPTOR dev_descriptor;
 	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptor; // list of pointers to the cached config descriptors
 };
 
@@ -299,7 +298,6 @@ struct windows_backend {
 		struct discovered_devs **discdevs);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
-	int (*get_device_descriptor)(struct libusb_device *device, void *buffer);
 	int (*get_active_config_descriptor)(struct libusb_device *device,
 		void *buffer, size_t len);
 	int (*get_config_descriptor)(struct libusb_device *device,

@@ -75,14 +75,6 @@ haiku_close(struct libusb_device_handle *dev_handle)
 }
 
 static int
-haiku_get_device_descriptor(struct libusb_device *device, void *buffer, int *host_endian)
-{
-	USBDevice *dev = *((USBDevice **)usbi_get_device_priv(device));
-	memcpy(buffer, dev->Descriptor(), LIBUSB_DT_DEVICE_SIZE);
-	return LIBUSB_SUCCESS;
-}
-
-static int
 haiku_get_active_config_descriptor(struct libusb_device *device, void *buffer, size_t len)
 {
 	USBDevice *dev = *((USBDevice **)usbi_get_device_priv(device));
@@ -198,7 +190,6 @@ const struct usbi_os_backend usbi_backend = {
 	/*.open =*/ haiku_open,
 	/*.close =*/ haiku_close,
 
-	/*.get_device_descriptor =*/ haiku_get_device_descriptor,
 	/*.get_active_config_descriptor =*/ haiku_get_active_config_descriptor,
 	/*.get_config_descriptor =*/ haiku_get_config_descriptor,
 	/*.get_config_descriptor_by_value =*/ NULL,

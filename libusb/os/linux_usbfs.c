@@ -516,17 +516,6 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 	return 0;
 }
 
-static int op_get_device_descriptor(struct libusb_device *dev,
-	void *buffer, int *host_endian)
-{
-	struct linux_device_priv *priv = usbi_get_device_priv(dev);
-
-	*host_endian = priv->sysfs_dir != NULL;
-	memcpy(buffer, priv->descriptors, LIBUSB_DT_DEVICE_SIZE);
-
-	return 0;
-}
-
 static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 {
 	uint8_t busnum, devaddr;
@@ -899,8 +888,13 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 		return LIBUSB_ERROR_IO;
 	}
 
-	if (sysfs_dir)
+	memcpy(&dev->device_descriptor, priv->descriptors, LIBUSB_DT_DEVICE_SIZE);
+
+	if (sysfs_dir) {
+		/* sysfs descriptors are in bus-endian format */
+		usbi_localize_device_descriptor(&dev->device_descriptor);
 		return LIBUSB_SUCCESS;
+	}
 
 	/* cache active config */
 	if (wrapped_fd < 0)
@@ -2664,7 +2658,6 @@ const struct usbi_os_backend usbi_backend = {
 	.init = op_init,
 	.exit = op_exit,
 	.hotplug_poll = op_hotplug_poll,
-	.get_device_descriptor = op_get_device_descriptor,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,

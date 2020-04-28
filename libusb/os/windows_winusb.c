@@ -674,7 +674,7 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 	PUSB_DESCRIPTOR_REQUEST cd_buf_actual = NULL;    // actual request
 	PUSB_CONFIGURATION_DESCRIPTOR cd_data;
 
-	num_configurations = priv->dev_descriptor.bNumConfigurations;
+	num_configurations = dev->device_descriptor.bNumConfigurations;
 	if (num_configurations == 0)
 		return;
 
@@ -847,13 +847,17 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 				return LIBUSB_ERROR_NO_DEVICE;
 			}
 
-			memcpy(&priv->dev_descriptor, &(conn_info.DeviceDescriptor), sizeof(USB_DEVICE_DESCRIPTOR));
+			static_assert(sizeof(dev->device_descriptor) == sizeof(conn_info.DeviceDescriptor),
+				      "mismatch between libusb and OS device descriptor sizes");
+			memcpy(&dev->device_descriptor, &conn_info.DeviceDescriptor, LIBUSB_DT_DEVICE_SIZE);
+			usbi_localize_device_descriptor(&dev->device_descriptor);
+
 			priv->active_config = conn_info.CurrentConfigurationValue;
 			if (priv->active_config == 0) {
 				usbi_dbg("0x%x:0x%x found %u configurations (not configured)",
-					priv->dev_descriptor.idVendor,
-					priv->dev_descriptor.idProduct,
-					priv->dev_descriptor.bNumConfigurations);
+					dev->device_descriptor.idVendor,
+					dev->device_descriptor.idProduct,
+					dev->device_descriptor.bNumConfigurations);
 				SleepEx(50, TRUE);
 			}
 		} while (priv->active_config == 0 && --ginfotimeout >= 0);
@@ -861,12 +865,12 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		if (priv->active_config == 0) {
 			usbi_info(ctx, "0x%x:0x%x found %u configurations but device isn't configured, "
 				"forcing current configuration to 1",
-				priv->dev_descriptor.idVendor,
-				priv->dev_descriptor.idProduct,
-				priv->dev_descriptor.bNumConfigurations);
+				dev->device_descriptor.idVendor,
+				dev->device_descriptor.idProduct,
+				dev->device_descriptor.bNumConfigurations);
 			priv->active_config = 1;
 		} else {
-			usbi_dbg("found %u configurations (current config: %u)", priv->dev_descriptor.bNumConfigurations, priv->active_config);
+			usbi_dbg("found %u configurations (current config: %u)", dev->device_descriptor.bNumConfigurations, priv->active_config);
 		}
 
 		// Cache as many config descriptors as we can
@@ -944,16 +948,16 @@ static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id
 		usbi_dbg("assigning HCD '%s' bus number %u", dev_id, bus_number);
 		priv = usbi_get_device_priv(dev);
 		dev->bus_number = bus_number;
-		priv->dev_descriptor.bLength = LIBUSB_DT_DEVICE_SIZE;
-		priv->dev_descriptor.bDescriptorType = LIBUSB_DT_DEVICE;
-		priv->dev_descriptor.bDeviceClass = LIBUSB_CLASS_HUB;
-		priv->dev_descriptor.bNumConfigurations = 1;
+		dev->device_descriptor.bLength = LIBUSB_DT_DEVICE_SIZE;
+		dev->device_descriptor.bDescriptorType = LIBUSB_DT_DEVICE;
+		dev->device_descriptor.bDeviceClass = LIBUSB_CLASS_HUB;
+		dev->device_descriptor.bNumConfigurations = 1;
 		priv->active_config = 1;
 		priv->root_hub = true;
-		if (sscanf(dev_id, "PCI\\VEN_%04hx&DEV_%04hx%*s", &priv->dev_descriptor.idVendor, &priv->dev_descriptor.idProduct) != 2) {
+		if (sscanf(dev_id, "PCI\\VEN_%04hx&DEV_%04hx%*s", &dev->device_descriptor.idVendor, &dev->device_descriptor.idProduct) != 2) {
 			usbi_warn(ctx, "could not infer VID/PID of HCD root hub from '%s'", dev_id);
-			priv->dev_descriptor.idVendor = 0x1d6b; // Linux Foundation root hub
-			priv->dev_descriptor.idProduct = 1;
+			dev->device_descriptor.idVendor = 0x1d6b; // Linux Foundation root hub
+			dev->device_descriptor.idProduct = 1;
 		}
 	}
 
@@ -1515,14 +1519,6 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	return r;
 }
 
-static int winusb_get_device_descriptor(struct libusb_device *dev, void *buffer)
-{
-	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
-
-	memcpy(buffer, &priv->dev_descriptor, LIBUSB_DT_DEVICE_SIZE);
-	return LIBUSB_SUCCESS;
-}
-
 static int winusb_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len)
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
@@ -1792,7 +1788,6 @@ const struct windows_backend winusb_backend = {
 	winusb_get_device_list,
 	winusb_open,
 	winusb_close,
-	winusb_get_device_descriptor,
 	winusb_get_active_config_descriptor,
 	winusb_get_config_descriptor,
 	winusb_get_config_descriptor_by_value,
@@ -3383,7 +3378,8 @@ static void hid_exit(void)
 // composite_open(), with interfaces belonging to different APIs
 static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 {
-	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+	struct libusb_device *dev = dev_handle->dev;
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
 	struct winusb_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
 	HIDD_ATTRIBUTES hid_attributes;
 	PHIDP_PREPARSED_DATA preparsed_data = NULL;
@@ -3507,19 +3503,19 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 		priv->hid->usagePage = capabilities.UsagePage;
 
 		// Fetch string descriptors
-		priv->hid->string_index[0] = priv->dev_descriptor.iManufacturer;
+		priv->hid->string_index[0] = dev->device_descriptor.iManufacturer;
 		if (priv->hid->string_index[0] != 0)
 			HidD_GetManufacturerString(hid_handle, priv->hid->string[0], sizeof(priv->hid->string[0]));
 		else
 			priv->hid->string[0][0] = 0;
 
-		priv->hid->string_index[1] = priv->dev_descriptor.iProduct;
+		priv->hid->string_index[1] = dev->device_descriptor.iProduct;
 		if (priv->hid->string_index[1] != 0)
 			HidD_GetProductString(hid_handle, priv->hid->string[1], sizeof(priv->hid->string[1]));
 		else
 			priv->hid->string[1][0] = 0;
 
-		priv->hid->string_index[2] = priv->dev_descriptor.iSerialNumber;
+		priv->hid->string_index[2] = dev->device_descriptor.iSerialNumber;
 		if (priv->hid->string_index[2] != 0)
 			HidD_GetSerialNumberString(hid_handle, priv->hid->string[2], sizeof(priv->hid->string[2]));
 		else

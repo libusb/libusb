@@ -37,7 +37,6 @@ struct device_priv {
 	int fd;					/* device file descriptor */
 
 	usb_config_descriptor_t *cdesc;		/* active config descriptor */
-	usb_device_descriptor_t ddesc;		/* usb device descriptor */
 };
 
 struct handle_priv {
@@ -52,8 +51,6 @@ static int obsd_get_device_list(struct libusb_context *,
 static int obsd_open(struct libusb_device_handle *);
 static void obsd_close(struct libusb_device_handle *);
 
-static int obsd_get_device_descriptor(struct libusb_device *, void *,
-    int *);
 static int obsd_get_active_config_descriptor(struct libusb_device *,
     void *, size_t);
 static int obsd_get_config_descriptor(struct libusb_device *, uint8_t,
@@ -92,7 +89,6 @@ const struct usbi_os_backend usbi_backend = {
 	.open = obsd_open,
 	.close = obsd_close,
 
-	.get_device_descriptor = obsd_get_device_descriptor,
 	.get_active_config_descriptor = obsd_get_active_config_descriptor,
 	.get_config_descriptor = obsd_get_config_descriptor,
 
@@ -188,7 +184,11 @@ obsd_get_device_list(struct libusb_context * ctx,
 					libusb_unref_device(dev);
 					continue;
 				}
-				dpriv->ddesc = dd.udd_desc;
+
+				static_assert(sizeof(dev->device_descriptor) == sizeof(dd.udd_desc),
+					      "mismatch between libusb and OS device descriptor sizes");
+				memcpy(&dev->device_descriptor, &dd.udd_desc, LIBUSB_DT_DEVICE_SIZE);
+				usbi_localize_device_descriptor(&dev->device_descriptor);
 
 				if (_cache_active_config_descriptor(dev)) {
 					libusb_unref_device(dev);
@@ -252,19 +252,6 @@ obsd_close(struct libusb_device_handle *handle)
 		close(dpriv->fd);
 		dpriv->fd = -1;
 	}
-}
-
-int
-obsd_get_device_descriptor(struct libusb_device *dev, void *buf,
-    int *host_endian)
-{
-	struct device_priv *dpriv = usbi_get_device_priv(dev);
-
-	usbi_dbg(" ");
-
-	memcpy(buf, &dpriv->ddesc, LIBUSB_DT_DEVICE_SIZE);
-
-	return (LIBUSB_SUCCESS);
 }
 
 int

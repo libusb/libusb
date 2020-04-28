@@ -37,13 +37,6 @@ null_close(struct libusb_device_handle *handle)
 }
 
 static int
-null_get_device_descriptor(struct libusb_device *dev, void *buf,
-    int *host_endian)
-{
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
-static int
 null_get_active_config_descriptor(struct libusb_device *dev,
     void *buf, size_t len)
 {
@@ -106,7 +99,6 @@ const struct usbi_os_backend usbi_backend = {
 	.get_device_list = null_get_device_list,
 	.open = null_open,
 	.close = null_close,
-	.get_device_descriptor = null_get_device_descriptor,
 	.get_active_config_descriptor = null_get_active_config_descriptor,
 	.get_config_descriptor = null_get_config_descriptor,
 	.set_configuration = null_set_configuration,

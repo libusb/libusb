@@ -271,13 +271,13 @@ static inline int usbdk_device_priv_init(struct libusb_context *ctx, struct libu
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
 
-	priv->info = *info;
+	priv->ID = info->ID;
 	priv->active_configuration = 0;
 
 	return usbdk_cache_config_descriptors(ctx, priv, info);
 }
 
-static void usbdk_device_init(libusb_device *dev, PUSB_DK_DEVICE_INFO info)
+static void usbdk_device_init(struct libusb_device *dev, PUSB_DK_DEVICE_INFO info)
 {
 	dev->bus_number = (uint8_t)info->FilterID;
 	dev->port_number = (uint8_t)info->Port;
@@ -286,7 +286,10 @@ static void usbdk_device_init(libusb_device *dev, PUSB_DK_DEVICE_INFO info)
 	// Addresses in libusb are 1-based
 	dev->device_address = (uint8_t)(info->Port + 1);
 
+	static_assert(sizeof(dev->device_descriptor) == sizeof(info->DeviceDescriptor),
+		      "mismatch between libusb and OS device descriptor sizes");
 	memcpy(&dev->device_descriptor, &info->DeviceDescriptor, LIBUSB_DT_DEVICE_SIZE);
+	usbi_localize_device_descriptor(&dev->device_descriptor);
 
 	switch (info->Speed) {
 	case LowSpeed:
@@ -357,15 +360,6 @@ func_exit:
 	return r;
 }
 
-static int usbdk_get_device_descriptor(struct libusb_device *dev, void *buffer)
-{
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
-
-	memcpy(buffer, &priv->info.DeviceDescriptor, LIBUSB_DT_DEVICE_SIZE);
-
-	return LIBUSB_SUCCESS;
-}
-
 static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
@@ -408,7 +402,7 @@ static int usbdk_open(struct libusb_device_handle *dev_handle)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 
-	priv->redirector_handle = usbdk_helper.StartRedirect(&priv->info.ID);
+	priv->redirector_handle = usbdk_helper.StartRedirect(&priv->ID);
 	if (priv->redirector_handle == INVALID_HANDLE_VALUE) {
 		usbi_err(HANDLE_CTX(dev_handle), "Redirector startup failed");
 		return LIBUSB_ERROR_OTHER;
@@ -498,7 +492,7 @@ static void usbdk_destroy_device(struct libusb_device *dev)
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
 
 	if (priv->config_descriptors != NULL)
-		usbdk_release_config_descriptors(priv, priv->info.DeviceDescriptor.bNumConfigurations);
+		usbdk_release_config_descriptors(priv, dev->device_descriptor.bNumConfigurations);
 }
 
 static void usbdk_clear_transfer_priv(struct usbi_transfer *itransfer)
@@ -698,7 +692,6 @@ const struct windows_backend usbdk_backend = {
 	usbdk_get_device_list,
 	usbdk_open,
 	usbdk_close,
-	usbdk_get_device_descriptor,
 	usbdk_get_active_config_descriptor,
 	usbdk_get_config_descriptor,
 	usbdk_get_config_descriptor_by_value,

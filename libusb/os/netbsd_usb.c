@@ -37,7 +37,6 @@ struct device_priv {
 	int fd;
 
 	usb_config_descriptor_t *cdesc;		/* active config descriptor */
-	usb_device_descriptor_t ddesc;		/* usb device descriptor */
 };
 
 struct handle_priv {
@@ -52,8 +51,6 @@ static int netbsd_get_device_list(struct libusb_context *,
 static int netbsd_open(struct libusb_device_handle *);
 static void netbsd_close(struct libusb_device_handle *);
 
-static int netbsd_get_device_descriptor(struct libusb_device *, void *,
-    int *);
 static int netbsd_get_active_config_descriptor(struct libusb_device *,
     void *, size_t);
 static int netbsd_get_config_descriptor(struct libusb_device *, uint8_t,
@@ -90,7 +87,6 @@ const struct usbi_os_backend usbi_backend = {
 	.open = netbsd_open,
 	.close = netbsd_close,
 
-	.get_device_descriptor = netbsd_get_device_descriptor,
 	.get_active_config_descriptor = netbsd_get_active_config_descriptor,
 	.get_config_descriptor = netbsd_get_config_descriptor,
 
@@ -121,6 +117,7 @@ netbsd_get_device_list(struct libusb_context * ctx,
 	struct libusb_device *dev;
 	struct device_priv *dpriv;
 	struct usb_device_info di;
+	usb_device_descriptor_t ddesc;
 	unsigned long session_id;
 	char devnode[16];
 	int fd, err, i;
@@ -157,10 +154,15 @@ netbsd_get_device_list(struct libusb_context * ctx,
 			strlcpy(dpriv->devnode, devnode, sizeof(devnode));
 			dpriv->fd = -1;
 
-			if (ioctl(fd, USB_GET_DEVICE_DESC, &dpriv->ddesc) < 0) {
+			if (ioctl(fd, USB_GET_DEVICE_DESC, &ddesc) < 0) {
 				err = errno;
 				goto error;
 			}
+
+			static_assert(sizeof(dev->device_descriptor) == sizeof(ddesc),
+				      "mismatch between libusb and OS device descriptor sizes");
+			memcpy(&dev->device_descriptor, &ddesc, LIBUSB_DT_DEVICE_SIZE);
+			usbi_localize_device_descriptor(&dev->device_descriptor);
 
 			if (_cache_active_config_descriptor(dev, fd)) {
 				err = errno;
@@ -217,19 +219,6 @@ netbsd_close(struct libusb_device_handle *handle)
 
 	close(dpriv->fd);
 	dpriv->fd = -1;
-}
-
-int
-netbsd_get_device_descriptor(struct libusb_device *dev, void *buf,
-    int *host_endian)
-{
-	struct device_priv *dpriv = usbi_get_device_priv(dev);
-
-	usbi_dbg(" ");
-
-	memcpy(buf, &dpriv->ddesc, LIBUSB_DT_DEVICE_SIZE);
-
-	return (LIBUSB_SUCCESS);
 }
 
 int

@@ -661,15 +661,6 @@ static void darwin_exit (struct libusb_context *ctx) {
   pthread_mutex_unlock (&libusb_darwin_init_mutex);
 }
 
-static int darwin_get_device_descriptor(struct libusb_device *dev, void *buffer, int *host_endian) {
-  struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
-
-  /* return cached copy */
-  memmove (buffer, &(priv->dev_descriptor), LIBUSB_DT_DEVICE_SIZE);
-
-  return LIBUSB_SUCCESS;
-}
-
 static int get_configuration_index (struct libusb_device *dev, int config_value) {
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   UInt8 i, numConfig;
@@ -749,7 +740,8 @@ static enum libusb_error darwin_check_configuration (struct libusb_context *ctx,
 
   /* checking the configuration of a root hub simulation takes ~1 s in 10.11. the device is
      not usable anyway */
-  if (0x05ac == dev->dev_descriptor.idVendor && 0x8005 == dev->dev_descriptor.idProduct) {
+  if (0x05ac == libusb_le16_to_cpu (dev->dev_descriptor.idVendor) &&
+      0x8005 == libusb_le16_to_cpu (dev->dev_descriptor.idProduct)) {
     usbi_dbg ("ignoring configuration on root hub simulation");
     dev->active_config = 0;
     return LIBUSB_SUCCESS;
@@ -930,14 +922,14 @@ static enum libusb_error darwin_cache_device_descriptor (struct darwin_cached_de
 
   usbi_dbg ("cached device descriptor:");
   usbi_dbg ("  bDescriptorType:    0x%02x", dev->dev_descriptor.bDescriptorType);
-  usbi_dbg ("  bcdUSB:             0x%04x", dev->dev_descriptor.bcdUSB);
+  usbi_dbg ("  bcdUSB:             0x%04x", libusb_le16_to_cpu (dev->dev_descriptor.bcdUSB));
   usbi_dbg ("  bDeviceClass:       0x%02x", dev->dev_descriptor.bDeviceClass);
   usbi_dbg ("  bDeviceSubClass:    0x%02x", dev->dev_descriptor.bDeviceSubClass);
   usbi_dbg ("  bDeviceProtocol:    0x%02x", dev->dev_descriptor.bDeviceProtocol);
   usbi_dbg ("  bMaxPacketSize0:    0x%02x", dev->dev_descriptor.bMaxPacketSize0);
-  usbi_dbg ("  idVendor:           0x%04x", dev->dev_descriptor.idVendor);
-  usbi_dbg ("  idProduct:          0x%04x", dev->dev_descriptor.idProduct);
-  usbi_dbg ("  bcdDevice:          0x%04x", dev->dev_descriptor.bcdDevice);
+  usbi_dbg ("  idVendor:           0x%04x", libusb_le16_to_cpu (dev->dev_descriptor.idVendor));
+  usbi_dbg ("  idProduct:          0x%04x", libusb_le16_to_cpu (dev->dev_descriptor.idProduct));
+  usbi_dbg ("  bcdDevice:          0x%04x", libusb_le16_to_cpu (dev->dev_descriptor.bcdDevice));
   usbi_dbg ("  iManufacturer:      0x%02x", dev->dev_descriptor.iManufacturer);
   usbi_dbg ("  iProduct:           0x%02x", dev->dev_descriptor.iProduct);
   usbi_dbg ("  iSerialNumber:      0x%02x", dev->dev_descriptor.iSerialNumber);
@@ -1074,7 +1066,8 @@ static enum libusb_error darwin_get_cached_device(io_service_t service, struct d
 
     if (new_device->can_enumerate) {
       snprintf(new_device->sys_path, 20, "%03i-%04x-%04x-%02x-%02x", new_device->address,
-               new_device->dev_descriptor.idVendor, new_device->dev_descriptor.idProduct,
+               libusb_le16_to_cpu (new_device->dev_descriptor.idVendor),
+               libusb_le16_to_cpu (new_device->dev_descriptor.idProduct),
                new_device->dev_descriptor.bDeviceClass, new_device->dev_descriptor.bDeviceSubClass);
     }
   } while (0);
@@ -1122,6 +1115,10 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
       dev->bus_number     = cached_device->location >> 24;
       assert(cached_device->address <= UINT8_MAX);
       dev->device_address = (uint8_t)cached_device->address;
+      static_assert(sizeof(dev->device_descriptor) == sizeof(cached_device->dev_descriptor),
+                    "mismatch between libusb and IOKit device descriptor sizes");
+      memcpy(&dev->device_descriptor, &cached_device->dev_descriptor, LIBUSB_DT_DEVICE_SIZE);
+      usbi_localize_device_descriptor(&dev->device_descriptor);
     } else {
       priv = usbi_get_device_priv(dev);
     }
@@ -2260,7 +2257,6 @@ const struct usbi_os_backend usbi_backend = {
         .caps = 0,
         .init = darwin_init,
         .exit = darwin_exit,
-        .get_device_descriptor = darwin_get_device_descriptor,
         .get_active_config_descriptor = darwin_get_active_config_descriptor,
         .get_config_descriptor = darwin_get_config_descriptor,
         .hotplug_poll = darwin_hotplug_poll,

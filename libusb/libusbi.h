@@ -36,6 +36,13 @@
 
 #include "libusb.h"
 
+/* Not all C standard library headers define static_assert in assert.h
+ * Additionally, Visual Studio treats static_assert as a keyword.
+ */
+#if !defined(__cplusplus) && !defined(static_assert) && !defined(_MSC_VER)
+#define static_assert(cond, msg) _Static_assert(cond, msg)
+#endif
+
 #define container_of(ptr, type, member) \
 	((type *)((uintptr_t)(ptr) - (uintptr_t)offsetof(type, member)))
 
@@ -450,6 +457,17 @@ struct libusb_device_handle {
 	int auto_detach_kernel_driver;
 };
 
+/* Function called by backend during device initialization to convert
+ * multi-byte fields in the device descriptor to host-endian format.
+ */
+static inline void usbi_localize_device_descriptor(struct libusb_device_descriptor *desc)
+{
+	desc->bcdUSB = libusb_le16_to_cpu(desc->bcdUSB);
+	desc->idVendor = libusb_le16_to_cpu(desc->idVendor);
+	desc->idProduct = libusb_le16_to_cpu(desc->idProduct);
+	desc->bcdDevice = libusb_le16_to_cpu(desc->bcdDevice);
+}
+
 #ifdef HAVE_CLOCK_GETTIME
 #define USBI_CLOCK_REALTIME	CLOCK_REALTIME
 #define USBI_CLOCK_MONOTONIC	CLOCK_MONOTONIC
@@ -618,7 +636,6 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 int usbi_handle_transfer_cancellation(struct usbi_transfer *itransfer);
 void usbi_signal_transfer_completion(struct usbi_transfer *itransfer);
 
-int usbi_device_cache_descriptor(libusb_device *dev);
 int usbi_get_config_index_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, int *idx);
 
@@ -850,30 +867,6 @@ struct usbi_os_backend {
 	 * This function is called when the user closes a device handle.
 	 */
 	void (*close)(struct libusb_device_handle *dev_handle);
-
-	/* Retrieve the device descriptor from a device.
-	 *
-	 * The descriptor should be retrieved from memory, NOT via bus I/O to the
-	 * device. This means that you may have to cache it in a private structure
-	 * during get_device_list enumeration. Alternatively, you may be able
-	 * to retrieve it from a kernel interface (some Linux setups can do this)
-	 * still without generating bus I/O.
-	 *
-	 * This function is expected to write LIBUSB_DT_DEVICE_SIZE (18) bytes into
-	 * buffer, which is guaranteed to be big enough.
-	 *
-	 * This function is called when sanity-checking a device before adding
-	 * it to the list of discovered devices, and also when the user requests
-	 * to read the device descriptor.
-	 *
-	 * This function is expected to return the descriptor in bus-endian format
-	 * (LE). If it returns the multi-byte values in host-endian format,
-	 * set the host_endian output parameter to "1".
-	 *
-	 * Return 0 on success or a LIBUSB_ERROR code on failure.
-	 */
-	int (*get_device_descriptor)(struct libusb_device *device, void *buffer,
-		int *host_endian);
 
 	/* Get the ACTIVE configuration descriptor for a device.
 	 *

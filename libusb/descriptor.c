@@ -482,24 +482,6 @@ static int raw_desc_to_config(struct libusb_context *ctx,
 	return LIBUSB_SUCCESS;
 }
 
-int usbi_device_cache_descriptor(libusb_device *dev)
-{
-	int r, host_endian = 0;
-
-	r = usbi_backend.get_device_descriptor(dev, &dev->device_descriptor, &host_endian);
-	if (r < 0)
-		return r;
-
-	if (!host_endian) {
-		dev->device_descriptor.bcdUSB = libusb_le16_to_cpu(dev->device_descriptor.bcdUSB);
-		dev->device_descriptor.idVendor = libusb_le16_to_cpu(dev->device_descriptor.idVendor);
-		dev->device_descriptor.idProduct = libusb_le16_to_cpu(dev->device_descriptor.idProduct);
-		dev->device_descriptor.bcdDevice = libusb_le16_to_cpu(dev->device_descriptor.bcdDevice);
-	}
-
-	return LIBUSB_SUCCESS;
-}
-
 /** \ingroup libusb_desc
  * Get the USB device descriptor for a given device.
  *
@@ -516,7 +498,9 @@ int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
 	struct libusb_device_descriptor *desc)
 {
 	usbi_dbg(" ");
-	memcpy(desc, &dev->device_descriptor, sizeof(dev->device_descriptor));
+	static_assert(sizeof(dev->device_descriptor) == LIBUSB_DT_DEVICE_SIZE,
+		      "struct libusb_device_descriptor is not expected size");
+	*desc = dev->device_descriptor;
 	return 0;
 }
 

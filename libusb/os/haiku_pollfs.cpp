@@ -128,6 +128,11 @@ WatchedEntry::WatchedEntry(BMessenger *messenger, entry_ref *ref)
 				sscanf(path.Path(), "/dev/bus/usb/%hhu", &dev->bus_number);
 				dev->device_address = addr - (dev->bus_number + 1);
 
+				static_assert(sizeof(dev->device_descriptor) == sizeof(usb_device_descriptor),
+					      "mismatch between libusb and OS device descriptor sizes");
+				memcpy(&dev->device_descriptor, fDevice->Descriptor(), LIBUSB_DT_DEVICE_SIZE);
+				usbi_localize_device_descriptor(&dev->device_descriptor);
+
 				if (usbi_sanitize_device(dev) < 0) {
 					usbi_dbg("device sanitization failed");
 					libusb_unref_device(dev);

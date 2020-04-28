@@ -737,12 +737,13 @@ void usbi_disconnect_device(struct libusb_device *dev)
  * to the discovered device list. */
 int usbi_sanitize_device(struct libusb_device *dev)
 {
-	int r;
 	uint8_t num_configurations;
 
-	r = usbi_device_cache_descriptor(dev);
-	if (r < 0)
-		return r;
+	if (dev->device_descriptor.bLength != LIBUSB_DT_DEVICE_SIZE ||
+	    dev->device_descriptor.bDescriptorType != LIBUSB_DT_DEVICE) {
+		usbi_err(DEVICE_CTX(dev), "invalid device descriptor");
+		return LIBUSB_ERROR_IO;
+	}
 
 	num_configurations = dev->device_descriptor.bNumConfigurations;
 	if (num_configurations > USB_MAXCONFIG) {

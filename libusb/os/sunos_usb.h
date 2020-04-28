@@ -30,7 +30,6 @@
 typedef struct sunos_device_priv {
 	uint8_t	cfgvalue;		/* active config value */
 	uint8_t	*raw_cfgdescr;		/* active config descriptor */
-	struct libusb_device_descriptor	dev_descr;	/* usb device descriptor */
 	char	*ugenpath;		/* name of the ugen(4) node */
 	char	*phypath;		/* physical path */
 } sunos_dev_priv_t;
