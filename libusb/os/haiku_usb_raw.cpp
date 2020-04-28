@@ -35,6 +35,7 @@ static int haiku_get_config_descriptor(struct libusb_device *, uint8_t,
 static int
 haiku_init(struct libusb_context *ctx)
 {
+	UNUSED(ctx);
 	if (atomic_add(&gInitCount, 1) == 0)
 		return gUsbRoster.Start();
 	return LIBUSB_SUCCESS;

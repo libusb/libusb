@@ -1639,7 +1639,7 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
 	int configuration)
 {
 	usbi_dbg("configuration %d", configuration);
-	if (configuration < -1 || configuration > UINT8_MAX)
+	if (configuration < -1 || configuration > (int)UINT8_MAX)
 		return LIBUSB_ERROR_INVALID_PARAM;
 	return usbi_backend.set_configuration(dev_handle, configuration);
 }
@@ -1768,7 +1768,7 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_hand
 		interface_number, alternate_setting);
 	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
-	if (alternate_setting < 0 || alternate_setting > UINT8_MAX)
+	if (alternate_setting < 0 || alternate_setting > (int)UINT8_MAX)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	usbi_mutex_lock(&dev_handle->lock);

@@ -227,13 +227,13 @@ netbsd_get_active_config_descriptor(struct libusb_device *dev,
 {
 	struct device_priv *dpriv = usbi_get_device_priv(dev);
 
-	len = MIN(len, UGETW(dpriv->cdesc->wTotalLength));
+	len = MIN(len, (size_t)UGETW(dpriv->cdesc->wTotalLength));
 
-	usbi_dbg("len %d", len);
+	usbi_dbg("len %zu", len);
 
 	memcpy(buf, dpriv->cdesc, len);
 
-	return len;
+	return (int)len;
 }
 
 int
@@ -244,7 +244,7 @@ netbsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 	struct usb_full_desc ufd;
 	int fd, err;
 
-	usbi_dbg("index %d, len %d", idx, len);
+	usbi_dbg("index %u, len %zu", idx, len);
 
 	/* A config descriptor may be requested before opening the device */
 	if (dpriv->fd >= 0) {
@@ -269,7 +269,7 @@ netbsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 	if (dpriv->fd < 0)
 		close(fd);
 
-	return len;
+	return (int)len;
 }
 
 int
@@ -306,6 +306,8 @@ netbsd_claim_interface(struct libusb_device_handle *handle, int iface)
 	struct handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int i;
 
+	UNUSED(iface);
+
 	for (i = 0; i < USB_MAX_ENDPOINTS; i++)
 		hpriv->endpoints[i] = -1;
 
@@ -317,6 +319,8 @@ netbsd_release_interface(struct libusb_device_handle *handle, int iface)
 {
 	struct handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int i;
+
+	UNUSED(iface);
 
 	for (i = 0; i < USB_MAX_ENDPOINTS; i++)
 		if (hpriv->endpoints[i] >= 0)
@@ -379,13 +383,11 @@ int
 netbsd_submit_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer;
-	struct handle_priv *hpriv;
 	int err = 0;
 
 	usbi_dbg(" ");
 
 	transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	hpriv = usbi_get_device_handle_priv(transfer->dev_handle);
 
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
@@ -424,6 +426,8 @@ netbsd_submit_transfer(struct usbi_transfer *itransfer)
 int
 netbsd_cancel_transfer(struct usbi_transfer *itransfer)
 {
+	UNUSED(itransfer);
+
 	usbi_dbg(" ");
 
 	return (LIBUSB_ERROR_NOT_SUPPORTED);
