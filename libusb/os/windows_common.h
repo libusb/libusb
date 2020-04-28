@@ -135,6 +135,11 @@ typedef LONG USBD_STATUS;
 #define USBD_STATUS_CANCELED		((USBD_STATUS)0xC0010000L)
 #endif
 
+// error code added with Windows SDK 10.0.18362
+#ifndef ERROR_NO_SUCH_DEVICE
+#define ERROR_NO_SUCH_DEVICE	433L
+#endif
+
 /* Windows versions */
 enum windows_version {
 	WINDOWS_UNDEFINED,
