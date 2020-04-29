@@ -1702,6 +1702,10 @@ static int darwin_reset_device(struct libusb_device_handle *dev_handle) {
     nanosleep (&delay, NULL);
   }
 
+  /* avoid race condition with 10 ms delay (hack) */
+  struct timespec delay = {.tv_sec = 0, .tv_nsec = 10000000};
+  nanosleep (&delay, NULL);
+
   /* compare descriptors */
   usbi_dbg ("darwin/reset_device: checking whether descriptors changed");
 
