@@ -57,20 +57,20 @@ null_set_configuration(struct libusb_device_handle *handle, int config)
 }
 
 static int
-null_claim_interface(struct libusb_device_handle *handle, int iface)
+null_claim_interface(struct libusb_device_handle *handle, uint8_t iface)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static int
-null_release_interface(struct libusb_device_handle *handle, int iface)
+null_release_interface(struct libusb_device_handle *handle, uint8_t iface)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static int
-null_set_interface_altsetting(struct libusb_device_handle *handle, int iface,
-    int altsetting)
+null_set_interface_altsetting(struct libusb_device_handle *handle, uint8_t iface,
+    uint8_t altsetting)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }

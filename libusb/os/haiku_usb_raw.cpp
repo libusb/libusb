@@ -108,14 +108,14 @@ haiku_set_configuration(struct libusb_device_handle *dev_handle, int config)
 }
 
 static int
-haiku_claim_interface(struct libusb_device_handle *dev_handle, int interface_number)
+haiku_claim_interface(struct libusb_device_handle *dev_handle, uint8_t interface_number)
 {
 	USBDeviceHandle *handle = *((USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle));
 	return handle->ClaimInterface(interface_number);
 }
 
 static int
-haiku_set_altsetting(struct libusb_device_handle *dev_handle, int interface_number, int altsetting)
+haiku_set_altsetting(struct libusb_device_handle *dev_handle, uint8_t interface_number, uint8_t altsetting)
 {
 	USBDeviceHandle *handle = *((USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle));
 	return handle->SetAltSetting(interface_number, altsetting);
@@ -129,10 +129,10 @@ haiku_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint
 }
 
 static int
-haiku_release_interface(struct libusb_device_handle *dev_handle, int interface_number)
+haiku_release_interface(struct libusb_device_handle *dev_handle, uint8_t interface_number)
 {
 	USBDeviceHandle *handle = *((USBDeviceHandle **)usbi_get_device_handle_priv(dev_handle));
-	haiku_set_altsetting(dev_handle,interface_number, 0);
+	haiku_set_altsetting(dev_handle, interface_number, 0);
 	return handle->ReleaseInterface(interface_number);
 }
 

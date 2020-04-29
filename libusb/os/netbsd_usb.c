@@ -56,14 +56,14 @@ static int netbsd_get_active_config_descriptor(struct libusb_device *,
 static int netbsd_get_config_descriptor(struct libusb_device *, uint8_t,
     void *, size_t);
 
-static int netbsd_get_configuration(struct libusb_device_handle *, int *);
+static int netbsd_get_configuration(struct libusb_device_handle *, uint8_t *);
 static int netbsd_set_configuration(struct libusb_device_handle *, int);
 
-static int netbsd_claim_interface(struct libusb_device_handle *, int);
-static int netbsd_release_interface(struct libusb_device_handle *, int);
+static int netbsd_claim_interface(struct libusb_device_handle *, uint8_t);
+static int netbsd_release_interface(struct libusb_device_handle *, uint8_t);
 
-static int netbsd_set_interface_altsetting(struct libusb_device_handle *, int,
-    int);
+static int netbsd_set_interface_altsetting(struct libusb_device_handle *,
+    uint8_t, uint8_t);
 static int netbsd_clear_halt(struct libusb_device_handle *, unsigned char);
 static void netbsd_destroy_device(struct libusb_device *);
 
@@ -273,16 +273,18 @@ netbsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 }
 
 int
-netbsd_get_configuration(struct libusb_device_handle *handle, int *config)
+netbsd_get_configuration(struct libusb_device_handle *handle, uint8_t *config)
 {
 	struct device_priv *dpriv = usbi_get_device_priv(handle->dev);
+	int tmp;
 
 	usbi_dbg(" ");
 
-	if (ioctl(dpriv->fd, USB_GET_CONFIG, config) < 0)
+	if (ioctl(dpriv->fd, USB_GET_CONFIG, &tmp) < 0)
 		return _errno_to_libusb(errno);
 
-	usbi_dbg("configuration %d", *config);
+	usbi_dbg("configuration %d", tmp);
+	*config = (uint8_t)tmp;
 
 	return (LIBUSB_SUCCESS);
 }
@@ -301,7 +303,7 @@ netbsd_set_configuration(struct libusb_device_handle *handle, int config)
 }
 
 int
-netbsd_claim_interface(struct libusb_device_handle *handle, int iface)
+netbsd_claim_interface(struct libusb_device_handle *handle, uint8_t iface)
 {
 	struct handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int i;
@@ -315,7 +317,7 @@ netbsd_claim_interface(struct libusb_device_handle *handle, int iface)
 }
 
 int
-netbsd_release_interface(struct libusb_device_handle *handle, int iface)
+netbsd_release_interface(struct libusb_device_handle *handle, uint8_t iface)
 {
 	struct handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int i;
@@ -330,13 +332,13 @@ netbsd_release_interface(struct libusb_device_handle *handle, int iface)
 }
 
 int
-netbsd_set_interface_altsetting(struct libusb_device_handle *handle, int iface,
-    int altsetting)
+netbsd_set_interface_altsetting(struct libusb_device_handle *handle, uint8_t iface,
+    uint8_t altsetting)
 {
 	struct device_priv *dpriv = usbi_get_device_priv(handle->dev);
 	struct usb_alt_interface intf;
 
-	usbi_dbg("iface %d, setting %d", iface, altsetting);
+	usbi_dbg("iface %u, setting %u", iface, altsetting);
 
 	memset(&intf, 0, sizeof(intf));
 

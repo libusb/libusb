@@ -56,14 +56,14 @@ static int obsd_get_active_config_descriptor(struct libusb_device *,
 static int obsd_get_config_descriptor(struct libusb_device *, uint8_t,
     void *, size_t);
 
-static int obsd_get_configuration(struct libusb_device_handle *, int *);
+static int obsd_get_configuration(struct libusb_device_handle *, uint8_t *);
 static int obsd_set_configuration(struct libusb_device_handle *, int);
 
-static int obsd_claim_interface(struct libusb_device_handle *, int);
-static int obsd_release_interface(struct libusb_device_handle *, int);
+static int obsd_claim_interface(struct libusb_device_handle *, uint8_t);
+static int obsd_release_interface(struct libusb_device_handle *, uint8_t);
 
-static int obsd_set_interface_altsetting(struct libusb_device_handle *, int,
-    int);
+static int obsd_set_interface_altsetting(struct libusb_device_handle *, uint8_t,
+    uint8_t);
 static int obsd_clear_halt(struct libusb_device_handle *, unsigned char);
 static void obsd_destroy_device(struct libusb_device *);
 
@@ -298,13 +298,13 @@ obsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 }
 
 int
-obsd_get_configuration(struct libusb_device_handle *handle, int *config)
+obsd_get_configuration(struct libusb_device_handle *handle, uint8_t *config)
 {
 	struct device_priv *dpriv = usbi_get_device_priv(handle->dev);
 
 	*config = dpriv->cdesc->bConfigurationValue;
 
-	usbi_dbg("bConfigurationValue %d", *config);
+	usbi_dbg("bConfigurationValue %u", *config);
 
 	return (LIBUSB_SUCCESS);
 }
@@ -326,7 +326,7 @@ obsd_set_configuration(struct libusb_device_handle *handle, int config)
 }
 
 int
-obsd_claim_interface(struct libusb_device_handle *handle, int iface)
+obsd_claim_interface(struct libusb_device_handle *handle, uint8_t iface)
 {
 	struct handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int i;
@@ -340,7 +340,7 @@ obsd_claim_interface(struct libusb_device_handle *handle, int iface)
 }
 
 int
-obsd_release_interface(struct libusb_device_handle *handle, int iface)
+obsd_release_interface(struct libusb_device_handle *handle, uint8_t iface)
 {
 	struct handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int i;
@@ -355,8 +355,8 @@ obsd_release_interface(struct libusb_device_handle *handle, int iface)
 }
 
 int
-obsd_set_interface_altsetting(struct libusb_device_handle *handle, int iface,
-    int altsetting)
+obsd_set_interface_altsetting(struct libusb_device_handle *handle, uint8_t iface,
+    uint8_t altsetting)
 {
 	struct device_priv *dpriv = usbi_get_device_priv(handle->dev);
 	struct usb_alt_interface intf;
@@ -364,7 +364,7 @@ obsd_set_interface_altsetting(struct libusb_device_handle *handle, int iface,
 	if (dpriv->devname == NULL)
 		return (LIBUSB_ERROR_NOT_SUPPORTED);
 
-	usbi_dbg("iface %d, setting %d", iface, altsetting);
+	usbi_dbg("iface %u, setting %u", iface, altsetting);
 
 	memset(&intf, 0, sizeof(intf));
 

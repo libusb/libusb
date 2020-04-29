@@ -252,7 +252,7 @@ USBDeviceHandle::~USBDeviceHandle()
 }
 
 int
-USBDeviceHandle::ClaimInterface(int inumber)
+USBDeviceHandle::ClaimInterface(uint8 inumber)
 {
 	int status = fUSBDevice->ClaimInterface(inumber);
 	if (status == LIBUSB_SUCCESS)
@@ -261,7 +261,7 @@ USBDeviceHandle::ClaimInterface(int inumber)
 }
 
 int
-USBDeviceHandle::ReleaseInterface(int inumber)
+USBDeviceHandle::ReleaseInterface(uint8 inumber)
 {
 	fUSBDevice->ReleaseInterface(inumber);
 	fClaimedInterfaces &= ~(1U << inumber);
@@ -285,7 +285,7 @@ USBDeviceHandle::SetConfiguration(uint8 config)
 }
 
 int
-USBDeviceHandle::SetAltSetting(int inumber, int alt)
+USBDeviceHandle::SetAltSetting(uint8 inumber, uint8 alt)
 {
 	usb_raw_command command;
 	command.alternate.config_index = fUSBDevice->ActiveConfigurationIndex();
@@ -401,7 +401,7 @@ USBDevice::ActiveConfigurationIndex() const
 	return fActiveConfiguration;
 }
 
-int USBDevice::ClaimInterface(int interface)
+int USBDevice::ClaimInterface(uint8 interface)
 {
 	if (interface > ActiveConfiguration()->number_interfaces)
 		return LIBUSB_ERROR_NOT_FOUND;
@@ -411,7 +411,7 @@ int USBDevice::ClaimInterface(int interface)
 	return LIBUSB_SUCCESS;
 }
 
-int USBDevice::ReleaseInterface(int interface)
+int USBDevice::ReleaseInterface(uint8 interface)
 {
 	fClaimedInterfaces &= ~(1U << interface);
 	return LIBUSB_SUCCESS;

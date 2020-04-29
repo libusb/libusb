@@ -304,12 +304,12 @@ struct windows_backend {
 		uint8_t config_index, void *buffer, size_t len);
 	int (*get_config_descriptor_by_value)(struct libusb_device *device,
 		uint8_t bConfigurationValue, void **buffer);
-	int (*get_configuration)(struct libusb_device_handle *dev_handle, int *config);
-	int (*set_configuration)(struct libusb_device_handle *dev_handle, int config);
-	int (*claim_interface)(struct libusb_device_handle *dev_handle, int interface_number);
-	int (*release_interface)(struct libusb_device_handle *dev_handle, int interface_number);
+	int (*get_configuration)(struct libusb_device_handle *dev_handle, uint8_t *config);
+	int (*set_configuration)(struct libusb_device_handle *dev_handle, uint8_t config);
+	int (*claim_interface)(struct libusb_device_handle *dev_handle, uint8_t interface_number);
+	int (*release_interface)(struct libusb_device_handle *dev_handle, uint8_t interface_number);
 	int (*set_interface_altsetting)(struct libusb_device_handle *dev_handle,
-		int interface_number, int altsetting);
+		uint8_t interface_number, uint8_t altsetting);
 	int (*clear_halt)(struct libusb_device_handle *dev_handle,
 		unsigned char endpoint);
 	int (*reset_device)(struct libusb_device_handle *dev_handle);

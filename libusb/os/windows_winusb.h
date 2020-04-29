@@ -98,10 +98,10 @@ struct windows_usb_api_backend {
 	void (*exit)(void);
 	int (*open)(int sub_api, struct libusb_device_handle *dev_handle);
 	void (*close)(int sub_api, struct libusb_device_handle *dev_handle);
-	int (*configure_endpoints)(int sub_api, struct libusb_device_handle *dev_handle, int iface);
-	int (*claim_interface)(int sub_api, struct libusb_device_handle *dev_handle, int iface);
-	int (*set_interface_altsetting)(int sub_api, struct libusb_device_handle *dev_handle, int iface, int altsetting);
-	int (*release_interface)(int sub_api, struct libusb_device_handle *dev_handle, int iface);
+	int (*configure_endpoints)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
+	int (*claim_interface)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
+	int (*set_interface_altsetting)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting);
+	int (*release_interface)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 	int (*clear_halt)(int sub_api, struct libusb_device_handle *dev_handle, unsigned char endpoint);
 	int (*reset_device)(int sub_api, struct libusb_device_handle *dev_handle);
 	int (*submit_bulk_transfer)(int sub_api, struct usbi_transfer *itransfer);

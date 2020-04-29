@@ -619,7 +619,7 @@ static int windows_get_config_descriptor_by_value(struct libusb_device *dev,
 	return priv->backend->get_config_descriptor_by_value(dev, bConfigurationValue, buffer);
 }
 
-static int windows_get_configuration(struct libusb_device_handle *dev_handle, int *config)
+static int windows_get_configuration(struct libusb_device_handle *dev_handle, uint8_t *config)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->get_configuration(dev_handle, config);
@@ -628,23 +628,25 @@ static int windows_get_configuration(struct libusb_device_handle *dev_handle, in
 static int windows_set_configuration(struct libusb_device_handle *dev_handle, int config)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
-	return priv->backend->set_configuration(dev_handle, config);
+	if (config == -1)
+		config = 0;
+	return priv->backend->set_configuration(dev_handle, (uint8_t)config);
 }
 
-static int windows_claim_interface(struct libusb_device_handle *dev_handle, int interface_number)
+static int windows_claim_interface(struct libusb_device_handle *dev_handle, uint8_t interface_number)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->claim_interface(dev_handle, interface_number);
 }
 
-static int windows_release_interface(struct libusb_device_handle *dev_handle, int interface_number)
+static int windows_release_interface(struct libusb_device_handle *dev_handle, uint8_t interface_number)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->release_interface(dev_handle, interface_number);
 }
 
 static int windows_set_interface_altsetting(struct libusb_device_handle *dev_handle,
-	int interface_number, int altsetting)
+	uint8_t interface_number, uint8_t altsetting)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->set_interface_altsetting(dev_handle, interface_number, altsetting);

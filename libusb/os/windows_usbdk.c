@@ -421,7 +421,7 @@ static void usbdk_close(struct libusb_device_handle *dev_handle)
 		usbi_err(HANDLE_CTX(dev_handle), "Redirector shutdown failed");
 }
 
-static int usbdk_get_configuration(struct libusb_device_handle *dev_handle, int *config)
+static int usbdk_get_configuration(struct libusb_device_handle *dev_handle, uint8_t *config)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 
@@ -430,21 +430,21 @@ static int usbdk_get_configuration(struct libusb_device_handle *dev_handle, int 
 	return LIBUSB_SUCCESS;
 }
 
-static int usbdk_set_configuration(struct libusb_device_handle *dev_handle, int config)
+static int usbdk_set_configuration(struct libusb_device_handle *dev_handle, uint8_t config)
 {
 	UNUSED(dev_handle);
 	UNUSED(config);
 	return LIBUSB_SUCCESS;
 }
 
-static int usbdk_claim_interface(struct libusb_device_handle *dev_handle, int iface)
+static int usbdk_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface)
 {
 	UNUSED(dev_handle);
 	UNUSED(iface);
 	return LIBUSB_SUCCESS;
 }
 
-static int usbdk_set_interface_altsetting(struct libusb_device_handle *dev_handle, int iface, int altsetting)
+static int usbdk_set_interface_altsetting(struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 
@@ -456,7 +456,7 @@ static int usbdk_set_interface_altsetting(struct libusb_device_handle *dev_handl
 	return LIBUSB_SUCCESS;
 }
 
-static int usbdk_release_interface(struct libusb_device_handle *dev_handle, int iface)
+static int usbdk_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface)
 {
 	UNUSED(dev_handle);
 	UNUSED(iface);

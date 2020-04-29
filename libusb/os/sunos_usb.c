@@ -64,20 +64,20 @@ static int sunos_get_active_config_descriptor(struct libusb_device *,
     void *, size_t);
 static int sunos_get_config_descriptor(struct libusb_device *, uint8_t,
     void *, size_t);
-static int sunos_get_configuration(struct libusb_device_handle *, int *);
+static int sunos_get_configuration(struct libusb_device_handle *, uint8_t *);
 static int sunos_set_configuration(struct libusb_device_handle *, int);
-static int sunos_claim_interface(struct libusb_device_handle *, int);
-static int sunos_release_interface(struct libusb_device_handle *, int);
+static int sunos_claim_interface(struct libusb_device_handle *, uint8_t);
+static int sunos_release_interface(struct libusb_device_handle *, uint8_t);
 static int sunos_set_interface_altsetting(struct libusb_device_handle *,
-    int, int);
-static int sunos_clear_halt(struct libusb_device_handle *, uint8_t);
+    uint8_t, uint8_t);
+static int sunos_clear_halt(struct libusb_device_handle *, unsigned char);
 static void sunos_destroy_device(struct libusb_device *);
 static int sunos_submit_transfer(struct usbi_transfer *);
 static int sunos_cancel_transfer(struct usbi_transfer *);
 static int sunos_handle_transfer_completion(struct usbi_transfer *);
-static int sunos_kernel_driver_active(struct libusb_device_handle *, int interface);
-static int sunos_detach_kernel_driver (struct libusb_device_handle *dev, int interface_number);
-static int sunos_attach_kernel_driver (struct libusb_device_handle *dev, int interface_number);
+static int sunos_kernel_driver_active(struct libusb_device_handle *, uint8_t);
+static int sunos_detach_kernel_driver(struct libusb_device_handle *, uint8_t);
+static int sunos_attach_kernel_driver(struct libusb_device_handle *, uint8_t);
 static int sunos_usb_open_ep0(sunos_dev_handle_priv_t *hpriv, sunos_dev_priv_t *dpriv);
 static int sunos_usb_ioctl(struct libusb_device *dev, int cmd);
 
@@ -222,7 +222,7 @@ sunos_usb_ioctl(struct libusb_device *dev, int cmd)
 }
 
 static int
-sunos_kernel_driver_active(struct libusb_device_handle *dev_handle, int interface)
+sunos_kernel_driver_active(struct libusb_device_handle *dev_handle, uint8_t interface)
 {
 	sunos_dev_priv_t *dpriv = usbi_get_device_priv(dev_handle->dev);
 
@@ -345,7 +345,7 @@ sunos_exec_command(struct libusb_context *ctx, const char *path,
 
 static int
 sunos_detach_kernel_driver(struct libusb_device_handle *dev_handle,
-	int interface_number)
+	uint8_t interface_number)
 {
 	struct libusb_context *ctx = HANDLE_CTX(dev_handle);
 	string_list_t *list;
@@ -402,7 +402,7 @@ sunos_detach_kernel_driver(struct libusb_device_handle *dev_handle,
 
 static int
 sunos_attach_kernel_driver(struct libusb_device_handle *dev_handle,
-	int interface_number)
+	uint8_t interface_number)
 {
 	struct libusb_context *ctx = HANDLE_CTX(dev_handle);
 	string_list_t *list;
@@ -1054,13 +1054,13 @@ sunos_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 }
 
 int
-sunos_get_configuration(struct libusb_device_handle *handle, int *config)
+sunos_get_configuration(struct libusb_device_handle *handle, uint8_t *config)
 {
 	sunos_dev_priv_t *dpriv = usbi_get_device_priv(handle->dev);
 
 	*config = dpriv->cfgvalue;
 
-	usbi_dbg("bConfigurationValue %d", *config);
+	usbi_dbg("bConfigurationValue %u", *config);
 
 	return (LIBUSB_SUCCESS);
 }
@@ -1087,21 +1087,21 @@ sunos_set_configuration(struct libusb_device_handle *handle, int config)
 }
 
 int
-sunos_claim_interface(struct libusb_device_handle *handle, int iface)
+sunos_claim_interface(struct libusb_device_handle *handle, uint8_t iface)
 {
 	UNUSED(handle);
 
-	usbi_dbg("iface %d", iface);
+	usbi_dbg("iface %u", iface);
 
 	return (LIBUSB_SUCCESS);
 }
 
 int
-sunos_release_interface(struct libusb_device_handle *handle, int iface)
+sunos_release_interface(struct libusb_device_handle *handle, uint8_t iface)
 {
 	sunos_dev_handle_priv_t *hpriv = usbi_get_device_handle_priv(handle);
 
-	usbi_dbg("iface %d", iface);
+	usbi_dbg("iface %u", iface);
 
 	/* XXX: can we release it? */
 	hpriv->altsetting[iface] = 0;
@@ -1110,13 +1110,13 @@ sunos_release_interface(struct libusb_device_handle *handle, int iface)
 }
 
 int
-sunos_set_interface_altsetting(struct libusb_device_handle *handle, int iface,
-    int altsetting)
+sunos_set_interface_altsetting(struct libusb_device_handle *handle, uint8_t iface,
+    uint8_t altsetting)
 {
 	sunos_dev_priv_t *dpriv = usbi_get_device_priv(handle->dev);
 	sunos_dev_handle_priv_t *hpriv = usbi_get_device_handle_priv(handle);
 
-	usbi_dbg("iface %d, setting %d", iface, altsetting);
+	usbi_dbg("iface %u, setting %u", iface, altsetting);
 
 	if (dpriv->ugenpath == NULL)
 		return (LIBUSB_ERROR_NOT_FOUND);
@@ -1340,7 +1340,7 @@ solaris_submit_ctrl_on_default(struct libusb_transfer *transfer)
 }
 
 int
-sunos_clear_halt(struct libusb_device_handle *handle, uint8_t endpoint)
+sunos_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 {
 	int ret;
 

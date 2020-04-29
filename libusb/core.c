@@ -1561,29 +1561,30 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev_handle,
 	int *config)
 {
 	int r = LIBUSB_ERROR_NOT_SUPPORTED;
+	uint8_t tmp = 0;
 
 	usbi_dbg(" ");
 	if (usbi_backend.get_configuration)
-		r = usbi_backend.get_configuration(dev_handle, config);
+		r = usbi_backend.get_configuration(dev_handle, &tmp);
 
 	if (r == LIBUSB_ERROR_NOT_SUPPORTED) {
-		uint8_t tmp = 0;
 		usbi_dbg("falling back to control message");
 		r = libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_IN,
 			LIBUSB_REQUEST_GET_CONFIGURATION, 0, 0, &tmp, 1, 1000);
-		if (r == 0) {
+		if (r == 1) {
+			r = 0;
+		} else if (r == 0) {
 			usbi_err(HANDLE_CTX(dev_handle), "zero bytes returned in ctrl transfer?");
 			r = LIBUSB_ERROR_IO;
-		} else if (r == 1) {
-			r = 0;
-			*config = tmp;
 		} else {
 			usbi_dbg("control failed, error %d", r);
 		}
 	}
 
-	if (r == 0)
-		usbi_dbg("active config %d", *config);
+	if (r == 0) {
+		usbi_dbg("active config %u", tmp);
+		*config = (int)tmp;
+	}
 
 	return r;
 }
@@ -1688,7 +1689,7 @@ int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
 	if (dev_handle->claimed_interfaces & (1U << interface_number))
 		goto out;
 
-	r = usbi_backend.claim_interface(dev_handle, interface_number);
+	r = usbi_backend.claim_interface(dev_handle, (uint8_t)interface_number);
 	if (r == 0)
 		dev_handle->claimed_interfaces |= 1U << interface_number;
 
@@ -1731,7 +1732,7 @@ int API_EXPORTED libusb_release_interface(libusb_device_handle *dev_handle,
 		goto out;
 	}
 
-	r = usbi_backend.release_interface(dev_handle, interface_number);
+	r = usbi_backend.release_interface(dev_handle, (uint8_t)interface_number);
 	if (r == 0)
 		dev_handle->claimed_interfaces &= ~(1U << interface_number);
 
@@ -1783,8 +1784,8 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_hand
 	}
 	usbi_mutex_unlock(&dev_handle->lock);
 
-	return usbi_backend.set_interface_altsetting(dev_handle, interface_number,
-		alternate_setting);
+	return usbi_backend.set_interface_altsetting(dev_handle,
+		(uint8_t)interface_number, (uint8_t)alternate_setting);
 }
 
 /** \ingroup libusb_dev
@@ -1996,7 +1997,7 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev_handle,
 		return LIBUSB_ERROR_NO_DEVICE;
 
 	if (usbi_backend.kernel_driver_active)
-		return usbi_backend.kernel_driver_active(dev_handle, interface_number);
+		return usbi_backend.kernel_driver_active(dev_handle, (uint8_t)interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
@@ -2034,7 +2035,7 @@ int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
 		return LIBUSB_ERROR_NO_DEVICE;
 
 	if (usbi_backend.detach_kernel_driver)
-		return usbi_backend.detach_kernel_driver(dev_handle, interface_number);
+		return usbi_backend.detach_kernel_driver(dev_handle, (uint8_t)interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
@@ -2071,7 +2072,7 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
 		return LIBUSB_ERROR_NO_DEVICE;
 
 	if (usbi_backend.attach_kernel_driver)
-		return usbi_backend.attach_kernel_driver(dev_handle, interface_number);
+		return usbi_backend.attach_kernel_driver(dev_handle, (uint8_t)interface_number);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }

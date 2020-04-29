@@ -100,7 +100,7 @@ static usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER
 usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 
 static int linux_scan_devices(struct libusb_context *ctx);
-static int detach_kernel_driver_and_claim(struct libusb_device_handle *, int);
+static int detach_kernel_driver_and_claim(struct libusb_device_handle *, uint8_t);
 
 #if !defined(HAVE_LIBUDEV)
 static int linux_default_scan_devices(struct libusb_context *ctx);
@@ -116,7 +116,7 @@ struct linux_device_priv {
 	char *sysfs_dir;
 	unsigned char *descriptors;
 	int descriptors_len;
-	int active_config; /* cache val for !sysfs_available  */
+	uint8_t active_config; /* cache val for !sysfs_available  */
 };
 
 struct linux_device_handle_priv {
@@ -529,18 +529,20 @@ static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 }
 
 /* read the bConfigurationValue for a device */
-static int sysfs_get_active_config(struct libusb_device *dev, int *config)
+static int sysfs_get_active_config(struct libusb_device *dev, uint8_t *config)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
-	int ret;
+	int ret, tmp;
 
 	ret = read_sysfs_attr(DEVICE_CTX(dev), priv->sysfs_dir, "bConfigurationValue",
-				UINT8_MAX, config);
+			      UINT8_MAX, &tmp);
 	if (ret < 0)
 		return ret;
 
-	if (*config == -1)
-		usbi_dbg("device unconfigured");
+	if (tmp == -1)
+		tmp = 0;	/* unconfigured */
+
+	*config = (uint8_t)tmp;
 
 	return 0;
 }
@@ -716,21 +718,25 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 	void *buffer, size_t len)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
-	int r, config;
 	void *config_desc;
+	uint8_t active_config;
+	int r;
 
 	if (priv->sysfs_dir) {
-		r = sysfs_get_active_config(dev, &config);
+		r = sysfs_get_active_config(dev, &active_config);
 		if (r < 0)
 			return r;
 	} else {
 		/* Use cached bConfigurationValue */
-		config = priv->active_config;
+		active_config = priv->active_config;
 	}
-	if (config == -1)
-		return LIBUSB_ERROR_NOT_FOUND;
 
-	r = op_get_config_descriptor_by_value(dev, config, &config_desc);
+	if (active_config == 0) {
+		usbi_err(DEVICE_CTX(dev), "device unconfigured");
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	r = op_get_config_descriptor_by_value(dev, active_config, &config_desc);
 	if (r < 0)
 		return r;
 
@@ -770,7 +776,7 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
-	unsigned char active_config = 0;
+	uint8_t active_config = 0;
 	int r;
 
 	struct usbfs_ctrltransfer ctrl = {
@@ -790,20 +796,16 @@ static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 
 		/* we hit this error path frequently with buggy devices :( */
 		usbi_warn(DEVICE_CTX(dev), "get configuration failed, errno=%d", errno);
-		priv->active_config = -1;
-	} else {
-		if (active_config > 0) {
-			priv->active_config = active_config;
-		} else {
-			/* some buggy devices have a configuration 0, but we're
-			 * reaching into the corner of a corner case here, so let's
-			 * not support buggy devices in these circumstances.
-			 * stick to the specs: a configuration value of 0 means
-			 * unconfigured. */
-			usbi_warn(DEVICE_CTX(dev), "active cfg 0? assuming unconfigured device");
-			priv->active_config = -1;
-		}
+	} else if (active_config == 0) {
+		/* some buggy devices have a configuration 0, but we're
+		 * reaching into the corner of a corner case here, so let's
+		 * not support buggy devices in these circumstances.
+		 * stick to the specs: a configuration value of 0 means
+		 * unconfigured. */
+		usbi_warn(DEVICE_CTX(dev), "active cfg 0? assuming unconfigured device");
 	}
+
+	priv->active_config = active_config;
 
 	return LIBUSB_SUCCESS;
 }
@@ -912,7 +914,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 			config = (struct usbi_configuration_descriptor *)(priv->descriptors + LIBUSB_DT_DEVICE_SIZE);
 			priv->active_config = config->bConfigurationValue;
 		} else {
-			priv->active_config = -1; /* No config dt */
+			priv->active_config = 0; /* No config dt */
 		}
 
 		return LIBUSB_SUCCESS;
@@ -1332,7 +1334,7 @@ static void op_close(struct libusb_device_handle *dev_handle)
 }
 
 static int op_get_configuration(struct libusb_device_handle *handle,
-	int *config)
+	uint8_t *config)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(handle->dev);
 	int r;
@@ -1349,10 +1351,8 @@ static int op_get_configuration(struct libusb_device_handle *handle,
 	if (r < 0)
 		return r;
 
-	if (*config == -1) {
+	if (*config == 0)
 		usbi_err(HANDLE_CTX(handle), "device unconfigured");
-		*config = 0;
-	}
 
 	return 0;
 }
@@ -1376,13 +1376,16 @@ static int op_set_configuration(struct libusb_device_handle *handle, int config)
 		return LIBUSB_ERROR_OTHER;
 	}
 
+	if (config == -1)
+		config = 0;
+
 	/* update our cached active config descriptor */
-	priv->active_config = config;
+	priv->active_config = (uint8_t)config;
 
 	return LIBUSB_SUCCESS;
 }
 
-static int claim_interface(struct libusb_device_handle *handle, int iface)
+static int claim_interface(struct libusb_device_handle *handle, unsigned int iface)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
@@ -1402,7 +1405,7 @@ static int claim_interface(struct libusb_device_handle *handle, int iface)
 	return 0;
 }
 
-static int release_interface(struct libusb_device_handle *handle, int iface)
+static int release_interface(struct libusb_device_handle *handle, unsigned int iface)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
@@ -1418,15 +1421,15 @@ static int release_interface(struct libusb_device_handle *handle, int iface)
 	return 0;
 }
 
-static int op_set_interface(struct libusb_device_handle *handle, int iface,
-	int altsetting)
+static int op_set_interface(struct libusb_device_handle *handle, uint8_t interface,
+	uint8_t altsetting)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
 	struct usbfs_setinterface setintf;
 	int r;
 
-	setintf.interface = iface;
+	setintf.interface = interface;
 	setintf.altsetting = altsetting;
 	r = ioctl(fd, IOCTL_USBFS_SETINTERFACE, &setintf);
 	if (r < 0) {
@@ -1467,7 +1470,8 @@ static int op_reset_device(struct libusb_device_handle *handle)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
-	int i, r, ret = 0;
+	int r, ret = 0;
+	uint8_t i;
 
 	/* Doing a device reset will cause the usbfs driver to get unbound
 	 * from any interfaces it is bound to. By voluntarily unbinding
@@ -1503,7 +1507,7 @@ static int op_reset_device(struct libusb_device_handle *handle)
 		 */
 		r = detach_kernel_driver_and_claim(handle, i);
 		if (r) {
-			usbi_warn(HANDLE_CTX(handle), "failed to re-claim interface %d after reset: %s",
+			usbi_warn(HANDLE_CTX(handle), "failed to re-claim interface %u after reset: %s",
 				  i, libusb_error_name(r));
 			handle->claimed_interfaces &= ~(1UL << i);
 			ret = LIBUSB_ERROR_NOT_FOUND;
@@ -1589,7 +1593,7 @@ static int op_dev_mem_free(struct libusb_device_handle *handle, void *buffer,
 }
 
 static int op_kernel_driver_active(struct libusb_device_handle *handle,
-	int interface)
+	uint8_t interface)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
@@ -1612,7 +1616,7 @@ static int op_kernel_driver_active(struct libusb_device_handle *handle,
 }
 
 static int op_detach_kernel_driver(struct libusb_device_handle *handle,
-	int interface)
+	uint8_t interface)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
@@ -1646,7 +1650,7 @@ static int op_detach_kernel_driver(struct libusb_device_handle *handle,
 }
 
 static int op_attach_kernel_driver(struct libusb_device_handle *handle,
-	int interface)
+	uint8_t interface)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
@@ -1678,7 +1682,7 @@ static int op_attach_kernel_driver(struct libusb_device_handle *handle,
 }
 
 static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
-	int interface)
+	uint8_t interface)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	struct usbfs_disconnect_claim dc;
@@ -1713,24 +1717,24 @@ static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
 	return claim_interface(handle, interface);
 }
 
-static int op_claim_interface(struct libusb_device_handle *handle, int iface)
+static int op_claim_interface(struct libusb_device_handle *handle, uint8_t interface)
 {
 	if (handle->auto_detach_kernel_driver)
-		return detach_kernel_driver_and_claim(handle, iface);
+		return detach_kernel_driver_and_claim(handle, interface);
 	else
-		return claim_interface(handle, iface);
+		return claim_interface(handle, interface);
 }
 
-static int op_release_interface(struct libusb_device_handle *handle, int iface)
+static int op_release_interface(struct libusb_device_handle *handle, uint8_t interface)
 {
 	int r;
 
-	r = release_interface(handle, iface);
+	r = release_interface(handle, interface);
 	if (r)
 		return r;
 
 	if (handle->auto_detach_kernel_driver)
-		op_attach_kernel_driver(handle, iface);
+		op_attach_kernel_driver(handle, interface);
 
 	return 0;
 }

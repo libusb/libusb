@@ -42,8 +42,8 @@ public:
 	const usb_configuration_descriptor*	ActiveConfiguration() const;
 	uint8					EndpointToIndex(uint8) const;
 	uint8					EndpointToInterface(uint8) const;
-	int					ClaimInterface(int);
-	int					ReleaseInterface(int);
+	int					ClaimInterface(uint8);
+	int					ReleaseInterface(uint8);
 	int					CheckInterfacesFree(uint8);
 	void					SetActiveConfiguration(uint8);
 	uint8					ActiveConfigurationIndex() const;
@@ -65,10 +65,10 @@ class USBDeviceHandle {
 public:
 				USBDeviceHandle(USBDevice *dev);
 	virtual			~USBDeviceHandle();
-	int			ClaimInterface(int);
-	int			ReleaseInterface(int);
+	int			ClaimInterface(uint8);
+	int			ReleaseInterface(uint8);
 	int			SetConfiguration(uint8);
-	int			SetAltSetting(int, int);
+	int			SetAltSetting(uint8, uint8);
 	int			ClearHalt(uint8);
 	status_t		SubmitTransfer(struct usbi_transfer *);
 	status_t		CancelTransfer(USBTransfer *);

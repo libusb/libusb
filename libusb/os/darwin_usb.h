@@ -162,7 +162,7 @@ struct darwin_cached_device {
   char                  sys_path[21];
   usb_device_t        **device;
   int                   open_count;
-  UInt8                 first_config, active_config, port;  
+  UInt8                 first_config, active_config, port;
   int                   can_enumerate;
   int                   refcount;
   bool                  in_reenumerate;
