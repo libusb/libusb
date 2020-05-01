@@ -1766,7 +1766,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   IOReturn               ret;
   uint8_t                transferType;
   /* None of the values below are used in libusbx for bulk transfers */
-  uint8_t                direction, number, interval, pipeRef;
+  uint8_t                direction, number, interval, pipeRef, alternateSetting;
   uint16_t               maxPacketSize;
 
   struct darwin_interface *cInterface;
@@ -1779,6 +1779,23 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
 
   ret = (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
                                                        &transferType, &maxPacketSize, &interval);
+
+  if (ret) {
+    usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
+              darwin_error_str(ret), ret);
+    return darwin_to_libusb (ret);
+  }
+
+  ret = (*(cInterface->interface))->GetAlternateSetting (cInterface->interface, &alternateSetting);
+
+  if (ret) {
+    usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
+              darwin_error_str(ret), ret);
+    return darwin_to_libusb (ret);
+  }
+
+  ret = (*(cInterface->interface))->GetEndpointProperties (cInterface->interface, alternateSetting, number, direction,
+                                                           &transferType, &maxPacketSize, &interval);
 
   if (ret) {
     usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
