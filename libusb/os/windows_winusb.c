@@ -801,7 +801,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 
 			for (depth = 1; bus_number == 0; depth++) {
 				tmp_dev = get_ancestor(ctx, devinst, &devinst);
-				if (tmp_dev->bus_number != 0) {
+				if (tmp_dev && tmp_dev->bus_number != 0) {
 					bus_number = tmp_dev->bus_number;
 					tmp_priv = usbi_get_device_priv(tmp_dev);
 					depth += tmp_priv->depth;
