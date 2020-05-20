@@ -1115,13 +1115,15 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
       dev->bus_number     = cached_device->location >> 24;
       assert(cached_device->address <= UINT8_MAX);
       dev->device_address = (uint8_t)cached_device->address;
-      static_assert(sizeof(dev->device_descriptor) == sizeof(cached_device->dev_descriptor),
-                    "mismatch between libusb and IOKit device descriptor sizes");
-      memcpy(&dev->device_descriptor, &cached_device->dev_descriptor, LIBUSB_DT_DEVICE_SIZE);
-      usbi_localize_device_descriptor(&dev->device_descriptor);
     } else {
       priv = usbi_get_device_priv(dev);
     }
+
+    static_assert(sizeof(dev->device_descriptor) == sizeof(cached_device->dev_descriptor),
+                  "mismatch between libusb and IOKit device descriptor sizes");
+    memcpy(&dev->device_descriptor, &cached_device->dev_descriptor, LIBUSB_DT_DEVICE_SIZE);
+    usbi_localize_device_descriptor(&dev->device_descriptor);
+    dev->session_data = cached_device->session;
 
     if (cached_device->parent_session > 0) {
       dev->parent_dev = usbi_get_device_by_session_id (ctx, (unsigned long) cached_device->parent_session);
