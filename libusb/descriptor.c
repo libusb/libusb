@@ -53,14 +53,14 @@ static void parse_descriptor(const void *source, const char *descriptor, void *d
 			*dp++ = *sp++;
 			break;
 		case 'w':	/* 16-bit word, convert from little endian to CPU */
-			dp += ((uintptr_t)dp & 1);	/* Align to word boundary */
+			dp += ((uintptr_t)dp & 1);			/* Align to word boundary */
 
 			*((uint16_t *)dp) = READ_LE16(sp);
 			sp += 2;
 			dp += 2;
 			break;
 		case 'd':	/* 32-bit word, convert from little endian to CPU */
-			dp += ((uintptr_t)dp & 1);	/* Align to word boundary */
+			dp = (uint8_t *)(((uintptr_t)dp + 3) & ~3);	/* Align to word boundary */
 
 			*((uint32_t *)dp) = READ_LE32(sp);
 			sp += 4;
