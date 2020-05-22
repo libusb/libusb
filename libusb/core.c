@@ -2189,6 +2189,7 @@ void API_EXPORTED libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb,
  * \returns LIBUSB_ERROR_INVALID_PARAM if the option or arguments are invalid
  * \returns LIBUSB_ERROR_NOT_SUPPORTED if the option is valid but not supported
  * on this platform
+ * \returns LIBUSB_ERROR_NOT_FOUND if LIBUSB_OPTION_USE_USBDK is valid on this platform but UsbDk is not available
  */
 int API_EXPORTED libusb_set_option(libusb_context *ctx,
 	enum libusb_option option, ...)
