@@ -1414,6 +1414,7 @@ int LIBUSB_CALL libusb_claim_interface(libusb_device_handle *dev_handle,
 	int interface_number);
 int LIBUSB_CALL libusb_release_interface(libusb_device_handle *dev_handle,
 	int interface_number);
+int LIBUSB_CALL libusb_release_all_interfaces(libusb_device_handle *dev_handle);
 
 libusb_device_handle * LIBUSB_CALL libusb_open_device_with_vid_pid(
 	libusb_context *ctx, uint16_t vendor_id, uint16_t product_id);

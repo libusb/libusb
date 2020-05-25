@@ -1742,6 +1742,46 @@ out:
 }
 
 /** \ingroup libusb_dev
+ * Release an interfaces previously claimed with libusb_claim_interface().
+ *
+ * This is a blocking function. A SET_INTERFACE control request will be sent
+ * to the device, resetting interfaces state to the first alternate setting.
+ *
+ * If auto_detach_kernel_driver is set to 1 for <tt>dev</tt>, the kernel
+ * drivers will be re-attached after releasing the interfaces.
+ *
+ * \param dev_handle a device handle
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns another LIBUSB_ERROR code on other failure
+ * \see libusb_set_auto_detach_kernel_driver()
+ */
+int API_EXPORTED libusb_release_all_interfaces(libusb_device_handle *dev_handle)
+{
+	int r;
+	size_t i;
+
+	usbi_dbg("all interfaces");
+	if (!dev_handle->claimed_interfaces)
+		return LIBUSB_SUCCESS;
+
+	usbi_mutex_lock(&dev_handle->lock);
+
+	for (i = 0; i < USB_MAXINTERFACES; i++) {
+		if (!(dev_handle->claimed_interfaces & (1UL << i)))
+			continue;
+		
+		r = usbi_backend.release_interface(dev_handle, (uint8_t)i);
+		if (r != 0)
+			break;
+		dev_handle->claimed_interfaces &= ~(1U << i);
+	}
+
+	usbi_mutex_unlock(&dev_handle->lock);
+	return r;
+}
+
+/** \ingroup libusb_dev
  * Activate an alternate setting for an interface. The interface must have
  * been previously claimed with libusb_claim_interface().
  *

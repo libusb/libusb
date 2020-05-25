@@ -140,6 +140,8 @@ EXPORTS
   libusb_pollfds_handle_timeouts@4 = libusb_pollfds_handle_timeouts
   libusb_ref_device
   libusb_ref_device@4 = libusb_ref_device
+  libusb_release_all_interfaces
+  libusb_release_all_interfaces@4 = libusb_release_all_interfaces
   libusb_release_interface
   libusb_release_interface@8 = libusb_release_interface
   libusb_reset_device
