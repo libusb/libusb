@@ -528,21 +528,17 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 
 	if (if_desc->bNumEndpoints == 0) {
 		usbi_dbg(HANDLE_CTX(dev_handle), "no endpoints found for interface %u", iface);
-		libusb_free_config_descriptor(conf_desc);
-		priv->usb_interface[iface].current_altsetting = altsetting;
-		return LIBUSB_SUCCESS;
-	}
-
-	priv->usb_interface[iface].endpoint = malloc(if_desc->bNumEndpoints);
-	if (priv->usb_interface[iface].endpoint == NULL) {
-		libusb_free_config_descriptor(conf_desc);
-		return LIBUSB_ERROR_NO_MEM;
-	}
-
-	priv->usb_interface[iface].nb_endpoints = if_desc->bNumEndpoints;
-	for (i = 0; i < if_desc->bNumEndpoints; i++) {
-		priv->usb_interface[iface].endpoint[i] = if_desc->endpoint[i].bEndpointAddress;
-		usbi_dbg(HANDLE_CTX(dev_handle), "(re)assigned endpoint %02X to interface %u", priv->usb_interface[iface].endpoint[i], iface);
+	} else {
+		priv->usb_interface[iface].endpoint = malloc(if_desc->bNumEndpoints);
+		if (priv->usb_interface[iface].endpoint == NULL) {
+			libusb_free_config_descriptor(conf_desc);
+			return LIBUSB_ERROR_NO_MEM;
+		}
+		priv->usb_interface[iface].nb_endpoints = if_desc->bNumEndpoints;
+		for (i = 0; i < if_desc->bNumEndpoints; i++) {
+			priv->usb_interface[iface].endpoint[i] = if_desc->endpoint[i].bEndpointAddress;
+			usbi_dbg(HANDLE_CTX(dev_handle), "(re)assigned endpoint %02X to interface %u", priv->usb_interface[iface].endpoint[i], iface);
+		}
 	}
 	libusb_free_config_descriptor(conf_desc);
 
