@@ -2581,6 +2581,7 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 	struct usbfs_urb *urb = NULL;
 	struct usbi_transfer *itransfer;
 	struct libusb_transfer *transfer;
+	struct linux_transfer_priv *tpriv;
 
 	r = ioctl(hpriv->fd, IOCTL_USBFS_REAPURBNDELAY, &urb);
 	if (r < 0) {
@@ -2595,6 +2596,11 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 
 	itransfer = urb->usercontext;
 	transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	tpriv = usbi_get_transfer_priv(itransfer);
+	if (tpriv->reap_action == CANCELLED) {
+		if (urb->status != -ENOENT)
+			tpriv->reap_action = NORMAL;
+	}
 
 	usbi_dbg("urb type=%u status=%d transferred=%d", urb->type, urb->status, urb->actual_length);
 
