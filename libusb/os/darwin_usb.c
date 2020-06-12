@@ -1,8 +1,8 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2019 Nathan Hjelm <hjelmn@users.sourceforge.net>
- * Copyright © 2019      Google LLC. All rights reserved.
+ * Copyright © 2008-2020 Nathan Hjelm <hjelmn@cs.unm.edu>
+ * Copyright © 2019-2020 Google LLC. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -122,6 +122,8 @@ static const char *darwin_error_str (IOReturn result) {
     return "out of resources";
   case kIOUSBHighSpeedSplitError:
     return "high speed split error";
+  case kIOUSBUnknownPipeErr:
+    return "pipe ref not recognized";
   default:
     snprintf(string_buffer, sizeof(string_buffer), "unknown error (0x%x)", result);
     return string_buffer;
@@ -149,6 +151,7 @@ static enum libusb_error darwin_to_libusb (IOReturn result) {
   case kIOReturnAborted:
   case kIOReturnError:
   case kIOUSBNoAsyncPortErr:
+  case kIOUSBUnknownPipeErr:
   default:
     return LIBUSB_ERROR_OTHER;
   }
