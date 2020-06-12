@@ -1770,11 +1770,16 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
 
   IOReturn               ret;
   uint8_t                transferType;
-  /* None of the values below are used in libusbx for bulk transfers */
-  uint8_t                direction, number, interval, pipeRef;
+  uint8_t                pipeRef;
   uint16_t               maxPacketSize;
 
   struct darwin_interface *cInterface;
+#if InterfaceVersion >= 550
+  IOUSBEndpointProperties pipeProperties;
+#else
+  /* None of the values below are used in libusb for bulk transfers */
+  uint8_t                 direction, number, interval;
+#endif
 
   if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface) != 0) {
     usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
@@ -1782,8 +1787,15 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
+#if InterfaceVersion >= 550
+  ret = (*(cInterface->interface))->GetPipePropertiesV3 (cInterface->interface, pipeRef, &pipeProperties);
+
+  transferType = pipeProperties.bTransferType;
+  maxPacketSize = pipeProperties.wMaxPacketSize;
+#else
   ret = (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
                                                        &transferType, &maxPacketSize, &interval);
+#endif
 
   if (ret) {
     usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
