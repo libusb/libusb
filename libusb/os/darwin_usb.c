@@ -1775,7 +1775,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
 
   struct darwin_interface *cInterface;
 #if InterfaceVersion >= 550
-  IOUSBEndpointProperties pipeProperties;
+  IOUSBEndpointProperties pipeProperties = {.bVersion = kUSBEndpointPropertiesVersion3};
 #else
   /* None of the values below are used in libusb for bulk transfers */
   uint8_t                 direction, number, interval;
