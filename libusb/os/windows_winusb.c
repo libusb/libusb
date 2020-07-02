@@ -3067,8 +3067,41 @@ static void WINAPI winusbx_native_iso_transfer_continue_stream_callback(struct l
 	} else {
 		// If the transfer wasn't successful we reschedule the transfer while forcing it
 		// not to continue the stream. This might results in a 5-ms delay.
-		transfer_priv->iso_break_stream = TRUE;
-		libusb_submit_transfer(transfer);
+		libusb_transfer_cb_fn postSubmissionHandler = NULL;
+		bool resubmitTransfer= TRUE;
+
+		if (transfer->callback) {
+			// Notify the user callback that a resubmission is about to take place
+			// This gives it an option to interfer or schedule submission of other transfers after this one
+			transfer->status = LIBUSB_TRANSFER_STALL;
+			transfer->callback(transfer);
+			if (transfer->callback != transfer_priv->iso_user_callback) {
+				// Callback temporarily used as signal by user callback
+				if (transfer->callback == NULL) {
+					// Signal to not resubmit with ContinueStream=False
+					resubmitTransfer = FALSE;
+				} else {
+					// Otherwise handler to call after resubmission
+					postSubmissionHandler = transfer->callback;
+				}
+				// Restore the user callback
+				transfer->callback = transfer_priv->iso_user_callback;
+			}
+		}
+
+		if (resubmitTransfer) {
+			usbi_info(TRANSFER_CTX(transfer), "Resubmitting with ContinueStream=False!");
+			transfer_priv->iso_break_stream = TRUE;
+			libusb_submit_transfer(transfer);
+		} else {
+			usbi_info(TRANSFER_CTX(transfer), "User callback supressed resubmission with ContinueStream=False!");
+		}
+
+		if (postSubmissionHandler) {
+			// User-supplied handler to call AFTER resubmission
+			// Probably submitting other transfers to follow up on the last one to continue the stream
+			postSubmissionHandler(transfer);
+		}
 	}
 }
 static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itransfer)
@@ -3232,6 +3265,17 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 		// - Transfers are first scheduled with ContinueStream = TRUE and with winusbx_iso_transfer_continue_stream_callback as user callback.
 		// - If the transfer succeeds, winusbx_iso_transfer_continue_stream_callback restore the user callback and calls its.
 		// - If the transfer fails, winusbx_iso_transfer_continue_stream_callback reschedule the transfer and force ContinueStream = FALSE.
+		// However, since the above would interfere with the standard practice of
+		// submitting multiple transfers at once, the user callback will
+		// additionally be called with the STALL event, allowing it to signal
+		// additional information. The user callback can signal to suppress this
+		// behaviour (by setting transfer->callback to NULL) or alternatively set
+		// transfer->callback to a custom callback which will be executed AFTER the
+		// resubmission with ContinueStream = False, allowing the user callback to
+		// submit further transfers to continue the stream only after one transfer
+		// has established a stream. This does NOT require extra work in the user
+		// callback if it properly ignores stall events for isochronous transfers,
+		// however it allows more control.
 		if (!transfer_priv->iso_break_stream) {
 			transfer_priv->iso_user_callback = transfer->callback;
 			transfer->callback = winusbx_native_iso_transfer_continue_stream_callback;
