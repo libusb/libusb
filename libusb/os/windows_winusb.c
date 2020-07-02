@@ -2990,7 +2990,11 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 			// WinUSB only supports isoch transfers spanning a full USB frames. Later, we might be smarter about this
 			// and allocate a temporary buffer. However, this is harder than it seems as its destruction would depend on overlapped
 			// IO...
-			iso_transfer_size_multiple = (pipe_info_ex.MaximumBytesPerInterval * 8) / interval;
+			if (transfer->dev_handle->dev->speed >= LIBUSB_SPEED_HIGH) // Microframes (125us)
+				iso_transfer_size_multiple = (pipe_info_ex.MaximumBytesPerInterval * 8) / interval;
+			else // Normal Frames (1ms)
+				iso_transfer_size_multiple = pipe_info_ex.MaximumBytesPerInterval / interval;
+
 			if (transfer->length % iso_transfer_size_multiple != 0) {
 				usbi_err(TRANSFER_CTX(transfer), "length of isoch buffer must be a multiple of the MaximumBytesPerInterval * 8 / Interval");
 				return LIBUSB_ERROR_INVALID_PARAM;
