@@ -60,8 +60,8 @@ static libusb_testlib_result test_get_device_list(libusb_testlib_ctx * tctx)
 		ssize_t list_size = libusb_get_device_list(ctx, &device_list);
 		if (list_size < 0 || device_list == NULL) {
 			libusb_testlib_logf(tctx,
-				"Failed to get device list on iteration %d: %d (%p)",
-				i, -list_size, device_list);
+				"Failed to get device list on iteration %d: %ld (%p)",
+				i, (long)-list_size, device_list);
 			return TEST_STATUS_FAILURE;
 		}
 		libusb_free_device_list(device_list, 1);
