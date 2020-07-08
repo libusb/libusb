@@ -2457,7 +2457,7 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 			&& (setup->Request == LIBUSB_REQUEST_SET_CONFIGURATION)) {
 		if (setup->Value != priv->active_config) {
 			usbi_warn(TRANSFER_CTX(transfer), "cannot set configuration other than the default one");
-			return LIBUSB_ERROR_INVALID_PARAM;
+			return LIBUSB_ERROR_NOT_SUPPORTED;
 		}
 		windows_force_sync_completion(overlapped, 0);
 	} else {
