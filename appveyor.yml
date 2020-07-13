@@ -1,4 +1,4 @@
-image: Visual Studio 2017
+image: Visual Studio 2019
 
 platform:
   - x64
@@ -9,7 +9,7 @@ configuration:
 
 environment:
   CTEST_OUTPUT_ON_FAILURE: True
-  MSVC_VERSION: 15
+  MSVC_VERSION: 16
   PYTHON: "C:\\Python37-x64"
   BUILD_NAME: master
 
@@ -28,7 +28,7 @@ install:
   - set PATH=C:\projects\deps\ninja;%PATH%
   
   # Visual Studio's compiler information
-  - call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+  - call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
 
 before_build:
   - conan profile new default --detect

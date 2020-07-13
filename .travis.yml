@@ -1,6 +1,6 @@
 language: c
 sudo: required
-dist: xenial
+dist: focal
 
 os:
   - osx
@@ -37,27 +37,19 @@ addons:
     update: true
   apt:
     sources:
-    - sourceline: 'ppa:ubuntu-toolchain-r/test'
     packages:
     - ruby
     - cppcheck
-    - gcc-6
-    - g++-6
-    - cmake
+
 
 install:
-  - |
-    if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-      sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-6 90
-      sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-6 90
-      sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-6 90
-
-      pyenv global $(pyenv versions | tail -1)
-    fi
-
   - export BARCOHC_BIN=https://${BIN_USER}:${BIN_PASSWORD}@barcohc.jfrog.io/barcohc
 
   # Install conan
+  - |
+    if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
+      brew link --overwrite python@3.8
+    fi
   - pip3 install --quiet conan
   - conan remote add barco https://barcohc.jfrog.io/barcohc/api/conan/barco
   - conan user -p ${CONAN_API_KEY} -r barco conan
