@@ -248,8 +248,10 @@ sunos_new_string_list(void)
 	if (list == NULL)
 		return (NULL);
 	list->string = calloc(DEFAULT_LISTSIZE, sizeof(char *));
-	if (list->string == NULL)
+	if (list->string == NULL) {
+		free(list);
 		return (NULL);
+	}
 	list->nargs = 0;
 	list->listsize = DEFAULT_LISTSIZE;
 
