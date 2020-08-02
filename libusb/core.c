@@ -1603,6 +1603,11 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev_handle,
  * causing most USB-related device state to be reset (altsetting reset to zero,
  * endpoint halts cleared, toggles reset).
  *
+ * Not all backends support setting the configuration from user space, which
+ * will be indicated by the return code LIBUSB_ERROR_NOT_SUPPORTED. As this
+ * suggests that the platform is handling the device configuration itself,
+ * this error should generally be safe to ignore.
+ *
  * You cannot change/reset configuration if your application has claimed
  * interfaces. It is advised to set the desired configuration before claiming
  * interfaces.
@@ -1632,6 +1637,8 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev_handle,
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the requested configuration does not exist
  * \returns LIBUSB_ERROR_BUSY if interfaces are currently claimed
+ * \returns LIBUSB_ERROR_NOT_SUPPORTED if setting or changing the configuration
+ * is not supported by the backend
  * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  * \see libusb_set_auto_detach_kernel_driver()
