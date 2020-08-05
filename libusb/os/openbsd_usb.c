@@ -225,15 +225,17 @@ obsd_open(struct libusb_device_handle *handle)
 	char devnode[16];
 
 	if (dpriv->devname) {
+		int fd;
 		/*
 		 * Only open ugen(4) attached devices read-write, all
 		 * read-only operations are done through the bus node.
 		 */
 		snprintf(devnode, sizeof(devnode), DEVPATH "%s.00",
 		    dpriv->devname);
-		dpriv->fd = open(devnode, O_RDWR);
-		if (dpriv->fd < 0)
+		fd = open(devnode, O_RDWR);
+		if (fd < 0)
 			return _errno_to_libusb(errno);
+		dpriv->fd = fd;
 
 		usbi_dbg("open %s: fd %d", devnode, dpriv->fd);
 	}
