@@ -173,6 +173,7 @@ obsd_get_device_list(struct libusb_context * ctx,
 				dev->bus_number = di.udi_bus;
 				dev->device_address = di.udi_addr;
 				dev->speed = di.udi_speed;
+				dev->port_number = di.udi_port;
 
 				dpriv = usbi_get_device_priv(dev);
 				dpriv->fd = -1;
