@@ -779,7 +779,7 @@ static int windows_handle_events(struct libusb_context *ctx, struct pollfd *fds,
 
 		transfer_priv = NULL;
 		usbi_mutex_lock(&ctx->flying_transfers_lock);
-		list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
+		for_each_transfer(ctx, itransfer) {
 			transfer_priv = usbi_get_transfer_priv(itransfer);
 			if (transfer_priv->pollable_fd.fd == fds[i].fd)
 				break;

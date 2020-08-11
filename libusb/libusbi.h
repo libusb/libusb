@@ -139,6 +139,9 @@ struct list_head {
 #define list_first_entry(ptr, type, member) \
 	list_entry((ptr)->next, type, member)
 
+#define list_next_entry(ptr, type, member) \
+	list_entry((ptr)->member.next, type, member)
+
 /* Get each entry from a list
  *  pos - A structure pointer has a "member" element
  *  head - list head
@@ -146,15 +149,24 @@ struct list_head {
  *  type - the type of the first parameter
  */
 #define list_for_each_entry(pos, head, member, type)			\
-	for (pos = list_entry((head)->next, type, member);		\
+	for (pos = list_first_entry(head, type, member);		\
 		 &pos->member != (head);				\
-		 pos = list_entry(pos->member.next, type, member))
+		 pos = list_next_entry(pos, type, member))
 
 #define list_for_each_entry_safe(pos, n, head, member, type)		\
-	for (pos = list_entry((head)->next, type, member),		\
-		 n = list_entry(pos->member.next, type, member);	\
+	for (pos = list_first_entry(head, type, member),		\
+		 n = list_next_entry(pos, type, member);		\
 		 &pos->member != (head);				\
-		 pos = n, n = list_entry(n->member.next, type, member))
+		 pos = n, n = list_next_entry(n, type, member))
+
+/* Helper macros to iterate over a list. The structure pointed
+ * to by "pos" must have a list_head member named "list".
+ */
+#define for_each_helper(pos, head, type) \
+	list_for_each_entry(pos, head, list, type)
+
+#define for_each_safe_helper(pos, n, head, type) \
+	list_for_each_entry_safe(pos, n, head, list, type)
 
 #define list_empty(entry) ((entry)->next == (entry))
 
@@ -1243,6 +1255,33 @@ extern const struct usbi_os_backend usbi_backend;
 
 extern struct list_head active_contexts_list;
 extern usbi_mutex_static_t active_contexts_lock;
+
+#define for_each_context(c) \
+	for_each_helper(c, &active_contexts_list, struct libusb_context)
+
+#define for_each_device(ctx, d) \
+	for_each_helper(d, &(ctx)->usb_devs, struct libusb_device)
+
+#define for_each_device_safe(ctx, d, n) \
+	for_each_safe_helper(d, n, &(ctx)->usb_devs, struct libusb_device)
+
+#define for_each_open_device(ctx, h) \
+	for_each_helper(h, &(ctx)->open_devs, struct libusb_device_handle)
+
+#define for_each_transfer(ctx, t) \
+	for_each_helper(t, &(ctx)->flying_transfers, struct usbi_transfer)
+
+#define for_each_transfer_safe(ctx, t, n) \
+	for_each_safe_helper(t, n, &(ctx)->flying_transfers, struct usbi_transfer)
+
+#define for_each_pollfd(ctx, p) \
+	for_each_helper(p, &(ctx)->ipollfds, struct usbi_pollfd)
+
+#define for_each_removed_pollfd(ctx, p) \
+	for_each_helper(p, &(ctx)->removed_ipollfds, struct usbi_pollfd)
+
+#define for_each_removed_pollfd_safe(ctx, p, n) \
+	for_each_safe_helper(p, n, &(ctx)->removed_ipollfds, struct usbi_pollfd)
 
 #ifdef __cplusplus
 }

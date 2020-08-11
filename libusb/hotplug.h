@@ -90,6 +90,12 @@ struct libusb_hotplug_message {
 	struct list_head list;
 };
 
+#define for_each_hotplug_cb(ctx, c) \
+	for_each_helper(c, &(ctx)->hotplug_cbs, struct libusb_hotplug_callback)
+
+#define for_each_hotplug_cb_safe(ctx, c, n) \
+	for_each_safe_helper(c, n, &(ctx)->hotplug_cbs, struct libusb_hotplug_callback)
+
 void usbi_hotplug_deregister(struct libusb_context *ctx, int forced);
 void usbi_hotplug_match(struct libusb_context *ctx, struct libusb_device *dev,
 	libusb_hotplug_event event);

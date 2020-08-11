@@ -1172,7 +1172,8 @@ err:
 static void cleanup_removed_pollfds(struct libusb_context *ctx)
 {
 	struct usbi_pollfd *ipollfd, *tmp;
-	list_for_each_entry_safe(ipollfd, tmp, &ctx->removed_ipollfds, list, struct usbi_pollfd) {
+
+	for_each_removed_pollfd_safe(ctx, ipollfd, tmp) {
 		list_del(&ipollfd->list);
 		free(ipollfd);
 	}
@@ -1344,7 +1345,7 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 {
 	struct usbi_transfer *itransfer;
 
-	list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
+	for_each_transfer(ctx, itransfer) {
 		struct timespec *cur_ts = &itransfer->timeout;
 
 		/* if we've reached transfers of infinite timeout, then we have no
@@ -1405,7 +1406,7 @@ static int add_to_flying_list(struct usbi_transfer *itransfer)
 	}
 
 	/* otherwise, find appropriate place in list */
-	list_for_each_entry(cur, &ctx->flying_transfers, list, struct usbi_transfer) {
+	for_each_transfer(ctx, cur) {
 		/* find first timeout that occurs after the transfer in question */
 		struct timespec *cur_ts = &cur->timeout;
 
@@ -2035,7 +2036,7 @@ static int handle_timeouts_locked(struct libusb_context *ctx)
 
 	/* iterate through flying transfers list, finding all transfers that
 	 * have expired timeouts */
-	list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
+	for_each_transfer(ctx, itransfer) {
 		struct timespec *cur_ts = &itransfer->timeout;
 
 		/* if we've reached transfers of infinite timeout, we're all done */
@@ -2150,7 +2151,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 			goto done;
 		}
 
-		list_for_each_entry(ipollfd, &ctx->ipollfds, list, struct usbi_pollfd) {
+		for_each_pollfd(ctx, ipollfd) {
 			struct libusb_pollfd *pollfd = &ipollfd->pollfd;
 			ctx->pollfds[i].fd = pollfd->fd;
 			ctx->pollfds[i].events = pollfd->events;
@@ -2293,7 +2294,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	}
 #endif
 
-	list_for_each_entry(ipollfd, &ctx->removed_ipollfds, list, struct usbi_pollfd) {
+	for_each_removed_pollfd(ctx, ipollfd) {
 		usbi_nfds_t n;
 
 		for (n = internal_nfds ; n < nfds ; n++) {
@@ -2611,7 +2612,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	}
 
 	/* find next transfer which hasn't already been processed as timed out */
-	list_for_each_entry(itransfer, &ctx->flying_transfers, list, struct usbi_transfer) {
+	for_each_transfer(ctx, itransfer) {
 		if (itransfer->timeout_flags & (USBI_TRANSFER_TIMEOUT_HANDLED | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
 			continue;
 
@@ -2725,11 +2726,12 @@ void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
 
 	usbi_dbg("remove fd %d", fd);
 	usbi_mutex_lock(&ctx->event_data_lock);
-	list_for_each_entry(ipollfd, &ctx->ipollfds, list, struct usbi_pollfd)
+	for_each_pollfd(ctx, ipollfd) {
 		if (ipollfd->pollfd.fd == fd) {
 			found = 1;
 			break;
 		}
+	}
 
 	if (!found) {
 		usbi_dbg("couldn't find fd %d to remove", fd);
@@ -2779,7 +2781,7 @@ const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 	if (!ret)
 		goto out;
 
-	list_for_each_entry(ipollfd, &ctx->ipollfds, list, struct usbi_pollfd)
+	for_each_pollfd(ctx, ipollfd)
 		ret[i++] = (struct libusb_pollfd *)ipollfd;
 	ret[ctx->pollfds_cnt] = NULL;
 
@@ -2815,6 +2817,7 @@ void API_EXPORTED libusb_free_pollfds(const struct libusb_pollfd **pollfds)
  */
 void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 {
+	struct libusb_context *ctx = HANDLE_CTX(dev_handle);
 	struct usbi_transfer *cur;
 	struct usbi_transfer *to_cancel;
 
@@ -2836,8 +2839,8 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 
 	while (1) {
 		to_cancel = NULL;
-		usbi_mutex_lock(&HANDLE_CTX(dev_handle)->flying_transfers_lock);
-		list_for_each_entry(cur, &HANDLE_CTX(dev_handle)->flying_transfers, list, struct usbi_transfer)
+		usbi_mutex_lock(&ctx->flying_transfers_lock);
+		for_each_transfer(ctx, cur) {
 			if (USBI_TRANSFER_TO_LIBUSB_TRANSFER(cur)->dev_handle == dev_handle) {
 				usbi_mutex_lock(&cur->lock);
 				if (cur->state_flags & USBI_TRANSFER_IN_FLIGHT)
@@ -2847,7 +2850,8 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 				if (to_cancel)
 					break;
 			}
-		usbi_mutex_unlock(&HANDLE_CTX(dev_handle)->flying_transfers_lock);
+		}
+		usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
 		if (!to_cancel)
 			break;

@@ -766,11 +766,12 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	struct libusb_device *ret = NULL;
 
 	usbi_mutex_lock(&ctx->usb_devs_lock);
-	list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device)
+	for_each_device(ctx, dev) {
 		if (dev->session_data == session_id) {
 			ret = libusb_ref_device(dev);
 			break;
 		}
+	}
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
 
 	return ret;
@@ -819,7 +820,7 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 			usbi_backend.hotplug_poll();
 
 		usbi_mutex_lock(&ctx->usb_devs_lock);
-		list_for_each_entry(dev, &ctx->usb_devs, list, struct libusb_device) {
+		for_each_device(ctx, dev) {
 			discdevs = discovered_devs_append(discdevs, dev);
 
 			if (!discdevs) {
@@ -1416,7 +1417,7 @@ static void do_close(struct libusb_context *ctx,
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
 
 	/* safe iteration because transfers may be being deleted */
-	list_for_each_entry_safe(itransfer, tmp, &ctx->flying_transfers, list, struct usbi_transfer) {
+	for_each_transfer_safe(ctx, itransfer, tmp) {
 		struct libusb_transfer *transfer =
 			USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
@@ -2359,7 +2360,7 @@ err_free_ctx:
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
 	usbi_mutex_lock(&ctx->usb_devs_lock);
-	list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
+	for_each_device_safe(ctx, dev, next) {
 		list_del(&dev->list);
 		libusb_unref_device(dev);
 	}
@@ -2439,7 +2440,7 @@ void API_EXPORTED libusb_exit(libusb_context *ctx)
 			libusb_handle_events_timeout(ctx, &tv);
 
 		usbi_mutex_lock(&ctx->usb_devs_lock);
-		list_for_each_entry_safe(dev, next, &ctx->usb_devs, list, struct libusb_device) {
+		for_each_device_safe(ctx, dev, next) {
 			list_del(&dev->list);
 			libusb_unref_device(dev);
 		}

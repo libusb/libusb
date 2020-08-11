@@ -184,7 +184,7 @@ void usbi_hotplug_match(struct libusb_context *ctx, struct libusb_device *dev,
 
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 
-	list_for_each_entry_safe(hotplug_cb, next, &ctx->hotplug_cbs, list, struct libusb_hotplug_callback) {
+	for_each_hotplug_cb_safe(ctx, hotplug_cb, next) {
 		if (hotplug_cb->flags & USBI_HOTPLUG_NEEDS_FREE) {
 			/* process deregistration in usbi_hotplug_deregister() */
 			continue;
@@ -331,7 +331,7 @@ void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
 	ctx = usbi_get_context(ctx);
 
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
-	list_for_each_entry(hotplug_cb, &ctx->hotplug_cbs, list, struct libusb_hotplug_callback) {
+	for_each_hotplug_cb(ctx, hotplug_cb) {
 		if (callback_handle == hotplug_cb->handle) {
 			/* Mark this callback for deregistration */
 			hotplug_cb->flags |= USBI_HOTPLUG_NEEDS_FREE;
@@ -369,7 +369,7 @@ void * LIBUSB_CALL libusb_hotplug_get_user_data(libusb_context *ctx,
 	ctx = usbi_get_context(ctx);
 
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
-	list_for_each_entry(hotplug_cb, &ctx->hotplug_cbs, list, struct libusb_hotplug_callback) {
+	for_each_hotplug_cb(ctx, hotplug_cb) {
 		if (callback_handle == hotplug_cb->handle) {
 			user_data = hotplug_cb->user_data;
 		}
@@ -384,7 +384,7 @@ void usbi_hotplug_deregister(struct libusb_context *ctx, int forced)
 	struct libusb_hotplug_callback *hotplug_cb, *next;
 
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
-	list_for_each_entry_safe(hotplug_cb, next, &ctx->hotplug_cbs, list, struct libusb_hotplug_callback) {
+	for_each_hotplug_cb_safe(ctx, hotplug_cb, next) {
 		if (forced || (hotplug_cb->flags & USBI_HOTPLUG_NEEDS_FREE)) {
 			usbi_dbg("freeing hotplug cb %p with handle %d", hotplug_cb,
 				 hotplug_cb->handle);

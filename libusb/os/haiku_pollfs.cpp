@@ -97,7 +97,7 @@ WatchedEntry::WatchedEntry(BMessenger *messenger, entry_ref *ref)
 			unsigned long session_id = (unsigned long)&fDevice;
 
 			usbi_mutex_lock(&active_contexts_lock);
-			list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
+			for_each_context(ctx) {
 				struct libusb_device *dev = usbi_get_device_by_session_id(ctx, session_id);
 				if (dev) {
 					usbi_dbg("using previously allocated device with location %lu", session_id);
@@ -172,7 +172,7 @@ WatchedEntry::~WatchedEntry()
 		unsigned long session_id = (unsigned long)&fDevice;
 
 		usbi_mutex_lock(&active_contexts_lock);
-		list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
+		for_each_context(ctx) {
 			dev = usbi_get_device_by_session_id(ctx, session_id);
 			if (dev != NULL) {
 				usbi_disconnect_device(dev);

@@ -991,7 +991,7 @@ static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_di
 retry:
 	/* find the parent in the context */
 	usbi_mutex_lock(&ctx->usb_devs_lock);
-	list_for_each_entry(it, &ctx->usb_devs, list, struct libusb_device) {
+	for_each_device(ctx, it) {
 		struct linux_device_priv *priv = usbi_get_device_priv(it);
 
 		if (priv->sysfs_dir) {
@@ -1070,7 +1070,7 @@ void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_na
 	struct libusb_context *ctx;
 
 	usbi_mutex_static_lock(&active_contexts_lock);
-	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
+	for_each_context(ctx) {
 		linux_enumerate_device(ctx, busnum, devaddr, sys_name);
 	}
 	usbi_mutex_static_unlock(&active_contexts_lock);
@@ -1083,7 +1083,7 @@ void linux_device_disconnected(uint8_t busnum, uint8_t devaddr)
 	unsigned long session_id = busnum << 8 | devaddr;
 
 	usbi_mutex_static_lock(&active_contexts_lock);
-	list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
+	for_each_context(ctx) {
 		dev = usbi_get_device_by_session_id(ctx, session_id);
 		if (dev) {
 			usbi_disconnect_device(dev);
@@ -2629,7 +2629,7 @@ static int op_handle_events(struct libusb_context *ctx,
 			continue;
 
 		num_ready--;
-		list_for_each_entry(handle, &ctx->open_devs, list, struct libusb_device_handle) {
+		for_each_open_device(ctx, handle) {
 			hpriv = usbi_get_device_handle_priv(handle);
 			if (hpriv->fd == pollfd->fd)
 				break;

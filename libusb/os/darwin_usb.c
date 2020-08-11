@@ -337,7 +337,7 @@ static void darwin_devices_attached (void *ptr, io_iterator_t add_devices) {
     }
 
     /* add this device to each active context's device list */
-    list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
+    for_each_context(ctx) {
       process_new_device (ctx, cached_device, old_session_id);
     }
 
@@ -403,7 +403,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
       continue;
     }
 
-    list_for_each_entry(ctx, &active_contexts_list, list, struct libusb_context) {
+    for_each_context(ctx) {
       usbi_dbg ("notifying context %p of device disconnect", ctx);
 
       dev = usbi_get_device_by_session_id(ctx, (unsigned long) session);
