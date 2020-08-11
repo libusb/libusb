@@ -327,6 +327,8 @@ struct windows_backend {
 
 struct windows_context_priv {
 	const struct windows_backend *backend;
+	HANDLE completion_port;
+	HANDLE completion_port_thread;
 };
 
 union windows_device_priv {
@@ -340,7 +342,7 @@ union windows_device_handle_priv {
 };
 
 struct windows_transfer_priv {
-	struct winfd pollable_fd;
+	OVERLAPPED overlapped;
 	HANDLE handle;
 	union {
 		struct usbdk_transfer_priv usbdk_priv;
@@ -351,7 +353,7 @@ struct windows_transfer_priv {
 static inline OVERLAPPED *get_transfer_priv_overlapped(struct usbi_transfer *itransfer)
 {
 	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
-	return transfer_priv->pollable_fd.overlapped;
+	return &transfer_priv->overlapped;
 }
 
 static inline void set_transfer_priv_handle(struct usbi_transfer *itransfer, HANDLE handle)
@@ -377,7 +379,7 @@ extern const struct windows_backend winusb_backend;
 
 unsigned long htab_hash(const char *str);
 enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS status);
-void windows_force_sync_completion(OVERLAPPED *overlapped, ULONG size);
+void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size);
 
 #if defined(ENABLE_LOGGING)
 const char *windows_error_str(DWORD error_code);

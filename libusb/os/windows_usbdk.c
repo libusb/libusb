@@ -400,15 +400,27 @@ static int usbdk_get_active_config_descriptor(struct libusb_device *dev, void *b
 
 static int usbdk_open(struct libusb_device_handle *dev_handle)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+	struct libusb_device *dev = dev_handle->dev;
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
+	struct usbdk_device_priv *device_priv = usbi_get_device_priv(dev);
 
-	priv->redirector_handle = usbdk_helper.StartRedirect(&priv->ID);
-	if (priv->redirector_handle == INVALID_HANDLE_VALUE) {
-		usbi_err(HANDLE_CTX(dev_handle), "Redirector startup failed");
+	device_priv->redirector_handle = usbdk_helper.StartRedirect(&device_priv->ID);
+	if (device_priv->redirector_handle == INVALID_HANDLE_VALUE) {
+		usbi_err(ctx, "Redirector startup failed");
+		device_priv->redirector_handle = NULL;
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	priv->system_handle = usbdk_helper.GetRedirectorSystemHandle(priv->redirector_handle);
+	device_priv->system_handle = usbdk_helper.GetRedirectorSystemHandle(device_priv->redirector_handle);
+
+	if (CreateIoCompletionPort(device_priv->system_handle, priv->completion_port, 0, 0) == NULL) {
+		usbi_err(ctx, "failed to associate handle to I/O completion port: %s", windows_error_str(0));
+		usbdk_helper.StopRedirect(device_priv->redirector_handle);
+		device_priv->system_handle = NULL;
+		device_priv->redirector_handle = NULL;
+		return LIBUSB_ERROR_OTHER;
+	}
 
 	return LIBUSB_SUCCESS;
 }
@@ -419,6 +431,9 @@ static void usbdk_close(struct libusb_device_handle *dev_handle)
 
 	if (!usbdk_helper.StopRedirect(priv->redirector_handle))
 		usbi_err(HANDLE_CTX(dev_handle), "Redirector shutdown failed");
+
+	priv->system_handle = NULL;
+	priv->redirector_handle = NULL;
 }
 
 static int usbdk_get_configuration(struct libusb_device_handle *dev_handle, uint8_t *config)
@@ -518,6 +533,8 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 	transfer_priv->request.BufferLength = transfer->length;
 	transfer_priv->request.TransferType = ControlTransferType;
 
+	set_transfer_priv_handle(itransfer, priv->system_handle);
+
 	if (transfer->buffer[0] & LIBUSB_ENDPOINT_IN)
 		transResult = usbdk_helper.ReadPipe(priv->redirector_handle, &transfer_priv->request, overlapped);
 	else
@@ -525,7 +542,7 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 
 	switch (transResult) {
 	case TransferSuccess:
-		windows_force_sync_completion(overlapped, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred);
+		windows_force_sync_completion(itransfer, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred);
 		break;
 	case TransferSuccessAsync:
 		break;
@@ -533,8 +550,6 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 		usbi_err(TRANSFER_CTX(transfer), "ControlTransfer failed: %s", windows_error_str(0));
 		return LIBUSB_ERROR_IO;
 	}
-
-	set_transfer_priv_handle(itransfer, priv->system_handle);
 
 	return LIBUSB_SUCCESS;
 }
@@ -560,6 +575,8 @@ static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 		break;
 	}
 
+	set_transfer_priv_handle(itransfer, priv->system_handle);
+
 	if (IS_XFERIN(transfer))
 		transferRes = usbdk_helper.ReadPipe(priv->redirector_handle, &transfer_priv->request, overlapped);
 	else
@@ -567,7 +584,7 @@ static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 
 	switch (transferRes) {
 	case TransferSuccess:
-		windows_force_sync_completion(overlapped, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred);
+		windows_force_sync_completion(itransfer, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred);
 		break;
 	case TransferSuccessAsync:
 		break;
@@ -575,8 +592,6 @@ static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 		usbi_err(TRANSFER_CTX(transfer), "ReadPipe/WritePipe failed: %s", windows_error_str(0));
 		return LIBUSB_ERROR_IO;
 	}
-
-	set_transfer_priv_handle(itransfer, priv->system_handle);
 
 	return LIBUSB_SUCCESS;
 }
@@ -612,6 +627,8 @@ static int usbdk_do_iso_transfer(struct usbi_transfer *itransfer)
 	for (i = 0; i < transfer->num_iso_packets; i++)
 		transfer_priv->IsochronousPacketsArray[i] = transfer->iso_packet_desc[i].length;
 
+	set_transfer_priv_handle(itransfer, priv->system_handle);
+
 	if (IS_XFERIN(transfer))
 		transferRes = usbdk_helper.ReadPipe(priv->redirector_handle, &transfer_priv->request, overlapped);
 	else
@@ -619,15 +636,13 @@ static int usbdk_do_iso_transfer(struct usbi_transfer *itransfer)
 
 	switch (transferRes) {
 	case TransferSuccess:
-		windows_force_sync_completion(overlapped, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred);
+		windows_force_sync_completion(itransfer, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred);
 		break;
 	case TransferSuccessAsync:
 		break;
 	case TransferFailure:
 		return LIBUSB_ERROR_IO;
 	}
-
-	set_transfer_priv_handle(itransfer, priv->system_handle);
 
 	return LIBUSB_SUCCESS;
 }

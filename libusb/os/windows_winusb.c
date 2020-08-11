@@ -465,6 +465,28 @@ static int get_interface_by_endpoint(struct libusb_config_descriptor *conf_desc,
 }
 
 /*
+ * Open a device and associate the HANDLE with the context's I/O completion port
+ */
+HANDLE windows_open(struct libusb_device *dev, const char *path, DWORD access)
+{
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
+	HANDLE handle;
+
+	handle = CreateFileA(path, access, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	if (handle == INVALID_HANDLE_VALUE)
+		return handle;
+
+	if (CreateIoCompletionPort(handle, priv->completion_port, 0, 0) == NULL) {
+		usbi_err(ctx, "failed to associate handle to I/O completion port: %s", windows_error_str(0));
+		CloseHandle(handle);
+		return INVALID_HANDLE_VALUE;
+	}
+
+	return handle;
+}
+
+/*
  * Populate the endpoints addresses of the device_priv interface helper structs
  */
 static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting)
@@ -822,8 +844,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		dev->parent_dev = parent_dev;
 		priv->depth = depth;
 
-		hub_handle = CreateFileA(parent_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
-				     0, NULL);
+		hub_handle = CreateFileA(parent_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
 		if (hub_handle == INVALID_HANDLE_VALUE) {
 			usbi_warn(ctx, "could not open hub %s: %s", parent_priv->path, windows_error_str(0));
 			return LIBUSB_ERROR_ACCESS;
@@ -2090,8 +2111,7 @@ static int winusbx_open(int sub_api, struct libusb_device_handle *dev_handle)
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
 		if ((priv->usb_interface[i].path != NULL)
 				&& (priv->usb_interface[i].apib->id == USB_API_WINUSBX)) {
-			file_handle = CreateFileA(priv->usb_interface[i].path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ,
-				NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+			file_handle = windows_open(dev_handle->dev, priv->usb_interface[i].path, GENERIC_READ | GENERIC_WRITE);
 			if (file_handle == INVALID_HANDLE_VALUE) {
 				usbi_err(HANDLE_CTX(dev_handle), "could not open device %s (interface %d): %s", priv->usb_interface[i].path, i, windows_error_str(0));
 				switch (GetLastError()) {
@@ -2103,6 +2123,7 @@ static int winusbx_open(int sub_api, struct libusb_device_handle *dev_handle)
 					return LIBUSB_ERROR_IO;
 				}
 			}
+
 			handle_priv->interface_handle[i].dev_handle = file_handle;
 		}
 	}
@@ -2262,8 +2283,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 					*dev_interface_path_guid_start = '\0';
 
 					if (strncmp(dev_interface_path, priv->usb_interface[iface].path, strlen(dev_interface_path)) == 0) {
-						file_handle = CreateFileA(filter_path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ,
-							NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+						file_handle = windows_open(dev_handle->dev, filter_path, GENERIC_READ | GENERIC_WRITE);
 						if (file_handle != INVALID_HANDLE_VALUE) {
 							if (WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
 								// Replace the existing file handle with the working one
@@ -2459,7 +2479,7 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 			usbi_warn(TRANSFER_CTX(transfer), "cannot set configuration other than the default one");
 			return LIBUSB_ERROR_NOT_SUPPORTED;
 		}
-		windows_force_sync_completion(overlapped, 0);
+		windows_force_sync_completion(itransfer, 0);
 	} else {
 		if (!WinUSBX[sub_api].ControlTransfer(winusb_handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, overlapped)) {
 			if (GetLastError() != ERROR_IO_PENDING) {
@@ -3400,8 +3420,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
 		if ((priv->usb_interface[i].path != NULL)
 				&& (priv->usb_interface[i].apib->id == USB_API_HID)) {
-			hid_handle = CreateFileA(priv->usb_interface[i].path, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_WRITE | FILE_SHARE_READ,
-				NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+			hid_handle = windows_open(dev, priv->usb_interface[i].path, GENERIC_READ | GENERIC_WRITE);
 			/*
 			 * http://www.lvr.com/hidfaq.htm: Why do I receive "Access denied" when attempting to access my HID?
 			 * "Windows 2000 and later have exclusive read/write access to HIDs that are configured as a system
@@ -3411,8 +3430,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 			 */
 			if (hid_handle == INVALID_HANDLE_VALUE) {
 				usbi_warn(HANDLE_CTX(dev_handle), "could not open HID device in R/W mode (keyboard or mouse?) - trying without");
-				hid_handle = CreateFileA(priv->usb_interface[i].path, 0, FILE_SHARE_WRITE | FILE_SHARE_READ,
-					NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+				hid_handle = windows_open(dev, priv->usb_interface[i].path, 0);
 				if (hid_handle == INVALID_HANDLE_VALUE) {
 					usbi_err(HANDLE_CTX(dev_handle), "could not open device %s (interface %d): %s", priv->path, i, windows_error_str(0));
 					switch (GetLastError()) {
@@ -3692,7 +3710,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 
 	if (r == LIBUSB_COMPLETED) {
 		// Force request to be completed synchronously. Transferred size has been set by previous call
-		windows_force_sync_completion(overlapped, (ULONG)size);
+		windows_force_sync_completion(itransfer, (ULONG)size);
 		r = LIBUSB_SUCCESS;
 	}
 

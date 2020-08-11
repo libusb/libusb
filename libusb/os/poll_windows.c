@@ -21,15 +21,6 @@
 /*
  * poll() and pipe() Windows compatibility layer for libusb 1.0
  *
- * The way this layer works is by using OVERLAPPED with async I/O transfers, as
- * OVERLAPPED have an associated event which is flagged for I/O completion.
- *
- * For USB pollable async I/O, you would typically:
- * - obtain a Windows HANDLE to a file or device that has been opened in
- *   OVERLAPPED mode
- * - call usbi_create_fd with this handle to obtain a custom fd.
- * - leave the core functions call the poll routine and flag POLLIN/POLLOUT
- *
  * The pipe pollable synchronous I/O works using the overlapped event associated
  * with a fake pipe. The read/write functions are only meant to be used in that
  * context.
@@ -44,12 +35,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-// public fd data
-const struct winfd INVALID_WINFD = { -1, NULL };
 
 // private data
 struct file_descriptor {
-	enum fd_type { FD_TYPE_PIPE, FD_TYPE_TRANSFER } type;
 	LONG refcount;
 	OVERLAPPED overlapped;
 };
@@ -71,7 +59,7 @@ static unsigned int fd_count;
 		return -1;		\
 	} while (0)
 
-static struct file_descriptor *alloc_fd(enum fd_type type, LONG refcount)
+static struct file_descriptor *alloc_fd(LONG refcount)
 {
 	struct file_descriptor *fd = calloc(1, sizeof(*fd));
 
@@ -82,7 +70,6 @@ static struct file_descriptor *alloc_fd(enum fd_type type, LONG refcount)
 		free(fd);
 		return NULL;
 	}
-	fd->type = type;
 	fd->refcount = refcount;
 	return fd;
 }
@@ -169,43 +156,6 @@ static void remove_fd(unsigned int pos)
 		fd_table_bitmap = NULL;
 		fd_table_size = 0;
 	}
-}
-
-/*
- * Create both an fd and an OVERLAPPED, so that it can be used with our
- * polling function
- * The handle MUST support overlapped transfers (usually requires CreateFile
- * with FILE_FLAG_OVERLAPPED)
- * Return a pollable file descriptor struct, or INVALID_WINFD on error
- *
- * Note that the fd returned by this function is a per-transfer fd, rather
- * than a per-session fd and cannot be used for anything else but our
- * custom functions.
- * if you plan to do R/W on the same handle, you MUST create 2 fds: one for
- * read and one for write. Using a single R/W fd is unsupported and will
- * produce unexpected results
- */
-struct winfd usbi_create_fd(void)
-{
-	struct file_descriptor *fd;
-	struct winfd wfd;
-
-	fd = alloc_fd(FD_TYPE_TRANSFER, 1);
-	if (fd == NULL)
-		return INVALID_WINFD;
-
-	usbi_mutex_static_lock(&fd_table_lock);
-	wfd.fd = install_fd(fd);
-	usbi_mutex_static_unlock(&fd_table_lock);
-
-	if (wfd.fd < 0) {
-		put_fd(fd);
-		return INVALID_WINFD;
-	}
-
-	wfd.overlapped = &fd->overlapped;
-
-	return wfd;
 }
 
 struct wait_thread_data {
@@ -461,7 +411,7 @@ int usbi_pipe(int filedes[2])
 	int r_fd, w_fd;
 	int error = 0;
 
-	fd = alloc_fd(FD_TYPE_PIPE, 2);
+	fd = alloc_fd(2);
 	if (fd == NULL)
 		return_with_errno(ENOMEM);
 
@@ -509,12 +459,10 @@ ssize_t usbi_write(int _fd, const void *buf, size_t count)
 
 	usbi_mutex_static_lock(&fd_table_lock);
 	fd = get_fd(_fd, false);
-	if (fd && fd->type == FD_TYPE_PIPE) {
+	if (fd != NULL) {
 		assert(fd->overlapped.Internal == STATUS_PENDING);
 		fd->overlapped.Internal = STATUS_WAIT_0;
 		SetEvent(fd->overlapped.hEvent);
-	} else {
-		fd = NULL;
 	}
 	usbi_mutex_static_unlock(&fd_table_lock);
 
@@ -540,12 +488,10 @@ ssize_t usbi_read(int _fd, void *buf, size_t count)
 
 	usbi_mutex_static_lock(&fd_table_lock);
 	fd = get_fd(_fd, false);
-	if (fd && fd->type == FD_TYPE_PIPE) {
+	if (fd != NULL) {
 		assert(fd->overlapped.Internal == STATUS_WAIT_0);
 		fd->overlapped.Internal = STATUS_PENDING;
 		ResetEvent(fd->overlapped.hEvent);
-	} else {
-		fd = NULL;
 	}
 	usbi_mutex_static_unlock(&fd_table_lock);
 

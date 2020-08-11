@@ -25,8 +25,6 @@
 #ifndef LIBUSB_POLL_WINDOWS_H
 #define LIBUSB_POLL_WINDOWS_H
 
-#define DUMMY_HANDLE ((HANDLE)(LONG_PTR)-2)
-
 #define POLLIN		0x0001	/* There is data to read */
 #define POLLPRI		0x0002	/* There is urgent data to read */
 #define POLLOUT		0x0004	/* Writing now will not block */
@@ -41,15 +39,6 @@ struct pollfd {
 	short events;	/* requested events */
 	short revents;	/* returned events */
 };
-
-struct winfd {
-	int fd;				// what's exposed to libusb core
-	OVERLAPPED *overlapped;		// what will report our I/O status
-};
-
-extern const struct winfd INVALID_WINFD;
-
-struct winfd usbi_create_fd(void);
 
 int usbi_pipe(int pipefd[2]);
 int usbi_poll(struct pollfd *fds, usbi_nfds_t nfds, int timeout);
