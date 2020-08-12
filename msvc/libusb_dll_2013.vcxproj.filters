@@ -18,6 +18,9 @@
     <ClInclude Include=".\config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\libusb\os\events_windows.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\libusb\hotplug.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -25,9 +28,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\libusb\libusbi.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\libusb\os\poll_windows.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\libusb\os\threads_windows.h">
@@ -61,13 +61,13 @@
     <ClCompile Include="..\libusb\descriptor.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\libusb\os\events_windows.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\libusb\hotplug.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\libusb\io.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\libusb\os\poll_windows.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\libusb\strerror.c">

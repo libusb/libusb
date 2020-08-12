@@ -223,7 +223,7 @@ void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device 
 	pending_events = usbi_pending_events(ctx);
 	list_add_tail(&message->list, &ctx->hotplug_msgs);
 	if (!pending_events)
-		usbi_signal_event(ctx);
+		usbi_signal_event(&ctx->event);
 	usbi_mutex_unlock(&ctx->event_data_lock);
 }
 
@@ -347,7 +347,7 @@ void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
 		pending_events = usbi_pending_events(ctx);
 		ctx->event_flags |= USBI_EVENT_HOTPLUG_CB_DEREGISTERED;
 		if (!pending_events)
-			usbi_signal_event(ctx);
+			usbi_signal_event(&ctx->event);
 		usbi_mutex_unlock(&ctx->event_data_lock);
 	}
 }

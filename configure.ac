@@ -75,13 +75,13 @@ case $host in
 *-darwin*)
 	AC_MSG_RESULT([Darwin/Mac OS X])
 	backend=darwin
-	poll=posix
+	events=posix
 	threads=posix
 	;;
 *-haiku*)
 	AC_MSG_RESULT([Haiku])
 	backend=haiku
-	poll=posix
+	events=posix
 	threads=posix
 	;;
 *-linux* | *-uclinux*)
@@ -96,37 +96,37 @@ case $host in
 		;;
 	esac
 	backend=linux
-	poll=posix
+	events=posix
 	threads=posix
 	;;
 *-netbsd*)
 	AC_MSG_RESULT([NetBSD])
 	backend=netbsd
-	poll=posix
+	events=posix
 	threads=posix
 	;;
 *-openbsd*)
 	AC_MSG_RESULT([OpenBSD])
 	backend=openbsd
-	poll=posix
+	events=posix
 	threads=posix
 	;;
 *-solaris*)
 	AC_MSG_RESULT([SunOS])
 	backend=sunos
-	poll=posix
+	events=posix
 	threads=posix
 	;;
 *-cygwin*)
 	AC_MSG_RESULT([Windows (using Cygwin)])
 	backend=windows
-	poll=windows
+	events=windows
 	threads=posix
 	;;
 *-mingw* | *msys*)
 	AC_MSG_RESULT([Windows])
 	backend=windows
-	poll=windows
+	events=windows
 	threads=windows
 	test "x$enable_shared" = xyes && create_import_lib=yes
 	EXTRA_CFLAGS="-fno-omit-frame-pointer"
@@ -136,19 +136,19 @@ case $host in
 	AC_MSG_WARN([The host being compiled for is not supported.])
 	AC_MSG_WARN([The library may compile but will not function in any useful manner.])
 	backend="null"
-	poll=posix
+	events=posix
 	threads="posix"
 	;;
 esac
 
-if test "x$poll" = xposix; then
-	AC_DEFINE([POLL_POSIX], [1], [Define to 1 if using the POSIX poll() implementation.])
+if test "x$events" = xposix; then
+	AC_DEFINE([EVENTS_POSIX], [1], [Define to 1 if using the POSIX events abstraction.])
 	AC_CHECK_TYPES([nfds_t], [], [], [[#include <poll.h>]])
 	AC_CHECK_FUNCS([pipe2])
-elif test "x$poll" = xwindows; then
-	AC_DEFINE([POLL_WINDOWS], [1], [Define to 1 if using the Windows poll() implementation.])
+elif test "x$events" = xwindows; then
+	AC_DEFINE([EVENTS_WINDOWS], [1], [Define to 1 if using the Windows events abstraction.])
 else
-	AC_MSG_ERROR([Unknown poll implementation])
+	AC_MSG_ERROR([Unknown events abstraction])
 fi
 
 if test "x$threads" = xposix; then
@@ -314,6 +314,8 @@ AC_ARG_ENABLE([tests-build],
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != xno])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != xno])
 AM_CONDITIONAL([CREATE_IMPORT_LIB], [test "x$create_import_lib" = xyes])
+AM_CONDITIONAL([EVENTS_POSIX], [test "x$events" = xposix])
+AM_CONDITIONAL([EVENTS_WINDOWS], [test "x$events" = xwindows])
 AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = xyes])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = xdarwin])
 AM_CONDITIONAL([OS_HAIKU], [test "x$backend" = xhaiku])
@@ -323,8 +325,6 @@ AM_CONDITIONAL([OS_NULL], [test "x$backend" = xnull])
 AM_CONDITIONAL([OS_OPENBSD], [test "x$backend" = xopenbsd])
 AM_CONDITIONAL([OS_SUNOS], [test "x$backend" = xsunos])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" = xwindows])
-AM_CONDITIONAL([POLL_POSIX], [test "x$poll" = xposix])
-AM_CONDITIONAL([POLL_WINDOWS], [test "x$poll" = xwindows])
 AM_CONDITIONAL([THREADS_POSIX], [test "x$threads" = xposix])
 AM_CONDITIONAL([THREADS_WINDOWS], [test "x$threads" = xwindows])
 AM_CONDITIONAL([USE_UDEV], [test "x$use_udev" = xyes])

@@ -5,13 +5,13 @@ AM_CXXFLAGS += -fvisibility=hidden $(THREAD_CFLAGS)
 
 lib_LTLIBRARIES = libusb-1.0.la
 
-POSIX_POLL_SRC = os/poll_posix.h os/poll_posix.c
-WINDOWS_POLL_SRC = os/poll_windows.h os/poll_windows.c
+POSIX_EVENTS_SRC = os/events_posix.h os/events_posix.c
+WINDOWS_EVENTS_SRC = os/events_windows.h os/events_windows.c
 
-if POLL_POSIX
-POLL_SRC = $(POSIX_POLL_SRC)
+if EVENTS_POSIX
+EVENTS_SRC = $(POSIX_EVENTS_SRC)
 else
-POLL_SRC = $(WINDOWS_POLL_SRC)
+EVENTS_SRC = $(WINDOWS_EVENTS_SRC)
 endif
 
 POSIX_THREADS_SRC = os/threads_posix.h os/threads_posix.c
@@ -90,6 +90,6 @@ endif
 libusb_1_0_la_LDFLAGS = $(LT_LDFLAGS)
 libusb_1_0_la_SOURCES = libusbi.h version.h version_nano.h \
 	core.c descriptor.c hotplug.h hotplug.c io.c strerror.c sync.c \
-	$(POLL_SRC) $(THREADS_SRC) $(OS_SRC)
+	$(EVENTS_SRC) $(THREADS_SRC) $(OS_SRC)
 
 pkginclude_HEADERS = libusb.h

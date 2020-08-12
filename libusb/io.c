@@ -25,10 +25,6 @@
 #include "hotplug.h"
 
 #include <errno.h>
-#ifdef HAVE_TIMERFD
-#include <sys/timerfd.h>
-#include <unistd.h>
-#endif
 
 /**
  * \page libusb_io Synchronous and asynchronous device I/O
@@ -1121,44 +1117,40 @@ int usbi_io_init(struct libusb_context *ctx)
 	usbi_mutex_init(&ctx->event_data_lock);
 	usbi_tls_key_create(&ctx->event_handling_key);
 	list_init(&ctx->flying_transfers);
-	list_init(&ctx->ipollfds);
-	list_init(&ctx->removed_ipollfds);
+	list_init(&ctx->event_sources);
+	list_init(&ctx->removed_event_sources);
 	list_init(&ctx->hotplug_msgs);
 	list_init(&ctx->completed_transfers);
 
-	/* FIXME should use an eventfd on kernels that support it */
-	r = usbi_pipe(ctx->event_pipe);
-	if (r < 0) {
-		r = LIBUSB_ERROR_OTHER;
-		goto err;
-	}
-
-	r = usbi_add_pollfd(ctx, ctx->event_pipe[0], POLLIN);
+	r = usbi_create_event(&ctx->event);
 	if (r < 0)
-		goto err_close_pipe;
+		goto err;
 
-#ifdef HAVE_TIMERFD
-	ctx->timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
-	if (ctx->timerfd >= 0) {
-		usbi_dbg("using timerfd for timeouts");
-		r = usbi_add_pollfd(ctx, ctx->timerfd, POLLIN);
+	r = usbi_add_event_source(ctx, USBI_EVENT_OS_HANDLE(&ctx->event), USBI_EVENT_POLL_EVENTS);
+	if (r < 0)
+		goto err_destroy_event;
+
+#ifdef HAVE_OS_TIMER
+	r = usbi_create_timer(&ctx->timer);
+	if (r == 0) {
+		usbi_dbg("using timer for timeouts");
+		r = usbi_add_event_source(ctx, USBI_TIMER_OS_HANDLE(&ctx->timer), USBI_TIMER_POLL_EVENTS);
 		if (r < 0)
-			goto err_close_timerfd;
+			goto err_destroy_timer;
 	} else {
-		usbi_dbg("timerfd not available, errno=%d", errno);
+		usbi_dbg("timer not available for timeouts");
 	}
 #endif
 
 	return 0;
 
-#ifdef HAVE_TIMERFD
-err_close_timerfd:
-	close(ctx->timerfd);
-	usbi_remove_pollfd(ctx, ctx->event_pipe[0]);
+#ifdef HAVE_OS_TIMER
+err_destroy_timer:
+	usbi_destroy_timer(&ctx->timer);
+	usbi_remove_event_source(ctx, USBI_EVENT_OS_HANDLE(&ctx->event));
 #endif
-err_close_pipe:
-	usbi_close(ctx->event_pipe[0]);
-	usbi_close(ctx->event_pipe[1]);
+err_destroy_event:
+	usbi_destroy_event(&ctx->event);
 err:
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
@@ -1169,35 +1161,34 @@ err:
 	return r;
 }
 
-static void cleanup_removed_pollfds(struct libusb_context *ctx)
+static void cleanup_removed_event_sources(struct libusb_context *ctx)
 {
-	struct usbi_pollfd *ipollfd, *tmp;
+	struct usbi_event_source *ievent_source, *tmp;
 
-	for_each_removed_pollfd_safe(ctx, ipollfd, tmp) {
-		list_del(&ipollfd->list);
-		free(ipollfd);
+	for_each_removed_event_source_safe(ctx, ievent_source, tmp) {
+		list_del(&ievent_source->list);
+		free(ievent_source);
 	}
 }
 
 void usbi_io_exit(struct libusb_context *ctx)
 {
-	usbi_remove_pollfd(ctx, ctx->event_pipe[0]);
-	usbi_close(ctx->event_pipe[0]);
-	usbi_close(ctx->event_pipe[1]);
-#ifdef HAVE_TIMERFD
-	if (usbi_using_timerfd(ctx)) {
-		usbi_remove_pollfd(ctx, ctx->timerfd);
-		close(ctx->timerfd);
+#ifdef HAVE_OS_TIMER
+	if (usbi_using_timer(ctx)) {
+		usbi_remove_event_source(ctx, USBI_TIMER_OS_HANDLE(&ctx->timer));
+		usbi_destroy_timer(&ctx->timer);
 	}
 #endif
+	usbi_remove_event_source(ctx, USBI_EVENT_OS_HANDLE(&ctx->event));
+	usbi_destroy_event(&ctx->event);
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
 	usbi_cond_destroy(&ctx->event_waiters_cond);
 	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_tls_key_delete(ctx->event_handling_key);
-	free(ctx->pollfds);
-	cleanup_removed_pollfds(ctx);
+	cleanup_removed_event_sources(ctx);
+	free(ctx->event_data);
 }
 
 static int calculate_timeout(struct usbi_transfer *itransfer)
@@ -1322,28 +1313,18 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 	free(ptr);
 }
 
-#ifdef HAVE_TIMERFD
-static int disarm_timerfd(struct libusb_context *ctx)
-{
-	const struct itimerspec disarm_timer = { { 0, 0 }, { 0, 0 } };
-	int r;
-
-	usbi_dbg(" ");
-	r = timerfd_settime(ctx->timerfd, 0, &disarm_timer, NULL);
-	if (r < 0)
-		return LIBUSB_ERROR_OTHER;
-	else
-		return 0;
-}
-
-/* iterates through the flying transfers, and rearms the timerfd based on the
+/* iterates through the flying transfers, and rearms the timer based on the
  * next upcoming timeout.
  * must be called with flying_list locked.
  * returns 0 on success or a LIBUSB_ERROR code on failure.
  */
-static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
+#ifdef HAVE_OS_TIMER
+static int arm_timer_for_next_timeout(struct libusb_context *ctx)
 {
 	struct usbi_transfer *itransfer;
+
+	if (!usbi_using_timer(ctx))
+		return 0;
 
 	for_each_transfer(ctx, itransfer) {
 		struct timespec *cur_ts = &itransfer->timeout;
@@ -1351,26 +1332,20 @@ static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
 		/* if we've reached transfers of infinite timeout, then we have no
 		 * arming to do */
 		if (!TIMESPEC_IS_SET(cur_ts))
-			goto disarm;
+			break;
 
 		/* act on first transfer that has not already been handled */
 		if (!(itransfer->timeout_flags & (USBI_TRANSFER_TIMEOUT_HANDLED | USBI_TRANSFER_OS_HANDLES_TIMEOUT))) {
-			int r;
-			const struct itimerspec it = { {0, 0},
-				{ cur_ts->tv_sec, cur_ts->tv_nsec } };
 			usbi_dbg("next timeout originally %ums", USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)->timeout);
-			r = timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &it, NULL);
-			if (r < 0)
-				return LIBUSB_ERROR_OTHER;
-			return 0;
+			return usbi_arm_timer(&ctx->timer, cur_ts);
 		}
 	}
 
-disarm:
-	return disarm_timerfd(ctx);
+	usbi_dbg("no timeouts, disarming timer");
+	return usbi_disarm_timer(&ctx->timer);
 }
 #else
-static int arm_timerfd_for_next_timeout(struct libusb_context *ctx)
+static inline int arm_timer_for_next_timeout(struct libusb_context *ctx)
 {
 	UNUSED(ctx);
 	return 0;
@@ -1421,19 +1396,13 @@ static int add_to_flying_list(struct usbi_transfer *itransfer)
 	/* otherwise we need to be inserted at the end */
 	list_add_tail(&itransfer->list, &ctx->flying_transfers);
 out:
-#ifdef HAVE_TIMERFD
-	if (first && usbi_using_timerfd(ctx) && TIMESPEC_IS_SET(timeout)) {
+#ifdef HAVE_OS_TIMER
+	if (first && usbi_using_timer(ctx) && TIMESPEC_IS_SET(timeout)) {
 		/* if this transfer has the lowest timeout of all active transfers,
-		 * rearm the timerfd with this transfer's timeout */
-		const struct itimerspec it = { {0, 0},
-			{ timeout->tv_sec, timeout->tv_nsec } };
-		usbi_dbg("arm timerfd for timeout in %ums (first in line)",
+		 * rearm the timer with this transfer's timeout */
+		usbi_dbg("arm timer for timeout in %ums (first in line)",
 			USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)->timeout);
-		r = timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &it, NULL);
-		if (r < 0) {
-			usbi_warn(ctx, "failed to arm first timerfd, errno=%d", errno);
-			r = LIBUSB_ERROR_OTHER;
-		}
+		r = usbi_arm_timer(&ctx->timer, timeout);
 	}
 #else
 	UNUSED(first);
@@ -1452,15 +1421,15 @@ out:
 static int remove_from_flying_list(struct usbi_transfer *itransfer)
 {
 	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
-	int rearm_timerfd;
+	int rearm_timer;
 	int r = 0;
 
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
-	rearm_timerfd = (TIMESPEC_IS_SET(&itransfer->timeout) &&
+	rearm_timer = (TIMESPEC_IS_SET(&itransfer->timeout) &&
 		list_first_entry(&ctx->flying_transfers, struct usbi_transfer, list) == itransfer);
 	list_del(&itransfer->list);
-	if (usbi_using_timerfd(ctx) && rearm_timerfd)
-		r = arm_timerfd_for_next_timeout(ctx);
+	if (rearm_timer)
+		r = arm_timer_for_next_timeout(ctx);
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
 	return r;
@@ -1660,7 +1629,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 
 	r = remove_from_flying_list(itransfer);
 	if (r < 0)
-		usbi_err(ITRANSFER_CTX(itransfer), "failed to set timer for next timeout, errno=%d", errno);
+		usbi_err(ITRANSFER_CTX(itransfer), "failed to set timer for next timeout");
 
 	usbi_mutex_lock(&itransfer->lock);
 	itransfer->state_flags &= ~USBI_TRANSFER_IN_FLIGHT;
@@ -1731,7 +1700,7 @@ void usbi_signal_transfer_completion(struct usbi_transfer *itransfer)
 		pending_events = usbi_pending_events(ctx);
 		list_add_tail(&itransfer->completed_list, &ctx->completed_transfers);
 		if (!pending_events)
-			usbi_signal_event(ctx);
+			usbi_signal_event(&ctx->event);
 		usbi_mutex_unlock(&ctx->event_data_lock);
 	}
 }
@@ -1918,7 +1887,7 @@ void API_EXPORTED libusb_interrupt_event_handler(libusb_context *ctx)
 	pending_events = usbi_pending_events(ctx);
 	ctx->event_flags |= USBI_EVENT_USER_INTERRUPT;
 	if (!pending_events)
-		usbi_signal_event(ctx);
+		usbi_signal_event(&ctx->event);
 
 	usbi_mutex_unlock(&ctx->event_data_lock);
 }
@@ -2068,8 +2037,76 @@ static int handle_timeouts(struct libusb_context *ctx)
 	return r;
 }
 
-#ifdef HAVE_TIMERFD
-static int handle_timerfd_trigger(struct libusb_context *ctx)
+static int handle_event_trigger(struct libusb_context *ctx)
+{
+	struct list_head hotplug_msgs;
+	int r = 0;
+
+	usbi_dbg("event triggered");
+
+	list_init(&hotplug_msgs);
+
+	/* take the the event data lock while processing events */
+	usbi_mutex_lock(&ctx->event_data_lock);
+
+	/* check if someone modified the event sources */
+	if (ctx->event_flags & USBI_EVENT_EVENT_SOURCES_MODIFIED)
+		usbi_dbg("someone updated the event sources");
+
+	if (ctx->event_flags & USBI_EVENT_USER_INTERRUPT) {
+		usbi_dbg("someone purposefully interrupted");
+		ctx->event_flags &= ~USBI_EVENT_USER_INTERRUPT;
+	}
+
+	/* check if someone is closing a device */
+	if (ctx->device_close)
+		usbi_dbg("someone is closing a device");
+
+	/* check for any pending hotplug messages */
+	if (!list_empty(&ctx->hotplug_msgs)) {
+		usbi_dbg("hotplug message received");
+		list_cut(&hotplug_msgs, &ctx->hotplug_msgs);
+	}
+
+	/* complete any pending transfers */
+	while (r == 0 && !list_empty(&ctx->completed_transfers)) {
+		struct usbi_transfer *itransfer =
+			list_first_entry(&ctx->completed_transfers, struct usbi_transfer, completed_list);
+
+		list_del(&itransfer->completed_list);
+		usbi_mutex_unlock(&ctx->event_data_lock);
+		r = usbi_backend.handle_transfer_completion(itransfer);
+		if (r)
+			usbi_err(ctx, "backend handle_transfer_completion failed with error %d", r);
+		usbi_mutex_lock(&ctx->event_data_lock);
+	}
+
+	/* if no further pending events, clear the event */
+	if (!usbi_pending_events(ctx))
+		usbi_clear_event(&ctx->event);
+
+	usbi_mutex_unlock(&ctx->event_data_lock);
+
+	/* process the hotplug messages, if any */
+	while (!list_empty(&hotplug_msgs)) {
+		struct libusb_hotplug_message *message =
+			list_first_entry(&hotplug_msgs, struct libusb_hotplug_message, list);
+
+		usbi_hotplug_match(ctx, message->device, message->event);
+
+		/* the device left, dereference the device */
+		if (message->event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
+			libusb_unref_device(message->device);
+
+		list_del(&message->list);
+		free(message);
+	}
+
+	return r;
+}
+
+#ifdef HAVE_OS_TIMER
+static int handle_timer_trigger(struct libusb_context *ctx)
 {
 	int r;
 
@@ -2081,7 +2118,7 @@ static int handle_timerfd_trigger(struct libusb_context *ctx)
 		goto out;
 
 	/* arm for next timeout */
-	r = arm_timerfd_for_next_timeout(ctx);
+	r = arm_timer_for_next_timeout(ctx);
 
 out:
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
@@ -2093,81 +2130,38 @@ out:
  * doing the same thing. */
 static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 {
-	int r;
-	struct usbi_pollfd *ipollfd;
-	usbi_nfds_t nfds = 0;
-	usbi_nfds_t internal_nfds;
-	struct pollfd *fds = NULL;
-	int timeout_ms;
+	struct usbi_reported_events reported_events;
+	int r, timeout_ms;
 
 	/* prevent attempts to recursively handle events (e.g. calling into
 	 * libusb_handle_events() from within a hotplug or transfer callback) */
-	usbi_mutex_lock(&ctx->event_data_lock);
-	r = 0;
 	if (usbi_handling_events(ctx))
-		r = LIBUSB_ERROR_BUSY;
-	else
-		usbi_start_event_handling(ctx);
-	usbi_mutex_unlock(&ctx->event_data_lock);
+		return LIBUSB_ERROR_BUSY;
 
-	if (r)
-		return r;
-
-	/* there are certain fds that libusb uses internally, currently:
-	 *
-	 *   1) event pipe
-	 *   2) timerfd
-	 *
-	 * the backend will never need to attempt to handle events on these fds, so
-	 * we determine how many fds are in use internally for this context and when
-	 * handle_events() is called in the backend, the pollfd list and count will
-	 * be adjusted to skip over these internal fds */
-	if (usbi_using_timerfd(ctx))
-		internal_nfds = 2;
-	else
-		internal_nfds = 1;
-
-	/* only reallocate the poll fds when the list of poll fds has been modified
-	 * since the last poll, otherwise reuse them to save the additional overhead */
+	/* only reallocate the event source data when the list of event sources has
+	 * been modified since the last handle_events(), otherwise reuse them to
+	 * save the additional overhead */
 	usbi_mutex_lock(&ctx->event_data_lock);
-	/* clean up removed poll fds */
-	cleanup_removed_pollfds(ctx);
-	if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED) {
-		int i = 0;
+	if (ctx->event_flags & USBI_EVENT_EVENT_SOURCES_MODIFIED) {
+		usbi_dbg("event sources modified, reallocating event data");
 
-		usbi_dbg("poll fds modified, reallocating");
+		/* free anything removed since we last ran */
+		cleanup_removed_event_sources(ctx);
 
-		free(ctx->pollfds);
-		ctx->pollfds = NULL;
-
-		/* sanity check - it is invalid for a context to have fewer than the
-		 * required internal fds (memory corruption?) */
-		assert(ctx->pollfds_cnt >= internal_nfds);
-
-		ctx->pollfds = calloc(ctx->pollfds_cnt, sizeof(*ctx->pollfds));
-		if (!ctx->pollfds) {
+		r = usbi_alloc_event_data(ctx);
+		if (r) {
 			usbi_mutex_unlock(&ctx->event_data_lock);
-			r = LIBUSB_ERROR_NO_MEM;
-			goto done;
-		}
-
-		for_each_pollfd(ctx, ipollfd) {
-			struct libusb_pollfd *pollfd = &ipollfd->pollfd;
-			ctx->pollfds[i].fd = pollfd->fd;
-			ctx->pollfds[i].events = pollfd->events;
-			i++;
+			return r;
 		}
 
 		/* reset the flag now that we have the updated list */
-		ctx->event_flags &= ~USBI_EVENT_POLLFDS_MODIFIED;
+		ctx->event_flags &= ~USBI_EVENT_EVENT_SOURCES_MODIFIED;
 
-		/* if no further pending events, clear the event pipe so that we do
-		 * not immediately return from poll */
+		/* if no further pending events, clear the event so that we do
+		 * not immediately return from the wait function */
 		if (!usbi_pending_events(ctx))
-			usbi_clear_event(ctx);
+			usbi_clear_event(&ctx->event);
 	}
-	fds = ctx->pollfds;
-	nfds = ctx->pollfds_cnt;
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
 	timeout_ms = (int)(tv->tv_sec * 1000) + (tv->tv_usec / 1000);
@@ -2176,141 +2170,38 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	if (tv->tv_usec % 1000)
 		timeout_ms++;
 
-	usbi_dbg("poll() %d fds with timeout in %dms", (int)nfds, timeout_ms);
-	r = usbi_poll(fds, nfds, timeout_ms);
-	usbi_dbg("poll() returned %d", r);
-	if (r == 0) {
-		r = handle_timeouts(ctx);
-		goto done;
-	} else if (r == -1 && errno == EINTR) {
-		r = LIBUSB_ERROR_INTERRUPTED;
-		goto done;
-	} else if (r < 0) {
-		usbi_err(ctx, "poll failed, errno=%d", errno);
-		r = LIBUSB_ERROR_IO;
+	usbi_start_event_handling(ctx);
+
+	r = usbi_wait_for_events(ctx, &reported_events, timeout_ms);
+	if (r != LIBUSB_SUCCESS) {
+		if (r == LIBUSB_ERROR_TIMEOUT)
+			r = handle_timeouts(ctx);
 		goto done;
 	}
 
-	/* fds[0] is always the event pipe */
-	if (fds[0].revents) {
-		struct list_head hotplug_msgs;
-		struct usbi_transfer *itransfer;
-		int hotplug_cb_deregistered = 0;
-		int ret = 0;
-
-		list_init(&hotplug_msgs);
-
-		usbi_dbg("caught a fish on the event pipe");
-
-		/* take the the event data lock while processing events */
-		usbi_mutex_lock(&ctx->event_data_lock);
-
-		/* check if someone added a new poll fd */
-		if (ctx->event_flags & USBI_EVENT_POLLFDS_MODIFIED)
-			usbi_dbg("someone updated the poll fds");
-
-		if (ctx->event_flags & USBI_EVENT_USER_INTERRUPT) {
-			usbi_dbg("someone purposely interrupted");
-			ctx->event_flags &= ~USBI_EVENT_USER_INTERRUPT;
-		}
-
-		if (ctx->event_flags & USBI_EVENT_HOTPLUG_CB_DEREGISTERED) {
-			usbi_dbg("someone unregistered a hotplug cb");
-			ctx->event_flags &= ~USBI_EVENT_HOTPLUG_CB_DEREGISTERED;
-			hotplug_cb_deregistered = 1;
-		}
-
-		/* check if someone is closing a device */
-		if (ctx->device_close)
-			usbi_dbg("someone is closing a device");
-
-		/* check for any pending hotplug messages */
-		if (!list_empty(&ctx->hotplug_msgs)) {
-			usbi_dbg("hotplug message received");
-			list_cut(&hotplug_msgs, &ctx->hotplug_msgs);
-		}
-
-		/* complete any pending transfers */
-		while (ret == 0 && !list_empty(&ctx->completed_transfers)) {
-			itransfer = list_first_entry(&ctx->completed_transfers, struct usbi_transfer, completed_list);
-			list_del(&itransfer->completed_list);
-			usbi_mutex_unlock(&ctx->event_data_lock);
-			ret = usbi_backend.handle_transfer_completion(itransfer);
-			if (ret)
-				usbi_err(ctx, "backend handle_transfer_completion failed with error %d", ret);
-			usbi_mutex_lock(&ctx->event_data_lock);
-		}
-
-		/* if no further pending events, clear the event pipe */
-		if (!usbi_pending_events(ctx))
-			usbi_clear_event(ctx);
-
-		usbi_mutex_unlock(&ctx->event_data_lock);
-
-		if (hotplug_cb_deregistered)
-			usbi_hotplug_deregister(ctx, 0);
-
-		/* process the hotplug messages, if any */
-		while (!list_empty(&hotplug_msgs)) {
-			struct libusb_hotplug_message *message =
-				list_first_entry(&hotplug_msgs, struct libusb_hotplug_message, list);
-
-			usbi_hotplug_match(ctx, message->device, message->event);
-
-			/* the device left, dereference the device */
-			if (LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT == message->event)
-				libusb_unref_device(message->device);
-
-			list_del(&message->list);
-			free(message);
-		}
-
-		if (ret) {
+	if (reported_events.event_triggered) {
+		r = handle_event_trigger(ctx);
+		if (r) {
 			/* return error code */
-			r = ret;
 			goto done;
 		}
-
-		if (0 == --r)
-			goto done;
 	}
 
-#ifdef HAVE_TIMERFD
-	/* on timerfd configurations, fds[1] is the timerfd */
-	if (usbi_using_timerfd(ctx) && fds[1].revents) {
-		/* timerfd indicates that a timeout has expired */
-		int ret;
-		usbi_dbg("timerfd triggered");
-
-		ret = handle_timerfd_trigger(ctx);
-		if (ret < 0) {
+#ifdef HAVE_OS_TIMER
+	if (reported_events.timer_triggered) {
+		r = handle_timer_trigger(ctx);
+		if (r) {
 			/* return error code */
-			r = ret;
 			goto done;
 		}
-
-		if (0 == --r)
-			goto done;
 	}
 #endif
 
-	for_each_removed_pollfd(ctx, ipollfd) {
-		usbi_nfds_t n;
+	if (!reported_events.num_ready)
+		goto done;
 
-		for (n = internal_nfds ; n < nfds ; n++) {
-			if (ipollfd->pollfd.fd == fds[n].fd) {
-				/* pollfd was removed between the creation of the fd
-				 * array and here. remove any triggered revent as
-				 * it is no longer relevant */
-				usbi_dbg("pollfd %d was removed. ignoring raised events",
-					 fds[n].fd);
-				fds[n].revents = 0;
-				break;
-			}
-		}
-	}
-
-	r = usbi_backend.handle_events(ctx, fds + internal_nfds, nfds - internal_nfds, r);
+	r = usbi_backend.handle_events(ctx, reported_events.event_data,
+		reported_events.event_data_count, reported_events.num_ready);
 	if (r)
 		usbi_err(ctx, "backend handle_events failed with error %d", r);
 
@@ -2555,13 +2446,8 @@ int API_EXPORTED libusb_handle_events_locked(libusb_context *ctx,
  */
 int API_EXPORTED libusb_pollfds_handle_timeouts(libusb_context *ctx)
 {
-#ifdef HAVE_TIMERFD
 	ctx = usbi_get_context(ctx);
-	return usbi_using_timerfd(ctx);
-#else
-	UNUSED(ctx);
-	return 0;
-#endif
+	return usbi_using_timer(ctx);
 }
 
 /** \ingroup libusb_poll
@@ -2601,7 +2487,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	int r;
 
 	ctx = usbi_get_context(ctx);
-	if (usbi_using_timerfd(ctx))
+	if (usbi_using_timer(ctx))
 		return 0;
 
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
@@ -2673,80 +2559,92 @@ void API_EXPORTED libusb_set_pollfd_notifiers(libusb_context *ctx,
 	libusb_pollfd_added_cb added_cb, libusb_pollfd_removed_cb removed_cb,
 	void *user_data)
 {
+#if !defined(_WIN32) && !defined(__CYGWIN__)
 	ctx = usbi_get_context(ctx);
 	ctx->fd_added_cb = added_cb;
 	ctx->fd_removed_cb = removed_cb;
 	ctx->fd_cb_user_data = user_data;
+#else
+	usbi_err(ctx, "external polling of libusb's internal event sources " \
+		"is not yet supported on Windows");
+	UNUSED(added_cb);
+	UNUSED(removed_cb);
+	UNUSED(user_data);
+#endif
 }
 
 /*
  * Interrupt the iteration of the event handling thread, so that it picks
- * up the fd change. Callers of this function must hold the event_data_lock.
+ * up the event source change. Callers of this function must hold the event_data_lock.
  */
-static void usbi_fd_notification(struct libusb_context *ctx)
+static void usbi_event_source_notification(struct libusb_context *ctx)
 {
 	int pending_events;
 
 	/* Record that there is a new poll fd.
 	 * Only signal an event if there are no prior pending events. */
 	pending_events = usbi_pending_events(ctx);
-	ctx->event_flags |= USBI_EVENT_POLLFDS_MODIFIED;
+	ctx->event_flags |= USBI_EVENT_EVENT_SOURCES_MODIFIED;
 	if (!pending_events)
-		usbi_signal_event(ctx);
+		usbi_signal_event(&ctx->event);
 }
 
-/* Add a file descriptor to the list of file descriptors to be monitored.
- * events should be specified as a bitmask of events passed to poll(), e.g.
+/* Add an event source to the list of event sources to be monitored.
+ * poll_events should be specified as a bitmask of events passed to poll(), e.g.
  * POLLIN and/or POLLOUT. */
-int usbi_add_pollfd(struct libusb_context *ctx, int fd, short events)
+int usbi_add_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle, short poll_events)
 {
-	struct usbi_pollfd *ipollfd = malloc(sizeof(*ipollfd));
-	if (!ipollfd)
+	struct usbi_event_source *ievent_source = malloc(sizeof(*ievent_source));
+
+	if (!ievent_source)
 		return LIBUSB_ERROR_NO_MEM;
 
-	usbi_dbg("add fd %d events %d", fd, events);
-	ipollfd->pollfd.fd = fd;
-	ipollfd->pollfd.events = events;
+	usbi_dbg("add " USBI_OS_HANDLE_FORMAT_STRING " events %d", os_handle, poll_events);
+	ievent_source->data.os_handle = os_handle;
+	ievent_source->data.poll_events = poll_events;
 	usbi_mutex_lock(&ctx->event_data_lock);
-	list_add_tail(&ipollfd->list, &ctx->ipollfds);
-	ctx->pollfds_cnt++;
-	usbi_fd_notification(ctx);
+	list_add_tail(&ievent_source->list, &ctx->event_sources);
+	usbi_event_source_notification(ctx);
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
+#if !defined(_WIN32) && !defined(__CYGWIN__)
 	if (ctx->fd_added_cb)
-		ctx->fd_added_cb(fd, events, ctx->fd_cb_user_data);
+		ctx->fd_added_cb(os_handle, poll_events, ctx->fd_cb_user_data);
+#endif
+
 	return 0;
 }
 
-/* Remove a file descriptor from the list of file descriptors to be polled. */
-void usbi_remove_pollfd(struct libusb_context *ctx, int fd)
+/* Remove an event source from the list of event sources to be monitored. */
+void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle)
 {
-	struct usbi_pollfd *ipollfd;
+	struct usbi_event_source *ievent_source;
 	int found = 0;
 
-	usbi_dbg("remove fd %d", fd);
+	usbi_dbg("remove " USBI_OS_HANDLE_FORMAT_STRING, os_handle);
 	usbi_mutex_lock(&ctx->event_data_lock);
-	for_each_pollfd(ctx, ipollfd) {
-		if (ipollfd->pollfd.fd == fd) {
+	for_each_event_source(ctx, ievent_source) {
+		if (ievent_source->data.os_handle == os_handle) {
 			found = 1;
 			break;
 		}
 	}
 
 	if (!found) {
-		usbi_dbg("couldn't find fd %d to remove", fd);
+		usbi_dbg("couldn't find " USBI_OS_HANDLE_FORMAT_STRING " to remove", os_handle);
 		usbi_mutex_unlock(&ctx->event_data_lock);
 		return;
 	}
 
-	list_del(&ipollfd->list);
-	list_add_tail(&ipollfd->list, &ctx->removed_ipollfds);
-	ctx->pollfds_cnt--;
-	usbi_fd_notification(ctx);
+	list_del(&ievent_source->list);
+	list_add_tail(&ievent_source->list, &ctx->removed_event_sources);
+	usbi_event_source_notification(ctx);
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
+#if !defined(_WIN32) && !defined(__CYGWIN__)
 	if (ctx->fd_removed_cb)
-		ctx->fd_removed_cb(fd, ctx->fd_cb_user_data);
+		ctx->fd_removed_cb(os_handle, ctx->fd_cb_user_data);
+#endif
 }
 
 /** \ingroup libusb_poll
@@ -2768,29 +2666,36 @@ DEFAULT_VISIBILITY
 const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 	libusb_context *ctx)
 {
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__CYGWIN__)
 	struct libusb_pollfd **ret = NULL;
-	struct usbi_pollfd *ipollfd;
-	size_t i = 0;
+	struct usbi_event_source *ievent_source;
+	size_t i;
+
+	static_assert(sizeof(struct usbi_event_source_data) == sizeof(struct libusb_pollfd),
+		      "mismatch between usbi_event_source_data and libusb_pollfd sizes");
 
 	ctx = usbi_get_context(ctx);
 
 	usbi_mutex_lock(&ctx->event_data_lock);
 
-	ret = calloc(ctx->pollfds_cnt + 1, sizeof(struct libusb_pollfd *));
+	i = 0;
+	for_each_event_source(ctx, ievent_source)
+		i++;
+
+	ret = calloc(i + 1, sizeof(struct libusb_pollfd *));
 	if (!ret)
 		goto out;
 
-	for_each_pollfd(ctx, ipollfd)
-		ret[i++] = (struct libusb_pollfd *)ipollfd;
-	ret[ctx->pollfds_cnt] = NULL;
+	i = 0;
+	for_each_event_source(ctx, ievent_source)
+		ret[i++] = (struct libusb_pollfd *)ievent_source;
 
 out:
 	usbi_mutex_unlock(&ctx->event_data_lock);
 	return (const struct libusb_pollfd **)ret;
 #else
-	usbi_err(ctx, "external polling of libusb's internal descriptors "\
-		"is not yet supported on Windows platforms");
+	usbi_err(ctx, "external polling of libusb's internal event sources " \
+		"is not yet supported on Windows");
 	return NULL;
 #endif
 }
@@ -2808,7 +2713,11 @@ out:
  */
 void API_EXPORTED libusb_free_pollfds(const struct libusb_pollfd **pollfds)
 {
+#if !defined(_WIN32) && !defined(__CYGWIN__)
 	free((void *)pollfds);
+#else
+	UNUSED(pollfds);
+#endif
 }
 
 /* Backends may call this from handle_events to report disconnection of a

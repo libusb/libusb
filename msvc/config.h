@@ -47,8 +47,8 @@
 /* Define to 1 to enable message logging. */
 #define ENABLE_LOGGING 1
 
-/* Define to 1 if using the Windows poll() implementation. */
-#define POLL_WINDOWS 1
+/* Define to 1 if using the Windows events abstraction. */
+#define EVENTS_WINDOWS 1
 
 /* Define to 1 if using Windows threads. */
 #define THREADS_WINDOWS 1

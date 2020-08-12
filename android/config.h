@@ -26,6 +26,9 @@
 /* Define to 1 to enable message logging. */
 #define ENABLE_LOGGING 1
 
+/* Define to 1 if using the POSIX events abstraction. */
+#define EVENTS_POSIX 1
+
 /* Define to 1 if you have the <asm/types.h> header file. */
 #define HAVE_ASM_TYPES_H 1
 
@@ -40,9 +43,6 @@
 
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define HAVE_SYS_TIME_H 1
-
-/* Define to 1 if using the POSIX poll() implementation. */
-#define POLL_POSIX 1
 
 /* Define to 1 if using POSIX threads. */
 #define THREADS_POSIX 1

@@ -42,7 +42,6 @@
 		008FBF901628B7E800BC5BE2 /* libusbi.h in Headers */ = {isa = PBXBuildFile; fileRef = 008FBF671628B7E800BC5BE2 /* libusbi.h */; };
 		008FBF921628B7E800BC5BE2 /* darwin_usb.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBF6C1628B7E800BC5BE2 /* darwin_usb.c */; };
 		008FBF931628B7E800BC5BE2 /* darwin_usb.h in Headers */ = {isa = PBXBuildFile; fileRef = 008FBF6D1628B7E800BC5BE2 /* darwin_usb.h */; };
-		008FBF971628B7E800BC5BE2 /* poll_posix.h in Headers */ = {isa = PBXBuildFile; fileRef = 008FBF711628B7E800BC5BE2 /* poll_posix.h */; };
 		008FBF9A1628B7E800BC5BE2 /* threads_posix.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBF741628B7E800BC5BE2 /* threads_posix.c */; };
 		008FBF9B1628B7E800BC5BE2 /* threads_posix.h in Headers */ = {isa = PBXBuildFile; fileRef = 008FBF751628B7E800BC5BE2 /* threads_posix.h */; };
 		008FBFA01628B7E800BC5BE2 /* sync.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBF7A1628B7E800BC5BE2 /* sync.c */; };
@@ -65,8 +64,9 @@
 		008FC0311628BC7800BC5BE2 /* libusb-1.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */; };
 		1438D77A17A2ED9F00166101 /* hotplug.c in Sources */ = {isa = PBXBuildFile; fileRef = 1438D77817A2ED9F00166101 /* hotplug.c */; };
 		1438D77B17A2ED9F00166101 /* hotplug.h in Headers */ = {isa = PBXBuildFile; fileRef = 1438D77917A2ED9F00166101 /* hotplug.h */; };
-		1438D77D17A2EDCD00166101 /* poll_posix.c in Sources */ = {isa = PBXBuildFile; fileRef = 1438D77C17A2EDCD00166101 /* poll_posix.c */; };
 		1438D77F17A2F0EA00166101 /* strerror.c in Sources */ = {isa = PBXBuildFile; fileRef = 1438D77E17A2F0EA00166101 /* strerror.c */; };
+		2018D95F24E453BA001589B2 /* events_posix.c in Sources */ = {isa = PBXBuildFile; fileRef = 2018D95E24E453BA001589B2 /* events_posix.c */; };
+		2018D96124E453D0001589B2 /* events_posix.h in Headers */ = {isa = PBXBuildFile; fileRef = 2018D96024E453D0001589B2 /* events_posix.h */; };
 		20468D70243298C100650534 /* sam3u_benchmark.c in Sources */ = {isa = PBXBuildFile; fileRef = 20468D6E243298C100650534 /* sam3u_benchmark.c */; };
 		20468D7E2432990100650534 /* testlibusb.c in Sources */ = {isa = PBXBuildFile; fileRef = 20468D7C2432990000650534 /* testlibusb.c */; };
 		20468D7F2432993300650534 /* libusb-1.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBF311628B79300BC5BE2 /* libusb-1.0.0.dylib */; };
@@ -308,7 +308,6 @@
 		008FBF671628B7E800BC5BE2 /* libusbi.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = libusbi.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		008FBF6C1628B7E800BC5BE2 /* darwin_usb.c */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.c; path = darwin_usb.c; sourceTree = "<group>"; tabWidth = 2; usesTabs = 0; };
 		008FBF6D1628B7E800BC5BE2 /* darwin_usb.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.h; path = darwin_usb.h; sourceTree = "<group>"; tabWidth = 2; usesTabs = 0; };
-		008FBF711628B7E800BC5BE2 /* poll_posix.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = poll_posix.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		008FBF741628B7E800BC5BE2 /* threads_posix.c */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = threads_posix.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		008FBF751628B7E800BC5BE2 /* threads_posix.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = threads_posix.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		008FBF7A1628B7E800BC5BE2 /* sync.c */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = sync.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
@@ -332,7 +331,6 @@
 		008FC0261628BC6B00BC5BE2 /* listdevs */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = listdevs; sourceTree = BUILT_PRODUCTS_DIR; };
 		1438D77817A2ED9F00166101 /* hotplug.c */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = hotplug.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		1438D77917A2ED9F00166101 /* hotplug.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = hotplug.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
-		1438D77C17A2EDCD00166101 /* poll_posix.c */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = poll_posix.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		1438D77E17A2F0EA00166101 /* strerror.c */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = strerror.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		1443EE8416417E63007E0579 /* common.xcconfig */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = text.xcconfig; path = common.xcconfig; sourceTree = SOURCE_ROOT; tabWidth = 4; usesTabs = 1; };
 		1443EE8516417E63007E0579 /* debug.xcconfig */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = text.xcconfig; path = debug.xcconfig; sourceTree = SOURCE_ROOT; tabWidth = 4; usesTabs = 1; };
@@ -340,6 +338,8 @@
 		1443EE8716417E63007E0579 /* libusb.xcconfig */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = text.xcconfig; path = libusb.xcconfig; sourceTree = SOURCE_ROOT; tabWidth = 4; usesTabs = 1; };
 		1443EE8816417E63007E0579 /* release.xcconfig */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = text.xcconfig; path = release.xcconfig; sourceTree = SOURCE_ROOT; tabWidth = 4; usesTabs = 1; };
 		1443EE8916417EA6007E0579 /* libusb_release.xcconfig */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = text.xcconfig; path = libusb_release.xcconfig; sourceTree = SOURCE_ROOT; tabWidth = 4; usesTabs = 1; };
+		2018D95E24E453BA001589B2 /* events_posix.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = events_posix.c; sourceTree = "<group>"; };
+		2018D96024E453D0001589B2 /* events_posix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = events_posix.h; sourceTree = "<group>"; };
 		20468D67243298AE00650534 /* sam3u_benchmark */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = sam3u_benchmark; sourceTree = BUILT_PRODUCTS_DIR; };
 		20468D6E243298C100650534 /* sam3u_benchmark.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = sam3u_benchmark.c; sourceTree = "<group>"; usesTabs = 1; };
 		20468D75243298D300650534 /* testlibusb */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = testlibusb; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -498,8 +498,8 @@
 			children = (
 				008FBF6C1628B7E800BC5BE2 /* darwin_usb.c */,
 				008FBF6D1628B7E800BC5BE2 /* darwin_usb.h */,
-				1438D77C17A2EDCD00166101 /* poll_posix.c */,
-				008FBF711628B7E800BC5BE2 /* poll_posix.h */,
+				2018D95E24E453BA001589B2 /* events_posix.c */,
+				2018D96024E453D0001589B2 /* events_posix.h */,
 				008FBF741628B7E800BC5BE2 /* threads_posix.c */,
 				008FBF751628B7E800BC5BE2 /* threads_posix.h */,
 			);
@@ -558,10 +558,10 @@
 			files = (
 				008FBFA51628B84200BC5BE2 /* config.h in Headers */,
 				008FBF931628B7E800BC5BE2 /* darwin_usb.h in Headers */,
+				2018D96124E453D0001589B2 /* events_posix.h in Headers */,
 				1438D77B17A2ED9F00166101 /* hotplug.h in Headers */,
 				008FBF891628B7E800BC5BE2 /* libusb.h in Headers */,
 				008FBF901628B7E800BC5BE2 /* libusbi.h in Headers */,
-				008FBF971628B7E800BC5BE2 /* poll_posix.h in Headers */,
 				008FBF9B1628B7E800BC5BE2 /* threads_posix.h in Headers */,
 				008FBFA11628B7E800BC5BE2 /* version.h in Headers */,
 				008FBFA21628B7E800BC5BE2 /* version_nano.h in Headers */,
@@ -826,9 +826,9 @@
 				008FBF861628B7E800BC5BE2 /* core.c in Sources */,
 				008FBF921628B7E800BC5BE2 /* darwin_usb.c in Sources */,
 				008FBF871628B7E800BC5BE2 /* descriptor.c in Sources */,
+				2018D95F24E453BA001589B2 /* events_posix.c in Sources */,
 				1438D77A17A2ED9F00166101 /* hotplug.c in Sources */,
 				008FBF881628B7E800BC5BE2 /* io.c in Sources */,
-				1438D77D17A2EDCD00166101 /* poll_posix.c in Sources */,
 				1438D77F17A2F0EA00166101 /* strerror.c in Sources */,
 				008FBFA01628B7E800BC5BE2 /* sync.c in Sources */,
 				008FBF9A1628B7E800BC5BE2 /* threads_posix.c in Sources */,

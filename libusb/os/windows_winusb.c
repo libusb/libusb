@@ -467,7 +467,7 @@ static int get_interface_by_endpoint(struct libusb_config_descriptor *conf_desc,
 /*
  * Open a device and associate the HANDLE with the context's I/O completion port
  */
-HANDLE windows_open(struct libusb_device *dev, const char *path, DWORD access)
+static HANDLE windows_open(struct libusb_device *dev, const char *path, DWORD access)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct windows_context_priv *priv = usbi_get_context_priv(ctx);

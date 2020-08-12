@@ -34,7 +34,7 @@
 /* udev context */
 static struct udev *udev_ctx = NULL;
 static int udev_monitor_fd = -1;
-static int udev_control_pipe[2] = {-1, -1};
+static usbi_event_t udev_control_event = USBI_INVALID_EVENT;
 static struct udev_monitor *udev_monitor = NULL;
 static pthread_t linux_event_thread;
 
@@ -100,23 +100,23 @@ int linux_udev_start_event_monitor(void)
 		}
 	}
 
-	r = usbi_pipe(udev_control_pipe);
+	r = usbi_create_event(&udev_control_event);
 	if (r) {
-		usbi_err(NULL, "could not create udev control pipe");
+		usbi_err(NULL, "failed to create udev control event");
 		goto err_free_monitor;
 	}
 
 	r = pthread_create(&linux_event_thread, NULL, linux_udev_event_thread_main, NULL);
 	if (r) {
-		usbi_err(NULL, "creating hotplug event thread (%d)", r);
-		goto err_close_pipe;
+		usbi_err(NULL, "failed to create hotplug event thread (%d)", r);
+		goto err_destroy_event;
 	}
 
 	return LIBUSB_SUCCESS;
 
-err_close_pipe:
-	close(udev_control_pipe[0]);
-	close(udev_control_pipe[1]);
+err_destroy_event:
+	usbi_destroy_event(&udev_control_event);
+	udev_control_event = (usbi_event_t)USBI_INVALID_EVENT;
 err_free_monitor:
 	udev_monitor_unref(udev_monitor);
 	udev_monitor = NULL;
@@ -130,20 +130,21 @@ err:
 
 int linux_udev_stop_event_monitor(void)
 {
-	char dummy = 1;
-	ssize_t r;
+	int r;
 
 	assert(udev_ctx != NULL);
 	assert(udev_monitor != NULL);
 	assert(udev_monitor_fd != -1);
 
-	/* Write some dummy data to the control pipe and
-	 * wait for the thread to exit */
-	r = write(udev_control_pipe[1], &dummy, sizeof(dummy));
-	if (r <= 0) {
-		usbi_warn(NULL, "udev control pipe signal failed");
-	}
-	pthread_join(linux_event_thread, NULL);
+	/* Signal the control event and wait for the thread to exit */
+	usbi_signal_event(&udev_control_event);
+
+	r = pthread_join(linux_event_thread, NULL);
+	if (r)
+		usbi_warn(NULL, "failed to join hotplug event thread (%d)", r);
+
+	usbi_destroy_event(&udev_control_event);
+	udev_control_event = (usbi_event_t)USBI_INVALID_EVENT;
 
 	/* Release the udev monitor */
 	udev_monitor_unref(udev_monitor);
@@ -154,27 +155,19 @@ int linux_udev_stop_event_monitor(void)
 	udev_unref(udev_ctx);
 	udev_ctx = NULL;
 
-	/* close and reset control pipe */
-	close(udev_control_pipe[0]);
-	close(udev_control_pipe[1]);
-	udev_control_pipe[0] = -1;
-	udev_control_pipe[1] = -1;
-
 	return LIBUSB_SUCCESS;
 }
 
 static void *linux_udev_event_thread_main(void *arg)
 {
-	char dummy;
-	int r;
-	ssize_t nb;
-	struct udev_device *udev_dev;
 	struct pollfd fds[] = {
-		{.fd = udev_control_pipe[0],
-		 .events = POLLIN},
-		{.fd = udev_monitor_fd,
-		 .events = POLLIN},
+		{ .fd = USBI_EVENT_OS_HANDLE(&udev_control_event),
+		  .events = USBI_EVENT_POLL_EVENTS },
+		{ .fd = udev_monitor_fd,
+		  .events = POLLIN },
 	};
+	struct udev_device *udev_dev;
+	int r;
 
 	UNUSED(arg);
 
@@ -186,20 +179,20 @@ static void *linux_udev_event_thread_main(void *arg)
 
 	usbi_dbg("udev event thread entering");
 
-	while ((r = poll(fds, 2, -1)) >= 0 || errno == EINTR) {
-		if (r < 0) {
-			/* temporary failure */
-			continue;
-		}
-		if (fds[0].revents & POLLIN) {
-			/* activity on control pipe, read the byte and exit */
-			nb = read(udev_control_pipe[0], &dummy, sizeof(dummy));
-			if (nb <= 0) {
-				usbi_warn(NULL, "udev control pipe read failed");
-			}
+	while (1) {
+		r = poll(fds, 2, -1);
+		if (r == -1) {
+			/* check for temporary failure */
+			if (errno == EINTR)
+				continue;
+			usbi_err(NULL, "poll() failed, errno=%d", errno);
 			break;
 		}
-		if (fds[1].revents & POLLIN) {
+		if (fds[0].revents) {
+			/* activity on control event, exit */
+			break;
+		}
+		if (fds[1].revents) {
 			usbi_mutex_static_lock(&linux_hotplug_lock);
 			udev_dev = udev_monitor_receive_device(udev_monitor);
 			if (udev_dev)
