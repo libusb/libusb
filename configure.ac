@@ -225,6 +225,44 @@ elif test "x$backend" != xdarwin && test "x$backend" != xwindows; then
 	AC_MSG_ERROR([clock_gettime() is required on this platform])
 fi
 
+dnl eventfd support
+if test "x$backend" = xlinux || test "x$backend" = xsunos; then
+	AC_ARG_ENABLE([eventfd],
+		[AS_HELP_STRING([--enable-eventfd], [use eventfd for signalling [default=auto]])],
+		[use_eventfd=$enableval],
+		[use_eventfd=auto])
+	if test "x$use_eventfd" != xno; then
+		AC_CHECK_HEADER([sys/eventfd.h], [eventfd_h=yes], [eventfd_h=])
+		if test "x$eventfd_h" = xyes; then
+			AC_CHECK_DECLS([EFD_NONBLOCK, EFD_CLOEXEC], [eventfd_h_ok=yes], [eventfd_h_ok=], [[#include <sys/eventfd.h>]])
+			if test "x$eventfd_h_ok" = xyes; then
+				AC_CHECK_FUNC([eventfd], [eventfd_ok=yes], [eventfd_ok=])
+				if test "x$eventfd_ok" = xyes; then
+					AC_DEFINE([HAVE_EVENTFD], [1], [Define to 1 if the system has eventfd functionality.])
+				elif test "x$use_eventfd" = xyes; then
+					AC_MSG_ERROR([eventfd() function not found; glibc 2.9+ required])
+				fi
+			elif test "x$use_eventfd" = xyes; then
+				AC_MSG_ERROR([eventfd header not usable; glibc 2.9+ required])
+			fi
+		elif test "x$use_eventfd" = xyes; then
+			AC_MSG_ERROR([eventfd header not available; glibc 2.9+ required])
+		fi
+	fi
+	AC_MSG_CHECKING([whether to use eventfd for signalling])
+	if test "x$use_eventfd" = xno; then
+		AC_MSG_RESULT([no (disabled by user)])
+	elif test "x$eventfd_h" != xyes; then
+		AC_MSG_RESULT([no (header not available)])
+	elif test "x$eventfd_h_ok" != xyes; then
+		AC_MSG_RESULT([no (header not usable)])
+	elif test "x$eventfd_ok" != xyes; then
+		AC_MSG_RESULT([no (functions not available)])
+	else
+		AC_MSG_RESULT([yes])
+	fi
+fi
+
 dnl timerfd support
 if test "x$backend" = xlinux || test "x$backend" = xsunos; then
 	AC_ARG_ENABLE([timerfd],

@@ -22,10 +22,21 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#ifdef HAVE_EVENTFD
+#include <sys/eventfd.h>
+#endif
 #ifdef HAVE_TIMERFD
 #include <sys/timerfd.h>
 #endif
 #include <unistd.h>
+
+#ifdef HAVE_EVENTFD
+#define EVENT_READ_FD(e)	((e)->eventfd)
+#define EVENT_WRITE_FD(e)	((e)->eventfd)
+#else
+#define EVENT_READ_FD(e)	((e)->pipefd[0])
+#define EVENT_WRITE_FD(e)	((e)->pipefd[1])
+#endif
 
 #ifdef HAVE_NFDS_T
 typedef nfds_t usbi_nfds_t;
@@ -35,6 +46,15 @@ typedef unsigned int usbi_nfds_t;
 
 int usbi_create_event(usbi_event_t *event)
 {
+#ifdef HAVE_EVENTFD
+	event->eventfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+	if (event->eventfd == -1) {
+		usbi_err(NULL, "failed to create eventfd, errno=%d", errno);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	return 0;
+#else
 #if defined(HAVE_PIPE2)
 	int ret = pipe2(event->pipefd, O_CLOEXEC);
 #else
@@ -87,34 +107,40 @@ err_close_pipe:
 	close(event->pipefd[1]);
 	close(event->pipefd[0]);
 	return LIBUSB_ERROR_OTHER;
+#endif
 }
 
 void usbi_destroy_event(usbi_event_t *event)
 {
+#ifdef HAVE_EVENTFD
+	if (close(event->eventfd) == -1)
+		usbi_warn(NULL, "failed to close eventfd, errno=%d", errno);
+#else
 	if (close(event->pipefd[1]) == -1)
 		usbi_warn(NULL, "failed to close pipe write end, errno=%d", errno);
 	if (close(event->pipefd[0]) == -1)
 		usbi_warn(NULL, "failed to close pipe read end, errno=%d", errno);
+#endif
 }
 
 void usbi_signal_event(usbi_event_t *event)
 {
-	unsigned char dummy = 1;
+	uint64_t dummy = 1;
 	ssize_t r;
 
-	r = write(event->pipefd[1], &dummy, sizeof(dummy));
+	r = write(EVENT_WRITE_FD(event), &dummy, sizeof(dummy));
 	if (r != sizeof(dummy))
-		usbi_warn(NULL, "pipe write failed");
+		usbi_warn(NULL, "event write failed");
 }
 
 void usbi_clear_event(usbi_event_t *event)
 {
-	unsigned char dummy;
+	uint64_t dummy;
 	ssize_t r;
 
-	r = read(event->pipefd[0], &dummy, sizeof(dummy));
+	r = read(EVENT_READ_FD(event), &dummy, sizeof(dummy));
 	if (r != sizeof(dummy))
-		usbi_warn(NULL, "pipe read failed");
+		usbi_warn(NULL, "event read failed");
 }
 
 #ifdef HAVE_TIMERFD

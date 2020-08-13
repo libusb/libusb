@@ -26,12 +26,21 @@
 typedef int usbi_os_handle_t;
 #define USBI_OS_HANDLE_FORMAT_STRING	"fd %d"
 
+#ifdef HAVE_EVENTFD
+typedef struct usbi_event {
+	int eventfd;
+} usbi_event_t;
+#define USBI_EVENT_OS_HANDLE(e)	((e)->eventfd)
+#define USBI_EVENT_POLL_EVENTS	POLLIN
+#define USBI_INVALID_EVENT	{ -1 }
+#else
 typedef struct usbi_event {
 	int pipefd[2];
 } usbi_event_t;
 #define USBI_EVENT_OS_HANDLE(e)	((e)->pipefd[0])
 #define USBI_EVENT_POLL_EVENTS	POLLIN
 #define USBI_INVALID_EVENT	{ { -1, -1 } }
+#endif
 
 #ifdef HAVE_TIMERFD
 #define HAVE_OS_TIMER 1
