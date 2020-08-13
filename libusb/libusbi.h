@@ -392,6 +392,9 @@ struct libusb_context {
 
 extern struct libusb_context *usbi_default_context;
 
+extern struct list_head active_contexts_list;
+extern usbi_mutex_static_t active_contexts_lock;
+
 static inline struct libusb_context *usbi_get_context(struct libusb_context *ctx)
 {
 	return ctx ? ctx : usbi_default_context;
@@ -406,6 +409,15 @@ enum usbi_event_flags {
 
 	/* A hotplug callback deregistration is pending */
 	USBI_EVENT_HOTPLUG_CB_DEREGISTERED = 1U << 2,
+
+	/* One or more hotplug messages are pending */
+	USBI_EVENT_HOTPLUG_MSG_PENDING = 1U << 3,
+
+	/* One or more completed transfers are pending */
+	USBI_EVENT_TRANSFER_COMPLETED = 1U << 4,
+
+	/* A device is in the process of being closed */
+	USBI_EVENT_DEVICE_CLOSE = 1U << 5,
 };
 
 /* Macros for managing event handling state */
@@ -422,15 +434,6 @@ static inline void usbi_start_event_handling(struct libusb_context *ctx)
 static inline void usbi_end_event_handling(struct libusb_context *ctx)
 {
 	usbi_tls_key_set(ctx->event_handling_key, NULL);
-}
-
-/* Update the following function if new event sources are added */
-static inline int usbi_pending_events(struct libusb_context *ctx)
-{
-	return ctx->event_flags ||
-	       ctx->device_close ||
-	       !list_empty(&ctx->hotplug_msgs) ||
-	       !list_empty(&ctx->completed_transfers);
 }
 
 struct libusb_device {
@@ -1285,9 +1288,6 @@ struct usbi_os_backend {
 };
 
 extern const struct usbi_os_backend usbi_backend;
-
-extern struct list_head active_contexts_list;
-extern usbi_mutex_static_t active_contexts_lock;
 
 #define for_each_context(c) \
 	for_each_helper(c, &active_contexts_list, struct libusb_context)

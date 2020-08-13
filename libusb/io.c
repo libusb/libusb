@@ -1694,12 +1694,13 @@ void usbi_signal_transfer_completion(struct usbi_transfer *itransfer)
 
 	if (dev_handle) {
 		struct libusb_context *ctx = HANDLE_CTX(dev_handle);
-		int pending_events;
+		unsigned int event_flags;
 
 		usbi_mutex_lock(&ctx->event_data_lock);
-		pending_events = usbi_pending_events(ctx);
+		event_flags = ctx->event_flags;
+		ctx->event_flags |= USBI_EVENT_TRANSFER_COMPLETED;
 		list_add_tail(&itransfer->completed_list, &ctx->completed_transfers);
-		if (!pending_events)
+		if (!event_flags)
 			usbi_signal_event(&ctx->event);
 		usbi_mutex_unlock(&ctx->event_data_lock);
 	}
@@ -1877,16 +1878,16 @@ int API_EXPORTED libusb_event_handler_active(libusb_context *ctx)
  */
 void API_EXPORTED libusb_interrupt_event_handler(libusb_context *ctx)
 {
-	int pending_events;
+	unsigned int event_flags;
 
 	usbi_dbg(" ");
 
 	ctx = usbi_get_context(ctx);
 	usbi_mutex_lock(&ctx->event_data_lock);
 
-	pending_events = usbi_pending_events(ctx);
+	event_flags = ctx->event_flags;
 	ctx->event_flags |= USBI_EVENT_USER_INTERRUPT;
-	if (!pending_events)
+	if (!event_flags)
 		usbi_signal_event(&ctx->event);
 
 	usbi_mutex_unlock(&ctx->event_data_lock);
@@ -2059,30 +2060,38 @@ static int handle_event_trigger(struct libusb_context *ctx)
 	}
 
 	/* check if someone is closing a device */
-	if (ctx->device_close)
+	if (ctx->event_flags & USBI_EVENT_DEVICE_CLOSE)
 		usbi_dbg("someone is closing a device");
 
 	/* check for any pending hotplug messages */
-	if (!list_empty(&ctx->hotplug_msgs)) {
+	if (ctx->event_flags & USBI_EVENT_HOTPLUG_MSG_PENDING) {
 		usbi_dbg("hotplug message received");
+		ctx->event_flags &= ~USBI_EVENT_HOTPLUG_MSG_PENDING;
+		assert(!list_empty(&ctx->hotplug_msgs));
 		list_cut(&hotplug_msgs, &ctx->hotplug_msgs);
 	}
 
 	/* complete any pending transfers */
-	while (r == 0 && !list_empty(&ctx->completed_transfers)) {
-		struct usbi_transfer *itransfer =
-			list_first_entry(&ctx->completed_transfers, struct usbi_transfer, completed_list);
+	if (ctx->event_flags & USBI_EVENT_TRANSFER_COMPLETED) {
+		assert(!list_empty(&ctx->completed_transfers));
+		while (r == 0 && !list_empty(&ctx->completed_transfers)) {
+			struct usbi_transfer *itransfer =
+				list_first_entry(&ctx->completed_transfers, struct usbi_transfer, completed_list);
 
-		list_del(&itransfer->completed_list);
-		usbi_mutex_unlock(&ctx->event_data_lock);
-		r = usbi_backend.handle_transfer_completion(itransfer);
-		if (r)
-			usbi_err(ctx, "backend handle_transfer_completion failed with error %d", r);
-		usbi_mutex_lock(&ctx->event_data_lock);
+			list_del(&itransfer->completed_list);
+			usbi_mutex_unlock(&ctx->event_data_lock);
+			r = usbi_backend.handle_transfer_completion(itransfer);
+			if (r)
+				usbi_err(ctx, "backend handle_transfer_completion failed with error %d", r);
+			usbi_mutex_lock(&ctx->event_data_lock);
+		}
+
+		if (list_empty(&ctx->completed_transfers))
+			ctx->event_flags &= ~USBI_EVENT_TRANSFER_COMPLETED;
 	}
 
 	/* if no further pending events, clear the event */
-	if (!usbi_pending_events(ctx))
+	if (!ctx->event_flags)
 		usbi_clear_event(&ctx->event);
 
 	usbi_mutex_unlock(&ctx->event_data_lock);
@@ -2159,7 +2168,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 		/* if no further pending events, clear the event so that we do
 		 * not immediately return from the wait function */
-		if (!usbi_pending_events(ctx))
+		if (!ctx->event_flags)
 			usbi_clear_event(&ctx->event);
 	}
 	usbi_mutex_unlock(&ctx->event_data_lock);
@@ -2579,13 +2588,13 @@ void API_EXPORTED libusb_set_pollfd_notifiers(libusb_context *ctx,
  */
 static void usbi_event_source_notification(struct libusb_context *ctx)
 {
-	int pending_events;
+	unsigned int event_flags;
 
 	/* Record that there is a new poll fd.
 	 * Only signal an event if there are no prior pending events. */
-	pending_events = usbi_pending_events(ctx);
+	event_flags = ctx->event_flags;
 	ctx->event_flags |= USBI_EVENT_EVENT_SOURCES_MODIFIED;
-	if (!pending_events)
+	if (!event_flags)
 		usbi_signal_event(&ctx->event);
 }
 

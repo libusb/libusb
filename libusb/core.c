@@ -1437,8 +1437,8 @@ static void do_close(struct libusb_context *ctx,
 void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 {
 	struct libusb_context *ctx;
+	unsigned int event_flags;
 	int handling_events;
-	int pending_events;
 
 	if (!dev_handle)
 		return;
@@ -1459,9 +1459,10 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 		/* Record that we are closing a device.
 		 * Only signal an event if there are no prior pending events. */
 		usbi_mutex_lock(&ctx->event_data_lock);
-		pending_events = usbi_pending_events(ctx);
-		ctx->device_close++;
-		if (!pending_events)
+		event_flags = ctx->event_flags;
+		if (!ctx->device_close++)
+			ctx->event_flags |= USBI_EVENT_DEVICE_CLOSE;
+		if (!event_flags)
 			usbi_signal_event(&ctx->event);
 		usbi_mutex_unlock(&ctx->event_data_lock);
 
@@ -1476,9 +1477,9 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 		/* We're done with closing this device.
 		 * Clear the event pipe if there are no further pending events. */
 		usbi_mutex_lock(&ctx->event_data_lock);
-		ctx->device_close--;
-		pending_events = usbi_pending_events(ctx);
-		if (!pending_events)
+		if (!--ctx->device_close)
+			ctx->event_flags &= ~USBI_EVENT_DEVICE_CLOSE;
+		if (!ctx->event_flags)
 			usbi_clear_event(&ctx->event);
 		usbi_mutex_unlock(&ctx->event_data_lock);
 

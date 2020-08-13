@@ -206,8 +206,8 @@ void usbi_hotplug_match(struct libusb_context *ctx, struct libusb_device *dev,
 void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device *dev,
 	libusb_hotplug_event event)
 {
-	int pending_events;
 	struct libusb_hotplug_message *message = calloc(1, sizeof(*message));
+	unsigned int event_flags;
 
 	if (!message) {
 		usbi_err(ctx, "error allocating hotplug message");
@@ -220,9 +220,10 @@ void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device 
 	/* Take the event data lock and add this message to the list.
 	 * Only signal an event if there are no prior pending events. */
 	usbi_mutex_lock(&ctx->event_data_lock);
-	pending_events = usbi_pending_events(ctx);
+	event_flags = ctx->event_flags;
+	ctx->event_flags |= USBI_EVENT_HOTPLUG_MSG_PENDING;
 	list_add_tail(&message->list, &ctx->hotplug_msgs);
-	if (!pending_events)
+	if (!event_flags)
 		usbi_signal_event(&ctx->event);
 	usbi_mutex_unlock(&ctx->event_data_lock);
 }
@@ -341,12 +342,12 @@ void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
 	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
 
 	if (deregistered) {
-		int pending_events;
+		unsigned int event_flags;
 
 		usbi_mutex_lock(&ctx->event_data_lock);
-		pending_events = usbi_pending_events(ctx);
+		event_flags = ctx->event_flags;
 		ctx->event_flags |= USBI_EVENT_HOTPLUG_CB_DEREGISTERED;
-		if (!pending_events)
+		if (!event_flags)
 			usbi_signal_event(&ctx->event);
 		usbi_mutex_unlock(&ctx->event_data_lock);
 	}
