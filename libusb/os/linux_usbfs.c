@@ -95,6 +95,9 @@ static int sysfs_available = -1;
 /* how many times have we initted (and not exited) ? */
 static int init_count = 0;
 
+/* is no authority to operate usb device directly */
+static int weak_authority = 0;
+
 /* Serialize hotplug start/stop */
 static usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
 /* Serialize scan-devices, event-thread, and poll */
@@ -381,6 +384,10 @@ static int op_init(struct libusb_context *ctx)
 		}
 	}
 
+    if (weak_authority) {
+        return LIBUSB_SUCCESS;
+    }
+
 	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	r = LIBUSB_SUCCESS;
 	if (init_count == 0) {
@@ -411,6 +418,21 @@ static void op_exit(struct libusb_context *ctx)
 		linux_stop_event_monitor();
 	}
 	usbi_mutex_static_unlock(&linux_hotplug_startstop_lock);
+}
+
+static int op_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
+{
+	UNUSED(ctx);
+	UNUSED(ap);
+
+	switch ((int)option) {
+	case LIBUSB_OPTION_WEAK_AUTHORITY:
+        usbi_dbg("set libusb has weak authority");
+        weak_authority = 1;
+        return LIBUSB_SUCCESS;
+	default:
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	}
 }
 
 static int linux_scan_devices(struct libusb_context *ctx)
@@ -2688,6 +2710,7 @@ const struct usbi_os_backend usbi_backend = {
 	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
 	.init = op_init,
 	.exit = op_exit,
+	.set_option = op_set_option,
 	.hotplug_poll = op_hotplug_poll,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,
