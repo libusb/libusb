@@ -283,6 +283,9 @@ DLL_DECLARE_FUNC_PREFIXED(WINAPI, HKEY, p, SetupDiOpenDevRegKey, (HDEVINFO, PSP_
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, HKEY, p, SetupDiOpenDeviceInterfaceRegKey, (HDEVINFO, PSP_DEVICE_INTERFACE_DATA, DWORD, DWORD));
 
 
+#ifndef USB_GET_NODE_INFORMATION
+#define USB_GET_NODE_INFORMATION			258
+#endif
 #ifndef USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION
 #define USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION		260
 #endif
@@ -300,6 +303,9 @@ DLL_DECLARE_FUNC_PREFIXED(WINAPI, HKEY, p, SetupDiOpenDeviceInterfaceRegKey, (HD
 #define USB_CTL_CODE(id) \
 	CTL_CODE(FILE_DEVICE_USB, (id), METHOD_BUFFERED, FILE_ANY_ACCESS)
 
+#define IOCTL_USB_GET_NODE_INFORMATION \
+	USB_CTL_CODE(USB_GET_NODE_INFORMATION)
+
 #define IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION \
 	USB_CTL_CODE(USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION)
 
@@ -309,7 +315,7 @@ DLL_DECLARE_FUNC_PREFIXED(WINAPI, HKEY, p, SetupDiOpenDeviceInterfaceRegKey, (HD
 #define IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2 \
 	USB_CTL_CODE(USB_GET_NODE_CONNECTION_INFORMATION_EX_V2)
 
-typedef enum USB_CONNECTION_STATUS {
+typedef enum _USB_CONNECTION_STATUS {
 	NoDeviceConnected,
 	DeviceConnected,
 	DeviceFailedEnumeration,
@@ -318,16 +324,49 @@ typedef enum USB_CONNECTION_STATUS {
 	DeviceNotEnoughPower,
 	DeviceNotEnoughBandwidth,
 	DeviceHubNestedTooDeeply,
-	DeviceInLegacyHub
-} USB_CONNECTION_STATUS, *PUSB_CONNECTION_STATUS;
+	DeviceInLegacyHub,
+	DeviceEnumerating,
+	DeviceReset
+} USB_CONNECTION_STATUS;
 
-typedef enum USB_HUB_NODE {
+typedef enum _USB_DEVICE_SPEED {
+	UsbLowSpeed = 0,
+	UsbFullSpeed,
+	UsbHighSpeed,
+	UsbSuperSpeed,
+	UsbSuperSpeedPlus	// Not in Microsoft headers
+} USB_DEVICE_SPEED;
+
+typedef enum _USB_HUB_NODE {
 	UsbHub,
 	UsbMIParent
 } USB_HUB_NODE;
 
 // Most of the structures below need to be packed
 #include <pshpack1.h>
+
+typedef struct _USB_HUB_DESCRIPTOR {
+	UCHAR bDescriptorLength;
+	UCHAR bDescriptorType;
+	UCHAR bNumberOfPorts;
+	USHORT wHubCharacteristics;
+	UCHAR bPowerOnToPowerGood;
+	UCHAR bHubControlCurrent;
+	UCHAR bRemoveAndPowerMask[64];
+} USB_HUB_DESCRIPTOR, *PUSB_HUB_DESCRIPTOR;
+
+typedef struct _USB_HUB_INFORMATION {
+	USB_HUB_DESCRIPTOR HubDescriptor;
+	BOOLEAN HubIsBusPowered;
+} USB_HUB_INFORMATION, *PUSB_HUB_INFORMATION;
+
+typedef struct _USB_NODE_INFORMATION {
+	USB_HUB_NODE NodeType;
+	union {
+		USB_HUB_INFORMATION HubInformation;
+//		USB_MI_PARENT_INFORMATION MiParentInformation;
+	} u;
+} USB_NODE_INFORMATION, *PUSB_NODE_INFORMATION;
 
 typedef struct _USB_DESCRIPTOR_REQUEST {
 	ULONG ConnectionIndex;

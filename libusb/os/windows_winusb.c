@@ -780,6 +780,236 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 	}
 }
 
+#define ROOT_HUB_FS_CONFIG_DESC_LENGTH		0x19
+#define ROOT_HUB_HS_CONFIG_DESC_LENGTH		0x19
+#define ROOT_HUB_SS_CONFIG_DESC_LENGTH		0x1f
+#define CONFIG_DESC_WTOTAL_LENGTH_OFFSET	0x02
+#define CONFIG_DESC_EP_MAX_PACKET_OFFSET	0x16
+#define CONFIG_DESC_EP_BINTERVAL_OFFSET		0x18
+
+static const uint8_t root_hub_config_descriptor_template[] = {
+	// Configuration Descriptor
+	LIBUSB_DT_CONFIG_SIZE,		// bLength
+	LIBUSB_DT_CONFIG,		// bDescriptorType
+	0x00, 0x00,			// wTotalLength (filled in)
+	0x01,				// bNumInterfaces
+	0x01,				// bConfigurationValue
+	0x00,				// iConfiguration
+	0xc0,				// bmAttributes (reserved + self-powered)
+	0x00,				// bMaxPower
+	// Interface Descriptor
+	LIBUSB_DT_INTERFACE_SIZE,	// bLength
+	LIBUSB_DT_INTERFACE,		// bDescriptorType
+	0x00,				// bInterfaceNumber
+	0x00,				// bAlternateSetting
+	0x01,				// bNumEndpoints
+	LIBUSB_CLASS_HUB,		// bInterfaceClass
+	0x00,				// bInterfaceSubClass
+	0x00,				// bInterfaceProtocol
+	0x00,				// iInterface
+	// Endpoint Descriptor
+	LIBUSB_DT_ENDPOINT_SIZE,	// bLength
+	LIBUSB_DT_ENDPOINT,		// bDescriptorType
+	0x81,				// bEndpointAddress
+	0x03,				// bmAttributes (Interrupt)
+	0x00, 0x00,			// wMaxPacketSize (filled in)
+	0x00,				// bInterval (filled in)
+	// SuperSpeed Endpoint Companion Descriptor
+	LIBUSB_DT_SS_ENDPOINT_COMPANION_SIZE,	// bLength
+	LIBUSB_DT_SS_ENDPOINT_COMPANION,	// bDescriptorType
+	0x00,					// bMaxBurst
+	0x00,					// bmAttributes
+	0x02, 0x00				// wBytesPerInterval
+};
+
+static int alloc_root_hub_config_desc(struct libusb_device *dev, ULONG num_ports,
+	uint8_t config_desc_length, uint8_t ep_interval)
+{
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	uint8_t *ptr;
+
+	priv->config_descriptor = malloc(sizeof(*priv->config_descriptor));
+	if (priv->config_descriptor == NULL)
+		return LIBUSB_ERROR_NO_MEM;
+
+	// Most config descriptors come from cache_config_descriptors() which obtains the
+	// descriptors from the hub using an allocated USB_DESCRIPTOR_REQUEST structure.
+	// To avoid an extra malloc + memcpy we just hold on to the USB_DESCRIPTOR_REQUEST
+	// structure we already have and back up the pointer in windows_device_priv_release()
+	// when freeing the descriptors. To keep a single execution path, we need to offset
+	// the pointer here by the same amount.
+	ptr = malloc(USB_DESCRIPTOR_REQUEST_SIZE + config_desc_length);
+	if (ptr == NULL)
+		return LIBUSB_ERROR_NO_MEM;
+
+	ptr += USB_DESCRIPTOR_REQUEST_SIZE;
+
+	memcpy(ptr, root_hub_config_descriptor_template, config_desc_length);
+	ptr[CONFIG_DESC_WTOTAL_LENGTH_OFFSET] = config_desc_length;
+	ptr[CONFIG_DESC_EP_MAX_PACKET_OFFSET] = (uint8_t)((num_ports + 7) / 8);
+	ptr[CONFIG_DESC_EP_BINTERVAL_OFFSET] = ep_interval;
+
+	priv->config_descriptor[0] = (PUSB_CONFIGURATION_DESCRIPTOR)ptr;
+	priv->active_config = 1;
+
+	return 0;
+}
+
+static int init_root_hub(struct libusb_device *dev)
+{
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	USB_NODE_CONNECTION_INFORMATION_EX conn_info;
+	USB_NODE_CONNECTION_INFORMATION_EX_V2 conn_info_v2;
+	USB_NODE_INFORMATION hub_info;
+	enum libusb_speed speed = LIBUSB_SPEED_UNKNOWN;
+	uint8_t config_desc_length;
+	uint8_t ep_interval;
+	HANDLE handle;
+	ULONG port_number, num_ports;
+	DWORD size;
+	int r;
+
+	// Determining the speed of a root hub is painful. Microsoft does not directly report the speed
+	// capabilities of the root hub itself, only its ports and/or connected devices. Therefore we
+	// are forced to query each individual port of the root hub to try and infer the root hub's
+	// speed. Note that we have to query all ports because the presence of a device on that port
+	// changes if/how Windows returns any useful speed information.
+	handle = CreateFileA(priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	if (handle == INVALID_HANDLE_VALUE) {
+		usbi_err(ctx, "could not open root hub %s: %s", priv->path, windows_error_str(0));
+		return LIBUSB_ERROR_ACCESS;
+	}
+
+	if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_INFORMATION, NULL, 0, &hub_info, sizeof(hub_info), &size, NULL)) {
+		usbi_warn(ctx, "could not get root hub info for '%s': %s", priv->dev_id, windows_error_str(0));
+		CloseHandle(handle);
+		return LIBUSB_ERROR_ACCESS;
+	}
+
+	num_ports = hub_info.u.HubInformation.HubDescriptor.bNumberOfPorts;
+	usbi_dbg("root hub '%s' reports %lu ports", priv->dev_id, ULONG_CAST(num_ports));
+
+	if (windows_version >= WINDOWS_8) {
+		// Windows 8 and later is better at reporting the speed capabilities of the root hub,
+		// but it is not perfect. If no device is attached to the port being queried, the
+		// returned information will only indicate whether that port supports USB 3.0 signalling.
+		// That is not enough information to distinguish between SuperSpeed and SuperSpeed Plus.
+		for (port_number = 1; port_number <= num_ports; port_number++) {
+			conn_info_v2.ConnectionIndex = port_number;
+			conn_info_v2.Length = sizeof(conn_info_v2);
+			conn_info_v2.SupportedUsbProtocols.Usb300 = 1;
+			if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
+				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size, NULL)) {
+				usbi_warn(ctx, "could not get node connection information (V2) for root hub '%s' port %lu: %s",
+					priv->dev_id, ULONG_CAST(port_number), windows_error_str(0));
+				break;
+			}
+
+			if (conn_info_v2.Flags.DeviceIsSuperSpeedPlusCapableOrHigher)
+				speed = MAX(speed, LIBUSB_SPEED_SUPER_PLUS);
+			else if (conn_info_v2.Flags.DeviceIsSuperSpeedCapableOrHigher || conn_info_v2.SupportedUsbProtocols.Usb300)
+				speed = MAX(speed, LIBUSB_SPEED_SUPER);
+			else if (conn_info_v2.SupportedUsbProtocols.Usb200)
+				speed = MAX(speed, LIBUSB_SPEED_HIGH);
+			else
+				speed = MAX(speed, LIBUSB_SPEED_FULL);
+		}
+
+		if (speed != LIBUSB_SPEED_UNKNOWN)
+			goto make_descriptors;
+	}
+
+	// At this point the speed is still not known, most likely because we are executing on
+	// Windows 7 or earlier. The following hackery peeks into the root hub's Device ID and
+	// tries to extract speed information from it, based on observed naming conventions.
+	// If this does not work, we will query individual ports of the root hub.
+	if (strstr(priv->dev_id, "ROOT_HUB31") != NULL)
+		speed = LIBUSB_SPEED_SUPER_PLUS;
+	else if (strstr(priv->dev_id, "ROOT_HUB30") != NULL)
+		speed = LIBUSB_SPEED_SUPER;
+	else if (strstr(priv->dev_id, "ROOT_HUB20") != NULL)
+		speed = LIBUSB_SPEED_HIGH;
+
+	if (speed != LIBUSB_SPEED_UNKNOWN)
+		goto make_descriptors;
+
+	// Windows only reports speed information about a connected device. This means that a root
+	// hub with no connected devices or devices that are all operating at a speed less than the
+	// highest speed that the root hub supports will not give us the correct speed.
+	for (port_number = 1; port_number <= num_ports; port_number++) {
+		conn_info.ConnectionIndex = port_number;
+		if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
+			&conn_info, sizeof(conn_info), &size, NULL)) {
+			usbi_warn(ctx, "could not get node connection information for root hub '%s' port %lu: %s",
+				priv->dev_id, ULONG_CAST(port_number), windows_error_str(0));
+			continue;
+		}
+
+		if (conn_info.ConnectionStatus != DeviceConnected)
+			continue;
+
+		if (conn_info.Speed == UsbHighSpeed) {
+			speed = LIBUSB_SPEED_HIGH;
+			break;
+		}
+	}
+
+make_descriptors:
+	CloseHandle(handle);
+
+	dev->device_descriptor.bLength = LIBUSB_DT_DEVICE_SIZE;
+	dev->device_descriptor.bDescriptorType = LIBUSB_DT_DEVICE;
+	dev->device_descriptor.bDeviceClass = LIBUSB_CLASS_HUB;
+	if ((dev->device_descriptor.idVendor == 0) && (dev->device_descriptor.idProduct == 0)) {
+		dev->device_descriptor.idVendor = 0x1d6b;	// Linux Foundation
+		dev->device_descriptor.idProduct = (uint16_t)speed;
+	}
+	dev->device_descriptor.bcdDevice = 0x0100;
+	dev->device_descriptor.bNumConfigurations = 1;
+
+	switch (speed) {
+	case LIBUSB_SPEED_SUPER_PLUS:
+		dev->device_descriptor.bcdUSB = 0x0310;
+		config_desc_length = ROOT_HUB_SS_CONFIG_DESC_LENGTH;
+		ep_interval = 0x0c;	// 256ms
+		break;
+	case LIBUSB_SPEED_SUPER:
+		dev->device_descriptor.bcdUSB = 0x0300;
+		config_desc_length = ROOT_HUB_SS_CONFIG_DESC_LENGTH;
+		ep_interval = 0x0c;	// 256ms
+		break;
+	case LIBUSB_SPEED_HIGH:
+		dev->device_descriptor.bcdUSB = 0x0200;
+		config_desc_length = ROOT_HUB_HS_CONFIG_DESC_LENGTH;
+		ep_interval = 0x0c;	// 256ms
+		break;
+	default:
+		// The default case means absolutely no information about this root hub was
+		// determined. There is not much choice than to be pessimistic and label this
+		// as a full-speed device.
+		speed = LIBUSB_SPEED_FULL;
+		dev->device_descriptor.bcdUSB = 0x0110;
+		config_desc_length = ROOT_HUB_FS_CONFIG_DESC_LENGTH;
+		ep_interval = 0xff;	// 255ms
+	}
+
+	if (speed >= LIBUSB_SPEED_SUPER) {
+		dev->device_descriptor.bDeviceProtocol = 0x03;	// USB 3.0 Hub
+		dev->device_descriptor.bMaxPacketSize0 = 0x09;	// 2^9 bytes
+	} else {
+		dev->device_descriptor.bMaxPacketSize0 = 0x40;	// 64 bytes
+	}
+
+	dev->speed = speed;
+
+	r = alloc_root_hub_config_desc(dev, num_ports, config_desc_length, ep_interval);
+	if (r)
+		usbi_err(ctx, "could not allocate config descriptor for root hub '%s'", priv->dev_id);
+
+	return r;
+}
+
 /*
  * Populate a libusb device structure
  */
@@ -909,11 +1139,11 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
 				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size, NULL)) {
 				usbi_warn(ctx, "could not get node connection information (V2) for device '%s': %s",
-					  priv->dev_id,  windows_error_str(0));
+					priv->dev_id,  windows_error_str(0));
 			} else if (conn_info_v2.Flags.DeviceIsOperatingAtSuperSpeedPlusOrHigher) {
-				conn_info.Speed = 4;
+				conn_info.Speed = UsbSuperSpeedPlus;
 			} else if (conn_info_v2.Flags.DeviceIsOperatingAtSuperSpeedOrHigher) {
-				conn_info.Speed = 3;
+				conn_info.Speed = UsbSuperSpeed;
 			}
 		}
 
@@ -925,15 +1155,19 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		dev->device_address = (uint8_t)conn_info.DeviceAddress;
 
 		switch (conn_info.Speed) {
-		case 0: dev->speed = LIBUSB_SPEED_LOW; break;
-		case 1: dev->speed = LIBUSB_SPEED_FULL; break;
-		case 2: dev->speed = LIBUSB_SPEED_HIGH; break;
-		case 3: dev->speed = LIBUSB_SPEED_SUPER; break;
-		case 4: dev->speed = LIBUSB_SPEED_SUPER_PLUS; break;
+		case UsbLowSpeed: dev->speed = LIBUSB_SPEED_LOW; break;
+		case UsbFullSpeed: dev->speed = LIBUSB_SPEED_FULL; break;
+		case UsbHighSpeed: dev->speed = LIBUSB_SPEED_HIGH; break;
+		case UsbSuperSpeed: dev->speed = LIBUSB_SPEED_SUPER; break;
+		case UsbSuperSpeedPlus: dev->speed = LIBUSB_SPEED_SUPER_PLUS; break;
 		default:
 			usbi_warn(ctx, "unknown device speed %u", conn_info.Speed);
 			break;
 		}
+	} else {
+		r = init_root_hub(dev);
+		if (r)
+			return r;
 	}
 
 	r = usbi_sanitize_device(dev);
@@ -971,19 +1205,13 @@ static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id
 	if (dev->bus_number == 0) {
 		// Only do this once
 		usbi_dbg("assigning HCD '%s' bus number %u", dev_id, bus_number);
-		priv = usbi_get_device_priv(dev);
 		dev->bus_number = bus_number;
-		dev->device_descriptor.bLength = LIBUSB_DT_DEVICE_SIZE;
-		dev->device_descriptor.bDescriptorType = LIBUSB_DT_DEVICE;
-		dev->device_descriptor.bDeviceClass = LIBUSB_CLASS_HUB;
-		dev->device_descriptor.bNumConfigurations = 1;
-		priv->active_config = 1;
-		priv->root_hub = true;
-		if (sscanf(dev_id, "PCI\\VEN_%04hx&DEV_%04hx%*s", &dev->device_descriptor.idVendor, &dev->device_descriptor.idProduct) != 2) {
+
+		if (sscanf(dev_id, "PCI\\VEN_%04hx&DEV_%04hx%*s", &dev->device_descriptor.idVendor, &dev->device_descriptor.idProduct) != 2)
 			usbi_warn(ctx, "could not infer VID/PID of HCD root hub from '%s'", dev_id);
-			dev->device_descriptor.idVendor = 0x1d6b; // Linux Foundation root hub
-			dev->device_descriptor.idProduct = 1;
-		}
+
+		priv = usbi_get_device_priv(dev);
+		priv->root_hub = true;
 	}
 
 	libusb_unref_device(dev);
