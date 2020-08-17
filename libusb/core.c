@@ -1223,6 +1223,9 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
  * handle for the underlying device. The handle allows you to use libusb to
  * perform I/O on the device in question.
  *
+ * Must call libusb_set_option(NULL, LIBUSB_OPTION_WEAK_AUTHORITY)
+ * before libusb_init if don't have authority to access the usb device directly.
+ *
  * On Linux, the system device handle must be a valid file descriptor opened
  * on the device node.
  *
@@ -2216,6 +2219,7 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 
 	/* Handle all backend-specific options here */
 	case LIBUSB_OPTION_USE_USBDK:
+	case LIBUSB_OPTION_WEAK_AUTHORITY:
 		if (usbi_backend.set_option)
 			r = usbi_backend.set_option(ctx, option, ap);
 		else

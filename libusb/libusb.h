@@ -2087,7 +2087,18 @@ enum libusb_option {
 	 *
 	 * Only valid on Windows.
 	 */
-	LIBUSB_OPTION_USE_USBDK = 1
+	LIBUSB_OPTION_USE_USBDK = 1,
+
+	/** Set libusb has weak authority. With this option, libusb will skip
+	 * scan devices in libusb_init.
+	 *
+	 * This option should be set before calling libusb_init(), otherwise
+	 * libusb_init will failed. Normally libusb_wrap_sys_device need set
+	 * this option.
+	 *
+	 * Only valid on Linux-based operating system, such as Android.
+	 */
+	LIBUSB_OPTION_WEAK_AUTHORITY = 2
 };
 
 int LIBUSB_CALL libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);
