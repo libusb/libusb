@@ -2620,7 +2620,7 @@ int usbi_add_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle
 	if (ctx->fd_added_cb)
 		ctx->fd_added_cb(os_handle, poll_events, ctx->fd_cb_user_data);
 #endif
-
+	free(ievent_source);
 	return 0;
 }
 
