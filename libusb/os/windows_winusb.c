@@ -823,6 +823,10 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 
 			for (depth = 1; bus_number == 0; depth++) {
 				tmp_dev = get_ancestor(ctx, devinst, &devinst);
+				if (tmp_dev == NULL) {
+					usbi_warn(ctx, "ancestor for device '%s' not found at depth %u", priv->dev_id, depth);
+					return LIBUSB_ERROR_NO_DEVICE;
+				}
 				if (tmp_dev->bus_number != 0) {
 					bus_number = tmp_dev->bus_number;
 					tmp_priv = usbi_get_device_priv(tmp_dev);
