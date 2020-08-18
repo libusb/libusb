@@ -2,7 +2,7 @@
 
    *********************************************************************
    *  The latest version of this snapshot can always be downloaded at: *
-   *         https://sourceforge.net/projects/libusb/files/           *
+   *         https://github.com/libusb/libusb/releases                 *
    *********************************************************************
 
 o Visual Studio:
@@ -37,6 +37,9 @@ o Additional information:
   - For some libusb samples (including source), please have a look in examples/
   - For additional information on the libusb 1.0 Windows backend please visit:
     http://windows.libusb.info
+  - Using the UsbDk backend is now a run-time choice rather than a compile-time
+    choice.  For additional information, including example usage, please visit:
+    http://windows.libusb.info/#Driver_Installation
   - The MinGW and MS generated DLLs are fully interchangeable, provided that you
     use the import libs provided or generate one from the .def also provided.
   - If you find any issue, please visit http://libusb.info/ and check the
