@@ -1,6 +1,8 @@
 #!/bin/sh
 
-if ! test -d m4 ; then
+set -e
+
+if [ ! -d m4 ]; then
     mkdir m4
 fi
-autoreconf -ivf || exit 1
+exec autoreconf -ivf

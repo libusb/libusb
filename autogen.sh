@@ -3,6 +3,6 @@
 set -e
 
 ./bootstrap.sh
-if test -z "$NOCONFIGURE"; then
+if [ -z "$NOCONFIGURE" ]; then
     exec ./configure --enable-examples-build --enable-tests-build "$@"
 fi
