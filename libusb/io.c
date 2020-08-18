@@ -319,9 +319,40 @@ if (r == 0 && actual_length == sizeof(data)) {
  * Freeing the transfer after it has been cancelled but before cancellation
  * has completed will result in undefined behaviour.
  *
+ * \attention
  * When a transfer is cancelled, some of the data may have been transferred.
- * libusb will communicate this to you in the transfer callback. Do not assume
- * that no data was transferred.
+ * libusb will communicate this to you in the transfer callback.
+ * <b>Do not assume that no data was transferred.</b>
+ *
+ * \section asyncpartial Partial data transfer resulting from cancellation
+ *
+ * As noted above, some of the data may have been transferred at the time a
+ * transfer is cancelled. It is helpful to see how this is possible if you
+ * consider a bulk transfer to an endpoint with a packet size of 64 bytes.
+ * Supposing you submit a 512-byte transfer to this endpoint, the operating
+ * system will divide this transfer up into 8 separate 64-byte frames that the
+ * host controller will schedule for the device to transfer data. If this
+ * transfer is cancelled while the device is transferring data, a subset of
+ * these frames may be descheduled from the host controller before the device
+ * has the opportunity to finish transferring data to the host.
+ *
+ * What your application should do with a partial data transfer is a policy
+ * decision; there is no single answer that satisfies the needs of every
+ * application. The data that was successfully transferred should be
+ * considered entirely valid, but your application must decide what to do with
+ * the remaining data that was not transferred. Some possible actions to take
+ * are:
+ * - Resubmit another transfer for the remaining data, possibly with a shorter
+ *   timeout
+ * - Discard the partially transferred data and report an error
+ *
+ * \section asynctimeout Timeouts
+ *
+ * When a transfer times out, libusb internally notes this and attempts to
+ * cancel the transfer. As noted in \ref asyncpartial "above", it is possible
+ * that some of the data may actually have been transferred. Your application
+ * should <b>always</b> check how much data was actually transferred once the
+ * transfer completes and act accordingly.
  *
  * \section bulk_overflows Overflows on device-to-host bulk/interrupt endpoints
  *

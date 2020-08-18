@@ -243,7 +243,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * underlying O/S requirements, meaning that the timeout may expire after
  * the first few chunks have completed. libusb is careful not to lose any data
  * that may have been transferred; do not assume that timeout conditions
- * indicate a complete lack of I/O.
+ * indicate a complete lack of I/O. See \ref asynctimeout for more details.
  *
  * \param dev_handle a handle for the device to communicate with
  * \param endpoint the address of a valid endpoint to communicate with
@@ -296,7 +296,7 @@ int API_EXPORTED libusb_bulk_transfer(libusb_device_handle *dev_handle,
  * underlying O/S requirements, meaning that the timeout may expire after
  * the first few chunks have completed. libusb is careful not to lose any data
  * that may have been transferred; do not assume that timeout conditions
- * indicate a complete lack of I/O.
+ * indicate a complete lack of I/O. See \ref asynctimeout for more details.
  *
  * The default endpoint bInterval value is used as the polling interval.
  *
