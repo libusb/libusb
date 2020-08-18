@@ -544,7 +544,14 @@ if (r == 0 && actual_length == sizeof(data)) {
  * application must call into when libusb has work do to. This gives libusb
  * the opportunity to reap pending transfers, invoke callbacks, etc.
  *
- * There are 2 different approaches to dealing with libusb_handle_events:
+ * \note
+ * All event handling is performed by whichever thread calls the
+ * libusb_handle_events() function. libusb does not invoke any callbacks
+ * outside of this context. Consequently, any callbacks will be run on the
+ * thread that calls the libusb_handle_events() function.
+ *
+ * When to call the libusb_handle_events() function depends on which model
+ * your application decides to use. The 2 different approaches:
  *
  * -# Repeatedly call libusb_handle_events() in blocking mode from a dedicated
  *    thread.
