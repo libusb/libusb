@@ -75,7 +75,7 @@
  * a single function call. When the function call returns, the transfer has
  * completed and you can parse the results.
  *
- * If you have used the libusb-0.1 before, this I/O style will seem familar to
+ * If you have used the libusb-0.1 before, this I/O style will seem familiar to
  * you. libusb-0.1 only offered a synchronous interface.
  *
  * In our input device example, to read button presses you might write code
@@ -101,7 +101,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  * sleeping for that long. Execution will be tied up inside the library -
  * the entire thread will be useless for that duration.
  *
- * Another issue is that by tieing up the thread with that single transaction
+ * Another issue is that by tying up the thread with that single transaction
  * there is no possibility of performing I/O with multiple endpoints and/or
  * multiple devices simultaneously, unless you resort to creating one thread
  * per transaction.
@@ -410,7 +410,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  * wLength of the setup packet, rather than the size of the data buffer. So,
  * if your wLength was 4, your transfer's <tt>length</tt> was 12, then you
  * should expect an <tt>actual_length</tt> of 4 to indicate that the data was
- * transferred in entirity.
+ * transferred in entirety.
  *
  * To simplify parsing of setup packets and obtaining the data from the
  * correct offset, you may wish to use the libusb_control_transfer_get_data()
@@ -572,7 +572,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  *
  * Lets begin with stating the obvious: If you're going to use a separate
  * thread for libusb event handling, your callback functions MUST be
- * threadsafe.
+ * thread-safe.
  *
  * Other then that doing event handling from a separate thread, is mostly
  * simple. You can use an event thread function as follows:
@@ -812,7 +812,7 @@ while (user has not requested application exit) {
  * system calls. This is directly exposed at the
  * \ref libusb_asyncio "asynchronous interface" but it is important to note that the
  * \ref libusb_syncio "synchronous interface" is implemented on top of the
- * asynchonrous interface, therefore the same considerations apply.
+ * asynchronous interface, therefore the same considerations apply.
  *
  * The issue is that if two or more threads are concurrently calling poll()
  * or select() on libusb's file descriptors then only one of those threads
@@ -1022,7 +1022,7 @@ printf("completed!\n");
  * event handling), because the event waiter seems to have taken the event
  * waiters lock while waiting for an event. However, the system does support
  * multiple event waiters, because libusb_wait_for_event() actually drops
- * the lock while waiting, and reaquires it before continuing.
+ * the lock while waiting, and reacquires it before continuing.
  *
  * We have now implemented code which can dynamically handle situations where
  * nobody is handling events (so we should do it ourselves), and it can also
@@ -1954,7 +1954,7 @@ void API_EXPORTED libusb_interrupt_event_handler(libusb_context *ctx)
  *
  * You only need to use this lock if you are developing an application
  * which calls poll() or select() on libusb's file descriptors directly,
- * <b>and</b> may potentially be handling events from 2 threads simultaenously.
+ * <b>and</b> may potentially be handling events from 2 threads simultaneously.
  * If you stick to libusb's event handling loop functions (e.g.
  * libusb_handle_events()) then you do not need to be concerned with this
  * locking.
@@ -2399,7 +2399,7 @@ int API_EXPORTED libusb_handle_events_timeout(libusb_context *ctx,
 
 /** \ingroup libusb_poll
  * Handle any pending events in blocking mode. There is currently a timeout
- * hardcoded at 60 seconds but we plan to make it unlimited in future. For
+ * hard-coded at 60 seconds but we plan to make it unlimited in future. For
  * finer control over whether this function is blocking or non-blocking, or
  * for control over the timeout, use libusb_handle_events_timeout_completed()
  * instead.
@@ -2561,7 +2561,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 		if (itransfer->timeout_flags & (USBI_TRANSFER_TIMEOUT_HANDLED | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
 			continue;
 
-		/* if we've reached transfers of infinte timeout, we're done looking */
+		/* if we've reached transfers of infinite timeout, we're done looking */
 		if (!TIMESPEC_IS_SET(&itransfer->timeout))
 			break;
 

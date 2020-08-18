@@ -735,7 +735,7 @@ int API_EXPORTED libusb_get_ss_endpoint_companion_descriptor(
 		header = (struct usbi_descriptor_header *)buffer;
 		if (header->bDescriptorType != LIBUSB_DT_SS_ENDPOINT_COMPANION) {
 			if (header->bLength < DESC_HEADER_LENGTH) {
-				usbi_err(ctx, "invalid desciptor length %u",
+				usbi_err(ctx, "invalid descriptor length %u",
 					 header->bLength);
 				return LIBUSB_ERROR_IO;
 			}

@@ -620,7 +620,7 @@ sunos_add_devices(di_devlink_t link, void *arg)
 
 			if (sunos_fill_in_dev_info(dn, dev) != LIBUSB_SUCCESS) {
 				libusb_unref_device(dev);
-				usbi_dbg("get infomation fail");
+				usbi_dbg("get information fail");
 				continue;
 			}
 			if (usbi_sanitize_device(dev) < 0) {

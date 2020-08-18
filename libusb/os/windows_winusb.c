@@ -1243,7 +1243,7 @@ static void get_api_type(HDEVINFO *dev_info, SP_DEVINFO_DATA *dev_info_data,
 
 			// MULTI_SZ is a pain to work with. Turn it into something much more manageable
 			// NB: none of the driver names we check against contain LIST_SEPARATOR,
-			// (currently ';'), so even if an unsuported one does, it's not an issue
+			// (currently ';'), so even if an unsupported one does, it's not an issue
 			for (l = 0; (lookup[k].list[l] != 0) || (lookup[k].list[l + 1] != 0); l++) {
 				if (lookup[k].list[l] == 0)
 					lookup[k].list[l] = LIST_SEPARATOR;
@@ -2932,7 +2932,7 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 		}
 
 		// Important note: the WinUSB_Read/WriteIsochPipeAsap API requires a ContinueStream parameter that tells whether the isochronous
-		// stream must be continued or if the WinUSB driver can schedule the transfer at its conveniance. Profiling subsequent transfers
+		// stream must be continued or if the WinUSB driver can schedule the transfer at its convenience. Profiling subsequent transfers
 		// with ContinueStream = FALSE showed that 5 frames, i.e. about 5 milliseconds, were left empty between each transfer. This
 		// is critical as this greatly diminish the achievable isochronous bandwidth. We solved the problem using the following strategy:
 		// - Transfers are first scheduled with ContinueStream = TRUE and with winusbx_iso_transfer_continue_stream_callback as user callback.
@@ -3645,7 +3645,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 	CHECK_HID_AVAILABLE;
 
 	if (priv->hid == NULL) {
-		usbi_err(HANDLE_CTX(dev_handle), "program assertion failed - private HID structure is unitialized");
+		usbi_err(HANDLE_CTX(dev_handle), "program assertion failed - private HID structure is uninitialized");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 

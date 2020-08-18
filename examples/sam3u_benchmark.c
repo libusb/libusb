@@ -132,7 +132,7 @@ static void measure(void)
 	diff_msec = (tv_stop.tv_sec - tv_start.tv_sec) * 1000L;
 	diff_msec += (tv_stop.tv_usec - tv_start.tv_usec) / 1000L;
 
-	printf("%lu transfers (total %lu bytes) in %lu miliseconds => %lu bytes/sec\n",
+	printf("%lu transfers (total %lu bytes) in %lu milliseconds => %lu bytes/sec\n",
 		num_xfer, num_bytes, diff_msec, (num_bytes * 1000L) / diff_msec);
 }
 

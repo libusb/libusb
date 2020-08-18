@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (!libusb_has_capability (LIBUSB_CAP_HAS_HOTPLUG)) {
-		printf ("Hotplug capabilites are not supported on this platform\n");
+		printf ("Hotplug capabilities are not supported on this platform\n");
 		libusb_exit (NULL);
 		return EXIT_FAILURE;
 	}

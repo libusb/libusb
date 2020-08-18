@@ -1081,7 +1081,7 @@ struct usbi_os_backend {
 	 * completes, assuming that the device descriptors did not change during
 	 * reset and all previous interface state can be restored.
 	 *
-	 * If something changes, or you cannot easily locate/verify the resetted
+	 * If something changes, or you cannot easily locate/verify the reset
 	 * device, return LIBUSB_ERROR_NOT_FOUND. This prompts the application
 	 * to close the old handle and re-enumerate the device.
 	 *

@@ -1,5 +1,5 @@
 /*
- * For Windows: input this file to the Resoure Compiler to produce a binary
+ * For Windows: input this file to the Resource Compiler to produce a binary
  * .res file. This is then embedded in the resultant library (like any other
  * compilation object).
  * The information can then be queried using standard APIs and can also be

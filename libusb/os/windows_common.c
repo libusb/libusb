@@ -125,7 +125,7 @@ static unsigned long htab_filled;
 static bool htab_create(struct libusb_context *ctx)
 {
 	if (htab_table != NULL) {
-		usbi_err(ctx, "program assertion falied - hash table already allocated");
+		usbi_err(ctx, "program assertion failed - hash table already allocated");
 		return true;
 	}
 
@@ -459,7 +459,7 @@ static int windows_init(struct libusb_context *ctx)
 	}
 
 	// A successful wait gives this thread ownership of the mutex
-	// => any concurent wait stalls until the mutex is released
+	// => any concurrent wait stalls until the mutex is released
 	if (WaitForSingleObject(mutex, INFINITE) != WAIT_OBJECT_0) {
 		usbi_err(ctx, "failure to access mutex: %s", windows_error_str(0));
 		CloseHandle(mutex);
@@ -553,7 +553,7 @@ static void windows_exit(struct libusb_context *ctx)
 		return;
 
 	// A successful wait gives this thread ownership of the mutex
-	// => any concurent wait stalls until the mutex is released
+	// => any concurrent wait stalls until the mutex is released
 	if (WaitForSingleObject(mutex, INFINITE) != WAIT_OBJECT_0) {
 		usbi_err(ctx, "failed to access mutex: %s", windows_error_str(0));
 		CloseHandle(mutex);

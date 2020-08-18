@@ -53,7 +53,7 @@ struct list_head active_contexts_list;
  * \section intro Introduction
  *
  * libusb is an open source library that allows you to communicate with USB
- * devices from userspace. For more info, see the
+ * devices from user space. For more info, see the
  * <a href="http://libusb.info">libusb homepage</a>.
  *
  * This documentation is aimed at application developers wishing to
@@ -213,12 +213,12 @@ struct list_head active_contexts_list;
  * you when this has happened, so if someone else resets your device it will
  * not be clear to your own program why the device state has changed.
  *
- * Ultimately, this is a limitation of writing drivers in userspace.
+ * Ultimately, this is a limitation of writing drivers in user space.
  * Separation from the USB stack in the underlying kernel makes it difficult
  * for the operating system to deliver such notifications to your program.
  * The Linux kernel USB stack allows such reset notifications to be delivered
  * to in-kernel USB drivers, but it is not clear how such notifications could
- * be delivered to second-class drivers that live in userspace.
+ * be delivered to second-class drivers that live in user space.
  *
  * \section blockonly Blocking-only functionality
  *
@@ -1927,7 +1927,7 @@ int API_EXPORTED libusb_free_streams(libusb_device_handle *dev_handle,
  * the same cache lines) when a transfer is in progress, although it is legal
  * to have several transfers going on within the same memory block.
  *
- * Will return NULL on failure. Many systems do not support such zerocopy
+ * Will return NULL on failure. Many systems do not support such zero-copy
  * and will always return NULL. Memory allocated with this function must be
  * freed with \ref libusb_dev_mem_free. Specifically, this means that the
  * flag \ref LIBUSB_TRANSFER_FREE_BUFFER cannot be used to free memory allocated

@@ -1846,7 +1846,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	 * a time, but there is a big performance gain doing it this way.
 	 *
 	 * Newer versions lift the 16k limit (USBFS_CAP_NO_PACKET_SIZE_LIM),
-	 * using arbritary large transfers can still be a bad idea though, as
+	 * using arbitrary large transfers can still be a bad idea though, as
 	 * the kernel needs to allocate physical contiguous memory for this,
 	 * which may fail for large buffers.
 	 *

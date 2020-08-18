@@ -81,7 +81,7 @@ static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
  * (depending on direction bits within bmRequestType)
  * \param wLength the length field for the setup packet. The data buffer should
  * be at least this size.
- * \param timeout timeout (in millseconds) that this function should wait
+ * \param timeout timeout (in milliseconds) that this function should wait
  * before giving up due to no response being received. For an unlimited
  * timeout, use value 0.
  * \returns on success, the number of bytes actually transferred
@@ -255,7 +255,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * transferred. Since version 1.0.21 (\ref LIBUSB_API_VERSION >= 0x01000105),
  * it is legal to pass a NULL pointer if you do not wish to receive this
  * information.
- * \param timeout timeout (in millseconds) that this function should wait
+ * \param timeout timeout (in milliseconds) that this function should wait
  * before giving up due to no response being received. For an unlimited
  * timeout, use value 0.
  *
@@ -310,7 +310,7 @@ int API_EXPORTED libusb_bulk_transfer(libusb_device_handle *dev_handle,
  * transferred. Since version 1.0.21 (\ref LIBUSB_API_VERSION >= 0x01000105),
  * it is legal to pass a NULL pointer if you do not wish to receive this
  * information.
- * \param timeout timeout (in millseconds) that this function should wait
+ * \param timeout timeout (in milliseconds) that this function should wait
  * before giving up due to no response being received. For an unlimited
  * timeout, use value 0.
  *
