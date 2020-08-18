@@ -157,6 +157,36 @@ struct list_head active_contexts_list;
 /**
  * \page libusb_caveats Caveats
  *
+ * \section threadsafety Thread safety
+ *
+ * libusb is designed to be completely thread-safe, but as with any API it
+ * cannot prevent a user from sabotaging themselves, either intentionally or
+ * otherwise.
+ *
+ * Observe the following general guidelines:
+ *
+ * - Calls to functions that release a resource (e.g. libusb_close(),
+ *   libusb_free_config_descriptor()) should not be called concurrently on
+ *   the same resource. This is no different than concurrently calling free()
+ *   on the same allocated pointer.
+ * - Each individual \ref libusb_transfer should be prepared by a single
+ *   thread. In other words, no two threads should ever be concurrently
+ *   filling out the fields of a \ref libusb_transfer. You can liken this to
+ *   calling sprintf() with the same destination buffer from multiple threads.
+ *   The results will likely not be what you want unless the input parameters
+ *   are all the same, but its best to avoid this situation entirely.
+ * - Both the \ref libusb_transfer structure and its associated data buffer
+ *   should not be accessed between the time the transfer is submitted and the
+ *   time the completion callback is invoked. You can think of "ownership" of
+ *   these things as being transferred to libusb while the transfer is active.
+ * - The various "setter" functions (e.g. libusb_set_log_cb(),
+ *   libusb_set_pollfd_notifiers()) should not be called concurrently on the
+ *   resource. Though doing so will not lead to any undefined behavior, it
+ *   will likely produce results that the application does not expect.
+ *
+ * Rules for multiple threads and asynchronous I/O are detailed
+ * \ref libusb_mtasync "here".
+ *
  * \section fork Fork considerations
  *
  * libusb is <em>not</em> designed to work across fork() calls. Depending on
