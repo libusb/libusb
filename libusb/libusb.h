@@ -1254,7 +1254,16 @@ struct libusb_transfer {
 	 * fails, or is cancelled. */
 	libusb_transfer_cb_fn callback;
 
-	/** User context data to pass to the callback function. */
+	/** User context data. Useful for associating specific data to a transfer
+	 * that can be accessed from within the callback function.
+	 *
+	 * This field may be set manually or is taken as the `user_data` parameter
+	 * of the following functions:
+	 * - libusb_fill_bulk_transfer()
+	 * - libusb_fill_bulk_stream_transfer()
+	 * - libusb_fill_control_transfer()
+	 * - libusb_fill_interrupt_transfer()
+	 * - libusb_fill_iso_transfer() */
 	void *user_data;
 
 	/** Data buffer */
