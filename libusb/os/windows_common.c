@@ -418,13 +418,18 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 	usbi_dbg("I/O completion thread started");
 
 	while (true) {
-		if (!GetQueuedCompletionStatus(iocp, &num_bytes, &completion_key, &overlapped, INFINITE)) {
+		overlapped = NULL;
+		if (!GetQueuedCompletionStatus(iocp, &num_bytes, &completion_key, &overlapped, INFINITE) && (overlapped == NULL)) {
 			usbi_err(ctx, "GetQueuedCompletionStatus failed: %s", windows_error_str(0));
 			break;
 		}
 
-		if (overlapped == NULL)
-			break; // Signal to quit
+		if (overlapped == NULL) {
+			// Signal to quit
+			if (completion_key != (ULONG_PTR)ctx)
+				usbi_err(ctx, "program assertion failed - overlapped is NULL");
+			break;
+		}
 
 		transfer_priv = container_of(overlapped, struct windows_transfer_priv, overlapped);
 		itransfer = (struct usbi_transfer *)((unsigned char *)transfer_priv + PTR_ALIGN(sizeof(*transfer_priv)));
@@ -556,7 +561,7 @@ static void windows_exit(struct libusb_context *ctx)
 	}
 
 	// A NULL completion status will indicate to the thread that it is time to exit
-	if (!PostQueuedCompletionStatus(priv->completion_port, 0, 0, NULL))
+	if (!PostQueuedCompletionStatus(priv->completion_port, 0, (ULONG_PTR)ctx, NULL))
 		usbi_err(ctx, "failed to post I/O completion: %s", windows_error_str(0));
 
 	if (WaitForSingleObject(priv->completion_port_thread, INFINITE) == WAIT_FAILED)
