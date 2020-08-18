@@ -920,6 +920,11 @@ void myfunc() {
  * do is submit a single transfer and wait for its completion, then using
  * one of the synchronous I/O functions is much easier.
  *
+ * \note
+ * The `completed` variable must be modified while holding the event lock,
+ * otherwise a race condition can still exist. It is simplest to do so from
+ * within the transfer callback as shown above.
+ *
  * \section eventlock The events lock
  *
  * The problem is when we consider the fact that libusb exposes file
