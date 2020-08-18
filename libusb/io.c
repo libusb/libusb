@@ -458,13 +458,20 @@ if (r == 0 && actual_length == sizeof(data)) {
  * libusb_get_iso_packet_buffer() and libusb_get_iso_packet_buffer_simple()
  * functions may help you here.
  *
- * <b>Note</b>: Some operating systems (e.g. Linux) may impose limits on the
- * length of individual isochronous packets and/or the total length of the
- * isochronous transfer. Such limits can be difficult for libusb to detect,
- * so the library will simply try and submit the transfer as set up by you.
- * If the transfer fails to submit because it is too large,
+ * \section asynclimits Transfer length limitations
+ *
+ * Some operating systems may impose limits on the length of the transfer data
+ * buffer or, in the case of isochronous transfers, the length of individual
+ * isochronous packets. Such limits can be difficult for libusb to detect, so
+ * in most cases the library will simply try and submit the transfer as set up
+ * by you. If the transfer fails to submit because it is too large,
  * libusb_submit_transfer() will return
  * \ref libusb_error::LIBUSB_ERROR_INVALID_PARAM "LIBUSB_ERROR_INVALID_PARAM".
+ *
+ * The following are known limits for control transfer lengths. Note that this
+ * length includes the 8-byte setup packet.
+ * - Linux (4,096 bytes)
+ * - Windows (4,096 bytes)
  *
  * \section asyncmem Memory caveats
  *
@@ -1446,7 +1453,7 @@ static int remove_from_flying_list(struct usbi_transfer *itransfer)
  * \returns LIBUSB_ERROR_NOT_SUPPORTED if the transfer flags are not supported
  * by the operating system.
  * \returns LIBUSB_ERROR_INVALID_PARAM if the transfer size is larger than
- * the operating system and/or hardware can support
+ * the operating system and/or hardware can support (see \ref asynclimits)
  * \returns another LIBUSB_ERROR code on other failure
  */
 int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
