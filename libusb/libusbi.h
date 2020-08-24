@@ -686,10 +686,15 @@ static inline int usbi_using_timer(struct libusb_context *ctx)
 }
 
 struct usbi_reported_events {
-	unsigned int event_triggered:1;
+	union {
+		struct {
+			unsigned int event_triggered:1;
 #ifdef HAVE_OS_TIMER
-	unsigned int timer_triggered:1;
+			unsigned int timer_triggered:1;
 #endif
+		};
+		unsigned int event_bits;
+	};
 	void *event_data;
 	unsigned int event_data_count;
 	unsigned int num_ready;

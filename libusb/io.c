@@ -2229,6 +2229,8 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	if (tv->tv_usec % 1000)
 		timeout_ms++;
 
+	reported_events.event_bits = 0;
+
 	usbi_start_event_handling(ctx);
 
 	r = usbi_wait_for_events(ctx, &reported_events, timeout_ms);
