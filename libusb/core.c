@@ -2188,12 +2188,16 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 		break;
 
 	/* Handle all backend-specific options here */
-	default:
+	case LIBUSB_OPTION_USE_USBDK:
+	case LIBUSB_OPTION_WEAK_AUTHORITY:
 		if (usbi_backend.set_option)
 			r = usbi_backend.set_option(ctx, option, ap);
 		else
 			r = LIBUSB_ERROR_NOT_SUPPORTED;
 		break;
+
+	default:
+		r = LIBUSB_ERROR_INVALID_PARAM;
 	}
 	va_end(ap);
 

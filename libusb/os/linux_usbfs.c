@@ -384,9 +384,9 @@ static int op_init(struct libusb_context *ctx)
 		}
 	}
 
-    if (weak_authority) {
-        return LIBUSB_SUCCESS;
-    }
+	if (weak_authority) {
+		return LIBUSB_SUCCESS;
+	}
 
 	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	r = LIBUSB_SUCCESS;
@@ -426,10 +426,12 @@ static int op_set_option(struct libusb_context *ctx, enum libusb_option option, 
 	UNUSED(ap);
 
 	switch ((int)option) {
+#ifdef __ANDROID__
 	case LIBUSB_OPTION_WEAK_AUTHORITY:
-        usbi_dbg("set libusb has weak authority");
-        weak_authority = 1;
-        return LIBUSB_SUCCESS;
+		usbi_dbg("set libusb has weak authority");
+		weak_authority = 1;
+		return LIBUSB_SUCCESS;
+#endif
 	default:
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
