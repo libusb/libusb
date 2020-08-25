@@ -254,7 +254,6 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	}
 #endif
 
-	assert(num_ready > 0);
 	if (!num_ready)
 		goto done;
 
