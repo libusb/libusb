@@ -47,7 +47,7 @@
 #define ULONG_CAST(x)	((unsigned long)(x))
 #endif
 
-#if defined(__CYGWIN__ )
+#if defined(__CYGWIN__)
 #define _stricmp strcasecmp
 #define _strdup strdup
 // _beginthreadex is MSVCRT => unavailable for cygwin. Fallback to using CreateThread

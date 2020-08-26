@@ -74,17 +74,12 @@
 #define PTR_ALIGN(v) \
 	(((v) + (sizeof(void *) - 1)) & ~(sizeof(void *) - 1))
 
-/* Internal abstraction for event handling */
-#if defined(EVENTS_POSIX)
+/* Internal abstractions for event handling and thread synchronization */
+#if defined(PLATFORM_POSIX)
 #include "os/events_posix.h"
-#elif defined(EVENTS_WINDOWS)
-#include "os/events_windows.h"
-#endif
-
-/* Internal abstraction for thread synchronization */
-#if defined(THREADS_POSIX)
 #include "os/threads_posix.h"
-#elif defined(THREADS_WINDOWS)
+#elif defined(PLATFORM_WINDOWS)
+#include "os/events_windows.h"
 #include "os/threads_windows.h"
 #endif
 
@@ -248,7 +243,7 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 		}							\
 	} while (0)
 
-#if defined(_WIN32)
+#if defined(PLATFORM_WINDOWS)
 #define TIMEVAL_TV_SEC_TYPE	long
 #else
 #define TIMEVAL_TV_SEC_TYPE	time_t
@@ -345,7 +340,7 @@ struct libusb_context {
 	 * take this lock first */
 	usbi_mutex_t flying_transfers_lock;
 
-#if !defined(_WIN32) && !defined(__CYGWIN__)
+#if !defined(PLATFORM_WINDOWS)
 	/* user callbacks for pollfd changes */
 	libusb_pollfd_added_cb fd_added_cb;
 	libusb_pollfd_removed_cb fd_removed_cb;

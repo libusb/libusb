@@ -8,7 +8,7 @@ fxload_SOURCES = ezusb.c ezusb.h fxload.c
 
 if HAVE_SIGACTION
 noinst_PROGRAMS += dpfp
-if THREADS_POSIX
+if PLATFORM_POSIX
 noinst_PROGRAMS += dpfp_threaded
 dpfp_threaded_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 dpfp_threaded_LDADD = $(LDADD) $(THREAD_LIBS)

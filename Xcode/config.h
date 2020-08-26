@@ -8,9 +8,6 @@
 /* Define to 1 to enable message logging. */
 #define ENABLE_LOGGING 1
 
-/* Define to 1 if using the POSIX events abstraction. */
-#define EVENTS_POSIX 1
-
 /* On 10.12 and later, use newly available clock_*() functions */
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 /* Define to 1 if you have the `clock_gettime' function. */
@@ -29,8 +26,8 @@
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define HAVE_SYS_TIME_H 1
 
-/* Define to 1 if using POSIX threads. */
-#define THREADS_POSIX 1
+/* Define to 1 if compiling for a POSIX platform. */
+#define PLATFORM_POSIX 1
 
 /* Enable GNU extensions. */
 #define _GNU_SOURCE 1

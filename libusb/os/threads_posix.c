@@ -60,14 +60,10 @@ int usbi_cond_timedwait(pthread_cond_t *cond,
 
 int usbi_get_tid(void)
 {
-#ifndef _WIN32
 	static _Thread_local int tid;
 
 	if (tid)
 		return tid;
-#else
-	int tid;
-#endif
 
 #if defined(__ANDROID__)
 	tid = gettid();
@@ -94,8 +90,6 @@ int usbi_get_tid(void)
 	tid = syscall(SYS_getthrid);
 #elif defined(__sun__)
 	tid = _lwp_self();
-#elif defined(_WIN32)
-	tid = (int)GetCurrentThreadId();
 #else
 	tid = -1;
 #endif

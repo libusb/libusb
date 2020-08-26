@@ -47,11 +47,8 @@
 /* Define to 1 to enable message logging. */
 #define ENABLE_LOGGING 1
 
-/* Define to 1 if using the Windows events abstraction. */
-#define EVENTS_WINDOWS 1
-
-/* Define to 1 if using Windows threads. */
-#define THREADS_WINDOWS 1
+/* Define to 1 if compiling for a Windows platform. */
+#define PLATFORM_WINDOWS 1
 
 /* Define to 1 to output logging messages to the systemwide log. */
 /* #undef USE_SYSTEM_LOGGING_FACILITY */
