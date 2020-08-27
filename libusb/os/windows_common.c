@@ -25,7 +25,6 @@
 #include <config.h>
 
 #include <errno.h>
-#include <inttypes.h>
 #include <process.h>
 #include <stdio.h>
 

@@ -37,7 +37,6 @@
 #include <sys/usb/clients/ugen/usb_ugen.h>
 #include <sys/usb/usba.h>
 #include <sys/pci.h>
-#include <inttypes.h>
 
 #include "libusbi.h"
 #include "sunos_usb.h"

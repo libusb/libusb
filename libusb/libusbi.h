@@ -27,6 +27,7 @@
 #include <config.h>
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -265,15 +266,12 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 #define snprintf usbi_snprintf
 #define vsnprintf usbi_vsnprintf
 int usbi_snprintf(char *dst, size_t size, const char *format, ...);
-int usbi_vsnprintf(char *dst, size_t size, const char *format, va_list ap);
+int usbi_vsnprintf(char *dst, size_t size, const char *format, va_list args);
 #define LIBUSB_PRINTF_WIN32
 #endif /* defined(_MSC_VER) && (_MSC_VER < 1900) */
 
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, ...) USBI_PRINTFLIKE(4, 5);
-
-void usbi_log_v(struct libusb_context *ctx, enum libusb_log_level level,
-	const char *function, const char *format, va_list args) USBI_PRINTFLIKE(4, 0);
 
 #define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __func__, __VA_ARGS__)
 

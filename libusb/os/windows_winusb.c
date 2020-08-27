@@ -32,7 +32,6 @@
 #include <fcntl.h>
 #include <process.h>
 #include <stdio.h>
-#include <inttypes.h>
 #include <objbase.h>
 #include <winioctl.h>
 
