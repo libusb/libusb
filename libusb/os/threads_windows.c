@@ -34,7 +34,7 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 	if (SleepConditionVariableCS(cond, mutex, millis))
 		return 0;
 	else if (GetLastError() == ERROR_TIMEOUT)
-		return ETIMEDOUT;
+		return LIBUSB_ERROR_TIMEOUT;
 	else
-		return EINVAL;
+		return LIBUSB_ERROR_OTHER;
 }

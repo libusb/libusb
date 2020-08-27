@@ -700,16 +700,11 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 {
 	size_t priv_size = usbi_backend.device_priv_size;
 	struct libusb_device *dev = calloc(1, PTR_ALIGN(sizeof(*dev)) + priv_size);
-	int r;
 
 	if (!dev)
 		return NULL;
 
-	r = usbi_mutex_init(&dev->lock);
-	if (r) {
-		free(dev);
-		return NULL;
-	}
+	usbi_mutex_init(&dev->lock);
 
 	dev->ctx = ctx;
 	dev->refcnt = 1;
@@ -1267,11 +1262,7 @@ int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
 	if (!_dev_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
-	r = usbi_mutex_init(&_dev_handle->lock);
-	if (r) {
-		free(_dev_handle);
-		return LIBUSB_ERROR_OTHER;
-	}
+	usbi_mutex_init(&_dev_handle->lock);
 
 	r = usbi_backend.wrap_sys_device(ctx, _dev_handle, sys_dev);
 	if (r < 0) {
@@ -1325,11 +1316,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	if (!_dev_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
-	r = usbi_mutex_init(&_dev_handle->lock);
-	if (r) {
-		free(_dev_handle);
-		return LIBUSB_ERROR_OTHER;
-	}
+	usbi_mutex_init(&_dev_handle->lock);
 
 	_dev_handle->dev = libusb_ref_device(dev);
 

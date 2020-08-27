@@ -1793,7 +1793,7 @@ int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
 	}
 
 	r = usbi_mutex_trylock(&ctx->events_lock);
-	if (r)
+	if (!r)
 		return 1;
 
 	ctx->event_handler_active = 1;
@@ -2016,11 +2016,10 @@ int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 
 	r = usbi_cond_timedwait(&ctx->event_waiters_cond,
 		&ctx->event_waiters_lock, tv);
-
 	if (r < 0)
-		return r;
-	else
-		return (r == ETIMEDOUT);
+		return r == LIBUSB_ERROR_TIMEOUT;
+
+	return 0;
 }
 
 static void handle_timeout(struct usbi_transfer *itransfer)

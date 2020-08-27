@@ -21,7 +21,11 @@
 #ifndef LIBUSB_THREADS_WINDOWS_H
 #define LIBUSB_THREADS_WINDOWS_H
 
-#include <errno.h>
+#define WINAPI_CHECK(expr)			\
+	do {					\
+		BOOL winapi_result = (expr);	\
+		assert(winapi_result != 0);	\
+	} while (0)
 
 #define USBI_MUTEX_INITIALIZER	0L
 typedef LONG usbi_mutex_static_t;
@@ -36,10 +40,9 @@ static inline void usbi_mutex_static_unlock(usbi_mutex_static_t *mutex)
 }
 
 typedef CRITICAL_SECTION usbi_mutex_t;
-static inline int usbi_mutex_init(usbi_mutex_t *mutex)
+static inline void usbi_mutex_init(usbi_mutex_t *mutex)
 {
 	InitializeCriticalSection(mutex);
-	return 0;
 }
 static inline void usbi_mutex_lock(usbi_mutex_t *mutex)
 {
@@ -51,14 +54,13 @@ static inline void usbi_mutex_unlock(usbi_mutex_t *mutex)
 }
 static inline int usbi_mutex_trylock(usbi_mutex_t *mutex)
 {
-	return !TryEnterCriticalSection(mutex);
+	return TryEnterCriticalSection(mutex) != 0;
 }
 static inline void usbi_mutex_destroy(usbi_mutex_t *mutex)
 {
 	DeleteCriticalSection(mutex);
 }
 
-// We *were* getting timespec from pthread.h:
 #if !defined(HAVE_STRUCT_TIMESPEC) && !defined(_TIMESPEC_DEFINED)
 #define HAVE_STRUCT_TIMESPEC 1
 #define _TIMESPEC_DEFINED 1
@@ -68,11 +70,6 @@ struct timespec {
 };
 #endif /* HAVE_STRUCT_TIMESPEC || _TIMESPEC_DEFINED */
 
-// We *were* getting ETIMEDOUT from pthread.h:
-#ifndef ETIMEDOUT
-#define ETIMEDOUT	10060	/* This is the value in winsock.h. */
-#endif
-
 typedef CONDITION_VARIABLE usbi_cond_t;
 static inline void usbi_cond_init(usbi_cond_t *cond)
 {
@@ -80,7 +77,7 @@ static inline void usbi_cond_init(usbi_cond_t *cond)
 }
 static inline void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
 {
-	(void)SleepConditionVariableCS(cond, mutex, INFINITE);
+	WINAPI_CHECK(SleepConditionVariableCS(cond, mutex, INFINITE));
 }
 int usbi_cond_timedwait(usbi_cond_t *cond,
 	usbi_mutex_t *mutex, const struct timeval *tv);
@@ -97,6 +94,7 @@ typedef DWORD usbi_tls_key_t;
 static inline void usbi_tls_key_create(usbi_tls_key_t *key)
 {
 	*key = TlsAlloc();
+	assert(*key != TLS_OUT_OF_INDEXES);
 }
 static inline void *usbi_tls_key_get(usbi_tls_key_t key)
 {
@@ -104,16 +102,16 @@ static inline void *usbi_tls_key_get(usbi_tls_key_t key)
 }
 static inline void usbi_tls_key_set(usbi_tls_key_t key, void *ptr)
 {
-	(void)TlsSetValue(key, ptr);
+	WINAPI_CHECK(TlsSetValue(key, ptr));
 }
 static inline void usbi_tls_key_delete(usbi_tls_key_t key)
 {
-	(void)TlsFree(key);
+	WINAPI_CHECK(TlsFree(key));
 }
 
-static inline int usbi_get_tid(void)
+static inline unsigned int usbi_get_tid(void)
 {
-	return (int)GetCurrentThreadId();
+	return (unsigned int)GetCurrentThreadId();
 }
 
 #endif /* LIBUSB_THREADS_WINDOWS_H */
