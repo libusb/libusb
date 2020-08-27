@@ -24,7 +24,6 @@
 
 #include <config.h>
 
-#include <errno.h>
 #include <process.h>
 #include <stdio.h>
 
@@ -41,12 +40,6 @@ enum windows_version windows_version = WINDOWS_UNDEFINED;
 // Global variables for init/exit
 static unsigned int init_count;
 static bool usbdk_available;
-
-#if !defined(HAVE_CLOCK_GETTIME)
-// Global variables for clock_gettime mechanism
-static uint64_t hires_ticks_to_ps;
-static uint64_t hires_frequency;
-#endif
 
 /*
 * Converts a windows error to human readable string
@@ -283,23 +276,6 @@ void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size)
 	usbi_signal_transfer_completion(itransfer);
 }
 
-static void windows_init_clock(void)
-{
-#if !defined(HAVE_CLOCK_GETTIME)
-	LARGE_INTEGER li_frequency;
-
-	// Microsoft says that the QueryPerformanceFrequency() and
-	// QueryPerformanceCounter() functions always succeed on XP and later
-	QueryPerformanceFrequency(&li_frequency);
-
-	// The hires frequency can go as high as 4 GHz, so we'll use a conversion
-	// to picoseconds to compute the tv_nsecs part in clock_gettime
-	hires_frequency = li_frequency.QuadPart;
-	hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency;
-	usbi_dbg("hires timer frequency: %"PRIu64" Hz", hires_frequency);
-#endif
-}
-
 /* Windows version detection */
 static BOOL is_x64(void)
 {
@@ -478,8 +454,6 @@ static int windows_init(struct libusb_context *ctx)
 			r = LIBUSB_ERROR_NOT_SUPPORTED;
 			goto init_exit;
 		}
-
-		windows_init_clock();
 
 		if (!htab_create(ctx)) {
 			r = LIBUSB_ERROR_NO_MEM;
@@ -818,50 +792,30 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
 		return usbi_handle_transfer_completion(itransfer, status);
 }
 
-#if !defined(HAVE_CLOCK_GETTIME)
-int usbi_clock_gettime(int clk_id, struct timespec *tp)
+void usbi_get_monotonic_time(struct timespec *tp)
 {
+	static LONG hires_counter_init;
+	static uint64_t hires_ticks_to_ps;
+	static uint64_t hires_frequency;
 	LARGE_INTEGER hires_counter;
-#if !defined(_MSC_VER) || (_MSC_VER < 1900)
-	FILETIME filetime;
-	ULARGE_INTEGER rtime;
-#endif
 
-	switch (clk_id) {
-	case USBI_CLOCK_MONOTONIC:
-		if (hires_frequency) {
-			QueryPerformanceCounter(&hires_counter);
-			tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
-			tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency) * hires_ticks_to_ps) / UINT64_C(1000));
-			return 0;
-		}
-		// Return real-time if monotonic was not detected @ timer init
-		// Fall through
-	case USBI_CLOCK_REALTIME:
-#if defined(_MSC_VER) && (_MSC_VER >= 1900)
-		if (!timespec_get(tp, TIME_UTC)) {
-			errno = EIO;
-			return -1;
-		}
-#else
-		// We follow http://msdn.microsoft.com/en-us/library/ms724928%28VS.85%29.aspx
-		// with a predef epoch time to have an epoch that starts at 1970.01.01 00:00
-		// Note however that our resolution is bounded by the Windows system time
-		// functions and is at best of the order of 1 ms (or, usually, worse)
-		GetSystemTimeAsFileTime(&filetime);
-		rtime.LowPart = filetime.dwLowDateTime;
-		rtime.HighPart = filetime.dwHighDateTime;
-		rtime.QuadPart -= EPOCH_TIME;
-		tp->tv_sec = (long)(rtime.QuadPart / 10000000);
-		tp->tv_nsec = (long)((rtime.QuadPart % 10000000) * 100);
-#endif
-		return 0;
-	default:
-		errno = EINVAL;
-		return -1;
+	if (InterlockedExchange(&hires_counter_init, 1L) == 0L) {
+		LARGE_INTEGER li_frequency;
+
+		// Microsoft says that the QueryPerformanceFrequency() and
+		// QueryPerformanceCounter() functions always succeed on XP and later
+		QueryPerformanceFrequency(&li_frequency);
+
+		// The hires frequency can go as high as 4 GHz, so we'll use a conversion
+		// to picoseconds to compute the tv_nsecs part
+		hires_frequency = li_frequency.QuadPart;
+		hires_ticks_to_ps = UINT64_C(1000000000000) / hires_frequency;
 	}
+
+	QueryPerformanceCounter(&hires_counter);
+	tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
+	tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency) * hires_ticks_to_ps) / UINT64_C(1000));
 }
-#endif
 
 // NB: MSVC6 does not support named initializers.
 const struct usbi_os_backend usbi_backend = {

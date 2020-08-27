@@ -28,7 +28,6 @@
 #include <windows.h>
 #include <setupapi.h>
 #include <ctype.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <process.h>
 #include <stdio.h>

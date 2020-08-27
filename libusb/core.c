@@ -2265,7 +2265,7 @@ int API_EXPORTED libusb_init(libusb_context **context)
 	usbi_mutex_static_lock(&default_context_lock);
 
 	if (!timestamp_origin.tv_sec)
-		usbi_clock_gettime(USBI_CLOCK_MONOTONIC, &timestamp_origin);
+		usbi_get_monotonic_time(&timestamp_origin);
 
 	if (!context && usbi_default_context) {
 		usbi_dbg("reusing default context");
@@ -2611,7 +2611,7 @@ static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 			log_str(LIBUSB_LOG_LEVEL_DEBUG, "--------------------------------------------------------------------------------" USBI_LOG_LINE_END);
 		}
 
-		usbi_clock_gettime(USBI_CLOCK_MONOTONIC, &timestamp);
+		usbi_get_monotonic_time(&timestamp);
 		TIMESPEC_SUB(&timestamp, &timestamp_origin, &timestamp);
 
 		header_len = snprintf(buf, sizeof(buf),

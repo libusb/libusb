@@ -23,7 +23,6 @@
 #include <assert.h>
 #include <time.h>
 #include <ctype.h>
-#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2180,30 +2179,24 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
 }
 
 #if !defined(HAVE_CLOCK_GETTIME)
-int usbi_clock_gettime(int clk_id, struct timespec *tp) {
+void usbi_get_monotonic_time(struct timespec *tp) {
   mach_timespec_t sys_time;
-  clock_serv_t clock_ref;
 
-  switch (clk_id) {
-  case USBI_CLOCK_REALTIME:
-    /* CLOCK_REALTIME represents time since the epoch */
-    clock_ref = clock_realtime;
-    break;
-  case USBI_CLOCK_MONOTONIC:
-    /* use system boot time as reference for the monotonic clock */
-    clock_ref = clock_monotonic;
-    break;
-  default:
-    errno = EINVAL;
-    return -1;
-  }
-
-  clock_get_time (clock_ref, &sys_time);
+  /* use system boot time as reference for the monotonic clock */
+  clock_get_time (clock_monotonic, &sys_time);
 
   tp->tv_sec  = sys_time.tv_sec;
   tp->tv_nsec = sys_time.tv_nsec;
+}
 
-  return 0;
+void usbi_get_real_time(struct timespec *tp) {
+  mach_timespec_t sys_time;
+
+  /* CLOCK_REALTIME represents time since the epoch */
+  clock_get_time (clock_realtime, &sys_time);
+
+  tp->tv_sec  = sys_time.tv_sec;
+  tp->tv_nsec = sys_time.tv_nsec;
 }
 #endif
 

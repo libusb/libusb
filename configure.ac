@@ -197,13 +197,15 @@ esac
 dnl headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 
-dnl the clock_gettime() function needs certain clock IDs defined
-AC_CHECK_FUNCS([clock_gettime], [have_clock_gettime=yes], [have_clock_gettime=])
-if test "x$have_clock_gettime" = xyes; then
-	AC_CHECK_DECL([CLOCK_REALTIME], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_REALTIME])], [[#include <time.h>]])
-	AC_CHECK_DECL([CLOCK_MONOTONIC], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_MONOTONIC])], [[#include <time.h>]])
-elif test "x$backend" != xdarwin && test "x$backend" != xwindows; then
-	AC_MSG_ERROR([clock_gettime() is required on this platform])
+if test "x$platform" = xposix; then
+	dnl the clock_gettime() function needs certain clock IDs defined
+	AC_CHECK_FUNCS([clock_gettime], [have_clock_gettime=yes], [have_clock_gettime=])
+	if test "x$have_clock_gettime" = xyes; then
+		AC_CHECK_DECL([CLOCK_MONOTONIC], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_MONOTONIC])], [[#include <time.h>]])
+		AC_CHECK_DECL([CLOCK_REALTIME], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_REALTIME])], [[#include <time.h>]])
+	elif test "x$backend" != xdarwin; then
+		AC_MSG_ERROR([clock_gettime() is required on this platform])
+	fi
 fi
 
 dnl eventfd support

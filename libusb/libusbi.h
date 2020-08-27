@@ -488,22 +488,28 @@ static inline void usbi_localize_device_descriptor(struct libusb_device_descript
 }
 
 #ifdef HAVE_CLOCK_GETTIME
-#define USBI_CLOCK_REALTIME	CLOCK_REALTIME
-#define USBI_CLOCK_MONOTONIC	CLOCK_MONOTONIC
-#define usbi_clock_gettime	clock_gettime
+static inline void usbi_get_monotonic_time(struct timespec *tp)
+{
+	int r = clock_gettime(CLOCK_MONOTONIC, tp);
+	assert(r == 0);
+}
+static inline void usbi_get_real_time(struct timespec *tp)
+{
+	int r = clock_gettime(CLOCK_REALTIME, tp);
+	assert(r == 0);
+}
 #else
 /* If the platform doesn't provide the clock_gettime() function, the backend
- * must provide its own implementation.  Two clocks must be supported by the
- * backend: USBI_CLOCK_REALTIME, and USBI_CLOCK_MONOTONIC.
+ * must provide its own clock implementations.  Two clock functions are
+ * required:
  *
- * Description of clocks:
- *   USBI_CLOCK_REALTIME:  clock returns time since system epoch.
- *   USBI_CLOCK_MONOTONIC: clock returns time since unspecified start time
- *			   (usually boot).
+ *   usbi_get_monotonic_time(): returns the time since an unspecified starting
+ *                              point (usually boot) that is monotonically
+ *                              increasing.
+ *   usbi_get_real_time(): returns the time since system epoch.
  */
-#define USBI_CLOCK_REALTIME	0
-#define USBI_CLOCK_MONOTONIC	1
-int usbi_clock_gettime(int clk_id, struct timespec *tp);
+void usbi_get_monotonic_time(struct timespec *tp);
+void usbi_get_real_time(struct timespec *tp);
 #endif
 
 /* in-memory transfer layout:

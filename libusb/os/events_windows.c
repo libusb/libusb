@@ -75,7 +75,6 @@ int usbi_arm_timer(usbi_timer_t *timer, const struct timespec *timeout)
 	struct timespec systime, remaining;
 	FILETIME filetime;
 	LARGE_INTEGER dueTime;
-	int r;
 
 	/* Transfer timeouts are based on the monotonic clock and the waitable
 	 * timers on the system clock. This requires a conversion between the
@@ -85,11 +84,7 @@ int usbi_arm_timer(usbi_timer_t *timer, const struct timespec *timeout)
 	 * be negative and thus an absolute system time in the past will be set.
 	 * This works just as intended because the timer becomes signalled
 	 * immediately. */
-	r = usbi_clock_gettime(USBI_CLOCK_MONOTONIC, &systime);
-	if (r < 0) {
-		usbi_err(NULL, "failed to read monotonic clock");
-		return LIBUSB_ERROR_OTHER;
-	}
+	usbi_get_monotonic_time(&systime);
 
 	TIMESPEC_SUB(timeout, &systime, &remaining);
 
