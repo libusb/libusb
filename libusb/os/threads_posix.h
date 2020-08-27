@@ -63,10 +63,7 @@ static inline void usbi_mutex_destroy(usbi_mutex_t *mutex)
 }
 
 typedef pthread_cond_t usbi_cond_t;
-static inline void usbi_cond_init(pthread_cond_t *cond)
-{
-	PTHREAD_CHECK(pthread_cond_init(cond, NULL));
-}
+void usbi_cond_init(pthread_cond_t *cond);
 static inline void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
 {
 	PTHREAD_CHECK(pthread_cond_wait(cond, mutex));

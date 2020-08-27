@@ -202,7 +202,11 @@ if test "x$platform" = xposix; then
 	AC_CHECK_FUNCS([clock_gettime], [have_clock_gettime=yes], [have_clock_gettime=])
 	if test "x$have_clock_gettime" = xyes; then
 		AC_CHECK_DECL([CLOCK_MONOTONIC], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_MONOTONIC])], [[#include <time.h>]])
-		AC_CHECK_DECL([CLOCK_REALTIME], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_REALTIME])], [[#include <time.h>]])
+		dnl use the monotonic clock for condition variable timed waits if possible
+		AC_CHECK_FUNCS([pthread_condattr_setclock], [need_clock_realtime=], [need_clock_realtime=yes])
+		if test "x$need_clock_realtime" = xyes; then
+			AC_CHECK_DECL([CLOCK_REALTIME], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_REALTIME])], [[#include <time.h>]])
+		fi
 	elif test "x$backend" != xdarwin; then
 		AC_MSG_ERROR([clock_gettime() is required on this platform])
 	fi

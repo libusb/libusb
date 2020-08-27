@@ -39,13 +39,31 @@
 # include <sys/lwp.h>
 #endif
 
+void usbi_cond_init(pthread_cond_t *cond)
+{
+#ifdef HAVE_PTHREAD_CONDATTR_SETCLOCK
+	pthread_condattr_t condattr;
+
+	PTHREAD_CHECK(pthread_condattr_init(&condattr));
+	PTHREAD_CHECK(pthread_condattr_setclock(&condattr, CLOCK_MONOTONIC));
+	PTHREAD_CHECK(pthread_cond_init(cond, &condattr));
+	PTHREAD_CHECK(pthread_condattr_destroy(&condattr));
+#else
+	PTHREAD_CHECK(pthread_cond_init(cond, NULL));
+#endif
+}
+
 int usbi_cond_timedwait(pthread_cond_t *cond,
 	pthread_mutex_t *mutex, const struct timeval *tv)
 {
 	struct timespec timeout;
 	int r;
 
+#ifdef HAVE_PTHREAD_CONDATTR_SETCLOCK
+	usbi_get_monotonic_time(&timeout);
+#else
 	usbi_get_real_time(&timeout);
+#endif
 
 	timeout.tv_sec += tv->tv_sec;
 	timeout.tv_nsec += tv->tv_usec * 1000L;
