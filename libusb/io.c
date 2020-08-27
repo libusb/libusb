@@ -1261,9 +1261,9 @@ static int calculate_timeout(struct usbi_transfer *itransfer)
 
 	itransfer->timeout.tv_sec += timeout / 1000U;
 	itransfer->timeout.tv_nsec += (timeout % 1000U) * 1000000L;
-	if (itransfer->timeout.tv_nsec >= 1000000000L) {
+	if (itransfer->timeout.tv_nsec >= NSEC_PER_SEC) {
 		++itransfer->timeout.tv_sec;
-		itransfer->timeout.tv_nsec -= 1000000000L;
+		itransfer->timeout.tv_nsec -= NSEC_PER_SEC;
 	}
 
 	return 0;
@@ -2002,6 +2002,7 @@ void API_EXPORTED libusb_unlock_event_waiters(libusb_context *ctx)
  * indicates unlimited timeout.
  * \returns 0 after a transfer completes or another thread stops event handling
  * \returns 1 if the timeout expired
+ * \returns LIBUSB_ERROR_INVALID_PARAM if timeval is invalid
  * \ref libusb_mtasync
  */
 int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
@@ -2009,10 +2010,13 @@ int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 	int r;
 
 	ctx = usbi_get_context(ctx);
-	if (tv == NULL) {
+	if (!tv) {
 		usbi_cond_wait(&ctx->event_waiters_cond, &ctx->event_waiters_lock);
 		return 0;
 	}
+
+	if (!TIMEVAL_IS_VALID(tv))
+		return LIBUSB_ERROR_INVALID_PARAM;
 
 	r = usbi_cond_timedwait(&ctx->event_waiters_cond,
 		&ctx->event_waiters_lock, tv);
@@ -2328,7 +2332,9 @@ static int get_next_timeout(libusb_context *ctx, struct timeval *tv,
  * \param tv the maximum time to block waiting for events, or an all zero
  * timeval struct for non-blocking mode
  * \param completed pointer to completion integer to check, or NULL
- * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_INVALID_PARAM if timeval is invalid
+ * \returns another LIBUSB_ERROR code on other failure
  * \ref libusb_mtasync
  */
 int API_EXPORTED libusb_handle_events_timeout_completed(libusb_context *ctx,
@@ -2336,6 +2342,9 @@ int API_EXPORTED libusb_handle_events_timeout_completed(libusb_context *ctx,
 {
 	int r;
 	struct timeval poll_timeout;
+
+	if (!TIMEVAL_IS_VALID(tv))
+		return LIBUSB_ERROR_INVALID_PARAM;
 
 	ctx = usbi_get_context(ctx);
 	r = get_next_timeout(ctx, tv, &poll_timeout);
@@ -2465,7 +2474,9 @@ int API_EXPORTED libusb_handle_events_completed(libusb_context *ctx,
  * \param ctx the context to operate on, or NULL for the default context
  * \param tv the maximum time to block waiting for events, or zero for
  * non-blocking mode
- * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_INVALID_PARAM if timeval is invalid
+ * \returns another LIBUSB_ERROR code on other failure
  * \ref libusb_mtasync
  */
 int API_EXPORTED libusb_handle_events_locked(libusb_context *ctx,
@@ -2473,6 +2484,9 @@ int API_EXPORTED libusb_handle_events_locked(libusb_context *ctx,
 {
 	int r;
 	struct timeval poll_timeout;
+
+	if (!TIMEVAL_IS_VALID(tv))
+		return LIBUSB_ERROR_INVALID_PARAM;
 
 	ctx = usbi_get_context(ctx);
 	r = get_next_timeout(ctx, tv, &poll_timeout);

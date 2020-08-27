@@ -50,9 +50,9 @@ int usbi_cond_timedwait(pthread_cond_t *cond,
 		return r;
 
 	timeout.tv_sec += tv->tv_sec;
-	timeout.tv_nsec += tv->tv_usec * 1000;
-	while (timeout.tv_nsec >= 1000000000L) {
-		timeout.tv_nsec -= 1000000000L;
+	timeout.tv_nsec += tv->tv_usec * 1000L;
+	if (timeout.tv_nsec >= NSEC_PER_SEC) {
+		timeout.tv_nsec -= NSEC_PER_SEC;
 		timeout.tv_sec++;
 	}
 

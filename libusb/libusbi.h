@@ -228,6 +228,13 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 	return ret;
 }
 
+#define USEC_PER_SEC	1000000L
+#define NSEC_PER_SEC	1000000000L
+
+#define TIMEVAL_IS_VALID(tv)						\
+	((tv)->tv_sec >= 0 &&						\
+	 (tv)->tv_usec >= 0 && (tv)->tv_usec < USEC_PER_SEC)
+
 #define TIMESPEC_IS_SET(ts)	((ts)->tv_sec || (ts)->tv_nsec)
 #define TIMESPEC_CLEAR(ts)	(ts)->tv_sec = (ts)->tv_nsec = 0
 #define TIMESPEC_CMP(a, b, CMP)						\
@@ -240,7 +247,7 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 		(result)->tv_nsec = (a)->tv_nsec - (b)->tv_nsec;	\
 		if ((result)->tv_nsec < 0L) {				\
 			--(result)->tv_sec;				\
-			(result)->tv_nsec += 1000000000L;		\
+			(result)->tv_nsec += NSEC_PER_SEC;		\
 		}							\
 	} while (0)
 
