@@ -40,24 +40,6 @@
 	 ((uint32_t)((p)[1]) <<  8) |	\
 	 ((uint32_t)((p)[0]))))
 
-union config_desc_buf {
-	struct usbi_configuration_descriptor desc;
-	uint8_t buf[LIBUSB_DT_CONFIG_SIZE];
-	uint16_t dummy;		/* Force 2-byte alignment */
-};
-
-union string_desc_buf {
-	struct usbi_string_descriptor desc;
-	uint8_t buf[255];	/* Some devices choke on size > 255 */
-	uint16_t dummy;		/* Force 2-byte alignment */
-};
-
-union bos_desc_buf {
-	struct usbi_bos_descriptor desc;
-	uint8_t buf[LIBUSB_DT_BOS_SIZE];
-	uint16_t dummy;		/* Force 2-byte alignment */
-};
-
 static void parse_descriptor(const void *source, const char *descriptor, void *dest)
 {
 	const uint8_t *sp = source;
@@ -573,7 +555,7 @@ int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
 int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 	struct libusb_config_descriptor **config)
 {
-	union config_desc_buf _config;
+	union usbi_config_desc_buf _config;
 	uint16_t config_len;
 	uint8_t *buf;
 	int r;
@@ -614,7 +596,7 @@ int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 	uint8_t config_index, struct libusb_config_descriptor **config)
 {
-	union config_desc_buf _config;
+	union usbi_config_desc_buf _config;
 	uint16_t config_len;
 	uint8_t *buf;
 	int r;
@@ -676,7 +658,7 @@ int API_EXPORTED libusb_get_config_descriptor_by_value(libusb_device *dev,
 
 	usbi_dbg("value %u", bConfigurationValue);
 	for (idx = 0; idx < dev->device_descriptor.bNumConfigurations; idx++) {
-		union config_desc_buf _config;
+		union usbi_config_desc_buf _config;
 
 		r = get_config_descriptor(dev, idx, _config.buf, sizeof(_config.buf));
 		if (r < 0)
@@ -864,7 +846,7 @@ static int parse_bos(struct libusb_context *ctx,
 int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *dev_handle,
 	struct libusb_bos_descriptor **bos)
 {
-	union bos_desc_buf _bos;
+	union usbi_bos_desc_buf _bos;
 	uint16_t bos_len;
 	uint8_t *bos_data;
 	int r;
@@ -1103,7 +1085,7 @@ void API_EXPORTED libusb_free_container_id_descriptor(
 int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_handle,
 	uint8_t desc_index, unsigned char *data, int length)
 {
-	union string_desc_buf str;
+	union usbi_string_desc_buf str;
 	int r, si, di;
 	uint16_t langid, wdata;
 

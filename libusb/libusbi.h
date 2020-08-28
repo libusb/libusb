@@ -630,7 +630,7 @@ struct usbi_interface_descriptor {
 struct usbi_string_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
-	uint16_t wData[];
+	uint16_t wData[ZERO_SIZED_ARRAY];
 } LIBUSB_PACKED;
 
 struct usbi_bos_descriptor {
@@ -643,6 +643,24 @@ struct usbi_bos_descriptor {
 #ifdef _MSC_VER
 #pragma pack(pop)
 #endif
+
+union usbi_config_desc_buf {
+        struct usbi_configuration_descriptor desc;
+        uint8_t buf[LIBUSB_DT_CONFIG_SIZE];
+        uint16_t align;         /* Force 2-byte alignment */
+};
+
+union usbi_string_desc_buf {
+        struct usbi_string_descriptor desc;
+        uint8_t buf[255];       /* Some devices choke on size > 255 */
+        uint16_t align;         /* Force 2-byte alignment */
+};
+
+union usbi_bos_desc_buf {
+        struct usbi_bos_descriptor desc;
+        uint8_t buf[LIBUSB_DT_BOS_SIZE];
+        uint16_t align;         /* Force 2-byte alignment */
+};
 
 /* shared data and functions */
 
