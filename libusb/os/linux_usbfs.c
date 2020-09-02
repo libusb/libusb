@@ -95,8 +95,10 @@ static int sysfs_available = -1;
 /* how many times have we initted (and not exited) ? */
 static int init_count = 0;
 
+#ifdef __ANDROID__
 /* is no authority to operate usb device directly */
 static int weak_authority = 0;
+#endif
 
 /* Serialize hotplug start/stop */
 static usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
@@ -384,9 +386,11 @@ static int op_init(struct libusb_context *ctx)
 		}
 	}
 
+#ifdef __ANDROID__
 	if (weak_authority) {
 		return LIBUSB_SUCCESS;
 	}
+#endif
 
 	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	r = LIBUSB_SUCCESS;
