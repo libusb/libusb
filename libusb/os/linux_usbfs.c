@@ -96,7 +96,7 @@ static int sysfs_available = -1;
 static int init_count = 0;
 
 #ifdef __ANDROID__
-/* is no authority to operate usb device directly */
+/* have no authority to operate usb device directly */
 static int weak_authority = 0;
 #endif
 
@@ -429,7 +429,7 @@ static int op_set_option(struct libusb_context *ctx, enum libusb_option option, 
 	UNUSED(ctx);
 	UNUSED(ap);
 
-	switch ((int)option) {
+	switch (option) {
 #ifdef __ANDROID__
 	case LIBUSB_OPTION_WEAK_AUTHORITY:
 		usbi_dbg("set libusb has weak authority");
