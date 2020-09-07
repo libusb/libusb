@@ -863,6 +863,26 @@ static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 	return LIBUSB_SUCCESS;
 }
 
+static enum libusb_speed usbfs_get_speed(struct libusb_context *ctx, int fd)
+{
+	int r;
+
+	r = ioctl(fd, IOCTL_USBFS_GET_SPEED, NULL);
+	switch (r) {
+	case USBFS_SPEED_UNKNOWN:	return LIBUSB_SPEED_UNKNOWN;
+	case USBFS_SPEED_LOW:		return LIBUSB_SPEED_LOW;
+	case USBFS_SPEED_FULL:		return LIBUSB_SPEED_FULL;
+	case USBFS_SPEED_HIGH:		return LIBUSB_SPEED_HIGH;
+	case USBFS_SPEED_WIRELESS:	return LIBUSB_SPEED_HIGH;
+	case USBFS_SPEED_SUPER:		return LIBUSB_SPEED_SUPER;
+	case USBFS_SPEED_SUPER_PLUS:	return LIBUSB_SPEED_SUPER_PLUS;
+	default:
+		usbi_warn(ctx, "Error getting device speed: %d", r);
+	}
+
+	return LIBUSB_SPEED_UNKNOWN;
+}
+
 static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	uint8_t devaddr, const char *sysfs_dir, int wrapped_fd)
 {
@@ -893,6 +913,8 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 				usbi_warn(ctx, "unknown device speed: %d Mbps", speed);
 			}
 		}
+	} else if (wrapped_fd >= 0) {
+		dev->speed = usbfs_get_speed(ctx, wrapped_fd);
 	}
 
 	/* cache descriptors in memory */
