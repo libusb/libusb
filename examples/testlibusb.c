@@ -164,8 +164,18 @@ static void print_device(libusb_device *dev, libusb_device_handle *handle)
 {
 	struct libusb_device_descriptor desc;
 	unsigned char string[256];
+	const char *speed;
 	int ret;
 	uint8_t i;
+
+	switch (libusb_get_device_speed(dev)) {
+	case LIBUSB_SPEED_LOW:		speed = "1.5M"; break;
+	case LIBUSB_SPEED_FULL:		speed = "12M"; break;
+	case LIBUSB_SPEED_HIGH:		speed = "480M"; break;
+	case LIBUSB_SPEED_SUPER:	speed = "5G"; break;
+	case LIBUSB_SPEED_SUPER_PLUS:	speed = "10G"; break;
+	default:			speed = "Unknown";
+	}
 
 	ret = libusb_get_device_descriptor(dev, &desc);
 	if (ret < 0) {
@@ -173,9 +183,9 @@ static void print_device(libusb_device *dev, libusb_device_handle *handle)
 		return;
 	}
 
-	printf("Dev (bus %u, device %u): %04X - %04X\n",
+	printf("Dev (bus %u, device %u): %04X - %04X speed: %s\n",
 	       libusb_get_bus_number(dev), libusb_get_device_address(dev),
-	       desc.idVendor, desc.idProduct);
+	       desc.idVendor, desc.idProduct, speed);
 
 	if (!handle)
 		libusb_open(dev, &handle);
