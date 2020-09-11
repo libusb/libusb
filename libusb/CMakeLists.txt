@@ -17,7 +17,7 @@ if (UNIX)
             os/events_posix.c
             )
 
-    target_link_libraries(libusb pthread)
+    target_link_libraries(libusb android log)
 endif (UNIX)
 
 include_directories(../android ../ )
