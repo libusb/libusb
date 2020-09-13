@@ -224,6 +224,7 @@ static inline void list_splice_front(struct list_head *list, struct list_head *h
 {
 	list->next->prev = head;
 	list->prev->next = head->next;
+	head->next->prev = list->prev;
 	head->next = list->next;
 }
 
