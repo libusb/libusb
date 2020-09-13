@@ -297,7 +297,7 @@ void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size)
 	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	OVERLAPPED *overlapped = &transfer_priv->overlapped;
 
-	usbi_dbg("transfer %p, length %lu", USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer), size);
+	usbi_dbg("transfer %p, length %lu", USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer), ULONG_CAST(size));
 
 	overlapped->Internal = (ULONG_PTR)STATUS_SUCCESS;
 	overlapped->InternalHigh = (ULONG_PTR)size;
