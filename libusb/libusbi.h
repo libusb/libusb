@@ -203,8 +203,10 @@ static inline void list_del(struct list_head *entry)
 
 static inline void list_cut(struct list_head *list, struct list_head *head)
 {
-	if (list_empty(head))
+	if (list_empty(head)) {
+		list_init(list);
 		return;
+	}
 
 	list->next = head->next;
 	list->next->prev = list;
@@ -212,6 +214,13 @@ static inline void list_cut(struct list_head *list, struct list_head *head)
 	list->prev->next = list;
 
 	list_init(head);
+}
+
+static inline void list_splice_front(struct list_head *list, struct list_head *head)
+{
+	list->next->prev = head;
+	list->prev->next = head->next;
+	head->next = list->next;
 }
 
 static inline void *usbi_reallocf(void *ptr, size_t size)
@@ -1306,11 +1315,17 @@ extern const struct usbi_os_backend usbi_backend;
 #define for_each_open_device(ctx, h) \
 	for_each_helper(h, &(ctx)->open_devs, struct libusb_device_handle)
 
+#define __for_each_transfer(list, t) \
+	for_each_helper(t, (list), struct usbi_transfer)
+
 #define for_each_transfer(ctx, t) \
-	for_each_helper(t, &(ctx)->flying_transfers, struct usbi_transfer)
+	__for_each_transfer(&(ctx)->flying_transfers, t)
+
+#define __for_each_transfer_safe(list, t, n) \
+	for_each_safe_helper(t, n, (list), struct usbi_transfer)
 
 #define for_each_transfer_safe(ctx, t, n) \
-	for_each_safe_helper(t, n, &(ctx)->flying_transfers, struct usbi_transfer)
+	__for_each_transfer_safe(&(ctx)->flying_transfers, t, n)
 
 #define for_each_event_source(ctx, e) \
 	for_each_helper(e, &(ctx)->event_sources, struct usbi_event_source)

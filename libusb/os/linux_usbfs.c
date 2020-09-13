@@ -2654,6 +2654,7 @@ static int op_handle_events(struct libusb_context *ctx,
 		struct pollfd *pollfd = &fds[n];
 		struct libusb_device_handle *handle;
 		struct linux_device_handle_priv *hpriv = NULL;
+		int reap_count;
 
 		if (!pollfd->revents)
 			continue;
@@ -2696,9 +2697,11 @@ static int op_handle_events(struct libusb_context *ctx,
 			continue;
 		}
 
+		reap_count = 0;
 		do {
 			r = reap_for_handle(handle);
-		} while (r == 0);
+		} while (r == 0 && ++reap_count <= 25);
+
 		if (r == 1 || r == LIBUSB_ERROR_NO_DEVICE)
 			continue;
 		else if (r < 0)
