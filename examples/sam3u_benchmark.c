@@ -22,23 +22,53 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <config.h>
+
 #include <errno.h>
 #include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <time.h>
 
 #include "libusb.h"
-
 
 #define EP_DATA_IN	0x82
 #define EP_ISO_IN	0x86
 
-static int do_exit = 0;
+static volatile sig_atomic_t do_exit = 0;
 static struct libusb_device_handle *devh = NULL;
 
 static unsigned long num_bytes = 0, num_xfer = 0;
 static struct timeval tv_start;
+
+static void get_timestamp(struct timeval *tv)
+{
+#if defined(PLATFORM_WINDOWS)
+	static LARGE_INTEGER frequency;
+	LARGE_INTEGER counter;
+
+	if (!frequency.QuadPart)
+		QueryPerformanceFrequency(&frequency);
+
+	QueryPerformanceCounter(&counter);
+	counter.QuadPart *= 1000000;
+	counter.QuadPart /= frequency.QuadPart;
+
+	tv->tv_sec = (long)(counter.QuadPart / 1000000ULL);
+	tv->tv_usec = (long)(counter.QuadPart % 1000000ULL);
+#elif defined(HAVE_CLOCK_GETTIME)
+	struct timespec ts;
+
+	(void)clock_gettime(CLOCK_MONOTONIC, &ts);
+	tv->tv_sec = ts.tv_sec;
+	tv->tv_usec = ts.tv_nsec / 1000L;
+#else
+	gettimeofday(tv, NULL);
+#endif
+}
 
 static void LIBUSB_CALL cb_xfr(struct libusb_transfer *xfr)
 {
@@ -103,7 +133,7 @@ static int benchmark_in(uint8_t ep)
 		libusb_fill_bulk_transfer(xfr, devh, ep, buf,
 				sizeof(buf), cb_xfr, NULL, 0);
 
-	gettimeofday(&tv_start, NULL);
+	get_timestamp(&tv_start);
 
 	/* NOTE: To reach maximum possible performance the program must
 	 * submit *multiple* transfers here, not just one.
@@ -127,7 +157,7 @@ static void measure(void)
 	struct timeval tv_stop;
 	unsigned long diff_msec;
 
-	gettimeofday(&tv_stop, NULL);
+	get_timestamp(&tv_stop);
 
 	diff_msec = (tv_stop.tv_sec - tv_start.tv_sec) * 1000L;
 	diff_msec += (tv_stop.tv_usec - tv_start.tv_usec) / 1000L;
@@ -138,23 +168,26 @@ static void measure(void)
 
 static void sig_hdlr(int signum)
 {
-	switch (signum) {
-	case SIGINT:
-		measure();
-		do_exit = 1;
-		break;
-	}
+	(void)signum;
+
+	measure();
+	do_exit = 1;
 }
 
 int main(void)
 {
 	int rc;
+
+#if defined(PLATFORM_POSIX)
 	struct sigaction sigact;
 
 	sigact.sa_handler = sig_hdlr;
 	sigemptyset(&sigact.sa_mask);
 	sigact.sa_flags = 0;
-	sigaction(SIGINT, &sigact, NULL);
+	(void)sigaction(SIGINT, &sigact, NULL);
+#else
+	(void)signal(SIGINT, sig_hdlr);
+#endif
 
 	rc = libusb_init(NULL);
 	if (rc < 0) {
@@ -184,7 +217,7 @@ int main(void)
 
 	/* Measurement has already been done by the signal handler. */
 
-	libusb_release_interface(devh, 0);
+	libusb_release_interface(devh, 2);
 out:
 	if (devh)
 		libusb_close(devh);

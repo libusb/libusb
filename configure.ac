@@ -325,10 +325,6 @@ AC_ARG_ENABLE([examples-build],
 	[AS_HELP_STRING([--enable-examples-build], [build example applications [default=no]])],
 	[build_examples=$enableval],
 	[build_examples=no])
-if test "x$build_examples" != xno; then
-	dnl sigaction needed for some example programs
-	AC_CHECK_FUNC([sigaction], [have_sigaction=yes], [have_sigaction=])
-fi
 
 dnl Tests build
 AC_ARG_ENABLE([tests-build],
@@ -339,7 +335,6 @@ AC_ARG_ENABLE([tests-build],
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != xno])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != xno])
 AM_CONDITIONAL([CREATE_IMPORT_LIB], [test "x$create_import_lib" = xyes])
-AM_CONDITIONAL([HAVE_SIGACTION], [test "x$have_sigaction" = xyes])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = xdarwin])
 AM_CONDITIONAL([OS_HAIKU], [test "x$backend" = xhaiku])
 AM_CONDITIONAL([OS_LINUX], [test "x$backend" = xlinux])
