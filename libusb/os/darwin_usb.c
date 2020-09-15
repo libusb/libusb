@@ -2147,31 +2147,34 @@ static enum libusb_transfer_status darwin_transfer_status (struct usbi_transfer 
 static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_transfer_priv *tpriv = usbi_get_transfer_priv(itransfer);
-  bool isIsoc      = LIBUSB_TRANSFER_TYPE_ISOCHRONOUS == transfer->type;
-  bool isBulk      = LIBUSB_TRANSFER_TYPE_BULK == transfer->type;
-  bool isControl   = LIBUSB_TRANSFER_TYPE_CONTROL == transfer->type;
-  bool isInterrupt = LIBUSB_TRANSFER_TYPE_INTERRUPT == transfer->type;
-  int i;
+  const unsigned char max_transfer_type = LIBUSB_TRANSFER_TYPE_BULK_STREAM;
+  const char *transfer_types[max_transfer_type + 1] = {"control", "isoc", "bulk", "interrupt", "bulk-stream"};
+  bool is_isoc = LIBUSB_TRANSFER_TYPE_ISOCHRONOUS == transfer->type;
 
-  if (!isIsoc && !isBulk && !isControl && !isInterrupt) {
+  if (transfer->type > max_transfer_type) {
     usbi_err (TRANSFER_CTX(transfer), "unknown endpoint type %d", transfer->type);
     return LIBUSB_ERROR_INVALID_PARAM;
   }
 
-  usbi_dbg ("handling %s completion with kernel status %d",
-             isControl ? "control" : isBulk ? "bulk" : isIsoc ? "isoc" : "interrupt", tpriv->result);
+  if (NULL == tpriv) {
+    usbi_err (TRANSFER_CTX(transfer), "malformed request is missing transfer priv");
+    return LIBUSB_ERROR_INVALID_PARAM;
+  }
+
+  usbi_dbg ("handling transfer completion type %s with kernel status %d", transfer_types[transfer->type], tpriv->result);
 
   if (kIOReturnSuccess == tpriv->result || kIOReturnUnderrun == tpriv->result) {
-    if (isIsoc && tpriv->isoc_framelist) {
+    if (is_isoc && tpriv->isoc_framelist) {
       /* copy isochronous results back */
 
-      for (i = 0; i < transfer->num_iso_packets ; i++) {
+      for (int i = 0; i < transfer->num_iso_packets ; i++) {
         struct libusb_iso_packet_descriptor *lib_desc = &transfer->iso_packet_desc[i];
         lib_desc->status = darwin_transfer_status (itransfer, tpriv->isoc_framelist[i].frStatus);
         lib_desc->actual_length = tpriv->isoc_framelist[i].frActCount;
       }
-    } else if (!isIsoc)
+    } else if (!is_isoc) {
       itransfer->transferred += tpriv->size;
+    }
   }
 
   /* it is ok to handle cancelled transfers without calling usbi_handle_transfer_cancellation (we catch timeout transfers) */
