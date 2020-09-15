@@ -3,7 +3,7 @@
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  * Copyright © 2019 Nathan Hjelm <hjelmn@cs.umm.edu>
- * Copyright © 2019 Google LLC. All rights reserved.
+ * Copyright © 2019-2020 Google LLC. All rights reserved.
  * Copyright © 2020 Chris Dickens <christopher.a.dickens@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -228,8 +228,13 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 	return ret;
 }
 
+#if !defined(USEC_PER_SEC)
 #define USEC_PER_SEC	1000000L
+#endif
+
+#if !defined(NSEC_PER_SEC)
 #define NSEC_PER_SEC	1000000000L
+#endif
 
 #define TIMEVAL_IS_VALID(tv)						\
 	((tv)->tv_sec >= 0 &&						\
