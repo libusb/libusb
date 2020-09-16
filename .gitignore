@@ -6,6 +6,9 @@ Makefile.in
 *.la
 *.lo
 *.o
+*.js
+*.wasm
+*.html
 libtool
 ltmain.sh
 missing

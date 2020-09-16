@@ -23,6 +23,8 @@
 
 #include "libusbi.h"
 
+void emscripten_sleep(int);
+
 /**
  * \page libusb_io Synchronous and asynchronous device I/O
  *
@@ -2065,6 +2067,7 @@ static void handle_timeouts_locked(struct libusb_context *ctx)
 
 	/* iterate through flying transfers list, finding all transfers that
 	 * have expired timeouts */
+	emscripten_sleep(0);
 	for_each_transfer(ctx, itransfer) {
 		struct timespec *cur_ts = &itransfer->timeout;
 

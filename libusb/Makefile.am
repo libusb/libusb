@@ -20,6 +20,7 @@ OS_DARWIN_SRC = os/darwin_usb.h os/darwin_usb.c
 OS_HAIKU_SRC = os/haiku_usb.h os/haiku_usb_backend.cpp \
 	       os/haiku_pollfs.cpp os/haiku_usb_raw.h os/haiku_usb_raw.cpp
 OS_LINUX_SRC = os/linux_usbfs.h os/linux_usbfs.c
+OS_EMSCRIPTEN_SRC = os/emscripten_webusb.cpp
 OS_NETBSD_SRC = os/netbsd_usb.c
 OS_NULL_SRC = os/null_usb.c
 OS_OPENBSD_SRC = os/openbsd_usb.c
@@ -46,6 +47,10 @@ OS_SRC += os/linux_udev.c
 else
 OS_SRC += os/linux_netlink.c
 endif
+endif
+
+if OS_EMSCRIPTEN
+OS_SRC = $(OS_EMSCRIPTEN_SRC)
 endif
 
 if OS_NETBSD

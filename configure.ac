@@ -83,6 +83,15 @@ case $host in
 	backend=haiku
 	platform=posix
 	;;
+wasm32-**)
+	AC_MSG_RESULT([Emscripten])
+	backend=emscripten
+	poll=posix
+	threads=posix
+	EXTRA_CFLAGS="--bind -s ASYNCIFY=1 -g -s ASSERTIONS -fdebug-prefix-map=/mnt/c/=C:/ -fdebug-prefix-map=/home/rreverser/emsdk/=C:/Users/rreverser/Projects/emsdk/ -s PROXY_TO_PTHREAD -s USE_PTHREADS -s INVOKE_RUN=0"
+	LT_LDFLAGS="${LT_LDFLAGS} --proxy-to-worker"
+	AC_SUBST(EXEEXT, [.html])
+	;;
 *-linux* | *-uclinux*)
 	dnl on Android Linux, some functions are in different places
 	case $host in
@@ -279,7 +288,7 @@ if test "x$backend" = xlinux || test "x$backend" = xsunos; then
 fi
 
 dnl timerfd support
-if test "x$backend" = xlinux || test "x$backend" = xsunos; then
+if test "x$backend" = xlinux || test "x$backend" = xsunos || test "x$backend" = xemscripten; then
 	AC_ARG_ENABLE([timerfd],
 		[AS_HELP_STRING([--enable-timerfd], [use timerfd for timing [default=auto]])],
 		[use_timerfd=$enableval],
@@ -372,6 +381,7 @@ AM_CONDITIONAL([OS_NULL], [test "x$backend" = xnull])
 AM_CONDITIONAL([OS_OPENBSD], [test "x$backend" = xopenbsd])
 AM_CONDITIONAL([OS_SUNOS], [test "x$backend" = xsunos])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" = xwindows])
+AM_CONDITIONAL([OS_EMSCRIPTEN], [test "x$backend" = xemscripten])
 AM_CONDITIONAL([PLATFORM_POSIX], [test "x$platform" = xposix])
 AM_CONDITIONAL([PLATFORM_WINDOWS], [test "x$platform" = xwindows])
 AM_CONDITIONAL([USE_UDEV], [test "x$use_udev" = xyes])
