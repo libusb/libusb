@@ -355,22 +355,24 @@ namespace
 			{
 			case LIBUSB_REQUEST_TYPE_STANDARD:
 				if (setup->bRequest == LIBUSB_REQUEST_GET_DESCRIPTOR && setup->wValue >> 8 == LIBUSB_DT_STRING) {
-					val str = val::undefined();
+					const char *propName = nullptr;
 					switch (setup->wValue & 0xFF) {
 						case 1:
-							str = (*web_usb_device)["manufacturerName"];
+							propName = "manufacturerName";
 							break;
 						case 2:
-							str = (*web_usb_device)["productName"];
+							propName = "productName";
 							break;
 						case 3:
-							str = (*web_usb_device)["serialNumber"];
+							propName = "serialNumber";
 							break;
 					}
-					if (str.isNull()) {
-						str = val("");
-					}
-					if (!str.isUndefined()) {
+					if (propName != nullptr) {
+						EM_ASM({ console.log("wIndex:", $0); }, setup->wIndex);
+						val str = (*web_usb_device)[propName];
+						if (str.isNull()) {
+							str = val("");
+						}
 						new (get_web_usb_transfer_result(itransfer)) val(std::move(str));
 						usbi_signal_transfer_completion(itransfer);
 						return LIBUSB_SUCCESS;
