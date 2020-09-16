@@ -266,7 +266,7 @@ namespace
 		return em_get_config_descriptor_impl((*get_web_usb_device(dev))["configurations"][idx], buf, len);
 	}
 
-	int em_get_configuration(struct libusb_device_handle *dev_handle, uint8_t *config)
+	int em_get_configuration(libusb_device_handle *dev_handle, uint8_t *config)
 	{
 		auto web_usb_config = (*get_web_usb_device(dev_handle->dev))["configuration"];
 		if (!web_usb_config.isNull())
@@ -460,7 +460,7 @@ namespace
 	}
 
 	int
-	em_handle_events(struct libusb_context *ctx, struct pollfd *fds, usbi_nfds_t nfds, int num_ready)
+	em_handle_events(libusb_context *ctx, void *event_data, unsigned int count, unsigned int num_ready)
 	{
 		EM_ASM({ debugger; });
 		return LIBUSB_SUCCESS;
@@ -524,7 +524,7 @@ namespace
 	}
 
 	void
-	em_clear_transfer_priv(struct usbi_transfer *itransfer)
+	em_clear_transfer_priv(usbi_transfer *itransfer)
 	{
 		delete get_web_usb_transfer_result(itransfer);
 	}

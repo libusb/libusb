@@ -86,8 +86,7 @@ case $host in
 wasm32-**)
 	AC_MSG_RESULT([Emscripten])
 	backend=emscripten
-	poll=posix
-	threads=posix
+	platform=posix
 	EXTRA_CFLAGS="--bind -s ASYNCIFY=1 -g -s ASSERTIONS -fdebug-prefix-map=/mnt/c/=C:/ -fdebug-prefix-map=/home/rreverser/emsdk/=C:/Users/rreverser/Projects/emsdk/ -s PROXY_TO_PTHREAD -s USE_PTHREADS -s INVOKE_RUN=0"
 	LT_LDFLAGS="${LT_LDFLAGS} --proxy-to-worker"
 	AC_SUBST(EXEEXT, [.html])
