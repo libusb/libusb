@@ -83,6 +83,11 @@ case $host in
 	backend=haiku
 	platform=posix
 	;;
+wasm32-**)
+	AC_MSG_RESULT([Emscripten])
+	backend=emscripten
+	platform=posix
+	;;
 *-linux* | *-uclinux*)
 	dnl on Android Linux, some functions are in different places
 	case $host in
@@ -138,7 +143,11 @@ esac
 if test "x$platform" = xposix; then
 	AC_DEFINE([PLATFORM_POSIX], [1], [Define to 1 if compiling for a POSIX platform.])
 	AC_CHECK_TYPES([nfds_t], [], [], [[#include <poll.h>]])
-	AC_CHECK_FUNCS([pipe2])
+	if test "x$backend" != xemscripten; then
+		# pipe2 is detected as present on Emscripten, but it isn't actually ported and always
+		# returns an error. https://github.com/emscripten-core/emscripten/issues/14824
+		AC_CHECK_FUNCS([pipe2])
+	fi
 	dnl Some compilers do not support the '-pthread' option so check for it here
 	saved_CFLAGS="${CFLAGS}"
 	CFLAGS="-Wall -Werror -pthread"
@@ -216,6 +225,11 @@ windows)
 	AC_CHECK_TYPES([struct timespec], [], [], [[#include <time.h>]])
 	AC_DEFINE([_WIN32_WINNT], [_WIN32_WINNT_VISTA], [Define to the oldest supported Windows version.])
 	LT_LDFLAGS="${LT_LDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
+	;;
+emscripten)
+	AC_SUBST(EXEEXT, [.html])
+	# Note: LT_LDFLAGS is not enough here because we need link flags for executable.
+	AM_LDFLAGS="${AM_LDFLAGS} --bind -s ASYNCIFY -s ASSERTIONS -s ALLOW_MEMORY_GROWTH -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=['callMain']"
 	;;
 *)
 	dnl no special handling required
@@ -372,6 +386,7 @@ AM_CONDITIONAL([OS_NULL], [test "x$backend" = xnull])
 AM_CONDITIONAL([OS_OPENBSD], [test "x$backend" = xopenbsd])
 AM_CONDITIONAL([OS_SUNOS], [test "x$backend" = xsunos])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$backend" = xwindows])
+AM_CONDITIONAL([OS_EMSCRIPTEN], [test "x$backend" = xemscripten])
 AM_CONDITIONAL([PLATFORM_POSIX], [test "x$platform" = xposix])
 AM_CONDITIONAL([PLATFORM_WINDOWS], [test "x$platform" = xwindows])
 AM_CONDITIONAL([USE_UDEV], [test "x$use_udev" = xyes])
@@ -399,6 +414,7 @@ AM_CXXFLAGS="-std=${c_dialect}++11 ${EXTRA_CFLAGS} ${SHARED_CFLAGS} -Wmissing-de
 AC_SUBST(AM_CXXFLAGS)
 
 AC_SUBST(LT_LDFLAGS)
+AC_SUBST(AM_LDFLAGS)
 
 AC_SUBST([EXTRA_LDFLAGS])
 
