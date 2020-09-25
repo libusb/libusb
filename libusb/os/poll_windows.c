@@ -151,7 +151,7 @@ struct winfd usbi_create_fd(void)
 
 void usbi_inc_fds_ref(struct pollfd *fds, unsigned int nfds)
 {
-	int n;
+	unsigned int n;
 	usbi_mutex_static_lock(&fd_table_lock);
 	for (n = 0; n < nfds; ++n) {
 		fd_table[fds[n].fd]->refcount++;
@@ -161,7 +161,7 @@ void usbi_inc_fds_ref(struct pollfd *fds, unsigned int nfds)
 
 void usbi_dec_fds_ref(struct pollfd *fds, unsigned int nfds)
 {
-	int n;
+	unsigned int n;
 	struct file_descriptor *fd;
 
 	usbi_mutex_static_lock(&fd_table_lock);

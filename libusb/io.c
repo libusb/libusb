@@ -2100,7 +2100,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	POLL_NFDS_TYPE nfds = 0;
 	POLL_NFDS_TYPE internal_nfds;
 	struct pollfd *fds = NULL;
-	int i = -1;
+	unsigned int i = 0;
 	int timeout_ms;
 
 	/* prevent attempts to recursively handle events (e.g. calling into
@@ -2154,9 +2154,9 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 
 		list_for_each_entry(ipollfd, &ctx->ipollfds, list, struct usbi_pollfd) {
 			struct libusb_pollfd *pollfd = &ipollfd->pollfd;
-			i++;
 			ctx->pollfds[i].fd = pollfd->fd;
 			ctx->pollfds[i].events = pollfd->events;
+			++i;
 		}
 
 		/* reset the flag now that we have the updated list */
