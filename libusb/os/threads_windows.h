@@ -21,11 +21,7 @@
 #ifndef LIBUSB_THREADS_WINDOWS_H
 #define LIBUSB_THREADS_WINDOWS_H
 
-#define WINAPI_CHECK(expr)			\
-	do {					\
-		BOOL winapi_result = (expr);	\
-		assert(winapi_result != 0);	\
-	} while (0)
+#define WINAPI_CHECK(expression)	ASSERT_NE(expression, 0)
 
 #define USBI_MUTEX_INITIALIZER	0L
 typedef LONG usbi_mutex_static_t;

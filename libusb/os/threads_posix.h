@@ -23,11 +23,7 @@
 
 #include <pthread.h>
 
-#define PTHREAD_CHECK(expr)			\
-	do {					\
-		int pthread_result = (expr);	\
-		assert(pthread_result == 0);	\
-	} while (0)
+#define PTHREAD_CHECK(expression)	ASSERT_EQ(expression, 0)
 
 #define USBI_MUTEX_INITIALIZER	PTHREAD_MUTEX_INITIALIZER
 typedef pthread_mutex_t usbi_mutex_static_t;

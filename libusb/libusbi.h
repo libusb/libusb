@@ -44,6 +44,14 @@
 #define static_assert(cond, msg) _Static_assert(cond, msg)
 #endif
 
+#ifdef NDEBUG
+#define ASSERT_EQ(expression, value)	(void)expression
+#define ASSERT_NE(expression, value)	(void)expression
+#else
+#define ASSERT_EQ(expression, value)	assert(expression == value)
+#define ASSERT_NE(expression, value)	assert(expression != value)
+#endif
+
 #define container_of(ptr, type, member) \
 	((type *)((uintptr_t)(ptr) - (uintptr_t)offsetof(type, member)))
 
@@ -495,13 +503,11 @@ static inline void usbi_localize_device_descriptor(struct libusb_device_descript
 #ifdef HAVE_CLOCK_GETTIME
 static inline void usbi_get_monotonic_time(struct timespec *tp)
 {
-	int r = clock_gettime(CLOCK_MONOTONIC, tp);
-	assert(r == 0);
+	ASSERT_EQ(clock_gettime(CLOCK_MONOTONIC, tp), 0);
 }
 static inline void usbi_get_real_time(struct timespec *tp)
 {
-	int r = clock_gettime(CLOCK_REALTIME, tp);
-	assert(r == 0);
+	ASSERT_EQ(clock_gettime(CLOCK_REALTIME, tp), 0);
 }
 #else
 /* If the platform doesn't provide the clock_gettime() function, the backend
