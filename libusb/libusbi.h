@@ -1363,6 +1363,9 @@ extern const struct usbi_os_backend usbi_backend;
 #define for_each_transfer_safe(ctx, t, n) \
 	__for_each_transfer_safe(&(ctx)->flying_transfers, t, n)
 
+#define __for_each_completed_transfer_safe(list, t, n) \
+	list_for_each_entry_safe(t, n, (list), completed_list, struct usbi_transfer)
+
 #define for_each_event_source(ctx, e) \
 	for_each_helper(e, &(ctx)->event_sources, struct usbi_event_source)
 

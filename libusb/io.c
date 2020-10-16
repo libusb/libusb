@@ -2112,7 +2112,7 @@ static int handle_event_trigger(struct libusb_context *ctx)
 		list_cut(&completed_transfers, &ctx->completed_transfers);
 		usbi_mutex_unlock(&ctx->event_data_lock);
 
-		__for_each_transfer_safe(&completed_transfers, itransfer, tmp) {
+		__for_each_completed_transfer_safe(&completed_transfers, itransfer, tmp) {
 			list_del(&itransfer->completed_list);
 			r = usbi_backend.handle_transfer_completion(itransfer);
 			if (r) {
