@@ -81,7 +81,7 @@ static void unload_usbdk_helper_dll(void)
 
 static int load_usbdk_helper_dll(struct libusb_context *ctx)
 {
-	usbdk_helper.module = LoadLibraryA("UsbDkHelper");
+	usbdk_helper.module = load_system_library(ctx, "UsbDkHelper");
 	if (usbdk_helper.module == NULL) {
 		usbi_err(ctx, "Failed to load UsbDkHelper.dll: %s", windows_error_str(0));
 		return LIBUSB_ERROR_NOT_FOUND;
@@ -160,7 +160,7 @@ static int usbdk_init(struct libusb_context *ctx)
 	SC_HANDLE serviceHandle;
 	HMODULE h;
 
-	h = LoadLibraryA("Advapi32");
+	h = load_system_library(ctx, "Advapi32");
 	if (h == NULL) {
 		usbi_warn(ctx, "failed to open Advapi32\n");
 		return LIBUSB_ERROR_OTHER;

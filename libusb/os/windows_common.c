@@ -95,6 +95,35 @@ const char *windows_error_str(DWORD error_code)
 }
 #endif
 
+/*
+ * Dynamically loads a DLL from the Windows system directory.  Unlike the
+ * LoadLibraryA() function, this function will not search through any
+ * directories to try and find the library.
+ */
+HMODULE load_system_library(struct libusb_context *ctx, const char *name)
+{
+	char library_path[MAX_PATH];
+	char *filename_start;
+	UINT length;
+
+	length = GetSystemDirectoryA(library_path, sizeof(library_path));
+	if ((length == 0) || (length >= (UINT)sizeof(library_path))) {
+		usbi_err(ctx, "program assertion failed - could not get system directory");
+		return NULL;
+	}
+
+	filename_start = library_path + length;
+	// Append '\' + name + ".dll" + NUL
+	length += 1 + strlen(name) + 4 + 1;
+	if (length >= (UINT)sizeof(library_path)) {
+		usbi_err(ctx, "program assertion failed - library path buffer overflow");
+		return NULL;
+	}
+
+	sprintf(filename_start, "\\%s.dll", name);
+	return LoadLibraryA(library_path);
+}
+
 /* Hash table functions - modified From glibc 2.3.2:
    [Aho,Sethi,Ullman] Compilers: Principles, Techniques and Tools, 1986
    [Knuth]            The Art of Computer Programming, part 3 (6.4)  */

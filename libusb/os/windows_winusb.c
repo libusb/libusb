@@ -146,21 +146,21 @@ static char *normalize_path(const char *path)
 /*
  * Cfgmgr32, AdvAPI32, OLE32 and SetupAPI DLL functions
  */
-static bool init_dlls(void)
+static bool init_dlls(struct libusb_context *ctx)
 {
-	DLL_GET_HANDLE(Cfgmgr32);
+	DLL_GET_HANDLE(ctx, Cfgmgr32);
 	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Parent, true);
 	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Child, true);
 
 	// Prefixed to avoid conflict with header files
-	DLL_GET_HANDLE(AdvAPI32);
+	DLL_GET_HANDLE(ctx, AdvAPI32);
 	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegQueryValueExW, true);
 	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegCloseKey, true);
 
-	DLL_GET_HANDLE(OLE32);
+	DLL_GET_HANDLE(ctx, OLE32);
 	DLL_LOAD_FUNC_PREFIXED(OLE32, p, IIDFromString, true);
 
-	DLL_GET_HANDLE(SetupAPI);
+	DLL_GET_HANDLE(ctx, SetupAPI);
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetClassDevsA, true);
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiEnumDeviceInfo, true);
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiEnumDeviceInterfaces, true);
@@ -643,7 +643,7 @@ static int winusb_init(struct libusb_context *ctx)
 	int i;
 
 	// Load DLL imports
-	if (!init_dlls()) {
+	if (!init_dlls(ctx)) {
 		usbi_err(ctx, "could not resolve DLL functions");
 		return LIBUSB_ERROR_OTHER;
 	}
@@ -2192,7 +2192,7 @@ static bool winusbx_init(struct libusb_context *ctx)
 {
 	HMODULE hWinUSB, hlibusbK;
 
-	hWinUSB = LoadLibraryA("WinUSB");
+	hWinUSB = load_system_library(ctx, "WinUSB");
 	if (hWinUSB != NULL) {
 		WinUSB_Set(hWinUSB, AbortPipe, true);
 		WinUSB_Set(hWinUSB, ControlTransfer, true);
@@ -2231,7 +2231,7 @@ cleanup_winusb:
 		usbi_info(ctx, "WinUSB DLL is not available");
 	}
 
-	hlibusbK = LoadLibraryA("libusbK");
+	hlibusbK = load_system_library(ctx, "libusbK");
 	if (hlibusbK != NULL) {
 		LibK_GetVersion_t pLibK_GetVersion;
 		LibK_GetProcAddress_t pLibK_GetProcAddress;
@@ -3592,9 +3592,7 @@ static int _hid_class_request(struct libusb_device *dev, HANDLE hid_handle, int 
  */
 static bool hid_init(struct libusb_context *ctx)
 {
-	UNUSED(ctx);
-
-	DLL_GET_HANDLE(hid);
+	DLL_GET_HANDLE(ctx, hid);
 
 	DLL_LOAD_FUNC(hid, HidD_GetAttributes, true);
 	DLL_LOAD_FUNC(hid, HidD_GetHidGuid, true);

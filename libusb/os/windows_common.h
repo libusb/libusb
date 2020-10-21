@@ -60,29 +60,29 @@
  * API macros - leveraged from libusb-win32 1.x
  */
 #define DLL_STRINGIFY(s) #s
-#define DLL_LOAD_LIBRARY(name) LoadLibraryA(DLL_STRINGIFY(name))
 
 /*
  * Macros for handling DLL themselves
  */
 #define DLL_HANDLE_NAME(name) __dll_##name##_handle
 
-#define DLL_DECLARE_HANDLE(name)				\
+#define DLL_DECLARE_HANDLE(name)					\
 	static HMODULE DLL_HANDLE_NAME(name)
 
-#define DLL_GET_HANDLE(name)					\
-	do {							\
-		DLL_HANDLE_NAME(name) = DLL_LOAD_LIBRARY(name);	\
-		if (!DLL_HANDLE_NAME(name))			\
-			return false;				\
+#define DLL_GET_HANDLE(ctx, name)					\
+	do {								\
+		DLL_HANDLE_NAME(name) = load_system_library(ctx,	\
+				DLL_STRINGIFY(name));			\
+		if (!DLL_HANDLE_NAME(name))				\
+			return false;					\
 	} while (0)
 
-#define DLL_FREE_HANDLE(name)					\
-	do {							\
-		if (DLL_HANDLE_NAME(name)) {			\
-			FreeLibrary(DLL_HANDLE_NAME(name));	\
-			DLL_HANDLE_NAME(name) = NULL;		\
-		}						\
+#define DLL_FREE_HANDLE(name)						\
+	do {								\
+		if (DLL_HANDLE_NAME(name)) {				\
+			FreeLibrary(DLL_HANDLE_NAME(name));		\
+			DLL_HANDLE_NAME(name) = NULL;			\
+		}							\
 	} while (0)
 
 /*
@@ -377,6 +377,7 @@ static inline struct winusb_transfer_priv *get_winusb_transfer_priv(struct usbi_
 extern const struct windows_backend usbdk_backend;
 extern const struct windows_backend winusb_backend;
 
+HMODULE load_system_library(struct libusb_context *ctx, const char *name);
 unsigned long htab_hash(const char *str);
 enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS status);
 void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size);
