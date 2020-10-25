@@ -231,6 +231,9 @@ enum libusb_class_code {
 	/** Wireless class */
 	LIBUSB_CLASS_WIRELESS = 0xe0,
 
+	/** Miscellaneous class */
+	LIBUSB_CLASS_MISCELLANEOUS = 0xef,
+
 	/** Application class */
 	LIBUSB_CLASS_APPLICATION = 0xfe,
 
