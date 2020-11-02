@@ -762,20 +762,31 @@ void usbi_disconnect_device(struct libusb_device *dev)
  * to the discovered device list. */
 int usbi_sanitize_device(struct libusb_device *dev)
 {
+    return usbi_sanitize_device_descriptor(DEVICE_CTX(dev), &dev->device_descriptor);
+}
+
+/* Perform sanity checks on a discovered device descriptor. If this
+ * function fails (negative return code), the device with this descriptor should not be added
+ * to the discovered device list. */
+int usbi_sanitize_device_descriptor(libusb_context *ctx, struct libusb_device_descriptor *device_descriptor)
+{
 	uint8_t num_configurations;
 
-	if (dev->device_descriptor.bLength != LIBUSB_DT_DEVICE_SIZE ||
-	    dev->device_descriptor.bDescriptorType != LIBUSB_DT_DEVICE) {
-		usbi_err(DEVICE_CTX(dev), "invalid device descriptor");
+	if (device_descriptor->bLength != LIBUSB_DT_DEVICE_SIZE ||
+		device_descriptor->bDescriptorType != LIBUSB_DT_DEVICE) {
+		if (ctx)
+			usbi_err(ctx, "invalid device descriptor");
 		return LIBUSB_ERROR_IO;
 	}
 
-	num_configurations = dev->device_descriptor.bNumConfigurations;
+	num_configurations = device_descriptor->bNumConfigurations;
 	if (num_configurations > USB_MAXCONFIG) {
-		usbi_err(DEVICE_CTX(dev), "too many configurations");
+		if (ctx)
+			usbi_err(ctx, "too many configurations");
 		return LIBUSB_ERROR_IO;
 	} else if (0 == num_configurations) {
-		usbi_dbg("zero configurations, maybe an unauthorized device");
+		if (ctx)
+			usbi_warn(ctx, "zero configurations, maybe an unauthorized device");
 	}
 
 	return 0;
