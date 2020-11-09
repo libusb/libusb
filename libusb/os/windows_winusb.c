@@ -1100,6 +1100,12 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 				return LIBUSB_ERROR_NO_DEVICE;
 			}
 
+			if ((conn_info.DeviceDescriptor.bLength != LIBUSB_DT_DEVICE_SIZE)
+				 || (conn_info.DeviceDescriptor.bDescriptorType != LIBUSB_DT_DEVICE)) {
+				SleepEx(50, TRUE);
+				continue;
+			}
+
 			static_assert(sizeof(dev->device_descriptor) == sizeof(conn_info.DeviceDescriptor),
 				      "mismatch between libusb and OS device descriptor sizes");
 			memcpy(&dev->device_descriptor, &conn_info.DeviceDescriptor, LIBUSB_DT_DEVICE_SIZE);
@@ -1114,6 +1120,13 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 				SleepEx(50, TRUE);
 			}
 		} while (priv->active_config == 0 && --ginfotimeout >= 0);
+
+		if ((conn_info.DeviceDescriptor.bLength != LIBUSB_DT_DEVICE_SIZE)
+			 || (conn_info.DeviceDescriptor.bDescriptorType != LIBUSB_DT_DEVICE)) {
+			usbi_err(ctx, "device '%s' has invalid descriptor!", priv->dev_id);
+			CloseHandle(hub_handle);
+			return LIBUSB_ERROR_OTHER;
+		}
 
 		if (priv->active_config == 0) {
 			usbi_info(ctx, "0x%x:0x%x found %u configurations but device isn't configured, "
@@ -1717,9 +1730,10 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 
 					*_discdevs = discdevs;
-				} else if (r == LIBUSB_ERROR_NO_DEVICE) {
-					// This can occur if the device was disconnected but Windows hasn't
-					// refreshed its enumeration yet - in that case, we ignore the device
+				} else {
+					// Failed to initialize a single device doesn't stop us from enumerating all other devices,
+					// but we skip it (don't add to list of discovered devices)
+					usbi_warn(ctx, "failed to initialize device '%s'", priv->dev_id);
 					r = LIBUSB_SUCCESS;
 				}
 				break;
