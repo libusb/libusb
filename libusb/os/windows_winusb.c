@@ -1103,11 +1103,6 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			static_assert(sizeof(dev->device_descriptor) == sizeof(conn_info.DeviceDescriptor),
 				      "mismatch between libusb and OS device descriptor sizes");
 			memcpy(&dev->device_descriptor, &conn_info.DeviceDescriptor, LIBUSB_DT_DEVICE_SIZE);
-			if (usbi_sanitize_device_descriptor(NULL, &dev->device_descriptor) < 0) {
-				SleepEx(50, TRUE);
-				continue;
-			}
-
 			usbi_localize_device_descriptor(&dev->device_descriptor);
 
 			priv->active_config = conn_info.CurrentConfigurationValue;
@@ -1119,12 +1114,6 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 				SleepEx(50, TRUE);
 			}
 		} while (priv->active_config == 0 && --ginfotimeout >= 0);
-
-		if (usbi_sanitize_device_descriptor(ctx, &dev->device_descriptor) < 0) {
-			usbi_err(ctx, "device '%s' has invalid descriptor!", priv->dev_id);
-			CloseHandle(hub_handle);
-			return LIBUSB_ERROR_NO_DEVICE;
-		}
 
 		if (priv->active_config == 0) {
 			usbi_info(ctx, "0x%x:0x%x found %u configurations but device isn't configured, "
