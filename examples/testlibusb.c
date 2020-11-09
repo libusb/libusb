@@ -261,6 +261,7 @@ static int test_wrapped_device(const char *device_name)
 #else
 static int test_wrapped_device(const char *device_name)
 {
+	(void)device_name;
 	printf("Testing wrapped devices is not supported on your platform\n");
 	return 1;
 }

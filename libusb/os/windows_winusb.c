@@ -982,14 +982,18 @@ make_descriptors:
 		config_desc_length = ROOT_HUB_HS_CONFIG_DESC_LENGTH;
 		ep_interval = 0x0c;	// 256ms
 		break;
-	default:
-		// The default case means absolutely no information about this root hub was
-		// determined. There is not much choice than to be pessimistic and label this
-		// as a full-speed device.
+	case LIBUSB_SPEED_LOW:		// Not used, but keeps compiler happy
+	case LIBUSB_SPEED_UNKNOWN:
+		// This case means absolutely no information about this root hub was determined.
+		// There is not much choice than to be pessimistic and label this as a
+		// full-speed device.
 		speed = LIBUSB_SPEED_FULL;
+		// fallthrough
+	case LIBUSB_SPEED_FULL:
 		dev->device_descriptor.bcdUSB = 0x0110;
 		config_desc_length = ROOT_HUB_FS_CONFIG_DESC_LENGTH;
 		ep_interval = 0xff;	// 255ms
+		break;
 	}
 
 	if (speed >= LIBUSB_SPEED_SUPER) {

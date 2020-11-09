@@ -592,19 +592,17 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 
 	UNUSED(ap);
 
-	switch ((int)option) {
-	case LIBUSB_OPTION_USE_USBDK:
-		if (usbdk_available) {
-			usbi_dbg("switching context %p to use UsbDk backend", ctx);
-			priv->backend = &usbdk_backend;
-		} else {
+	if (option == LIBUSB_OPTION_USE_USBDK) {
+		if (!usbdk_available) {
 			usbi_err(ctx, "UsbDk backend not available");
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
+		usbi_dbg("switching context %p to use UsbDk backend", ctx);
+		priv->backend = &usbdk_backend;
 		return LIBUSB_SUCCESS;
-	default:
-		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
+
+	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **discdevs)

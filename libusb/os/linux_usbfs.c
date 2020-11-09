@@ -429,16 +429,17 @@ static int op_set_option(struct libusb_context *ctx, enum libusb_option option, 
 	UNUSED(ctx);
 	UNUSED(ap);
 
-	switch (option) {
 #ifdef __ANDROID__
-	case LIBUSB_OPTION_WEAK_AUTHORITY:
+	if (option == LIBUSB_OPTION_WEAK_AUTHORITY) {
 		usbi_dbg("set libusb has weak authority");
 		weak_authority = 1;
 		return LIBUSB_SUCCESS;
-#endif
-	default:
-		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
+#else
+	UNUSED(option);
+#endif
+
+	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static int linux_scan_devices(struct libusb_context *ctx)
@@ -676,7 +677,7 @@ static int parse_config_descriptors(struct libusb_device *dev)
 	uint8_t *buffer;
 	size_t remaining;
 
-	device_desc = (struct usbi_device_descriptor *)priv->descriptors;
+	device_desc = priv->descriptors;
 	num_configs = device_desc->bNumConfigurations;
 
 	if (num_configs == 0)
@@ -686,7 +687,7 @@ static int parse_config_descriptors(struct libusb_device *dev)
 	if (!priv->config_descriptors)
 		return LIBUSB_ERROR_NO_MEM;
 
-	buffer = priv->descriptors + LIBUSB_DT_DEVICE_SIZE;
+	buffer = (uint8_t *)priv->descriptors + LIBUSB_DT_DEVICE_SIZE;
 	remaining = priv->descriptors_len - LIBUSB_DT_DEVICE_SIZE;
 
 	for (idx = 0; idx < num_configs; idx++) {
@@ -935,19 +936,21 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 
 	alloc_len = 0;
 	do {
-		alloc_len += 256;
+		const size_t desc_read_length = 256;
+		uint8_t *read_ptr;
+
+		alloc_len += desc_read_length;
 		priv->descriptors = usbi_reallocf(priv->descriptors, alloc_len);
 		if (!priv->descriptors) {
 			if (fd != wrapped_fd)
 				close(fd);
 			return LIBUSB_ERROR_NO_MEM;
 		}
+		read_ptr = (uint8_t *)priv->descriptors + priv->descriptors_len;
 		/* usbfs has holes in the file */
 		if (!sysfs_dir)
-			memset(priv->descriptors + priv->descriptors_len,
-			       0, alloc_len - priv->descriptors_len);
-		nb = read(fd, priv->descriptors + priv->descriptors_len,
-			  alloc_len - priv->descriptors_len);
+			memset(read_ptr, 0, desc_read_length);
+		nb = read(fd, read_ptr, desc_read_length);
 		if (nb < 0) {
 			usbi_err(ctx, "read descriptor failed, errno=%d", errno);
 			if (fd != wrapped_fd)

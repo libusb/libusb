@@ -2524,6 +2524,7 @@ static void log_str(enum libusb_log_level level, const char *str)
 #if defined(__ANDROID__)
 	int priority;
 	switch (level) {
+	case LIBUSB_LOG_LEVEL_NONE: return;	/* Impossible, but keeps compiler happy */
 	case LIBUSB_LOG_LEVEL_ERROR: priority = ANDROID_LOG_ERROR; break;
 	case LIBUSB_LOG_LEVEL_WARNING: priority = ANDROID_LOG_WARN; break;
 	case LIBUSB_LOG_LEVEL_INFO: priority = ANDROID_LOG_INFO; break;
@@ -2537,6 +2538,7 @@ static void log_str(enum libusb_log_level level, const char *str)
 #elif defined(HAVE_SYSLOG)
 	int syslog_level;
 	switch (level) {
+	case LIBUSB_LOG_LEVEL_NONE: return;	/* Impossible, but keeps compiler happy */
 	case LIBUSB_LOG_LEVEL_ERROR: syslog_level = LOG_ERR; break;
 	case LIBUSB_LOG_LEVEL_WARNING: syslog_level = LOG_WARNING; break;
 	case LIBUSB_LOG_LEVEL_INFO: syslog_level = LOG_INFO; break;
@@ -2585,6 +2587,8 @@ static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 #endif
 
 	switch (level) {
+	case LIBUSB_LOG_LEVEL_NONE:	/* Impossible, but keeps compiler happy */
+		return;
 	case LIBUSB_LOG_LEVEL_ERROR:
 		prefix = "error";
 		break;
