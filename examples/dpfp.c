@@ -35,31 +35,42 @@
 
 #if defined(DPFP_THREADED)
 #if defined(PLATFORM_POSIX)
+#include <fcntl.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <unistd.h>
 
 #define THREAD_RETURN_VALUE	NULL
-typedef sem_t semaphore_t;
+typedef sem_t * semaphore_t;
 typedef pthread_t thread_t;
 
-static inline int semaphore_init(semaphore_t *semaphore)
+static inline semaphore_t semaphore_create(void)
 {
-	return sem_init(semaphore, 0, 0);
+	sem_t *semaphore;
+	char name[50];
+
+	sprintf(name, "/org.libusb.example.dpfp_threaded:%d", (int)getpid());
+	semaphore = sem_open(name, O_CREAT | O_EXCL, 0, 0);
+	if (semaphore == SEM_FAILED)
+		return NULL;
+	/* Remove semaphore so that it does not persist after process exits */
+	(void)sem_unlink(name);
+	return semaphore;
 }
 
-static inline void semaphore_give(semaphore_t *semaphore)
+static inline void semaphore_give(semaphore_t semaphore)
 {
 	(void)sem_post(semaphore);
 }
 
-static inline void semaphore_take(semaphore_t *semaphore)
+static inline void semaphore_take(semaphore_t semaphore)
 {
 	(void)sem_wait(semaphore);
 }
 
-static inline void semaphore_destroy(semaphore_t *semaphore)
+static inline void semaphore_destroy(semaphore_t semaphore)
 {
-	(void)sem_destroy(semaphore);
+	(void)sem_close(semaphore);
 }
 
 static inline int thread_create(thread_t *thread,
@@ -84,26 +95,24 @@ typedef DWORD thread_return_t;
 typedef unsigned thread_return_t;
 #endif
 
-static inline int semaphore_init(semaphore_t *semaphore)
+static inline semaphore_t semaphore_create(void)
 {
-	*semaphore = CreateSemaphore(NULL, 0, 1, NULL);
-	return *semaphore != NULL ? 0 : -1;
+	return CreateSemaphore(NULL, 0, 1, NULL);
 }
 
-static inline void semaphore_give(semaphore_t *semaphore)
+static inline void semaphore_give(semaphore_t semaphore)
 {
-	(void)ReleaseSemaphore(*semaphore, 1, NULL);
+	(void)ReleaseSemaphore(semaphore, 1, NULL);
 }
 
-static inline void semaphore_take(semaphore_t *semaphore)
+static inline void semaphore_take(semaphore_t semaphore)
 {
-	(void)WaitForSingleObject(*semaphore, INFINITE);
+	(void)WaitForSingleObject(semaphore, INFINITE);
 }
 
-static inline void semaphore_destroy(semaphore_t *semaphore)
+static inline void semaphore_destroy(semaphore_t semaphore)
 {
-	(void)CloseHandle(*semaphore);
-	*semaphore = NULL;
+	(void)CloseHandle(semaphore);
 }
 
 static inline int thread_create(thread_t *thread,
@@ -170,7 +179,7 @@ static void request_exit(sig_atomic_t code)
 {
 	do_exit = code;
 #if defined(DPFP_THREADED)
-	semaphore_give(&exit_semaphore);
+	semaphore_give(exit_semaphore);
 #endif
 }
 
@@ -605,7 +614,6 @@ int main(void)
 		goto out_deinit;
 
 	/* async from here onwards */
-
 	setup_signals();
 
 	r = alloc_transfers();
@@ -613,15 +621,15 @@ int main(void)
 		goto out_deinit;
 
 #if defined(DPFP_THREADED)
-	r = semaphore_init(&exit_semaphore);
-	if (r < 0) {
+	exit_semaphore = semaphore_create();
+	if (!exit_semaphore) {
 		fprintf(stderr, "failed to initialise semaphore\n");
 		goto out_deinit;
 	}
 
 	r = thread_create(&poll_thread, poll_thread_main, NULL);
 	if (r) {
-		semaphore_destroy(&exit_semaphore);
+		semaphore_destroy(exit_semaphore);
 		goto out_deinit;
 	}
 
@@ -630,7 +638,7 @@ int main(void)
 		request_exit(2);
 
 	while (!do_exit)
-		semaphore_take(&exit_semaphore);
+		semaphore_take(exit_semaphore);
 #else
 	r = init_capture();
 	if (r < 0)
@@ -647,7 +655,7 @@ int main(void)
 
 #if defined(DPFP_THREADED)
 	thread_join(poll_thread);
-	semaphore_destroy(&exit_semaphore);
+	semaphore_destroy(exit_semaphore);
 #endif
 
 	if (img_transfer) {

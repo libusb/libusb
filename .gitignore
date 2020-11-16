@@ -38,6 +38,8 @@ examples/hotplugtest
 examples/sam3u_benchmark
 examples/testlibusb
 tests/stress
+android/libs
+android/obj
 *.exe
 *.pc
 doc/api-1.0

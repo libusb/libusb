@@ -24,9 +24,6 @@ LIBUSB_ROOT_ABS := $(LOCAL_PATH)/../..
 
 include $(CLEAR_VARS)
 
-LIBUSB_ROOT_REL := ../..
-LIBUSB_ROOT_ABS := $(LOCAL_PATH)/../..
-
 LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/libusb/core.c \
   $(LIBUSB_ROOT_REL)/libusb/descriptor.c \

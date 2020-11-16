@@ -29,6 +29,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/tests/testlib.c
 
 LOCAL_C_INCLUDES += \
+  $(LOCAL_PATH)/.. \
   $(LIBUSB_ROOT_ABS)
 
 LOCAL_SHARED_LIBRARIES += libusb1.0

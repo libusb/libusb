@@ -64,7 +64,7 @@ static void get_timestamp(struct timeval *tv)
 
 	(void)clock_gettime(CLOCK_MONOTONIC, &ts);
 	tv->tv_sec = ts.tv_sec;
-	tv->tv_usec = ts.tv_nsec / 1000L;
+	tv->tv_usec = (int)(ts.tv_nsec / 1000L);
 #else
 	gettimeofday(tv, NULL);
 #endif

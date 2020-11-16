@@ -28,6 +28,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/dpfp.c
 
 LOCAL_C_INCLUDES += \
+  $(LOCAL_PATH)/.. \
   $(LIBUSB_ROOT_ABS)
 
 LOCAL_SHARED_LIBRARIES += libusb1.0
@@ -41,12 +42,13 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-  $(LIBUSB_ROOT_REL)/examples/dpfp_threaded.c
+  $(LIBUSB_ROOT_REL)/examples/dpfp.c
 
 LOCAL_C_INCLUDES += \
+  $(LOCAL_PATH)/.. \
   $(LIBUSB_ROOT_ABS)
 
-LOCAL_CFLAGS := -pthread
+LOCAL_CFLAGS := -DDPFP_THREADED -pthread
 
 LOCAL_SHARED_LIBRARIES += libusb1.0
 
@@ -63,6 +65,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/fxload.c
 
 LOCAL_C_INCLUDES += \
+  $(LOCAL_PATH)/.. \
   $(LIBUSB_ROOT_ABS)
 
 LOCAL_SHARED_LIBRARIES += libusb1.0
@@ -79,6 +82,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/hotplugtest.c
 
 LOCAL_C_INCLUDES += \
+  $(LOCAL_PATH)/.. \
   $(LIBUSB_ROOT_ABS)
 
 LOCAL_SHARED_LIBRARIES += libusb1.0
@@ -95,6 +99,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/listdevs.c
 
 LOCAL_C_INCLUDES += \
+  $(LOCAL_PATH)/.. \
   $(LIBUSB_ROOT_ABS)
 
 LOCAL_SHARED_LIBRARIES += libusb1.0
@@ -111,6 +116,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/sam3u_benchmark.c
 
 LOCAL_C_INCLUDES += \
+  $(LOCAL_PATH)/.. \
   $(LIBUSB_ROOT_ABS)
 
 LOCAL_SHARED_LIBRARIES += libusb1.0
@@ -127,6 +133,7 @@ LOCAL_SRC_FILES := \
   $(LIBUSB_ROOT_REL)/examples/xusb.c
 
 LOCAL_C_INCLUDES += \
+  $(LOCAL_PATH)/.. \
   $(LIBUSB_ROOT_ABS)
 
 LOCAL_SHARED_LIBRARIES += libusb1.0
