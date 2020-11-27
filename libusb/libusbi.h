@@ -101,16 +101,6 @@
  */
 #define API_EXPORTED LIBUSB_CALL DEFAULT_VISIBILITY
 
-/* Macro to decorate printf-like functions, in order to get
- * compiler warnings about format string mistakes.
- */
-#ifndef _MSC_VER
-#define USBI_PRINTFLIKE(formatarg, firstvararg) \
-	__attribute__ ((__format__ (__printf__, formatarg, firstvararg)))
-#else
-#define USBI_PRINTFLIKE(formatarg, firstvararg)
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -292,7 +282,7 @@ int usbi_vsnprintf(char *dst, size_t size, const char *format, va_list args);
 #endif /* defined(_MSC_VER) && (_MSC_VER < 1900) */
 
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
-	const char *function, const char *format, ...) USBI_PRINTFLIKE(4, 5);
+	const char *function, const char *format, ...) PRINTF_FORMAT(4, 5);
 
 #define _usbi_log(ctx, level, ...) usbi_log(ctx, level, __func__, __VA_ARGS__)
 

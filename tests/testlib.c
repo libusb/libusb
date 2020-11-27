@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "libusb_testlib.h"
+#include <config.h>
 
 #include <errno.h>
 #include <stdarg.h>
@@ -25,10 +25,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#define NULL_PATH "nul"
-#else
+#include "libusb_testlib.h"
+
+#if defined(PLATFORM_POSIX)
 #define NULL_PATH "/dev/null"
+#elif defined(PLATFORM_WINDOWS)
+#define NULL_PATH "nul"
 #endif
 
 /**

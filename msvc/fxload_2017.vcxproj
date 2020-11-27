@@ -92,6 +92,7 @@
     <ClCompile Include="..\examples\fxload.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include=".\config.h" />
     <ClInclude Include="..\examples\ezusb.h" />
   </ItemGroup>
   <ItemGroup>

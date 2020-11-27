@@ -50,5 +50,9 @@
 /* Define to 1 if compiling for a Windows platform. */
 #define PLATFORM_WINDOWS 1
 
+/* Define to the attribute for enabling parameter checks on printf-like
+   functions. */
+#define PRINTF_FORMAT(a, b) /**/
+
 /* Define to 1 to output logging messages to the systemwide log. */
 /* #undef USE_SYSTEM_LOGGING_FACILITY */

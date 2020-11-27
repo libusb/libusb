@@ -92,6 +92,7 @@
     <ClCompile Include="..\tests\testlib.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include=".\config.h" />
     <ClInclude Include="..\tests\libusb_testlib.h" />
   </ItemGroup>
   <ItemGroup>

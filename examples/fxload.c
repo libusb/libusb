@@ -21,6 +21,8 @@
  *    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
 
+#include <config.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -46,9 +48,6 @@ static bool dosyslog = false;
 #ifndef ARRAYSIZE
 #define ARRAYSIZE(A) (sizeof(A)/sizeof((A)[0]))
 #endif
-
-void logerror(const char *format, ...)
-	__attribute__ ((format (__printf__, 1, 2)));
 
 void logerror(const char *format, ...)
 {

@@ -21,12 +21,7 @@
  *    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
 
-#if defined(_MSC_VER)
-#define __attribute__(x)
-#if defined(_PREFAST_)
-#pragma warning(disable:28193)
-#endif
-#endif
+#include <config.h>
 
 #include <stdbool.h>
 
@@ -104,6 +99,8 @@ extern int ezusb_load_eeprom(libusb_device_handle *device,
 
 /* Verbosity level (default 1). Can be increased or decreased with options v/q  */
 extern int verbose;
+
+extern void logerror(const char *format, ...) PRINTF_FORMAT(1, 2);
 
 #ifdef __cplusplus
 }
