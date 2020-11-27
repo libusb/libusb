@@ -5,6 +5,15 @@
       <UniqueIdentifier>{4bdcefa9-8c79-431b-965b-15b234737380}</UniqueIdentifier>
       <Extensions>c</Extensions>
     </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{f81e24cd-e12b-4324-ada3-accbab00ef08}</UniqueIdentifier>
+      <Extensions>h</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\libusb\libusb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\examples\xusb.c">

@@ -93,7 +93,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include=".\config.h" />
+    <ClInclude Include=".\getopt\getopt.h" />
     <ClInclude Include="..\examples\ezusb.h" />
+    <ClInclude Include="..\libusb\libusb.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include=".\getopt_2017.vcxproj">

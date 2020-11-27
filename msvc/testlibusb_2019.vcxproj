@@ -91,6 +91,9 @@
     <ClCompile Include="..\examples\testlibusb.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\libusb\libusb.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include=".\libusb_static_2019.vcxproj">
       <Project>{349ee8f9-7d25-4909-aaf5-ff3fade72187}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>

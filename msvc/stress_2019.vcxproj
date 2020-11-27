@@ -93,6 +93,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include=".\config.h" />
+    <ClInclude Include="..\libusb\libusb.h" />
     <ClInclude Include="..\tests\libusb_testlib.h" />
   </ItemGroup>
   <ItemGroup>

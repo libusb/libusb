@@ -14,7 +14,13 @@
     <ClInclude Include=".\config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include=".\getopt\getopt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\examples\ezusb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libusb\libusb.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -5,6 +5,15 @@
       <UniqueIdentifier>{2499509b-af28-4409-aed1-a0c3cc458288}</UniqueIdentifier>
       <Extensions>c</Extensions>
     </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{6fa5acdf-d7e4-48e3-a554-9000deb594d1}</UniqueIdentifier>
+      <Extensions>h</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\libusb\libusb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\examples\hotplugtest.c">

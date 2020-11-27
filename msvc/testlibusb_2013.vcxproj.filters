@@ -5,6 +5,15 @@
       <UniqueIdentifier>{4a89b408-009b-41e4-bb05-78f07a7c7f82}</UniqueIdentifier>
       <Extensions>c</Extensions>
     </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{9dc8bfc2-c1d0-41d9-9fd2-858137d5d7c7}</UniqueIdentifier>
+      <Extensions>h</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\libusb\libusb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\examples\testlibusb.c">
