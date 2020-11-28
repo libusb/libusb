@@ -33,6 +33,10 @@
 
 #include "libusb.h"
 
+#if defined(_MSC_VER)
+#define snprintf _snprintf
+#endif
+
 #if defined(DPFP_THREADED)
 #if defined(PLATFORM_POSIX)
 #include <fcntl.h>
