@@ -994,6 +994,9 @@ make_descriptors:
 		config_desc_length = ROOT_HUB_FS_CONFIG_DESC_LENGTH;
 		ep_interval = 0xff;	// 255ms
 		break;
+	default:			// Impossible, buts keeps compiler happy
+		usbi_err(ctx, "program assertion failed - unknown root hub speed");
+		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
 	if (speed >= LIBUSB_SPEED_SUPER) {

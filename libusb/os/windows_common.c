@@ -114,7 +114,7 @@ HMODULE load_system_library(struct libusb_context *ctx, const char *name)
 
 	filename_start = library_path + length;
 	// Append '\' + name + ".dll" + NUL
-	length += 1 + strlen(name) + 4 + 1;
+	length += 1 + (UINT)strlen(name) + 4 + 1;
 	if (length >= (UINT)sizeof(library_path)) {
 		usbi_err(ctx, "program assertion failed - library path buffer overflow");
 		return NULL;
