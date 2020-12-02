@@ -5,7 +5,7 @@ LIBUSB_DOC_SRC = $(filter-out $(addprefix $(LIBUSB_SRC_DIR)/,$(EXCLUDED_FILES)),
 
 docs: @DOXYGEN_HTMLDIR@
 
-@DOXYGEN_HTMLDIR@: doxygen.cfg libusb.png $(LIBUSB_DOC_SRC)
+@DOXYGEN_HTMLDIR@: doxygen.cfg @top_srcdir@/doc/libusb.png $(LIBUSB_DOC_SRC)
 	doxygen $<
 
 sfurl = web.sourceforge.net:/home/project-web/libusb/htdocs

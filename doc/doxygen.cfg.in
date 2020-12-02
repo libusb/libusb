@@ -51,7 +51,7 @@ PROJECT_BRIEF          = "A cross-platform user library to access USB devices"
 # pixels and the maximum width should not exceed 200 pixels. Doxygen will copy
 # the logo to the output directory.
 
-PROJECT_LOGO           = libusb.png
+PROJECT_LOGO           = @top_srcdir@/doc/libusb.png
 
 # The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute) path
 # into which the generated documentation will be written. If a relative path is
