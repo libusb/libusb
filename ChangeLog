@@ -1,6 +1,30 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
+2020-12-09: v1.0.24
+* Add new platform abstraction (#252)
+* Add Null POSIX backend
+* Add support for eventfd
+* Add support for thread IDs on Haiku, NetBSD and Solaris
+* New API libusb_hotplug_get_user_data()
+* Darwin (macOS): Fix race condition that results in segmentation fault (#701)
+* Darwin (macOS): Fix stale descriptor information post reset (#733)
+* Darwin (macOS): use IOUSBDevice as darwin_device_class explicitly (#693)
+* Linux: Drop support for kernel older than 2.6.32
+* Linux: Provide an event thread name (#689)
+* Linux: Wait until all USBs have been reaped before freeing them (#607)
+* NetBSD: Recognize device timeouts (#710)
+* OpenBSD: Allow opening ugen devices multiple times (#763)
+* OpenBSD: Support libusb_get_port_number() (#764)
+* SunOS: Fix a memory leak (#756)
+* SunOS: Various fixes (#627, #628, #629)
+* Windows: Add Visual Studio 2019 support
+* Windows: Drop support for WinCE and Visual Studio older than 2013
+* Windows: Drop support for Windows XP
+* Windows: Support building all examples using Visual Studio (#151)
+* Documentation fixes and improvements
+* Various other bug fixes and improvements
+
 2019-08-28: v1.0.23
 * Add German translation (#446)
 * Add Hungarian translation (#493)
@@ -22,7 +46,7 @@ visit: http://log.libusb.info
 * Windows: Add support for isochronous transfers with WinUSB
 * Various other bug fixes and improvements
 
-2018-03-24: v1.0.22:
+2018-03-24: v1.0.22
 * New libusb_set_option() API
 * Fix transfer timeout not being cleared upon resubmission
 * Report super speed plus devices on modern Linux and macOS
@@ -40,7 +64,7 @@ visit: http://log.libusb.info
 * Windows: Support cancelation of individual transfers (Vista and later)
 * Various other bug fixes and improvements
 
-2016-10-01: v1.0.21:
+2016-10-01: v1.0.21
 * Core: Refactor code related to transfer flags and timeout handling
 * Darwin: Ignore root hub simulation devices
 * Darwin: Improved support for OS X El Capitan

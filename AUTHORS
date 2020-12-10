@@ -11,11 +11,18 @@ Copyright © 2012-2013 Toby Gray <toby.gray@realvnc.com>
 Copyright © 2013-2018 Chris Dickens <christopher.a.dickens@gmail.com>
 
 Other contributors:
+Aaron Luft
 Adrian Bunk
+Adrien Destugues
 Akshay Jaggi
 Alan Ott
 Alan Stern
+Aleksandr Mezin
+Alexander Pyhalov
+Alexander Schlarb
+Alexander Stein
 Alex Vatchenko
+Andrew Aldridge
 Andrew Fernandes
 Andy Chunyu
 Andy McFadden
@@ -25,18 +32,25 @@ Anthony Clay
 Antonio Ospite
 Artem Egorkine
 Aurelien Jarno
+Axel Gembe
+Aymeric Vincent
+Baruch Siach
 Bastien Nocera
 Bei Zhang
+Bence Csokas
 Benjamin Dobell
 Brent Rector
 Carl Karsten
+Chris Zhu
 Christophe Zeitouny
+Chunyu Xie
 Colin Walters
 Dave Camarillo
 David Engraf
-David Moore
 Davidlohr Bueso
+David Moore
 Dmitry Fleytman
+Dmitry Kostjuchenko
 Doug Johnston
 Evan Hunter
 Federico Manzan
@@ -44,60 +58,85 @@ Felipe Balbi
 Florian Albrechtskirchinger
 Francesco Montorsi
 Francisco Facioni
+Frank Li
+Frederik Carlier
 Gaurav Gupta
 Graeme Gill
+Greg Kroah-Hartman
 Gustavo Zacarias
 Hans Ulrich Niedermann
+Harry Mallon
 Hector Martin
 Hoi-Ho Chan
+Ido Yariv
+Igor Anokhin
+Ihor Dutchak
 Ilya Konstantinov
 Jakub Klama
 James Hanko
 Jeffrey Nichols
+Jie Zhang
 Johann Richard
+John Keeping
 John Sheu
+Jonas Malaco
 Jonathon Jongsma
 Joost Muller
 Josh Gao
 Joshua Blake
+Joshua Hou
+Juan Cruz Viotti
 Justin Bischoff
-KIMURA Masaru
 Karsten Koenig
+Kenjiro Tsuji
+KIMURA Masaru
 Konrad Rzepecki
 Kuangye Guo
 Lars Kanis
 Lars Wirzenius
 Lei Chen
+Léo Lam
 Luca Longinotti
 Marcus Meissner
 Markus Heidelberg
 Martin Ettl
 Martin Koegler
+Martin Thierer
 Matthew Stapleton
 Matthias Bolte
 Michel Zou
 Mike Frysinger
 Mikhail Gusarov
+Mikolaj Kucharski
 Morgan Leborgne
 Moritz Fischer
-Ларионов Даниил
+Nia Alarie
 Nicholas Corgan
 Omri Iluz
 Orin Eman
+Patrick Stewart
 Paul Fertser
+Paul Qureshi
 Pekka Nikander
+Philémon Favrod
+Pino Toscano
 Rob Walker
 Romain Vimont
 Roman Kalashnikov
+Saleem Rashid
 Sameeh Jubran
 Sean McBride
 Sebastian Pipping
+Sebastian von Ohr
 Sergey Serb
 Simon Haggett
 Simon Newton
+Slash Gordon
 Stefan Agner
 Stefan Tauner
 Steinar H. Gunderson
+Stephen Groat
+Theo Buehler
 Thomas Röfer
 Tim Hutt
 Tim Roberts
@@ -106,14 +145,25 @@ Toby Peterson
 Tormod Volden
 Trygve Laugstøl
 Uri Lublin
+Uwe Bonnes
 Vasily Khoruzhick
 Vegard Storheil Eriksen
 Venkatesh Shukla
 Vianney le Clément de Saint-Marcq
 Victor Toso
+Vinicius Tinti
 Vitali Lovich
+Vladimir Beloborodov
+William Orr
 William Skellenger
 Xiaofan Chen
+Zhiqiang Liu
 Zoltán Kovács
+Сергей Валерьевич
+Ларионов Даниил
 Роман Донченко
+liangyunwang
 parafin
+RipleyTom
+saur0n
+winterrace
