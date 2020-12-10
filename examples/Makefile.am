@@ -2,7 +2,9 @@ AM_CPPFLAGS = -I$(top_srcdir)/libusb
 LDADD = ../libusb/libusb-1.0.la
 LIBS =
 
-noinst_PROGRAMS = dpfp dpfp_threaded fxload hotplugtest listdevs sam3u_benchmark testlibusb xusb
+noinst_PROGRAMS = dpfp dpfp_threaded hotplugtest listdevs sam3u_benchmark testlibusb xusb
+
+bin_PROGRAMS = fxload
 
 dpfp_threaded_CPPFLAGS = $(AM_CPPFLAGS) -DDPFP_THREADED
 dpfp_threaded_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
