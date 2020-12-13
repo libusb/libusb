@@ -12,7 +12,7 @@ visit: http://log.libusb.info
 * Darwin (macOS): use IOUSBDevice as darwin_device_class explicitly (#693)
 * Linux: Drop support for kernel older than 2.6.32
 * Linux: Provide an event thread name (#689)
-* Linux: Wait until all USBs have been reaped before freeing them (#607)
+* Linux: Wait until all URBs have been reaped before freeing them (#607)
 * NetBSD: Recognize device timeouts (#710)
 * OpenBSD: Allow opening ugen devices multiple times (#763)
 * OpenBSD: Support libusb_get_port_number() (#764)
