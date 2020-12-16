@@ -83,6 +83,33 @@
 #define PTR_ALIGN(v) \
 	(((v) + (sizeof(void *) - 1)) & ~(sizeof(void *) - 1))
 
+/* Atomic operations
+ *
+ * Useful for reference counting or when accessing a value without a lock
+ *
+ * The following atomic operations are defined:
+ *   usbi_atomic_load() - Atomically read a variable's value
+ *   usbi_atomic_store() - Atomically write a new value value to a variable
+ *   usbi_atomic_inc() - Atomically increment a variable's value and return the new value
+ *   usbi_atomic_dec() - Atomically decrement a variable's value and return the new value
+ *
+ * All of these operations are ordered with each other, thus the effects of
+ * any one operation is guaranteed to be seen by any other operation.
+ */
+#ifdef _MSC_VER
+typedef volatile LONG usbi_atomic_t;
+#define usbi_atomic_load(a)	(*(a))
+#define usbi_atomic_store(a, v)	(*(a)) = (v)
+#define usbi_atomic_inc(a)	InterlockedIncrement((a))
+#define usbi_atomic_dec(a)	InterlockedDecrement((a))
+#else
+typedef long usbi_atomic_t;
+#define usbi_atomic_load(a)	__atomic_load_n((a), __ATOMIC_SEQ_CST)
+#define usbi_atomic_store(a, v)	__atomic_store_n((a), (v), __ATOMIC_SEQ_CST)
+#define usbi_atomic_inc(a)	__atomic_add_fetch((a), 1, __ATOMIC_SEQ_CST)
+#define usbi_atomic_dec(a)	__atomic_sub_fetch((a), 1, __ATOMIC_SEQ_CST)
+#endif
+
 /* Internal abstractions for event handling and thread synchronization */
 #if defined(PLATFORM_POSIX)
 #include "os/events_posix.h"
@@ -450,10 +477,7 @@ static inline void usbi_end_event_handling(struct libusb_context *ctx)
 }
 
 struct libusb_device {
-	/* lock protects refcnt, everything else is finalized at initialization
-	 * time */
-	usbi_mutex_t lock;
-	int refcnt;
+	usbi_atomic_t refcnt;
 
 	struct libusb_context *ctx;
 	struct libusb_device *parent_dev;
@@ -467,7 +491,7 @@ struct libusb_device {
 	unsigned long session_data;
 
 	struct libusb_device_descriptor device_descriptor;
-	int attached;
+	usbi_atomic_t attached;
 };
 
 struct libusb_device_handle {

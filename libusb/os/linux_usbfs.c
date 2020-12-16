@@ -1365,7 +1365,7 @@ static int op_wrap_sys_device(struct libusb_context *ctx,
 		goto out;
 	/* Consider the device as connected, but do not add it to the managed
 	 * device list. */
-	dev->attached = 1;
+	usbi_atomic_store(&dev->attached, 1);
 	handle->dev = dev;
 
 	r = initialize_handle(handle, fd);
@@ -1387,7 +1387,7 @@ static int op_open(struct libusb_device_handle *handle)
 			/* device will still be marked as attached if hotplug monitor thread
 			 * hasn't processed remove event yet */
 			usbi_mutex_static_lock(&linux_hotplug_lock);
-			if (handle->dev->attached) {
+			if (usbi_atomic_load(&handle->dev->attached)) {
 				usbi_dbg("open failed with no device, but device still attached");
 				linux_device_disconnected(handle->dev->bus_number,
 							  handle->dev->device_address);
@@ -2711,7 +2711,7 @@ static int op_handle_events(struct libusb_context *ctx,
 			/* device will still be marked as attached if hotplug monitor thread
 			 * hasn't processed remove event yet */
 			usbi_mutex_static_lock(&linux_hotplug_lock);
-			if (handle->dev->attached)
+			if (usbi_atomic_load(&handle->dev->attached))
 				linux_device_disconnected(handle->dev->bus_number,
 							  handle->dev->device_address);
 			usbi_mutex_static_unlock(&linux_hotplug_lock);
