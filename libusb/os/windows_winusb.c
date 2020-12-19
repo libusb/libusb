@@ -28,14 +28,9 @@
 #include <windows.h>
 #include <setupapi.h>
 #include <ctype.h>
-#include <fcntl.h>
-#include <process.h>
 #include <stdio.h>
-#include <objbase.h>
-#include <winioctl.h>
 
 #include "libusbi.h"
-#include "windows_common.h"
 #include "windows_winusb.h"
 
 #define HANDLE_VALID(h) (((h) != NULL) && ((h) != INVALID_HANDLE_VALUE))

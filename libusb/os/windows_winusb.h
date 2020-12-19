@@ -23,20 +23,10 @@
 #ifndef LIBUSB_WINDOWS_WINUSB_H
 #define LIBUSB_WINDOWS_WINUSB_H
 
+#include <devioctl.h>
+#include <guiddef.h>
+
 #include "windows_common.h"
-
-#if defined(_MSC_VER)
-// disable /W4 MSVC warnings that are benign
-#pragma warning(disable:4214)  // bit field types other than int
-#endif
-
-// Missing from MSVC6 setupapi.h
-#ifndef SPDRP_ADDRESS
-#define SPDRP_ADDRESS		28
-#endif
-#ifndef SPDRP_INSTALL_STATE
-#define SPDRP_INSTALL_STATE	34
-#endif
 
 #define MAX_CTRL_BUFFER_LENGTH	4096
 #define MAX_USB_STRING_LENGTH	128
@@ -55,18 +45,10 @@
 // http://msdn.microsoft.com/en-us/library/ff545978.aspx
 // http://msdn.microsoft.com/en-us/library/ff545972.aspx
 // http://msdn.microsoft.com/en-us/library/ff545982.aspx
-#ifndef GUID_DEVINTERFACE_USB_HOST_CONTROLLER
-const GUID GUID_DEVINTERFACE_USB_HOST_CONTROLLER = {0x3ABF6F2D, 0x71C4, 0x462A, {0x8A, 0x92, 0x1E, 0x68, 0x61, 0xE6, 0xAF, 0x27}};
-#endif
-#ifndef GUID_DEVINTERFACE_USB_DEVICE
-const GUID GUID_DEVINTERFACE_USB_DEVICE = {0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED}};
-#endif
-#ifndef GUID_DEVINTERFACE_USB_HUB
-const GUID GUID_DEVINTERFACE_USB_HUB = {0xF18A0E88, 0xC30C, 0x11D0, {0x88, 0x15, 0x00, 0xA0, 0xC9, 0x06, 0xBE, 0xD8}};
-#endif
-#ifndef GUID_DEVINTERFACE_LIBUSB0_FILTER
-const GUID GUID_DEVINTERFACE_LIBUSB0_FILTER = {0xF9F3FF14, 0xAE21, 0x48A0, {0x8A, 0x25, 0x80, 0x11, 0xA7, 0xA9, 0x31, 0xD9}};
-#endif
+static const GUID GUID_DEVINTERFACE_USB_HOST_CONTROLLER = {0x3ABF6F2D, 0x71C4, 0x462A, {0x8A, 0x92, 0x1E, 0x68, 0x61, 0xE6, 0xAF, 0x27}};
+static const GUID GUID_DEVINTERFACE_USB_HUB = {0xF18A0E88, 0xC30C, 0x11D0, {0x88, 0x15, 0x00, 0xA0, 0xC9, 0x06, 0xBE, 0xD8}};
+static const GUID GUID_DEVINTERFACE_USB_DEVICE = {0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED}};
+static const GUID GUID_DEVINTERFACE_LIBUSB0_FILTER = {0xF9F3FF14, 0xAE21, 0x48A0, {0x8A, 0x25, 0x80, 0x11, 0xA7, 0xA9, 0x31, 0xD9}};
 
 // The following define MUST be == sizeof(USB_DESCRIPTOR_REQUEST)
 #define USB_DESCRIPTOR_REQUEST_SIZE	12U
@@ -151,11 +133,6 @@ struct libusb_hid_descriptor {
 #define LIBUSB_REQ_TYPE(request_type)		((request_type) & (0x03 << 5))
 #define LIBUSB_REQ_IN(request_type)		((request_type) & LIBUSB_ENDPOINT_IN)
 #define LIBUSB_REQ_OUT(request_type)		(!LIBUSB_REQ_IN(request_type))
-
-#ifndef CTL_CODE
-#define CTL_CODE(DeviceType, Function, Method, Access) \
-	(((DeviceType) << 16) | ((Access) << 14) | ((Function) << 2) | (Method))
-#endif
 
 // The following are used for HID reports IOCTLs
 #define HID_IN_CTL_CODE(id) \
@@ -282,23 +259,12 @@ DLL_DECLARE_FUNC_PREFIXED(WINAPI, BOOL, p, SetupDiDestroyDeviceInfoList, (HDEVIN
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, HKEY, p, SetupDiOpenDevRegKey, (HDEVINFO, PSP_DEVINFO_DATA, DWORD, DWORD, DWORD, REGSAM));
 DLL_DECLARE_FUNC_PREFIXED(WINAPI, HKEY, p, SetupDiOpenDeviceInterfaceRegKey, (HDEVINFO, PSP_DEVICE_INTERFACE_DATA, DWORD, DWORD));
 
+#define FILE_DEVICE_USB	FILE_DEVICE_UNKNOWN
 
-#ifndef USB_GET_NODE_INFORMATION
 #define USB_GET_NODE_INFORMATION			258
-#endif
-#ifndef USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION
 #define USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION		260
-#endif
-#ifndef USB_GET_NODE_CONNECTION_INFORMATION_EX
 #define USB_GET_NODE_CONNECTION_INFORMATION_EX		274
-#endif
-#ifndef USB_GET_NODE_CONNECTION_INFORMATION_EX_V2
 #define USB_GET_NODE_CONNECTION_INFORMATION_EX_V2	279
-#endif
-
-#ifndef FILE_DEVICE_USB
-#define FILE_DEVICE_USB		FILE_DEVICE_UNKNOWN
-#endif
 
 #define USB_CTL_CODE(id) \
 	CTL_CODE(FILE_DEVICE_USB, (id), METHOD_BUFFERED, FILE_ANY_ACCESS)
@@ -341,6 +307,12 @@ typedef enum _USB_HUB_NODE {
 	UsbHub,
 	UsbMIParent
 } USB_HUB_NODE;
+
+#if defined(_MSC_VER)
+// disable /W4 MSVC warnings that are benign
+#pragma warning(push)
+#pragma warning(disable:4214)  // bit field types other than int
+#endif
 
 // Most of the structures below need to be packed
 #include <pshpack1.h>
@@ -438,6 +410,11 @@ typedef struct _USB_NODE_CONNECTION_INFORMATION_EX_V2 {
 } USB_NODE_CONNECTION_INFORMATION_EX_V2, *PUSB_NODE_CONNECTION_INFORMATION_EX_V2;
 
 #include <poppack.h>
+
+#if defined(_MSC_VER)
+// Restore original warnings
+#pragma warning(pop)
+#endif
 
 /* winusb.dll interface */
 

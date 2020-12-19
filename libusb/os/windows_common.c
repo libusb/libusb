@@ -24,7 +24,6 @@
 
 #include <config.h>
 
-#include <process.h>
 #include <stdio.h>
 
 #include "libusbi.h"

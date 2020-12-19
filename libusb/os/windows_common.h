@@ -52,6 +52,8 @@
 #define _strdup strdup
 // _beginthreadex is MSVCRT => unavailable for cygwin. Fallback to using CreateThread
 #define _beginthreadex(a, b, c, d, e, f) CreateThread(a, b, (LPTHREAD_START_ROUTINE)c, d, e, (LPDWORD)f)
+#else
+#include <process.h>
 #endif
 
 #define safe_free(p) do {if (p != NULL) {free((void *)p); p = NULL;}} while (0)
