@@ -104,12 +104,12 @@ static struct winusb_interface WinUSBX[SUB_API_MAX];
 	} while (0)
 
 #if defined(ENABLE_LOGGING)
-static const char *guid_to_string(const GUID *guid)
+static const char *guid_to_string(const GUID *guid, char guid_string[MAX_GUID_STRING_LENGTH])
 {
-	static char guid_string[MAX_GUID_STRING_LENGTH];
-
-	if (guid == NULL)
-		return "";
+	if (guid == NULL) {
+		guid_string[0] = '\0';
+		return guid_string;
+	}
 
 	sprintf(guid_string, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
 		(unsigned int)guid->Data1, guid->Data2, guid->Data3,
@@ -119,6 +119,37 @@ static const char *guid_to_string(const GUID *guid)
 	return guid_string;
 }
 #endif
+
+static bool string_to_guid(const char guid_string[MAX_GUID_STRING_LENGTH], GUID *guid)
+{
+	unsigned short tmp[4];
+	int num_chars = -1;
+	char extra;
+	int r;
+
+	// Unfortunately MinGW complains that '%hhx' is not a valid format specifier,
+	// even though Visual Studio 2013 and later support it. Rather than complicating
+	// the logic in this function with '#ifdef's, use a temporary array on the stack
+	// to store the conversions.
+	r = sscanf(guid_string, "{%8x-%4hx-%4hx-%4hx-%4hx%4hx%4hx}%n%c",
+		(unsigned int *)&guid->Data1, &guid->Data2, &guid->Data3,
+		&tmp[0], &tmp[1], &tmp[2], &tmp[3], &num_chars, &extra);
+
+	if ((r != 7) || (num_chars != 38))
+		return false;
+
+	// Extract the bytes from the 2-byte shorts
+	guid->Data4[0] = (unsigned char)((tmp[0] >> 8) & 0xFF);
+	guid->Data4[1] = (unsigned char)(tmp[0] & 0xFF);
+	guid->Data4[2] = (unsigned char)((tmp[1] >> 8) & 0xFF);
+	guid->Data4[3] = (unsigned char)(tmp[1] & 0xFF);
+	guid->Data4[4] = (unsigned char)((tmp[2] >> 8) & 0xFF);
+	guid->Data4[5] = (unsigned char)(tmp[2] & 0xFF);
+	guid->Data4[6] = (unsigned char)((tmp[3] >> 8) & 0xFF);
+	guid->Data4[7] = (unsigned char)(tmp[3] & 0xFF);
+
+	return true;
+}
 
 /*
  * Normalize Microsoft's paths: return a duplicate of the given path
@@ -149,11 +180,8 @@ static bool init_dlls(struct libusb_context *ctx)
 
 	// Prefixed to avoid conflict with header files
 	DLL_GET_HANDLE(ctx, AdvAPI32);
-	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegQueryValueExW, true);
+	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegQueryValueExA, true);
 	DLL_LOAD_FUNC_PREFIXED(AdvAPI32, p, RegCloseKey, true);
-
-	DLL_GET_HANDLE(ctx, OLE32);
-	DLL_LOAD_FUNC_PREFIXED(OLE32, p, IIDFromString, true);
 
 	DLL_GET_HANDLE(ctx, SetupAPI);
 	DLL_LOAD_FUNC_PREFIXED(SetupAPI, p, SetupDiGetClassDevsA, true);
@@ -172,7 +200,6 @@ static bool init_dlls(struct libusb_context *ctx)
 static void exit_dlls(void)
 {
 	DLL_FREE_HANDLE(SetupAPI);
-	DLL_FREE_HANDLE(OLE32);
 	DLL_FREE_HANDLE(AdvAPI32);
 	DLL_FREE_HANDLE(Cfgmgr32);
 }
@@ -233,6 +260,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 {
 	SP_DEVICE_INTERFACE_DATA dev_interface_data;
 	PSP_DEVICE_INTERFACE_DETAIL_DATA_A dev_interface_details;
+	char guid_string[MAX_GUID_STRING_LENGTH];
 	DWORD size;
 
 	dev_info_data->cbSize = sizeof(SP_DEVINFO_DATA);
@@ -241,7 +269,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 		if (!pSetupDiEnumDeviceInfo(dev_info, *_index, dev_info_data)) {
 			if (GetLastError() != ERROR_NO_MORE_ITEMS) {
 				usbi_err(ctx, "Could not obtain device info data for %s index %lu: %s",
-					guid_to_string(guid), ULONG_CAST(*_index), windows_error_str(0));
+					guid_to_string(guid, guid_string), ULONG_CAST(*_index), windows_error_str(0));
 				return LIBUSB_ERROR_OTHER;
 			}
 
@@ -257,7 +285,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 
 		if (GetLastError() != ERROR_NO_MORE_ITEMS) {
 			usbi_err(ctx, "Could not obtain interface data for %s devInst %lX: %s",
-				guid_to_string(guid), ULONG_CAST(dev_info_data->DevInst), windows_error_str(0));
+				guid_to_string(guid, guid_string), ULONG_CAST(dev_info_data->DevInst), windows_error_str(0));
 			return LIBUSB_ERROR_OTHER;
 		}
 
@@ -269,7 +297,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 		// The dummy call should fail with ERROR_INSUFFICIENT_BUFFER
 		if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
 			usbi_err(ctx, "could not access interface data (dummy) for %s devInst %lX: %s",
-				guid_to_string(guid), ULONG_CAST(dev_info_data->DevInst), windows_error_str(0));
+				guid_to_string(guid, guid_string), ULONG_CAST(dev_info_data->DevInst), windows_error_str(0));
 			return LIBUSB_ERROR_OTHER;
 		}
 	} else {
@@ -280,7 +308,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 	dev_interface_details = malloc(size);
 	if (dev_interface_details == NULL) {
 		usbi_err(ctx, "could not allocate interface data for %s devInst %lX",
-			guid_to_string(guid), ULONG_CAST(dev_info_data->DevInst));
+			guid_to_string(guid, guid_string), ULONG_CAST(dev_info_data->DevInst));
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
@@ -288,7 +316,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 	if (!pSetupDiGetDeviceInterfaceDetailA(dev_info, &dev_interface_data,
 		dev_interface_details, size, NULL, NULL)) {
 		usbi_err(ctx, "could not access interface data (actual) for %s devInst %lX: %s",
-			guid_to_string(guid), ULONG_CAST(dev_info_data->DevInst), windows_error_str(0));
+			guid_to_string(guid, guid_string), ULONG_CAST(dev_info_data->DevInst), windows_error_str(0));
 		free(dev_interface_details);
 		return LIBUSB_ERROR_OTHER;
 	}
@@ -298,7 +326,7 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 
 	if (*dev_interface_path == NULL) {
 		usbi_err(ctx, "could not allocate interface path for %s devInst %lX",
-			guid_to_string(guid), ULONG_CAST(dev_info_data->DevInst));
+			guid_to_string(guid, guid_string), ULONG_CAST(dev_info_data->DevInst));
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
@@ -381,7 +409,7 @@ static int get_interface_details_filter(struct libusb_context *ctx, HDEVINFO *de
 		DWORD value_length = sizeof(DWORD);
 		LONG status;
 
-		status = pRegQueryValueExW(hkey_dev_interface, L"LUsb0", NULL, NULL,
+		status = pRegQueryValueExA(hkey_dev_interface, "LUsb0", NULL, NULL,
 			(LPBYTE)&libusb0_symboliclink_index, &value_length);
 		if (status == ERROR_SUCCESS) {
 			if (libusb0_symboliclink_index < 256) {
@@ -1379,7 +1407,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	unsigned long session_id;
 	DWORD size, port_nr, reg_type, install_state;
 	HKEY key;
-	WCHAR guid_string_w[MAX_GUID_STRING_LENGTH];
+	char guid_string[MAX_GUID_STRING_LENGTH];
 	GUID *if_guid;
 	LONG s;
 #define HUB_PASS 0
@@ -1449,7 +1477,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 //#define ENUM_DEBUG
 #if defined(ENABLE_LOGGING) && defined(ENUM_DEBUG)
 		const char * const passname[] = {"HUB", "DEV", "HCD", "GEN", "HID", "EXT"};
-		usbi_dbg("#### PROCESSING %ss %s", passname[MIN(pass, EXT_PASS)], guid_to_string(guid_list[pass]));
+		usbi_dbg("#### PROCESSING %ss %s", passname[MIN(pass, EXT_PASS)], guid_to_string(guid_list[pass], guid_string));
 #endif
 		if ((pass == HID_PASS) && (guid_list[HID_PASS] == NULL))
 			continue;
@@ -1550,16 +1578,16 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				if (key == INVALID_HANDLE_VALUE)
 					break;
 				// Look for both DeviceInterfaceGUIDs *and* DeviceInterfaceGUID, in that order
-				size = sizeof(guid_string_w);
-				s = pRegQueryValueExW(key, L"DeviceInterfaceGUIDs", NULL, &reg_type,
-					(LPBYTE)guid_string_w, &size);
+				size = sizeof(guid_string);
+				s = pRegQueryValueExA(key, "DeviceInterfaceGUIDs", NULL, &reg_type,
+					(LPBYTE)guid_string, &size);
 				if (s == ERROR_FILE_NOT_FOUND)
-					s = pRegQueryValueExW(key, L"DeviceInterfaceGUID", NULL, &reg_type,
-						(LPBYTE)guid_string_w, &size);
+					s = pRegQueryValueExA(key, "DeviceInterfaceGUID", NULL, &reg_type,
+						(LPBYTE)guid_string, &size);
 				pRegCloseKey(key);
 				if ((s == ERROR_SUCCESS) &&
-				    (((reg_type == REG_SZ) && (size == (sizeof(guid_string_w) - sizeof(WCHAR)))) ||
-				     ((reg_type == REG_MULTI_SZ) && (size == sizeof(guid_string_w))))) {
+				    (((reg_type == REG_SZ) && (size == (sizeof(guid_string) - sizeof(char)))) ||
+				     ((reg_type == REG_MULTI_SZ) && (size == sizeof(guid_string))))) {
 					if (nb_guids == guid_size) {
 						new_guid_list = realloc((void *)guid_list, (guid_size + GUID_SIZE_STEP) * sizeof(void *));
 						if (new_guid_list == NULL) {
@@ -1574,8 +1602,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						usbi_err(ctx, "failed to alloc if_guid");
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 					}
-					if (pIIDFromString(guid_string_w, if_guid) != 0) {
-						usbi_warn(ctx, "device '%s' has malformed DeviceInterfaceGUID string, skipping", dev_id);
+					if (!string_to_guid(guid_string, if_guid)) {
+						usbi_warn(ctx, "device '%s' has malformed DeviceInterfaceGUID string '%s', skipping", dev_id, guid_string);
 						free(if_guid);
 					} else {
 						// Check if we've already seen this GUID
@@ -1584,7 +1612,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 								break;
 						}
 						if (j == nb_guids) {
-							usbi_dbg("extra GUID: %s", guid_to_string(if_guid));
+							usbi_dbg("extra GUID: %s", guid_string);
 							guid_list[nb_guids++] = if_guid;
 						} else {
 							// Duplicate, ignore
