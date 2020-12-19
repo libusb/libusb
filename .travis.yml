@@ -47,7 +47,6 @@ addons:
             - automake
             - libtool
             - m4
-        update: true
 
 before_script:
     - ./bootstrap.sh
