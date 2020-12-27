@@ -1795,7 +1795,7 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_hand
 int API_EXPORTED libusb_clear_halt(libusb_device_handle *dev_handle,
 	unsigned char endpoint)
 {
-	usbi_dbg("endpoint %x", endpoint);
+	usbi_dbg("endpoint 0x%x", endpoint);
 	if (!usbi_atomic_load(&dev_handle->dev->attached))
 		return LIBUSB_ERROR_NO_DEVICE;
 

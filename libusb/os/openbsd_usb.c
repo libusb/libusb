@@ -565,7 +565,7 @@ _sync_control_transfer(struct usbi_transfer *itransfer)
 	dpriv = usbi_get_device_priv(transfer->dev_handle->dev);
 	setup = (struct libusb_control_setup *)transfer->buffer;
 
-	usbi_dbg("type %x request %x value %x index %d length %d timeout %d",
+	usbi_dbg("type 0x%x request 0x%x value 0x%x index %d length %d timeout %d",
 	    setup->bmRequestType, setup->bRequest,
 	    libusb_le16_to_cpu(setup->wValue),
 	    libusb_le16_to_cpu(setup->wIndex),
