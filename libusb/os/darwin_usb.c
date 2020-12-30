@@ -2148,7 +2148,7 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_transfer_priv *tpriv = usbi_get_transfer_priv(itransfer);
   const unsigned char max_transfer_type = LIBUSB_TRANSFER_TYPE_BULK_STREAM;
-  const char *transfer_types[max_transfer_type + 1] = {"control", "isoc", "bulk", "interrupt", "bulk-stream"};
+  const char *transfer_types[] = {"control", "isoc", "bulk", "interrupt", "bulk-stream", NULL};
   bool is_isoc = LIBUSB_TRANSFER_TYPE_ISOCHRONOUS == transfer->type;
 
   if (transfer->type > max_transfer_type) {
