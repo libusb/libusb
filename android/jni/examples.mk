@@ -147,3 +147,22 @@ LOCAL_SHARED_LIBRARIES += $(LIBUSB_MODULE)
 LOCAL_MODULE := xusb
 
 include $(BUILD_EXECUTABLE)
+
+# unrooted_android
+
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
+  $(LIBUSB_ROOT_REL)/android/examples/unrooted_android.c
+
+LOCAL_C_INCLUDES += \
+  $(LOCAL_PATH)/.. \
+  $(LIBUSB_ROOT_ABS)
+
+LOCAL_SHARED_LIBRARIES += libusb1.0
+
+LOCAL_LDLIBS += -llog
+
+LOCAL_MODULE := unrooted_android
+
+include $(BUILD_SHARED_LIBRARY)
