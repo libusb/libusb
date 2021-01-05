@@ -2726,7 +2726,7 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 	size = transfer->length - LIBUSB_CONTROL_SETUP_SIZE;
 
 	// Windows places upper limits on the control transfer size
-	// See: https://msdn.microsoft.com/en-us/library/windows/hardware/ff538112.aspx
+	// See: https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-bandwidth-allocation#maximum-transfer-size
 	if (size > MAX_CTRL_BUFFER_LENGTH)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
