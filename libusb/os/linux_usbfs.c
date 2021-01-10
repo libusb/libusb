@@ -415,6 +415,13 @@ static int op_init(struct libusb_context *ctx)
 static void op_exit(struct libusb_context *ctx)
 {
 	UNUSED(ctx);
+
+#ifdef __ANDROID__
+	if (weak_authority) {
+		return;
+	}
+#endif
+
 	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	assert(init_count != 0);
 	if (!--init_count) {
