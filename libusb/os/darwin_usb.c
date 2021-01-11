@@ -1567,8 +1567,15 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
     return LIBUSB_ERROR_NO_DEVICE;
 
   kresult = (*(cInterface->interface))->SetAlternateInterface (cInterface->interface, altsetting);
-  if (kresult != kIOReturnSuccess)
+  /* If a device only supports a default setting for the specified interface, then a STALL
+     (kIOUSBPipeStalled) may be returned. Ref: USB 2.0 specs 9.4.10.
+     Mimick the behaviour in e.g. the Linux kernel: in such case, reset all endpoints,
+     and hide errors.Current implementation resets the entire device, instead of single
+     interface, due to historic reasons. */
+  if (kresult != kIOReturnSuccess) {
+    usbi_warn (HANDLE_CTX (dev_handle), "SetAlternateInterface: %s", darwin_error_str(kresult));
     darwin_reset_device (dev_handle);
+  }
 
   /* update list of endpoints */
   ret = get_endpoints (dev_handle, iface);
@@ -1576,10 +1583,9 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
     /* this should not happen */
     darwin_release_interface (dev_handle, iface);
     usbi_err (HANDLE_CTX (dev_handle), "could not build endpoint table");
-    return ret;
   }
 
-  return darwin_to_libusb (kresult);
+  return ret;
 }
 
 static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint) {
