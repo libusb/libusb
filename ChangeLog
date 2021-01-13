@@ -1,6 +1,9 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
+2021-01-13: v1.0.25-pre
+* Darwin (macOS): Silence pipe error in set_interface_alt_setting().
+
 2020-12-09: v1.0.24
 * Add new platform abstraction (#252)
 * Add Null POSIX backend
