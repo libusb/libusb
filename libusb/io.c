@@ -1349,7 +1349,9 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 
 	priv_size = PTR_ALIGN(usbi_backend.transfer_priv_size);
 	ptr = (unsigned char *)itransfer - priv_size;
+
 	assert(ptr == itransfer->priv);
+	memset(ptr, 0, priv_size);
 	free(ptr);
 }
 
