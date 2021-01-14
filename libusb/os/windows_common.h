@@ -345,6 +345,8 @@ union windows_device_handle_priv {
 
 struct windows_transfer_priv {
 	OVERLAPPED overlapped;
+	uint32_t marker_low;
+	uint32_t marker_high;
 	HANDLE handle;
 	union {
 		struct usbdk_transfer_priv usbdk_priv;

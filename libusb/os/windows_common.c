@@ -33,6 +33,10 @@
 
 #define STATUS_SUCCESS	((ULONG_PTR)0UL)
 
+// "LIBUSBTR" in memory
+#define LIBUSB_TRANSFER_MARKER_LOW 0x5542494C
+#define LIBUSB_TRANSFER_MARKER_HIGH 0x52544253
+
 // Public
 enum windows_version windows_version = WINDOWS_UNDEFINED;
 
@@ -435,10 +439,15 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 		}
 
 		transfer_priv = container_of(overlapped, struct windows_transfer_priv, overlapped);
-		itransfer = (struct usbi_transfer *)((unsigned char *)transfer_priv + PTR_ALIGN(sizeof(*transfer_priv)));
-		usbi_dbg("transfer %p completed, length %lu",
-			 USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer), ULONG_CAST(num_bytes));
-		usbi_signal_transfer_completion(itransfer);
+
+		if (transfer_priv->marker_low == LIBUSB_TRANSFER_MARKER_LOW && transfer_priv->marker-high == LIBUSB_TRANSFER_MARKER_HIGH) {
+			itransfer = ( struct usbi_transfer * )( (unsigned char *)transfer_priv + PTR_ALIGN( sizeof( *transfer_priv ) ) );
+			usbi_dbg( "transfer %p completed, length %lu",
+				USBI_TRANSFER_TO_LIBUSB_TRANSFER( itransfer ), ULONG_CAST( num_bytes ) );
+			usbi_signal_transfer_completion( itransfer );
+		} else {
+			usbi_dbg( "foreign I/O operation completed, length %lu", ULONG_CAST( num_bytes ) );
+		}
 	}
 
 	usbi_dbg("I/O completion thread exiting");
@@ -701,6 +710,9 @@ static int windows_submit_transfer(struct usbi_transfer *itransfer)
 	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
 	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	int r;
+
+	transfer_priv->marker_low = LIBUSB_TRANSFER_MARKER_LOW;
+	transfer_priv->marker_high = LIBUSB_TRANSFER_MARKER_HIGH;
 
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
