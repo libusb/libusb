@@ -81,6 +81,7 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
 static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
 static int darwin_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
 static int darwin_reenumerate_device(struct libusb_device_handle *dev_handle, bool capture);
+static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint);
 static int darwin_reset_device(struct libusb_device_handle *dev_handle);
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0);
 
@@ -1562,6 +1563,8 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
   struct darwin_device_handle_priv *priv = usbi_get_device_handle_priv(dev_handle);
   IOReturn kresult;
   enum libusb_error ret;
+  int i;
+  uint8_t old_alt_setting;
 
   /* current interface */
   struct darwin_interface *cInterface = &priv->interfaces[iface];
@@ -1570,25 +1573,34 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
     return LIBUSB_ERROR_NO_DEVICE;
 
   kresult = (*(cInterface->interface))->SetAlternateInterface (cInterface->interface, altsetting);
+  if (kresult != kIOReturnSuccess)
+    usbi_warn (HANDLE_CTX (dev_handle), "SetAlternateInterface: %s", darwin_error_str(kresult));
+
+  if (kresult != kIOUSBPipeStalled)
+    return darwin_to_libusb (kresult);
+
   /* If a device only supports a default setting for the specified interface, then a STALL
      (kIOUSBPipeStalled) may be returned. Ref: USB 2.0 specs 9.4.10.
-     Mimick the behaviour in e.g. the Linux kernel: in such case, reset all endpoints,
-     and hide errors.Current implementation resets the entire device, instead of single
-     interface, due to historic reasons. */
-  if (kresult != kIOReturnSuccess) {
-    usbi_warn (HANDLE_CTX (dev_handle), "SetAlternateInterface: %s", darwin_error_str(kresult));
-    darwin_reset_device (dev_handle);
-  }
+     Mimick the behaviour in e.g. the Linux kernel: in such case, reset all endpoints
+     of the interface (as would have been done per 9.1.1.5) and return success. */
 
-  /* update list of endpoints */
-  ret = get_endpoints (dev_handle, iface);
+  /* For some reason we need to reclaim the interface after the pipe error */
+  ret = darwin_claim_interface (dev_handle, iface);
+
   if (ret) {
-    /* this should not happen */
     darwin_release_interface (dev_handle, iface);
-    usbi_err (HANDLE_CTX (dev_handle), "could not build endpoint table");
+    usbi_err (HANDLE_CTX (dev_handle), "could not reclaim interface");
   }
 
-  return ret;
+  /* Return error if a change to another value was attempted */
+  kresult = (*(cInterface->interface))->GetAlternateSetting (cInterface->interface, &old_alt_setting);
+  if (kresult == kIOReturnSuccess && altsetting != old_alt_setting)
+    return LIBUSB_ERROR_PIPE;
+
+  for (i = 0 ; i < cInterface->num_endpoints ; i++)
+    darwin_clear_halt(dev_handle, cInterface->endpoint_addrs[i]);
+
+  return LIBUSB_SUCCESS;
 }
 
 static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint) {
