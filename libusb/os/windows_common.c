@@ -440,7 +440,7 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 
 		transfer_priv = container_of(overlapped, struct windows_transfer_priv, overlapped);
 
-		if (transfer_priv->marker_low == LIBUSB_TRANSFER_MARKER_LOW && transfer_priv->marker-high == LIBUSB_TRANSFER_MARKER_HIGH) {
+		if (transfer_priv->marker_low == LIBUSB_TRANSFER_MARKER_LOW && transfer_priv->marker_high == LIBUSB_TRANSFER_MARKER_HIGH) {
 			itransfer = ( struct usbi_transfer * )( (unsigned char *)transfer_priv + PTR_ALIGN( sizeof( *transfer_priv ) ) );
 			usbi_dbg( "transfer %p completed, length %lu",
 				USBI_TRANSFER_TO_LIBUSB_TRANSFER( itransfer ), ULONG_CAST( num_bytes ) );
