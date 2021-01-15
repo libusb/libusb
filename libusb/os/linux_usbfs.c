@@ -808,10 +808,10 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 		active_config = priv->active_config;
 	}
 
-	if (active_config == 0) {
-		usbi_err(DEVICE_CTX(dev), "device unconfigured");
-		return LIBUSB_ERROR_NOT_FOUND;
-	}
+	/* this might be a buggy device with a configuration value 0
+	 * in which case retrieving the descriptor may work */
+	if (active_config == 0)
+		usbi_warn(DEVICE_CTX(dev), "active cfg is 0, unconfigured?");
 
 	r = op_get_config_descriptor_by_value(dev, active_config, &config_desc);
 	if (r < 0)
@@ -862,12 +862,9 @@ static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 		/* we hit this error path frequently with buggy devices :( */
 		usbi_warn(DEVICE_CTX(dev), "get configuration failed, errno=%d", errno);
 	} else if (active_config == 0) {
-		/* some buggy devices have a configuration 0, but we're
-		 * reaching into the corner of a corner case here, so let's
-		 * not support buggy devices in these circumstances.
-		 * stick to the specs: a configuration value of 0 means
-		 * unconfigured. */
-		usbi_warn(DEVICE_CTX(dev), "active cfg 0? assuming unconfigured device");
+		/* some buggy devices have a configuration 0, but normally
+		 * a configuration value of 0 means unconfigured. */
+		usbi_warn(DEVICE_CTX(dev), "active cfg is 0, unconfigured?");
 	}
 
 	priv->active_config = active_config;
@@ -1441,7 +1438,7 @@ static int op_get_configuration(struct libusb_device_handle *handle,
 		return r;
 
 	if (*config == 0)
-		usbi_err(HANDLE_CTX(handle), "device unconfigured");
+		usbi_warn(HANDLE_CTX(handle), "active cfg is 0, unconfigured?");
 
 	return 0;
 }
