@@ -477,25 +477,8 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 static int windows_init(struct libusb_context *ctx)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
-	char mutex_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
-	HANDLE mutex;
 	bool winusb_backend_init = false;
 	int r;
-
-	sprintf(mutex_name, "libusb_init%08lX", ULONG_CAST(GetCurrentProcessId() & 0xFFFFFFFFU));
-	mutex = CreateMutexA(NULL, FALSE, mutex_name);
-	if (mutex == NULL) {
-		usbi_err(ctx, "could not create mutex: %s", windows_error_str(0));
-		return LIBUSB_ERROR_NO_MEM;
-	}
-
-	// A successful wait gives this thread ownership of the mutex
-	// => any concurrent wait stalls until the mutex is released
-	if (WaitForSingleObject(mutex, INFINITE) != WAIT_OBJECT_0) {
-		usbi_err(ctx, "failure to access mutex: %s", windows_error_str(0));
-		CloseHandle(mutex);
-		return LIBUSB_ERROR_NO_MEM;
-	}
 
 	// NB: concurrent usage supposes that init calls are equally balanced with
 	// exit calls. If init is called more than exit, we will not exit properly
@@ -565,29 +548,12 @@ init_exit: // Holds semaphore here
 		--init_count;
 	}
 
-	ReleaseMutex(mutex);
-	CloseHandle(mutex);
 	return r;
 }
 
 static void windows_exit(struct libusb_context *ctx)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
-	char mutex_name[11 + 8 + 1]; // strlen("libusb_init") + (32-bit hex PID) + '\0'
-	HANDLE mutex;
-
-	sprintf(mutex_name, "libusb_init%08lX", ULONG_CAST(GetCurrentProcessId() & 0xFFFFFFFFU));
-	mutex = CreateMutexA(NULL, FALSE, mutex_name);
-	if (mutex == NULL)
-		return;
-
-	// A successful wait gives this thread ownership of the mutex
-	// => any concurrent wait stalls until the mutex is released
-	if (WaitForSingleObject(mutex, INFINITE) != WAIT_OBJECT_0) {
-		usbi_err(ctx, "failed to access mutex: %s", windows_error_str(0));
-		CloseHandle(mutex);
-		return;
-	}
 
 	// A NULL completion status will indicate to the thread that it is time to exit
 	if (!PostQueuedCompletionStatus(priv->completion_port, 0, (ULONG_PTR)ctx, NULL))
@@ -608,9 +574,6 @@ static void windows_exit(struct libusb_context *ctx)
 		winusb_backend.exit(ctx);
 		htab_destroy();
 	}
-
-	ReleaseMutex(mutex);
-	CloseHandle(mutex);
 }
 
 static int windows_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
