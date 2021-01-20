@@ -860,8 +860,7 @@ RECURSIVE              = NO
 # Note that relative paths are relative to the directory from which doxygen is
 # run.
 
-EXCLUDE                = @top_srcdir@/libusb/hotplug.h \
-                         @top_srcdir@/libusb/libusbi.h \
+EXCLUDE                = @top_srcdir@/libusb/libusbi.h \
                          @top_srcdir@/libusb/version.h \
                          @top_srcdir@/libusb/version_nano.h \
                          @top_srcdir@/libusb/os

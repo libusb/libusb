@@ -48,7 +48,6 @@
 
 #include "darwin_usb.h"
 
-static pthread_mutex_t libusb_darwin_init_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int init_count = 0;
 
 /* async event thread */
@@ -575,8 +574,6 @@ static int darwin_init(struct libusb_context *ctx) {
   bool first_init;
   int rc;
 
-  pthread_mutex_lock (&libusb_darwin_init_mutex);
-
   first_init = (1 == ++init_count);
 
   do {
@@ -632,15 +629,11 @@ static int darwin_init(struct libusb_context *ctx) {
     --init_count;
   }
 
-  pthread_mutex_unlock (&libusb_darwin_init_mutex);
-
   return rc;
 }
 
 static void darwin_exit (struct libusb_context *ctx) {
   UNUSED(ctx);
-
-  pthread_mutex_lock (&libusb_darwin_init_mutex);
 
   if (0 == --init_count) {
     /* stop the event runloop and wait for the thread to terminate. */
@@ -659,8 +652,6 @@ static void darwin_exit (struct libusb_context *ctx) {
     mach_port_deallocate(mach_task_self(), clock_monotonic);
 #endif
   }
-
-  pthread_mutex_unlock (&libusb_darwin_init_mutex);
 }
 
 static int get_configuration_index (struct libusb_device *dev, UInt8 config_value) {

@@ -22,7 +22,6 @@
  */
 
 #include "libusbi.h"
-#include "hotplug.h"
 
 /**
  * \page libusb_io Synchronous and asynchronous device I/O
@@ -2073,6 +2072,7 @@ static void handle_timeouts(struct libusb_context *ctx)
 static int handle_event_trigger(struct libusb_context *ctx)
 {
 	struct list_head hotplug_msgs;
+	int hotplug_event = 0;
 	int r = 0;
 
 	usbi_dbg("event triggered");
@@ -2091,6 +2091,12 @@ static int handle_event_trigger(struct libusb_context *ctx)
 		ctx->event_flags &= ~USBI_EVENT_USER_INTERRUPT;
 	}
 
+	if (ctx->event_flags & USBI_EVENT_HOTPLUG_CB_DEREGISTERED) {
+		usbi_dbg("someone unregistered a hotplug cb");
+		ctx->event_flags &= ~USBI_EVENT_HOTPLUG_CB_DEREGISTERED;
+		hotplug_event = 1;
+	}
+
 	/* check if someone is closing a device */
 	if (ctx->event_flags & USBI_EVENT_DEVICE_CLOSE)
 		usbi_dbg("someone is closing a device");
@@ -2099,6 +2105,7 @@ static int handle_event_trigger(struct libusb_context *ctx)
 	if (ctx->event_flags & USBI_EVENT_HOTPLUG_MSG_PENDING) {
 		usbi_dbg("hotplug message received");
 		ctx->event_flags &= ~USBI_EVENT_HOTPLUG_MSG_PENDING;
+		hotplug_event = 1;
 		assert(!list_empty(&ctx->hotplug_msgs));
 		list_cut(&hotplug_msgs, &ctx->hotplug_msgs);
 	}
@@ -2136,20 +2143,9 @@ static int handle_event_trigger(struct libusb_context *ctx)
 
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
-	/* process the hotplug messages, if any */
-	while (!list_empty(&hotplug_msgs)) {
-		struct libusb_hotplug_message *message =
-			list_first_entry(&hotplug_msgs, struct libusb_hotplug_message, list);
-
-		usbi_hotplug_match(ctx, message->device, message->event);
-
-		/* the device left, dereference the device */
-		if (message->event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
-			libusb_unref_device(message->device);
-
-		list_del(&message->list);
-		free(message);
-	}
+	/* process the hotplug events, if any */
+	if (hotplug_event)
+		usbi_hotplug_process(ctx, &hotplug_msgs);
 
 	return r;
 }

@@ -100,8 +100,6 @@ static int init_count = 0;
 static int weak_authority = 0;
 #endif
 
-/* Serialize hotplug start/stop */
-static usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
 /* Serialize scan-devices, event-thread, and poll */
 usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 
@@ -392,7 +390,6 @@ static int op_init(struct libusb_context *ctx)
 	}
 #endif
 
-	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	r = LIBUSB_SUCCESS;
 	if (init_count == 0) {
 		/* start up hotplug event handler */
@@ -407,7 +404,6 @@ static int op_init(struct libusb_context *ctx)
 	} else {
 		usbi_err(ctx, "error starting hotplug event monitor");
 	}
-	usbi_mutex_static_unlock(&linux_hotplug_startstop_lock);
 
 	return r;
 }
@@ -422,13 +418,11 @@ static void op_exit(struct libusb_context *ctx)
 	}
 #endif
 
-	usbi_mutex_static_lock(&linux_hotplug_startstop_lock);
 	assert(init_count != 0);
 	if (!--init_count) {
 		/* tear down event handler */
 		linux_stop_event_monitor();
 	}
-	usbi_mutex_static_unlock(&linux_hotplug_startstop_lock);
 }
 
 static int op_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)

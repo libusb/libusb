@@ -79,7 +79,6 @@
   <ItemGroup>
     <ClInclude Include=".\config.h" />
     <ClInclude Include="..\libusb\os\events_windows.h" />
-    <ClInclude Include="..\libusb\hotplug.h" />
     <ClInclude Include="..\libusb\libusb.h" />
     <ClInclude Include="..\libusb\libusbi.h" />
     <ClInclude Include="..\libusb\os\threads_windows.h" />
