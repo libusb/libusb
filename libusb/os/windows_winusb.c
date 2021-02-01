@@ -3667,7 +3667,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 {
 	struct libusb_device *dev = dev_handle->dev;
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
-	struct winusb_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	HIDD_ATTRIBUTES hid_attributes;
 	PHIDP_PREPARSED_DATA preparsed_data = NULL;
 	HIDP_CAPS capabilities;
@@ -3692,7 +3692,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
 		if ((priv->usb_interface[i].path != NULL)
 				&& (priv->usb_interface[i].apib->id == USB_API_HID)) {
-			hid_handle = windows_open(dev, priv->usb_interface[i].path, GENERIC_READ | GENERIC_WRITE);
+			hid_handle = windows_open(dev_handle, priv->usb_interface[i].path, GENERIC_READ | GENERIC_WRITE);
 			/*
 			 * http://www.lvr.com/hidfaq.htm: Why do I receive "Access denied" when attempting to access my HID?
 			 * "Windows 2000 and later have exclusive read/write access to HIDs that are configured as a system
@@ -3702,7 +3702,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 			 */
 			if (hid_handle == INVALID_HANDLE_VALUE) {
 				usbi_warn(HANDLE_CTX(dev_handle), "could not open HID device in R/W mode (keyboard or mouse?) - trying without");
-				hid_handle = windows_open(dev, priv->usb_interface[i].path, 0);
+				hid_handle = windows_open(dev_handle, priv->usb_interface[i].path, 0);
 				if (hid_handle == INVALID_HANDLE_VALUE) {
 					usbi_err(HANDLE_CTX(dev_handle), "could not open device %s (interface %d): %s", priv->path, i, windows_error_str(0));
 					switch (GetLastError()) {
@@ -3816,7 +3816,7 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 static void hid_close(int sub_api, struct libusb_device_handle *dev_handle)
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
-	struct winusb_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	HANDLE file_handle;
 	int i;
 
@@ -3836,7 +3836,7 @@ static void hid_close(int sub_api, struct libusb_device_handle *dev_handle)
 
 static int hid_claim_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
 {
-	struct winusb_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 
 	UNUSED(sub_api);
@@ -3860,7 +3860,7 @@ static int hid_claim_interface(int sub_api, struct libusb_device_handle *dev_han
 
 static int hid_release_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
 {
-	struct winusb_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 
 	UNUSED(sub_api);
@@ -3897,7 +3897,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct winusb_transfer_priv *transfer_priv = get_winusb_transfer_priv(itransfer);
 	struct libusb_device_handle *dev_handle = transfer->dev_handle;
-	struct winusb_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	struct winusb_device_priv *priv = usbi_get_device_priv(transfer->dev_handle->dev);
 	WINUSB_SETUP_PACKET *setup = (WINUSB_SETUP_PACKET *)transfer->buffer;
 	HANDLE hid_handle;
@@ -3995,7 +3995,7 @@ static int hid_submit_bulk_transfer(int sub_api, struct usbi_transfer *itransfer
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct winusb_transfer_priv *transfer_priv = get_winusb_transfer_priv(itransfer);
-	struct winusb_device_handle_priv *handle_priv = usbi_get_device_handle_priv(transfer->dev_handle);
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(transfer->dev_handle);
 	struct winusb_device_priv *priv = usbi_get_device_priv(transfer->dev_handle->dev);
 	HANDLE hid_handle;
 	OVERLAPPED *overlapped;
@@ -4064,7 +4064,7 @@ static int hid_submit_bulk_transfer(int sub_api, struct usbi_transfer *itransfer
 
 static int hid_reset_device(int sub_api, struct libusb_device_handle *dev_handle)
 {
-	struct winusb_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	HANDLE hid_handle;
 	int current_interface;
 
@@ -4083,7 +4083,7 @@ static int hid_reset_device(int sub_api, struct libusb_device_handle *dev_handle
 
 static int hid_clear_halt(int sub_api, struct libusb_device_handle *dev_handle, unsigned char endpoint)
 {
-	struct winusb_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 	HANDLE hid_handle;
 	int current_interface;

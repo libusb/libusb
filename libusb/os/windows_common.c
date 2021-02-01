@@ -293,15 +293,18 @@ enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS st
  */
 void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size)
 {
+	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct windows_context_priv *priv = usbi_get_context_priv(TRANSFER_CTX(transfer));
 	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	OVERLAPPED *overlapped = &transfer_priv->overlapped;
 
-	usbi_dbg("transfer %p, length %lu", USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer), ULONG_CAST(size));
+	usbi_dbg("transfer %p, length %lu", transfer, ULONG_CAST(size));
 
 	overlapped->Internal = (ULONG_PTR)STATUS_SUCCESS;
 	overlapped->InternalHigh = (ULONG_PTR)size;
 
-	usbi_signal_transfer_completion(itransfer);
+	if (!PostQueuedCompletionStatus(priv->completion_port, (DWORD)size, (ULONG_PTR)transfer->dev_handle, overlapped))
+		usbi_err(TRANSFER_CTX(transfer), "failed to post I/O completion: %s", windows_error_str(0));
 }
 
 /* Windows version detection */
