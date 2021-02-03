@@ -1223,6 +1223,47 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	return LIBUSB_SUCCESS;
 }
 
+static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, DWORD *port_nr)
+{
+	char buffer[MAX_KEY_LENGTH];
+	DWORD size;
+
+	// First try SPDRP_LOCATION_INFORMATION, which returns a REG_SZ. The string *may* have a format
+	// similar to "Port_#0002.Hub_#000D", in which case we can extract the port number. However, we
+	// cannot extract the port if the returned string does not follow this format.
+	if (pSetupDiGetDeviceRegistryPropertyA(dev_info, dev_info_data, SPDRP_LOCATION_INFORMATION,
+			NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
+		// Check for the required format.
+		if (strncmp(buffer, "Port_#", 6) == 0) {
+			*port_nr = atoi(buffer + 6);
+			return true;
+		}
+	}
+
+	// Next try SPDRP_LOCATION_PATHS, which returns a REG_MULTI_SZ (but we only examine the first
+	// string in it). Each path has a format similar to,
+	// "PCIROOT(B2)#PCI(0300)#PCI(0000)#USBROOT(0)#USB(1)#USB(2)#USBMI(3)", and the port number is
+	// the number within the last "USB(x)" token.
+	if (pSetupDiGetDeviceRegistryPropertyA(dev_info, dev_info_data, SPDRP_LOCATION_PATHS,
+			NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
+		// Find the last "#USB(x)" substring
+		for (char *token = strrchr(buffer, '#'); token != NULL; token = strrchr(buffer, '#')) {
+			if (strncmp(token, "#USB(", 5) == 0) {
+				*port_nr = atoi(token + 5);
+				return true;
+			}
+			// Shorten the string and try again.
+			*token = '\0';
+		}
+	}
+
+	// Lastly, try SPDRP_ADDRESS, which returns a REG_DWORD. The address *may* be the port number,
+	// which is true for the Microsoft driver but may not be true for other drivers. However, we
+	// have no other options here but to accept what it returns.
+	return pSetupDiGetDeviceRegistryPropertyA(dev_info, dev_info_data, SPDRP_ADDRESS,
+			NULL, (PBYTE)port_nr, sizeof(*port_nr), &size) && (size == sizeof(*port_nr));
+}
+
 static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id,
 	uint8_t bus_number, DEVINST devinst)
 {
@@ -1747,10 +1788,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				r = enumerate_hcd_root_hub(ctx, dev_id, (uint8_t)(i + 1), dev_info_data.DevInst);
 				break;
 			case GEN_PASS:
-				// The SPDRP_ADDRESS for USB devices is the device port number on the hub
 				port_nr = 0;
-				if (!pSetupDiGetDeviceRegistryPropertyA(*dev_info, &dev_info_data, SPDRP_ADDRESS,
-						NULL, (PBYTE)&port_nr, sizeof(port_nr), &size) || (size != sizeof(port_nr)))
+				if (!get_dev_port_number(*dev_info, &dev_info_data, &port_nr))
 					usbi_warn(ctx, "could not retrieve port number for device '%s': %s", dev_id, windows_error_str(0));
 				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_info_data.DevInst);
 				if (r == LIBUSB_SUCCESS) {
