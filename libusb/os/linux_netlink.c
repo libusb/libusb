@@ -34,8 +34,8 @@
 #ifdef HAVE_ASM_TYPES_H
 #include <asm/types.h>
 #endif
-#include <linux/netlink.h>
 #include <sys/socket.h>
+#include <linux/netlink.h>
 
 #define NL_GROUP_KERNEL 1
 
