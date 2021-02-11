@@ -2127,6 +2127,8 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
  * If ENABLE_DEBUG_LOGGING is defined then per context callback function will
  * never be called.
  *
+ * Since version 1.0.23, \ref LIBUSB_API_VERSION >= 0x01000107
+ *
  * \param ctx context on which to assign log handler, or NULL for the default
  * context. Parameter ignored if only LIBUSB_LOG_CB_GLOBAL mode is requested.
  * \param cb pointer to the callback function, or NULL to stop log
