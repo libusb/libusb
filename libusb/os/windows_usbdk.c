@@ -359,6 +359,16 @@ func_exit:
 	return r;
 }
 
+static int usbdk_get_serial_string_descriptor(struct libusb_device *device,
+	unsigned char *data, int length)
+{
+	UNREFERENCED_PARAMETER(device);
+	UNREFERENCED_PARAMETER(data);
+	UNREFERENCED_PARAMETER(length);
+
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
@@ -706,6 +716,7 @@ const struct windows_backend usbdk_backend = {
 	usbdk_get_device_list,
 	usbdk_open,
 	usbdk_close,
+	usbdk_get_serial_string_descriptor,
 	usbdk_get_active_config_descriptor,
 	usbdk_get_config_descriptor,
 	usbdk_get_config_descriptor_by_value,

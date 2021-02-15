@@ -201,6 +201,7 @@ static inline void winusb_device_priv_release(struct libusb_device *dev)
 		}
 	}
 	free(priv->config_descriptor);
+	free(priv->serial_string_descriptor);
 	free(priv->hid);
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
 		free(priv->usb_interface[i].path);
@@ -348,6 +349,11 @@ typedef struct _USB_CONFIGURATION_DESCRIPTOR_SHORT {
 	USB_DESCRIPTOR_REQUEST req;
 	USB_CONFIGURATION_DESCRIPTOR desc;
 } USB_CONFIGURATION_DESCRIPTOR_SHORT;
+
+typedef struct _USB_STRING_DESCRIPTOR_SHORT {
+	USB_DESCRIPTOR_REQUEST req;
+	USB_STRING_DESCRIPTOR desc;
+} USB_STRING_DESCRIPTOR_SHORT;
 
 typedef struct USB_INTERFACE_DESCRIPTOR {
 	UCHAR bLength;

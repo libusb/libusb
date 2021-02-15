@@ -645,6 +645,13 @@ static void windows_close(struct libusb_device_handle *dev_handle)
 	priv->backend->close(dev_handle);
 }
 
+static int windows_get_serial_string_descriptor(struct libusb_device *dev,
+	unsigned char *data, int length)
+{
+	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
+	return priv->backend->get_serial_string_descriptor(dev, data, length);
+}
+
 static int windows_get_active_config_descriptor(struct libusb_device *dev,
 	void *buffer, size_t len)
 {
@@ -892,7 +899,7 @@ const struct usbi_os_backend usbi_backend = {
 	NULL,	/* wrap_sys_device */
 	windows_open,
 	windows_close,
-	NULL,	/* get_serial_string_descriptor */
+	windows_get_serial_string_descriptor,
 	windows_get_active_config_descriptor,
 	windows_get_config_descriptor,
 	windows_get_config_descriptor_by_value,

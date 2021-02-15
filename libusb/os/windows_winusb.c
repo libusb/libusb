@@ -1060,6 +1060,98 @@ make_descriptors:
 }
 
 /*
+ * Cache the serial number string descriptor
+ */
+static void cache_serial_string_descriptor(struct libusb_device *dev, HANDLE hub_handle)
+{
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	DWORD size, ret_size;
+
+	USB_STRING_DESCRIPTOR_SHORT sd_buf_short;     // dummy request
+	PUSB_DESCRIPTOR_REQUEST sd_buf_actual = NULL; // actual request
+	PUSB_STRING_DESCRIPTOR sd_data;
+
+	if (dev->device_descriptor.iSerialNumber == 0)
+		return;
+
+	size = sizeof(sd_buf_short);
+	memset(&sd_buf_short, 0, size);
+
+	sd_buf_short.req.ConnectionIndex = (ULONG)dev->port_number;
+	sd_buf_short.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
+	sd_buf_short.req.SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
+	sd_buf_short.req.SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | dev->device_descriptor.iSerialNumber;
+	sd_buf_short.req.SetupPacket.wIndex = 0;
+	sd_buf_short.req.SetupPacket.wLength = (USHORT)sizeof(USB_STRING_DESCRIPTOR);
+
+	// Dummy call to get the required data size. Initial failures are reported as info rather
+	// than error as they can occur for non-penalizing situations, such as with some hubs.
+	// coverity[tainted_data_argument]
+	if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd_buf_short, size,
+		&sd_buf_short, size, &ret_size, NULL)) {
+		usbi_info(ctx, "could not access string descriptor %u (dummy) for '%s': %s", dev->device_descriptor.iSerialNumber,
+			priv->dev_id, windows_error_str(0));
+		return;
+	}
+
+	if ((ret_size != size) || (sd_buf_short.desc.bLength < sizeof(USB_STRING_DESCRIPTOR))) {
+		usbi_info(ctx, "unexpected string descriptor %u size (dummy) for '%s'", dev->device_descriptor.iSerialNumber, priv->dev_id);
+		return;
+	}
+
+	size = sizeof(USB_DESCRIPTOR_REQUEST) + sd_buf_short.desc.bLength;
+	sd_buf_actual = malloc(size);
+	if (sd_buf_actual == NULL) {
+		usbi_err(ctx, "could not allocate string descriptor %u buffer for '%s'", dev->device_descriptor.iSerialNumber, priv->dev_id);
+		return;
+	}
+
+	// Actual call
+	sd_buf_actual->ConnectionIndex = (ULONG)dev->port_number;
+	sd_buf_actual->SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
+	sd_buf_actual->SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
+	sd_buf_actual->SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | dev->device_descriptor.iSerialNumber;
+	sd_buf_actual->SetupPacket.wIndex = 0;
+	sd_buf_actual->SetupPacket.wLength = sd_buf_short.desc.bLength;
+
+	if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, sd_buf_actual, size,
+		sd_buf_actual, size, &ret_size, NULL)) {
+		usbi_err(ctx, "could not access string descriptor %u for '%s': %s", dev->device_descriptor.iSerialNumber,
+			priv->dev_id, windows_error_str(0));
+		safe_free(sd_buf_actual);
+		return;
+	}
+
+	sd_data = (PUSB_STRING_DESCRIPTOR)((UCHAR *)sd_buf_actual + sizeof(USB_DESCRIPTOR_REQUEST));
+
+	if ((size != ret_size) || (sd_data->bLength != sd_buf_short.desc.bLength)) {
+		usbi_err(ctx, "unexpected string descriptor %u size (actual) for '%s'", dev->device_descriptor.iSerialNumber, priv->dev_id);
+		safe_free(sd_buf_actual);
+		return;
+	}
+
+	if (sd_data->bDescriptorType != LIBUSB_DT_STRING) {
+		usbi_err(ctx, "descriptor %u not a string descriptor for '%s'", dev->device_descriptor.iSerialNumber, priv->dev_id);
+		safe_free(sd_buf_actual);
+		return;
+	}
+
+	usbi_dbg(ctx, "cached string descriptor %u (%u bytes)",
+		dev->device_descriptor.iSerialNumber, sd_data->bLength);
+
+	// Cache the descriptor
+	priv->serial_string_descriptor = malloc(sd_data->bLength);
+	if (priv->serial_string_descriptor != NULL) {
+		memcpy(priv->serial_string_descriptor, sd_data, sd_data->bLength);
+	} else {
+		usbi_err(ctx, "could not allocate string descriptor %u buffer for '%s'", dev->device_descriptor.iSerialNumber, priv->dev_id);
+	}
+
+	safe_free(sd_buf_actual);
+}
+
+/*
  * Populate a libusb device structure
  */
 static int init_device(struct libusb_device *dev, struct libusb_device *parent_dev,
@@ -1192,6 +1284,9 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 
 		// Cache as many config descriptors as we can
 		cache_config_descriptors(dev, hub_handle);
+
+		// Cache serial string descriptor
+		cache_serial_string_descriptor(dev, hub_handle);
 
 		// In their great wisdom, Microsoft decided to BREAK the USB speed report between Windows 7 and Windows 8
 		if (windows_version >= WINDOWS_8) {
@@ -1914,6 +2009,20 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	return r;
 }
 
+static int winusb_get_serial_string_descriptor(struct libusb_device *dev,
+	unsigned char *buffer, int len)
+{
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	int size;
+
+	if (priv->serial_string_descriptor == NULL)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	size = MIN(priv->serial_string_descriptor->bLength, len);
+	memcpy(buffer, priv->serial_string_descriptor, size);
+	return size;
+}
+
 static int winusb_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len)
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
@@ -2281,6 +2390,7 @@ const struct windows_backend winusb_backend = {
 	winusb_get_device_list,
 	winusb_open,
 	winusb_close,
+	winusb_get_serial_string_descriptor,
 	winusb_get_active_config_descriptor,
 	winusb_get_config_descriptor,
 	winusb_get_config_descriptor_by_value,

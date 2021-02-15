@@ -189,6 +189,12 @@ typedef struct USB_CONFIGURATION_DESCRIPTOR {
 	UCHAR  MaxPower;
 } USB_CONFIGURATION_DESCRIPTOR, *PUSB_CONFIGURATION_DESCRIPTOR;
 
+typedef struct USB_STRING_DESCRIPTOR {
+	UCHAR bLength;
+	UCHAR bDescriptorType;
+	WCHAR bString[1];
+} USB_STRING_DESCRIPTOR, *PUSB_STRING_DESCRIPTOR;
+
 #include <poppack.h>
 
 #define MAX_DEVICE_ID_LEN	200
@@ -267,6 +273,7 @@ struct winusb_device_priv {
 	} usb_interface[USB_MAXINTERFACES];
 	struct hid_device_priv *hid;
 	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptor; // list of pointers to the cached config descriptors
+	PUSB_STRING_DESCRIPTOR serial_string_descriptor;
 	GUID class_guid; // checked for change during re-enumeration
 };
 
@@ -321,6 +328,8 @@ struct windows_backend {
 		struct discovered_devs **discdevs);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
+	int (*get_serial_string_descriptor)(struct libusb_device *device,
+		unsigned char *data, int length);
 	int (*get_active_config_descriptor)(struct libusb_device *device,
 		void *buffer, size_t len);
 	int (*get_config_descriptor)(struct libusb_device *device,
