@@ -666,6 +666,56 @@ static void darwin_exit (struct libusb_context *ctx) {
   usbi_mutex_unlock(&darwin_cached_devices_mutex);
 }
 
+static int darwin_get_serial_string_descriptor(struct libusb_device *dev, unsigned char *buffer, int length) {
+  struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
+  io_iterator_t deviceIterator;
+  io_service_t service;
+  kern_return_t kresult;
+  int r;
+  CFStringRef cf;
+  UInt8 utf16[255];
+  CFIndex utf16_len;
+
+  utf16_len = -1;
+
+  kresult = usb_setup_device_iterator (&deviceIterator, priv->location);
+  if (kresult != kIOReturnSuccess)
+    return darwin_to_libusb (kresult);
+
+  service = IOIteratorNext (deviceIterator);
+  IOObjectRelease(deviceIterator);
+  if (service == IO_OBJECT_NULL)
+    return LIBUSB_ERROR_NOT_FOUND;
+
+  cf = IORegistryEntryCreateCFProperty(service, CFSTR(kUSBSerialNumberString), kCFAllocatorDefault, 0);
+  IOObjectRelease(service);
+  if (cf == NULL)
+    return LIBUSB_ERROR_NOT_FOUND;
+
+  CFStringGetBytes(cf, CFRangeMake(0, CFStringGetLength(cf)), kCFStringEncodingUTF16LE, '?', false, utf16, sizeof(utf16), &utf16_len);
+  CFRelease(cf);
+
+  if (utf16_len <= 0)
+    return LIBUSB_ERROR_NOT_FOUND;
+
+  r = 0;
+
+  if (length > 2) {
+    r = r + MIN(length - 2, utf16_len);
+    memcpy(buffer + 2, utf16, r);
+  }
+  if (length > 1) {
+    r = r + 1;
+    buffer[1] = LIBUSB_DT_STRING;
+  }
+  if (length > 0) {
+    r = r + 1;
+    buffer[0] = r;
+  }
+
+  return r;
+}
+
 static int get_configuration_index (struct libusb_device *dev, UInt8 config_value) {
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   UInt8 i, numConfig;
@@ -2644,6 +2694,7 @@ const struct usbi_os_backend usbi_backend = {
         .caps = USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
         .init = darwin_init,
         .exit = darwin_exit,
+        .get_serial_string_descriptor = darwin_get_serial_string_descriptor,
         .get_active_config_descriptor = darwin_get_active_config_descriptor,
         .get_config_descriptor = darwin_get_config_descriptor,
         .hotplug_poll = darwin_hotplug_poll,
