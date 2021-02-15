@@ -30,6 +30,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <iconv.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -495,6 +496,70 @@ static int open_sysfs_attr(struct libusb_context *ctx,
 	return fd;
 }
 
+static int iconv_utf8_to_utf16le(char *in, size_t in_len, char *out, size_t out_len) {
+	char *i, *o;
+	iconv_t convert;
+
+	i = in;
+	o = out;
+
+	convert = iconv_open("UTF-16LE", "UTF-8");
+	if (iconv(convert, &i, &in_len, &o, &out_len) == (size_t)-1) {
+		return -1;
+	}
+	iconv_close(convert);
+	return (o - out);
+}
+
+static int read_sysfs_attr_string_descriptor(struct libusb_context *ctx,
+	const char *sysfs_dir, const char *attr, unsigned char *buffer, int length)
+{
+	char utf16[255];
+	char utf8[255];
+	ssize_t r;
+	int fd, utf16_len, utf8_len;
+
+	fd = open_sysfs_attr(ctx, sysfs_dir, attr);
+	if (fd < 0)
+		return fd;
+
+	r = read(fd, utf8, sizeof(utf8) - 1);
+	if (r < 0) {
+		r = errno;
+		close(fd);
+		if (r == ENODEV)
+			return LIBUSB_ERROR_NO_DEVICE;
+		usbi_err(ctx, "attribute %s read failed, errno=%zd", attr, r);
+		return LIBUSB_ERROR_IO;
+	}
+	close(fd);
+
+	utf8_len = r;
+
+	utf16_len = iconv_utf8_to_utf16le(utf8, utf8_len, utf16, sizeof(utf16));
+	if (utf16_len < 0) {
+		usbi_err(ctx, "iconv %s failed errno=%d", attr, errno);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	r = 0;
+
+	if (length > 2) {
+		r = r + MIN(length - 2, utf16_len);
+		memcpy(buffer + 2, utf16, r);
+	}
+	if (length > 1) {
+		r = r + 1;
+		buffer[1] = LIBUSB_DT_STRING;
+	}
+	if (length > 0) {
+		r = r + 1;
+		buffer[0] = r;
+	}
+
+	return r;
+}
+
 /* Note only suitable for attributes which always read >= 0, < 0 is error */
 static int read_sysfs_attr(struct libusb_context *ctx,
 	const char *sysfs_dir, const char *attr, int max_value, int *value_p)
@@ -574,6 +639,15 @@ static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 		return ret;
 
 	return linux_enumerate_device(ctx, busnum, devaddr, devname);
+}
+
+static int op_get_serial_string_descriptor(struct libusb_device *dev,
+	unsigned char *data, int length)
+{
+	struct linux_device_priv *priv = usbi_get_device_priv(dev);
+
+	return read_sysfs_attr_string_descriptor(DEVICE_CTX(dev), priv->sysfs_dir,
+		"serial", data, length);
 }
 
 /* read the bConfigurationValue for a device */
@@ -2772,6 +2846,7 @@ const struct usbi_os_backend usbi_backend = {
 	.exit = op_exit,
 	.set_option = op_set_option,
 	.hotplug_poll = op_hotplug_poll,
+	.get_serial_string_descriptor = op_get_serial_string_descriptor,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
