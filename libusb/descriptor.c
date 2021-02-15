@@ -539,6 +539,49 @@ int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
 }
 
 /** \ingroup libusb_desc
+ * Get the USB device serial for a given device. The string returned is Unicode,
+ * as detailed in the USB specifications.
+ *
+ * \param dev the device
+ * \param data output buffer for descriptor
+ * \param length size of data buffer
+ * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
+ * \see libusb_get_serial_string_descriptor_ascii()
+ */
+int API_EXPORTED libusb_get_serial_string_descriptor(libusb_device *dev,
+	unsigned char *data, int length)
+{
+	if (usbi_backend.get_serial_string_descriptor) {
+		return usbi_backend.get_serial_string_descriptor(dev, data, length);
+	}
+
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+/** \ingroup libusb_desc
+ * Get the USB device serial for a given device in C style ASCII.
+ *
+ * Wrapper around libusb_get_serial_string_descriptor().
+ *
+ * \param dev the device
+ * \param data output buffer for ASCII string descriptor
+ * \param length size of data buffer
+ * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
+ */
+int API_EXPORTED libusb_get_serial_string_descriptor_ascii(libusb_device *dev,
+	unsigned char *data, int length)
+{
+	union usbi_string_desc_buf str;
+	int r;
+
+	r = libusb_get_serial_string_descriptor(dev, str.buf, sizeof(str.buf));
+	if (r < 0)
+		return r;
+
+	return usbi_string_descriptor_to_ascii(&str, data, length);
+}
+
+/** \ingroup libusb_desc
  * Get the USB configuration descriptor for the currently active configuration.
  * This is a non-blocking function which does not involve any requests being
  * sent to the device.

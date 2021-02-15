@@ -191,6 +191,7 @@ const struct usbi_os_backend usbi_backend = {
 	/*.open =*/ haiku_open,
 	/*.close =*/ haiku_close,
 
+	/*.get_serial_string_descriptor =*/ NULL,
 	/*.get_active_config_descriptor =*/ haiku_get_active_config_descriptor,
 	/*.get_config_descriptor =*/ haiku_get_config_descriptor,
 	/*.get_config_descriptor_by_value =*/ NULL,
