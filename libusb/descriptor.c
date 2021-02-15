@@ -1070,6 +1070,27 @@ void API_EXPORTED libusb_free_container_id_descriptor(
 	free(container_id);
 }
 
+int usbi_string_descriptor_to_ascii(union usbi_string_desc_buf* str,
+	unsigned char *data, int length)
+{
+	int si, di;
+	uint16_t wdata;
+	di = 0;
+	for (si = 2; si < str->desc.bLength; si += 2) {
+		if (di >= (length - 1))
+			break;
+
+		wdata = libusb_le16_to_cpu(str->desc.wData[di]);
+		if (wdata < 0x80)
+			data[di++] = (unsigned char)wdata;
+		else
+			data[di++] = '?'; /* non-ASCII */
+	}
+
+	data[di] = 0;
+	return di;
+}
+
 /** \ingroup libusb_desc
  * Get a platform descriptor
  *
@@ -1148,8 +1169,8 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 	uint8_t desc_index, unsigned char *data, int length)
 {
 	union usbi_string_desc_buf str;
-	int r, si, di;
-	uint16_t langid, wdata;
+	int r;
+	uint16_t langid;
 
 	/* Asking for the zero'th index is special - it returns a string
 	 * descriptor that contains all the language IDs supported by the
@@ -1184,20 +1205,7 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 	else if ((str.desc.bLength & 1) || str.desc.bLength != r)
 		usbi_warn(HANDLE_CTX(dev_handle), "suspicious bLength %u for string descriptor (read %d)", str.desc.bLength, r);
 
-	di = 0;
-	for (si = 2; si < str.desc.bLength; si += 2) {
-		if (di >= (length - 1))
-			break;
-
-		wdata = libusb_le16_to_cpu(str.desc.wData[di]);
-		if (wdata < 0x80)
-			data[di++] = (unsigned char)wdata;
-		else
-			data[di++] = '?'; /* non-ASCII */
-	}
-
-	data[di] = 0;
-	return di;
+	return usbi_string_descriptor_to_ascii(&str, data, length);
 }
 
 static int parse_iad_array(struct libusb_context *ctx,
