@@ -728,6 +728,9 @@ void usbi_destroy_event(usbi_event_t *event);
 void usbi_signal_event(usbi_event_t *event);
 void usbi_clear_event(usbi_event_t *event);
 
+int usbi_string_descriptor_to_ascii(union usbi_string_desc_buf* str,
+	unsigned char *data, int length);
+
 #ifdef HAVE_OS_TIMER
 int usbi_create_timer(usbi_timer_t *timer);
 void usbi_destroy_timer(usbi_timer_t *timer);
