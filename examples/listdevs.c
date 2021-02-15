@@ -45,6 +45,13 @@ static void print_devs(libusb_device **devs)
 			for (j = 1; j < r; j++)
 				printf(".%d", path[j]);
 		}
+
+		unsigned char buf[255];
+		r = libusb_get_serial_string_descriptor_ascii(dev, buf, sizeof(buf));
+		if (r > 0) {
+			printf(" serial: \"%s\"", buf);
+		}
+
 		printf("\n");
 	}
 }
