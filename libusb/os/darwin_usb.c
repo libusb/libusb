@@ -2169,7 +2169,7 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
 
   usbi_dbg ("handling transfer completion type %s with kernel status %d", transfer_types[transfer->type], tpriv->result);
 
-  if (kIOReturnSuccess == tpriv->result || kIOReturnUnderrun == tpriv->result) {
+  if (kIOReturnSuccess == tpriv->result || kIOReturnUnderrun == tpriv->result || kIOUSBTransactionTimeout == tpriv->result) {
     if (is_isoc && tpriv->isoc_framelist) {
       /* copy isochronous results back */
 
