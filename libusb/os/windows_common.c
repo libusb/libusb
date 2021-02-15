@@ -892,6 +892,7 @@ const struct usbi_os_backend usbi_backend = {
 	NULL,	/* wrap_sys_device */
 	windows_open,
 	windows_close,
+	NULL,	/* get_serial_string_descriptor */
 	windows_get_active_config_descriptor,
 	windows_get_config_descriptor,
 	windows_get_config_descriptor_by_value,

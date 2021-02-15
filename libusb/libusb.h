@@ -1588,6 +1588,10 @@ int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
 	int *config);
 int LIBUSB_CALL libusb_get_device_descriptor(libusb_device *dev,
 	struct libusb_device_descriptor *desc);
+int LIBUSB_CALL libusb_get_serial_string_descriptor(libusb_device *dev,
+	unsigned char *data, int length);
+int LIBUSB_CALL libusb_get_serial_string_descriptor_ascii(libusb_device *dev,
+	unsigned char *data, int length);
 int LIBUSB_CALL libusb_get_active_config_descriptor(libusb_device *dev,
 	struct libusb_config_descriptor **config);
 int LIBUSB_CALL libusb_get_config_descriptor(libusb_device *dev,

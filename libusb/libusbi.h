@@ -1079,6 +1079,20 @@ struct usbi_os_backend {
 	 */
 	void (*close)(struct libusb_device_handle *dev_handle);
 
+	/* Retrieve the device serial number string from a device.
+	 *
+	 * The descriptor should be retrieved from memory, NOT via bus I/O to the
+	 * device. This means that you may have to cache it in a private structure
+	 * during get_device_list enumeration. Alternatively, you may be able
+	 * to retrieve it from a kernel interface still without generating bus I/O.
+	 *
+	 * This function is expected to write length bytes into data or fewer.
+	 *
+	 * Return size of written data on success or a LIBUSB_ERROR code on failure.
+	 */
+	int (*get_serial_string_descriptor)(struct libusb_device *dev,
+		unsigned char *data, int length);
+
 	/* Get the ACTIVE configuration descriptor for a device.
 	 *
 	 * The descriptor should be retrieved from memory, NOT via bus I/O to the

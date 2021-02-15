@@ -104,6 +104,10 @@ EXPORTS
   libusb_get_port_numbers@12 = libusb_get_port_numbers
   libusb_get_port_path
   libusb_get_port_path@16 = libusb_get_port_path
+  libusb_get_serial_string_descriptor
+  libusb_get_serial_string_descriptor@12 = libusb_get_serial_string_descriptor
+  libusb_get_serial_string_descriptor_ascii
+  libusb_get_serial_string_descriptor_ascii@12 = libusb_get_serial_string_descriptor_ascii
   libusb_get_ss_endpoint_companion_descriptor
   libusb_get_ss_endpoint_companion_descriptor@12 = libusb_get_ss_endpoint_companion_descriptor
   libusb_get_ss_usb_device_capability_descriptor
