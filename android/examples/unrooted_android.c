@@ -1,5 +1,5 @@
 /*
- *  libusb example program for reading out the usb device specifications for unRooted Android Devices based of testlibusb.c
+ *  libusb example program for reading out the usb device specifications for Unrooted Android Devices based of testlibusb.c
  *  Copyright 2020 Peter Stoiber
  *
  *  This library is free software; you can redistribute it and/or
@@ -22,14 +22,15 @@
 
 /*
  * This example creates a shared Object which can be accessed over JNA or JNI from Java or Kotlin in Android.
+ * Hint: If you are using Android Studio set the "Debug type" to "Java Only" to receive debug messages. 
  */
 
 /*
  * Todo:
  * First you have to connect your Usb Device from the Java side.
- * Use the android.hardware.usb class for finding the USB Device, claiming the interfaces and open the UsbDeviceConnection.
- * Obtain the native File Descriptor --> UsbDeviceConnection.getFileDescriptor()
- * Pass the received int Value to the main method of this code (over JNA)
+ * Use the android.hardware.usb class for finding the USB Device, claiming the interfaces and open the usb_device_connection.
+ * Obtain the native File Descriptor --> usb_device_connection.getFileDescriptor()
+ * Pass the received int Value to the unrooted_usb_description method of this code (over JNA)
  */
 
 /*
@@ -40,21 +41,20 @@
 
 /*
  Example JNA Approach:
-    public interface unRootedSample extends Library {
-        public static final unRootedSample INSTANCE = Native.load("unRootedAndroid", unRootedSample.class);
+    public interface unrooted_sample extends Library {
+        public static final unrooted_sample INSTANCE = Native.load("unrooted_android", unrooted_sample.class);
         public int main (int fileDescriptor);
     }
-    unRootedSample.INSTANCE.main( usbDeviceConnection.getFileDescriptor());
+    unrooted_sample.INSTANCE.unrooted_usb_description( usbDeviceConnection.getFileDescriptor());
  */
 
 #include <jni.h>
 #include <string.h>
+#include "unrooted_android.h"
 #include "libusb.h"
-#ifdef __ANDROID__
 #include <android/log.h>
 #define  LOG_TAG    "LibUsb"
 #define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#endif
 
 int verbose = 0;
 
@@ -268,8 +268,10 @@ static void print_device(libusb_device *dev, libusb_device_handle *handle)
         libusb_close(handle);
 }
 
+
 // fileDescriptor = is the native File Descriptor obtained in Java and transfered to native over JNA for Example.
-extern int main(int fileDescriptor) {
+int unrooted_usb_description(int fileDescriptor)
+{
     libusb_context *ctx;
     libusb_device_handle *devh = NULL;
     int r = 0;
@@ -288,11 +290,11 @@ extern int main(int fileDescriptor) {
     if (r < 0) {
         LOGD("libusb_wrap_sys_device failed: %d\n", r);
         return r;
-    }
-    else if (devh == NULL) {
+    } else if (devh == NULL) {
         LOGD("libusb_wrap_sys_device returned invalid handle\n");
         return r;
     }
     print_device(libusb_get_device(devh), devh);
     return r;
 }
+
