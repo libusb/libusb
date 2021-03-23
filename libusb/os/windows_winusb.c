@@ -1586,8 +1586,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						(LPBYTE)guid_string, &size);
 				pRegCloseKey(key);
 				if ((s == ERROR_SUCCESS) &&
-				    (((reg_type == REG_SZ) && (size == (sizeof(guid_string) - sizeof(char)))) ||
-				     ((reg_type == REG_MULTI_SZ) && (size == sizeof(guid_string))))) {
+				    (((reg_type == REG_SZ) && (size >= (sizeof(guid_string) - sizeof(uint16_t))) && (size <= sizeof(guid_string))) ||
+				     ((reg_type == REG_MULTI_SZ) && (size >= sizeof(guid_string)) && (size <= (sizeof(guid_string) - sizeof(uint16_t)))))) {
 					if (nb_guids == guid_size) {
 						new_guid_list = realloc((void *)guid_list, (guid_size + GUID_SIZE_STEP) * sizeof(void *));
 						if (new_guid_list == NULL) {
