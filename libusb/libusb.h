@@ -45,6 +45,8 @@ typedef SSIZE_T ssize_t;
 
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
 #define ZERO_SIZED_ARRAY		/* [] - valid C99 code */
+#elif defined(__WATCOMC__)
+#define ZERO_SIZED_ARRAY	1	/* [0] - non-standard, but usually working code */
 #else
 #define ZERO_SIZED_ARRAY	0	/* [0] - non-standard, but usually working code */
 #endif /* __STDC_VERSION__ */
@@ -904,7 +906,7 @@ struct libusb_container_id_descriptor {
 
 /** \ingroup libusb_asyncio
  * Setup packet for control transfers. */
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__WATCOMC__)
 #pragma pack(push, 1)
 #endif
 struct libusb_control_setup {
@@ -932,7 +934,7 @@ struct libusb_control_setup {
 	/** Number of bytes to transfer */
 	uint16_t wLength;
 } LIBUSB_PACKED;
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__WATCOMC__)
 #pragma pack(pop)
 #endif
 
