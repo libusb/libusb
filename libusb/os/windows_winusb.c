@@ -1721,6 +1721,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 
 					priv = winusb_device_priv_init(dev);
 					priv->dev_id = _strdup(dev_id);
+					priv->class_guid = dev_info_data.ClassGuid;
 					if (priv->dev_id == NULL) {
 						libusb_unref_device(dev);
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
@@ -1731,6 +1732,12 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					priv = usbi_get_device_priv(dev);
 					if (strcmp(priv->dev_id, dev_id) != 0) {
 						usbi_dbg("device instance ID for session [%lX] changed", session_id);
+						usbi_disconnect_device(dev);
+						libusb_unref_device(dev);
+						goto alloc_device;
+					}
+					if (!IsEqualGUID(&priv->class_guid, &dev_info_data.ClassGuid)) {
+						usbi_dbg("device class GUID for session [%lX] changed", session_id);
 						usbi_disconnect_device(dev);
 						libusb_unref_device(dev);
 						goto alloc_device;
