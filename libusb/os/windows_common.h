@@ -259,7 +259,7 @@ struct winusb_device_priv {
 	} usb_interface[USB_MAXINTERFACES];
 	struct hid_device_priv *hid;
 	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptor; // list of pointers to the cached config descriptors
-+	GUID class_guid; // ClassGUID is cheched for change during re-enumeration @note cached descriptors invalidated if the class changes
+	GUID class_guid; // ClassGUID is cheched for change during re-enumeration @note cached descriptors invalidated if the class changes
 };
 
 struct usbdk_device_handle_priv {
