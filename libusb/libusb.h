@@ -904,7 +904,7 @@ struct libusb_container_id_descriptor {
 
 /** \ingroup libusb_asyncio
  * Setup packet for control transfers. */
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__WATCOMC__)
 #pragma pack(push, 1)
 #endif
 struct libusb_control_setup {
@@ -932,7 +932,7 @@ struct libusb_control_setup {
 	/** Number of bytes to transfer */
 	uint16_t wLength;
 } LIBUSB_PACKED;
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__WATCOMC__)
 #pragma pack(pop)
 #endif
 
