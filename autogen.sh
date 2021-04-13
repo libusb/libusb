@@ -2,7 +2,9 @@
 
 set -e
 
-./bootstrap.sh
+srcdir="$(dirname "$0")"
+
+"$srcdir"/bootstrap.sh
 if [ -z "$NOCONFIGURE" ]; then
-    exec ./configure --enable-examples-build --enable-tests-build "$@"
+    exec "$srcdir"/configure --enable-examples-build --enable-tests-build "$@"
 fi
