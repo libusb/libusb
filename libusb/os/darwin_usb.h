@@ -148,6 +148,16 @@
 #define IO_OBJECT_NULL ((io_object_t) 0)
 #endif
 
+/* Testing availability */
+#ifndef __has_builtin
+  #define __has_builtin(x) 0  // Compatibility with non-clang compilers.
+#endif
+#if __has_builtin(__builtin_available)
+  #define HAS_CAPTURE_DEVICE() __builtin_available(macOS 10.10, *)
+#else
+  #define HAS_CAPTURE_DEVICE() 0
+#endif
+
 typedef IOCFPlugInInterface *io_cf_plugin_ref_t;
 typedef IONotificationPortRef io_notification_port_t;
 
@@ -166,6 +176,7 @@ struct darwin_cached_device {
   int                   can_enumerate;
   int                   refcount;
   bool                  in_reenumerate;
+  int                   capture_count;
 };
 
 struct darwin_device_priv {

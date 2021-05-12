@@ -1994,7 +1994,7 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev_handle,
  * Detach a kernel driver from an interface. If successful, you will then be
  * able to claim the interface and perform I/O.
  *
- * This functionality is not available on Darwin or Windows.
+ * This functionality is not available on Windows.
  *
  * Note that libusb itself also talks to the device through a special kernel
  * driver, if this driver is already attached to the device, this call will
@@ -2030,10 +2030,9 @@ int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
 
 /** \ingroup libusb_dev
  * Re-attach an interface's kernel driver, which was previously detached
- * using libusb_detach_kernel_driver(). This call is only effective on
- * Linux and returns LIBUSB_ERROR_NOT_SUPPORTED on all other platforms.
+ * using libusb_detach_kernel_driver().
  *
- * This functionality is not available on Darwin or Windows.
+ * This functionality is not available on Windows.
  *
  * \param dev_handle a device handle
  * \param interface_number the interface to attach the driver from
