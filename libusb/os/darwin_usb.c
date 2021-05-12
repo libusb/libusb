@@ -172,6 +172,7 @@ static void darwin_deref_cached_device(struct darwin_cached_device *cached_dev) 
       (*(cached_dev->device))->Release(cached_dev->device);
       cached_dev->device = NULL;
     }
+    IOObjectRelease (cached_dev->service);
     free (cached_dev);
   }
 }
@@ -1057,6 +1058,9 @@ static enum libusb_error darwin_get_cached_device(io_service_t service, struct d
       (*device)->GetLocationID (device, &new_device->location);
       new_device->port = port;
       new_device->parent_session = parent_sessionID;
+    } else {
+      /* release the ref to old device's service */
+      IOObjectRelease (new_device->service);
     }
 
     /* keep track of devices regardless of if we successfully enumerate them to
@@ -1065,6 +1069,10 @@ static enum libusb_error darwin_get_cached_device(io_service_t service, struct d
 
     new_device->session = sessionID;
     new_device->device = device;
+    new_device->service = service;
+
+    /* retain the service */
+    IOObjectRetain (service);
 
     /* cache the device descriptor */
     ret = darwin_cache_device_descriptor(new_device);
@@ -2294,6 +2302,34 @@ static int darwin_free_streams (struct libusb_device_handle *dev_handle, unsigne
 
 #if InterfaceVersion >= 700
 
+/* macOS APIs for getting entitlement values */
+
+#if TARGET_OS_OSX
+#include <Security/Security.h>
+#else
+typedef struct __SecTask *SecTaskRef;
+extern SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator);
+extern CFTypeRef SecTaskCopyValueForEntitlement(SecTaskRef task, CFStringRef entitlement, CFErrorRef *error);
+#endif
+
+static bool darwin_has_capture_entitlements (void) {
+  SecTaskRef task;
+  CFTypeRef value;
+  bool entitled;
+
+  task = SecTaskCreateFromSelf (kCFAllocatorDefault);
+  if (task == NULL) {
+    return false;
+  }
+  value = SecTaskCopyValueForEntitlement(task, CFSTR("com.apple.vm.device-access"), NULL);
+  CFRelease (task);
+  entitled = value && (CFGetTypeID (value) == CFBooleanGetTypeID ()) && CFBooleanGetValue (value);
+  if (value) {
+    CFRelease (value);
+  }
+  return entitled;
+}
+
 static int darwin_reload_device (struct libusb_device_handle *dev_handle) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   enum libusb_error err;
@@ -2325,6 +2361,19 @@ static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle,
   }
 
   if (dpriv->capture_count == 0) {
+    /* request authorization */
+    if (darwin_has_capture_entitlements ()) {
+      kresult = IOServiceAuthorize (dpriv->service, kIOServiceInteractionAllowed);
+      if (kresult != kIOReturnSuccess) {
+        usbi_err (HANDLE_CTX (dev_handle), "IOServiceAuthorize: %s", darwin_error_str(kresult));
+        return darwin_to_libusb (kresult);
+      }
+      /* we need start() to be called again for authorization status to refresh */
+      err = darwin_reload_device (dev_handle);
+      if (err != LIBUSB_SUCCESS) {
+        return err;
+      }
+    }
     /* reset device to release existing drivers */
     err = darwin_reenumerate_device (dev_handle, true);
     if (err != LIBUSB_SUCCESS) {

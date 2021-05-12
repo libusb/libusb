@@ -161,7 +161,7 @@ fi
 case $backend in
 darwin)
 	AC_CHECK_FUNCS([pthread_threadid_np])
-	LIBS="${LIBS} -lobjc -Wl,-framework,IOKit -Wl,-framework,CoreFoundation"
+	LIBS="${LIBS} -lobjc -Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-framework,Security"
 	;;
 haiku)
 	LIBS="${LIBS} -lbe"
