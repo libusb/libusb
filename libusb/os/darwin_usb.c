@@ -81,6 +81,7 @@ static pthread_t libusb_darwin_at;
 static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len);
 static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
 static int darwin_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
+static int darwin_reenumerate_device(struct libusb_device_handle *dev_handle, bool capture);
 static int darwin_reset_device(struct libusb_device_handle *dev_handle);
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0);
 
@@ -1673,7 +1674,7 @@ static int darwin_restore_state (struct libusb_device_handle *dev_handle, int8_t
   return LIBUSB_SUCCESS;
 }
 
-static int darwin_reset_device(struct libusb_device_handle *dev_handle) {
+static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   unsigned long claimed_interfaces = dev_handle->claimed_interfaces;
   int8_t active_config = dpriv->active_config;
@@ -1708,7 +1709,7 @@ static int darwin_reset_device(struct libusb_device_handle *dev_handle) {
     return darwin_to_libusb (kresult);
   }
 
-  usbi_dbg ("darwin/reset_device: waiting for re-enumeration to complete...");
+  usbi_dbg ("darwin/reenumerate_device: waiting for re-enumeration to complete...");
 
   time = 0;
   while (dpriv->in_reenumerate) {
@@ -1722,23 +1723,23 @@ static int darwin_reset_device(struct libusb_device_handle *dev_handle) {
   }
 
   /* compare descriptors */
-  usbi_dbg ("darwin/reset_device: checking whether descriptors changed");
+  usbi_dbg ("darwin/reenumerate_device: checking whether descriptors changed");
 
   if (memcmp (&descriptor, &dpriv->dev_descriptor, sizeof (descriptor))) {
     /* device descriptor changed. need to return not found. */
-    usbi_dbg ("darwin/reset_device: device descriptor changed");
+    usbi_dbg ("darwin/reenumerate_device: device descriptor changed");
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
   for (i = 0 ; i < descriptor.bNumConfigurations ; ++i) {
     (void) (*(dpriv->device))->GetConfigurationDescriptorPtr (dpriv->device, i, &cached_configuration);
     if (memcmp (cached_configuration, cached_configurations + i, sizeof (cached_configurations[i]))) {
-      usbi_dbg ("darwin/reset_device: configuration descriptor %d changed", i);
+      usbi_dbg ("darwin/reenumerate_device: configuration descriptor %d changed", i);
       return LIBUSB_ERROR_NOT_FOUND;
     }
   }
 
-  usbi_dbg ("darwin/reset_device: device reset complete. restoring state...");
+  usbi_dbg ("darwin/reenumerate_device: device reset complete. restoring state...");
 
   return darwin_restore_state (dev_handle, active_config, claimed_interfaces);
 }
@@ -2297,7 +2298,7 @@ const struct usbi_os_backend usbi_backend = {
 
         .set_interface_altsetting = darwin_set_interface_altsetting,
         .clear_halt = darwin_clear_halt,
-        .reset_device = darwin_reset_device,
+        .reset_device = darwin_reenumerate_device,
 
 #if InterfaceVersion >= 550
         .alloc_streams = darwin_alloc_streams,
