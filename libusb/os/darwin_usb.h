@@ -33,56 +33,56 @@
 /* IOUSBInterfaceInferface */
 
 /* New in OS 10.12.0. */
-#if defined (kIOUSBInterfaceInterfaceID800) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 101200)
+#if defined (kIOUSBInterfaceInterfaceID800)
 
 #define usb_interface_t IOUSBInterfaceInterface800
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID800
 #define InterfaceVersion 800
 
 /* New in OS 10.10.0. */
-#elif defined (kIOUSBInterfaceInterfaceID700) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 101000)
+#elif defined (kIOUSBInterfaceInterfaceID700)
 
 #define usb_interface_t IOUSBInterfaceInterface700
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID700
 #define InterfaceVersion 700
 
 /* New in OS 10.9.0. */
-#elif defined (kIOUSBInterfaceInterfaceID650) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
+#elif defined (kIOUSBInterfaceInterfaceID650)
 
 #define usb_interface_t IOUSBInterfaceInterface650
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID650
 #define InterfaceVersion 650
 
 /* New in OS 10.8.2 but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBInterfaceInterfaceID550) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
+#elif defined (kIOUSBInterfaceInterfaceID550)
 
 #define usb_interface_t IOUSBInterfaceInterface550
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID550
 #define InterfaceVersion 550
 
 /* New in OS 10.7.3 but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBInterfaceInterfaceID500) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1080)
+#elif defined (kIOUSBInterfaceInterfaceID500)
 
 #define usb_interface_t IOUSBInterfaceInterface500
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID500
 #define InterfaceVersion 500
 
 /* New in OS 10.5.0. */
-#elif defined (kIOUSBInterfaceInterfaceID300) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1050)
+#elif defined (kIOUSBInterfaceInterfaceID300)
 
 #define usb_interface_t IOUSBInterfaceInterface300
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID300
 #define InterfaceVersion 300
 
 /* New in OS 10.4.5 (or 10.4.6?) but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBInterfaceInterfaceID245) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1050)
+#elif defined (kIOUSBInterfaceInterfaceID245)
 
 #define usb_interface_t IOUSBInterfaceInterface245
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID245
 #define InterfaceVersion 245
 
 /* New in OS 10.4.0. */
-#elif defined (kIOUSBInterfaceInterfaceID220) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1040)
+#elif defined (kIOUSBInterfaceInterfaceID220)
 
 #define usb_interface_t IOUSBInterfaceInterface220
 #define InterfaceInterfaceID kIOUSBInterfaceInterfaceID220
@@ -97,42 +97,42 @@
 /* IOUSBDeviceInterface */
 
 /* New in OS 10.9.0. */
-#if defined (kIOUSBDeviceInterfaceID650) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
+#if defined (kIOUSBDeviceInterfaceID650)
 
 #define usb_device_t    IOUSBDeviceInterface650
 #define DeviceInterfaceID kIOUSBDeviceInterfaceID650
 #define DeviceVersion 650
 
 /* New in OS 10.7.3 but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBDeviceInterfaceID500) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1080)
+#elif defined (kIOUSBDeviceInterfaceID500)
 
 #define usb_device_t    IOUSBDeviceInterface500
 #define DeviceInterfaceID kIOUSBDeviceInterfaceID500
 #define DeviceVersion 500
 
 /* New in OS 10.5.4 but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBDeviceInterfaceID320) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
+#elif defined (kIOUSBDeviceInterfaceID320)
 
 #define usb_device_t    IOUSBDeviceInterface320
 #define DeviceInterfaceID kIOUSBDeviceInterfaceID320
 #define DeviceVersion 320
 
 /* New in OS 10.5.0. */
-#elif defined (kIOUSBDeviceInterfaceID300) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1050)
+#elif defined (kIOUSBDeviceInterfaceID300)
 
 #define usb_device_t    IOUSBDeviceInterface300
 #define DeviceInterfaceID kIOUSBDeviceInterfaceID300
 #define DeviceVersion 300
 
 /* New in OS 10.4.5 (or 10.4.6?) but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBDeviceInterfaceID245) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1050)
+#elif defined (kIOUSBDeviceInterfaceID245)
 
 #define usb_device_t    IOUSBDeviceInterface245
 #define DeviceInterfaceID kIOUSBDeviceInterfaceID245
 #define DeviceVersion 245
 
 /* New in OS 10.2.3 but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBDeviceInterfaceID197) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 1030)
+#elif defined (kIOUSBDeviceInterfaceID197)
 
 #define usb_device_t    IOUSBDeviceInterface197
 #define DeviceInterfaceID kIOUSBDeviceInterfaceID197
