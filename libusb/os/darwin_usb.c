@@ -41,6 +41,10 @@
  * function. Its use is also conditionalized to only older deployment targets. */
 #define OBJC_SILENCE_GC_DEPRECATIONS 1
 
+/* Default timeout to 10s for reenumerate. This is needed because USBDeviceReEnumerate
+ * does not return error status on macOS. */
+#define DARWIN_REENUMERATE_TIMEOUT_US 10000000
+
 #include <AvailabilityMacros.h>
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060 && MAC_OS_X_VERSION_MIN_REQUIRED < 101200
   #include <objc/objc-auto.h>
@@ -1672,6 +1676,7 @@ static int darwin_reset_device(struct libusb_device_handle *dev_handle) {
   IOUSBConfigurationDescriptor *cached_configurations;
   IOReturn kresult;
   UInt8 i;
+  UInt32 time;
 
   if (dpriv->in_reenumerate) {
     /* ack, two (or more) threads are trying to reset the device! abort! */
@@ -1699,9 +1704,15 @@ static int darwin_reset_device(struct libusb_device_handle *dev_handle) {
 
   usbi_dbg ("darwin/reset_device: waiting for re-enumeration to complete...");
 
+  time = 0;
   while (dpriv->in_reenumerate) {
     struct timespec delay = {.tv_sec = 0, .tv_nsec = 1000};
     nanosleep (&delay, NULL);
+    if (time++ >= DARWIN_REENUMERATE_TIMEOUT_US) {
+      usbi_err (HANDLE_CTX (dev_handle), "darwin/reenumerate_device: timeout waiting for reenumerate");
+      dpriv->in_reenumerate = false;
+      return LIBUSB_ERROR_TIMEOUT;
+    }
   }
 
   /* compare descriptors */
