@@ -1668,10 +1668,11 @@ static int darwin_restore_state (struct libusb_device_handle *dev_handle, int8_t
   return LIBUSB_SUCCESS;
 }
 
-static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle) {
+static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, bool capture) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   unsigned long claimed_interfaces = dev_handle->claimed_interfaces;
   int8_t active_config = dpriv->active_config;
+  UInt32 options = 0;
   IOUSBDeviceDescriptor descriptor;
   IOUSBConfigurationDescriptorPtr cached_configuration;
   IOUSBConfigurationDescriptor *cached_configurations;
@@ -1695,12 +1696,28 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle) {
     memcpy (cached_configurations + i, cached_configuration, sizeof (cached_configurations[i]));
   }
 
+  /* if we need to release capture */
+  if (HAS_CAPTURE_DEVICE()) {
+    if (capture) {
+      options |= kUSBReEnumerateCaptureDeviceMask;
+    }
+  } else {
+    capture = false;
+  }
+
   /* from macOS 10.11 ResetDevice no longer does anything so just use USBDeviceReEnumerate */
-  kresult = (*(dpriv->device))->USBDeviceReEnumerate (dpriv->device, 0);
+  kresult = (*(dpriv->device))->USBDeviceReEnumerate (dpriv->device, options);
   if (kresult != kIOReturnSuccess) {
     usbi_err (HANDLE_CTX (dev_handle), "USBDeviceReEnumerate: %s", darwin_error_str (kresult));
     dpriv->in_reenumerate = false;
     return darwin_to_libusb (kresult);
+  }
+
+  /* capture mode does not re-enumerate but it does require re-open */
+  if (capture) {
+    usbi_dbg ("darwin/reenumerate_device: restoring state...");
+    dpriv->in_reenumerate = false;
+    return darwin_restore_state (dev_handle, active_config, claimed_interfaces);
   }
 
   usbi_dbg ("darwin/reenumerate_device: waiting for re-enumeration to complete...");
@@ -1738,30 +1755,25 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle) {
   return darwin_restore_state (dev_handle, active_config, claimed_interfaces);
 }
 
-static int darwin_kernel_driver_active(struct libusb_device_handle *dev_handle, uint8_t interface) {
+static int darwin_reset_device (struct libusb_device_handle *dev_handle) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
-  io_service_t usbInterface;
-  CFTypeRef driver;
   IOReturn kresult;
 
-  kresult = darwin_get_interface (dpriv->device, interface, &usbInterface);
-  if (kresult != kIOReturnSuccess) {
-    usbi_err (HANDLE_CTX (dev_handle), "darwin_get_interface: %s", darwin_error_str(kresult));
-
+  if (dpriv->capture_count > 0) {
+    /* we have to use ResetDevice as USBDeviceReEnumerate() loses the authorization for capture */
+    kresult = (*(dpriv->device))->ResetDevice (dpriv->device);
     return darwin_to_libusb (kresult);
+  } else {
+    return darwin_reenumerate_device (dev_handle, false);
   }
+}
 
-  driver = IORegistryEntryCreateCFProperty (usbInterface, kIOBundleIdentifierKey, kCFAllocatorDefault, 0);
-  IOObjectRelease (usbInterface);
-
-  if (driver) {
-    CFRelease (driver);
-
-    return 1;
+static int darwin_kernel_driver_active(struct libusb_device_handle *dev_handle, uint8_t interface) {
+  enum libusb_error ret = darwin_claim_interface (dev_handle, interface);
+  if (ret == LIBUSB_SUCCESS) {
+    darwin_release_interface (dev_handle, interface);
   }
-
-  /* no driver */
-  return 0;
+  return (ret == LIBUSB_ERROR_ACCESS);
 }
 
 static void darwin_destroy_device(struct libusb_device *dev) {
@@ -2274,9 +2286,98 @@ static int darwin_free_streams (struct libusb_device_handle *dev_handle, unsigne
 }
 #endif
 
+#if InterfaceVersion >= 700
+
+static int darwin_reload_device (struct libusb_device_handle *dev_handle) {
+  struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
+  enum libusb_error err;
+
+  usbi_mutex_lock(&darwin_cached_devices_lock);
+  (*(dpriv->device))->Release(dpriv->device);
+  dpriv->device = darwin_device_from_service (dpriv->service);
+  if (!dpriv->device) {
+    err = LIBUSB_ERROR_NO_DEVICE;
+  } else {
+    err = LIBUSB_SUCCESS;
+  }
+  usbi_mutex_unlock(&darwin_cached_devices_lock);
+
+  return err;
+}
+
+/* On macOS, we capture an entire device at once, not individual interfaces. */
+
+static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) {
+  UNUSED(interface);
+  struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
+  IOReturn kresult;
+  enum libusb_error err;
+
+  if (HAS_CAPTURE_DEVICE()) {
+  } else {
+    return LIBUSB_ERROR_NOT_SUPPORTED;
+  }
+
+  if (dpriv->capture_count == 0) {
+    /* reset device to release existing drivers */
+    err = darwin_reenumerate_device (dev_handle, true);
+    if (err != LIBUSB_SUCCESS) {
+      return err;
+    }
+  }
+  dpriv->capture_count++;
+  return LIBUSB_SUCCESS;
+}
+
+
+static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) {
+  UNUSED(interface);
+  struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
+
+  if (HAS_CAPTURE_DEVICE()) {
+  } else {
+    return LIBUSB_ERROR_NOT_SUPPORTED;
+  }
+
+  dpriv->capture_count--;
+  if (dpriv->capture_count > 0) {
+    return LIBUSB_SUCCESS;
+  } else {
+    dpriv->capture_count = 0;
+  }
+  /* reset device to attach kernel drivers */
+  return darwin_reenumerate_device (dev_handle, false);
+}
+
+static int darwin_capture_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface) {
+  enum libusb_error ret;
+  if (dev_handle->auto_detach_kernel_driver) {
+    ret = darwin_detach_kernel_driver (dev_handle, iface);
+    if (ret != LIBUSB_SUCCESS) {
+      return ret;
+    }
+  }
+  return darwin_claim_interface (dev_handle, iface);
+}
+
+static int darwin_capture_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface) {
+  enum libusb_error ret;
+
+  ret = darwin_release_interface (dev_handle, iface);
+  if (ret != LIBUSB_SUCCESS) {
+    return ret;
+  }
+  if (dev_handle->auto_detach_kernel_driver) {
+    ret = darwin_attach_kernel_driver (dev_handle, iface);
+  }
+  return ret;
+}
+
+#endif
+
 const struct usbi_os_backend usbi_backend = {
         .name = "Darwin",
-        .caps = 0,
+        .caps = USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
         .init = darwin_init,
         .exit = darwin_exit,
         .get_active_config_descriptor = darwin_get_active_config_descriptor,
@@ -2287,12 +2388,10 @@ const struct usbi_os_backend usbi_backend = {
         .close = darwin_close,
         .get_configuration = darwin_get_configuration,
         .set_configuration = darwin_set_configuration,
-        .claim_interface = darwin_claim_interface,
-        .release_interface = darwin_release_interface,
 
         .set_interface_altsetting = darwin_set_interface_altsetting,
         .clear_halt = darwin_clear_halt,
-        .reset_device = darwin_reenumerate_device,
+        .reset_device = darwin_reset_device,
 
 #if InterfaceVersion >= 550
         .alloc_streams = darwin_alloc_streams,
@@ -2300,6 +2399,16 @@ const struct usbi_os_backend usbi_backend = {
 #endif
 
         .kernel_driver_active = darwin_kernel_driver_active,
+
+#if InterfaceVersion >= 700
+        .detach_kernel_driver = darwin_detach_kernel_driver,
+        .attach_kernel_driver = darwin_attach_kernel_driver,
+        .claim_interface = darwin_capture_claim_interface,
+        .release_interface = darwin_capture_release_interface,
+#else
+        .claim_interface = darwin_claim_interface,
+        .release_interface = darwin_release_interface,
+#endif
 
         .destroy_device = darwin_destroy_device,
 
