@@ -86,6 +86,7 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, uin
 static int darwin_reenumerate_device(struct libusb_device_handle *dev_handle, bool capture);
 static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint);
 static int darwin_reset_device(struct libusb_device_handle *dev_handle);
+static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface);
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0);
 
 static enum libusb_error darwin_scan_devices(struct libusb_context *ctx);
@@ -1857,14 +1858,40 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
 static int darwin_reset_device (struct libusb_device_handle *dev_handle) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   IOReturn kresult;
+  enum libusb_error ret;
 
+#if !defined(TARGET_OS_OSX) || TARGET_OS_OSX == 1
   if (dpriv->capture_count > 0) {
     /* we have to use ResetDevice as USBDeviceReEnumerate() loses the authorization for capture */
     kresult = (*(dpriv->device))->ResetDevice (dpriv->device);
-    return darwin_to_libusb (kresult);
+    ret = darwin_to_libusb (kresult);
   } else {
-    return darwin_reenumerate_device (dev_handle, false);
+    ret = darwin_reenumerate_device (dev_handle, false);
   }
+#else
+  /* ResetDevice() is missing on non-macOS platforms */
+  ret = darwin_reenumerate_device (dev_handle, false);
+  if ((ret == LIBUSB_SUCCESS || ret == LIBUSB_ERROR_NOT_FOUND) && dpriv->capture_count > 0) {
+    int capture_count;
+    int8_t active_config = dpriv->active_config;
+    unsigned long claimed_interfaces = dev_handle->claimed_interfaces;
+
+    /* save old capture_count */
+    capture_count = dpriv->capture_count;
+    /* reset capture count */
+    dpriv->capture_count = 0;
+    /* attempt to detach kernel driver again as it is now re-attached */
+    ret = darwin_detach_kernel_driver (dev_handle, 0);
+    if (ret != LIBUSB_SUCCESS) {
+      return ret;
+    }
+    /* restore capture_count */
+    dpriv->capture_count = capture_count;
+    /* restore configuration */
+    ret = darwin_restore_state (dev_handle, active_config, claimed_interfaces);
+  }
+#endif
+  return ret;
 }
 
 static io_service_t usb_find_interface_matching_location (const io_name_t class_name, UInt8 interface_number, UInt32 location) {
