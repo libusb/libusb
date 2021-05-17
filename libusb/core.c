@@ -1218,6 +1218,8 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
  *
  * This is a non-blocking function; no requests are sent over the bus.
  *
+ * Since version 1.0.23, \ref LIBUSB_API_VERSION >= 0x01000107
+ *
  * \param ctx the context to operate on, or NULL for the default context
  * \param sys_dev the platform-specific system device handle
  * \param dev_handle output location for the returned device handle pointer. Only
