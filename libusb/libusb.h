@@ -2102,10 +2102,10 @@ enum libusb_option {
 	 * scan devices in libusb_init.
 	 *
 	 * This option should be set before calling libusb_init(), otherwise
-	 * libusb_init will failed. Normally libusb_wrap_sys_device need set
-	 * this option.
+	 * libusb_init will failed. Normally libusb_wrap_sys_device on Android
+	 * need set this option.
 	 *
-	 * Only valid on Linux-based operating system, such as Android.
+	 * Only valid for Android builds.
 	 */
 	LIBUSB_OPTION_WEAK_AUTHORITY = 2
 };
