@@ -226,7 +226,7 @@ windows)
 emscripten)
 	AC_SUBST(EXEEXT, [.html])
 	# Note: LT_LDFLAGS is not enough here because we need link flags for executable.
-	AM_LDFLAGS="${AM_LDFLAGS} --bind -s ASYNCIFY -s ASSERTIONS -s PROXY_TO_PTHREAD -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=['callMain']"
+	AM_LDFLAGS="${AM_LDFLAGS} --bind -s ASYNCIFY -s ASSERTIONS -s ALLOW_MEMORY_GROWTH -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=['callMain']"
 	;;
 *)
 	dnl no special handling required
