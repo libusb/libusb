@@ -88,8 +88,10 @@ wasm32-**)
 	backend=emscripten
 	platform=posix
 	EXTRA_CFLAGS="-g"
-	LT_LDFLAGS="${LT_LDFLAGS} --bind -s ASYNCIFY -s ASSERTIONS -s PROXY_TO_PTHREAD -s INVOKE_RUN=0"
 	AC_SUBST(EXEEXT, [.html])
+	# Note: LT_LDFLAGS are not enough here because we need link flags for .html files (executables).
+	AM_LDFLAGS = "--bind -s ASYNCIFY -s ASSERTIONS -s PROXY_TO_PTHREAD -s INVOKE_RUN=0"
+	AC_SUBST(AM_LDFLAGS)
 	;;
 *-linux* | *-uclinux*)
 	dnl on Android Linux, some functions are in different places
