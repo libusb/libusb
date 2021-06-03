@@ -87,8 +87,8 @@ wasm32-**)
 	AC_MSG_RESULT([Emscripten])
 	backend=emscripten
 	platform=posix
-	EXTRA_CFLAGS="-pthread -g"
-	LT_LDFLAGS="${LT_LDFLAGS} -pthread --bind -s ASYNCIFY -s ASSERTIONS -s PROXY_TO_PTHREAD -s INVOKE_RUN=0"
+	EXTRA_CFLAGS="-g"
+	LT_LDFLAGS="${LT_LDFLAGS} --bind -s ASYNCIFY -s ASSERTIONS -s PROXY_TO_PTHREAD -s INVOKE_RUN=0"
 	AC_SUBST(EXEEXT, [.html])
 	;;
 *-linux* | *-uclinux*)
