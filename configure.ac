@@ -88,10 +88,6 @@ wasm32-**)
 	backend=emscripten
 	platform=posix
 	EXTRA_CFLAGS="-g"
-	AC_SUBST(EXEEXT, [.html])
-	# Note: LT_LDFLAGS are not enough here because we need link flags for .html files (executables).
-	AM_LDFLAGS = "--bind -s ASYNCIFY -s ASSERTIONS -s PROXY_TO_PTHREAD -s INVOKE_RUN=0"
-	AC_SUBST(AM_LDFLAGS)
 	;;
 *-linux* | *-uclinux*)
 	dnl on Android Linux, some functions are in different places
@@ -226,6 +222,11 @@ windows)
 	AC_CHECK_TYPES([struct timespec], [], [], [[#include <time.h>]])
 	AC_DEFINE([_WIN32_WINNT], [_WIN32_WINNT_VISTA], [Define to the oldest supported Windows version.])
 	LT_LDFLAGS="${LT_LDFLAGS} -avoid-version -Wl,--add-stdcall-alias"
+	;;
+emscripten)
+	AC_SUBST(EXEEXT, [.html])
+	# Note: LT_LDFLAGS is not enough here because we need link flags for executable.
+	AM_LDFLAGS="${AM_LDFLAGS} --bind -s ASYNCIFY -s ASSERTIONS -s PROXY_TO_PTHREAD -s INVOKE_RUN=0"
 	;;
 *)
 	dnl no special handling required
@@ -410,6 +411,7 @@ AM_CXXFLAGS="-std=${c_dialect}++11 ${EXTRA_CFLAGS} ${SHARED_CFLAGS} -Wmissing-de
 AC_SUBST(AM_CXXFLAGS)
 
 AC_SUBST(LT_LDFLAGS)
+AC_SUBST(AM_LDFLAGS)
 
 AC_SUBST([EXTRA_LDFLAGS])
 
