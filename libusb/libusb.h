@@ -2107,7 +2107,9 @@ enum libusb_option {
 	 *
 	 * Only valid for Android builds.
 	 */
-	LIBUSB_OPTION_WEAK_AUTHORITY = 2
+	LIBUSB_OPTION_WEAK_AUTHORITY = 2,
+
+	LIBUSB_OPTION_MAX = 3
 };
 
 int LIBUSB_CALL libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);

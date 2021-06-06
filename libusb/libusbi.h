@@ -791,6 +791,13 @@ int usbi_add_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle
 	short poll_events);
 void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle);
 
+struct usbi_option {
+  int is_set;
+  union {
+    int ival;
+  } arg;
+};
+
 /* OS event abstraction */
 
 int usbi_create_event(usbi_event_t *event);
