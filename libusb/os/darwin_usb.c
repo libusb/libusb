@@ -572,8 +572,6 @@ static void darwin_cleanup_devices(void) {
   list_for_each_entry_safe(dev, next, &darwin_cached_devices, list, struct darwin_cached_device) {
     darwin_deref_cached_device(dev);
   }
-
-  darwin_cached_devices.prev = darwin_cached_devices.next = NULL;
 }
 
 static int darwin_init(struct libusb_context *ctx) {
@@ -584,9 +582,10 @@ static int darwin_init(struct libusb_context *ctx) {
 
   do {
     if (first_init) {
-      assert (NULL == darwin_cached_devices.next);
-      list_init (&darwin_cached_devices);
-
+      if (NULL == darwin_cached_devices.next) {
+        list_init (&darwin_cached_devices);
+      }
+      assert(list_empty(&darwin_cached_devices));
 #if !defined(HAVE_CLOCK_GETTIME)
       /* create the clocks that will be used if clock_gettime() is not available */
       host_name_port_t host_self;
