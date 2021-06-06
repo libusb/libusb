@@ -43,6 +43,8 @@ static libusb_log_cb log_handler;
 struct libusb_context *usbi_default_context;
 static int default_context_refcnt;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
+static struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
+
 
 usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
 struct list_head active_contexts_list;
@@ -2173,40 +2175,63 @@ void API_EXPORTED libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb,
 int API_EXPORTED libusb_set_option(libusb_context *ctx,
 	enum libusb_option option, ...)
 {
-	int arg, r = LIBUSB_SUCCESS;
+	int arg = 0, r = LIBUSB_SUCCESS;
 	va_list ap;
 
-	ctx = usbi_get_context(ctx);
-
 	va_start(ap, option);
-	switch (option) {
-	case LIBUSB_OPTION_LOG_LEVEL:
+	if (LIBUSB_OPTION_LOG_LEVEL == option) {
 		arg = va_arg(ap, int);
 		if (arg < LIBUSB_LOG_LEVEL_NONE || arg > LIBUSB_LOG_LEVEL_DEBUG) {
 			r = LIBUSB_ERROR_INVALID_PARAM;
-			break;
 		}
+	}
+	va_end(ap);
+
+	if (LIBUSB_SUCCESS != r) {
+		return r;
+	}
+
+	if (option >= LIBUSB_OPTION_MAX) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	if (NULL == ctx) {
+		usbi_mutex_static_lock(&default_context_lock);
+		default_context_options[option].is_set = 1;
+		if (LIBUSB_OPTION_LOG_LEVEL == option) {
+			default_context_options[option].arg.ival = arg;
+		}
+		usbi_mutex_static_unlock(&default_context_lock);
+	}
+
+	ctx = usbi_get_context(ctx);
+	if (NULL == ctx) {
+		return LIBUSB_SUCCESS;
+	}
+
+	switch (option) {
+	case LIBUSB_OPTION_LOG_LEVEL:
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 		if (!ctx->debug_fixed)
 			ctx->debug = (enum libusb_log_level)arg;
 #endif
 		break;
 
-	/* Handle all backend-specific options here */
+		/* Handle all backend-specific options here */
 	case LIBUSB_OPTION_USE_USBDK:
 	case LIBUSB_OPTION_WEAK_AUTHORITY:
 		if (usbi_backend.set_option)
-			r = usbi_backend.set_option(ctx, option, ap);
-		else
-			r = LIBUSB_ERROR_NOT_SUPPORTED;
+			return usbi_backend.set_option(ctx, option, ap);
+
+		return LIBUSB_ERROR_NOT_SUPPORTED;
 		break;
 
+	case LIBUSB_OPTION_MAX:
 	default:
-		r = LIBUSB_ERROR_INVALID_PARAM;
+		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-	va_end(ap);
 
-	return r;
+	return LIBUSB_SUCCESS;;
 }
 
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
@@ -2270,7 +2295,11 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 	}
 
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-	_ctx->debug = get_env_debug_level();
+	if (NULL == ctx && default_context_options[LIBUSB_OPTION_LOG_LEVEL].is_set) {
+		_ctx->debug = default_context_options[LIBUSB_OPTION_LOG_LEVEL].arg.ival;
+	} else {
+		_ctx->debug = get_env_debug_level();
+	}
 	if (_ctx->debug != LIBUSB_LOG_LEVEL_NONE)
 		_ctx->debug_fixed = 1;
 #endif
@@ -2308,10 +2337,19 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 
 	usbi_hotplug_init(_ctx);
 
-	usbi_mutex_static_unlock(&default_context_lock);
-
-	if (ctx)
+	if (!ctx) {
+		for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
+			if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
+				continue;
+			}
+			r = libusb_set_option(_ctx, option);
+			if (LIBUSB_SUCCESS != r)
+				goto err_io_exit;
+		}
+	} else
 		*ctx = _ctx;
+
+	usbi_mutex_static_unlock(&default_context_lock);
 
 	return 0;
 
