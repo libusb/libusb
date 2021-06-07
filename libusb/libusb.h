@@ -2098,14 +2098,16 @@ enum libusb_option {
 	 */
 	LIBUSB_OPTION_USE_USBDK = 1,
 
-	/** Set libusb has weak authority. With this option, libusb will skip
-	 * scan devices in libusb_init.
+	/** Flag that libusb has weak authority.
+	 *
+	 * With this option set, libusb will skip scanning devices in
+	 * libusb_init().
 	 *
 	 * This option should be set before calling libusb_init(), otherwise
-	 * libusb_init will failed. Normally libusb_wrap_sys_device on Android
-	 * need set this option.
+	 * libusb_init() might fail. The option is typically needed on Android
+	 * and used together with libusb_wrap_sys_device().
 	 *
-	 * Only valid for Android builds.
+	 * Only valid on Linux.
 	 */
 	LIBUSB_OPTION_WEAK_AUTHORITY = 2
 };
