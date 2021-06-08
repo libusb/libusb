@@ -1585,42 +1585,59 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					s = pRegQueryValueExA(key, "DeviceInterfaceGUID", NULL, &reg_type,
 						(LPBYTE)guid_string, &size);
 				pRegCloseKey(key);
-				if ((s == ERROR_SUCCESS) &&
-				    (((reg_type == REG_SZ) && (size >= (sizeof(guid_string) - sizeof(uint16_t))) && (size <= sizeof(guid_string))) ||
-				     ((reg_type == REG_MULTI_SZ) && (size >= sizeof(guid_string)) && (size <= (sizeof(guid_string) - sizeof(uint16_t)))))) {
-					if (nb_guids == guid_size) {
-						new_guid_list = realloc((void *)guid_list, (guid_size + GUID_SIZE_STEP) * sizeof(void *));
-						if (new_guid_list == NULL) {
-							usbi_err(ctx, "failed to realloc guid list");
-							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-						}
-						guid_list = new_guid_list;
-						guid_size += GUID_SIZE_STEP;
-					}
-					if_guid = malloc(sizeof(*if_guid));
-					if (if_guid == NULL) {
-						usbi_err(ctx, "failed to alloc if_guid");
-						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-					}
-					if (!string_to_guid(guid_string, if_guid)) {
-						usbi_warn(ctx, "device '%s' has malformed DeviceInterfaceGUID string '%s', skipping", dev_id, guid_string);
-						free(if_guid);
-					} else {
-						// Check if we've already seen this GUID
-						for (j = EXT_PASS; j < nb_guids; j++) {
-							if (memcmp(guid_list[j], if_guid, sizeof(*if_guid)) == 0)
-								break;
-						}
-						if (j == nb_guids) {
-							usbi_dbg("extra GUID: %s", guid_string);
-							guid_list[nb_guids++] = if_guid;
-						} else {
-							// Duplicate, ignore
-							free(if_guid);
-						}
-					}
-				} else if (s == ERROR_SUCCESS) {
-					usbi_warn(ctx, "unexpected type/size of DeviceInterfaceGUID for '%s'", dev_id);
+				if ( s == ERROR_SUCCESS)
+				{
+                    /// https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regqueryvalueexa#remarks
+                    /// - REG_SZ: "string may not have been stored with the proper terminating null characters."
+                    /// - As REG_SZ but also "Note that REG_MULTI_SZ strings could have two terminating null characters"
+                    unsigned int minREG_SZ = sizeof(guid_string) - sizeof(uint16_t);
+                    unsigned int maxREG_SZ = sizeof(guid_string);   
+                    
+                    /// As the reading code does not read enough for REG_MULTI_SZ we can handle it as REG_SZ
+				    if ( ((reg_type == REG_SZ) || (reg_type == REG_MULTI_SZ)) 
+                        && (size >= minREG_SZ) 
+                        && (size <= maxREG_SZ) ) 
+                    {
+                        if (nb_guids == guid_size) {
+                            new_guid_list = realloc((void *)guid_list, (guid_size + GUID_SIZE_STEP) * sizeof(void *));
+                            if (new_guid_list == NULL) {
+                                usbi_err(ctx, "failed to realloc guid list");
+                                LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+                            }
+                            guid_list = new_guid_list;
+                            guid_size += GUID_SIZE_STEP;
+                        }
+                        if_guid = malloc(sizeof(*if_guid));
+                        if (if_guid == NULL) {
+                            usbi_err(ctx, "failed to alloc if_guid");
+                            LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+                        }
+                        if (!string_to_guid(guid_string, if_guid)) {
+                            usbi_warn(ctx, "device '%s' has malformed DeviceInterfaceGUID string '%s', skipping", dev_id, guid_string);
+                            free(if_guid);
+                        } else {
+                            // Check if we've already seen this GUID
+                            for (j = EXT_PASS; j < nb_guids; j++) {
+                                if (memcmp(guid_list[j], if_guid, sizeof(*if_guid)) == 0)
+                                    break;
+                            }
+                            if (j == nb_guids) {
+                                usbi_dbg("extra GUID: %s", guid_string);
+                                guid_list[nb_guids++] = if_guid;
+                            } else {
+                                // Duplicate, ignore
+                                free(if_guid);
+                            }
+                        }
+				    } 
+                    else
+				    {
+					    usbi_warn(ctx, "unexpected type/size of DeviceInterfaceGUID for '%s'", dev_id);
+				    }
+				} 
+				else 
+				{
+				    // @todo Handle "s != ERROR_SUCCESS" ?
 				}
 				break;
 			case HID_PASS:
