@@ -43,7 +43,7 @@
  Example JNA Approach:
     public interface unrooted_sample extends Library {
         public static final unrooted_sample INSTANCE = Native.load("unrooted_android", unrooted_sample.class);
-        public int main (int fileDescriptor);
+        public int unrooted_usb_description (int fileDescriptor);
     }
     unrooted_sample.INSTANCE.unrooted_usb_description( usbDeviceConnection.getFileDescriptor());
  */
@@ -276,7 +276,7 @@ int unrooted_usb_description(int fileDescriptor)
     libusb_device_handle *devh = NULL;
     int r = 0;
     verbose = 1;
-    r = libusb_set_option(&ctx, LIBUSB_OPTION_WEAK_AUTHORITY, NULL);
+    r = libusb_set_option(ctx, LIBUSB_OPTION_WEAK_AUTHORITY, NULL);
     if (r != LIBUSB_SUCCESS) {
         LOGD("libusb_init failed: %d\n", r);
         return -1;
@@ -286,7 +286,7 @@ int unrooted_usb_description(int fileDescriptor)
         LOGD("libusb_init failed: %d\n", r);
         return r;
     }
-    r = libusb_wrap_sys_device(NULL, (intptr_t)fileDescriptor, &devh);
+    r = libusb_wrap_sys_device(ctx, (intptr_t)fileDescriptor, &devh);
     if (r < 0) {
         LOGD("libusb_wrap_sys_device failed: %d\n", r);
         return r;
