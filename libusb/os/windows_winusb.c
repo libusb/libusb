@@ -1626,9 +1626,15 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					s = pRegQueryValueExA(key, "DeviceInterfaceGUID", NULL, &reg_type,
 						(LPBYTE)guid_string, &size);
 				pRegCloseKey(key);
-				if ((s == ERROR_SUCCESS) &&
-				    (((reg_type == REG_SZ) && (size == (sizeof(guid_string) - sizeof(char)))) ||
-				     ((reg_type == REG_MULTI_SZ) && (size == sizeof(guid_string))))) {
+				if (s != ERROR_SUCCESS) {
+					usbi_warn(ctx, "unexpected error from pRegQueryValueExA for '%s'", dev_id);
+					break;
+				}
+				// https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regqueryvalueexa#remarks
+				// - "string may not have been stored with the proper terminating null characters"
+				// - "Note that REG_MULTI_SZ strings could have two terminating null characters"
+			        if ((reg_type == REG_SZ && size >= sizeof(guid_string) - sizeof(char))
+				    || (reg_type == REG_MULTI_SZ && size >= sizeof(guid_string) - 2 * sizeof(char))) {
 					if (nb_guids == guid_size) {
 						new_guid_list = realloc((void *)guid_list, (guid_size + GUID_SIZE_STEP) * sizeof(void *));
 						if (new_guid_list == NULL) {
@@ -1660,7 +1666,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 							free(if_guid);
 						}
 					}
-				} else if (s == ERROR_SUCCESS) {
+				} else {
 					usbi_warn(ctx, "unexpected type/size of DeviceInterfaceGUID for '%s'", dev_id);
 				}
 				break;
