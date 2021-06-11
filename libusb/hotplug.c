@@ -198,10 +198,11 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 			/* remove the device from the usb_devs list only if there are no
 			 * references held, otherwise leave it on the list so that a
 			 * warning message will be shown */
-			if (usbi_atomic_load(&dev->refcnt) == 1)
+			if (usbi_atomic_load(&dev->refcnt) == 1) {
+				++devices_released;
 				list_del(&dev->list);
+			}
 			libusb_unref_device(dev);
-			++devices_released;
 		}
 	} while (devices_released > 0);
 
