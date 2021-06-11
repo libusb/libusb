@@ -166,6 +166,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 	struct usbi_hotplug_callback *hotplug_cb, *next_cb;
 	struct usbi_hotplug_message *msg;
 	struct libusb_device *dev, *next_dev;
+	int devices_released;
 
 	/* check for hotplug support */
 	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
@@ -190,15 +191,19 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 		free(msg);
 	}
 
-	/* free all discovered devices */
-	for_each_device_safe(ctx, dev, next_dev) {
-		/* remove the device from the usb_devs list only if there are no
-		 * references held, otherwise leave it on the list so that a
-		 * warning message will be shown */
-		if (usbi_atomic_load(&dev->refcnt) == 1)
-			list_del(&dev->list);
-		libusb_unref_device(dev);
-	}
+	/* free all discovered devices. due to parent references loop until no devices are freed. */
+	do {
+		devices_released = 0;
+		for_each_device_safe(ctx, dev, next_dev) {
+			/* remove the device from the usb_devs list only if there are no
+			 * references held, otherwise leave it on the list so that a
+			 * warning message will be shown */
+			if (usbi_atomic_load(&dev->refcnt) == 1)
+				list_del(&dev->list);
+			libusb_unref_device(dev);
+			++devices_released;
+		}
+	} while (devices_released > 0);
 
 	usbi_mutex_destroy(&ctx->hotplug_cbs_lock);
 }
