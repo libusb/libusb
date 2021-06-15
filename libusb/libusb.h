@@ -2098,20 +2098,30 @@ enum libusb_option {
 	 */
 	LIBUSB_OPTION_USE_USBDK = 1,
 
-	/** Flag that libusb has weak authority.
+	/** Do not scan for devices
 	 *
 	 * With this option set, libusb will skip scanning devices in
-	 * libusb_init().
+	 * libusb_init(). Must be set before calling libusb_init().
 	 *
-	 * This option should be set before calling libusb_init(), otherwise
-	 * libusb_init() might fail. The option is typically needed on Android
-	 * and used together with libusb_wrap_sys_device().
+	 * Hotplug functionality will also be deactivated.
+	 *
+	 * The option is useful in combination with libusb_wrap_sys_device(),
+	 * which can access a device directly without prior device scanning.
+	 *
+	 * This is typically needed on Android, where access to USB devices
+	 * is limited.
 	 *
 	 * Only valid on Linux.
 	 */
-	LIBUSB_OPTION_WEAK_AUTHORITY = 2,
+	LIBUSB_OPTION_NO_DEVICE_DISCOVERY = 2,
 
-	LIBUSB_OPTION_MAX = 3
+	/** Flag that libusb has weak authority.
+	 *
+	 * (Deprecated) alias for LIBUSB_OPTION_NO_DEVICE_DISCOVERY
+	 */
+	LIBUSB_OPTION_WEAK_AUTHORITY = 3,
+
+	LIBUSB_OPTION_MAX = 4
 };
 
 int LIBUSB_CALL libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);
