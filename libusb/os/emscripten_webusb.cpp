@@ -353,14 +353,6 @@ namespace
 
 	thread_local const val Uint8Array = val::global("Uint8Array");
 
-	void em_start_transfer(usbi_transfer *itransfer, val promise) {
-		auto promise_ptr = new (get_web_usb_transfer_result(itransfer)) val(std::move(promise));
-		auto handle = *reinterpret_cast<emscripten::internal::EM_VAL *>(promise_ptr);
-		// Catch the error to transform promise of `value` into promise of `{value, error}`.
-		em_promise_catch_impl(handle);
-		em_start_transfer_impl(itransfer, handle);
-	}
-
 	EM_JS(void, em_start_transfer_impl, (usbi_transfer *transfer, emscripten::internal::EM_VAL handle), {
 		handle = emval_handle_array[handle];
 		if (handle.refcount !== 1)
@@ -374,6 +366,14 @@ namespace
 			Module._em_signal_transfer_completion(transfer);
 		});
 	});
+
+	void em_start_transfer(usbi_transfer *itransfer, val promise) {
+		auto promise_ptr = new (get_web_usb_transfer_result(itransfer)) val(std::move(promise));
+		auto handle = *reinterpret_cast<emscripten::internal::EM_VAL *>(promise_ptr);
+		// Catch the error to transform promise of `value` into promise of `{value, error}`.
+		em_promise_catch_impl(handle);
+		em_start_transfer_impl(itransfer, handle);
+	}
 
 	int
 	em_submit_transfer(usbi_transfer *itransfer)
