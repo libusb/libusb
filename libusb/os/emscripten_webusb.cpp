@@ -211,7 +211,7 @@ namespace
 			.bNumInterfaces = num_interfaces,
 			.bConfigurationValue = web_usb_config["configurationValue"].as<uint8_t>(),
 			.iConfiguration = 0,	// TODO: assign some index and handle `configurationName`
-			.bmAttributes = 1 << 7, // bus powered
+			.bmAttributes = 1 << 7, // bus powered (should be always set according to docs)
 			.bMaxPower = 0,			// yolo
 		};
 		buf = static_cast<uint8_t *>(buf) + LIBUSB_DT_CONFIG_SIZE;
@@ -388,6 +388,7 @@ namespace
 			auto web_usb_control_transfer_params = val::object();
 
 			const char *web_usb_request_type = "unknown";
+			// See LIBUSB_REQ_TYPE in windows_winusb.h (or docs for `bmRequestType`).
 			switch (setup->bmRequestType & (0x03 << 5))
 			{
 			case LIBUSB_REQUEST_TYPE_STANDARD:
