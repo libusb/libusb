@@ -28,6 +28,14 @@ using namespace emscripten;
 #pragma clang diagnostic ignored "-Wunused-parameter"
 namespace
 {
+	// In order to handle promise errors, we need a JS snippet to wrap value
+	// or error to a {value, error} object that can be handled by Embind.
+	//
+	// Unfortunately, EM_JS / EM_ASM is currently not integrated at all with Embind,
+	// which makes it impossible to officially manipulate same JS values from both
+	// custom JS snippets and Embind-based C++.
+	//
+	// So we have to reach into Embind internals unofficially instead...
 	EM_JS(void, em_promise_catch_impl, (emscripten::internal::EM_VAL handle), {
 		handle = emval_handle_array[handle];
 		if (handle.refcount !== 1)
@@ -74,43 +82,64 @@ namespace
 			});
 	});
 
+	// C++ struct representation for {value, error} object from above
+	// (performs conversion in the constructor).
 	struct promise_result {
 		libusb_error error;
 		val value;
 
 		promise_result(val &&result) : error(static_cast<libusb_error>(result["error"].as<int>())), value(result["value"]) {}
 
+		// C++ counterpart of the promise helper above that takes a promise, catches its error, converts to a libusb status
+		// and returns the whole thing as `promise_result` struct for easier handling.
 		static promise_result await(val &&promise) {
 			em_promise_catch_impl(*reinterpret_cast<emscripten::internal::EM_VAL *>(&promise));
 			return {promise.await()};
 		}
 	};
 
+	// We store an Embind handle to WebUSB USBDevice in "priv" metadata of
+	// libusb device, this helper returns a pointer to it.
 	val *get_web_usb_device(libusb_device *dev)
 	{
 		return static_cast<val *>(usbi_get_device_priv(dev));
 	}
 
+	// Same for transfer results.
 	val *get_web_usb_transfer_result(usbi_transfer *itransfer)
 	{
 		return static_cast<val *>(usbi_get_transfer_priv(itransfer));
 	}
 
+	// Store the global `navigator.usb` once upon initialisation.
 	thread_local const val web_usb = val::global("navigator")["usb"];
 
 	int em_get_device_list(libusb_context * ctx, discovered_devs **devs)
 	{
+		// C++ equivalent of `await navigator.usb.getDevices()`.
+		// Note: at this point we must already have some devices exposed -
+		// caller must have called `await navigator.usb.requestDevice(...)`
+		// in response to user interaction before going to LibUSB.
+		// Otherwise this list will be empty.
 		auto result = promise_result::await(web_usb.call<val>("getDevices"));
 		if (result.error) {
 			return result.error;
 		}
 		auto &web_usb_devices = result.value;
+		// Iterate over the exposed devices.
 		uint8_t devices_num = web_usb_devices["length"].as<uint8_t>();
 		for (uint8_t i = 0; i < devices_num; i++) {
 			auto web_usb_device = web_usb_devices[i];
 			auto vendor_id = web_usb_device["vendorId"].as<uint16_t>();
 			auto product_id = web_usb_device["productId"].as<uint16_t>();
-			unsigned long session_id = (vendor_id << 16) | product_id; // TODO: find a better, unique ID
+			// TODO: this has to be a unique ID for the device in libusb structs.
+			// We can't really rely on the index in the list, and otherwise
+			// I can't think of a good way to assign permanent IDs to those
+			// devices, so here goes best-effort attempt...
+			unsigned long session_id = (vendor_id << 16) | product_id;
+			// LibUSB uses that ID to check if this device is already in its own
+			// list. As long as there are no two instances of same device
+			// connected and exposed to the page, we should be fine...
 			auto dev = usbi_get_device_by_session_id(ctx, session_id);
 			if (dev == NULL)
 			{
@@ -132,9 +161,14 @@ namespace
 					.idVendor = vendor_id,
 					.idProduct = product_id,
 					.bcdDevice = static_cast<uint16_t>((web_usb_device["deviceVersionMajor"].as<uint8_t>() << 8) | (web_usb_device["deviceVersionMinor"].as<uint8_t>() << 4) | web_usb_device["deviceVersionSubminor"].as<uint8_t>()),
-					.iManufacturer = 1, // todo
-					.iProduct = 2,		// todo
-					.iSerialNumber = 3, // todo
+					// TODO: those are supposed to be indices for USB string descriptors.
+					// Even after reading docs, I don't really know how to replicate that structure
+					// (without having access to it directly) and how those string descriptors are indexed -
+					// per-device, in global list or somehow else, so for now leaving dubious values.
+					// In most use-cases we don't care about this info anyway.
+					.iManufacturer = 1,
+					.iProduct = 2,
+					.iSerialNumber = 3,
 					.bNumConfigurations = web_usb_device["configurations"]["length"].as<uint8_t>(),
 				};
 
@@ -176,9 +210,9 @@ namespace
 			.wTotalLength = LIBUSB_DT_CONFIG_SIZE,
 			.bNumInterfaces = num_interfaces,
 			.bConfigurationValue = web_usb_config["configurationValue"].as<uint8_t>(),
-			.iConfiguration = 0,	// todo
+			.iConfiguration = 0,	// TODO, see other string comments above
 			.bmAttributes = 1 << 7, // bus powered
-			.bMaxPower = 0,			// todo
+			.bMaxPower = 0,			// yolo
 		};
 		buf = static_cast<uint8_t *>(buf) + LIBUSB_DT_CONFIG_SIZE;
 		for (uint8_t i = 0; i < num_interfaces; i++)
@@ -202,7 +236,7 @@ namespace
 				.bInterfaceClass = web_usb_alternate["interfaceClass"].as<uint8_t>(),
 				.bInterfaceSubClass = web_usb_alternate["interfaceSubclass"].as<uint8_t>(),
 				.bInterfaceProtocol = web_usb_alternate["interfaceProtocol"].as<uint8_t>(),
-				.iInterface = 0, // TODO
+				.iInterface = 0, // TODO, see other string comments above
 			};
 			buf = static_cast<uint8_t *>(buf) + LIBUSB_DT_INTERFACE_SIZE;
 			for (uint8_t j = 0; j < num_endpoints; j++)
@@ -319,24 +353,27 @@ namespace
 
 	thread_local const val Uint8Array = val::global("Uint8Array");
 
+	void em_start_transfer(usbi_transfer *itransfer, val promise) {
+		auto promise_ptr = new (get_web_usb_transfer_result(itransfer)) val(std::move(promise));
+		auto handle = *reinterpret_cast<emscripten::internal::EM_VAL *>(promise_ptr);
+		// Catch the error to transform promise of `value` into promise of `{value, error}`.
+		em_promise_catch_impl(handle);
+		em_start_transfer_impl(itransfer, handle);
+	}
+
 	EM_JS(void, em_start_transfer_impl, (usbi_transfer *transfer, emscripten::internal::EM_VAL handle), {
 		handle = emval_handle_array[handle];
 		if (handle.refcount !== 1)
 		{
 			throw new Error("Must be an owned promise");
 		}
+		// Right now the transfer value should be a `Promise<{value, error}>` for the actual WebUSB transfer op.
+		// Subscribe to its result to unwrap the promise to `{value, error}` and signal transfer completion.
 		handle.value.then(result => {
 			handle.value = result;
 			Module._em_signal_transfer_completion(transfer);
 		});
 	});
-
-	void em_start_transfer(usbi_transfer *itransfer, val promise) {
-		auto promise_ptr = new (get_web_usb_transfer_result(itransfer)) val(std::move(promise));
-		auto handle = *reinterpret_cast<emscripten::internal::EM_VAL *>(promise_ptr);
-		em_promise_catch_impl(handle);
-		em_start_transfer_impl(itransfer, handle);
-	}
 
 	int
 	em_submit_transfer(usbi_transfer *itransfer)
@@ -355,6 +392,9 @@ namespace
 			{
 			case LIBUSB_REQUEST_TYPE_STANDARD:
 				if (setup->bRequest == LIBUSB_REQUEST_GET_DESCRIPTOR && setup->wValue >> 8 == LIBUSB_DT_STRING) {
+					// For string descriptors we provide custom implementation that doesn't require an actual transfer,
+					// but just retrieves the value from JS, stores that string handle as transfer data (instead of a Promise)
+					// and immediately signals completion.
 					const char *propName = nullptr;
 					switch (setup->wValue & 0xFF) {
 						case 1:
@@ -435,6 +475,7 @@ namespace
 
 			break;
 		}
+		// TODO: finalize implementation for isochronous transfers too.
 		// case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS: {
 		// 	if (setup->bmRequestType & LIBUSB_ENDPOINT_IN) {
 		// 		// todo: read result
@@ -475,14 +516,17 @@ namespace
 		libusb_transfer_status status = LIBUSB_TRANSFER_ERROR;
 
 		auto result_val_ptr = get_web_usb_transfer_result(itransfer);
+		// If this was a LIBUSB_DT_STRING request, then the value will be a string handle instead of a promise.
 		if (result_val_ptr->isString()) {
 			int written = EM_ASM_INT({
+				// There's no good way to get UTF-16 output directly from JS string, so again reach out to internals via JS snippet.
 				return stringToUTF16(emval_handle_array[$0].value, $1, $2);
 			}, *reinterpret_cast<emscripten::internal::EM_VAL *>(result_val_ptr), transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE + 2, transfer->length - LIBUSB_CONTROL_SETUP_SIZE - 2);
 			itransfer->transferred = transfer->buffer[LIBUSB_CONTROL_SETUP_SIZE] = 2 + written;
 			transfer->buffer[LIBUSB_CONTROL_SETUP_SIZE + 1] = LIBUSB_DT_STRING;
 			status = LIBUSB_TRANSFER_COMPLETED;
 		} else {
+			// Otherwise we should have a `{value, error}` object by now (see `em_start_transfer_impl` callback).
 			promise_result result(std::move(*result_val_ptr));
 
 			thread_local const val web_usb_transfer_status_ok("ok");
