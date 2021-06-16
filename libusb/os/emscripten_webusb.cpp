@@ -161,11 +161,11 @@ namespace
 					.idVendor = vendor_id,
 					.idProduct = product_id,
 					.bcdDevice = static_cast<uint16_t>((web_usb_device["deviceVersionMajor"].as<uint8_t>() << 8) | (web_usb_device["deviceVersionMinor"].as<uint8_t>() << 4) | web_usb_device["deviceVersionSubminor"].as<uint8_t>()),
-					// TODO: those are supposed to be indices for USB string descriptors.
-					// Even after reading docs, I don't really know how to replicate that structure
-					// (without having access to it directly) and how those string descriptors are indexed -
-					// per-device, in global list or somehow else, so for now leaving dubious values.
-					// In most use-cases we don't care about this info anyway.
+					// Those are supposed to be indices for USB string descriptors. Normally they're part of
+					// the raw USB descriptor structure, but in our case we don't have it.
+					// Luckily, libusb provides hooks for that (to accomodate for other systems in similar position)
+					// so we can just assign constant IDs we can recognise later and then handle them in
+					// `em_submit_transfer` when there is a request to get string descriptor value.
 					.iManufacturer = 1,
 					.iProduct = 2,
 					.iSerialNumber = 3,
@@ -210,7 +210,7 @@ namespace
 			.wTotalLength = LIBUSB_DT_CONFIG_SIZE,
 			.bNumInterfaces = num_interfaces,
 			.bConfigurationValue = web_usb_config["configurationValue"].as<uint8_t>(),
-			.iConfiguration = 0,	// TODO, see other string comments above
+			.iConfiguration = 0,	// TODO: assign some index and handle `configurationName`
 			.bmAttributes = 1 << 7, // bus powered
 			.bMaxPower = 0,			// yolo
 		};
@@ -236,7 +236,7 @@ namespace
 				.bInterfaceClass = web_usb_alternate["interfaceClass"].as<uint8_t>(),
 				.bInterfaceSubClass = web_usb_alternate["interfaceSubclass"].as<uint8_t>(),
 				.bInterfaceProtocol = web_usb_alternate["interfaceProtocol"].as<uint8_t>(),
-				.iInterface = 0, // TODO, see other string comments above
+				.iInterface = 0, // Not exposed in WebUSB, don't assign any string.
 			};
 			buf = static_cast<uint8_t *>(buf) + LIBUSB_DT_INTERFACE_SIZE;
 			for (uint8_t j = 0; j < num_endpoints; j++)
