@@ -464,14 +464,16 @@ namespace
 		case LIBUSB_TRANSFER_TYPE_BULK:
 		case LIBUSB_TRANSFER_TYPE_INTERRUPT:
 		{
+			auto endpoint = transfer->endpoint & LIBUSB_ENDPOINT_ADDRESS_MASK;
+
 			if (IS_XFERIN(transfer))
 			{
-				em_start_transfer(itransfer, web_usb_device->call<val>("transferIn", transfer->endpoint, transfer->length));
+				em_start_transfer(itransfer, web_usb_device->call<val>("transferIn", endpoint, transfer->length));
 			}
 			else
 			{
 				auto data = val(typed_memory_view(transfer->length, transfer->buffer)).call<val>("slice");
-				em_start_transfer(itransfer, web_usb_device->call<val>("transferOut", transfer->endpoint, data));
+				em_start_transfer(itransfer, web_usb_device->call<val>("transferOut", endpoint, data));
 			}
 
 			break;
