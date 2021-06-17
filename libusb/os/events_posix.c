@@ -28,6 +28,9 @@
 #ifdef HAVE_TIMERFD
 #include <sys/timerfd.h>
 #endif
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 #include <unistd.h>
 
 #ifdef HAVE_EVENTFD
@@ -223,6 +226,9 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	int internal_fds, num_ready;
 
 	usbi_dbg(ctx, "poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
+#ifdef __EMSCRIPTEN__
+	emscripten_sleep(0);
+#endif
 	num_ready = poll(fds, nfds, timeout_ms);
 	usbi_dbg(ctx, "poll() returned %d", num_ready);
 	if (num_ready == 0) {
