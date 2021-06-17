@@ -338,7 +338,13 @@ namespace
 	int
 	em_clear_halt(libusb_device_handle *handle, unsigned char endpoint)
 	{
-		return LIBUSB_ERROR_NOT_SUPPORTED;
+		thread_local const val web_usb_direction_in("in");
+		thread_local const val web_usb_direction_out("out");
+
+		auto direction = endpoint & LIBUSB_ENDPOINT_IN ? web_usb_direction_in : web_usb_direction_out;
+		endpoint &= LIBUSB_ENDPOINT_ADDRESS_MASK;
+
+		return promise_result::await(get_web_usb_device(handle->dev)->call<val>("clearHalt", direction, endpoint)).error;
 	}
 
 	int em_reset_device(libusb_device_handle *handle)
