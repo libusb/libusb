@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019 Pino Toscano <toscano.pino@tiscali.it>
+ * Copyright © 2021 Ingvar Stepanyan <rreverser@google.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
