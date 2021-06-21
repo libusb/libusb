@@ -512,13 +512,6 @@ namespace
 	}
 
 	int
-	em_handle_events(libusb_context *ctx, void *event_data, unsigned int count, unsigned int num_ready)
-	{
-		EM_ASM({ debugger; });
-		return LIBUSB_SUCCESS;
-	}
-
-	int
 	em_handle_transfer_completion(usbi_transfer *itransfer)
 	{
 		auto transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
@@ -606,7 +599,6 @@ extern "C"
 		.submit_transfer = em_submit_transfer,
 		.cancel_transfer = em_cancel_transfer,
 		.clear_transfer_priv = em_clear_transfer_priv,
-		.handle_events = em_handle_events,
 		.handle_transfer_completion = em_handle_transfer_completion,
 		.device_priv_size = sizeof(val),
 		.transfer_priv_size = sizeof(val),

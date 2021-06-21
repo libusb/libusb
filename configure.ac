@@ -87,7 +87,6 @@ wasm32-**)
 	AC_MSG_RESULT([Emscripten])
 	backend=emscripten
 	platform=posix
-	EXTRA_CFLAGS="-g"
 	;;
 *-linux* | *-uclinux*)
 	dnl on Android Linux, some functions are in different places
@@ -290,7 +289,7 @@ if test "x$backend" = xlinux || test "x$backend" = xsunos; then
 fi
 
 dnl timerfd support
-if test "x$backend" = xlinux || test "x$backend" = xsunos || test "x$backend" = xemscripten; then
+if test "x$backend" = xlinux || test "x$backend" = xsunos; then
 	AC_ARG_ENABLE([timerfd],
 		[AS_HELP_STRING([--enable-timerfd], [use timerfd for timing [default=auto]])],
 		[use_timerfd=$enableval],
