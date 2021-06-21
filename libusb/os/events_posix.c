@@ -227,9 +227,23 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 
 	usbi_dbg(ctx, "poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
 #ifdef __EMSCRIPTEN__
-	emscripten_sleep(0);
-#endif
+	// TODO: optimize this. Right now it will keep unwinding-rewinding the stack
+	// on each short sleep until an event comes or the timeout expires.
+	// We should probably create an actual separate thread that does signalling
+	// or come up with a custom event mechanism to report events from
+	// `usbi_signal_event` and process them here.
+	double until_time = emscripten_get_now() + timeout_ms;
+	do {
+		// Emscripten `poll` ignores timeout param, but pass 0 explicitly just
+		// in case.
+		num_ready = poll(fds, nfds, 0);
+		if (num_ready != 0) break;
+		// Yield to the browser event loop to handle events.
+		emscripten_sleep(0);
+	} while (emscripten_get_now() < until_time);
+#else
 	num_ready = poll(fds, nfds, timeout_ms);
+#endif
 	usbi_dbg(ctx, "poll() returned %d", num_ready);
 	if (num_ready == 0) {
 		if (usbi_using_timer(ctx))
