@@ -508,7 +508,12 @@ namespace
 	int
 	em_cancel_transfer(usbi_transfer *itransfer)
 	{
-		return LIBUSB_ERROR_NOT_SUPPORTED;
+		// TODO: is there any repercussion for this? (e.g. when cancelling
+		// an input transfer and then it still returns data that libusb doesn't
+		// expect maybe?)
+		// Previously I returned `LIBUSB_ERROR_NOT_SUPPORTED` here, but it
+		// was pretty noisy and returning `LIBUSB_SUCCESS` _seems_ to work.
+		return LIBUSB_SUCCESS;
 	}
 
 	int
