@@ -272,7 +272,7 @@ static void print_device(libusb_device *dev, libusb_device_handle *handle)
 // fileDescriptor = is the native File Descriptor obtained in Java and transfered to native over JNA for Example.
 int unrooted_usb_description(int fileDescriptor)
 {
-    libusb_context *ctx;
+    libusb_context *ctx = NULL;
     libusb_device_handle *devh = NULL;
     int r = 0;
     verbose = 1;
