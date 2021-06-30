@@ -419,6 +419,7 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 	ULONG_PTR completion_key;
 	OVERLAPPED *overlapped;
 	struct libusb_device_handle *dev_handle;
+	struct libusb_device_handle *opened_device_handle;
 	struct windows_device_handle_priv *handle_priv;
 	struct windows_transfer_priv *transfer_priv;
 	struct usbi_transfer *itransfer;
@@ -444,18 +445,30 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 		// If we cannot find a match, the I/O operation originated from outside of libusb
 		// (e.g. within libusbK) and we need to ignore it.
 		dev_handle = (struct libusb_device_handle *)completion_key;
-		handle_priv = usbi_get_device_handle_priv(dev_handle);
+
 		found = false;
-		usbi_mutex_lock(&dev_handle->lock);
-		list_for_each_entry(transfer_priv, &handle_priv->active_transfers, list, struct windows_transfer_priv) {
-			if (overlapped == &transfer_priv->overlapped) {
-				// This OVERLAPPED belongs to us, remove the transfer from the device handle's list
-				list_del(&transfer_priv->list);
-				found = true;
-				break;
+		transfer_priv = NULL;
+
+		// Issue 912: lock opened device handles in context to search the current device handle
+		// to avoid accessing unallocated memory after device has been closed
+		usbi_mutex_lock(&ctx->open_devs_lock);
+		for_each_open_device(ctx, opened_device_handle) {
+			if (dev_handle == opened_device_handle) {
+				handle_priv = usbi_get_device_handle_priv(dev_handle);
+
+				usbi_mutex_lock(&dev_handle->lock);
+				list_for_each_entry(transfer_priv, &handle_priv->active_transfers, list, struct windows_transfer_priv) {
+					if (overlapped == &transfer_priv->overlapped) {
+						// This OVERLAPPED belongs to us, remove the transfer from the device handle's list
+						list_del(&transfer_priv->list);
+						found = true;
+						break;
+					}
+				}
+				usbi_mutex_unlock(&dev_handle->lock);
 			}
 		}
-		usbi_mutex_unlock(&dev_handle->lock);
+		usbi_mutex_unlock(&ctx->open_devs_lock);
 
 		if (!found) {
 			usbi_dbg("ignoring overlapped %p for handle %p (device %u.%u)",
