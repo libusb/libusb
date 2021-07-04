@@ -434,7 +434,15 @@ struct libusb_context {
 	struct list_head list;
 };
 
+struct usbi_option {
+  int is_set;
+  union {
+    int ival;
+  } arg;
+};
+
 extern struct libusb_context *usbi_default_context;
+extern struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
 
 extern struct list_head active_contexts_list;
 extern usbi_mutex_static_t active_contexts_lock;
@@ -790,13 +798,6 @@ struct usbi_event_source {
 int usbi_add_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle,
 	short poll_events);
 void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle);
-
-struct usbi_option {
-  int is_set;
-  union {
-    int ival;
-  } arg;
-};
 
 /* OS event abstraction */
 

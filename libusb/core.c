@@ -43,7 +43,7 @@ static libusb_log_cb log_handler;
 struct libusb_context *usbi_default_context;
 static int default_context_refcnt;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
-static struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
+struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
 
 
 usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;

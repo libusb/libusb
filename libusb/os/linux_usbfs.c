@@ -95,9 +95,6 @@ static int sysfs_available = -1;
 /* how many times have we initted (and not exited) ? */
 static int init_count = 0;
 
-/* have no authority to operate usb device directly */
-static int no_enumeration = 0;
-
 /* Serialize scan-devices, event-thread, and poll */
 usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 
@@ -397,7 +394,9 @@ static int op_init(struct libusb_context *ctx)
 		}
 	}
 
-	if (no_enumeration) {
+	if (default_context_options[LIBUSB_OPTION_NO_DEVICE_DISCOVERY].is_set ||
+	    default_context_options[LIBUSB_OPTION_WEAK_AUTHORITY].is_set) {
+		/* have no authority to operate usb device directly */
 		return LIBUSB_SUCCESS;
 	}
 
@@ -423,7 +422,8 @@ static void op_exit(struct libusb_context *ctx)
 {
 	UNUSED(ctx);
 
-	if (no_enumeration) {
+	if (default_context_options[LIBUSB_OPTION_NO_DEVICE_DISCOVERY].is_set ||
+	    default_context_options[LIBUSB_OPTION_WEAK_AUTHORITY].is_set) {
 		return;
 	}
 
@@ -437,13 +437,15 @@ static void op_exit(struct libusb_context *ctx)
 static int op_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
 {
 	UNUSED(ctx);
+	UNUSED(option);
 	UNUSED(ap);
 
 	if (option == LIBUSB_OPTION_NO_DEVICE_DISCOVERY ||
 	    option == LIBUSB_OPTION_WEAK_AUTHORITY) {
-		usbi_dbg(ctx, "no enumeration will be performed");
-		no_enumeration = 1;
-		return LIBUSB_SUCCESS;
+		if (ctx == NULL) {
+			usbi_dbg(ctx, "no enumeration will be performed");
+			return LIBUSB_SUCCESS;
+		}
 	}
 
 	return LIBUSB_ERROR_NOT_SUPPORTED;
