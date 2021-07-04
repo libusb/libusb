@@ -437,6 +437,7 @@ static void op_exit(struct libusb_context *ctx)
 static int op_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
 {
 	UNUSED(ctx);
+	UNUSED(option);
 	UNUSED(ap);
 
 	if (option == LIBUSB_OPTION_NO_DEVICE_DISCOVERY) {
