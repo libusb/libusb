@@ -2125,7 +2125,52 @@ enum libusb_option {
 	 */
 	LIBUSB_OPTION_WEAK_AUTHORITY = 3,
 
-	LIBUSB_OPTION_MAX = 4
+	/** Provide a JNIEnv* pointer for libusb to use on Android.  If this
+	 * pointer is nonzero, the Android SDK will be used for backend
+	 * functions that would otherwise require additional Java code to
+	 * ask for permission.  The pointer must be correct for the current
+	 * thread and process.
+	 *
+	 * This option should be set _before_ calling libusb_init(), and
+	 * specifies the java virtual machine only for new calls to
+	 * libusb_init() after the option is set.  The context pointer is
+	 * unused.
+	 *
+	 * When this option is set, the provided pointer is used for device
+	 * enumeration and connection for the entire lifetime of the libusb
+	 * context.  After connection, the normal linux backend is used via
+	 * the opened file descriptor.
+	 *
+	 * If a device does not have permission to connect, an Android Intent
+	 * is broadcast via UsbManager.requestPermission with action string
+	 * "libusb.android.USB_PERMISSION".  As documented in the Android
+	 * SDK, this Intent will have two "extras" indicating details of the
+	 * USB device in question, and whether or not the user granted
+	 * permission. The call to open the device returns LIBUSB_ERROR_ACCESS.
+	 *
+	 * Before a connection is made and the user provides permission for a
+	 * device, libusb generates fake descriptors for it from Android's API.
+	 * If these descriptors are used before connection, the correct ones
+	 * must be rerequested with an appropriate libusb API function, after
+	 * connection.
+	 *
+	 * A crash may happen if fork() is performed in a way Android doesn't
+	 * track, because the Application Context will no longer be valid.
+	 *
+	 * Only valid on Android.
+	 */
+	LIBUSB_OPTION_ANDROID_JNIENV = 4,
+
+	/** Like LIBUSB_OPTION_ANDROID_JNIENV, except a thread-agnostic JavaVM*
+	 * pointer is passed instead of a thread-specific JNIEnv* pointer.  If
+	 * you can pass a JavaVM* instead of a JNIEnv* pointer, the it does not
+	 * matter what thread it is passed from.
+	 *
+	 * Setting either option is equivalent.
+	 */
+	LIBUSB_OPTION_ANDROID_JAVAVM = 5,
+
+	LIBUSB_OPTION_MAX = 6
 };
 
 int LIBUSB_CALL libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);
