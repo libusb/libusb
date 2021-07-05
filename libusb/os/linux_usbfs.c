@@ -116,6 +116,11 @@ struct config_descriptor {
 	size_t actual_len;
 };
 
+struct linux_context_priv {
+	/* have no authority to operate usb device directly */
+	int no_device_discovery;
+};
+
 struct linux_device_priv {
 	char *sysfs_dir;
 	void *descriptors;
@@ -351,6 +356,7 @@ static int op_init(struct libusb_context *ctx)
 	struct kernel_version kversion;
 	const char *usbfs_path;
 	int r;
+	struct linux_context_priv *cpriv = usbi_get_context_priv(ctx);
 
 	if (get_kernel_version(ctx, &kversion) < 0)
 		return LIBUSB_ERROR_OTHER;
@@ -394,9 +400,11 @@ static int op_init(struct libusb_context *ctx)
 		}
 	}
 
-	if (default_context_options[LIBUSB_OPTION_NO_DEVICE_DISCOVERY].is_set ||
-	    default_context_options[LIBUSB_OPTION_WEAK_AUTHORITY].is_set) {
-		/* have no authority to operate usb device directly */
+	cpriv->no_device_discovery =
+		default_context_options[LIBUSB_OPTION_NO_DEVICE_DISCOVERY].is_set ||
+		default_context_options[LIBUSB_OPTION_WEAK_AUTHORITY].is_set;
+
+	if (cpriv->no_device_discovery) {
 		return LIBUSB_SUCCESS;
 	}
 
@@ -420,10 +428,9 @@ static int op_init(struct libusb_context *ctx)
 
 static void op_exit(struct libusb_context *ctx)
 {
-	UNUSED(ctx);
+	struct linux_context_priv *cpriv = usbi_get_context_priv(ctx);
 
-	if (default_context_options[LIBUSB_OPTION_NO_DEVICE_DISCOVERY].is_set ||
-	    default_context_options[LIBUSB_OPTION_WEAK_AUTHORITY].is_set) {
+	if (cpriv->no_device_discovery) {
 		return;
 	}
 
@@ -2804,6 +2811,7 @@ const struct usbi_os_backend usbi_backend = {
 
 	.handle_events = op_handle_events,
 
+	.context_priv_size = sizeof(struct linux_context_priv),
 	.device_priv_size = sizeof(struct linux_device_priv),
 	.device_handle_priv_size = sizeof(struct linux_device_handle_priv),
 	.transfer_priv_size = sizeof(struct linux_transfer_priv),
