@@ -95,9 +95,6 @@ static int sysfs_available = -1;
 /* how many times have we initted (and not exited) ? */
 static int init_count = 0;
 
-/* have no authority to operate usb device directly */
-static int no_enumeration = 0;
-
 /* Serialize scan-devices, event-thread, and poll */
 usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 
@@ -117,6 +114,11 @@ struct kernel_version {
 struct config_descriptor {
 	struct usbi_configuration_descriptor *desc;
 	size_t actual_len;
+};
+
+struct linux_context_priv {
+	/* no enumeration or hot-plug detection */
+	int no_device_discovery;
 };
 
 struct linux_device_priv {
@@ -354,6 +356,7 @@ static int op_init(struct libusb_context *ctx)
 	struct kernel_version kversion;
 	const char *usbfs_path;
 	int r;
+	struct linux_context_priv *cpriv = usbi_get_context_priv(ctx);
 
 	if (get_kernel_version(ctx, &kversion) < 0)
 		return LIBUSB_ERROR_OTHER;
@@ -397,7 +400,7 @@ static int op_init(struct libusb_context *ctx)
 		}
 	}
 
-	if (no_enumeration) {
+	if (cpriv->no_device_discovery) {
 		return LIBUSB_SUCCESS;
 	}
 
@@ -421,9 +424,9 @@ static int op_init(struct libusb_context *ctx)
 
 static void op_exit(struct libusb_context *ctx)
 {
-	UNUSED(ctx);
+	struct linux_context_priv *cpriv = usbi_get_context_priv(ctx);
 
-	if (no_enumeration) {
+	if (cpriv->no_device_discovery) {
 		return;
 	}
 
@@ -436,12 +439,13 @@ static void op_exit(struct libusb_context *ctx)
 
 static int op_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
 {
-	UNUSED(ctx);
 	UNUSED(ap);
 
 	if (option == LIBUSB_OPTION_NO_DEVICE_DISCOVERY) {
-		usbi_dbg(ctx, "no enumeration will be performed");
-		no_enumeration = 1;
+		struct linux_context_priv *cpriv = usbi_get_context_priv(ctx);
+
+		usbi_dbg(ctx, "no device discovery will be performed");
+		cpriv->no_device_discovery = 1;
 		return LIBUSB_SUCCESS;
 	}
 
@@ -2801,6 +2805,7 @@ const struct usbi_os_backend usbi_backend = {
 
 	.handle_events = op_handle_events,
 
+	.context_priv_size = sizeof(struct linux_context_priv),
 	.device_priv_size = sizeof(struct linux_device_priv),
 	.device_handle_priv_size = sizeof(struct linux_device_handle_priv),
 	.transfer_priv_size = sizeof(struct linux_transfer_priv),
