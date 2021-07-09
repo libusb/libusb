@@ -2372,19 +2372,26 @@ static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle,
   }
 
   if (dpriv->capture_count == 0) {
-    /* request authorization */
-    if (darwin_has_capture_entitlements ()) {
-      kresult = IOServiceAuthorize (dpriv->service, kIOServiceInteractionAllowed);
-      if (kresult != kIOReturnSuccess) {
-        usbi_err (HANDLE_CTX (dev_handle), "IOServiceAuthorize: %s", darwin_error_str(kresult));
-        return darwin_to_libusb (kresult);
-      }
-      /* we need start() to be called again for authorization status to refresh */
-      err = darwin_reload_device (dev_handle);
-      if (err != LIBUSB_SUCCESS) {
-        return err;
-      }
+    usbi_dbg ("attempting to detach kernel driver from device");
+
+    if (!darwin_has_capture_entitlements ()) {
+      usbi_warn (HANDLE_CTX (dev_handle), "no capture entitlements. can not detach the kernel driver for this device");
+      return LIBUSB_ERROR_NOT_SUPPORTED;
     }
+
+    /* request authorization */
+    kresult = IOServiceAuthorize (dpriv->service, kIOServiceInteractionAllowed);
+    if (kresult != kIOReturnSuccess) {
+      usbi_err (HANDLE_CTX (dev_handle), "IOServiceAuthorize: %s", darwin_error_str(kresult));
+      return darwin_to_libusb (kresult);
+    }
+
+    /* we need start() to be called again for authorization status to refresh */
+    err = darwin_reload_device (dev_handle);
+    if (err != LIBUSB_SUCCESS) {
+      return err;
+    }
+
     /* reset device to release existing drivers */
     err = darwin_reenumerate_device (dev_handle, true);
     if (err != LIBUSB_SUCCESS) {
@@ -2408,9 +2415,10 @@ static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle,
   dpriv->capture_count--;
   if (dpriv->capture_count > 0) {
     return LIBUSB_SUCCESS;
-  } else {
-    dpriv->capture_count = 0;
   }
+
+  usbi_dbg ("reenumerating device for kernel driver attach");
+
   /* reset device to attach kernel drivers */
   return darwin_reenumerate_device (dev_handle, false);
 }
@@ -2420,23 +2428,31 @@ static int darwin_capture_claim_interface(struct libusb_device_handle *dev_handl
   if (dev_handle->auto_detach_kernel_driver) {
     ret = darwin_detach_kernel_driver (dev_handle, iface);
     if (ret != LIBUSB_SUCCESS) {
-      return ret;
+      usbi_warn (HANDLE_CTX (dev_handle), "failed to auto-detach the kernel driver for this device, ret=%d", ret);
     }
   }
+
   return darwin_claim_interface (dev_handle, iface);
 }
 
 static int darwin_capture_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface) {
   enum libusb_error ret;
+  struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
 
   ret = darwin_release_interface (dev_handle, iface);
   if (ret != LIBUSB_SUCCESS) {
     return ret;
   }
-  if (dev_handle->auto_detach_kernel_driver) {
+
+  if (dev_handle->auto_detach_kernel_driver && dpriv->capture_count > 0) {
     ret = darwin_attach_kernel_driver (dev_handle, iface);
+    if (LIBUSB_SUCCESS != ret) {
+      usbi_warn (HANDLE_CTX (dev_handle), "on attempt to reattach the kernel driver got ret=%d", ret);
+    }
+    /* ignore the error as the interface was successfully released */
   }
-  return ret;
+
+  return LIBUSB_SUCCESS;
 }
 
 #endif
