@@ -2308,7 +2308,7 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 #endif
 
 	/* default context should be initialized before calling usbi_dbg */
-	if (!ctx) {
+	if (!usbi_default_context) {
 		usbi_default_context = _ctx;
 		default_context_refcnt = 1;
 		usbi_dbg("created default context");
