@@ -256,7 +256,14 @@ static inline void list_splice_front(struct list_head *list, struct list_head *h
 
 static inline void *usbi_reallocf(void *ptr, size_t size)
 {
-	void *ret = realloc(ptr, size);
+	void *ret;
+
+	if (size == 0) {
+		free(ptr);
+		return NULL;
+	}
+
+	ret = realloc(ptr, size);
 
 	if (!ret)
 		free(ptr);
