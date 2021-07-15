@@ -82,8 +82,10 @@ typedef SSIZE_T ssize_t;
 
 #if defined(__GNUC__)
 #define LIBUSB_PACKED __attribute__ ((packed))
+#define LIBUSB_NONNULL(...) __attribute__((nonnull(__VA_ARGS__)))
 #else
 #define LIBUSB_PACKED
+#define LIBUSB_NONNULL(...)
 #endif /* __GNUC__ */
 
 /** \def LIBUSB_CALL
@@ -1703,6 +1705,7 @@ int LIBUSB_CALL libusb_set_auto_detach_kernel_driver(
  * \param transfer a transfer
  * \returns pointer to the first byte of the data section
  */
+LIBUSB_NONNULL(1)
 static inline unsigned char *libusb_control_transfer_get_data(
 	struct libusb_transfer *transfer)
 {
@@ -1721,6 +1724,7 @@ static inline unsigned char *libusb_control_transfer_get_data(
  * \param transfer a transfer
  * \returns a casted pointer to the start of the transfer data buffer
  */
+LIBUSB_NONNULL(1)
 static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
 	struct libusb_transfer *transfer)
 {
@@ -1750,6 +1754,7 @@ static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
  * \ref libusb_control_setup::wLength "wLength" field of
  * \ref libusb_control_setup
  */
+LIBUSB_NONNULL(1)
 static inline void libusb_fill_control_setup(unsigned char *buffer,
 	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	uint16_t wLength)
@@ -1799,6 +1804,7 @@ uint32_t LIBUSB_CALL libusb_transfer_get_stream_id(
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
+LIBUSB_NONNULL(1)
 static inline void libusb_fill_control_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char *buffer, libusb_transfer_cb_fn callback, void *user_data,
@@ -1830,6 +1836,7 @@ static inline void libusb_fill_control_transfer(
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
+LIBUSB_NONNULL(1)
 static inline void libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
 	libusb_device_handle *dev_handle, unsigned char endpoint,
 	unsigned char *buffer, int length, libusb_transfer_cb_fn callback,
@@ -1861,6 +1868,7 @@ static inline void libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
+LIBUSB_NONNULL(1)
 static inline void libusb_fill_bulk_stream_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char endpoint, uint32_t stream_id,
@@ -1886,6 +1894,7 @@ static inline void libusb_fill_bulk_stream_transfer(
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
+LIBUSB_NONNULL(1)
 static inline void libusb_fill_interrupt_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *buffer, int length,
@@ -1915,6 +1924,7 @@ static inline void libusb_fill_interrupt_transfer(
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
+LIBUSB_NONNULL(1)
 static inline void libusb_fill_iso_transfer(struct libusb_transfer *transfer,
 	libusb_device_handle *dev_handle, unsigned char endpoint,
 	unsigned char *buffer, int length, int num_iso_packets,
@@ -1939,6 +1949,7 @@ static inline void libusb_fill_iso_transfer(struct libusb_transfer *transfer,
  * \param length the length to set in each isochronous packet descriptor
  * \see libusb_get_max_packet_size()
  */
+LIBUSB_NONNULL(1)
 static inline void libusb_set_iso_packet_lengths(
 	struct libusb_transfer *transfer, unsigned int length)
 {
@@ -1964,6 +1975,7 @@ static inline void libusb_set_iso_packet_lengths(
  * or NULL if the packet does not exist.
  * \see libusb_get_iso_packet_buffer_simple()
  */
+LIBUSB_NONNULL(1)
 static inline unsigned char *libusb_get_iso_packet_buffer(
 	struct libusb_transfer *transfer, unsigned int packet)
 {
@@ -2006,6 +2018,7 @@ static inline unsigned char *libusb_get_iso_packet_buffer(
  * or NULL if the packet does not exist.
  * \see libusb_get_iso_packet_buffer()
  */
+LIBUSB_NONNULL(1)
 static inline unsigned char *libusb_get_iso_packet_buffer_simple(
 	struct libusb_transfer *transfer, unsigned int packet)
 {
