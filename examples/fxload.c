@@ -87,7 +87,8 @@ int main(int argc, char*argv[])
 	const char *type = NULL;
 	const char *fx_name[FX_TYPE_MAX] = FX_TYPE_NAMES;
 	const char *ext, *img_name[] = IMG_TYPE_NAMES;
-	int fx_type = FX_TYPE_UNDEFINED, img_type[ARRAYSIZE(path)];
+	int fx_type = FX_TYPE_UNDEFINED;
+	int img_type[ARRAYSIZE(path)] = { IMG_TYPE_UNDEFINED, IMG_TYPE_UNDEFINED };
 	int opt, status;
 	unsigned int i, j;
 	unsigned vid = 0, pid = 0;
