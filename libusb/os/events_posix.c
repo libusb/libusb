@@ -222,9 +222,9 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	usbi_nfds_t nfds = (usbi_nfds_t)ctx->event_data_cnt;
 	int internal_fds, num_ready;
 
-	usbi_dbg("poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
+	usbi_dbg(ctx, "poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
 	num_ready = poll(fds, nfds, timeout_ms);
-	usbi_dbg("poll() returned %d", num_ready);
+	usbi_dbg(ctx, "poll() returned %d", num_ready);
 	if (num_ready == 0) {
 		if (usbi_using_timer(ctx))
 			goto done;
@@ -279,7 +279,7 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 					continue;
 				/* pollfd was removed between the creation of the fds array and
 				 * here. remove triggered revent as it is no longer relevant. */
-				usbi_dbg("fd %d was removed, ignoring raised events", fds[n].fd);
+				usbi_dbg(ctx, "fd %d was removed, ignoring raised events", fds[n].fd);
 				fds[n].revents = 0;
 				num_ready--;
 				break;

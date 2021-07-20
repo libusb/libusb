@@ -177,7 +177,7 @@ static void *linux_udev_event_thread_main(void *arg)
 		usbi_warn(NULL, "failed to set hotplug event thread name, error=%d", r);
 #endif
 
-	usbi_dbg("udev event thread entering");
+	usbi_dbg(NULL, "udev event thread entering");
 
 	while (1) {
 		r = poll(fds, 2, -1);
@@ -201,7 +201,7 @@ static void *linux_udev_event_thread_main(void *arg)
 		}
 	}
 
-	usbi_dbg("udev event thread exiting");
+	usbi_dbg(NULL, "udev event thread exiting");
 
 	return NULL;
 }
@@ -246,7 +246,7 @@ static void udev_hotplug_event(struct udev_device *udev_dev)
 			break;
 		}
 
-		usbi_dbg("udev hotplug event. action: %s.", udev_action);
+		usbi_dbg(NULL, "udev hotplug event. action: %s.", udev_action);
 
 		if (strncmp(udev_action, "add", 3) == 0) {
 			linux_hotplug_enumerate(busnum, devaddr, sys_name);
@@ -313,7 +313,7 @@ void linux_udev_hotplug_poll(void)
 	do {
 		udev_dev = udev_monitor_receive_device(udev_monitor);
 		if (udev_dev) {
-			usbi_dbg("Handling hotplug event from hotplug_poll");
+			usbi_dbg(NULL, "Handling hotplug event from hotplug_poll");
 			udev_hotplug_event(udev_dev);
 		}
 	} while (udev_dev);

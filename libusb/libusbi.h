@@ -317,14 +317,14 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 #define usbi_err(ctx, ...)	_usbi_log(ctx, LIBUSB_LOG_LEVEL_ERROR, __VA_ARGS__)
 #define usbi_warn(ctx, ...)	_usbi_log(ctx, LIBUSB_LOG_LEVEL_WARNING, __VA_ARGS__)
 #define usbi_info(ctx, ...)	_usbi_log(ctx, LIBUSB_LOG_LEVEL_INFO, __VA_ARGS__)
-#define usbi_dbg(...)		_usbi_log(NULL, LIBUSB_LOG_LEVEL_DEBUG, __VA_ARGS__)
+#define usbi_dbg(ctx ,...)      	_usbi_log(ctx, LIBUSB_LOG_LEVEL_DEBUG, __VA_ARGS__)
 
 #else /* ENABLE_LOGGING */
 
 #define usbi_err(ctx, ...)	UNUSED(ctx)
 #define usbi_warn(ctx, ...)	UNUSED(ctx)
 #define usbi_info(ctx, ...)	UNUSED(ctx)
-#define usbi_dbg(...)		do {} while (0)
+#define usbi_dbg(ctx, ...)	do {} while (0)
 
 #endif /* ENABLE_LOGGING */
 
