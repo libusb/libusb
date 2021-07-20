@@ -1120,6 +1120,8 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
       priv->dev = cached_device;
       darwin_ref_cached_device (priv->dev);
       dev->port_number    = cached_device->port;
+      /* the location ID encodes the path to the device. the top byte of the location ID contains the bus number
+         (numbered from 0). the remaining bytes can be used to construct the device tree for that bus. */
       dev->bus_number     = cached_device->location >> 24;
       assert(cached_device->address <= UINT8_MAX);
       dev->device_address = (uint8_t)cached_device->address;
