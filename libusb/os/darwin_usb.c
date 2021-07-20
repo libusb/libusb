@@ -1467,7 +1467,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
   }
 
   if (!usbInterface) {
-    usbi_err (HANDLE_CTX (dev_handle), "interface not found");
+    usbi_info (HANDLE_CTX (dev_handle), "interface not found");
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
@@ -1503,7 +1503,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
   /* claim the interface */
   kresult = (*(cInterface->interface))->USBInterfaceOpen(cInterface->interface);
   if (kresult != kIOReturnSuccess) {
-    usbi_err (HANDLE_CTX (dev_handle), "USBInterfaceOpen: %s", darwin_error_str(kresult));
+    usbi_info (HANDLE_CTX (dev_handle), "USBInterfaceOpen: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
   }
 
@@ -2387,14 +2387,14 @@ static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle,
     usbi_dbg ("attempting to detach kernel driver from device");
 
     if (!darwin_has_capture_entitlements ()) {
-      usbi_warn (HANDLE_CTX (dev_handle), "no capture entitlements. can not detach the kernel driver for this device");
+      usbi_info (HANDLE_CTX (dev_handle), "no capture entitlements. can not detach the kernel driver for this device");
       return LIBUSB_ERROR_NOT_SUPPORTED;
     }
 
     /* request authorization */
     kresult = IOServiceAuthorize (dpriv->service, kIOServiceInteractionAllowed);
     if (kresult != kIOReturnSuccess) {
-      usbi_err (HANDLE_CTX (dev_handle), "IOServiceAuthorize: %s", darwin_error_str(kresult));
+      usbi_warn (HANDLE_CTX (dev_handle), "IOServiceAuthorize: %s", darwin_error_str(kresult));
       return darwin_to_libusb (kresult);
     }
 
@@ -2440,7 +2440,7 @@ static int darwin_capture_claim_interface(struct libusb_device_handle *dev_handl
   if (dev_handle->auto_detach_kernel_driver) {
     ret = darwin_detach_kernel_driver (dev_handle, iface);
     if (ret != LIBUSB_SUCCESS) {
-      usbi_warn (HANDLE_CTX (dev_handle), "failed to auto-detach the kernel driver for this device, ret=%d", ret);
+      usbi_info (HANDLE_CTX (dev_handle), "failed to auto-detach the kernel driver for this device, ret=%d", ret);
     }
   }
 
@@ -2459,7 +2459,7 @@ static int darwin_capture_release_interface(struct libusb_device_handle *dev_han
   if (dev_handle->auto_detach_kernel_driver && dpriv->capture_count > 0) {
     ret = darwin_attach_kernel_driver (dev_handle, iface);
     if (LIBUSB_SUCCESS != ret) {
-      usbi_warn (HANDLE_CTX (dev_handle), "on attempt to reattach the kernel driver got ret=%d", ret);
+      usbi_info (HANDLE_CTX (dev_handle), "on attempt to reattach the kernel driver got ret=%d", ret);
     }
     /* ignore the error as the interface was successfully released */
   }
