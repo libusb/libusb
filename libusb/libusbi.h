@@ -805,6 +805,9 @@ void usbi_destroy_event(usbi_event_t *event);
 void usbi_signal_event(usbi_event_t *event);
 void usbi_clear_event(usbi_event_t *event);
 
+int usbi_string_descriptor_to_ascii(union usbi_string_desc_buf* str,
+	unsigned char *data, int length);
+
 #ifdef HAVE_OS_TIMER
 int usbi_create_timer(usbi_timer_t *timer);
 void usbi_destroy_timer(usbi_timer_t *timer);
@@ -1056,6 +1059,20 @@ struct usbi_os_backend {
 	 * This function is called when the user closes a device handle.
 	 */
 	void (*close)(struct libusb_device_handle *dev_handle);
+
+	/* Retrieve the device serial number string from a device.
+	 *
+	 * The descriptor should be retrieved from memory, NOT via bus I/O to the
+	 * device. This means that you may have to cache it in a private structure
+	 * during get_device_list enumeration. Alternatively, you may be able
+	 * to retrieve it from a kernel interface still without generating bus I/O.
+	 *
+	 * This function is expected to write length bytes into data or fewer.
+	 *
+	 * Return size of written data on success or a LIBUSB_ERROR code on failure.
+	 */
+	int (*get_serial_string_descriptor)(struct libusb_device *dev,
+		unsigned char *data, int length);
 
 	/* Get the ACTIVE configuration descriptor for a device.
 	 *
