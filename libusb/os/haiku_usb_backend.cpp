@@ -296,7 +296,7 @@ USBDeviceHandle::SetAltSetting(uint8 inumber, uint8 alt)
 		return _errno_to_libusb(command.alternate.status);
 	}
 	if (command.alternate.alternate_info == (uint32)alt) {
-		usbi_dbg("Setting alternate interface successful");
+		usbi_dbg(NULL, "Setting alternate interface successful");
 		return LIBUSB_SUCCESS;
 	}
 	command.alternate.alternate_info = alt;
@@ -305,7 +305,7 @@ USBDeviceHandle::SetAltSetting(uint8 inumber, uint8 alt)
 		usbi_err(NULL, "Error setting alternate interface");
 		return _errno_to_libusb(command.alternate.status);
 	}
-	usbi_dbg("Setting alternate interface successful");
+	usbi_dbg(NULL, "Setting alternate interface successful");
 	return LIBUSB_SUCCESS;
 }
 

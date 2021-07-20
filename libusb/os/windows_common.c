@@ -152,7 +152,7 @@ static bool htab_create(struct libusb_context *ctx)
 	// Create a mutex
 	usbi_mutex_init(&htab_mutex);
 
-	usbi_dbg("using %lu entries hash table", HTAB_SIZE);
+	usbi_dbg(ctx, "using %lu entries hash table", HTAB_SIZE);
 	htab_filled = 0;
 
 	// allocate memory and zero out.
@@ -221,7 +221,7 @@ unsigned long htab_hash(const char *str)
 		if ((htab_table[idx].used == hval) && (strcmp(str, htab_table[idx].str) == 0))
 			goto out_unlock; // existing hash
 
-		usbi_dbg("hash collision ('%s' vs '%s')", str, htab_table[idx].str);
+		usbi_dbg(NULL, "hash collision ('%s' vs '%s')", str, htab_table[idx].str);
 
 		// Second hash function, as suggested in [Knuth]
 		hval2 = 1UL + hval % (HTAB_SIZE - 2);
@@ -283,7 +283,7 @@ enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS st
 	case USBD_STATUS_DEVICE_GONE:
 		return LIBUSB_TRANSFER_NO_DEVICE;
 	default:
-		usbi_dbg("USBD_STATUS 0x%08lx translated to LIBUSB_TRANSFER_ERROR", ULONG_CAST(status));
+		usbi_dbg(NULL, "USBD_STATUS 0x%08lx translated to LIBUSB_TRANSFER_ERROR", ULONG_CAST(status));
 		return LIBUSB_TRANSFER_ERROR;
 	}
 }
@@ -298,7 +298,7 @@ void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size)
 	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	OVERLAPPED *overlapped = &transfer_priv->overlapped;
 
-	usbi_dbg("transfer %p, length %lu", transfer, ULONG_CAST(size));
+	usbi_dbg(TRANSFER_CTX(transfer), "transfer %p, length %lu", transfer, ULONG_CAST(size));
 
 	overlapped->Internal = (ULONG_PTR)STATUS_SUCCESS;
 	overlapped->InternalHigh = (ULONG_PTR)size;
@@ -401,11 +401,11 @@ static enum windows_version get_windows_version(void)
 	arch = is_x64() ? "64-bit" : "32-bit";
 
 	if (vi.wServicePackMinor)
-		usbi_dbg("Windows %s SP%u.%u %s", w, vi.wServicePackMajor, vi.wServicePackMinor, arch);
+		usbi_dbg(NULL, "Windows %s SP%u.%u %s", w, vi.wServicePackMajor, vi.wServicePackMinor, arch);
 	else if (vi.wServicePackMajor)
-		usbi_dbg("Windows %s SP%u %s", w, vi.wServicePackMajor, arch);
+		usbi_dbg(NULL, "Windows %s SP%u %s", w, vi.wServicePackMajor, arch);
 	else
-		usbi_dbg("Windows %s %s", w, arch);
+		usbi_dbg(NULL, "Windows %s %s", w, arch);
 
 	return winver;
 }
@@ -425,7 +425,7 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 	struct usbi_transfer *itransfer;
 	bool found;
 
-	usbi_dbg("I/O completion thread started");
+	usbi_dbg(ctx, "I/O completion thread started");
 
 	while (true) {
 		overlapped = NULL;
@@ -471,18 +471,18 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 		usbi_mutex_unlock(&ctx->open_devs_lock);
 
 		if (!found) {
-			usbi_dbg("ignoring overlapped %p for handle %p (device %u.%u)",
+			usbi_dbg(ctx, "ignoring overlapped %p for handle %p (device %u.%u)",
 				overlapped, dev_handle, dev_handle->dev->bus_number, dev_handle->dev->device_address);
 			continue;
 		}
 
 		itransfer = (struct usbi_transfer *)((unsigned char *)transfer_priv + PTR_ALIGN(sizeof(*transfer_priv)));
-		usbi_dbg("transfer %p completed, length %lu",
+		usbi_dbg(ctx, "transfer %p completed, length %lu",
 			 USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer), ULONG_CAST(num_bytes));
 		usbi_signal_transfer_completion(itransfer);
 	}
 
-	usbi_dbg("I/O completion thread exiting");
+	usbi_dbg(ctx, "I/O completion thread exiting");
 
 	return 0;
 }
@@ -519,7 +519,7 @@ static int windows_init(struct libusb_context *ctx)
 
 		r = usbdk_backend.init(ctx);
 		if (r == LIBUSB_SUCCESS) {
-			usbi_dbg("UsbDk backend is available");
+			usbi_dbg(ctx, "UsbDk backend is available");
 			usbdk_available = true;
 		} else {
 			usbi_info(ctx, "UsbDk backend is not available");
@@ -600,7 +600,7 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 			usbi_err(ctx, "UsbDk backend not available");
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
-		usbi_dbg("switching context %p to use UsbDk backend", ctx);
+		usbi_dbg(ctx, "switching context %p to use UsbDk backend", ctx);
 		priv->backend = &usbdk_backend;
 		return LIBUSB_SUCCESS;
 	}
@@ -790,7 +790,7 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
 	else
 		result = GetLastError();
 
-	usbi_dbg("handling transfer %p completion with errcode %lu, length %lu",
+	usbi_dbg(ctx, "handling transfer %p completion with errcode %lu, length %lu",
 		 USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer), ULONG_CAST(result), ULONG_CAST(bytes_transferred));
 
 	switch (result) {
@@ -798,25 +798,25 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
 		status = backend->copy_transfer_data(itransfer, bytes_transferred);
 		break;
 	case ERROR_GEN_FAILURE:
-		usbi_dbg("detected endpoint stall");
+		usbi_dbg(ctx, "detected endpoint stall");
 		status = LIBUSB_TRANSFER_STALL;
 		break;
 	case ERROR_SEM_TIMEOUT:
-		usbi_dbg("detected semaphore timeout");
+		usbi_dbg(ctx, "detected semaphore timeout");
 		status = LIBUSB_TRANSFER_TIMED_OUT;
 		break;
 	case ERROR_OPERATION_ABORTED:
 		istatus = backend->copy_transfer_data(itransfer, bytes_transferred);
 		if (istatus != LIBUSB_TRANSFER_COMPLETED)
-			usbi_dbg("failed to copy partial data in aborted operation: %d", (int)istatus);
+			usbi_dbg(ctx, "failed to copy partial data in aborted operation: %d", (int)istatus);
 
-		usbi_dbg("detected operation aborted");
+		usbi_dbg(ctx, "detected operation aborted");
 		status = LIBUSB_TRANSFER_CANCELLED;
 		break;
 	case ERROR_FILE_NOT_FOUND:
 	case ERROR_DEVICE_NOT_CONNECTED:
 	case ERROR_NO_SUCH_DEVICE:
-		usbi_dbg("detected device removed");
+		usbi_dbg(ctx, "detected device removed");
 		status = LIBUSB_TRANSFER_NO_DEVICE;
 		break;
 	default:
