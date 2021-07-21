@@ -162,6 +162,7 @@ case $backend in
 darwin)
 	AC_CHECK_FUNCS([pthread_threadid_np])
 	LIBS="${LIBS} -lobjc -Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-framework,Security"
+	AC_CHECK_HEADERS([IOKit/usb/IOUSBHostFamilyDefinitions.h])
 	;;
 haiku)
 	LIBS="${LIBS} -lbe"

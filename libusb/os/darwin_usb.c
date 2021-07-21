@@ -1815,12 +1815,49 @@ static int darwin_reset_device (struct libusb_device_handle *dev_handle) {
   }
 }
 
+static io_service_t usb_find_interface_matching_location (const io_name_t class_name, UInt8 interface_number, UInt32 location) {
+  CFMutableDictionaryRef matchingDict = IOServiceMatching (class_name);
+  CFMutableDictionaryRef propertyMatchDict = CFDictionaryCreateMutable (kCFAllocatorDefault, 0,
+                                                                        &kCFTypeDictionaryKeyCallBacks,
+                                                                        &kCFTypeDictionaryValueCallBacks);
+  CFTypeRef locationCF = CFNumberCreate (NULL, kCFNumberSInt32Type, &location);
+  CFTypeRef interfaceCF =  CFNumberCreate (NULL, kCFNumberSInt8Type, &interface_number);
+
+  CFDictionarySetValue (matchingDict, CFSTR(kIOPropertyMatchKey), propertyMatchDict);
+  CFDictionarySetValue (propertyMatchDict, CFSTR(kUSBDevicePropertyLocationID), locationCF);
+  CFDictionarySetValue (propertyMatchDict, CFSTR(kUSBHostMatchingPropertyInterfaceNumber), interfaceCF);
+
+  CFRelease (interfaceCF);
+  CFRelease (locationCF);
+  CFRelease (propertyMatchDict);
+
+  return IOServiceGetMatchingService (kIOMasterPortDefault, matchingDict);
+}
+
 static int darwin_kernel_driver_active(struct libusb_device_handle *dev_handle, uint8_t interface) {
-  enum libusb_error ret = darwin_claim_interface (dev_handle, interface);
-  if (ret == LIBUSB_SUCCESS) {
-    darwin_release_interface (dev_handle, interface);
+  struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
+  io_service_t usb_interface, child = IO_OBJECT_NULL;
+
+  /* locate the IO registry entry for this interface */
+  usb_interface = usb_find_interface_matching_location (kIOUSBHostInterfaceClassName, interface, dpriv->location);
+  if (0 == usb_interface) {
+    /* check for the legacy class entry */
+    usb_interface = usb_find_interface_matching_location (kIOUSBInterfaceClassName, interface, dpriv->location);
+    if (0 == usb_interface) {
+      return LIBUSB_ERROR_NOT_FOUND;
+    }
   }
-  return (ret == LIBUSB_ERROR_ACCESS);
+
+  /* if the IO object has a child entry in the IO Registry it has a kernel driver attached */
+  (void) IORegistryEntryGetChildEntry (usb_interface, kIOServicePlane, &child);
+  IOObjectRelease (usb_interface);
+  if (IO_OBJECT_NULL != child) {
+    IOObjectRelease (child);
+    return 1;
+  }
+
+  /* no driver */
+  return 0;
 }
 
 static void darwin_destroy_device(struct libusb_device *dev) {

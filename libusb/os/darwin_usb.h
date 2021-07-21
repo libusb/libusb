@@ -30,6 +30,10 @@
 #include <IOKit/usb/IOUSBLib.h>
 #include <IOKit/IOCFPlugIn.h>
 
+#if defined(HAVE_IOKIT_USB_IOUSBHOSTFAMILYDEFINITIONS_H)
+#include <IOKit/usb/IOUSBHostFamilyDefinitions.h>
+#endif
+
 /* IOUSBInterfaceInferface */
 
 /* New in OS 10.12.0. */
@@ -142,6 +146,14 @@
 
 #error "IOUSBFamily is too old. Please upgrade your SDK and/or deployment target"
 
+#endif
+
+#if !defined(kIOUSBHostInterfaceClassName)
+#define kIOUSBHostInterfaceClassName "IOUSBHostInterface"
+#endif
+
+#if !defined(kUSBHostMatchingPropertyInterfaceNumber)
+#define kUSBHostMatchingPropertyInterfaceNumber "bInterfaceNumber"
 #endif
 
 #if !defined(IO_OBJECT_NULL)
