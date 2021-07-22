@@ -36,6 +36,10 @@ namespace
 	// custom JS snippets and Embind-based C++.
 	//
 	// So we have to reach into Embind internals unofficially instead...
+	emscripten::internal::EM_VAL em_value_to_raw_handle(val &value) {
+		return *reinterpret_cast<emscripten::internal::EM_VAL *>(&value);
+	}
+
 	EM_JS(void, em_promise_catch_impl, (emscripten::internal::EM_VAL handle), {
 		handle = emval_handle_array[handle];
 		if (handle.refcount !== 1)
@@ -93,7 +97,7 @@ namespace
 		// C++ counterpart of the promise helper above that takes a promise, catches its error, converts to a libusb status
 		// and returns the whole thing as `promise_result` struct for easier handling.
 		static promise_result await(val &&promise) {
-			em_promise_catch_impl(*reinterpret_cast<emscripten::internal::EM_VAL *>(&promise));
+			em_promise_catch_impl(em_value_to_raw_handle(promise));
 			return {promise.await()};
 		}
 	};
@@ -354,7 +358,7 @@ namespace
 
 	void em_destroy_device(libusb_device *dev)
 	{
-		delete get_web_usb_device(dev);
+		std::move(*get_web_usb_device(dev));
 	}
 
 	thread_local const val Uint8Array = val::global("Uint8Array");
@@ -375,7 +379,7 @@ namespace
 
 	void em_start_transfer(usbi_transfer *itransfer, val promise) {
 		auto promise_ptr = new (get_web_usb_transfer_result(itransfer)) val(std::move(promise));
-		auto handle = *reinterpret_cast<emscripten::internal::EM_VAL *>(promise_ptr);
+		auto handle = em_value_to_raw_handle(*promise_ptr);
 		// Catch the error to transform promise of `value` into promise of `{value, error}`.
 		em_promise_catch_impl(handle);
 		em_start_transfer_impl(itransfer, handle);
@@ -505,14 +509,15 @@ namespace
 		return LIBUSB_SUCCESS;
 	}
 
+	void
+	em_clear_transfer_priv(usbi_transfer *itransfer)
+	{
+		std::move(*get_web_usb_transfer_result(itransfer));
+	}
+
 	int
 	em_cancel_transfer(usbi_transfer *itransfer)
 	{
-		// TODO: is there any repercussion for this? (e.g. when cancelling
-		// an input transfer and then it still returns data that libusb doesn't
-		// expect maybe?)
-		// Previously I returned `LIBUSB_ERROR_NOT_SUPPORTED` here, but it
-		// was pretty noisy and returning `LIBUSB_SUCCESS` _seems_ to work.
 		return LIBUSB_SUCCESS;
 	}
 
@@ -520,21 +525,32 @@ namespace
 	em_handle_transfer_completion(usbi_transfer *itransfer)
 	{
 		auto transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+
+		// Take ownership of the transfer result, as `em_clear_transfer_priv`
+		// is not called automatically for completed transfers and we must
+		// free it to avoid leaks.
+		// std::unique_ptr<val> result_val(get_web_usb_transfer_result(itransfer));
+
+		auto result_val = std::move(*get_web_usb_transfer_result(itransfer));
+
+		if (itransfer->state_flags & USBI_TRANSFER_CANCELLING) {
+			return usbi_handle_transfer_cancellation(itransfer);
+		}
+
 		libusb_transfer_status status = LIBUSB_TRANSFER_ERROR;
 
-		auto result_val_ptr = get_web_usb_transfer_result(itransfer);
 		// If this was a LIBUSB_DT_STRING request, then the value will be a string handle instead of a promise.
-		if (result_val_ptr->isString()) {
+		if (result_val.isString()) {
 			int written = EM_ASM_INT({
 				// There's no good way to get UTF-16 output directly from JS string, so again reach out to internals via JS snippet.
-				return stringToUTF16(emval_handle_array[$0].value, $1, $2);
-			}, *reinterpret_cast<emscripten::internal::EM_VAL *>(result_val_ptr), transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE + 2, transfer->length - LIBUSB_CONTROL_SETUP_SIZE - 2);
+				return stringToUTF16(requireHandle($0), $1, $2);
+			}, em_value_to_raw_handle(result_val), transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE + 2, transfer->length - LIBUSB_CONTROL_SETUP_SIZE - 2);
 			itransfer->transferred = transfer->buffer[LIBUSB_CONTROL_SETUP_SIZE] = 2 + written;
 			transfer->buffer[LIBUSB_CONTROL_SETUP_SIZE + 1] = LIBUSB_DT_STRING;
 			status = LIBUSB_TRANSFER_COMPLETED;
 		} else {
 			// Otherwise we should have a `{value, error}` object by now (see `em_start_transfer_impl` callback).
-			promise_result result(std::move(*result_val_ptr));
+			promise_result result(std::move(result_val));
 
 			thread_local const val web_usb_transfer_status_ok("ok");
 			thread_local const val web_usb_transfer_status_stall("stall");
@@ -574,12 +590,6 @@ namespace
 		}
 
 		return usbi_handle_transfer_completion(itransfer, status);
-	}
-
-	void
-	em_clear_transfer_priv(usbi_transfer *itransfer)
-	{
-		delete get_web_usb_transfer_result(itransfer);
 	}
 } // namespace
 
