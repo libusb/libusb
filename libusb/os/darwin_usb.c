@@ -2490,7 +2490,7 @@ static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle,
 
 static int darwin_capture_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface) {
   enum libusb_error ret;
-  if (dev_handle->auto_detach_kernel_driver) {
+  if (dev_handle->auto_detach_kernel_driver && darwin_kernel_driver_active(dev_handle, iface)) {
     ret = darwin_detach_kernel_driver (dev_handle, iface);
     if (ret != LIBUSB_SUCCESS) {
       usbi_info (HANDLE_CTX (dev_handle), "failed to auto-detach the kernel driver for this device, ret=%d", ret);
