@@ -30,6 +30,26 @@
 #endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+
+EM_JS(void, em_libusb_notify, (void), {
+	dispatchEvent(new Event("em-libusb"));
+});
+
+EM_ASYNC_JS(int, em_libusb_wait, (int timeout), {
+	let onEvent, timeoutId;
+
+	try {
+		return await new Promise(resolve => {
+			onEvent = () => resolve(0);
+			addEventListener('em-libusb', onEvent);
+
+			timeoutId = setTimeout(resolve, timeout, -1);
+		});
+	} finally {
+		removeEventListener('em-libusb', onEvent);
+		clearTimeout(timeoutId);
+	}
+});
 #endif
 #include <unistd.h>
 
@@ -134,6 +154,9 @@ void usbi_signal_event(usbi_event_t *event)
 	r = write(EVENT_WRITE_FD(event), &dummy, sizeof(dummy));
 	if (r != sizeof(dummy))
 		usbi_warn(NULL, "event write failed");
+#ifdef __EMSCRIPTEN__
+	em_libusb_notify();
+#endif
 }
 
 void usbi_clear_event(usbi_event_t *event)
@@ -227,20 +250,20 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 
 	usbi_dbg(ctx, "poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
 #ifdef __EMSCRIPTEN__
-	// TODO: optimize this. Right now it will keep unwinding-rewinding the stack
-	// on each short sleep until an event comes or the timeout expires.
-	// We should probably create an actual separate thread that does signalling
-	// or come up with a custom event mechanism to report events from
-	// `usbi_signal_event` and process them here.
+	// TODO: improve event system to watch only for fd events we're interested in
+	// (although a scenario where we have multiple watchers in parallel is very rare
+	// in real world anyway).
 	double until_time = emscripten_get_now() + timeout_ms;
-	do {
+	for (;;) {
 		// Emscripten `poll` ignores timeout param, but pass 0 explicitly just
 		// in case.
 		num_ready = poll(fds, nfds, 0);
 		if (num_ready != 0) break;
-		// Yield to the browser event loop to handle events.
-		emscripten_sleep(0);
-	} while (emscripten_get_now() < until_time);
+		int timeout = until_time - emscripten_get_now();
+		if (timeout <= 0) break;
+		int result = em_libusb_wait(timeout);
+		if (result != 0) break;
+	}
 #else
 	num_ready = poll(fds, nfds, timeout_ms);
 #endif
