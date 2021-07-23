@@ -530,6 +530,10 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 		usbi_dbg(HANDLE_CTX(dev_handle), "no endpoints found for interface %u", iface);
 		libusb_free_config_descriptor(conf_desc);
 		priv->usb_interface[iface].current_altsetting = altsetting;
+
+		// Extra init may be required to configure endpoint 0
+		if (priv->apib->configure_endpoints)
+			r = priv->apib->configure_endpoints(SUB_API_NOTSET, dev_handle, iface);
 		return LIBUSB_SUCCESS;
 	}
 
