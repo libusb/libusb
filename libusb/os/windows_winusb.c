@@ -2871,8 +2871,41 @@ static void WINAPI winusbx_native_iso_transfer_continue_stream_callback(struct l
 	} else {
 		// If the transfer wasn't successful we reschedule the transfer while forcing it
 		// not to continue the stream. This might results in a 5-ms delay.
-		transfer_priv->iso_break_stream = TRUE;
-		libusb_submit_transfer(transfer);
+		libusb_transfer_cb_fn postSubmissionHandler = NULL;
+		bool resubmitTransfer= TRUE;
+
+		if (transfer->callback) {
+			// Notify the user callback that a resubmission is about to take place
+			// This gives it an option to interfer or schedule submission of other transfers after this one
+			transfer->status = LIBUSB_TRANSFER_STALL;
+			transfer->callback(transfer);
+			if (transfer->callback != transfer_priv->iso_user_callback) {
+				// Callback temporarily used as signal by user callback
+				if (transfer->callback == NULL) {
+					// Signal to not resubmit with ContinueStream=False
+					resubmitTransfer = FALSE;
+				} else {
+					// Otherwise handler to call after resubmission
+					postSubmissionHandler = transfer->callback;
+				}
+				// Restore the user callback
+				transfer->callback = transfer_priv->iso_user_callback;
+			}
+		}
+
+		if (resubmitTransfer) {
+			usbi_info(TRANSFER_CTX(transfer), "Resubmitting with ContinueStream=False!");
+			transfer_priv->iso_break_stream = TRUE;
+			libusb_submit_transfer(transfer);
+		} else {
+			usbi_info(TRANSFER_CTX(transfer), "User callback supressed resubmission with ContinueStream=False!");
+		}
+
+		if (postSubmissionHandler) {
+			// User-supplied handler to call AFTER resubmission
+			// Probably submitting other transfers to follow up on the last one to continue the stream
+			postSubmissionHandler(transfer);
+		}
 	}
 }
 static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itransfer)
@@ -2989,7 +3022,11 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 			// WinUSB only supports isoch transfers spanning a full USB frames. Later, we might be smarter about this
 			// and allocate a temporary buffer. However, this is harder than it seems as its destruction would depend on overlapped
 			// IO...
-			iso_transfer_size_multiple = (pipe_info_ex.MaximumBytesPerInterval * 8) / interval;
+			if (transfer->dev_handle->dev->speed >= LIBUSB_SPEED_HIGH) // Microframes (125us)
+				iso_transfer_size_multiple = (pipe_info_ex.MaximumBytesPerInterval * 8) / interval;
+			else // Normal Frames (1ms)
+				iso_transfer_size_multiple = pipe_info_ex.MaximumBytesPerInterval / interval;
+
 			if (transfer->length % iso_transfer_size_multiple != 0) {
 				usbi_err(TRANSFER_CTX(transfer), "length of isoch buffer must be a multiple of the MaximumBytesPerInterval * 8 / Interval");
 				return LIBUSB_ERROR_INVALID_PARAM;
@@ -3033,6 +3070,13 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 		// - Transfers are first scheduled with ContinueStream = TRUE and with winusbx_iso_transfer_continue_stream_callback as user callback.
 		// - If the transfer succeeds, winusbx_iso_transfer_continue_stream_callback restore the user callback and calls its.
 		// - If the transfer fails, winusbx_iso_transfer_continue_stream_callback reschedule the transfer and force ContinueStream = FALSE.
+		// However, since this behaviour interferes with the standard practice to submit multiple transfers at once (see #747), additionally
+		// the user callback is called with the STALL event, allowing it signal additional information. The user callback can signal to
+		// suppress this behaviour (by setting transfer->callback to NULL) or alternatively set transfer->callback to a custom callback
+		// which get's executed AFTER the resubmission with ContinueStream = False, allowing the user callback to submit further transfers
+		// to continue the stream only after one transfer has established a stream. This does NOT require extra work in the user callback,
+		// if it properly ignores stall events for isochronous transfers, however it adds more control. libusb can and should not operate
+		// on just speculation on such a matter. Implementation example of a working isochronous stream in #747
 		if (!transfer_priv->iso_break_stream) {
 			transfer_priv->iso_user_callback = transfer->callback;
 			transfer->callback = winusbx_native_iso_transfer_continue_stream_callback;
@@ -3231,6 +3275,9 @@ static enum libusb_transfer_status winusbx_copy_transfer_data(int sub_api, struc
 	int i;
 
 	if (transfer->type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS) {
+		struct winusb_device_priv *priv = usbi_get_device_priv(transfer->dev_handle->dev);
+		CHECK_WINUSBX_AVAILABLE(sub_api);
+
 		// for isochronous, need to copy the individual iso packet actual_lengths and statuses
 		if ((sub_api == SUB_API_LIBUSBK) || (sub_api == SUB_API_LIBUSB0)) {
 			// iso only supported on libusbk-based backends for now
