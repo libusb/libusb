@@ -434,7 +434,16 @@ struct libusb_context {
 	struct list_head list;
 };
 
+struct usbi_option {
+  int is_set;
+  union {
+    int ival;
+    void *pval;
+  } arg;
+};
+
 extern struct libusb_context *usbi_default_context;
+extern struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
 
 extern struct list_head active_contexts_list;
 extern usbi_mutex_static_t active_contexts_lock;
@@ -657,6 +666,15 @@ struct usbi_interface_descriptor {
 	uint8_t  iInterface;
 } LIBUSB_PACKED;
 
+struct usbi_endpoint_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint8_t  bEndpointAddress;
+	uint8_t  bmAttributes;
+	uint16_t wMaxPacketSize;
+	uint8_t  bInterval;
+} LIBUSB_PACKED;
+
 struct usbi_string_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
@@ -790,13 +808,6 @@ struct usbi_event_source {
 int usbi_add_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle,
 	short poll_events);
 void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle);
-
-struct usbi_option {
-  int is_set;
-  union {
-    int ival;
-  } arg;
-};
 
 /* OS event abstraction */
 

@@ -43,7 +43,7 @@ static libusb_log_cb log_handler;
 struct libusb_context *usbi_default_context;
 static int default_context_refcnt;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
-static struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
+struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
 
 
 usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
@@ -2208,27 +2208,37 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 	}
 
 	ctx = usbi_get_context(ctx);
-	if (NULL == ctx) {
-		return LIBUSB_SUCCESS;
-	}
 
 	switch (option) {
 	case LIBUSB_OPTION_LOG_LEVEL:
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-		if (!ctx->debug_fixed)
+		if (ctx && !ctx->debug_fixed)
 			ctx->debug = (enum libusb_log_level)arg;
 #endif
 		break;
 
 		/* Handle all backend-specific options here */
 	case LIBUSB_OPTION_USE_USBDK:
-	case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
-	case LIBUSB_OPTION_WEAK_AUTHORITY:
+		if (ctx == NULL) {
+			return LIBUSB_SUCCESS;
+		}
 		if (usbi_backend.set_option)
 			return usbi_backend.set_option(ctx, option, ap);
 
 		return LIBUSB_ERROR_NOT_SUPPORTED;
-		break;
+		
+	case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+	case LIBUSB_OPTION_WEAK_AUTHORITY:
+	case LIBUSB_OPTION_ANDROID_JNIENV:
+	case LIBUSB_OPTION_ANDROID_JAVAVM:
+		usbi_mutex_static_lock(&default_context_lock);
+		if (usbi_backend.set_option)
+			r = usbi_backend.set_option(ctx, option, ap);
+		else
+			r = LIBUSB_ERROR_NOT_SUPPORTED;
+		usbi_mutex_static_unlock(&default_context_lock);
+
+		return r;
 
 	case LIBUSB_OPTION_MAX:
 	default:
