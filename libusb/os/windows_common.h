@@ -257,6 +257,13 @@ struct winusb_device_priv {
 		int current_altsetting;
 		bool restricted_functionality;  // indicates if the interface functionality is restricted
 						// by Windows (eg. HID keyboards or mice cannot do R/W)
+		uint8_t num_associated_interfaces; // If non-zero, the interface is part of a grouped
+		                                   // set of associated interfaces (defined by an IAD)
+						   // and this is the number of interfaces within the
+						   // associated group (bInterfaceCount in IAD).
+		uint8_t first_associated_interface; // For associated interfaces, this is the index of
+						    // the first interface (bFirstInterface in IAD) for
+		                                    // the grouped set of associated interfaces.
 	} usb_interface[USB_MAXINTERFACES];
 	struct hid_device_priv *hid;
 	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptor; // list of pointers to the cached config descriptors

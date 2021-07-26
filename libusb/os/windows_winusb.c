@@ -1377,6 +1377,9 @@ static int set_composite_interface(struct libusb_context *ctx, struct libusb_dev
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
 	int interface_number;
 	const char *mi_str;
+	int iadi, iadintfi;
+	struct libusb_interface_association_descriptor_array *iad_array;
+	const struct libusb_interface_association_descriptor *iad;
 
 	// Because MI_## are not necessarily in sequential order (some composite
 	// devices will have only MI_00 & MI_03 for instance), we retrieve the actual
@@ -1413,6 +1416,27 @@ static int set_composite_interface(struct libusb_context *ctx, struct libusb_dev
 		priv->hid = calloc(1, sizeof(struct hid_device_priv));
 		if (priv->hid == NULL)
 			return LIBUSB_ERROR_NO_MEM;
+	}
+
+	// For WinUSBX, set up associations for interfaces grouped by an IAD
+	if ((api == USB_API_WINUSBX) && !libusb_get_active_interface_association_descriptors(dev, &iad_array)) {
+		for (iadi = 0; iadi < iad_array->length; iadi++) {
+			iad = &iad_array->iad[iadi];
+			if (iad->bFirstInterface == interface_number) {
+				priv->usb_interface[interface_number].num_associated_interfaces = iad->bInterfaceCount;
+				priv->usb_interface[interface_number].first_associated_interface = iad->bFirstInterface;
+				for (iadintfi = 1; iadintfi < iad->bInterfaceCount; iadintfi++) {
+					usbi_dbg(ctx, "interface[%d] is associated with interface[%d]",
+							      interface_number + iadintfi, interface_number);
+					priv->usb_interface[interface_number + iadintfi].apib = &usb_api_backend[api];
+					priv->usb_interface[interface_number + iadintfi].sub_api = sub_api;
+					priv->usb_interface[interface_number + iadintfi].num_associated_interfaces = iad->bInterfaceCount;
+					priv->usb_interface[interface_number + iadintfi].first_associated_interface = iad->bFirstInterface;
+				}
+				break;
+			}
+		}
+		libusb_free_interface_association_descriptors(iad_array);
 	}
 
 	return LIBUSB_SUCCESS;
@@ -2482,7 +2506,7 @@ static void winusbx_close(int sub_api, struct libusb_device_handle *dev_handle)
 	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 	HANDLE handle;
-	int i;
+	int i, ai;
 
 	if (sub_api == SUB_API_NOTSET)
 		sub_api = priv->sub_api;
@@ -2491,17 +2515,41 @@ static void winusbx_close(int sub_api, struct libusb_device_handle *dev_handle)
 		return;
 
 	if (priv->apib->id == USB_API_COMPOSITE) {
-		// If this is a composite device, just free and close all WinUSB-like
-		// interfaces directly (each is independent and not associated with another)
+		// If this is a composite device, just free and close any WinUSB-like
+		// interfaces that are not part of an associated group
+		// (each is independent and not associated with another).
+		// For associated interface groupings, free interfaces that
+		// are NOT the first within that group (i.e. not bFirstInterface),
+		// then free & close bFirstInterface last.
 		for (i = 0; i < USB_MAXINTERFACES; i++) {
 			if (priv->usb_interface[i].apib->id == USB_API_WINUSBX) {
-				handle = handle_priv->interface_handle[i].api_handle;
-				if (HANDLE_VALID(handle))
-					WinUSBX[sub_api].Free(handle);
+				if (priv->usb_interface[i].num_associated_interfaces == 0) {
+					handle = handle_priv->interface_handle[i].api_handle;
+					if (HANDLE_VALID(handle))
+						WinUSBX[sub_api].Free(handle);
 
-				handle = handle_priv->interface_handle[i].dev_handle;
-				if (HANDLE_VALID(handle))
-					CloseHandle(handle);
+					handle = handle_priv->interface_handle[i].dev_handle;
+					if (HANDLE_VALID(handle))
+						CloseHandle(handle);
+				} else {
+					if (i==priv->usb_interface[i].first_associated_interface) {
+						//first free all handles for all *other* associated interfaces
+						for (ai = 1; ai < priv->usb_interface[i].num_associated_interfaces; ai++) {
+							handle = handle_priv->interface_handle[i + ai].api_handle;
+							if (HANDLE_VALID(handle))
+								WinUSBX[sub_api].Free(handle);
+						}
+
+						//free & close bFirstInterface
+						handle = handle_priv->interface_handle[i].api_handle;
+						if (HANDLE_VALID(handle))
+							WinUSBX[sub_api].Free(handle);
+
+						handle = handle_priv->interface_handle[i].dev_handle;
+						if (HANDLE_VALID(handle))
+							CloseHandle(handle);
+					}
+				}
 			}
 		}
 	} else {
@@ -2582,6 +2630,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 	bool is_using_usbccgp = (priv->apib->id == USB_API_COMPOSITE);
+	bool is_associated_interface = (priv->usb_interface[iface].num_associated_interfaces != 0);
 	HDEVINFO dev_info;
 	char *dev_interface_path = NULL;
 	char *dev_interface_path_guid_start;
@@ -2590,12 +2639,18 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 	HANDLE file_handle, winusb_handle;
 	DWORD err, _index;
 	int r;
+	uint8_t initialized_iface;
 
 	CHECK_WINUSBX_AVAILABLE(sub_api);
 
 	// If the device is composite, but using the default Windows composite parent driver (usbccgp)
 	// or if it's the first WinUSB-like interface, we get a handle through Initialize().
-	if ((is_using_usbccgp) || (iface == 0)) {
+	// If it's an associated interface, and is the first one (iface==bFirstInterface), we also
+	// want to get the handle through Initialize(). If it's an associated interface, and NOT
+	// the first one, we want to direct control to the 'else' where the handle will be obtained
+	// via GetAssociatedInterface().
+	if (((is_using_usbccgp) || (iface == 0)) &&
+	    (!is_associated_interface || (iface==priv->usb_interface[iface].first_associated_interface))) {
 		// composite device (independent interfaces) or interface 0
 		file_handle = handle_priv->interface_handle[iface].dev_handle;
 		if (!HANDLE_VALID(file_handle))
@@ -2656,21 +2711,32 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 		}
 		handle_priv->interface_handle[iface].api_handle = winusb_handle;
 	} else {
+		if (is_associated_interface) {
+			initialized_iface = priv->usb_interface[iface].first_associated_interface;
+			if (iface <= initialized_iface) {
+				usbi_err(ctx, "invalid associated index. iface=%u, initialized iface=%u", iface, initialized_iface);
+				return LIBUSB_ERROR_NOT_FOUND;
+			}
+		} else {
+			initialized_iface = 0;
+		}
+
 		// For all other interfaces, use GetAssociatedInterface()
-		winusb_handle = handle_priv->interface_handle[0].api_handle;
+		winusb_handle = handle_priv->interface_handle[initialized_iface].api_handle;
 		// It is a requirement for multiple interface devices on Windows that, to you
 		// must first claim the first interface before you claim the others
 		if (!HANDLE_VALID(winusb_handle)) {
-			file_handle = handle_priv->interface_handle[0].dev_handle;
+			file_handle = handle_priv->interface_handle[initialized_iface].dev_handle;
 			if (WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
-				handle_priv->interface_handle[0].api_handle = winusb_handle;
-				usbi_warn(ctx, "auto-claimed interface 0 (required to claim %u with WinUSB)", iface);
+				handle_priv->interface_handle[initialized_iface].api_handle = winusb_handle;
+				usbi_warn(ctx, "auto-claimed interface %u (required to claim %u with WinUSB)", initialized_iface, iface);
 			} else {
-				usbi_warn(ctx, "failed to auto-claim interface 0 (required to claim %u with WinUSB): %s", iface, windows_error_str(0));
+				usbi_warn(ctx, "failed to auto-claim interface %u (required to claim %u with WinUSB): %s",
+						initialized_iface, iface, windows_error_str(0));
 				return LIBUSB_ERROR_ACCESS;
 			}
 		}
-		if (!WinUSBX[sub_api].GetAssociatedInterface(winusb_handle, (UCHAR)(iface - 1),
+		if (!WinUSBX[sub_api].GetAssociatedInterface(winusb_handle, (UCHAR)(iface - 1 - initialized_iface),
 			&handle_priv->interface_handle[iface].api_handle)) {
 			handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
 			switch (GetLastError()) {
@@ -2685,7 +2751,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 				return LIBUSB_ERROR_ACCESS;
 			}
 		}
-		handle_priv->interface_handle[iface].dev_handle = handle_priv->interface_handle[0].dev_handle;
+		handle_priv->interface_handle[iface].dev_handle = handle_priv->interface_handle[initialized_iface].dev_handle;
 	}
 	usbi_dbg(ctx, "claimed interface %u", iface);
 	handle_priv->active_interface = iface;
