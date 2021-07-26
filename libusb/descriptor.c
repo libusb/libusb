@@ -1137,3 +1137,188 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 	data[di] = 0;
 	return di;
 }
+
+static int parse_iad_array(struct libusb_context *ctx,
+	struct libusb_interface_association_descriptor_array *iad_array,
+	const uint8_t *buffer, int size)
+{
+	uint8_t i;
+	struct usbi_descriptor_header header;
+	int consumed = 0;
+	const uint8_t *buf = buffer;
+	struct libusb_interface_association_descriptor *iad;
+
+	if (size < LIBUSB_DT_CONFIG_SIZE) {
+		usbi_err(ctx, "short config descriptor read %d/%d",
+			 size, LIBUSB_DT_CONFIG_SIZE);
+		return LIBUSB_ERROR_IO;
+	}
+
+	// First pass: Iterate through desc list, count number of IADs
+	iad_array->length = 0;
+	while (consumed < size) {
+		parse_descriptor(buf, "bb", &header);
+		if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION)
+			iad_array->length++;
+		buf += header.bLength;
+		consumed += header.bLength;
+	}
+
+	iad_array->iad = NULL;
+	if (iad_array->length > 0) {
+		iad = calloc(iad_array->length, sizeof(*iad));
+		if (!iad)
+			return LIBUSB_ERROR_NO_MEM;
+
+		iad_array->iad = iad;
+
+		// Second pass: Iterate through desc list, fill IAD structures
+		consumed = 0;
+		i = 0;
+		while (consumed < size) {
+		   parse_descriptor(buffer, "bb", &header);
+		   if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION)
+			  parse_descriptor(buffer, "bbbbbbbb", &iad[i++]);
+		   buffer += header.bLength;
+		   consumed += header.bLength;
+		}
+	}
+
+	return LIBUSB_SUCCESS;
+}
+
+static int raw_desc_to_iad_array(struct libusb_context *ctx, const uint8_t *buf,
+		int size, struct libusb_interface_association_descriptor_array **iad_array)
+{
+	struct libusb_interface_association_descriptor_array *_iad_array
+		= calloc(1, sizeof(*_iad_array));
+	int r;
+
+	if (!_iad_array)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = parse_iad_array(ctx, _iad_array, buf, size);
+	if (r < 0) {
+		usbi_err(ctx, "parse_iad_array failed with error %d", r);
+		free(_iad_array);
+		return r;
+	}
+
+	*iad_array = _iad_array;
+	return LIBUSB_SUCCESS;
+}
+
+/** \ingroup libusb_desc
+ * Get an array of interface association descriptors (IAD) for a given
+ * configuration.
+ * This is a non-blocking function which does not involve any requests being
+ * sent to the device.
+ *
+ * \param dev a device
+ * \param config_index the index of the configuration you wish to retrieve the
+ * IADs for.
+ * \param iad_array output location for the array of IADs. Only valid if 0 was
+ * returned. Must be freed with libusb_free_interface_association_descriptors()
+ * after use. It's possible that a given configuration contains no IADs. In this
+ * case the iad_array is still output, but will have 'length' field set to 0, and
+ * iad field set to NULL.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if the configuration does not exist
+ * \returns another LIBUSB_ERROR code on error
+ * \see libusb_get_active_interface_association_descriptors()
+ */
+int API_EXPORTED libusb_get_interface_association_descriptors(libusb_device *dev,
+	uint8_t config_index, struct libusb_interface_association_descriptor_array **iad_array)
+{
+	union usbi_config_desc_buf _config;
+	uint16_t config_len;
+	uint8_t *buf;
+	int r;
+
+	if (!iad_array)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	usbi_dbg(DEVICE_CTX(dev), "IADs for config index %u", config_index);
+	if (config_index >= dev->device_descriptor.bNumConfigurations)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	r = get_config_descriptor(dev, config_index, _config.buf, sizeof(_config.buf));
+	if (r < 0)
+		return r;
+
+	config_len = libusb_le16_to_cpu(_config.desc.wTotalLength);
+	buf = malloc(config_len);
+	if (!buf)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = get_config_descriptor(dev, config_index, buf, config_len);
+	if (r >= 0)
+		r = raw_desc_to_iad_array(DEVICE_CTX(dev), buf, r, iad_array);
+
+	free(buf);
+	return r;
+}
+
+/** \ingroup libusb_desc
+ * Get an array of interface association descriptors (IAD) for the currently
+ * active configuration.
+ * This is a non-blocking function which does not involve any requests being
+ * sent to the device.
+ *
+ * \param dev a device
+ * \param iad_array output location for the array of IADs. Only valid if 0 was
+ * returned. Must be freed with libusb_free_interface_association_descriptors()
+ * after use. It's possible that a given configuration contains no IADs. In this
+ * case the iad_array is still output, but will have 'length' field set to 0, and
+ * iad field set to NULL.
+ * \returns 0 on success
+ * \returns LIBUSB_ERROR_NOT_FOUND if the device is in unconfigured state
+ * \returns another LIBUSB_ERROR code on error
+ * \see libusb_get_interface_association_descriptors
+ */
+int API_EXPORTED libusb_get_active_interface_association_descriptors(libusb_device *dev,
+	struct libusb_interface_association_descriptor_array **iad_array)
+{
+	union usbi_config_desc_buf _config;
+	uint16_t config_len;
+	uint8_t *buf;
+	int r;
+
+	if (!iad_array)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	r = get_active_config_descriptor(dev, _config.buf, sizeof(_config.buf));
+	if (r < 0)
+		return r;
+
+	config_len = libusb_le16_to_cpu(_config.desc.wTotalLength);
+	buf = malloc(config_len);
+	if (!buf)
+		return LIBUSB_ERROR_NO_MEM;
+
+	r = get_active_config_descriptor(dev, buf, config_len);
+	if (r >= 0)
+		r = raw_desc_to_iad_array(DEVICE_CTX(dev), buf, r, iad_array);
+	free(buf);
+	return r;
+}
+
+/** \ingroup libusb_desc
+ * Free an array of interface association descriptors (IADs) obtained from
+ * libusb_get_interface_association_descriptors() or
+ * libusb_get_active_interface_association_descriptors().
+ * It is safe to call this function with a NULL iad_array parameter, in which
+ * case the function simply returns.
+ *
+ * \param iad_array the IAD array to free
+ */
+void API_EXPORTED libusb_free_interface_association_descriptors(
+	struct libusb_interface_association_descriptor_array *iad_array)
+{
+	if (!iad_array)
+		return;
+
+	if (iad_array->iad)
+		free((void*)iad_array->iad);
+	free(iad_array);
+}

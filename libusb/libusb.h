@@ -269,6 +269,10 @@ enum libusb_descriptor_type {
 	/** Endpoint descriptor. See libusb_endpoint_descriptor. */
 	LIBUSB_DT_ENDPOINT = 0x05,
 
+	/** Interface Association Descriptor.
+	* See libusb_interface_association_descriptor */
+	LIBUSB_DT_INTERFACE_ASSOCIATION = 0x0b,
+
 	/** BOS descriptor */
 	LIBUSB_DT_BOS = 0x0f,
 
@@ -630,6 +634,65 @@ struct libusb_endpoint_descriptor {
 
 	/** Length of the extra descriptors, in bytes. Must be non-negative. */
 	int extra_length;
+};
+
+/** \ingroup libusb_desc
+ * A structure representing the standard USB interface association descriptor.
+ * This descriptor is documented in section 9.6.4 of the USB 3.0 specification.
+ * All multiple-byte fields are represented in host-endian format.
+ */
+struct libusb_interface_association_descriptor {
+	/** Size of this descriptor (in bytes) */
+	uint8_t  bLength;
+
+	/** Descriptor type. Will have value
+	* \ref libusb_descriptor_type::LIBUSB_DT_INTERFACE_ASSOCIATION
+	* LIBUSB_DT_INTERFACE_ASSOCIATION in this context. */
+	uint8_t  bDescriptorType;
+
+	/** Interface number of the first interface that is associated
+	* with this function */
+	uint8_t  bFirstInterface;
+
+	/** Number of contiguous interfaces that are associated with
+	* this function */
+	uint8_t  bInterfaceCount;
+
+	/** USB-IF class code for this function.
+	* A value of zero is not allowed in this descriptor.
+	* If this field is 0xff, the function class is vendor-specific.
+	* All other values are reserved for assignment by the USB-IF.
+	*/
+	uint8_t  bFunctionClass;
+
+	/** USB-IF subclass code for this function.
+	* If this field is not set to 0xff, all values are reserved
+	* for assignment by the USB-IF
+	*/
+	uint8_t  bFunctionSubClass;
+
+	/** USB-IF protocol code for this function.
+	* These codes are qualified by the values of the bFunctionClass
+	* and bFunctionSubClass fields.
+	*/
+	uint8_t  bFunctionProtocol;
+
+	/** Index of string descriptor describing this function */
+	uint8_t  iFunction;
+};
+
+/** \ingroup libusb_desc
+ * Structure containing an array of 0 or more interface association
+ * descriptors
+ */
+struct libusb_interface_association_descriptor_array {
+	/** Array of interface association descriptors. The size of this array
+	 * is determined by the length field.
+	 */
+	const struct libusb_interface_association_descriptor *iad;
+
+	/** Number of interface association descriptors contained. Read-only. */
+	int length;
 };
 
 /** \ingroup libusb_desc
@@ -1432,6 +1495,13 @@ int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint);
 int LIBUSB_CALL libusb_get_max_iso_packet_size(libusb_device *dev,
 	unsigned char endpoint);
+
+int LIBUSB_CALL libusb_get_interface_association_descriptors(libusb_device *dev,
+	uint8_t config_index, struct libusb_interface_association_descriptor_array **iad_array);
+int LIBUSB_CALL libusb_get_active_interface_association_descriptors(libusb_device *dev,
+	struct libusb_interface_association_descriptor_array **iad_array);
+void LIBUSB_CALL libusb_free_interface_association_descriptors(
+	struct libusb_interface_association_descriptor_array *iad_array);
 
 int LIBUSB_CALL libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev, libusb_device_handle **dev_handle);
 int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle **dev_handle);
