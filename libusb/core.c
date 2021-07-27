@@ -2308,20 +2308,29 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 		_ctx->debug_fixed = 1;
 #endif
 
+	usbi_mutex_init(&_ctx->usb_devs_lock);
+	usbi_mutex_init(&_ctx->open_devs_lock);
+	list_init(&_ctx->usb_devs);
+	list_init(&_ctx->open_devs);
+
 	/* default context should be initialized before calling usbi_dbg */
 	if (!ctx) {
 		usbi_default_context = _ctx;
 		default_context_refcnt = 1;
 		usbi_dbg(usbi_default_context, "created default context");
+
+		for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
+			if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
+				continue;
+			}
+			r = libusb_set_option(_ctx, option);
+			if (LIBUSB_SUCCESS != r)
+				goto err_free_ctx;
+		}
 	}
 
 	usbi_dbg(_ctx, "libusb v%u.%u.%u.%u%s", libusb_version_internal.major, libusb_version_internal.minor,
 		libusb_version_internal.micro, libusb_version_internal.nano, libusb_version_internal.rc);
-
-	usbi_mutex_init(&_ctx->usb_devs_lock);
-	usbi_mutex_init(&_ctx->open_devs_lock);
-	list_init(&_ctx->usb_devs);
-	list_init(&_ctx->open_devs);
 
 	r = usbi_io_init(_ctx);
 	if (r < 0) {
@@ -2341,16 +2350,7 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 
 	usbi_hotplug_init(_ctx);
 
-	if (!ctx) {
-		for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
-			if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
-				continue;
-			}
-			r = libusb_set_option(_ctx, option);
-			if (LIBUSB_SUCCESS != r)
-				goto err_io_exit;
-		}
-	} else
+	if (ctx)
 		*ctx = _ctx;
 
 	usbi_mutex_static_unlock(&default_context_lock);
