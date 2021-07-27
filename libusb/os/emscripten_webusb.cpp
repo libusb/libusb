@@ -419,7 +419,6 @@ namespace
 							break;
 					}
 					if (propName != nullptr) {
-						EM_ASM({ console.log("wIndex:", $0); }, setup->wIndex);
 						val str = (*web_usb_device)[propName];
 						if (str.isNull()) {
 							str = val("");
