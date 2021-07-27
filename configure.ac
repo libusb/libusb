@@ -171,7 +171,7 @@ linux)
 	AC_SEARCH_LIBS([clock_gettime], [rt], [], [], [])
 	AC_CHECK_FUNCS([pthread_setname_np])
 	AC_ARG_ENABLE([udev],
-		[AC_HELP_STRING([--enable-udev], [use udev for device enumeration and hotplug support (recommended) [default=yes]])],
+		[AS_HELP_STRING([--enable-udev], [use udev for device enumeration and hotplug support (recommended) [default=yes]])],
 		[use_udev=$enableval], [use_udev=yes])
 	if test "x$use_udev" = xyes; then
 		dnl system has udev. use it or fail!
