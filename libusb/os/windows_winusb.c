@@ -2794,6 +2794,7 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 
 	usbi_dbg(ITRANSFER_CTX(itransfer), "will use interface %d", current_interface);
 
+	transfer_priv->interface_number = (uint8_t)current_interface;
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 	set_transfer_priv_handle(itransfer, handle_priv->interface_handle[current_interface].dev_handle);
 	overlapped = get_transfer_priv_overlapped(itransfer);
@@ -2815,8 +2816,6 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 			}
 		}
 	}
-
-	transfer_priv->interface_number = (uint8_t)current_interface;
 
 	return LIBUSB_SUCCESS;
 }
@@ -2896,6 +2895,7 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 
 	usbi_dbg(TRANSFER_CTX(transfer), "matched endpoint %02X with interface %d", transfer->endpoint, current_interface);
 
+	transfer_priv->interface_number = (uint8_t)current_interface;
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 	set_transfer_priv_handle(itransfer, handle_priv->interface_handle[current_interface].dev_handle);
 	overlapped = get_transfer_priv_overlapped(itransfer);
@@ -2939,8 +2939,6 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 			usbi_err(TRANSFER_CTX(transfer), "IsoReadPipe/IsoWritePipe failed: %s", windows_error_str(0));
 			return LIBUSB_ERROR_IO;
 		}
-
-		transfer_priv->interface_number = (uint8_t)current_interface;
 
 		return LIBUSB_SUCCESS;
 	} else if (sub_api == SUB_API_WINUSB) {
@@ -3056,8 +3054,6 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 
 		transfer_priv->isoch_buffer_handle = buffer_handle;
 
-		transfer_priv->interface_number = (uint8_t)current_interface;
-
 		return LIBUSB_SUCCESS;
 	} else {
 		PRINT_UNSUPPORTED_API(winusbx_submit_iso_transfer);
@@ -3086,6 +3082,7 @@ static int winusbx_submit_bulk_transfer(int sub_api, struct usbi_transfer *itran
 
 	usbi_dbg(TRANSFER_CTX(transfer), "matched endpoint %02X with interface %d", transfer->endpoint, current_interface);
 
+	transfer_priv->interface_number = (uint8_t)current_interface;
 	winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
 	set_transfer_priv_handle(itransfer, handle_priv->interface_handle[current_interface].dev_handle);
 	overlapped = get_transfer_priv_overlapped(itransfer);
@@ -3119,8 +3116,6 @@ static int winusbx_submit_bulk_transfer(int sub_api, struct usbi_transfer *itran
 		usbi_err(TRANSFER_CTX(transfer), "ReadPipe/WritePipe failed: %s", windows_error_str(0));
 		return LIBUSB_ERROR_IO;
 	}
-
-	transfer_priv->interface_number = (uint8_t)current_interface;
 
 	return LIBUSB_SUCCESS;
 }
@@ -3995,6 +3990,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 
 	usbi_dbg(ITRANSFER_CTX(itransfer), "will use interface %d", current_interface);
 
+	transfer_priv->interface_number = (uint8_t)current_interface;
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 	set_transfer_priv_handle(itransfer, hid_handle);
 	overlapped = get_transfer_priv_overlapped(itransfer);
@@ -4056,8 +4052,6 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 		r = LIBUSB_SUCCESS;
 	}
 
-	transfer_priv->interface_number = (uint8_t)current_interface;
-
 	return LIBUSB_SUCCESS;
 }
 
@@ -4090,6 +4084,7 @@ static int hid_submit_bulk_transfer(int sub_api, struct usbi_transfer *itransfer
 
 	usbi_dbg(TRANSFER_CTX(transfer), "matched endpoint %02X with interface %d", transfer->endpoint, current_interface);
 
+	transfer_priv->interface_number = (uint8_t)current_interface;
 	hid_handle = handle_priv->interface_handle[current_interface].api_handle;
 	set_transfer_priv_handle(itransfer, hid_handle);
 	overlapped = get_transfer_priv_overlapped(itransfer);
@@ -4129,8 +4124,6 @@ static int hid_submit_bulk_transfer(int sub_api, struct usbi_transfer *itransfer
 		safe_free(transfer_priv->hid_buffer);
 		return LIBUSB_ERROR_IO;
 	}
-
-	transfer_priv->interface_number = (uint8_t)current_interface;
 
 	return LIBUSB_SUCCESS;
 }
