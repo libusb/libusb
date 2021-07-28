@@ -940,6 +940,32 @@ static int test_device(uint16_t vid, uint16_t pid)
 		read_ms_winsub_feature_descriptors(handle, string[MS_OS_DESC_VENDOR_CODE_OFFSET], first_iface);
 	}
 
+	//Read IAD's
+	printf("\nReading interface association descriptors (IADs) for first configuration:\n");
+	struct libusb_interface_association_descriptor_array *iad_array;
+	r = libusb_get_interface_association_descriptors(dev, 0, &iad_array);
+	if (r == LIBUSB_SUCCESS) {
+		printf("    nb IADs: %d\n", iad_array->length);
+		for (i=0; i<iad_array->length;i++) {
+			const struct libusb_interface_association_descriptor *iad = &iad_array->iad[i];
+			printf("      IAD %d:\n", i);
+			printf("            bFirstInterface: %u\n", iad->bFirstInterface);
+			printf("            bInterfaceCount: %u\n", iad->bInterfaceCount);
+			printf("             bFunctionClass: %02X\n", iad->bFunctionClass);
+			printf("          bFunctionSubClass: %02X\n", iad->bFunctionSubClass);
+			printf("          bFunctionProtocol: %02X\n", iad->bFunctionProtocol);
+			if (iad->iFunction) {
+				if (libusb_get_string_descriptor_ascii(handle, iad->iFunction, (unsigned char*)string, sizeof(string)) > 0)
+					printf("                  iFunction: %u (%s)\n", iad->iFunction, string);
+				else
+					printf("                  iFunction: %u (libusb_get_string_descriptor_ascii failed!)\n", iad->iFunction);
+			}
+			else
+				printf("                  iFunction: 0\n");
+		}
+		libusb_free_interface_association_descriptors(iad_array);
+	}
+
 	switch(test_mode) {
 	case USE_PS3:
 		CALL_CHECK_CLOSE(display_ps3_status(handle), handle);
