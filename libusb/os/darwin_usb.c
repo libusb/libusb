@@ -2439,22 +2439,21 @@ static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle,
   if (dpriv->capture_count == 0) {
     usbi_dbg (ctx, "attempting to detach kernel driver from device");
 
-    if (!darwin_has_capture_entitlements ()) {
-      usbi_info (ctx, "no capture entitlements. can not detach the kernel driver for this device");
-      return LIBUSB_ERROR_NOT_SUPPORTED;
-    }
+    if (darwin_has_capture_entitlements ()) {
+      /* request authorization */
+      kresult = IOServiceAuthorize (dpriv->service, kIOServiceInteractionAllowed);
+      if (kresult != kIOReturnSuccess) {
+        usbi_warn (ctx, "IOServiceAuthorize: %s", darwin_error_str(kresult));
+        return darwin_to_libusb (kresult);
+      }
 
-    /* request authorization */
-    kresult = IOServiceAuthorize (dpriv->service, kIOServiceInteractionAllowed);
-    if (kresult != kIOReturnSuccess) {
-      usbi_warn (ctx, "IOServiceAuthorize: %s", darwin_error_str(kresult));
-      return darwin_to_libusb (kresult);
-    }
-
-    /* we need start() to be called again for authorization status to refresh */
-    err = darwin_reload_device (dev_handle);
-    if (err != LIBUSB_SUCCESS) {
-      return err;
+      /* we need start() to be called again for authorization status to refresh */
+      err = darwin_reload_device (dev_handle);
+      if (err != LIBUSB_SUCCESS) {
+        return err;
+      }
+    } else {
+      usbi_info (ctx, "no capture entitlements. may not be able to detach the kernel driver for this device");
     }
 
     /* reset device to release existing drivers */
