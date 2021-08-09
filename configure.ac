@@ -143,7 +143,9 @@ esac
 if test "x$platform" = xposix; then
 	AC_DEFINE([PLATFORM_POSIX], [1], [Define to 1 if compiling for a POSIX platform.])
 	AC_CHECK_TYPES([nfds_t], [], [], [[#include <poll.h>]])
-	AC_CHECK_FUNCS([pipe2])
+	if test "x$backend" -ne xemscripten; then
+		AC_CHECK_FUNCS([pipe2])
+	fi
 	dnl Some compilers do not support the '-pthread' option so check for it here
 	saved_CFLAGS="${CFLAGS}"
 	CFLAGS="-Wall -Werror -pthread"
