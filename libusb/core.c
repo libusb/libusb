@@ -2313,12 +2313,8 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 	list_init(&_ctx->usb_devs);
 	list_init(&_ctx->open_devs);
 
-	/* default context should be initialized before calling usbi_dbg */
-	if (!ctx) {
-		usbi_default_context = _ctx;
-		default_context_refcnt = 1;
-		usbi_dbg(usbi_default_context, "created default context");
-
+	if (ctx || !usbi_default_context) {
+		/* It's a new context or we are not reusing the default context. */
 		for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
 			if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
 				continue;
@@ -2327,6 +2323,13 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 			if (LIBUSB_SUCCESS != r)
 				goto err_free_ctx;
 		}
+	}
+
+	/* default context should be initialized before calling usbi_dbg */
+	if (!ctx) {
+		usbi_default_context = _ctx;
+		default_context_refcnt = 1;
+		usbi_dbg(usbi_default_context, "created default context");
 	}
 
 	usbi_dbg(_ctx, "libusb v%u.%u.%u.%u%s", libusb_version_internal.major, libusb_version_internal.minor,
