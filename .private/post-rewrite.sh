@@ -6,7 +6,7 @@
 # .git/hooks/ with the following content:
 # #!/bin/sh
 # if [ -x .private/post-rewrite.sh ]; then
-#   source .private/post-rewrite.sh
+#   . .private/post-rewrite.sh
 # fi
 #
 # NOTE: These versioning hooks are intended to be used *INTERNALLY* by the
