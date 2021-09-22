@@ -8,7 +8,7 @@
 # .git/hooks/ with the following content:
 # #!/bin/sh
 # if [ -x .private/pre-commit.sh ]; then
-#   source .private/pre-commit.sh
+#   . .private/pre-commit.sh
 # fi
 #
 # NOTE: These versioning hooks are intended to be used *INTERNALLY* by the
