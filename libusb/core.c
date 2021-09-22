@@ -2340,10 +2340,8 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 		libusb_version_internal.micro, libusb_version_internal.nano, libusb_version_internal.rc);
 
 	r = usbi_io_init(_ctx);
-	if (r < 0) {
-		usbi_mutex_static_unlock(&default_context_lock);
+	if (r < 0)
 		goto err_free_ctx;
-	}
 
 	usbi_mutex_static_lock(&active_contexts_lock);
 	list_add(&_ctx->list, &active_contexts_list);
@@ -2369,21 +2367,22 @@ err_io_exit:
 	list_del(&_ctx->list);
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
-	if (!ctx) {
-		usbi_default_context = NULL;
-		default_context_refcnt = 0;
-	}
-
-	usbi_mutex_static_unlock(&default_context_lock);
-
 	usbi_hotplug_exit(_ctx);
 	usbi_io_exit(_ctx);
 
 err_free_ctx:
+	if (!ctx) {
+		/* clear default context that was not fully initialized */
+		usbi_default_context = NULL;
+		default_context_refcnt = 0;
+	}
+
 	usbi_mutex_destroy(&_ctx->open_devs_lock);
 	usbi_mutex_destroy(&_ctx->usb_devs_lock);
 
 	free(_ctx);
+
+	usbi_mutex_static_unlock(&default_context_lock);
 
 	return r;
 }
