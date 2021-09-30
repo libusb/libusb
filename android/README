@@ -48,60 +48,66 @@ application package (APK) file, provided ndk-build is invoked before
 the package is built.
 
 
-
 Runtime Permissions:
 --------------------
 
-The Runtime Permissions on Android can be transfered from Java to Native over the following approach:
+The Runtime Permissions on Android can be transfered from Java to Native
+over the following approach:
 
   JAVA:
-     
-   --> obtaining the Usb Permissions over the android.hardware.usb.UsbManager class
-   
+
+   --> Obtain USB permissions over the android.hardware.usb.UsbManager class
+
       usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
       HashMap<String, UsbDevice> deviceList = usbManager.getDeviceList();
-      for (UsbDevice usbDevice : deviceList.values()) {   usbManager.requestPermission(usbDevice, mPermissionIntent); }
-     
-   --> get the native FileDescriptor of the UsbDevice and transfer it to Native over JNI or JNA
-   
-      UsbDeviceConnection usbDeviceConnection = usbManager.openDevice(camDevice);      int fileDescriptor = usbDeviceConnection.getFileDescriptor();
-      
-   --> JNA sample method: 
-  
-      JNA.INSTANCE.set_the_native_Descriptor(fileDescriptor);  
+      for (UsbDevice usbDevice : deviceList.values()) {
+          usbManager.requestPermission(usbDevice, mPermissionIntent);
+      }
+
+   --> Get the native FileDescriptor of the UsbDevice and transfer it to
+       Native over JNI or JNA
+
+      UsbDeviceConnection usbDeviceConnection = usbManager.openDevice(camDevice);
+      int fileDescriptor = usbDeviceConnection.getFileDescriptor();
+
+   --> JNA sample method:
+
+      JNA.INSTANCE.set_the_native_Descriptor(fileDescriptor);
 
   NATIVE:
-  
-   --> Initialize LibUsb on Android
-   
+
+   --> Initialize libusb on Android
+
       set_the_native_Descriptor(int fileDescriptor) {
-       libusb_context *ctx;
-       libusb_device_handle *devh;
-       libusb_set_option(&ctx, LIBUSB_OPTION_WEAK_AUTHORITY, NULL);        //  
-       libusb_init(&ctx);
-       libusb_wrap_sys_device(NULL, (intptr_t)fileDescriptor, &devh);
-       //  From this point you can regulary use all LibUsb functions as usual.
+          libusb_context *ctx;
+          libusb_device_handle *devh;
+          libusb_set_option(&ctx, LIBUSB_OPTION_NO_DEVICE_DISCOVERY, NULL);
+          libusb_init(&ctx);
+          libusb_wrap_sys_device(NULL, (intptr_t)fileDescriptor, &devh);
       }
-      
-   LIBUSB_OPTION_WEAK_AUTHORITY:
-   
-    The method libusb_set_option(&ctx, LIBUSB_OPTION_WEAK_AUTHORITY, NULL) does not affect the ctx !
-    It was added in 1.0.24 to safely initialize LibUsb for unrooted Android devices.
- 
-Rooted Devices 
--------
+      /* From this point you can regulary use all libusb functions as usual */
+
+   About LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+
+    The method libusb_set_option(&ctx, LIBUSB_OPTION_NO_DEVICE_DISCOVERY, NULL)
+    does not affect the ctx.
+    It allows initializing libusb on unrooted Android devices by skipping
+    the device enumeration.
+
+Rooted Devices:
+---------------
 
     For rooted devices the code using libusb could be executed as root
     using the "su" command. An alternative would be to use the "su" command
     to change the permissions on the appropriate /dev/bus/usb/ files.
-    
+
     Users have reported success in using android.hardware.usb.UsbManager
     to request permission to use the UsbDevice and then opening the
     device. The difficulties in this method is that there is no guarantee
     that it will continue to work in the future Android versions, it
     requires invoking Java APIs and running code to match each
     android.hardware.usb.UsbDevice to a libusb_device.
-    
+
     For a rooted device it is possible to install libusb into the system
     image of a running device:
 
@@ -144,3 +150,4 @@ Rooted Devices
         adb tcpip 5555
         # Use the IP address from netcfg
         adb connect 192.168.1.123:5555
+

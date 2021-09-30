@@ -140,7 +140,7 @@ static int parse_endpoint(struct libusb_context *ctx,
 		    header->bDescriptorType == LIBUSB_DT_DEVICE)
 			break;
 
-		usbi_dbg("skipping descriptor 0x%x", header->bDescriptorType);
+		usbi_dbg(ctx, "skipping descriptor 0x%x", header->bDescriptorType);
 		buffer += header->bLength;
 		size -= header->bLength;
 		parsed += header->bLength;
@@ -414,7 +414,7 @@ static int parse_configuration(struct libusb_context *ctx,
 			    header->bDescriptorType == LIBUSB_DT_DEVICE)
 				break;
 
-			usbi_dbg("skipping descriptor 0x%x", header->bDescriptorType);
+			usbi_dbg(ctx, "skipping descriptor 0x%x", header->bDescriptorType);
 			buffer += header->bLength;
 			size -= header->bLength;
 		}
@@ -531,7 +531,7 @@ static int get_config_descriptor(struct libusb_device *dev, uint8_t config_idx,
 int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
 	struct libusb_device_descriptor *desc)
 {
-	usbi_dbg(" ");
+	usbi_dbg(DEVICE_CTX(dev), " ");
 	static_assert(sizeof(dev->device_descriptor) == LIBUSB_DT_DEVICE_SIZE,
 		      "struct libusb_device_descriptor is not expected size");
 	*desc = dev->device_descriptor;
@@ -601,7 +601,7 @@ int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 	uint8_t *buf;
 	int r;
 
-	usbi_dbg("index %u", config_index);
+	usbi_dbg(DEVICE_CTX(dev), "index %u", config_index);
 	if (config_index >= dev->device_descriptor.bNumConfigurations)
 		return LIBUSB_ERROR_NOT_FOUND;
 
@@ -656,7 +656,7 @@ int API_EXPORTED libusb_get_config_descriptor_by_value(libusb_device *dev,
 		return raw_desc_to_config(DEVICE_CTX(dev), buf, r, config);
 	}
 
-	usbi_dbg("value %u", bConfigurationValue);
+	usbi_dbg(DEVICE_CTX(dev), "value %u", bConfigurationValue);
 	for (idx = 0; idx < dev->device_descriptor.bNumConfigurations; idx++) {
 		union usbi_config_desc_buf _config;
 
@@ -850,23 +850,24 @@ int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *dev_handle,
 	uint16_t bos_len;
 	uint8_t *bos_data;
 	int r;
+	struct libusb_context *ctx = HANDLE_CTX(dev_handle);
 
 	/* Read the BOS. This generates 2 requests on the bus,
 	 * one for the header, and one for the full BOS */
 	r = libusb_get_descriptor(dev_handle, LIBUSB_DT_BOS, 0, _bos.buf, sizeof(_bos.buf));
 	if (r < 0) {
 		if (r != LIBUSB_ERROR_PIPE)
-			usbi_err(HANDLE_CTX(dev_handle), "failed to read BOS (%d)", r);
+			usbi_err(ctx, "failed to read BOS (%d)", r);
 		return r;
 	}
 	if (r < LIBUSB_DT_BOS_SIZE) {
-		usbi_err(HANDLE_CTX(dev_handle), "short BOS read %d/%d",
+		usbi_err(ctx, "short BOS read %d/%d",
 			 r, LIBUSB_DT_BOS_SIZE);
 		return LIBUSB_ERROR_IO;
 	}
 
 	bos_len = libusb_le16_to_cpu(_bos.desc.wTotalLength);
-	usbi_dbg("found BOS descriptor: size %u bytes, %u capabilities",
+	usbi_dbg(ctx, "found BOS descriptor: size %u bytes, %u capabilities",
 		 bos_len, _bos.desc.bNumDeviceCaps);
 	bos_data = calloc(1, bos_len);
 	if (!bos_data)
@@ -875,11 +876,10 @@ int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *dev_handle,
 	r = libusb_get_descriptor(dev_handle, LIBUSB_DT_BOS, 0, bos_data, bos_len);
 	if (r >= 0) {
 		if (r != (int)bos_len)
-			usbi_warn(HANDLE_CTX(dev_handle), "short BOS read %d/%u",
-				  r, bos_len);
+			usbi_warn(ctx, "short BOS read %d/%u", r, bos_len);
 		r = parse_bos(HANDLE_CTX(dev_handle), bos, bos_data, r);
 	} else {
-		usbi_err(HANDLE_CTX(dev_handle), "failed to read BOS (%d)", r);
+		usbi_err(ctx, "failed to read BOS (%d)", r);
 	}
 
 	free(bos_data);

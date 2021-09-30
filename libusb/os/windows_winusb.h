@@ -96,7 +96,7 @@ struct windows_usb_api_backend {
 extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
 
 #define PRINT_UNSUPPORTED_API(fname)				\
-	usbi_dbg("unsupported API call for '%s' "		\
+	usbi_dbg(NULL, "unsupported API call for '%s' "		\
 		"(unrecognized device driver)", #fname)
 
 #define CHECK_SUPPORTED_API(apip, fname)			\

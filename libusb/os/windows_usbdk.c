@@ -413,7 +413,7 @@ static int usbdk_open(struct libusb_device_handle *dev_handle)
 
 	device_priv->system_handle = usbdk_helper.GetRedirectorSystemHandle(device_priv->redirector_handle);
 
-	if (CreateIoCompletionPort(device_priv->system_handle, priv->completion_port, 0, 0) == NULL) {
+	if (CreateIoCompletionPort(device_priv->system_handle, priv->completion_port, (ULONG_PTR)dev_handle, 0) == NULL) {
 		usbi_err(ctx, "failed to associate handle to I/O completion port: %s", windows_error_str(0));
 		usbdk_helper.StopRedirect(device_priv->redirector_handle);
 		device_priv->system_handle = NULL;
