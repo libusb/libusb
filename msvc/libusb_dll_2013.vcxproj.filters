@@ -21,9 +21,6 @@
     <ClInclude Include="..\libusb\os\events_windows.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\libusb\hotplug.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\libusb\libusb.h">
       <Filter>Header Files</Filter>
     </ClInclude>

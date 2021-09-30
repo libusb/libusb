@@ -914,6 +914,8 @@ static int test_device(uint16_t vid, uint16_t pid)
 	libusb_set_auto_detach_kernel_driver(handle, 1);
 	for (iface = 0; iface < nb_ifaces; iface++)
 	{
+		int ret = libusb_kernel_driver_active(handle, iface);
+		printf("\nKernel driver attached for interface %d: %d\n", iface, ret);
 		printf("\nClaiming interface %d...\n", iface);
 		r = libusb_claim_interface(handle, iface);
 		if (r != LIBUSB_SUCCESS) {

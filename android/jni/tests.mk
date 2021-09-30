@@ -20,6 +20,12 @@ LOCAL_PATH := $(call my-dir)
 LIBUSB_ROOT_REL := ../..
 LIBUSB_ROOT_ABS := $(LOCAL_PATH)/../..
 
+ifeq ($(USE_PC_NAME),1)
+  LIBUSB_MODULE := usb-1.0
+else
+  LIBUSB_MODULE := libusb1.0
+endif
+
 # stress
 
 include $(CLEAR_VARS)
@@ -32,7 +38,7 @@ LOCAL_C_INCLUDES += \
   $(LOCAL_PATH)/.. \
   $(LIBUSB_ROOT_ABS)
 
-LOCAL_SHARED_LIBRARIES += libusb1.0
+LOCAL_SHARED_LIBRARIES += $(LIBUSB_MODULE)
 
 LOCAL_MODULE := stress
 

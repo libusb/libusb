@@ -161,7 +161,8 @@ fi
 case $backend in
 darwin)
 	AC_CHECK_FUNCS([pthread_threadid_np])
-	LIBS="${LIBS} -lobjc -Wl,-framework,IOKit -Wl,-framework,CoreFoundation"
+	LIBS="${LIBS} -lobjc -Wl,-framework,IOKit -Wl,-framework,CoreFoundation -Wl,-framework,Security"
+	AC_CHECK_HEADERS([IOKit/usb/IOUSBHostFamilyDefinitions.h])
 	;;
 haiku)
 	LIBS="${LIBS} -lbe"
@@ -170,7 +171,7 @@ linux)
 	AC_SEARCH_LIBS([clock_gettime], [rt], [], [], [])
 	AC_CHECK_FUNCS([pthread_setname_np])
 	AC_ARG_ENABLE([udev],
-		[AC_HELP_STRING([--enable-udev], [use udev for device enumeration and hotplug support (recommended) [default=yes]])],
+		[AS_HELP_STRING([--enable-udev], [use udev for device enumeration and hotplug support (recommended) [default=yes]])],
 		[use_udev=$enableval], [use_udev=yes])
 	if test "x$use_udev" = xyes; then
 		dnl system has udev. use it or fail!
@@ -199,17 +200,37 @@ dnl headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 
 if test "x$platform" = xposix; then
-	dnl the clock_gettime() function needs certain clock IDs defined
-	AC_CHECK_FUNCS([clock_gettime], [have_clock_gettime=yes], [have_clock_gettime=])
+	dnl check availability of clock_gettime()
+	if test "x$backend" = xdarwin; then
+		dnl need to verify that OS X target is 10.12 or later for clock_gettime()
+		AC_MSG_CHECKING([whether OS X target version is 10.12 or later])
+		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
+				#include <AvailabilityMacros.h>
+				#if MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_12
+				# error "Target OS X version is too old"
+				#endif
+			], [])],
+			[AC_MSG_RESULT([yes])
+			 osx_10_12_or_later=yes],
+			[AC_MSG_RESULT([no])
+			 osx_10_12_or_later=])
+		if test "x$osx_10_12_or_later" = xyes; then
+			AC_CHECK_FUNCS([clock_gettime], [have_clock_gettime=yes], [have_clock_gettime=])
+		else
+			AC_MSG_NOTICE([clock_gettime() is not available on target OS X version])
+		fi
+	else
+		AC_CHECK_FUNCS([clock_gettime], [have_clock_gettime=yes], [AC_MSG_ERROR([clock_gettime() is required on this platform])])
+	fi
+
 	if test "x$have_clock_gettime" = xyes; then
+		dnl the clock_gettime() function needs certain clock IDs defined
 		AC_CHECK_DECL([CLOCK_MONOTONIC], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_MONOTONIC])], [[#include <time.h>]])
 		dnl use the monotonic clock for condition variable timed waits if possible
 		AC_CHECK_FUNCS([pthread_condattr_setclock], [need_clock_realtime=], [need_clock_realtime=yes])
 		if test "x$need_clock_realtime" = xyes; then
 			AC_CHECK_DECL([CLOCK_REALTIME], [], [AC_MSG_ERROR([C library headers missing definition for CLOCK_REALTIME])], [[#include <time.h>]])
 		fi
-	elif test "x$backend" != xdarwin; then
-		AC_MSG_ERROR([clock_gettime() is required on this platform])
 	fi
 fi
 

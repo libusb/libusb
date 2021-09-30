@@ -34,8 +34,8 @@
 #ifdef HAVE_ASM_TYPES_H
 #include <asm/types.h>
 #endif
-#include <linux/netlink.h>
 #include <sys/socket.h>
+#include <linux/netlink.h>
 
 #define NL_GROUP_KERNEL 1
 
@@ -99,7 +99,7 @@ int linux_netlink_start_event_monitor(void)
 
 	linux_netlink_socket = socket(PF_NETLINK, socktype, NETLINK_KOBJECT_UEVENT);
 	if (linux_netlink_socket == -1 && errno == EINVAL) {
-		usbi_dbg("failed to create netlink socket of type %d, attempting SOCK_RAW", socktype);
+		usbi_dbg(NULL, "failed to create netlink socket of type %d, attempting SOCK_RAW", socktype);
 		socktype = SOCK_RAW;
 		linux_netlink_socket = socket(PF_NETLINK, socktype, NETLINK_KOBJECT_UEVENT);
 	}
@@ -204,7 +204,7 @@ static int linux_netlink_parse(const char *buffer, size_t len, int *detached,
 	} else if (strcmp(tmp, "remove") == 0) {
 		*detached = 1;
 	} else if (strcmp(tmp, "add") != 0) {
-		usbi_dbg("unknown device action %s", tmp);
+		usbi_dbg(NULL, "unknown device action %s", tmp);
 		return -1;
 	}
 
@@ -311,20 +311,20 @@ static int linux_netlink_read_message(void)
 	}
 
 	if (sa_nl.nl_groups != NL_GROUP_KERNEL || sa_nl.nl_pid != 0) {
-		usbi_dbg("ignoring netlink message from unknown group/PID (%u/%u)",
+		usbi_dbg(NULL, "ignoring netlink message from unknown group/PID (%u/%u)",
 			 (unsigned int)sa_nl.nl_groups, (unsigned int)sa_nl.nl_pid);
 		return -1;
 	}
 
 	cmsg = CMSG_FIRSTHDR(&msg);
 	if (!cmsg || cmsg->cmsg_type != SCM_CREDENTIALS) {
-		usbi_dbg("ignoring netlink message with no sender credentials");
+		usbi_dbg(NULL, "ignoring netlink message with no sender credentials");
 		return -1;
 	}
 
 	cred = (struct ucred *)CMSG_DATA(cmsg);
 	if (cred->uid != 0) {
-		usbi_dbg("ignoring netlink message with non-zero sender UID %u", (unsigned int)cred->uid);
+		usbi_dbg(NULL, "ignoring netlink message with non-zero sender UID %u", (unsigned int)cred->uid);
 		return -1;
 	}
 
@@ -332,7 +332,7 @@ static int linux_netlink_read_message(void)
 	if (r)
 		return r;
 
-	usbi_dbg("netlink hotplug found device busnum: %hhu, devaddr: %hhu, sys_name: %s, removed: %s",
+	usbi_dbg(NULL, "netlink hotplug found device busnum: %hhu, devaddr: %hhu, sys_name: %s, removed: %s",
 		 busnum, devaddr, sys_name, detached ? "yes" : "no");
 
 	/* signal device is available (or not) to all contexts */
@@ -362,7 +362,7 @@ static void *linux_netlink_event_thread_main(void *arg)
 		usbi_warn(NULL, "failed to set hotplug event thread name, error=%d", r);
 #endif
 
-	usbi_dbg("netlink event thread entering");
+	usbi_dbg(NULL, "netlink event thread entering");
 
 	while (1) {
 		r = poll(fds, 2, -1);
@@ -384,7 +384,7 @@ static void *linux_netlink_event_thread_main(void *arg)
 		}
 	}
 
-	usbi_dbg("netlink event thread exiting");
+	usbi_dbg(NULL, "netlink event thread exiting");
 
 	return NULL;
 }

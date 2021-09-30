@@ -36,7 +36,7 @@ static void LIBUSB_CALL sync_transfer_cb(struct libusb_transfer *transfer)
 {
 	int *completed = transfer->user_data;
 	*completed = 1;
-	usbi_dbg("actual_length=%d", transfer->actual_length);
+	usbi_dbg(TRANSFER_CTX(transfer), "actual_length=%d", transfer->actual_length);
 	/* caller interprets result and frees transfer */
 }
 

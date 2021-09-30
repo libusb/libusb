@@ -1,5 +1,5 @@
 LIBUSB_SRC_DIR = @top_srcdir@/libusb
-EXCLUDED_FILES = hotplug.h libusbi.h version.h version_nano.h
+EXCLUDED_FILES = libusbi.h version.h version_nano.h
 LIBUSB_SRC = $(wildcard $(LIBUSB_SRC_DIR)/*.c) $(wildcard $(LIBUSB_SRC_DIR)/*.h)
 LIBUSB_DOC_SRC = $(filter-out $(addprefix $(LIBUSB_SRC_DIR)/,$(EXCLUDED_FILES)),$(LIBUSB_SRC))
 

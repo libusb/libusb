@@ -171,9 +171,9 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	DWORD num_handles = (DWORD)ctx->event_data_cnt;
 	DWORD result;
 
-	usbi_dbg("WaitForMultipleObjects() for %lu HANDLEs with timeout in %dms", ULONG_CAST(num_handles), timeout_ms);
+	usbi_dbg(ctx, "WaitForMultipleObjects() for %lu HANDLEs with timeout in %dms", ULONG_CAST(num_handles), timeout_ms);
 	result = WaitForMultipleObjects(num_handles, handles, FALSE, (DWORD)timeout_ms);
-	usbi_dbg("WaitForMultipleObjects() returned %lu", ULONG_CAST(result));
+	usbi_dbg(ctx, "WaitForMultipleObjects() returned %lu", ULONG_CAST(result));
 	if (result == WAIT_TIMEOUT) {
 		if (usbi_using_timer(ctx))
 			goto done;
