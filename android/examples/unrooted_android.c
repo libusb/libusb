@@ -276,7 +276,7 @@ int unrooted_usb_description(int fileDescriptor)
     libusb_device_handle *devh = NULL;
     int r = 0;
     verbose = 1;
-    r = libusb_set_option(ctx, LIBUSB_OPTION_WEAK_AUTHORITY, NULL);
+    r = libusb_set_option(ctx, LIBUSB_OPTION_NO_DEVICE_DISCOVERY, NULL);
     if (r != LIBUSB_SUCCESS) {
         LOGD("libusb_init failed: %d\n", r);
         return -1;
