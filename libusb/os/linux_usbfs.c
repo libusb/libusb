@@ -439,8 +439,7 @@ static int op_set_option(struct libusb_context *ctx, enum libusb_option option, 
 	UNUSED(ctx);
 	UNUSED(ap);
 
-	if (option == LIBUSB_OPTION_NO_DEVICE_DISCOVERY ||
-	    option == LIBUSB_OPTION_WEAK_AUTHORITY) {
+	if (option == LIBUSB_OPTION_NO_DEVICE_DISCOVERY) {
 		usbi_dbg(ctx, "no enumeration will be performed");
 		no_enumeration = 1;
 		return LIBUSB_SUCCESS;
