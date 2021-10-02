@@ -312,7 +312,8 @@ if (cfg != desired)
  * - libusb is able to send a packet of zero length to an endpoint simply by
  * submitting a transfer of zero length.
  * - The \ref libusb_transfer_flags::LIBUSB_TRANSFER_ADD_ZERO_PACKET
- * "LIBUSB_TRANSFER_ADD_ZERO_PACKET" flag is currently only supported on Linux.
+ * "LIBUSB_TRANSFER_ADD_ZERO_PACKET" flag is currently supported on Linux,
+ * Darwin and Windows (WinUSB).
  */
 
 /**
