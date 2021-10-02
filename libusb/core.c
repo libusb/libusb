@@ -2166,6 +2166,9 @@ void API_EXPORTED libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb,
  * Some options require one or more arguments to be provided. Consult each
  * option's documentation for specific requirements.
  *
+ * If the context ctx is NULL, the option will be added to a list of default
+ * options that will be applied to all subsequently created contexts.
+ *
  * Since version 1.0.22, \ref LIBUSB_API_VERSION >= 0x01000106
  *
  * \param ctx context on which to operate

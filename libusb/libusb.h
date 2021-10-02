@@ -982,8 +982,9 @@ struct libusb_version {
  * Sessions are created by libusb_init() and destroyed through libusb_exit().
  * If your application is guaranteed to only ever include a single libusb
  * user (i.e. you), you do not have to worry about contexts: pass NULL in
- * every function call where a context is required. The default context
- * will be used.
+ * every function call where a context is required, and the default context
+ * will be used. Note that libusb_set_option(NULL, ...) is special, and adds
+ * an option to a list of default options for new contexts.
  *
  * For more information, see \ref libusb_contexts.
  */
