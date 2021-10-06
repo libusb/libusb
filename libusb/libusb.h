@@ -31,8 +31,11 @@
 #define inline __inline
 #endif
 /* ssize_t is also not available */
+#ifndef _SSIZE_T_DEFINED
+#define _SSIZE_T_DEFINED
 #include <basetsd.h>
 typedef SSIZE_T ssize_t;
+#endif /* _SSIZE_T_DEFINED */
 #endif /* _MSC_VER */
 
 #include <limits.h>
