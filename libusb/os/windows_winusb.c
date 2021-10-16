@@ -1619,6 +1619,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				if (key == INVALID_HANDLE_VALUE)
 					break;
 				// Look for both DeviceInterfaceGUIDs *and* DeviceInterfaceGUID, in that order
+				// If multiple GUIDs just process the first and ignore the others
 				size = sizeof(guid_string);
 				s = pRegQueryValueExA(key, "DeviceInterfaceGUIDs", NULL, &reg_type,
 					(LPBYTE)guid_string, &size);
@@ -1628,7 +1629,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				pRegCloseKey(key);
 				if (s == ERROR_FILE_NOT_FOUND) {
 					break; /* no DeviceInterfaceGUID registered */
-				} else if (s != ERROR_SUCCESS) {
+				} else if (s != ERROR_SUCCESS && s != ERROR_MORE_DATA) {
 					usbi_warn(ctx, "unexpected error from pRegQueryValueExA for '%s'", dev_id);
 					break;
 				}
