@@ -107,6 +107,9 @@ static const char *darwin_error_str (IOReturn result) {
   case kIOReturnExclusiveAccess:
     return "another process has device opened for exclusive access";
   case kIOUSBPipeStalled:
+#if defined(kUSBHostReturnPipeStalled)
+  case kUSBHostReturnPipeStalled:
+#endif
     return "pipe is stalled";
   case kIOReturnError:
     return "could not establish a connection to the Darwin kernel";
@@ -146,6 +149,9 @@ static enum libusb_error darwin_to_libusb (IOReturn result) {
   case kIOReturnExclusiveAccess:
     return LIBUSB_ERROR_ACCESS;
   case kIOUSBPipeStalled:
+#if defined(kUSBHostReturnPipeStalled)
+  case kUSBHostReturnPipeStalled:
+#endif
     return LIBUSB_ERROR_PIPE;
   case kIOReturnBadArgument:
     return LIBUSB_ERROR_INVALID_PARAM;
@@ -1603,8 +1609,10 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
   else
     usbi_warn (HANDLE_CTX (dev_handle), "SetAlternateInterface: %s", darwin_error_str(kresult));
 
-  if (kresult != kIOUSBPipeStalled)
+  ret = darwin_to_libusb(kresult);
+  if (ret != LIBUSB_ERROR_PIPE) {
     return darwin_to_libusb (kresult);
+  }
 
   /* If a device only supports a default setting for the specified interface, then a STALL
      (kIOUSBPipeStalled) may be returned. Ref: USB 2.0 specs 9.4.10.
