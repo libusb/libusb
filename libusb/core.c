@@ -580,7 +580,9 @@ libusb_free_device_list(list, 1);
  *
  * The libusb_get_device_list() function can be used to obtain a list of
  * devices currently connected to the system. This is known as device
- * discovery.
+ * discovery. Devices can also be discovered with the hotplug mechanism,
+ * whereby a callback function registered with libusb_hotplug_register_callback()
+ * will be called when a device of interest is connected or disconnected.
  *
  * Just because you have a reference to a device does not mean it is
  * necessarily usable. The device may have been unplugged, you may not have
@@ -611,7 +613,7 @@ libusb_free_device_list(list, 1);
  *
  * With the above information in mind, the process of opening a device can
  * be viewed as follows:
- * -# Discover devices using libusb_get_device_list().
+ * -# Discover devices using libusb_get_device_list() or libusb_hotplug_register_callback().
  * -# Choose the device that you want to operate, and call libusb_open().
  * -# Unref all devices in the discovered device list.
  * -# Free the discovered device list.

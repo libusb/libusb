@@ -992,7 +992,7 @@ typedef struct libusb_context libusb_context;
 /** \ingroup libusb_dev
  * Structure representing a USB device detected on the system. This is an
  * opaque type for which you are only ever provided with a pointer, usually
- * originating from libusb_get_device_list().
+ * originating from libusb_get_device_list() or libusb_hotplug_register_callback().
  *
  * Certain operations can be performed on a device, but in order to do any
  * I/O you will have to first obtain a device handle using libusb_open().

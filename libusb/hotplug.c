@@ -62,7 +62,7 @@
  * A hotplug event can listen for either or both of these events.
  *
  * Note: If you receive notification that a device has left and you have any
- * a libusb_device_handles for the device it is up to you to call libusb_close()
+ * libusb_device_handles for the device it is up to you to call libusb_close()
  * on each device handle to free up any remaining resources associated with the device.
  * Once a device has left any libusb_device_handle associated with the device
  * are invalid and will remain so even if the device comes back.
