@@ -195,7 +195,7 @@ static bool ezusb_cpucs(libusb_device_handle *device, uint32_t addr, bool doRun)
 }
 
 /*
- * Send an FX3 jumpt to address command
+ * Send an FX3 jump to address command
  * Returns false on error.
  */
 static bool ezusb_fx3_jump(libusb_device_handle *device, uint32_t addr)

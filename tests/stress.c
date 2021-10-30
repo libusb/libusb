@@ -133,7 +133,7 @@ static libusb_testlib_result test_default_context_change(void)
 		/* Enable debug output on new context, to be sure to use the context */
 		libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_DEBUG);
 
-		/* Enable debug outout on the default context. This should work even before
+		/* Enable debug output on the default context. This should work even before
 		 * the context has been created. */
 		libusb_set_option(NULL, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_DEBUG);
 
