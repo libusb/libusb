@@ -1620,7 +1620,7 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
 
   /* If a device only supports a default setting for the specified interface, then a STALL
      (kIOUSBPipeStalled) may be returned. Ref: USB 2.0 specs 9.4.10.
-     Mimick the behaviour in e.g. the Linux kernel: in such case, reset all endpoints
+     Mimic the behaviour in e.g. the Linux kernel: in such case, reset all endpoints
      of the interface (as would have been done per 9.1.1.5) and return success. */
 
   /* For some reason we need to reclaim the interface after the pipe error */

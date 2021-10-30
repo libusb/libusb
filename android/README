@@ -51,7 +51,7 @@ the package is built.
 Runtime Permissions:
 --------------------
 
-The Runtime Permissions on Android can be transfered from Java to Native
+The Runtime Permissions on Android can be transferred from Java to Native
 over the following approach:
 
   JAVA:
@@ -85,7 +85,7 @@ over the following approach:
           libusb_init(&ctx);
           libusb_wrap_sys_device(NULL, (intptr_t)fileDescriptor, &devh);
       }
-      /* From this point you can regulary use all libusb functions as usual */
+      /* From this point you can regularly use all libusb functions as usual */
 
    About LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
 

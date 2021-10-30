@@ -301,7 +301,7 @@ USBDeviceHandle::SetAltSetting(uint8 inumber, uint8 alt)
 	}
 	command.alternate.alternate_info = alt;
 	if (ioctl(fRawFD, B_USB_RAW_COMMAND_SET_ALT_INTERFACE, &command, sizeof(command)) ||
-			command.alternate.status != B_USB_RAW_STATUS_SUCCESS) { //IF IOCTL FAILS DEVICE DISONNECTED PROBABLY
+			command.alternate.status != B_USB_RAW_STATUS_SUCCESS) { //IF IOCTL FAILS DEVICE DISCONNECTED PROBABLY
 		usbi_err(NULL, "Error setting alternate interface");
 		return _errno_to_libusb(command.alternate.status);
 	}

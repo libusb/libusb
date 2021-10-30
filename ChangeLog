@@ -66,7 +66,7 @@ visit: http://log.libusb.info
 * Windows: Fix enumeration problems on Windows 8 and later
 * Windows: Major rework of poll() emulation
 * Windows: Numerous HID API fixes
-* Windows: Support cancelation of individual transfers (Vista and later)
+* Windows: Support cancellation of individual transfers (Vista and later)
 * Various other bug fixes and improvements
 
 2016-10-01: v1.0.21

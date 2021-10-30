@@ -220,7 +220,7 @@ static int display_ps3_status(libusb_device_handle *handle)
 			printf("\tRIGHT 3 pressed\n");
 			break;
 		case 0x08:
-			printf("\tSTART presed\n");
+			printf("\tSTART pressed\n");
 			break;
 		case 0x10:
 			printf("\tUP pressed\n");
@@ -246,7 +246,7 @@ static int display_ps3_status(libusb_device_handle *handle)
 			printf("\tLEFT 1 pressed\n");
 			break;
 		case 0x08:
-			printf("\tRIGHT 1 presed\n");
+			printf("\tRIGHT 1 pressed\n");
 			break;
 		case 0x10:
 			printf("\tTRIANGLE pressed\n");
