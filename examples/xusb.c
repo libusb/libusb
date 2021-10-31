@@ -863,6 +863,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 
 	printf("\nReading first configuration descriptor:\n");
 	CALL_CHECK_CLOSE(libusb_get_config_descriptor(dev, 0, &conf_desc), handle);
+	printf("              total length: %d\n", conf_desc->wTotalLength);
 	printf("         descriptor length: %d\n", conf_desc->bLength);
 	nb_ifaces = conf_desc->bNumInterfaces;
 	printf("             nb interfaces: %d\n", nb_ifaces);
