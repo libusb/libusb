@@ -147,7 +147,6 @@ static enum test_type {
 	USE_SCSI,
 	USE_HID,
 } test_mode;
-static uint16_t VID, PID;
 
 static void display_buffer_hex(unsigned char *buffer, unsigned size)
 {
@@ -1105,13 +1104,11 @@ int main(int argc, char** argv)
 	const struct libusb_version* version;
 	int j, r;
 	size_t i, arglen;
-	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
 	char *error_lang = NULL;
+	uint16_t vid = 0, pid = 0;
 
-	// Default to generic, expecting VID:PID
-	VID = 0;
-	PID = 0;
+	// Default to generic
 	test_mode = USE_GENERIC;
 
 	if (((uint8_t*)&endian_test)[0] == 0xBE) {
@@ -1157,35 +1154,35 @@ int main(int argc, char** argv)
 					break;
 				case 'j':
 					// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
-					if (!VID && !PID) {
-						VID = 0x15BA;
-						PID = 0x0004;
+					if (!vid && !pid) {
+						vid = 0x15BA;
+						pid = 0x0004;
 					}
 					break;
 				case 'k':
 					// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
-					if (!VID && !PID) {
-						VID = 0x0204;
-						PID = 0x6025;
+					if (!vid && !pid) {
+						vid = 0x0204;
+						pid = 0x6025;
 					}
 					break;
 				// The following tests will force VID:PID if already provided
 				case 'p':
 					// Sony PS3 Controller - 1 interface
-					VID = 0x054C;
-					PID = 0x0268;
+					vid = 0x054C;
+					pid = 0x0268;
 					test_mode = USE_PS3;
 					break;
 				case 's':
 					// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
-					VID = 0x045E;
-					PID = 0x0008;
+					vid = 0x045E;
+					pid = 0x0008;
 					test_mode = USE_HID;
 					break;
 				case 'x':
 					// Microsoft XBox Controller Type S - 1 interface
-					VID = 0x045E;
-					PID = 0x0289;
+					vid = 0x045E;
+					pid = 0x0289;
 					test_mode = USE_XBOX;
 					break;
 				case 'h':
@@ -1201,12 +1198,14 @@ int main(int argc, char** argv)
 						break;
 				}
 				if (i != arglen) {
+					unsigned int tmp_vid, tmp_pid;
+
 					if (sscanf(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
 						printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
 						return EXIT_FAILURE;
 					}
-					VID = (uint16_t)tmp_vid;
-					PID = (uint16_t)tmp_pid;
+					vid = (uint16_t)tmp_vid;
+					pid = (uint16_t)tmp_pid;
 				} else {
 					display_help(argv[0]);
 					return EXIT_FAILURE;
@@ -1238,7 +1237,7 @@ int main(int argc, char** argv)
 			printf("Invalid or unsupported locale '%s': %s\n", error_lang, libusb_strerror((enum libusb_error)r));
 	}
 
-	r = test_device(VID, PID);
+	r = test_device(vid, pid);
 
 	libusb_exit(NULL);
 
