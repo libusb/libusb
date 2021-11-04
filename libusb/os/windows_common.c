@@ -291,7 +291,7 @@ enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS st
 /*
  * Make a transfer complete synchronously
  */
-void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size)
+void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size, DWORD error_code)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct windows_context_priv *priv = usbi_get_context_priv(TRANSFER_CTX(transfer));
@@ -300,7 +300,7 @@ void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size)
 
 	usbi_dbg(TRANSFER_CTX(transfer), "transfer %p, length %lu", transfer, ULONG_CAST(size));
 
-	overlapped->Internal = (ULONG_PTR)STATUS_SUCCESS;
+	overlapped->Internal = (ULONG_PTR)error_code;
 	overlapped->InternalHigh = (ULONG_PTR)size;
 
 	if (!PostQueuedCompletionStatus(priv->completion_port, (DWORD)size, (ULONG_PTR)transfer->dev_handle, overlapped))
