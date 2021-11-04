@@ -482,7 +482,8 @@ static void op_exit(struct libusb_context *ctx)
 
 static int op_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
 {
-	if (NULL != ctx) {
+	/* ensure ctx is not active yet */
+	if (ctx->list.next != NULL) {
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
 
