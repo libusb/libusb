@@ -2364,18 +2364,7 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 			goto err_io_exit;
 	}
 
-	if (!ctx) {
-		for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
-			if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
-				continue;
-			}
-			r = libusb_set_option(_ctx, option);
-			if (LIBUSB_SUCCESS != r) {
-				usbi_mutex_static_unlock(&default_context_lock);
-				goto err_io_exit;
-			}
-		}
-	} else
+	if (ctx)
 		*ctx = _ctx;
 
 	usbi_mutex_static_unlock(&default_context_lock);
