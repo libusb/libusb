@@ -479,8 +479,10 @@ static void op_exit(struct libusb_context *ctx)
 
 static int op_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
 {
-	if (NULL != ctx) {
-		return LIBUSB_ERROR_NOT_SUPPORTED;
+   if ( ctx != NULL ){
+      if (ctx->list.prev != NULL ){
+		   return LIBUSB_ERROR_NOT_SUPPORTED;
+      }
 	}
 
 #ifdef __ANDROID__
