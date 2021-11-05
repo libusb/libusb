@@ -2233,6 +2233,7 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 		if (NULL == ctx) {
 			return LIBUSB_SUCCESS;
 		}
+		/* fallthru */
 	case LIBUSB_OPTION_ANDROID_JNIENV:
 	case LIBUSB_OPTION_ANDROID_JAVAVM:
 		usbi_mutex_static_lock(&default_context_lock);
@@ -2338,6 +2339,10 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 			case LIBUSB_OPTION_ANDROID_JNIENV:
 			case LIBUSB_OPTION_ANDROID_JAVAVM:
 				continue;
+			case LIBUSB_OPTION_USE_USBDK:
+			case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+			case LIBUSB_OPTION_WEAK_AUTHORITY:
+			case LIBUSB_OPTION_MAX:
 			default:
 				usbi_mutex_static_unlock(&default_context_lock);
 				r = libusb_set_option(_ctx, option);
