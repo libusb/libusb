@@ -2235,11 +2235,10 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
 	case LIBUSB_OPTION_ANDROID_JNIENV:
 	case LIBUSB_OPTION_ANDROID_JAVAVM:
-		usbi_mutex_static_lock(&default_context_lock);
 		if (usbi_backend.set_option)
 			return usbi_backend.set_option(ctx, option, ap);
 
-		return r;
+		return LIBUSB_ERROR_NOT_SUPPORTED;
 
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;
