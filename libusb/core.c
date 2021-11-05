@@ -2232,13 +2232,10 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 	case LIBUSB_OPTION_WEAK_AUTHORITY:
 	case LIBUSB_OPTION_ANDROID_JNIENV:
 	case LIBUSB_OPTION_ANDROID_JAVAVM:
-		usbi_mutex_static_lock(&default_context_lock);
 		if (usbi_backend.set_option)
 			r = usbi_backend.set_option(ctx, option, ap);
 		else
 			r = LIBUSB_ERROR_NOT_SUPPORTED;
-		usbi_mutex_static_unlock(&default_context_lock);
-
 		return r;
 
 	case LIBUSB_OPTION_MAX:
