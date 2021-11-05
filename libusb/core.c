@@ -2214,13 +2214,13 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 	}
 
 	ctx = usbi_get_context(ctx);
-	if (NULL == ctx) {
-		return LIBUSB_SUCCESS;
-	}
 
 	switch (option) {
 	case LIBUSB_OPTION_LOG_LEVEL:
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
+		if (NULL == ctx) {
+			return LIBUSB_SUCCESS;
+		}
 		if (!ctx->debug_fixed)
 			ctx->debug = (enum libusb_log_level)arg;
 #endif
@@ -2230,6 +2230,9 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 	case LIBUSB_OPTION_USE_USBDK:
 	case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
 	case LIBUSB_OPTION_WEAK_AUTHORITY:
+		if (NULL == ctx) {
+			return LIBUSB_SUCCESS;
+		}
 	case LIBUSB_OPTION_ANDROID_JNIENV:
 	case LIBUSB_OPTION_ANDROID_JAVAVM:
 		usbi_mutex_static_lock(&default_context_lock);
@@ -2327,14 +2330,21 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 	/* apply options to new contexts (also default context being created) */
 	if (ctx || !usbi_default_context) {
 		for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
-			if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
+			if (!default_context_options[option].is_set) {
 				continue;
 			}
-			usbi_mutex_static_unlock(&default_context_lock);
-			r = libusb_set_option(_ctx, option);
-			usbi_mutex_static_lock(&default_context_lock);
-			if (LIBUSB_SUCCESS != r)
-				goto err_free_ctx;
+			switch (option) {
+			case LIBUSB_OPTION_LOG_LEVEL:
+			case LIBUSB_OPTION_ANDROID_JNIENV:
+			case LIBUSB_OPTION_ANDROID_JAVAVM:
+				continue;
+			default:
+				usbi_mutex_static_unlock(&default_context_lock);
+				r = libusb_set_option(_ctx, option);
+				usbi_mutex_static_lock(&default_context_lock);
+				if (LIBUSB_SUCCESS != r)
+					goto err_free_ctx;
+			}
 		}
 	}
 

@@ -488,14 +488,20 @@ static int op_set_option(struct libusb_context *ctx, enum libusb_option option, 
 
 #ifdef __ANDROID__
 	JavaVM **default_vmptr = (JavaVM **)&default_context_options[LIBUSB_OPTION_ANDROID_JAVAVM].arg.pval;
+	JavaVM **default_jniptr = (JavaVM **)&default_context_options[LIBUSB_OPTION_ANDROID_JNIENV].arg.pval;
 
 	if (option == LIBUSB_OPTION_ANDROID_JNIENV) {
 		JNIEnv * jni_env = va_arg(ap, JNIEnv *);
 		int r = android_jnienv_javavm(jni_env, default_vmptr);
+		if (r != LIBUSB_SUCCESS) {
+			return r;
+		}
+		*default_jniptr = NULL;
 		usbi_dbg(ctx, "set default jnienv javavm %p %p", jni_env, *default_vmptr);
-		return r;
+		return LIBUSB_SUCCESS;
 	} else if (option == LIBUSB_OPTION_ANDROID_JAVAVM) {
 		*default_vmptr = va_arg(ap, JavaVM *);
+		*default_jniptr = NULL;
 		usbi_dbg(ctx, "set default javavm %p", *default_vmptr);
 		return LIBUSB_SUCCESS;
 	}
