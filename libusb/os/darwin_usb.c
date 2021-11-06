@@ -1758,7 +1758,9 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   /* if we need to release capture */
   if (HAS_CAPTURE_DEVICE()) {
     if (capture) {
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101000
       options |= kUSBReEnumerateCaptureDeviceMask;
+#endif
     }
   } else {
     capture = false;
