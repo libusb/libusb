@@ -802,7 +802,7 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
 	DWORD result, bytes_transferred;
 
 	if (GetOverlappedResult(transfer_priv->handle, &transfer_priv->overlapped, &bytes_transferred, FALSE))
-		result = NO_ERROR;
+		result = (DWORD) transfer_priv->overlapped.Internal;
 	else
 		result = GetLastError();
 
