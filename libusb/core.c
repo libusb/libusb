@@ -2319,16 +2319,14 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 	list_init(&_ctx->usb_devs);
 	list_init(&_ctx->open_devs);
 
-	/* apply options to new contexts (also default context being created) */
-	if (ctx || !usbi_default_context) {
-		for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
-			if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
-				continue;
-			}
-			r = libusb_set_option(_ctx, option);
-			if (LIBUSB_SUCCESS != r)
-				goto err_free_ctx;
+	/* apply default options to all new contexts */
+	for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
+		if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
+			continue;
 		}
+		r = libusb_set_option(_ctx, option);
+		if (LIBUSB_SUCCESS != r)
+			goto err_free_ctx;
 	}
 
 	/* default context must be initialized before calling usbi_dbg */
