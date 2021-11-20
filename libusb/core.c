@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * Core functions for libusb
- * Copyright © 2012-2013 Nathan Hjelm <hjelmn@cs.unm.edu>
+ * Copyright © 2012-2021 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
@@ -111,17 +111,18 @@ struct list_head active_contexts_list;
  * libusb uses stderr for all logging. By default, logging is set to NONE,
  * which means that no output will be produced. However, unless the library
  * has been compiled with logging disabled, then any application calls to
- * libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level), or the setting of the
- * environmental variable LIBUSB_DEBUG outside of the application, can result
- * in logging being produced. Your application should therefore not close
- * stderr, but instead direct it to the null device if its output is
- * undesirable.
+ * libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level),
+ * libusb_init_context, or the setting of the environmental variable
+ * LIBUSB_DEBUG outside of the application, can result in logging being
+ * produced. Your application should therefore not close stderr, but instead
+ * direct it to the null device if its output is undesirable.
  *
- * The libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level) function can be
- * used to enable logging of certain messages. Under standard configuration,
- * libusb doesn't really log much so you are advised to use this function
- * to enable all error/warning/ informational messages. It will help debug
- * problems with your software.
+ * The libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level) or
+ * libusb_init_context functions can be used to enable logging of certain
+ * messages. With the default configuration, libusb will not log much so if
+ * you are advised to use one of these functions to enable all
+ * error/warning/informational messages. It will help debug problems with your
+ * software.
  *
  * The logged messages are unstructured. There is no one-to-one correspondence
  * between messages being logged and success or failure return codes from
@@ -137,19 +138,19 @@ struct list_head active_contexts_list;
  * The LIBUSB_DEBUG environment variable can be used to enable message logging
  * at run-time. This environment variable should be set to a log level number,
  * which is interpreted the same as the
- * libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level) parameter. When this
- * environment variable is set, the message logging verbosity level is fixed
- * and libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level) effectively does
- * nothing.
+ * libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level), or
+ * libusb_init_context(&ctx, &(struct libusb_init_option){.option = LIBUSB_OPTION_LOG_LEVEL, .value = {.ival = level}}, 0).
+ * When the environment variable is set, the message logging verbosity level is
+ * fixed and setting the LIBUSB_OPTION_LOG_LEVEL option has no effect.
  *
  * libusb can be compiled without any logging functions, useful for embedded
- * systems. In this case, libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level)
- * and the LIBUSB_DEBUG environment variable have no effects.
+ * systems. In this case, neither the LIBUSB_OPTION_LOG_LEVEL option, nor the
+ * LIBUSB_DEBUG environment variable will have any effect.
  *
  * libusb can also be compiled with verbose debugging messages always. When
  * the library is compiled in this way, all messages of all verbosities are
- * always logged. libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level) and
- * the LIBUSB_DEBUG environment variable have no effects.
+ * always logged. Again, in this case, neither the LIBUSB_OPTION_LOG_LEVEL
+ * option, nor the LIBUSB_DEBUG environment variable will have any effect.
  *
  * \section remarks Other remarks
  *
@@ -327,9 +328,9 @@ if (cfg != desired)
  * developed modules may both use libusb.
  *
  * libusb is written to allow for these multiple user scenarios. The two
- * "instances" of libusb will not interfere: libusb_set_option() calls
- * from one user will not affect the same settings for other users, other
- * users can continue using libusb after one of them calls libusb_exit(), etc.
+ * "instances" of libusb will not interfere: an option set by one user will have
+ * no effect the same option for other users, other users can continue using
+ * libusb after one of them calls libusb_exit(), etc.
  *
  * This is made possible through libusb's <em>context</em> concept. When you
  * call libusb_init(), you are (optionally) given a context. You can then pass
@@ -436,6 +437,7 @@ if (cfg != desired)
   * - libusb_hotplug_deregister_callback()
   * - libusb_hotplug_register_callback()
   * - libusb_init()
+  * - libusb_init_context()
   * - libusb_interrupt_event_handler()
   * - libusb_interrupt_transfer()
   * - libusb_kernel_driver_active()
@@ -1209,11 +1211,10 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
  * handle for the underlying device. The handle allows you to use libusb to
  * perform I/O on the device in question.
  *
- * Call libusb_set_option() with the parameters (NULL,
- * \ref LIBUSB_OPTION_NO_DEVICE_DISCOVERY) before libusb_init() if you want
- * to skip enumeration of USB devices. In particular, this might be
- * needed on Android if you don't have authority to access USB devices
- * in general.
+ * Call libusb_init_context with the LIBUSB_OPTION_NO_DEVICE_DISCOVERY
+ * option if you want to skip enumeration of USB devices. In particular, this
+ * might be needed on Android if you don't have authority to access USB
+ * devices in general. Setting this option with libusb_set_option is deprecated.
  *
  * On Linux, the system device handle must be a valid file descriptor opened
  * on the device node.
@@ -2098,8 +2099,8 @@ int API_EXPORTED libusb_set_auto_detach_kernel_driver(
 }
 
 /** \ingroup libusb_lib
- * \deprecated Use libusb_set_option() instead using the
- * \ref LIBUSB_OPTION_LOG_LEVEL option.
+ * \deprecated Use libusb_set_option() or libusb_init_context() instead
+ * using the \ref LIBUSB_OPTION_LOG_LEVEL option.
  */
 void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 {
@@ -2271,7 +2272,8 @@ static enum libusb_log_level get_env_debug_level(void)
  *
  * If you do not provide an output location for a context pointer, a default
  * context will be created. If there was already a default context, it will
- * be reused (and nothing will be initialized/reinitialized).
+ * be reused (and nothing will be initialized/reinitialized). Deprecated in
+ * favor of \ref libusb_init_context().
  *
  * \param ctx Optional output location for context pointer.
  * Only valid on return code 0.
@@ -2279,6 +2281,27 @@ static enum libusb_log_level get_env_debug_level(void)
  * \see libusb_contexts
  */
 int API_EXPORTED libusb_init(libusb_context **ctx)
+{
+	return libusb_init_context(ctx, NULL, 0);
+}
+
+/** \ingroup libusb_lib
+ * Initialize libusb. This function must be called before calling any other
+ * libusb function.
+ *
+ * If you do not provide an output location for a context pointer, a default
+ * context will be created. If there was already a default context, it will
+ * be reused (and nothing will be initialized/reinitialized and options will
+ * be ignored). If num_options is 0 then options is ignored and may be NULL.
+ *
+ * \param ctx Optional output location for context pointer.
+ * Only valid on return code 0.
+ * \param options Optional array of options to set on the new context.
+ * \param num_options Number of elements in the options array.
+ * \returns 0 on success, or a LIBUSB_ERROR code on failure
+ * \see libusb_contexts
+ */
+int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_init_option options[], int num_options)
 {
 	size_t priv_size = usbi_backend.context_priv_size;
 	struct libusb_context *_ctx;
@@ -2326,6 +2349,13 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 			continue;
 		}
 		r = libusb_set_option(_ctx, option);
+		if (LIBUSB_SUCCESS != r)
+			goto err_free_ctx;
+	}
+
+	/* apply any options provided by the user */
+	for (int i = 0 ; i < num_options ; ++i) {
+		r = libusb_set_option(_ctx, options[i].option, options[i].value.ival);
 		if (LIBUSB_SUCCESS != r)
 			goto err_free_ctx;
 	}

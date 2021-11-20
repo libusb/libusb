@@ -3,7 +3,7 @@
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2012 Pete Batard <pete@akeo.ie>
- * Copyright © 2012-2018 Nathan Hjelm <hjelmn@cs.unm.edu>
+ * Copyright © 2012-2021 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2014-2020 Chris Dickens <christopher.a.dickens@gmail.com>
  * For more information, please visit: http://libusb.info
  *
@@ -1351,6 +1351,72 @@ enum libusb_log_cb_mode {
 };
 
 /** \ingroup libusb_lib
+ * Available option values for libusb_set_option() and libusb_init_context().
+ */
+enum libusb_option {
+	/** Set the log message verbosity.
+	 *
+	 * The default level is LIBUSB_LOG_LEVEL_NONE, which means no messages are ever
+	 * printed. If you choose to increase the message verbosity level, ensure
+	 * that your application does not close the stderr file descriptor.
+	 *
+	 * You are advised to use level LIBUSB_LOG_LEVEL_WARNING. libusb is conservative
+	 * with its message logging and most of the time, will only log messages that
+	 * explain error conditions and other oddities. This will help you debug
+	 * your software.
+	 *
+	 * If the LIBUSB_DEBUG environment variable was set when libusb was
+	 * initialized, this function does nothing: the message verbosity is fixed
+	 * to the value in the environment variable.
+	 *
+	 * If libusb was compiled without any message logging, this function does
+	 * nothing: you'll never get any messages.
+	 *
+	 * If libusb was compiled with verbose debug message logging, this function
+	 * does nothing: you'll always get messages from all levels.
+	 */
+	LIBUSB_OPTION_LOG_LEVEL = 0,
+
+	/** Use the UsbDk backend for a specific context, if available.
+	 *
+	 * This option should be set immediately after calling libusb_init(), or set at
+	 * initialization with libusb_init_context() otherwise unspecified behavior
+	 * may occur.
+	 *
+	 * Only valid on Windows. Ignored on all other platforms.
+	 */
+	LIBUSB_OPTION_USE_USBDK = 1,
+
+	/** Do not scan for devices
+	 *
+	 * With this option set, libusb will skip scanning devices in
+	 * libusb_init_context().
+	 *
+	 * Hotplug functionality will also be deactivated.
+	 *
+	 * The option is useful in combination with libusb_wrap_sys_device(),
+	 * which can access a device directly without prior device scanning.
+	 *
+	 * This is typically needed on Android, where access to USB devices
+	 * is limited.
+	 *
+	 * Only valid on Linux. Ignored on all other platforms.
+	 */
+	LIBUSB_OPTION_NO_DEVICE_DISCOVERY = 2,
+
+#define LIBUSB_OPTION_WEAK_AUTHORITY LIBUSB_OPTION_NO_DEVICE_DISCOVERY
+
+	LIBUSB_OPTION_MAX = 3
+};
+
+struct libusb_init_option {
+  enum libusb_option option;
+  union {
+    int64_t ival;
+  } value;
+};
+
+/** \ingroup libusb_lib
  * Callback function for handling log messages.
  * \param ctx the context which is related to the log message, or NULL if it
  * is a global log message
@@ -1364,7 +1430,9 @@ enum libusb_log_cb_mode {
 typedef void (LIBUSB_CALL *libusb_log_cb)(libusb_context *ctx,
 	enum libusb_log_level level, const char *str);
 
+LIBUSB_DEPRECATED_FOR(libusb_init_context)
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
+int LIBUSB_CALL libusb_init_context(libusb_context **ctx, const struct libusb_init_option options[], int num_options);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 LIBUSB_DEPRECATED_FOR(libusb_set_option)
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
@@ -2073,66 +2141,6 @@ void LIBUSB_CALL libusb_hotplug_deregister_callback(libusb_context *ctx,
  */
 void * LIBUSB_CALL libusb_hotplug_get_user_data(libusb_context *ctx,
 	libusb_hotplug_callback_handle callback_handle);
-
-/** \ingroup libusb_lib
- * Available option values for libusb_set_option().
- */
-enum libusb_option {
-	/** Set the log message verbosity.
-	 *
-	 * The default level is LIBUSB_LOG_LEVEL_NONE, which means no messages are ever
-	 * printed. If you choose to increase the message verbosity level, ensure
-	 * that your application does not close the stderr file descriptor.
-	 *
-	 * You are advised to use level LIBUSB_LOG_LEVEL_WARNING. libusb is conservative
-	 * with its message logging and most of the time, will only log messages that
-	 * explain error conditions and other oddities. This will help you debug
-	 * your software.
-	 *
-	 * If the LIBUSB_DEBUG environment variable was set when libusb was
-	 * initialized, this function does nothing: the message verbosity is fixed
-	 * to the value in the environment variable.
-	 *
-	 * If libusb was compiled without any message logging, this function does
-	 * nothing: you'll never get any messages.
-	 *
-	 * If libusb was compiled with verbose debug message logging, this function
-	 * does nothing: you'll always get messages from all levels.
-	 */
-	LIBUSB_OPTION_LOG_LEVEL = 0,
-
-	/** Use the UsbDk backend for a specific context, if available.
-	 *
-	 * This option should be set immediately after calling libusb_init(), otherwise
-	 * unspecified behavior may occur.
-	 *
-	 * Only valid on Windows.
-	 */
-	LIBUSB_OPTION_USE_USBDK = 1,
-
-	/** Do not scan for devices
-	 *
-	 * With this option set, libusb will skip scanning devices in
-	 * libusb_init(). Must be set before calling libusb_init().
-	 *
-	 * Hotplug functionality will also be deactivated.
-	 *
-	 * The option is useful in combination with libusb_wrap_sys_device(),
-	 * which can access a device directly without prior device scanning.
-	 *
-	 * This is typically needed on Android, where access to USB devices
-	 * is limited.
-	 *
-	 * For LIBUSB_API_VERSION 0x01000108 it was called LIBUSB_OPTION_WEAK_AUTHORITY
-	 *
-	 * Only valid on Linux.
-	 */
-	LIBUSB_OPTION_NO_DEVICE_DISCOVERY = 2,
-
-#define LIBUSB_OPTION_WEAK_AUTHORITY LIBUSB_OPTION_NO_DEVICE_DISCOVERY
-
-	LIBUSB_OPTION_MAX = 3
-};
 
 int LIBUSB_CALLV libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);
 
