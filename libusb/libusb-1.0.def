@@ -132,6 +132,8 @@ EXPORTS
   libusb_hotplug_register_callback@36 = libusb_hotplug_register_callback
   libusb_init
   libusb_init@4 = libusb_init
+  libusb_init_context
+  libusb_init_context@12 = libusb_init_context
   libusb_interrupt_event_handler
   libusb_interrupt_event_handler@4 = libusb_interrupt_event_handler
   libusb_interrupt_transfer
