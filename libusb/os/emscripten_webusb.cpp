@@ -29,18 +29,6 @@ using namespace emscripten;
 #pragma clang diagnostic ignored "-Wmissing-prototypes"
 #pragma clang diagnostic ignored "-Wunused-parameter"
 namespace {
-// In order to handle promise errors, we need a JS snippet to wrap value
-// or error to a {value, error} object that can be handled by Embind.
-//
-// Unfortunately, EM_JS / EM_ASM is currently not integrated at all with Embind,
-// which makes it impossible to officially manipulate same JS values from both
-// custom JS snippets and Embind-based C++.
-//
-// So we have to reach into Embind internals unofficially instead...
-EM_VAL em_value_to_raw_handle(val &value) {
-  return *reinterpret_cast<EM_VAL *>(&value);
-}
-
 // clang-format off
 	EM_JS(void, em_promise_catch_impl, (EM_VAL handle), {
 		handle = emval_handle_array[handle];
@@ -103,7 +91,7 @@ struct promise_result {
   // its error, converts to a libusb status and returns the whole thing as
   // `promise_result` struct for easier handling.
   static promise_result await(val &&promise) {
-    em_promise_catch_impl(em_value_to_raw_handle(promise));
+    em_promise_catch_impl(promise.as_handle());
     return {promise.await()};
   }
 };
@@ -383,7 +371,7 @@ EM_JS(void, em_start_transfer_impl, (usbi_transfer * transfer, EM_VAL handle), {
 void em_start_transfer(usbi_transfer *itransfer, val promise) {
   auto promise_ptr =
       new (get_web_usb_transfer_result(itransfer)) val(std::move(promise));
-  auto handle = em_value_to_raw_handle(*promise_ptr);
+  auto handle = promise_ptr->as_handle();
   // Catch the error to transform promise of `value` into promise of `{value,
   // error}`.
   em_promise_catch_impl(handle);
@@ -548,7 +536,7 @@ int em_handle_transfer_completion(usbi_transfer *itransfer) {
           // so again reach out to internals via JS snippet.
           return stringToUTF16(requireHandle($0), $1, $2);
         },
-        em_value_to_raw_handle(result_val),
+        result_val.as_handle(),
         transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE + 2,
         transfer->length - LIBUSB_CONTROL_SETUP_SIZE - 2);
     itransfer->transferred = transfer->buffer[LIBUSB_CONTROL_SETUP_SIZE] =
