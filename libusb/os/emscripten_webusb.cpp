@@ -508,7 +508,6 @@ int em_handle_transfer_completion(usbi_transfer *itransfer) {
   // Take ownership of the transfer result, as `em_clear_transfer_priv`
   // is not called automatically for completed transfers and we must
   // free it to avoid leaks.
-  // std::unique_ptr<val> result_val(get_web_usb_transfer_result(itransfer));
 
   auto result_val = std::move(*get_web_usb_transfer_result(itransfer));
 
