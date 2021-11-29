@@ -37,12 +37,12 @@ namespace {
 // custom JS snippets and Embind-based C++.
 //
 // So we have to reach into Embind internals unofficially instead...
-emscripten::internal::EM_VAL em_value_to_raw_handle(val &value) {
-  return *reinterpret_cast<emscripten::internal::EM_VAL *>(&value);
+EM_VAL em_value_to_raw_handle(val &value) {
+  return *reinterpret_cast<EM_VAL *>(&value);
 }
 
 // clang-format off
-	EM_JS(void, em_promise_catch_impl, (emscripten::internal::EM_VAL handle), {
+	EM_JS(void, em_promise_catch_impl, (EM_VAL handle), {
 		handle = emval_handle_array[handle];
 		if (handle.refcount !== 1)
 		{
@@ -366,20 +366,19 @@ void em_destroy_device(libusb_device *dev) {
 
 thread_local const val Uint8Array = val::global("Uint8Array");
 
-EM_JS(void, em_start_transfer_impl,
-      (usbi_transfer * transfer, emscripten::internal::EM_VAL handle), {
-        handle = emval_handle_array[handle];
-        if (handle.refcount != = 1) {
-          throw new Error("Must be an owned promise");
-        }
-        // Right now the transfer value should be a `Promise<{value, error}>`
-        // for the actual WebUSB transfer op. Subscribe to its result to unwrap
-        // the promise to `{value, error}` and signal transfer completion.
-        handle.value.then(result = > {
-          handle.value = result;
-          Module._em_signal_transfer_completion(transfer);
-        });
-      });
+EM_JS(void, em_start_transfer_impl, (usbi_transfer * transfer, EM_VAL handle), {
+  handle = emval_handle_array[handle];
+  if (handle.refcount != = 1) {
+    throw new Error("Must be an owned promise");
+  }
+  // Right now the transfer value should be a `Promise<{value, error}>`
+  // for the actual WebUSB transfer op. Subscribe to its result to unwrap
+  // the promise to `{value, error}` and signal transfer completion.
+  handle.value.then(result = > {
+    handle.value = result;
+    Module._em_signal_transfer_completion(transfer);
+  });
+});
 
 void em_start_transfer(usbi_transfer *itransfer, val promise) {
   auto promise_ptr =
