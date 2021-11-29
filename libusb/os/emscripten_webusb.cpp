@@ -30,13 +30,9 @@ using namespace emscripten;
 #pragma clang diagnostic ignored "-Wunused-parameter"
 namespace {
 // clang-format off
-	EM_JS(void, em_promise_catch_impl, (EM_VAL handle), {
-		handle = emval_handle_array[handle];
-		if (handle.refcount !== 1)
-		{
-			throw new Error("Must be an owned promise");
-		}
-		handle.value = handle.value.then(
+	EM_JS(EM_VAL, em_promise_catch_impl, (EM_VAL handle), {
+		let promise = Emval.toValue(handle);
+		promise = promise.then(
 			value => ({error : 0, value}),
 			error => {
 				const ERROR_CODES = {
@@ -73,9 +69,17 @@ namespace {
 					error = -99; // LIBUSB_ERROR_OTHER
 				}
 				return {error, value: undefined};
-			});
+			}
+    );
+    return Emval.toHandle(promise);
 	});
 // clang-format on
+
+val em_promise_catch(val &&promise) {
+  EM_VAL handle = promise.as_handle();
+  handle = em_promise_catch_impl(handle);
+  return val::take_ownership(handle);
+}
 
 // C++ struct representation for {value, error} object from above
 // (performs conversion in the constructor).
@@ -91,7 +95,7 @@ struct promise_result {
   // its error, converts to a libusb status and returns the whole thing as
   // `promise_result` struct for easier handling.
   static promise_result await(val &&promise) {
-    em_promise_catch_impl(promise.as_handle());
+    promise = em_promise_catch(std::move(promise));
     return {promise.await()};
   }
 };
@@ -345,28 +349,22 @@ void em_destroy_device(libusb_device *dev) {
 
 thread_local const val Uint8Array = val::global("Uint8Array");
 
+// clang-format off
 EM_JS(void, em_start_transfer_impl, (usbi_transfer * transfer, EM_VAL handle), {
-  handle = emval_handle_array[handle];
-  if (handle.refcount != = 1) {
-    throw new Error("Must be an owned promise");
-  }
-  // Right now the transfer value should be a `Promise<{value, error}>`
+  // Right now the handle value should be a `Promise<{value, error}>`
   // for the actual WebUSB transfer op. Subscribe to its result to unwrap
   // the promise to `{value, error}` and signal transfer completion.
-  handle.value.then(result = > {
-    handle.value = result;
-    Module._em_signal_transfer_completion(transfer);
-  });
-});
-
-void em_start_transfer(usbi_transfer *itransfer, val &&promise) {
-  auto promise_ptr =
-      new (get_web_usb_transfer_result(itransfer)) val(std::move(promise));
-  auto handle = promise_ptr->as_handle();
   // Catch the error to transform promise of `value` into promise of `{value,
   // error}`.
-  em_promise_catch_impl(handle);
-  em_start_transfer_impl(itransfer, handle);
+  handle = em_promise_catch_impl(handle);
+  Emval.toValue(handle).then(result => {
+    _em_signal_transfer_completion(transfer, Emval.toHandle(result));
+  });
+});
+// clang-format on
+
+void em_start_transfer(usbi_transfer *itransfer, val &&promise) {
+  em_start_transfer_impl(itransfer, promise.as_handle());
 }
 
 int em_submit_transfer(usbi_transfer *itransfer) {
@@ -404,8 +402,7 @@ int em_submit_transfer(usbi_transfer *itransfer) {
               if (str.isNull()) {
                 str = val("");
               }
-              new (get_web_usb_transfer_result(itransfer)) val(std::move(str));
-              usbi_signal_transfer_completion(itransfer);
+              em_signal_transfer_completion_impl(itransfer, std::move(str));
               return LIBUSB_SUCCESS;
             }
           }
@@ -603,9 +600,17 @@ const usbi_os_backend usbi_backend = {
     .transfer_priv_size = sizeof(val),
 };
 
-EMSCRIPTEN_KEEPALIVE
-void em_signal_transfer_completion(usbi_transfer *itransfer) {
+void em_signal_transfer_completion_impl(usbi_transfer *itransfer,
+                                        val &&result) {
+  new (get_web_usb_transfer_result(itransfer)) val(std::move(result));
   usbi_signal_transfer_completion(itransfer);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void em_signal_transfer_completion(usbi_transfer *itransfer,
+                                   EM_VAL result_handle) {
+  em_signal_transfer_completion_impl(itransfer,
+                                     val::take_ownership(result_handle));
 }
 }
 #pragma clang diagnostic pop
