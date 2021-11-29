@@ -534,7 +534,7 @@ int em_handle_transfer_completion(usbi_transfer *itransfer) {
         {
           // There's no good way to get UTF-16 output directly from JS string,
           // so again reach out to internals via JS snippet.
-          return stringToUTF16(requireHandle($0), $1, $2);
+          return stringToUTF16(Emval.toValue($0), $1, $2);
         },
         result_val.as_handle(),
         transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE + 2,
