@@ -359,7 +359,7 @@ EM_JS(void, em_start_transfer_impl, (usbi_transfer * transfer, EM_VAL handle), {
   });
 });
 
-void em_start_transfer(usbi_transfer *itransfer, val promise) {
+void em_start_transfer(usbi_transfer *itransfer, val &&promise) {
   auto promise_ptr =
       new (get_web_usb_transfer_result(itransfer)) val(std::move(promise));
   auto handle = promise_ptr->as_handle();
