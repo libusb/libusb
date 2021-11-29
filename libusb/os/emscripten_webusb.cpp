@@ -245,19 +245,14 @@ int em_get_config_descriptor_impl(val &&web_usb_config, void *buf, size_t len) {
       auto web_usb_endpoint = web_usb_endpoints[j];
       auto endpoint = static_cast<libusb_endpoint_descriptor *>(buf);
 
-      thread_local const val web_usb_direction_in("in");
-      thread_local const val web_usb_endpoint_type_bulk("bulk");
-      thread_local const val web_usb_endpoint_type_interrupt("interrupt");
-      thread_local const val web_usb_endpoint_type_isochronous("isochronous");
-
-      auto web_usb_endpoint_type = web_usb_endpoint["type"];
+      auto web_usb_endpoint_type = web_usb_endpoint["type"].as<std::string>();
       auto transfer_type = LIBUSB_ENDPOINT_TRANSFER_TYPE_CONTROL;
 
-      if (web_usb_endpoint_type == web_usb_endpoint_type_bulk) {
+      if (web_usb_endpoint_type == "bulk") {
         transfer_type = LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK;
-      } else if (web_usb_endpoint_type == web_usb_endpoint_type_interrupt) {
+      } else if (web_usb_endpoint_type == "interrupt") {
         transfer_type = LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT;
-      } else if (web_usb_endpoint_type == web_usb_endpoint_type_isochronous) {
+      } else if (web_usb_endpoint_type == "isochronous") {
         transfer_type = LIBUSB_ENDPOINT_TRANSFER_TYPE_ISOCHRONOUS;
       }
 
@@ -268,7 +263,7 @@ int em_get_config_descriptor_impl(val &&web_usb_config, void *buf, size_t len) {
       endpoint->bLength = LIBUSB_DT_ENDPOINT_SIZE;
       endpoint->bDescriptorType = LIBUSB_DT_ENDPOINT;
       endpoint->bEndpointAddress =
-          ((web_usb_endpoint["direction"] == web_usb_direction_in) << 7) |
+          ((web_usb_endpoint["direction"].as<std::string>() == "in") << 7) |
           web_usb_endpoint["endpointNumber"].as<uint8_t>();
       endpoint->bmAttributes = transfer_type;
       endpoint->wMaxPacketSize = web_usb_endpoint["packetSize"].as<uint16_t>();
@@ -329,11 +324,7 @@ int em_set_interface_altsetting(libusb_device_handle *handle, uint8_t iface,
 }
 
 int em_clear_halt(libusb_device_handle *handle, unsigned char endpoint) {
-  thread_local const val web_usb_direction_in("in");
-  thread_local const val web_usb_direction_out("out");
-
-  auto direction = endpoint & LIBUSB_ENDPOINT_IN ? web_usb_direction_in
-                                                 : web_usb_direction_out;
+  auto direction = endpoint & LIBUSB_ENDPOINT_IN ? "in" : "out";
   endpoint &= LIBUSB_ENDPOINT_ADDRESS_MASK;
 
   return promise_result::await(
@@ -548,17 +539,13 @@ int em_handle_transfer_completion(usbi_transfer *itransfer) {
     // `em_start_transfer_impl` callback).
     promise_result result(std::move(result_val));
 
-    thread_local const val web_usb_transfer_status_ok("ok");
-    thread_local const val web_usb_transfer_status_stall("stall");
-    thread_local const val web_usb_transfer_status_babble("babble");
-
     if (!result.error) {
-      auto web_usb_transfer_status = result.value["status"];
-      if (web_usb_transfer_status == web_usb_transfer_status_ok) {
+      auto web_usb_transfer_status = result.value["status"].as<std::string>();
+      if (web_usb_transfer_status == "ok") {
         status = LIBUSB_TRANSFER_COMPLETED;
-      } else if (web_usb_transfer_status == web_usb_transfer_status_stall) {
+      } else if (web_usb_transfer_status == "stall") {
         status = LIBUSB_TRANSFER_STALL;
-      } else if (web_usb_transfer_status == web_usb_transfer_status_babble) {
+      } else if (web_usb_transfer_status == "babble") {
         status = LIBUSB_TRANSFER_OVERFLOW;
       }
 
