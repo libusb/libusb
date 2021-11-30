@@ -56,19 +56,16 @@ namespace {
 					NotSupportedError : -12,
 				};
 				console.error(error);
+        let errorCode = -99; // LIBUSB_ERROR_OTHER
 				if (error instanceof DOMException)
 				{
-					error = ERROR_CODES[error.name] || result;
+					errorCode = ERROR_CODES[error.name] ?? errorCode;
 				}
 				else if ((error instanceof RangeError) || (error instanceof TypeError))
 				{
-					error = -2; // LIBUSB_ERROR_INVALID_PARAM
+					errorCode = -2; // LIBUSB_ERROR_INVALID_PARAM
 				}
-				else
-				{
-					error = -99; // LIBUSB_ERROR_OTHER
-				}
-				return {error, value: undefined};
+				return {error: errorCode, value: undefined};
 			}
     );
     return Emval.toHandle(promise);
