@@ -1,8 +1,8 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2020 Nathan Hjelm <hjelmn@cs.unm.edu>
- * Copyright © 2019-2020 Google LLC. All rights reserved.
+ * Copyright © 2008-2021 Nathan Hjelm <hjelmn@cs.unm.edu>
+ * Copyright © 2019-2021 Google LLC. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -160,11 +160,12 @@ static enum libusb_error darwin_to_libusb (IOReturn result) {
     return LIBUSB_ERROR_INVALID_PARAM;
   case kIOUSBTransactionTimeout:
     return LIBUSB_ERROR_TIMEOUT;
+  case kIOUSBUnknownPipeErr:
+    return LIBUSB_ERROR_NOT_FOUND;
   case kIOReturnNotResponding:
   case kIOReturnAborted:
   case kIOReturnError:
   case kIOUSBNoAsyncPortErr:
-  case kIOUSBUnknownPipeErr:
   default:
     return LIBUSB_ERROR_OTHER;
   }
@@ -1586,12 +1587,34 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, uin
   return darwin_to_libusb (kresult);
 }
 
+static int check_alt_setting_and_clear_halt(struct libusb_device_handle *dev_handle, uint8_t altsetting, struct darwin_interface *cInterface) {
+  enum libusb_error ret;
+  IOReturn kresult;
+  uint8_t current_alt_setting;
+
+  kresult = (*(cInterface->interface))->GetAlternateSetting (cInterface->interface, &current_alt_setting);
+  if (kresult == kIOReturnSuccess && altsetting != current_alt_setting) {
+    return LIBUSB_ERROR_PIPE;
+  }
+
+  for (int i = 0 ; i < cInterface->num_endpoints ; i++) {
+    ret = darwin_clear_halt(dev_handle, cInterface->endpoint_addrs[i]);
+    if (LIBUSB_SUCCESS != ret) {
+      usbi_warn(HANDLE_CTX (dev_handle), "error clearing pipe halt for endpoint %d", i);
+      if (LIBUSB_ERROR_NOT_FOUND == ret) {
+        /* may need to re-open the interface */
+        return ret;
+      }
+    }
+  }
+
+  return LIBUSB_SUCCESS;
+}
+
 static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting) {
   struct darwin_device_handle_priv *priv = usbi_get_device_handle_priv(dev_handle);
   IOReturn kresult;
   enum libusb_error ret;
-  int i;
-  uint8_t old_alt_setting;
 
   /* current interface */
   struct darwin_interface *cInterface = &priv->interfaces[iface];
@@ -1623,23 +1646,18 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
      Mimic the behaviour in e.g. the Linux kernel: in such case, reset all endpoints
      of the interface (as would have been done per 9.1.1.5) and return success. */
 
-  /* For some reason we need to reclaim the interface after the pipe error */
-  ret = darwin_claim_interface (dev_handle, iface);
-
-  if (ret) {
-    darwin_release_interface (dev_handle, iface);
-    usbi_err (HANDLE_CTX (dev_handle), "could not reclaim interface");
+  ret = check_alt_setting_and_clear_halt(dev_handle, altsetting, cInterface);
+  if (LIBUSB_ERROR_NOT_FOUND == ret) {
+    /* For some reason we need to reclaim the interface after the pipe error with some versions of macOS */
+    ret = darwin_claim_interface (dev_handle, iface);
+    if (LIBUSB_SUCCESS != ret) {
+      darwin_release_interface (dev_handle, iface);
+      usbi_err (HANDLE_CTX (dev_handle), "could not reclaim interface: %s", darwin_error_str(kresult));
+    }
+    ret = check_alt_setting_and_clear_halt(dev_handle, altsetting, cInterface);
   }
 
-  /* Return error if a change to another value was attempted */
-  kresult = (*(cInterface->interface))->GetAlternateSetting (cInterface->interface, &old_alt_setting);
-  if (kresult == kIOReturnSuccess && altsetting != old_alt_setting)
-    return LIBUSB_ERROR_PIPE;
-
-  for (i = 0 ; i < cInterface->num_endpoints ; i++)
-    darwin_clear_halt(dev_handle, cInterface->endpoint_addrs[i]);
-
-  return LIBUSB_SUCCESS;
+  return ret;
 }
 
 static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint) {
