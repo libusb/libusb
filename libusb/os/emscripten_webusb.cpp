@@ -360,13 +360,12 @@ extern "C" void em_signal_transfer_completion(usbi_transfer *itransfer,
 }
 
 // clang-format off
-EM_JS(void, em_start_transfer_impl, (usbi_transfer * transfer, EM_VAL handle), {
-  // Right now the handle value should be a `Promise<{value, error}>`
-  // for the actual WebUSB transfer op. Subscribe to its result to unwrap
-  // the promise to `{value, error}` and signal transfer completion.
+EM_JS(void, em_start_transfer_impl, (usbi_transfer *transfer, EM_VAL handle), {
+  // Right now the handle value should be a `Promise<{value, error}>`.
+  // Subscribe to its result to unwrap the promise to `{value, error}`
+  // and signal transfer completion.
   // Catch the error to transform promise of `value` into promise of `{value,
   // error}`.
-  handle = em_promise_catch_impl(handle);
   Emval.toValue(handle).then(result => {
     _em_signal_transfer_completion(transfer, Emval.toHandle(result));
   });
@@ -374,6 +373,7 @@ EM_JS(void, em_start_transfer_impl, (usbi_transfer * transfer, EM_VAL handle), {
 // clang-format on
 
 void em_start_transfer(usbi_transfer *itransfer, val &&promise) {
+  promise = em_promise_catch(std::move(promise));
   em_start_transfer_impl(itransfer, promise.as_handle());
 }
 
