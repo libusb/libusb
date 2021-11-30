@@ -356,8 +356,8 @@ void em_destroy_device(libusb_device *dev) {
 thread_local const val Uint8Array = val::global("Uint8Array");
 
 EMSCRIPTEN_KEEPALIVE
-void em_signal_transfer_completion(usbi_transfer *itransfer,
-                                   EM_VAL result_handle) {
+extern "C" void em_signal_transfer_completion(usbi_transfer *itransfer,
+                                              EM_VAL result_handle) {
   em_signal_transfer_completion_impl(itransfer,
                                      val::take_ownership(result_handle));
 }
