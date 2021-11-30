@@ -111,6 +111,12 @@ val *get_web_usb_transfer_result(usbi_transfer *itransfer) {
   return static_cast<val *>(usbi_get_transfer_priv(itransfer));
 }
 
+void em_signal_transfer_completion_impl(usbi_transfer *itransfer,
+                                        val &&result) {
+  new (get_web_usb_transfer_result(itransfer)) val(std::move(result));
+  usbi_signal_transfer_completion(itransfer);
+}
+
 // Store the global `navigator.usb` once upon initialisation.
 thread_local const val web_usb = val::global("navigator")["usb"];
 
@@ -348,6 +354,13 @@ void em_destroy_device(libusb_device *dev) {
 }
 
 thread_local const val Uint8Array = val::global("Uint8Array");
+
+EMSCRIPTEN_KEEPALIVE
+void em_signal_transfer_completion(usbi_transfer *itransfer,
+                                   EM_VAL result_handle) {
+  em_signal_transfer_completion_impl(itransfer,
+                                     val::take_ownership(result_handle));
+}
 
 // clang-format off
 EM_JS(void, em_start_transfer_impl, (usbi_transfer * transfer, EM_VAL handle), {
@@ -599,18 +612,5 @@ const usbi_os_backend usbi_backend = {
     .device_priv_size = sizeof(val),
     .transfer_priv_size = sizeof(val),
 };
-
-void em_signal_transfer_completion_impl(usbi_transfer *itransfer,
-                                        val &&result) {
-  new (get_web_usb_transfer_result(itransfer)) val(std::move(result));
-  usbi_signal_transfer_completion(itransfer);
-}
-
-EMSCRIPTEN_KEEPALIVE
-void em_signal_transfer_completion(usbi_transfer *itransfer,
-                                   EM_VAL result_handle) {
-  em_signal_transfer_completion_impl(itransfer,
-                                     val::take_ownership(result_handle));
-}
 }
 #pragma clang diagnostic pop
