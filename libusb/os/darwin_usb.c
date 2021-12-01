@@ -1633,12 +1633,12 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
     }
     return ret;
   }
-  else
-    usbi_warn (HANDLE_CTX (dev_handle), "SetAlternateInterface: %s", darwin_error_str(kresult));
+
+  usbi_warn (HANDLE_CTX (dev_handle), "SetAlternateInterface: %s", darwin_error_str(kresult));
 
   ret = darwin_to_libusb(kresult);
   if (ret != LIBUSB_ERROR_PIPE) {
-    return darwin_to_libusb (kresult);
+    return ret;
   }
 
   /* If a device only supports a default setting for the specified interface, then a STALL
