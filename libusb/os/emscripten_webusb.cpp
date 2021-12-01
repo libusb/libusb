@@ -99,18 +99,39 @@ struct promise_result {
 
 // We store an Embind handle to WebUSB USBDevice in "priv" metadata of
 // libusb device, this helper returns a pointer to it.
-val *get_web_usb_device(libusb_device *dev) {
-  return static_cast<val *>(usbi_get_device_priv(dev));
+struct ValPtr {
+ public:
+  void init_to(val &&value) { new (ptr) val(std::move(value)); }
+
+  val &get() { return *ptr; }
+  val take() { return std::move(get()); }
+
+ protected:
+  ValPtr(val *ptr) : ptr(ptr) {}
+
+ private:
+  val *ptr;
+};
+
+struct WebUsbDevicePtr : ValPtr {
+ public:
+  WebUsbDevicePtr(libusb_device *dev)
+      : ValPtr(static_cast<val *>(usbi_get_device_priv(dev))) {}
+};
+
+val &get_web_usb_device(libusb_device *dev) {
+  return WebUsbDevicePtr(dev).get();
 }
 
-// Same for transfer results.
-val *get_web_usb_transfer_result(usbi_transfer *itransfer) {
-  return static_cast<val *>(usbi_get_transfer_priv(itransfer));
-}
+struct WebUsbTransferPtr : ValPtr {
+ public:
+  WebUsbTransferPtr(usbi_transfer *itransfer)
+      : ValPtr(static_cast<val *>(usbi_get_transfer_priv(itransfer))) {}
+};
 
 void em_signal_transfer_completion_impl(usbi_transfer *itransfer,
                                         val &&result) {
-  new (get_web_usb_transfer_result(itransfer)) val(std::move(result));
+  WebUsbTransferPtr(itransfer).init_to(std::move(result));
   usbi_signal_transfer_completion(itransfer);
 }
 
@@ -186,7 +207,7 @@ int em_get_device_list(libusb_context *ctx, discovered_devs **devs) {
         continue;
       }
 
-      new (get_web_usb_device(dev)) val(std::move(web_usb_device));
+      WebUsbDevicePtr(dev).init_to(std::move(web_usb_device));
     }
     *devs = discovered_devs_append(*devs, dev);
   }
@@ -195,13 +216,13 @@ int em_get_device_list(libusb_context *ctx, discovered_devs **devs) {
 
 int em_open(libusb_device_handle *handle) {
   auto web_usb_device = get_web_usb_device(handle->dev);
-  return promise_result::await(web_usb_device->call<val>("open")).error;
+  return promise_result::await(web_usb_device.call<val>("open")).error;
 }
 
 void em_close(libusb_device_handle *handle) {
   // LibUSB API doesn't allow us to handle an error here, so ignore the Promise
   // altogether.
-  return get_web_usb_device(handle->dev)->call<void>("close");
+  return get_web_usb_device(handle->dev).call<void>("close");
 }
 
 int em_get_config_descriptor_impl(val &&web_usb_config, void *buf, size_t len) {
@@ -283,7 +304,7 @@ int em_get_config_descriptor_impl(val &&web_usb_config, void *buf, size_t len) {
 }
 
 int em_get_active_config_descriptor(libusb_device *dev, void *buf, size_t len) {
-  auto web_usb_config = (*get_web_usb_device(dev))["configuration"];
+  auto web_usb_config = get_web_usb_device(dev)["configuration"];
   if (web_usb_config.isNull()) {
     return LIBUSB_ERROR_NOT_FOUND;
   }
@@ -293,11 +314,11 @@ int em_get_active_config_descriptor(libusb_device *dev, void *buf, size_t len) {
 int em_get_config_descriptor(libusb_device *dev, uint8_t idx, void *buf,
                              size_t len) {
   return em_get_config_descriptor_impl(
-      (*get_web_usb_device(dev))["configurations"][idx], buf, len);
+      get_web_usb_device(dev)["configurations"][idx], buf, len);
 }
 
 int em_get_configuration(libusb_device_handle *dev_handle, uint8_t *config) {
-  auto web_usb_config = (*get_web_usb_device(dev_handle->dev))["configuration"];
+  auto web_usb_config = get_web_usb_device(dev_handle->dev)["configuration"];
   if (!web_usb_config.isNull()) {
     *config = web_usb_config["configurationValue"].as<uint8_t>();
   }
@@ -306,19 +327,19 @@ int em_get_configuration(libusb_device_handle *dev_handle, uint8_t *config) {
 
 int em_set_configuration(libusb_device_handle *handle, int config) {
   return promise_result::await(get_web_usb_device(handle->dev)
-                                   ->call<val>("selectConfiguration", config))
+                                   .call<val>("selectConfiguration", config))
       .error;
 }
 
 int em_claim_interface(libusb_device_handle *handle, uint8_t iface) {
-  return promise_result::await(get_web_usb_device(handle->dev)
-                                   ->call<val>("claimInterface", iface))
+  return promise_result::await(
+             get_web_usb_device(handle->dev).call<val>("claimInterface", iface))
       .error;
 }
 
 int em_release_interface(libusb_device_handle *handle, uint8_t iface) {
   return promise_result::await(get_web_usb_device(handle->dev)
-                                   ->call<val>("releaseInterface", iface))
+                                   .call<val>("releaseInterface", iface))
       .error;
 }
 
@@ -326,7 +347,7 @@ int em_set_interface_altsetting(libusb_device_handle *handle, uint8_t iface,
                                 uint8_t altsetting) {
   return promise_result::await(
              get_web_usb_device(handle->dev)
-                 ->call<val>("selectAlternateInterface", iface, altsetting))
+                 .call<val>("selectAlternateInterface", iface, altsetting))
       .error;
 }
 
@@ -334,21 +355,18 @@ int em_clear_halt(libusb_device_handle *handle, unsigned char endpoint) {
   auto direction = endpoint & LIBUSB_ENDPOINT_IN ? "in" : "out";
   endpoint &= LIBUSB_ENDPOINT_ADDRESS_MASK;
 
-  return promise_result::await(
-             get_web_usb_device(handle->dev)
-                 ->call<val>("clearHalt", direction, endpoint))
+  return promise_result::await(get_web_usb_device(handle->dev)
+                                   .call<val>("clearHalt", direction, endpoint))
       .error;
 }
 
 int em_reset_device(libusb_device_handle *handle) {
   return promise_result::await(
-             get_web_usb_device(handle->dev)->call<val>("reset"))
+             get_web_usb_device(handle->dev).call<val>("reset"))
       .error;
 }
 
-void em_destroy_device(libusb_device *dev) {
-  std::move(*get_web_usb_device(dev));
-}
+void em_destroy_device(libusb_device *dev) { WebUsbDevicePtr(dev).take(); }
 
 thread_local const val Uint8Array = val::global("Uint8Array");
 
@@ -408,7 +426,7 @@ int em_submit_transfer(usbi_transfer *itransfer) {
                 break;
             }
             if (propName != nullptr) {
-              val str = (*web_usb_device)[propName];
+              val str = web_usb_device[propName];
               if (str.isNull()) {
                 str = val("");
               }
@@ -448,16 +466,16 @@ int em_submit_transfer(usbi_transfer *itransfer) {
       if (setup->bmRequestType & LIBUSB_ENDPOINT_IN) {
         em_start_transfer(
             itransfer,
-            web_usb_device->call<val>(
-                "controlTransferIn", std::move(web_usb_control_transfer_params),
-                setup->wLength));
+            web_usb_device.call<val>("controlTransferIn",
+                                     std::move(web_usb_control_transfer_params),
+                                     setup->wLength));
       } else {
         auto data =
             val(typed_memory_view(setup->wLength,
                                   libusb_control_transfer_get_data(transfer)))
                 .call<val>("slice");
         em_start_transfer(
-            itransfer, web_usb_device->call<val>(
+            itransfer, web_usb_device.call<val>(
                            "controlTransferOut",
                            std::move(web_usb_control_transfer_params), data));
       }
@@ -469,14 +487,14 @@ int em_submit_transfer(usbi_transfer *itransfer) {
       auto endpoint = transfer->endpoint & LIBUSB_ENDPOINT_ADDRESS_MASK;
 
       if (IS_XFERIN(transfer)) {
-        em_start_transfer(itransfer,
-                          web_usb_device->call<val>("transferIn", endpoint,
-                                                    transfer->length));
+        em_start_transfer(
+            itransfer,
+            web_usb_device.call<val>("transferIn", endpoint, transfer->length));
       } else {
         auto data = val(typed_memory_view(transfer->length, transfer->buffer))
                         .call<val>("slice");
-        em_start_transfer(itransfer, web_usb_device->call<val>("transferOut",
-                                                               endpoint, data));
+        em_start_transfer(
+            itransfer, web_usb_device.call<val>("transferOut", endpoint, data));
       }
 
       break;
@@ -490,10 +508,10 @@ int em_submit_transfer(usbi_transfer *itransfer) {
     // 			web_usb_packet_lengths.call<void>("push",
     // transfer->iso_packet_desc[i].length);
     // 		}
-    // 		await_int(web_usb_device->call<val>("isochronousTransferIn",
+    // 		await_int(web_usb_device.call<val>("isochronousTransferIn",
     // transfer->endpoint, std::move(web_usb_packet_lengths))); 	} else {
     // 		// todo: read result
-    // 		await_int(web_usb_device->call<val>("isochronousTransferOut"));
+    // 		await_int(web_usb_device.call<val>("isochronousTransferOut"));
     // 	}
     // 	break;
     // }
@@ -504,7 +522,7 @@ int em_submit_transfer(usbi_transfer *itransfer) {
 }
 
 void em_clear_transfer_priv(usbi_transfer *itransfer) {
-  std::move(*get_web_usb_transfer_result(itransfer));
+  WebUsbTransferPtr(itransfer).take();
 }
 
 int em_cancel_transfer(usbi_transfer *itransfer) { return LIBUSB_SUCCESS; }
@@ -516,7 +534,7 @@ int em_handle_transfer_completion(usbi_transfer *itransfer) {
   // is not called automatically for completed transfers and we must
   // free it to avoid leaks.
 
-  auto result_val = std::move(*get_web_usb_transfer_result(itransfer));
+  auto result_val = WebUsbTransferPtr(itransfer).take();
 
   if (itransfer->state_flags & USBI_TRANSFER_CANCELLING) {
     return usbi_handle_transfer_cancellation(itransfer);
