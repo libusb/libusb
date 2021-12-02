@@ -245,6 +245,9 @@ int em_get_config_descriptor_impl(val &&web_usb_config, void *buf, size_t len) {
   buf = static_cast<uint8_t *>(buf) + LIBUSB_DT_CONFIG_SIZE;
   for (uint8_t i = 0; i < num_interfaces; i++) {
     auto web_usb_interface = web_usb_interfaces[i];
+    // TODO: update to `web_usb_interface["alternate"]` once
+    // fix for https://bugs.chromium.org/p/chromium/issues/detail?id=1093502 is
+    // stable.
     auto web_usb_alternate = web_usb_interface["alternates"][0];
     auto web_usb_endpoints = web_usb_alternate["endpoints"];
     auto num_endpoints = web_usb_endpoints["length"].as<uint8_t>();
