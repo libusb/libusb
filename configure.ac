@@ -144,6 +144,8 @@ if test "x$platform" = xposix; then
 	AC_DEFINE([PLATFORM_POSIX], [1], [Define to 1 if compiling for a POSIX platform.])
 	AC_CHECK_TYPES([nfds_t], [], [], [[#include <poll.h>]])
 	if test "x$backend" -ne xemscripten; then
+		# pipe2 is detected as present on Emscripten, but it isn't actually ported and always
+		# returns an error. https://github.com/emscripten-core/emscripten/issues/14824
 		AC_CHECK_FUNCS([pipe2])
 	fi
 	dnl Some compilers do not support the '-pthread' option so check for it here
