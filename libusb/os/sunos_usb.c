@@ -1379,8 +1379,7 @@ sunos_submit_transfer(struct usbi_transfer *itransfer)
 
 	err = sunos_check_device_and_status_open(hdl,
 	    transfer->endpoint, transfer->type);
-	if (err < 0) {
-
+	if (err != 0) {
 		return (_errno_to_libusb(err));
 	}
 
