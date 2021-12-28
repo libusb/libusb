@@ -1753,7 +1753,6 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   IOUSBConfigurationDescriptor *cached_configurations;
   IOReturn kresult;
   UInt8 i;
-  UInt32 time;
 
   struct libusb_context *ctx = HANDLE_CTX (dev_handle);
 
@@ -1801,11 +1800,18 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
 
   usbi_dbg (ctx, "darwin/reenumerate_device: waiting for re-enumeration to complete...");
 
-  time = 0;
+  struct timespec start;
+  clock_gettime(CLOCK_MONOTONIC, &start);
+
   while (dpriv->in_reenumerate) {
     struct timespec delay = {.tv_sec = 0, .tv_nsec = 1000};
     nanosleep (&delay, NULL);
-    if (time++ >= DARWIN_REENUMERATE_TIMEOUT_US) {
+
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    UInt32 elapsed = (now.tv_sec - start.tv_sec) * 1000000 + (now.tv_nsec - start.tv_nsec) / 1000;
+
+    if (elapsed >= DARWIN_REENUMERATE_TIMEOUT_US) {
       usbi_err (ctx, "darwin/reenumerate_device: timeout waiting for reenumerate");
       dpriv->in_reenumerate = false;
       return LIBUSB_ERROR_TIMEOUT;
