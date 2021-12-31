@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
 	product_id = (argc > 2) ? (int)strtol (argv[2], NULL, 0) : 0x5005;
 	class_id   = (argc > 3) ? (int)strtol (argv[3], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
 
-	rc = libusb_init (NULL);
+	rc = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
 	if (rc < 0)
 	{
 		printf("failed to initialise libusb: %s\n", libusb_error_name(rc));

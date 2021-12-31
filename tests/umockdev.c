@@ -430,7 +430,7 @@ test_fixture_setup_libusb(UMockdevTestbedFixture * fixture, int devcount)
 {
 	libusb_device **devs = NULL;
 
-	libusb_init (&fixture->ctx);
+	libusb_init_context(/*ctx=*/&fixture->ctx, /*options=*/NULL, /*num_options=*/0);
 
 	/* Supress global log messages completely
 	 * (though, in some tests it might be interesting to check there are no real ones).
@@ -573,7 +573,7 @@ test_implicit_default(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 	libusb_free_device_list(devs, TRUE);
 	clear_libusb_log(fixture, LIBUSB_LOG_LEVEL_INFO);
 
-	libusb_init(NULL);
+	libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
 	g_assert_cmpint(libusb_get_device_list(NULL, &devs), ==, 1);
 	libusb_exit(NULL);
 

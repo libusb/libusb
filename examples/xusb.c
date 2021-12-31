@@ -1153,7 +1153,7 @@ int main(int argc, char** argv)
 
 	version = libusb_get_version();
 	printf("Using libusb v%d.%d.%d.%d\n\n", version->major, version->minor, version->micro, version->nano);
-	r = libusb_init(NULL);
+	r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
 	if (r < 0)
 		return r;
 

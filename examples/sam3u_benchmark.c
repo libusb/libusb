@@ -191,7 +191,7 @@ int main(void)
 	(void)signal(SIGINT, sig_hdlr);
 #endif
 
-	rc = libusb_init(NULL);
+	rc = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
 	if (rc < 0) {
 		fprintf(stderr, "Error initializing libusb: %s\n", libusb_error_name(rc));
 		exit(1);

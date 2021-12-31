@@ -32,7 +32,7 @@ static libusb_testlib_result test_init_and_exit(void)
 		libusb_context *ctx = NULL;
 		int r;
 
-		r = libusb_init(&ctx);
+		r = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
 		if (r != LIBUSB_SUCCESS) {
 			libusb_testlib_logf(
 				"Failed to init libusb on iteration %d: %d",
@@ -51,7 +51,7 @@ static libusb_testlib_result test_get_device_list(void)
 	libusb_context *ctx;
 	int r;
 
-	r = libusb_init(&ctx);
+	r = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
 	if (r != LIBUSB_SUCCESS) {
 		libusb_testlib_logf("Failed to init libusb: %d", r);
 		return TEST_STATUS_FAILURE;
@@ -83,7 +83,7 @@ static libusb_testlib_result test_many_device_lists(void)
 	libusb_device **device_lists[LIST_COUNT];
 	int r;
 
-	r = libusb_init(&ctx);
+	r = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
 	if (r != LIBUSB_SUCCESS) {
 		libusb_testlib_logf("Failed to init libusb: %d", r);
 		return TEST_STATUS_FAILURE;
@@ -123,22 +123,25 @@ static libusb_testlib_result test_default_context_change(void)
 		libusb_context *ctx = NULL;
 		int r;
 
+
+		/* Enable debug output on new context, to be sure to use the context */
+		struct libusb_init_option options[] = {
+		  {
+		    .option = LIBUSB_OPTION_LOG_LEVEL,
+		    .value = {.ival = LIBUSB_LOG_LEVEL_DEBUG},
+		  },
+		};
+		int num_options = 1;
+
 		/* First create a new context */
-		r = libusb_init(&ctx);
+		r = libusb_init_context(&ctx, options, num_options);
 		if (r != LIBUSB_SUCCESS) {
 			libusb_testlib_logf("Failed to init libusb: %d", r);
 			return TEST_STATUS_FAILURE;
 		}
 
-		/* Enable debug output on new context, to be sure to use the context */
-		libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_DEBUG);
-
-		/* Enable debug output on the default context. This should work even before
-		 * the context has been created. */
-		libusb_set_option(NULL, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_DEBUG);
-
 		/* Now create a reference to the default context */
-		r = libusb_init(NULL);
+		r = libusb_init_context(/*ctx=*/NULL, options, num_options);
 		if (r != LIBUSB_SUCCESS) {
 			libusb_testlib_logf("Failed to init libusb: %d", r);
 			libusb_exit(ctx);
