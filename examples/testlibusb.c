@@ -287,7 +287,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	r = libusb_init(NULL);
+	r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
 	if (r < 0)
 		return r;
 

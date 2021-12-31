@@ -601,7 +601,7 @@ int main(void)
 {
 	int r;
 
-	r = libusb_init(NULL);
+	r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
 	if (r < 0) {
 		fprintf(stderr, "failed to initialise libusb %d - %s\n", r, libusb_strerror(r));
 		exit(1);

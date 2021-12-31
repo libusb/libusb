@@ -16,7 +16,7 @@ static void *test_init_and_exit(void * arg)
 		libusb_context *ctx = NULL;
 		int r;
 
-		r = libusb_init(&ctx);
+		r = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
 		if (r != LIBUSB_SUCCESS) {
 			printf("Failed to init libusb on iteration %d: %d", i, r);
 			return NULL;

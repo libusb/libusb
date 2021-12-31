@@ -172,9 +172,9 @@ int main(int argc, char*argv[])
 	}
 
 	/* open the device using libusb */
-	status = libusb_init(NULL);
+	status = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
 	if (status < 0) {
-		logerror("libusb_init() failed: %s\n", libusb_error_name(status));
+		logerror("libusb_init_context() failed: %s\n", libusb_error_name(status));
 		return -1;
 	}
 	libusb_set_option(NULL, LIBUSB_OPTION_LOG_LEVEL, verbose);
