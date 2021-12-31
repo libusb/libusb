@@ -1,0 +1,36 @@
+name: macOS
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on: [push, pull_request]
+
+# A workflow run is made up of one or more jobs that can run
+# sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    runs-on: macos-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job
+      # can access it
+      - uses: actions/checkout@v2
+
+      - name: setup prerequisites
+        shell: bash
+        run: |
+          brew update
+          brew install autoconf automake libtool m4
+
+      - name: bootstrap
+        shell: bash
+        run: ./bootstrap.sh
+
+      - name: compile
+        shell: bash
+        run: .private/ci-build.sh --build-dir build
+
+      - name: Xcode
+        shell: bash
+        run: cd Xcode && xcodebuild -project libusb.xcodeproj
