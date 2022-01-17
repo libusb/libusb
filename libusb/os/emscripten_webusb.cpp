@@ -358,7 +358,7 @@ int em_set_interface_altsetting(libusb_device_handle *handle, uint8_t iface,
 }
 
 int em_clear_halt(libusb_device_handle *handle, unsigned char endpoint) {
-  auto direction = endpoint & LIBUSB_ENDPOINT_IN ? "in" : "out";
+  std::string direction = endpoint & LIBUSB_ENDPOINT_IN ? "in" : "out";
   endpoint &= LIBUSB_ENDPOINT_ADDRESS_MASK;
 
   return promise_result::await(get_web_usb_device(handle->dev)
