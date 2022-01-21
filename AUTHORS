@@ -12,6 +12,7 @@ Copyright © 2013-2018 Chris Dickens <christopher.a.dickens@gmail.com>
 
 Other contributors:
 Aaron Luft
+Adam Korcz
 Adrian Bunk
 Adrien Destugues
 Akshay Jaggi
@@ -24,10 +25,12 @@ Alexander Stein
 Alex Vatchenko
 Andrew Aldridge
 Andrew Fernandes
+Andrew Goodney
 Andy Chunyu
 Andy McFadden
 Angus Gratton
 Anil Nair
+Ankur Verma
 Anthony Clay
 Antonio Ospite
 Artem Egorkine
@@ -39,20 +42,25 @@ Bastien Nocera
 Bei Zhang
 Bence Csokas
 Benjamin Dobell
+Bohdan Tymkiv
 Brent Rector
+Bruno Harbulot
 Carl Karsten
-Chris Zhu
 Christophe Zeitouny
+Chris Zhu
 Chunyu Xie
 Colin Walters
+Craig Hutchinson
 Dave Camarillo
 David Engraf
 Davidlohr Bueso
 David Moore
 Dmitry Fleytman
 Dmitry Kostjuchenko
+Dmitry Zakablukov
 Doug Johnston
 Evan Hunter
+Evan Miller
 Federico Manzan
 Felipe Balbi
 Florian Albrechtskirchinger
@@ -60,10 +68,12 @@ Francesco Montorsi
 Francisco Facioni
 Frank Li
 Frederik Carlier
+Freek Dijkstra
 Gaurav Gupta
 Graeme Gill
 Greg Kroah-Hartman
 Gustavo Zacarias
+Haidong Zheng
 Hans Ulrich Niedermann
 Harry Mallon
 Hector Martin
@@ -76,6 +86,7 @@ Jakub Klama
 James Hanko
 Jeffrey Nichols
 Jie Zhang
+Jim Chen
 Johann Richard
 John Keeping
 John Sheu
@@ -86,35 +97,45 @@ Josh Gao
 Joshua Blake
 Joshua Hou
 Juan Cruz Viotti
+Julian Scheel
 Justin Bischoff
 Karsten Koenig
 Kenjiro Tsuji
-KIMURA Masaru
+Kimura Masaru
 Konrad Rzepecki
 Kuangye Guo
 Lars Kanis
 Lars Wirzenius
 Lei Chen
 Léo Lam
+Liang Yunwang
 Luca Longinotti
+Luz Paz
+Mac Wang
+Marco Trevisan (Treviño)
 Marcus Meissner
+Mark Kuo
 Markus Heidelberg
 Martin Ettl
 Martin Koegler
 Martin Thierer
 Matthew Stapleton
 Matthias Bolte
+Michael Dickens
 Michel Zou
 Mike Frysinger
 Mikhail Gusarov
 Mikolaj Kucharski
 Morgan Leborgne
 Moritz Fischer
+Nancy Li
 Nia Alarie
 Nicholas Corgan
 Omri Iluz
 Orin Eman
+Ozkan Sezer
 Patrick Stewart
+Paul Cercueil
 Paul Fertser
 Paul Qureshi
 Pekka Nikander
@@ -123,6 +144,7 @@ Pino Toscano
 Rob Walker
 Romain Vimont
 Roman Kalashnikov
+Ryan Schmidt
 Saleem Rashid
 Sameeh Jubran
 Sean McBride
@@ -162,7 +184,8 @@ Zoltán Kovács
 Сергей Валерьевич
 Ларионов Даниил
 Роман Донченко
-liangyunwang
+jonner
+orbitcowboy
 parafin
 RipleyTom
 saur0n
