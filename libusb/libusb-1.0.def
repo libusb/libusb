@@ -150,12 +150,10 @@ EXPORTS
   libusb_set_configuration@8 = libusb_set_configuration
   libusb_set_debug
   libusb_set_debug@8 = libusb_set_debug
-  libusb_set_log_cb
-  libusb_set_log_cb@12 = libusb_set_log_cb
   libusb_set_interface_alt_setting
   libusb_set_interface_alt_setting@12 = libusb_set_interface_alt_setting
-  libusb_set_option
-  libusb_set_option@8 = libusb_set_option
+  libusb_set_log_cb
+  libusb_set_log_cb@12 = libusb_set_log_cb
   libusb_set_pollfd_notifiers
   libusb_set_pollfd_notifiers@16 = libusb_set_pollfd_notifiers
   libusb_setlocale
