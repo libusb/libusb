@@ -1,10 +1,18 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2021-05-16: v1.0.25-pre
+2022-01-21: v1.0.25-rc1
+* Linux: Fix regression with some particular devices
+* Linux: Fix regression with libusb_handle_events_timeout_completed()
+* Linux: Fix regression with cpu usage in libusb_bulk_transfer
 * Darwin (macOS): Add support for detaching kernel drivers with authorization.
 * Darwin (macOS): Do not drop partial data on timeout.
 * Darwin (macOS): Silence pipe error in set_interface_alt_setting().
+* Windows: Fix HID backend missing byte
+* Windows: Fix segfault with libusbk driver
+* Windows: Fix regression when using libusb0 driver
+* Windows: Support LIBUSB_TRANSFER_ADD_ZERO_PACKET on winusb
+* New NO_DEVICE_DISCOVERY option replaces WEAK_AUTHORITY option
 
 2020-12-09: v1.0.24
 * Add new platform abstraction (#252)
