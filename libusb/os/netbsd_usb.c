@@ -561,7 +561,7 @@ _access_endpoint(struct libusb_transfer *transfer)
 	endpt = UE_GET_ADDR(transfer->endpoint);
 	mode = IS_XFERIN(transfer) ? O_RDONLY : O_WRONLY;
 
-	usbi_dbg(ITRANFER_CTX(itransfer), "endpoint %d mode %d", endpt, mode);
+	usbi_dbg(TRANSFER_CTX(transfer), "endpoint %d mode %d", endpt, mode);
 
 	if (hpriv->endpoints[endpt] < 0) {
 		/* Pick the right node given the control one */
