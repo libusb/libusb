@@ -122,8 +122,10 @@ static int benchmark_in(uint8_t ep)
 		num_iso_pack = 16;
 
 	xfr = libusb_alloc_transfer(num_iso_pack);
-	if (!xfr)
-		return -ENOMEM;
+	if (!xfr) {
+		errno = ENOMEM;
+		return -1;
+	}
 
 	if (ep == EP_ISO_IN) {
 		libusb_fill_iso_transfer(xfr, devh, ep, buf,

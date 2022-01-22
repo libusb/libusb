@@ -139,7 +139,11 @@ static int ezusb_write(libusb_device_handle *device, const char *label,
 		else
 			logerror("%s ==> %d\n", label, status);
 	}
-	return (status < 0) ? -EIO : 0;
+	if (status < 0) {
+		errno = EIO;
+		return -1;
+	}
+	return 0;
 }
 
 /*
@@ -162,7 +166,11 @@ static int ezusb_read(libusb_device_handle *device, const char *label,
 		else
 			logerror("%s ==> %d\n", label, status);
 	}
-	return (status < 0) ? -EIO : 0;
+	if (status < 0) {
+		errno = EIO;
+		return -1;
+	}
+	return 0;
 }
 
 /*
@@ -514,7 +522,8 @@ static int ram_poke(void *context, uint32_t addr, bool external,
 		if (external) {
 			logerror("can't write %u bytes external memory at 0x%08x\n",
 				(unsigned)len, addr);
-			return -EINVAL;
+			errno = EINVAL;
+			return -1;
 		}
 		break;
 	case skip_internal:		/* CPU must be running */
@@ -538,7 +547,8 @@ static int ram_poke(void *context, uint32_t addr, bool external,
 	case _undef:
 	default:
 		logerror("bug\n");
-		return -EDOM;
+		errno = EDOM;
+		return -1;
 	}
 
 	ctx->total += len;
