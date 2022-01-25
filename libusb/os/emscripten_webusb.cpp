@@ -22,8 +22,6 @@
 #include <emscripten.h>
 #include <emscripten/val.h>
 
-#include <optional>
-
 #include "libusbi.h"
 
 using namespace emscripten;
