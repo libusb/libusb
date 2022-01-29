@@ -70,3 +70,10 @@ for:
         - image: Visual Studio 2019
     build:
       project: msvc\libusb_2019.sln
+
+after_build:
+  - cmd: dir .. /s
+  - cmd: 7z a libusb-buildtree.7z ..\Win32 ..\x64
+
+artifacts:
+  - path: libusb-buildtree.7z
