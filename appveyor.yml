@@ -72,8 +72,7 @@ for:
       project: msvc\libusb_2019.sln
 
 after_build:
-  - cmd: dir .. /s
-  - cmd: 7z a libusb-buildtree.7z ..\Win32 ..\x64
+  - cmd: 7z a libusb-build.7z %PLATFORM%\%CONFIGURATION%\dll\*.dll %PLATFORM%\%CONFIGURATION%\lib\*.dll %PLATFORM%\%CONFIGURATION%\examples\*.exe %PLATFORM%\%CONFIGURATION%\tests\*.exe
 
 artifacts:
-  - path: libusb-buildtree.7z
+  - path: libusb-build.7z
