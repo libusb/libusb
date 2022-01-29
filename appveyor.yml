@@ -70,3 +70,11 @@ for:
         - image: Visual Studio 2019
     build:
       project: msvc\libusb_2019.sln
+
+after_build:
+  - cmd: ECHO This was built by %APPVEYOR_BUILD_WORKER_IMAGE% from %APPVEYOR_REPO_NAME% commit %APPVEYOR_REPO_COMMIT% > README-build.txt
+  - cmd: ECHO > tag_%APPVEYOR_REPO_TAG_NAME%_commit_%APPVEYOR_REPO_COMMIT%
+  - cmd: 7z a "libusb-build_%APPVEYOR_BUILD_WORKER_IMAGE%_%PLATFORM%_%CONFIGURATION%.7z" tag_* README-build.txt %PLATFORM%\%CONFIGURATION%\dll\*.* %PLATFORM%\%CONFIGURATION%\lib\*.* %PLATFORM%\%CONFIGURATION%\examples\*.exe %PLATFORM%\%CONFIGURATION%\tests\*.exe
+
+artifacts:
+  - path: "libusb-build_%APPVEYOR_BUILD_WORKER_IMAGE%_%PLATFORM%_%CONFIGURATION%.7z"
