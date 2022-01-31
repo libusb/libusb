@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2022-01-21: v1.0.25-rc1
+2022-01-31: v1.0.25
 * Linux: Fix regression with some particular devices
 * Linux: Fix regression with libusb_handle_events_timeout_completed()
 * Linux: Fix regression with cpu usage in libusb_bulk_transfer
@@ -13,6 +13,7 @@ visit: http://log.libusb.info
 * Windows: Fix regression when using libusb0 driver
 * Windows: Support LIBUSB_TRANSFER_ADD_ZERO_PACKET on winusb
 * New NO_DEVICE_DISCOVERY option replaces WEAK_AUTHORITY option
+* Various other bug fixes and improvements
 
 2020-12-09: v1.0.24
 * Add new platform abstraction (#252)
