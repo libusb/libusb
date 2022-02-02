@@ -1389,12 +1389,16 @@ static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle,
 
   /* current interface */
   struct darwin_interface *cInterface = &priv->interfaces[iface];
+#if InterfaceVersion >= 550
+  IOUSBEndpointProperties pipeProperties = {.bVersion = kUSBEndpointPropertiesVersion3};
+#else
+  UInt8 dont_care1, dont_care3;
+  UInt16 dont_care2;
+#endif
 
   IOReturn kresult;
 
   UInt8 numep, direction, number;
-  UInt8 dont_care1, dont_care3;
-  UInt16 dont_care2;
   int rc;
   struct libusb_context *ctx = HANDLE_CTX (dev_handle);
 
@@ -1410,9 +1414,14 @@ static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle,
 
   /* iterate through pipe references */
   for (UInt8 i = 1 ; i <= numep ; i++) {
+#if InterfaceVersion >= 550
+    kresult = (*(cInterface->interface))->GetPipePropertiesV3 (cInterface->interface, i, &pipeProperties);
+    number = pipeProperties.bEndpointNumber;
+    direction = pipeProperties.bDirection;
+#else
     kresult = (*(cInterface->interface))->GetPipeProperties(cInterface->interface, i, &direction, &number, &dont_care1,
                                                             &dont_care2, &dont_care3);
-
+#endif
     if (kresult != kIOReturnSuccess) {
       /* probably a buggy device. try to get the endpoint address from the descriptors */
       struct libusb_config_descriptor *config;
@@ -2024,11 +2033,17 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   struct darwin_transfer_priv *tpriv = usbi_get_transfer_priv(itransfer);
 
   IOReturn kresult;
-  uint8_t direction, number, interval, pipeRef, transferType;
-  uint16_t maxPacketSize;
+  uint8_t pipeRef, interval;
   UInt64 frame;
   AbsoluteTime atTime;
   int i;
+#if InterfaceVersion >= 550
+  IOUSBEndpointProperties pipeProperties = {.bVersion = kUSBEndpointPropertiesVersion3};
+#else
+  /* None of the values below are used in libusb for iso transfers */
+  uint8_t direction, number, transferType;
+  uint16_t maxPacketSize;
+#endif
 
   struct darwin_interface *cInterface;
 
@@ -2060,8 +2075,20 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   }
 
   /* determine the properties of this endpoint and the speed of the device */
-  (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
+#if InterfaceVersion >= 550
+  kresult = (*(cInterface->interface))->GetPipePropertiesV3 (cInterface->interface, pipeRef, &pipeProperties);
+  interval = pipeProperties.bInterval;
+#else
+  kresult = (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
                                                  &transferType, &maxPacketSize, &interval);
+#endif
+  if (kresult != kIOReturnSuccess) {
+    usbi_err (TRANSFER_CTX (transfer), "failed to get pipe properties: %d", kresult);
+    free(tpriv->isoc_framelist);
+    tpriv->isoc_framelist = NULL;
+
+    return darwin_to_libusb (kresult);
+  }
 
   /* Last but not least we need the bus frame number */
   kresult = (*(cInterface->interface))->GetBusFrameNumber(cInterface->interface, &frame, &atTime);
@@ -2072,9 +2099,6 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
 
     return darwin_to_libusb (kresult);
   }
-
-  (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
-                                                 &transferType, &maxPacketSize, &interval);
 
   /* schedule for a frame a little in the future */
   frame += 4;
