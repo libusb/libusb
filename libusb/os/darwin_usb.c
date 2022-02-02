@@ -43,7 +43,7 @@
 
 /* Default timeout to 10s for reenumerate. This is needed because USBDeviceReEnumerate
  * does not return error status on macOS. */
-#define DARWIN_REENUMERATE_TIMEOUT_US 10000000
+#define DARWIN_REENUMERATE_TIMEOUT_US (10 * USEC_PER_SEC)
 
 #include <AvailabilityMacros.h>
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060 && MAC_OS_X_VERSION_MIN_REQUIRED < 101200
@@ -1809,9 +1809,10 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
 
     struct timespec now;
     usbi_get_monotonic_time(&now);
-    UInt32 elapsed = (now.tv_sec - start.tv_sec) * 1000000 + (now.tv_nsec - start.tv_nsec) / 1000;
+    unsigned long elapsed_us = (now.tv_sec - start.tv_sec) * USEC_PER_SEC +
+                                (now.tv_nsec - start.tv_nsec) / 1000;
 
-    if (elapsed >= DARWIN_REENUMERATE_TIMEOUT_US) {
+    if (elapsed_us >= DARWIN_REENUMERATE_TIMEOUT_US) {
       usbi_err (ctx, "darwin/reenumerate_device: timeout waiting for reenumerate");
       dpriv->in_reenumerate = false;
       return LIBUSB_ERROR_TIMEOUT;
