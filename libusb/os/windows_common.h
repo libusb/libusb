@@ -153,7 +153,8 @@ enum windows_version {
 	WINDOWS_8,
 	WINDOWS_8_1,
 	WINDOWS_10,
-	WINDOWS_11_OR_LATER
+	WINDOWS_11,
+	WINDOWS_12_OR_LATER
 };
 
 extern enum windows_version windows_version;
