@@ -346,6 +346,8 @@ static enum windows_version get_windows_version(void)
 	if ((vi.dwMajorVersion > 6) || ((vi.dwMajorVersion == 6) && (vi.dwMinorVersion >= 2))) {
 		// Starting with Windows 8.1 Preview, GetVersionEx() does no longer report the actual OS version
 		// See: http://msdn.microsoft.com/en-us/library/windows/desktop/dn302074.aspx
+		// And starting with Windows 10 Preview 2, Windows enforces the use of the application/supportedOS
+		// manifest in order for VerSetConditionMask() to report the ACTUAL OS major and minor...
 
 		major_equal = VerSetConditionMask(0, VER_MAJORVERSION, VER_EQUAL);
 		for (major = vi.dwMajorVersion; major <= 9; major++) {
@@ -381,6 +383,7 @@ static enum windows_version get_windows_version(void)
 
 	ws = (vi.wProductType <= VER_NT_WORKSTATION);
 	version = vi.dwMajorVersion << 4 | vi.dwMinorVersion;
+
 	switch (version) {
 	case 0x50: winver = WINDOWS_2000;  w = "2000"; break;
 	case 0x51: winver = WINDOWS_XP;	   w = "XP";   break;
@@ -401,6 +404,10 @@ static enum windows_version get_windows_version(void)
 		winver = WINDOWS_12_OR_LATER;
 		w = "12 or later";
 	}
+
+	// We cannot tell if we are on 8, 10, or 11 without "app manifest"
+	if (version == 0x62 && vi.dwBuildNumber == 9200)
+		w = "8 (or later)";
 
 	arch = is_x64() ? "64-bit" : "32-bit";
 
