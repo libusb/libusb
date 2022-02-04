@@ -29,6 +29,11 @@
 #include <sys/timerfd.h>
 #endif
 #ifdef __EMSCRIPTEN__
+// On Emscripten pipe does not conform to the spec and does not block until events are available,
+// which makes it unusable for event system and often results in deadlocks when `pipe` is in a loop
+// like it is in libusb.
+//
+// To work around that, I'm introducing a custom event system based on browser event emitters.
 #include <emscripten.h>
 
 EM_JS(void, em_libusb_notify, (void), {
