@@ -2441,6 +2441,7 @@ void API_EXPORTED libusb_exit(libusb_context *ctx)
 	for_each_device(_ctx, dev) {
 		usbi_warn(_ctx, "device %d.%d still referenced",
 			dev->bus_number, dev->device_address);
+		DEVICE_CTX(dev) = NULL;
 	}
 
 	if (!list_empty(&_ctx->open_devs))
