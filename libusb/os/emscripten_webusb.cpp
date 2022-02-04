@@ -139,6 +139,12 @@ void em_signal_transfer_completion_impl(usbi_transfer *itransfer,
 // Store the global `navigator.usb` once upon initialisation.
 thread_local const val web_usb = val::global("navigator")["usb"];
 
+enum StringId : uint8_t {
+  Manufacturer = 1,
+  Product = 2,
+  SerialNumber = 3,
+};
+
 int em_get_device_list(libusb_context *ctx, discovered_devs **devs) {
   // C++ equivalent of `await navigator.usb.getDevices()`.
   // Note: at this point we must already have some devices exposed -
@@ -196,9 +202,9 @@ int em_get_device_list(libusb_context *ctx, discovered_devs **devs) {
           // just assign constant IDs we can recognise later and then handle
           // them in `em_submit_transfer` when there is a request to get string
           // descriptor value.
-          .iManufacturer = 1,
-          .iProduct = 2,
-          .iSerialNumber = 3,
+          .iManufacturer = StringId::Manufacturer,
+          .iProduct = StringId::Product,
+          .iSerialNumber = StringId::SerialNumber,
           .bNumConfigurations =
               web_usb_device["configurations"]["length"].as<uint8_t>(),
       };
@@ -419,13 +425,13 @@ int em_submit_transfer(usbi_transfer *itransfer) {
             // Promise) and immediately signals completion.
             const char *propName = nullptr;
             switch (setup->wValue & 0xFF) {
-              case 1:
+              case StringId::Manufacturer:
                 propName = "manufacturerName";
                 break;
-              case 2:
+              case StringId::Product:
                 propName = "productName";
                 break;
-              case 3:
+              case StringId::SerialNumber:
                 propName = "serialNumber";
                 break;
             }
@@ -503,22 +509,7 @@ int em_submit_transfer(usbi_transfer *itransfer) {
 
       break;
     }
-    // TODO: finalize implementation for isochronous transfers too.
-    // case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS: {
-    // 	if (setup->bmRequestType & LIBUSB_ENDPOINT_IN) {
-    // 		// todo: read result
-    // 		auto web_usb_packet_lengths = val::array();
-    // 		for (int i = 0; i < transfer->num_iso_packets; i++) {
-    // 			web_usb_packet_lengths.call<void>("push",
-    // transfer->iso_packet_desc[i].length);
-    // 		}
-    // 		await_int(web_usb_device.call<val>("isochronousTransferIn",
-    // transfer->endpoint, std::move(web_usb_packet_lengths))); 	} else {
-    // 		// todo: read result
-    // 		await_int(web_usb_device.call<val>("isochronousTransferOut"));
-    // 	}
-    // 	break;
-    // }
+    // TODO: add implementation for isochronous transfers too.
     default:
       return LIBUSB_ERROR_NOT_SUPPORTED;
   }
