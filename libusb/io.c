@@ -1817,6 +1817,7 @@ int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
 		return 1;
 
 	ctx->event_handler_active = 1;
+	/* coverity[missing_unlock] is expected here */
 	return 0;
 }
 
