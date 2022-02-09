@@ -1989,6 +1989,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	tpriv->num_urbs = num_urbs;
 	tpriv->num_retired = 0;
 	tpriv->reap_action = NORMAL;
+	/* coverity[missing_lock] as we don't need to lock before submission */
 	tpriv->reap_status = LIBUSB_TRANSFER_COMPLETED;
 
 	for (i = 0; i < num_urbs; i++) {
