@@ -554,13 +554,8 @@ static int do_init(void)
 static int alloc_transfers(void)
 {
 	img_transfer = libusb_alloc_transfer(0);
-	if (!img_transfer) {
-		errno = ENOMEM;
-		return -1;
-	}
-
 	irq_transfer = libusb_alloc_transfer(0);
-	if (!irq_transfer) {
+	if (!img_transfer || !irq_transfer) {
 		errno = ENOMEM;
 		return -1;
 	}
