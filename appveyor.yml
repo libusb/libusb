@@ -42,6 +42,8 @@ for:
       - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb_2015.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
       - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" MinGW
       - cmd: C:\cygwin\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" cygwin
+    after_build:
+      - cmd: 7z a "libusb-build_%APPVEYOR_BUILD_WORKER_IMAGE%_%PLATFORM%_%CONFIGURATION%.7z" tag_* README-build.txt %PLATFORM%\%CONFIGURATION%\dll\*.* %PLATFORM%\%CONFIGURATION%\lib\*.* %PLATFORM%\%CONFIGURATION%\examples\*.exe %PLATFORM%\%CONFIGURATION%\tests\*.exe C:\msys64\home\appveyor\libusb-MinGW-Win32 C:\cygwin\home\appveyor\libusb-cygwin-Win32
 
   -
     matrix:
@@ -56,6 +58,8 @@ for:
       - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb_2015.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
       - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" MinGW
       - cmd: C:\cygwin64\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" cygwin
+    after_build:
+      - cmd: 7z a "libusb-build_%APPVEYOR_BUILD_WORKER_IMAGE%_%PLATFORM%_%CONFIGURATION%.7z" tag_* README-build.txt %PLATFORM%\%CONFIGURATION%\dll\*.* %PLATFORM%\%CONFIGURATION%\lib\*.* %PLATFORM%\%CONFIGURATION%\examples\*.exe %PLATFORM%\%CONFIGURATION%\tests\*.exe C:\msys64\home\appveyor\libusb-MinGW-x64 C:\cygwin64\home\appveyor\libusb-cygwin-x64
 
   -
     matrix:
