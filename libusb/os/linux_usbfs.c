@@ -199,6 +199,8 @@ static int get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 	if (fd != -1)
 		return fd; /* Success */
 
+/* This workaround is only relevant when watching netlink directly rather than udev. */
+#if !defined(HAVE_LIBUDEV)
 	if (errno == ENOENT) {
 		const long delay_ms = 10L;
 		const struct timespec delay_ts = { 0L, delay_ms * 1000L * 1000L };
@@ -213,6 +215,7 @@ static int get_usbfs_fd(struct libusb_device *dev, mode_t mode, int silent)
 		if (fd != -1)
 			return fd; /* Success */
 	}
+#endif
 
 	if (!silent) {
 		usbi_err(ctx, "libusb couldn't open USB device %s, errno=%d", path, errno);
