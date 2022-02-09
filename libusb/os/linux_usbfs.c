@@ -642,6 +642,7 @@ int linux_get_device_address(struct libusb_context *ctx, int detached,
 }
 
 /* Return offset of the next config descriptor */
+/* coverity[-taint_source] as the returned offset can be trusted */
 static int seek_to_next_config(struct libusb_context *ctx,
 	uint8_t *buffer, size_t len)
 {
