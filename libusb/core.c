@@ -2308,10 +2308,6 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		return r;
 	}
 
-	if (option >= LIBUSB_OPTION_MAX) {
-		return LIBUSB_ERROR_INVALID_PARAM;
-	}
-
 	if (NULL == ctx) {
 		usbi_mutex_static_lock(&default_context_lock);
 		default_context_options[option].is_set = 1;
