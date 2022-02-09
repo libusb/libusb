@@ -1723,8 +1723,10 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 		transfer->callback(transfer);
 	/* transfer might have been freed by the above call, do not use from
 	 * this point. */
-	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER)
+	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER) {
+		/* coverity[incorrect_free] is reported incorrectly here due to the memory layout */
 		libusb_free_transfer(transfer);
+	}
 	return r;
 }
 
