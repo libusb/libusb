@@ -390,7 +390,10 @@ static enum windows_version get_windows_version(void)
 	case 0x62: winver = WINDOWS_8;	   w = (ws ? "8" : "2012");	 break;
 	case 0x63: winver = WINDOWS_8_1;   w = (ws ? "8.1" : "2012_R2"); break;
 	case 0x64: // Early Windows 10 Insider Previews and Windows Server 2017 Technical Preview 1 used version 6.4
-	case 0xA0: winver = WINDOWS_10;	   w = (ws ? "10" : "2016");	 break;
+	case 0xA0: winver = WINDOWS_10;	   w = (ws ? "10" : "2016");
+		   if (vi.dwBuildNumber < 20000)
+			   break;
+		   // fallthrough
 	case 0xB0: winver = WINDOWS_11;	   w = (ws ? "11" : "2022");	 break;
 	default:
 		if (version < 0x50)
