@@ -223,6 +223,8 @@ static inline void list_add_tail(struct list_head *entry,
 LIBUSB_NONNULL(1)
 static inline void list_del(struct list_head *entry)
 {
+	assert(entry->next && entry->prev);
+
 	entry->next->prev = entry->prev;
 	entry->prev->next = entry->next;
 	entry->next = entry->prev = NULL;
