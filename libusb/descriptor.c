@@ -555,7 +555,7 @@ int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
 int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 	struct libusb_config_descriptor **config)
 {
-	union usbi_config_desc_buf _config;
+	union usbi_config_desc_buf _config = { 0, };
 	uint16_t config_len;
 	uint8_t *buf;
 	int r;
@@ -658,7 +658,7 @@ int API_EXPORTED libusb_get_config_descriptor_by_value(libusb_device *dev,
 
 	usbi_dbg(DEVICE_CTX(dev), "value %u", bConfigurationValue);
 	for (idx = 0; idx < dev->device_descriptor.bNumConfigurations; idx++) {
-		union usbi_config_desc_buf _config;
+		union usbi_config_desc_buf _config = { 0, };
 
 		r = get_config_descriptor(dev, idx, _config.buf, sizeof(_config.buf));
 		if (r < 0)
