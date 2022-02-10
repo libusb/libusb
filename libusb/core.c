@@ -2778,16 +2778,13 @@ static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 		header_len = 0;
 	}
 
-	text_len = vsnprintf(buf + header_len, sizeof(buf) - (size_t)header_len,
+	text_len = vsnprintf(buf + header_len,
+		sizeof(buf) - (size_t)header_len - (int)sizeof(USBI_LOG_LINE_END),
 		format, args);
-	if (text_len < 0 || text_len + header_len >= (int)sizeof(buf)) {
+	if (text_len < 0 || text_len + header_len + (int)sizeof(USBI_LOG_LINE_END) >= (int)sizeof(buf)) {
 		/* Truncated log output. On some platforms a -1 return value means
-		 * that the output was truncated. */
-		text_len = (int)sizeof(buf) - header_len;
-	}
-	if (header_len + text_len + (int)sizeof(USBI_LOG_LINE_END) >= (int)sizeof(buf)) {
-		/* Need to truncate the text slightly to fit on the terminator. */
-		text_len -= (header_len + text_len + (int)sizeof(USBI_LOG_LINE_END)) - (int)sizeof(buf);
+		 * that the output was truncated (e.g. glibc < 2.1). */
+		text_len = (int)sizeof(buf) - header_len - (int)sizeof(USBI_LOG_LINE_END);
 	}
 	strcpy(buf + header_len + text_len, USBI_LOG_LINE_END);
 
