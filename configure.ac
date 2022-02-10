@@ -124,6 +124,7 @@ case $host in
 	platform=windows
 	test "x$enable_shared" = xyes && create_import_lib=yes
 	EXTRA_CFLAGS="-mwin32 -fno-omit-frame-pointer"
+	EXTRA_LDFLAGS="-static-libgcc"
 	;;
 *)
 	AC_MSG_RESULT([Null])
@@ -393,6 +394,8 @@ AM_CXXFLAGS="-std=${c_dialect}++11 ${EXTRA_CFLAGS} ${SHARED_CFLAGS} -Wmissing-de
 AC_SUBST(AM_CXXFLAGS)
 
 AC_SUBST(LT_LDFLAGS)
+
+AC_SUBST([EXTRA_LDFLAGS])
 
 dnl set name of html output directory for doxygen
 AC_SUBST(DOXYGEN_HTMLDIR, [api-1.0])
