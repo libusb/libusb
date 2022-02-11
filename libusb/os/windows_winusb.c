@@ -2505,6 +2505,8 @@ static void winusbx_close(int sub_api, struct libusb_device_handle *dev_handle)
 
 static int winusbx_configure_endpoints(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
 {
+	struct libusb_context *ctx = HANDLE_CTX(dev_handle);
+	struct windows_context_priv *ctx_priv = usbi_get_context_priv(ctx);
 	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 	HANDLE winusb_handle = handle_priv->interface_handle[iface].api_handle;
@@ -2546,6 +2548,12 @@ static int winusbx_configure_endpoints(int sub_api, struct libusb_device_handle 
 		if (!WinUSBX[sub_api].SetPipePolicy(winusb_handle, endpoint_address,
 			AUTO_CLEAR_STALL, sizeof(UCHAR), &policy))
 			usbi_dbg(HANDLE_CTX(dev_handle), "failed to enable AUTO_CLEAR_STALL for endpoint %02X", endpoint_address);
+
+		if (ctx_priv->use_raw_io) {
+			if (!WinUSBX[sub_api].SetPipePolicy(winusb_handle, endpoint_address,
+				RAW_IO, sizeof(UCHAR), &policy))
+				usbi_dbg(HANDLE_CTX(dev_handle), "failed to enable RAW_IO for endpoint %02X", endpoint_address);
+		}
 
 		if (sub_api == SUB_API_LIBUSBK) {
 			if (!WinUSBX[sub_api].SetPipePolicy(winusb_handle, endpoint_address,

@@ -614,6 +614,10 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 		usbi_dbg(ctx, "switching context %p to use UsbDk backend", ctx);
 		priv->backend = &usbdk_backend;
 		return LIBUSB_SUCCESS;
+	} else if (option == LIBUSB_OPTION_WINUSB_RAW_IO) {
+		usbi_dbg(ctx, "enabling RAW_IO for context %p", ctx);
+		priv->use_raw_io = true;
+		return LIBUSB_SUCCESS;
 	}
 
 	return LIBUSB_ERROR_NOT_SUPPORTED;

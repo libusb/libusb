@@ -2123,10 +2123,16 @@ enum libusb_option {
 	 * Only valid on Linux.
 	 */
 	LIBUSB_OPTION_NO_DEVICE_DISCOVERY = 2,
-
 #define LIBUSB_OPTION_WEAK_AUTHORITY LIBUSB_OPTION_NO_DEVICE_DISCOVERY
 
-	LIBUSB_OPTION_MAX = 3
+	/** Use WinUSB RAW_IO policy on Windows.
+	 * Improves performance by allowing the backend to queue multiple transfer
+	 * requests, the same way it works by default on other platforms.
+	 * This requires transfer sizes to be a multiple of maximum packet size.
+	 */
+	LIBUSB_OPTION_WINUSB_RAW_IO = 3,
+
+	LIBUSB_OPTION_MAX = 4
 };
 
 int LIBUSB_CALL libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);

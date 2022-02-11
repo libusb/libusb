@@ -340,6 +340,7 @@ struct windows_context_priv {
 	const struct windows_backend *backend;
 	HANDLE completion_port;
 	HANDLE completion_port_thread;
+	BOOL use_raw_io;
 };
 
 union windows_device_priv {
