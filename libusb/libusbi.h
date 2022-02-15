@@ -329,10 +329,11 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 #endif /* ENABLE_LOGGING */
 
 #define DEVICE_CTX(dev)		((dev)->ctx)
-#define HANDLE_CTX(handle)	(DEVICE_CTX((handle)->dev))
-#define TRANSFER_CTX(transfer)	(HANDLE_CTX((transfer)->dev_handle))
+#define HANDLE_CTX(handle)	((handle) ? DEVICE_CTX((handle)->dev) : NULL)
 #define ITRANSFER_CTX(itransfer) \
-	(TRANSFER_CTX(USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)))
+	((itransfer)->dev ? DEVICE_CTX((itransfer)->dev) : NULL)
+#define TRANSFER_CTX(transfer) \
+	(ITRANSFER_CTX(LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)))
 
 #define IS_EPIN(ep)		(0 != ((ep) & LIBUSB_ENDPOINT_IN))
 #define IS_EPOUT(ep)		(!IS_EPIN(ep))
@@ -561,6 +562,10 @@ struct usbi_transfer {
 	uint32_t stream_id;
 	uint32_t state_flags;   /* Protected by usbi_transfer->lock */
 	uint32_t timeout_flags; /* Protected by the flying_stransfers_lock */
+
+	/* The device reference is held until destruction for logging
+	 * even after dev_handle is set to NULL.  */
+	struct libusb_device *dev;
 
 	/* this lock is held during libusb_submit_transfer() and
 	 * libusb_cancel_transfer() (allowing the OS backend to prevent duplicate

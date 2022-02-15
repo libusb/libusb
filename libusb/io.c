@@ -1344,6 +1344,8 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 
 	itransfer = LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	usbi_mutex_destroy(&itransfer->lock);
+	if (itransfer->dev)
+		libusb_unref_device(itransfer->dev);
 
 	priv_size = PTR_ALIGN(usbi_backend.transfer_priv_size);
 	ptr = (unsigned char *)itransfer - priv_size;
@@ -1489,9 +1491,15 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 {
 	struct usbi_transfer *itransfer =
 		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
-	struct libusb_context *ctx = TRANSFER_CTX(transfer);
+	struct libusb_context *ctx;
 	int r;
 
+	assert(transfer->dev_handle);
+	if (itransfer->dev)
+		libusb_unref_device(itransfer->dev);
+	itransfer->dev = libusb_ref_device(transfer->dev_handle->dev);
+
+	ctx = HANDLE_CTX(transfer->dev_handle);
 	usbi_dbg(ctx, "transfer %p", transfer);
 
 	/*
@@ -1551,8 +1559,6 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	r = usbi_backend.submit_transfer(itransfer);
 	if (r == LIBUSB_SUCCESS) {
 		itransfer->state_flags |= USBI_TRANSFER_IN_FLIGHT;
-		/* keep a reference to this device */
-		libusb_ref_device(transfer->dev_handle->dev);
 	}
 	usbi_mutex_unlock(&itransfer->lock);
 
@@ -1659,7 +1665,6 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 {
 	struct libusb_transfer *transfer =
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct libusb_device_handle *dev_handle = transfer->dev_handle;
 	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
 	uint8_t flags;
 	int r;
@@ -1693,7 +1698,6 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	 * this point. */
 	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER)
 		libusb_free_transfer(transfer);
-	libusb_unref_device(dev_handle->dev);
 	return r;
 }
 
@@ -1727,10 +1731,10 @@ int usbi_handle_transfer_cancellation(struct usbi_transfer *itransfer)
  * function will be called the next time an event handler runs. */
 void usbi_signal_transfer_completion(struct usbi_transfer *itransfer)
 {
-	libusb_device_handle *dev_handle = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)->dev_handle;
+	struct libusb_device *dev = itransfer->dev;
 
-	if (dev_handle) {
-		struct libusb_context *ctx = HANDLE_CTX(dev_handle);
+	if (dev) {
+		struct libusb_context *ctx = DEVICE_CTX(dev);
 		unsigned int event_flags;
 
 		usbi_mutex_lock(&ctx->event_data_lock);
