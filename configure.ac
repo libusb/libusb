@@ -179,6 +179,14 @@ linux)
 		dnl system has udev. use it or fail!
 		AC_CHECK_HEADER([libudev.h], [], [AC_MSG_ERROR([udev support requested but libudev header not installed])])
 		AC_CHECK_LIB([udev], [udev_new], [], [AC_MSG_ERROR([udev support requested but libudev not installed])])
+
+		# We can build umockdev tests (if available)
+		PKG_PROG_PKG_CONFIG
+		PKG_CHECK_MODULES(UMOCKDEV, umockdev-1.0 >= 0.16.0, ac_have_umockdev=yes, ac_have_umockdev=no)
+		PKG_CHECK_MODULES(UMOCKDEV_HOTPLUG, umockdev-1.0 >= 0.17.7, ac_umockdev_hotplug=yes, ac_umockdev_hotplug=no)
+		if test "x$ac_umockdev_hotplug" = xyes; then
+			AC_DEFINE([UMOCKDEV_HOTPLUG], [1], [UMockdev hotplug code is not racy])
+		fi
 	else
 		AC_CHECK_HEADERS([asm/types.h])
 		AC_CHECK_HEADER([linux/netlink.h], [], [AC_MSG_ERROR([Linux netlink header not found])])
@@ -358,6 +366,7 @@ AC_ARG_ENABLE([tests-build],
 
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != xno])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != xno])
+AM_CONDITIONAL([BUILD_UMOCKDEV_TEST], [test "x$ac_have_umockdev" = xyes -a "x$log_enabled" != xno])
 AM_CONDITIONAL([CREATE_IMPORT_LIB], [test "x$create_import_lib" = xyes])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = xdarwin])
 AM_CONDITIONAL([OS_HAIKU], [test "x$backend" = xhaiku])
