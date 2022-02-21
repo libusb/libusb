@@ -208,7 +208,7 @@ if test "x$platform" = xposix; then
 		AC_MSG_CHECKING([whether OS X target version is 10.12 or later])
 		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
 				#include <AvailabilityMacros.h>
-				#if MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_12
+				#if MAC_OS_X_VERSION_MIN_REQUIRED < 101200
 				# error "Target OS X version is too old"
 				#endif
 			], [])],
