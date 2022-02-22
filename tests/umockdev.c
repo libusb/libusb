@@ -559,6 +559,32 @@ test_open_close(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 }
 
 static void
+test_implicit_default(UMockdevTestbedFixture * fixture, UNUSED_DATA)
+{
+	libusb_device **devs = NULL;
+
+	clear_libusb_log(fixture, LIBUSB_LOG_LEVEL_INFO);
+	g_assert_cmpint(libusb_get_device_list(NULL, &devs), ==, 1);
+	libusb_free_device_list(devs, TRUE);
+	assert_libusb_log_msg(fixture, LIBUSB_LOG_LEVEL_ERROR, "\\[usbi_get_context\\].*implicit default");
+
+	/* Only warns once */
+	g_assert_cmpint(libusb_get_device_list(NULL, &devs), ==, 1);
+	libusb_free_device_list(devs, TRUE);
+	clear_libusb_log(fixture, LIBUSB_LOG_LEVEL_INFO);
+
+	libusb_init(NULL);
+	g_assert_cmpint(libusb_get_device_list(NULL, &devs), ==, 1);
+	libusb_exit(NULL);
+
+	/* We free late, causing a warning from libusb_exit. However,
+	 * we never see this warning (i.e. test success) because it is on a
+	 * different context.
+	 */
+	libusb_free_device_list(devs, TRUE);
+}
+
+static void
 test_close_flying(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 {
 	UsbChat chat[] = {
@@ -1099,6 +1125,11 @@ main(int argc, char **argv)
 	g_test_add("/libusb/open-close", UMockdevTestbedFixture, NULL,
 	           test_fixture_setup_with_canon,
 	           test_open_close,
+	           test_fixture_teardown);
+
+	g_test_add("/libusb/implicit-default", UMockdevTestbedFixture, NULL,
+	           test_fixture_setup_with_canon,
+	           test_implicit_default,
 	           test_fixture_teardown);
 
 	g_test_add("/libusb/close-flying", UMockdevTestbedFixture, NULL,
