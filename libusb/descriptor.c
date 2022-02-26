@@ -81,7 +81,8 @@ static void clear_endpoint(struct libusb_endpoint_descriptor *endpoint)
 }
 
 static int parse_endpoint(struct libusb_context *ctx,
-	struct libusb_endpoint_descriptor *endpoint, const uint8_t *buffer, int size)
+	struct libusb_endpoint_descriptor *endpoint,
+	struct libusb_interface_descriptor *interface, const uint8_t *buffer, int size)
 {
 	const struct usbi_descriptor_header *header;
 	const uint8_t *begin;
@@ -157,8 +158,15 @@ static int parse_endpoint(struct libusb_context *ctx,
 		return LIBUSB_ERROR_NO_MEM;
 
 	memcpy(extra, begin, len);
-	endpoint->extra = extra;
-	endpoint->extra_length = len;
+	
+	if(interface != NULL)
+	{
+		interface->extra = extra;
+		interface->extra_length = len;
+	}else{
+		endpoint->extra = extra;
+		endpoint->extra_length = len;
+	}
 
 	return parsed;
 }
@@ -303,7 +311,13 @@ static int parse_interface(libusb_context *ctx,
 
 			ifp->endpoint = endpoint;
 			for (i = 0; i < ifp->bNumEndpoints; i++) {
-				r = parse_endpoint(ctx, endpoint + i, buffer, size);
+				
+				if(len == 0)
+					r = parse_endpoint(ctx, endpoint + i, ifp, buffer, size);
+				else
+					r = parse_endpoint(ctx, endpoint + i, NULL, buffer, size);
+				
+				
 				if (r < 0)
 					goto err;
 				if (r == 0) {
