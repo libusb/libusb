@@ -71,6 +71,8 @@ typedef SSIZE_T ssize_t;
 #define LIBUSB_DEPRECATED_FOR(f) __attribute__ ((deprecated ("Use " #f " instead")))
 #elif defined(__GNUC__) && (__GNUC__ >= 3)
 #define LIBUSB_DEPRECATED_FOR(f) __attribute__ ((deprecated))
+#elif defined(_MSC_VER)
+#define LIBUSB_DEPRECATED_FOR(f) __declspec(deprecated("Use " #f " instead"))
 #else
 #define LIBUSB_DEPRECATED_FOR(f)
 #endif /* __GNUC__ */
