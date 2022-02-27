@@ -15,14 +15,11 @@ o Visual Studio:
     Also make sure that the directory where libusb-1.0.lib resides is added to
     'Additional Library Directories' (Configuration Properties -> Linker
     -> General)
-  - If you use the static version of the libusb library, make sure that
-    'Runtime Library' is set to 'Multi-threaded DLL (/MD)' (Configuration
-    Properties -> C/C++ -> Code Generation).
-    NB: If your application requires /MT (Multi-threaded/libCMT), you need to
-    recompile a static libusb 1.0 library from source.
+  - By default, static libusb statically links against the CRT and the dll build
+    dynamically links against CRT. You need to rebuild libusb from source to
+    change this if required by your application.
   - Compile and run your application. If you use the DLL version of libusb-1.0,
-    remember that you need to have a copy of the DLL either in the runtime
-    directory or in system32
+    remember that the DLL needs to be in the DLL search path of your application.
 
 o MinGW/cygwin
   - Copy libusb.h, from include/libusb-1.0/ to your default include directory,
