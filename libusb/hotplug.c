@@ -171,6 +171,9 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
 		return;
 
+	if (!usbi_atomic_load(&ctx->hotplug_ready))
+		return;
+
 	/* free all registered hotplug callbacks */
 	for_each_hotplug_cb_safe(ctx, hotplug_cb, next_cb) {
 		list_del(&hotplug_cb->list);
