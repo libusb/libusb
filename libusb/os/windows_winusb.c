@@ -3864,7 +3864,10 @@ static int hid_open(int sub_api, struct libusb_device_handle *dev_handle)
 
 		priv->hid->string_index[1] = dev->device_descriptor.iProduct;
 		if (priv->hid->string_index[1] != 0)
-			HidD_GetProductString(hid_handle, priv->hid->string[1], sizeof(priv->hid->string[1]));
+			// Using HidD_GetIndexedString() instead of HidD_GetProductString(), as the latter would otherwise return the name
+			// of the interface instead of the iProduct string whenever the iInterface member of the USB_INTERFACE_DESCRIPTOR
+			// structure for the interface is nonzero (see Remarks section in the documentation of the HID API routines)
+			HidD_GetIndexedString(hid_handle, priv->hid->string_index[1], priv->hid->string[1], sizeof(priv->hid->string[1]));
 		else
 			priv->hid->string[1][0] = 0;
 
