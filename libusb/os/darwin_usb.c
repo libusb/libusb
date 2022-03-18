@@ -1430,6 +1430,10 @@ static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle,
         return rc;
       }
 
+      if (iface >= config->bNumInterfaces) {
+        usbi_err (HANDLE_CTX (dev_handle), "interface %d out of range for device", iface);
+        return LIBUSB_ERROR_NOT_FOUND;
+      }
       endpoint_desc = config->interface[iface].altsetting[alt_setting].endpoint + i - 1;
 
       cInterface->endpoint_addrs[i - 1] = endpoint_desc->bEndpointAddress;
