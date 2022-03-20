@@ -2117,7 +2117,7 @@ static enum libusb_transfer_status winusb_copy_transfer_data(struct usbi_transfe
 		return LIBUSB_TRANSFER_ERROR;
 	}
 
-	return priv->apib->copy_transfer_data(SUB_API_NOTSET, itransfer, length);
+	return priv->apib->copy_transfer_data(priv->sub_api, itransfer, length);
 }
 
 // NB: MSVC6 does not support named initializers.
