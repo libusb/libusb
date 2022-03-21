@@ -3222,12 +3222,12 @@ static enum libusb_transfer_status winusbx_copy_transfer_data(int sub_api, struc
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct winusb_transfer_priv *transfer_priv = get_winusb_transfer_priv(itransfer);
-	struct winusb_device_priv *priv = usbi_get_device_priv(transfer->dev_handle->dev);
 	int i;
 
-	CHECK_WINUSBX_AVAILABLE(sub_api);
-
 	if (transfer->type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS) {
+		struct winusb_device_priv *priv = usbi_get_device_priv(transfer->dev_handle->dev);
+		CHECK_WINUSBX_AVAILABLE(sub_api);
+
 		// for isochronous, need to copy the individual iso packet actual_lengths and statuses
 		if ((sub_api == SUB_API_LIBUSBK) || (sub_api == SUB_API_LIBUSB0)) {
 			// iso only supported on libusbk-based backends for now
