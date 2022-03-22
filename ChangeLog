@@ -1,6 +1,17 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
+2022-03-26: v1.0.26-rc1
+* Fix regression with transfer free's after closing device
+* Fix regression with destroyed context if API is misused
+* Workaround for applications using missing default context
+* Fix hotplog enumeration regression
+* Fix Windows isochronous transfer regression since 1.0.24
+* Build fixes for various platforms and configurations
+* Fix Windows HID multi-interface product string retrieval
+* Add interface bound checking for broken devices
+* Add umockdev tests on Linux
+
 2022-01-31: v1.0.25
 * Linux: Fix regression with some particular devices
 * Linux: Fix regression with libusb_handle_events_timeout_completed()
