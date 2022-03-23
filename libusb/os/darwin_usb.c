@@ -2446,7 +2446,7 @@ static int darwin_free_streams (struct libusb_device_handle *dev_handle, unsigne
 
 /* macOS APIs for getting entitlement values */
 
-#if TARGET_OS_OSX
+#if !defined(TARGET_OS_OSX) || TARGET_OS_OSX == 1
 #include <Security/Security.h>
 #else
 typedef struct __SecTask *SecTaskRef;
