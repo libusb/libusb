@@ -3234,7 +3234,11 @@ static enum libusb_transfer_status winusbx_copy_transfer_data(int sub_api, struc
 
 	if (transfer->type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS) {
 		struct winusb_device_priv *priv = usbi_get_device_priv(transfer->dev_handle->dev);
-		CHECK_WINUSBX_AVAILABLE(sub_api);
+
+		if (sub_api == SUB_API_NOTSET)
+			sub_api = priv->sub_api;
+		if (WinUSBX[sub_api].hDll == NULL)
+			return LIBUSB_TRANSFER_ERROR;
 
 		// for isochronous, need to copy the individual iso packet actual_lengths and statuses
 		if ((sub_api == SUB_API_LIBUSBK) || (sub_api == SUB_API_LIBUSB0)) {
