@@ -1438,7 +1438,7 @@ static void op_close(struct libusb_device_handle *dev_handle)
 
 	/* fd may have already been removed by POLLERR condition in op_handle_events() */
 	if (!hpriv->fd_removed)
-		usbi_remove_event_source(HANDLE_CTX(dev_handle), hpriv->fd);
+		usbi_remove_event_source(DEVICE_CTX(dev_handle->dev), hpriv->fd);
 	if (!hpriv->fd_keep)
 		close(hpriv->fd);
 }
@@ -2741,7 +2741,7 @@ static int op_handle_events(struct libusb_context *ctx,
 			/* remove the fd from the pollfd set so that it doesn't continuously
 			 * trigger an event, and flag that it has been removed so op_close()
 			 * doesn't try to remove it a second time */
-			usbi_remove_event_source(HANDLE_CTX(handle), hpriv->fd);
+			usbi_remove_event_source(DEVICE_CTX(handle->dev), hpriv->fd);
 			hpriv->fd_removed = 1;
 
 			/* device will still be marked as attached if hotplug monitor thread
