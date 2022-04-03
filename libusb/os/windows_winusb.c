@@ -3241,7 +3241,13 @@ static enum libusb_transfer_status winusbx_copy_transfer_data(int sub_api, struc
 			// iso only supported on libusbk-based backends for now
 			PKISO_CONTEXT iso_context = transfer_priv->iso_context;
 			for (i = 0; i < transfer->num_iso_packets; i++) {
-				transfer->iso_packet_desc[i].actual_length = iso_context->IsoPackets[i].actual_length;
+				if (IS_XFERIN(transfer)) {
+					transfer->iso_packet_desc[i].actual_length = iso_context->IsoPackets[i].actual_length;
+				} else {
+					// On Windows the usbd Length field is not used for OUT transfers
+					// Copy the requested value back for consistency with other platforms
+					transfer->iso_packet_desc[i].actual_length = transfer->iso_packet_desc[i].length;
+				}
 				// TODO translate USDB_STATUS codes http://msdn.microsoft.com/en-us/library/ff539136(VS.85).aspx to libusb_transfer_status
 				//transfer->iso_packet_desc[i].status = transfer_priv->iso_context->IsoPackets[i].status;
 			}
