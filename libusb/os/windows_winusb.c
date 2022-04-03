@@ -2849,7 +2849,7 @@ static int winusbx_set_interface_altsetting(int sub_api, struct libusb_device_ha
 static void WINAPI winusbx_native_iso_transfer_continue_stream_callback(struct libusb_transfer *transfer)
 {
 	// If this callback is invoked, this means that we attempted to set ContinueStream
-	// to TRUE when calling Read/WriteIsochPipeAsap in winusbx_do_iso_transfer.
+	// to TRUE when calling Read/WriteIsochPipeAsap in winusbx_submit_iso_transfer().
 	// The role of this callback is to fallback to ContinueStream = FALSE if the transfer
 	// did not succeed.
 
