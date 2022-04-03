@@ -3262,6 +3262,9 @@ static enum libusb_transfer_status winusbx_copy_transfer_data(int sub_api, struc
 			} else {
 				for (i = 0; i < transfer->num_iso_packets; i++) {
 					transfer->iso_packet_desc[i].status = LIBUSB_TRANSFER_COMPLETED;
+					// On Windows the usbd Length field is not used for OUT transfers
+					// Just copy the requested value back for consistency with other platforms
+					transfer->iso_packet_desc[i].actual_length = transfer->iso_packet_desc[i].length;
 				}
 			}
 		} else {
