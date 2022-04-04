@@ -3252,8 +3252,7 @@ static enum libusb_transfer_status winusbx_copy_transfer_data(int sub_api, struc
 					// Copy the requested value back for consistency with other platforms.
 					transfer->iso_packet_desc[i].actual_length = transfer->iso_packet_desc[i].length;
 				}
-				// TODO translate USDB_STATUS codes http://msdn.microsoft.com/en-us/library/ff539136(VS.85).aspx to libusb_transfer_status
-				//transfer->iso_packet_desc[i].status = transfer_priv->iso_context->IsoPackets[i].status;
+				transfer->iso_packet_desc[i].status = usbd_status_to_libusb_transfer_status(iso_context->IsoPackets[i].status);
 			}
 		} else if (sub_api == SUB_API_WINUSB) {
 			if (IS_XFERIN(transfer)) {
