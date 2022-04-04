@@ -3260,7 +3260,14 @@ static enum libusb_transfer_status winusbx_copy_transfer_data(int sub_api, struc
 				 * Both representation are guaranteed to have the same length in bytes.*/
 				PUSBD_ISO_PACKET_DESCRIPTOR usbd_iso_packet_desc = (PUSBD_ISO_PACKET_DESCRIPTOR)transfer->iso_packet_desc;
 				for (i = 0; i < transfer->num_iso_packets; i++) {
-					unsigned int packet_length = (i < transfer->num_iso_packets - 1) ? (usbd_iso_packet_desc[i + 1].Offset - usbd_iso_packet_desc[i].Offset) : usbd_iso_packet_desc[i].Length;
+					unsigned int packet_length;
+					if (i < transfer->num_iso_packets - 1 && usbd_iso_packet_desc[i + 1].Offset != 0)
+						packet_length = (usbd_iso_packet_desc[i + 1].Offset - usbd_iso_packet_desc[i].Offset);
+					else
+						packet_length = usbd_iso_packet_desc[i].Length;
+					if (i < transfer->num_iso_packets - 1 && usbd_iso_packet_desc[i + 1].Offset == 0)
+						usbi_err(TRANSFER_CTX(transfer), "packet %d has Offset 0, packet %d length set to %d",
+							 i + 1, i, packet_length);
 					unsigned int actual_length = usbd_iso_packet_desc[i].Length;
 					USBD_STATUS status = usbd_iso_packet_desc[i].Status;
 
