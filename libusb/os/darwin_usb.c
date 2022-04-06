@@ -2278,15 +2278,17 @@ static int darwin_abort_transfers (struct usbi_transfer *itransfer) {
   /* abort transactions */
 #if InterfaceVersion >= 550
   if (LIBUSB_TRANSFER_TYPE_BULK_STREAM == transfer->type)
-    (*(cInterface->interface))->AbortStreamsPipe (cInterface->interface, pipeRef, itransfer->stream_id);
+    kresult = (*(cInterface->interface))->AbortStreamsPipe (cInterface->interface, pipeRef, itransfer->stream_id);
   else
 #endif
-    (*(cInterface->interface))->AbortPipe (cInterface->interface, pipeRef);
+    kresult = (*(cInterface->interface))->AbortPipe (cInterface->interface, pipeRef);
 
-  usbi_dbg (ctx, "calling clear pipe stall to clear the data toggle bit");
-
-  /* newer versions of darwin support clearing additional bits on the device's endpoint */
+#if InterfaceVersion <= 245
+  /* with older releases of IOUSBFamily the OS always clears the host side data toggle. for
+     consistency also clear the data toggle on the device. */
+  usbi_dbg (ctx, "calling ClearPipeStallBothEnds to clear the data toggle bit");
   kresult = (*(cInterface->interface))->ClearPipeStallBothEnds(cInterface->interface, pipeRef);
+#endif
 
   return darwin_to_libusb (kresult);
 }

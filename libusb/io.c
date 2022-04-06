@@ -3,8 +3,8 @@
  * I/O functions for libusb
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
- * Copyright © 2019 Nathan Hjelm <hjelmn@cs.umm.edu>
- * Copyright © 2019 Google LLC. All rights reserved.
+ * Copyright © 2019-2022 Nathan Hjelm <hjelmn@cs.unm.edu>
+ * Copyright © 2019-2022 Google LLC. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -311,7 +311,11 @@ if (r == 0 && actual_length == sizeof(data)) {
  * libusb_cancel_transfer() is asynchronous/non-blocking in itself. When the
  * cancellation actually completes, the transfer's callback function will
  * be invoked, and the callback function should check the transfer status to
- * determine that it was cancelled.
+ * determine that it was cancelled. On macOS and iOS it is not possible to
+ * cancel a single transfer. In this case cancelling one tranfer on an endpoint
+ * will cause all transfers on that endpoint to be cancelled. In some cases
+ * the call may cause the endpoint to stall. A call to \ref libusb_clear_halt
+ * may be needed.
  *
  * Freeing the transfer after it has been cancelled but before cancellation
  * has completed will result in undefined behaviour.
