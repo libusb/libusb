@@ -19,7 +19,7 @@ for:
       only:
         - image: Visual Studio 2013
     build:
-      project: msvc\libusb_2013.sln
+      project: msvc\libusb.sln
 
   -
     matrix:
@@ -27,7 +27,7 @@ for:
         - image: Visual Studio 2015
           configuration: Debug
     build:
-      project: msvc\libusb_2015.sln
+      project: msvc\libusb.sln
 
   -
     matrix:
@@ -39,7 +39,7 @@ for:
       - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\msys64\home\appveyor\libusb
       - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\cygwin\home\appveyor\libusb
     build_script:
-      - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb_2015.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+      - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
       - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" MinGW
       - cmd: C:\cygwin\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" cygwin
     after_build:
@@ -55,7 +55,7 @@ for:
       - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\msys64\home\appveyor\libusb
       - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\cygwin64\home\appveyor\libusb
     build_script:
-      - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb_2015.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+      - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
       - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" MinGW
       - cmd: C:\cygwin64\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" cygwin
     after_build:
@@ -66,14 +66,14 @@ for:
       only:
         - image: Visual Studio 2017
     build:
-      project: msvc\libusb_2017.sln
+      project: msvc\libusb.sln
 
   -
     matrix:
       only:
         - image: Visual Studio 2019
     build:
-      project: msvc\libusb_2019.sln
+      project: msvc\libusb.sln
 
 after_build:
   - cmd: ECHO This was built by %APPVEYOR_BUILD_WORKER_IMAGE% from %APPVEYOR_REPO_NAME% commit %APPVEYOR_REPO_COMMIT% > README-build.txt
