@@ -494,6 +494,7 @@ static void *darwin_event_thread_main (void *arg0) {
   io_iterator_t          libusb_rem_device_iterator;
   io_iterator_t          libusb_add_device_iterator;
 
+  /* ctx must only be used for logging during thread startup */
   usbi_dbg (ctx, "creating hotplug event source");
 
   runloop = CFRunLoopGetCurrent ();
@@ -515,7 +516,7 @@ static void *darwin_event_thread_main (void *arg0) {
   kresult = IOServiceAddMatchingNotification (libusb_notification_port, kIOTerminatedNotification,
                                               IOServiceMatching(darwin_device_class),
                                               darwin_devices_detached,
-                                              ctx, &libusb_rem_device_iterator);
+                                              NULL, &libusb_rem_device_iterator);
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "could not add hotplug event source: %s", darwin_error_str (kresult));
@@ -528,7 +529,7 @@ static void *darwin_event_thread_main (void *arg0) {
   kresult = IOServiceAddMatchingNotification(libusb_notification_port, kIOFirstMatchNotification,
                                               IOServiceMatching(darwin_device_class),
                                               darwin_devices_attached,
-                                              ctx, &libusb_add_device_iterator);
+                                              NULL, &libusb_add_device_iterator);
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "could not add hotplug event source: %s", darwin_error_str (kresult));
@@ -553,7 +554,7 @@ static void *darwin_event_thread_main (void *arg0) {
   /* run the runloop */
   CFRunLoopRun();
 
-  usbi_dbg (ctx, "darwin event thread exiting");
+  usbi_dbg (NULL, "darwin event thread exiting");
 
   /* signal the main thread that the hotplug runloop has finished. */
   pthread_mutex_lock (&libusb_darwin_at_mutex);
