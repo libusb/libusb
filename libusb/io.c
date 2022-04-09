@@ -1576,6 +1576,26 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
  * \ref libusb_transfer_status::LIBUSB_TRANSFER_CANCELLED
  * "LIBUSB_TRANSFER_CANCELLED."
  *
+ * This function behaves differently on Darwin-based systems (macOS and iOS):
+ *
+ * - Calling this function for one transfer will cause all transfers on the
+ *   same endpoint to be cancelled. Your callback function will be invoked with
+ *   a transfer status of
+ *   \ref libusb_transfer_status::LIBUSB_TRANSFER_CANCELLED
+ *   "LIBUSB_TRANSFER_CANCELLED" for each transfer that was cancelled.
+
+ * - Calling this function also sends a \c ClearFeature(ENDPOINT_HALT) request
+ *   for the transfer's endpoint. If the device does not handle this request
+ *   correctly, the data toggle bits for the endpoint can be left out of sync
+ *   between host and device, which can have unpredictable results when the
+ *   next data is sent on the endpoint, including data being silently lost.
+ *   A call to \ref libusb_clear_halt will not resolve this situation, since
+ *   that function uses the same request. Therefore, if your program runs on
+ *   Darwin and uses a device that does not correctly implement
+ *   \c ClearFeature(ENDPOINT_HALT) requests, it may only be safe to cancel
+ *   transfers when followed by a device reset using
+ *   \ref libusb_reset_device.
+ *
  * \param transfer the transfer to cancel
  * \returns 0 on success
  * \returns LIBUSB_ERROR_NOT_FOUND if the transfer is not in progress,
