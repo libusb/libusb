@@ -1,14 +1,16 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
-2022-03-26: v1.0.26-rc1
+2022-04-10: v1.0.26
 * Fix regression with transfer free's after closing device
 * Fix regression with destroyed context if API is misused
 * Workaround for applications using missing default context
 * Fix hotplog enumeration regression
 * Fix Windows isochronous transfer regression since 1.0.24
+* Fix macOS exit crash in some multi-context cases
 * Build fixes for various platforms and configurations
 * Fix Windows HID multi-interface product string retrieval
+* Update isochronous OUT packet actual lengths on Windows
 * Add interface bound checking for broken devices
 * Add umockdev tests on Linux
 
