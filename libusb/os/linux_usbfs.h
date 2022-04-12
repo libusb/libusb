@@ -164,12 +164,10 @@ int linux_udev_start_event_monitor(void);
 int linux_udev_stop_event_monitor(void);
 int linux_udev_scan_devices(struct libusb_context *ctx);
 void linux_udev_hotplug_poll(void);
-#elif !defined(__ANDROID__)
+#else
 int linux_netlink_start_event_monitor(void);
 int linux_netlink_stop_event_monitor(void);
 void linux_netlink_hotplug_poll(void);
-#elif defined(__ANDROID__)
-void android_jni_hotplug_poll();
 #endif
 
 static inline int linux_start_event_monitor(void)
@@ -198,8 +196,6 @@ static inline void linux_hotplug_poll(void)
 	linux_udev_hotplug_poll();
 #elif !defined(__ANDROID__)
 	linux_netlink_hotplug_poll();
-#elif defined(__ANDROID__)
-	android_jni_hotplug_poll();
 #endif
 }
 
