@@ -2432,6 +2432,9 @@ void API_EXPORTED libusb_exit(libusb_context *ctx)
 	list_del(&_ctx->list);
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
+	/* Exit hotplug before backend dependency */
+	usbi_hotplug_exit(_ctx);
+	
 	if (usbi_backend.exit)
 		usbi_backend.exit(_ctx);
 
@@ -2445,7 +2448,6 @@ void API_EXPORTED libusb_exit(libusb_context *ctx)
 	/* Don't bother with locking after this point because unless there is
 	 * an application bug, nobody will be accessing the context. */
 
-	usbi_hotplug_exit(_ctx);
 	usbi_io_exit(_ctx);
 
 	for_each_device(_ctx, dev) {
