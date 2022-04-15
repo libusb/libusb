@@ -533,7 +533,7 @@ static inline void usbi_localize_device_descriptor(struct libusb_device_descript
 	desc->bcdDevice = libusb_le16_to_cpu(desc->bcdDevice);
 }
 
-#ifdef HAVE_CLOCK_GETTIME
+#if defined(HAVE_CLOCK_GETTIME) && !defined(__APPLE__)
 static inline void usbi_get_monotonic_time(struct timespec *tp)
 {
 	ASSERT_EQ(clock_gettime(CLOCK_MONOTONIC, tp), 0);
