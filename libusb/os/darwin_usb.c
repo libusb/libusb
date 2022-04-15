@@ -32,10 +32,7 @@
 #include <fcntl.h>
 #include <sys/sysctl.h>
 
-#include <mach/clock.h>
-#include <mach/clock_types.h>
-#include <mach/mach_host.h>
-#include <mach/mach_port.h>
+#include <mach/mach_time.h>
 
 /* Suppress warnings about the use of the deprecated objc_registerThreadWithCollector
  * function. Its use is also conditionalized to only older deployment targets. */
@@ -62,11 +59,6 @@ static const mach_port_t darwin_default_master_port = 0;
    darwin_cached_devices_mutex must be acquired first. */
 static pthread_mutex_t libusb_darwin_at_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  libusb_darwin_at_cond = PTHREAD_COND_INITIALIZER;
-
-#if !defined(HAVE_CLOCK_GETTIME)
-static clock_serv_t clock_realtime;
-static clock_serv_t clock_monotonic;
-#endif
 
 #define LIBUSB_DARWIN_STARTUP_FAILURE ((CFRunLoopRef) -1)
 
@@ -608,16 +600,6 @@ static int darwin_first_time_init(void) {
     return LIBUSB_ERROR_OTHER;
   }
 
-#if !defined(HAVE_CLOCK_GETTIME)
-  /* create the clocks that will be used if clock_gettime() is not available */
-  host_name_port_t host_self;
-
-  host_self = mach_host_self();
-  host_get_clock_service(host_self, CALENDAR_CLOCK, &clock_realtime);
-  host_get_clock_service(host_self, SYSTEM_CLOCK, &clock_monotonic);
-  mach_port_deallocate(mach_task_self(), host_self);
-#endif
-
   int rc = pthread_create (&libusb_darwin_at, NULL, darwin_event_thread_main, NULL);
   if (0 != rc) {
     usbi_err (NULL, "could not create event thread, error %d", rc);
@@ -680,11 +662,6 @@ static void darwin_exit (struct libusb_context *ctx) {
     pthread_join (libusb_darwin_at, NULL);
 
     darwin_cleanup_devices ();
-
-#if !defined(HAVE_CLOCK_GETTIME)
-    mach_port_deallocate(mach_task_self(), clock_realtime);
-    mach_port_deallocate(mach_task_self(), clock_monotonic);
-#endif
   }
   usbi_mutex_unlock(&darwin_cached_devices_mutex);
 }
@@ -2402,27 +2379,36 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
   return usbi_handle_transfer_completion (itransfer, darwin_transfer_status (itransfer, tpriv->result));
 }
 
-#if !defined(HAVE_CLOCK_GETTIME)
 void usbi_get_monotonic_time(struct timespec *tp) {
-  mach_timespec_t sys_time;
+/* Check if the SDK is new enough to declare clock_gettime(), and the deployment target is at least 10.12. */
+#if ((MAC_OS_X_VERSION_MAX_ALLOWED >= 101200) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 101200))
+  clock_gettime(CLOCK_MONOTONIC, tp);
+#else
+  mach_timebase_info_data_t machTimeBaseInfo;
+  mach_timebase_info(&machTimeBaseInfo);
 
-  /* use system boot time as reference for the monotonic clock */
-  clock_get_time (clock_monotonic, &sys_time);
+  uint64_t uptime = mach_absolute_time();
+  uint64_t uptimeNano = uptime * machTimeBaseInfo.numer / machTimeBaseInfo.denom;
 
-  tp->tv_sec  = sys_time.tv_sec;
-  tp->tv_nsec = sys_time.tv_nsec;
+  uint64_t uptimeSeconds = uptimeNano / NSEC_PER_SEC;
+  uint64_t uptimeNanoRemainder = uptimeNano - (uptimeSeconds * NSEC_PER_SEC);
+
+  tp->tv_sec = uptimeSeconds;
+  tp->tv_nsec = uptimeNanoRemainder;
+#endif
 }
 
 void usbi_get_real_time(struct timespec *tp) {
-  mach_timespec_t sys_time;
-
-  /* CLOCK_REALTIME represents time since the epoch */
-  clock_get_time (clock_realtime, &sys_time);
-
-  tp->tv_sec  = sys_time.tv_sec;
-  tp->tv_nsec = sys_time.tv_nsec;
-}
+/* Check if the SDK is new enough to declare clock_gettime(), and the deployment target is at least 10.12. */
+#if ((MAC_OS_X_VERSION_MAX_ALLOWED >= 101200) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 101200))
+  clock_gettime(CLOCK_REALTIME, tp);
+#else
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  tp->tv_sec = tv.tv_sec;
+  tp->tv_nsec = tv.tv_usec * NSEC_PER_USEC;
 #endif
+}
 
 #if InterfaceVersion >= 550
 static int darwin_alloc_streams (struct libusb_device_handle *dev_handle, uint32_t num_streams, unsigned char *endpoints,

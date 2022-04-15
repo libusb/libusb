@@ -211,29 +211,9 @@ esac
 dnl headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
 
-if test "x$platform" = xposix; then
-	dnl check availability of clock_gettime()
-	if test "x$backend" = xdarwin; then
-		dnl need to verify that OS X target is 10.12 or later for clock_gettime()
-		AC_MSG_CHECKING([whether OS X target version is 10.12 or later])
-		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
-				#include <AvailabilityMacros.h>
-				#if MAC_OS_X_VERSION_MIN_REQUIRED < 101200
-				# error "Target OS X version is too old"
-				#endif
-			], [])],
-			[AC_MSG_RESULT([yes])
-			 osx_10_12_or_later=yes],
-			[AC_MSG_RESULT([no])
-			 osx_10_12_or_later=])
-		if test "x$osx_10_12_or_later" = xyes; then
-			AC_CHECK_FUNCS([clock_gettime], [have_clock_gettime=yes], [have_clock_gettime=])
-		else
-			AC_MSG_NOTICE([clock_gettime() is not available on target OS X version])
-		fi
-	else
-		AC_CHECK_FUNCS([clock_gettime], [have_clock_gettime=yes], [AC_MSG_ERROR([clock_gettime() is required on this platform])])
-	fi
+dnl check availability of clock_gettime(), except don't bother on Darwin, because the result is not used.
+if test "x$platform" = xposix && test "x$backend" != xdarwin; then
+	AC_CHECK_FUNCS([clock_gettime], [have_clock_gettime=yes], [AC_MSG_ERROR([clock_gettime() is required on this platform])])
 
 	if test "x$have_clock_gettime" = xyes; then
 		dnl the clock_gettime() function needs certain clock IDs defined
