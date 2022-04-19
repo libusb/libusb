@@ -305,6 +305,7 @@ enum libusb_descriptor_type {
 #define LIBUSB_BT_USB_2_0_EXTENSION_SIZE	7
 #define LIBUSB_BT_SS_USB_DEVICE_CAPABILITY_SIZE	10
 #define LIBUSB_BT_CONTAINER_ID_SIZE		20
+#define LIBUSB_BT_PLATFORM_DESCRIPTOR_MIN_SIZE		20
 
 /* We unwrap the BOS => define its max size */
 #define LIBUSB_DT_BOS_MAX_SIZE				\
@@ -523,7 +524,10 @@ enum libusb_bos_type {
 	LIBUSB_BT_SS_USB_DEVICE_CAPABILITY = 0x03,
 
 	/** Container ID type */
-	LIBUSB_BT_CONTAINER_ID = 0x04
+	LIBUSB_BT_CONTAINER_ID = 0x04,
+
+	/** Platform descriptor */
+	LIBUSB_BT_PLATFORM_DESCRIPTOR = 0x05,
 };
 
 /** \ingroup libusb_desc
@@ -906,6 +910,34 @@ struct libusb_container_id_descriptor {
 
 	/** 128 bit UUID */
 	uint8_t  ContainerID[16];
+};
+
+/** \ingroup libusb_desc
+ * A structure representing a Platform descriptor.
+ * This descriptor is documented in section 9.6.2.4 of the USB 3.2 specification.
+ */
+struct libusb_platform_descriptor {
+	/** Size of this descriptor (in bytes) */
+	uint8_t  bLength;
+
+	/** Descriptor type. Will have value
+	 * \ref libusb_descriptor_type::LIBUSB_DT_DEVICE_CAPABILITY
+	 * LIBUSB_DT_DEVICE_CAPABILITY in this context. */
+	uint8_t  bDescriptorType;
+
+	/** Capability type. Will have value
+	 * \ref libusb_capability_type::LIBUSB_BT_PLATFORM_DESCRIPTOR
+	 * LIBUSB_BT_CONTAINER_ID in this context. */
+	uint8_t  bDevCapabilityType;
+
+	/** Reserved field */
+	uint8_t  bReserved;
+
+	/** 128 bit UUID */
+	uint8_t  PlatformCapabilityUUID[16];
+
+	/** Capability data (bLength - 20) */
+	uint8_t  CapabilityData[ZERO_SIZED_ARRAY];
 };
 
 /** \ingroup libusb_asyncio
@@ -1415,6 +1447,11 @@ int LIBUSB_CALL libusb_get_container_id_descriptor(libusb_context *ctx,
 	struct libusb_container_id_descriptor **container_id);
 void LIBUSB_CALL libusb_free_container_id_descriptor(
 	struct libusb_container_id_descriptor *container_id);
+int LIBUSB_CALL libusb_get_platform_descriptor(libusb_context *ctx,
+	struct libusb_bos_dev_capability_descriptor *dev_cap,
+	struct libusb_platform_descriptor **platform_descriptor);
+void LIBUSB_CALL libusb_free_platform_descriptor(
+	struct libusb_platform_descriptor *platform_descriptor);
 uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_port_number(libusb_device *dev);
 int LIBUSB_CALL libusb_get_port_numbers(libusb_device *dev, uint8_t *port_numbers, int port_numbers_len);
