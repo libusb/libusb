@@ -789,6 +789,20 @@ static void print_device_cap(struct libusb_bos_dev_capability_descriptor *dev_ca
 		}
 		break;
 	}
+	case LIBUSB_BT_PLATFORM_DESCRIPTOR: {
+		struct libusb_platform_descriptor *platform_descriptor = NULL;
+		libusb_get_platform_descriptor(NULL, dev_cap, &platform_descriptor);
+		if (platform_descriptor) {
+			printf("    Platform descriptor:\n");
+			printf("      bLength                : %d\n", platform_descriptor->bLength);
+			printf("      PlatformCapabilityUUID : %s\n", uuid_to_string(platform_descriptor->PlatformCapabilityUUID));
+			display_buffer_hex(&platform_descriptor->CapabilityData[0], platform_descriptor->bLength - 20);
+			printf("\n");
+			libusb_free_platform_descriptor(platform_descriptor);
+		}
+		break;
+
+	}
 	default:
 		printf("    Unknown BOS device capability %02x:\n", dev_cap->bDevCapabilityType);
 	}

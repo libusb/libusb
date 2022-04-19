@@ -1071,6 +1071,68 @@ void API_EXPORTED libusb_free_container_id_descriptor(
 }
 
 /** \ingroup libusb_desc
+ * Get a platform descriptor
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
+ * \ref libusb_capability_type::LIBUSB_BT_PLATFORM_DESCRIPTOR
+ * LIBUSB_BT_PLATFORM_DESCRIPTOR
+ * \param platform_descriptor output location for the Platform descriptor.
+ * Only valid if 0 was returned. Must be freed with
+ * libusb_free_platform_descriptor() after use.
+ * \returns 0 on success
+ * \returns a LIBUSB_ERROR code on error
+ */
+int API_EXPORTED libusb_get_platform_descriptor(libusb_context *ctx,
+	struct libusb_bos_dev_capability_descriptor *dev_cap,
+	struct libusb_platform_descriptor **platform_descriptor)
+{
+	struct libusb_platform_descriptor *_platform_descriptor;
+
+	if (dev_cap->bDevCapabilityType != LIBUSB_BT_PLATFORM_DESCRIPTOR) {
+		usbi_err(ctx, "unexpected bDevCapabilityType 0x%x (expected 0x%x)",
+			 dev_cap->bDevCapabilityType,
+			 LIBUSB_BT_PLATFORM_DESCRIPTOR);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	} else if (dev_cap->bLength < LIBUSB_BT_PLATFORM_DESCRIPTOR_MIN_SIZE) {
+		usbi_err(ctx, "short dev-cap descriptor read %u/%d",
+			 dev_cap->bLength, LIBUSB_BT_PLATFORM_DESCRIPTOR_MIN_SIZE);
+		return LIBUSB_ERROR_IO;
+	}
+
+	_platform_descriptor = malloc(dev_cap->bLength);
+	if (!_platform_descriptor)
+		return LIBUSB_ERROR_NO_MEM;
+
+	parse_descriptor(dev_cap, "bbbbu", _platform_descriptor);
+
+	/* Capability data is located after reserved byte and 128-bit UUID */
+	uint8_t* capability_data = dev_cap->dev_capability_data + 1 + 16;
+
+	/* Capability data length is total descriptor length minus initial fields */
+	size_t capability_data_length = _platform_descriptor->bLength - (16 + 4);
+
+	memcpy(_platform_descriptor->CapabilityData, capability_data, capability_data_length);
+
+	*platform_descriptor = _platform_descriptor;
+	return LIBUSB_SUCCESS;
+}
+
+/** \ingroup libusb_desc
+ * Free a platform descriptor obtained from
+ * libusb_get_platform_descriptor().
+ * It is safe to call this function with a NULL platform_descriptor parameter,
+ * in which case the function simply returns.
+ *
+ * \param platform_descriptor the Platform descriptor to free
+ */
+void API_EXPORTED libusb_free_platform_descriptor(
+	struct libusb_platform_descriptor *platform_descriptor)
+{
+	free(platform_descriptor);
+}
+
+/** \ingroup libusb_desc
  * Retrieve a string descriptor in C style ASCII.
  *
  * Wrapper around libusb_get_string_descriptor(). Uses the first language
