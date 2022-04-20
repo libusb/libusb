@@ -40,6 +40,8 @@ EXPORTS
   libusb_free_container_id_descriptor@4 = libusb_free_container_id_descriptor
   libusb_free_device_list
   libusb_free_device_list@8 = libusb_free_device_list
+  libusb_free_platform_descriptor
+  libusb_free_platform_descriptor@4 = libusb_free_platform_descriptor
   libusb_free_pollfds
   libusb_free_pollfds@4 = libusb_free_pollfds
   libusb_free_ss_endpoint_companion_descriptor
@@ -84,6 +86,8 @@ EXPORTS
   libusb_get_next_timeout@8 = libusb_get_next_timeout
   libusb_get_parent
   libusb_get_parent@4 = libusb_get_parent
+  libusb_get_platform_descriptor
+  libusb_get_platform_descriptor@12 = libusb_get_platform_descriptor
   libusb_get_pollfds
   libusb_get_pollfds@4 = libusb_get_pollfds
   libusb_get_port_number
