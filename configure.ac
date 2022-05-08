@@ -153,7 +153,21 @@ if test "x$platform" = xposix; then
 	AC_SEARCH_LIBS([pthread_create], [pthread],
 		[test "x$ac_cv_search_pthread_create" != "xnone required" && AC_SUBST(THREAD_LIBS, [-lpthread])],
 		[], [])
-	AC_SEARCH_LIBS([__atomic_fetch_add_4], [atomic])
+	dnl Check for new-style atomic builtins. We first check without linking to -latomic.
+	AC_MSG_CHECKING(whether __atomic_load_n is supported)
+	AC_LINK_IFELSE([AC_LANG_SOURCE([[
+	#include <stdint.h>
+	int main() {
+		struct {
+			uint64_t *v;
+		} x;
+		return (int)__atomic_load_n(x.v, __ATOMIC_ACQUIRE) &
+		       (int)__atomic_add_fetch(x.v, (uint64_t)1, __ATOMIC_ACQ_REL);
+	}]])], GCC_ATOMIC_BUILTINS_SUPPORTED=yes, GCC_ATOMIC_BUILTINS_SUPPORTED=no)
+	AC_MSG_RESULT($GCC_ATOMIC_BUILTINS_SUPPORTED)
+	if test "x$GCC_ATOMIC_BUILTINS_SUPPORTED" != xyes; then
+		AC_SEARCH_LIBS([__atomic_fetch_add_4], [atomic])
+	fi
 elif test "x$platform" = xwindows; then
 	AC_DEFINE([PLATFORM_WINDOWS], [1], [Define to 1 if compiling for a Windows platform.])
 else
