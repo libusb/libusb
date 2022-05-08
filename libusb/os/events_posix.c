@@ -29,11 +29,11 @@
 #include <sys/timerfd.h>
 #endif
 #ifdef __EMSCRIPTEN__
-// On Emscripten pipe does not conform to the spec and does not block until events are available,
-// which makes it unusable for event system and often results in deadlocks when `pipe` is in a loop
-// like it is in libusb.
-//
-// To work around that, I'm introducing a custom event system based on browser event emitters.
+/* On Emscripten pipe does not conform to the spec and does not block until events are available,
+ * which makes it unusable for event system and often results in deadlocks when `pipe` is in a loop
+ * like it is in libusb.
+ *
+ * To work around that, I'm introducing a custom event system based on browser event emitters. */
 #include <emscripten.h>
 
 EM_JS(void, em_libusb_notify, (void), {
@@ -255,13 +255,12 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 
 	usbi_dbg(ctx, "poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
 #ifdef __EMSCRIPTEN__
-	// TODO: improve event system to watch only for fd events we're interested in
-	// (although a scenario where we have multiple watchers in parallel is very rare
-	// in real world anyway).
+	/* TODO: improve event system to watch only for fd events we're interested in
+	 * (although a scenario where we have multiple watchers in parallel is very rare
+	 * in real world anyway). */
 	double until_time = emscripten_get_now() + timeout_ms;
 	for (;;) {
-		// Emscripten `poll` ignores timeout param, but pass 0 explicitly just
-		// in case.
+		/* Emscripten `poll` ignores timeout param, but pass 0 explicitly just in case. */
 		num_ready = poll(fds, nfds, 0);
 		if (num_ready != 0) break;
 		int timeout = until_time - emscripten_get_now();
