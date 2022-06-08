@@ -1479,11 +1479,11 @@ static int remove_from_flying_list(struct usbi_transfer *itransfer)
  *
  * \param transfer the transfer to submit
  * \returns 0 on success
- * \returns LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
- * \returns LIBUSB_ERROR_BUSY if the transfer has already been submitted.
- * \returns LIBUSB_ERROR_NOT_SUPPORTED if the transfer flags are not supported
+ * \returns \ref LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ * \returns \ref LIBUSB_ERROR_BUSY if the transfer has already been submitted.
+ * \returns \ref LIBUSB_ERROR_NOT_SUPPORTED if the transfer flags are not supported
  * by the operating system.
- * \returns LIBUSB_ERROR_INVALID_PARAM if the transfer size is larger than
+ * \returns \ref LIBUSB_ERROR_INVALID_PARAM if the transfer size is larger than
  * the operating system and/or hardware can support (see \ref asynclimits)
  * \returns another LIBUSB_ERROR code on other failure
  */
@@ -1598,7 +1598,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
  *
  * \param transfer the transfer to cancel
  * \returns 0 on success
- * \returns LIBUSB_ERROR_NOT_FOUND if the transfer is not in progress,
+ * \returns \ref LIBUSB_ERROR_NOT_FOUND if the transfer is not in progress,
  * already complete, or already cancelled.
  * \returns a LIBUSB_ERROR code on failure
  */
@@ -2013,7 +2013,7 @@ void API_EXPORTED libusb_unlock_event_waiters(libusb_context *ctx)
  * indicates unlimited timeout.
  * \returns 0 after a transfer completes or another thread stops event handling
  * \returns 1 if the timeout expired
- * \returns LIBUSB_ERROR_INVALID_PARAM if timeval is invalid
+ * \returns \ref LIBUSB_ERROR_INVALID_PARAM if timeval is invalid
  * \ref libusb_mtasync
  */
 int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
@@ -2332,7 +2332,7 @@ static int get_next_timeout(libusb_context *ctx, struct timeval *tv,
  * timeval struct for non-blocking mode
  * \param completed pointer to completion integer to check, or NULL
  * \returns 0 on success
- * \returns LIBUSB_ERROR_INVALID_PARAM if timeval is invalid
+ * \returns \ref LIBUSB_ERROR_INVALID_PARAM if timeval is invalid
  * \returns another LIBUSB_ERROR code on other failure
  * \ref libusb_mtasync
  */
@@ -2474,7 +2474,7 @@ int API_EXPORTED libusb_handle_events_completed(libusb_context *ctx,
  * \param tv the maximum time to block waiting for events, or zero for
  * non-blocking mode
  * \returns 0 on success
- * \returns LIBUSB_ERROR_INVALID_PARAM if timeval is invalid
+ * \returns \ref LIBUSB_ERROR_INVALID_PARAM if timeval is invalid
  * \returns another LIBUSB_ERROR code on other failure
  * \ref libusb_mtasync
  */
@@ -2558,7 +2558,7 @@ int API_EXPORTED libusb_pollfds_handle_timeouts(libusb_context *ctx)
  * \param tv output location for a relative time against the current
  * clock in which libusb must be called into in order to process timeout events
  * \returns 0 if there are no pending timeouts, 1 if a timeout was returned,
- * or LIBUSB_ERROR_OTHER on failure
+ * or \ref LIBUSB_ERROR_OTHER on failure
  */
 int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	struct timeval *tv)

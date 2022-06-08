@@ -169,9 +169,9 @@ static const char * const (*usbi_error_strings)[LIBUSB_ERROR_COUNT] = &usbi_loca
  *
  * \param locale locale-string in the form of lang[_country_region][.codeset]
  * or lang[-region], where lang is a 2 letter ISO 639-1 code
- * \returns LIBUSB_SUCCESS on success
- * \returns LIBUSB_ERROR_INVALID_PARAM if the locale doesn't meet the requirements
- * \returns LIBUSB_ERROR_NOT_FOUND if the requested language is not supported
+ * \returns \ref LIBUSB_SUCCESS on success
+ * \returns \ref LIBUSB_ERROR_INVALID_PARAM if the locale doesn't meet the requirements
+ * \returns \ref LIBUSB_ERROR_NOT_FOUND if the requested language is not supported
  * \returns a LIBUSB_ERROR code on other errors
  */
 
