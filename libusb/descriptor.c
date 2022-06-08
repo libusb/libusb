@@ -548,7 +548,7 @@ int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
  * valid if 0 was returned. Must be freed with libusb_free_config_descriptor()
  * after use.
  * \returns 0 on success
- * \returns LIBUSB_ERROR_NOT_FOUND if the device is in unconfigured state
+ * \returns \ref LIBUSB_ERROR_NOT_FOUND if the device is in unconfigured state
  * \returns another LIBUSB_ERROR code on error
  * \see libusb_get_config_descriptor
  */
@@ -588,7 +588,7 @@ int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
  * valid if 0 was returned. Must be freed with libusb_free_config_descriptor()
  * after use.
  * \returns 0 on success
- * \returns LIBUSB_ERROR_NOT_FOUND if the configuration does not exist
+ * \returns \ref LIBUSB_ERROR_NOT_FOUND if the configuration does not exist
  * \returns another LIBUSB_ERROR code on error
  * \see libusb_get_active_config_descriptor()
  * \see libusb_get_config_descriptor_by_value()
@@ -634,7 +634,7 @@ int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
  * valid if 0 was returned. Must be freed with libusb_free_config_descriptor()
  * after use.
  * \returns 0 on success
- * \returns LIBUSB_ERROR_NOT_FOUND if the configuration does not exist
+ * \returns \ref LIBUSB_ERROR_NOT_FOUND if the configuration does not exist
  * \returns another LIBUSB_ERROR code on error
  * \see libusb_get_active_config_descriptor()
  * \see libusb_get_config_descriptor()
@@ -699,7 +699,7 @@ void API_EXPORTED libusb_free_config_descriptor(
  * descriptor. Only valid if 0 was returned. Must be freed with
  * libusb_free_ss_endpoint_companion_descriptor() after use.
  * \returns 0 on success
- * \returns LIBUSB_ERROR_NOT_FOUND if the configuration does not exist
+ * \returns \ref LIBUSB_ERROR_NOT_FOUND if the configuration does not exist
  * \returns another LIBUSB_ERROR code on error
  */
 int API_EXPORTED libusb_get_ss_endpoint_companion_descriptor(
@@ -840,7 +840,7 @@ static int parse_bos(struct libusb_context *ctx,
  * \param bos output location for the BOS descriptor. Only valid if 0 was returned.
  * Must be freed with \ref libusb_free_bos_descriptor() after use.
  * \returns 0 on success
- * \returns LIBUSB_ERROR_NOT_FOUND if the device doesn't have a BOS descriptor
+ * \returns \ref LIBUSB_ERROR_NOT_FOUND if the device doesn't have a BOS descriptor
  * \returns another LIBUSB_ERROR code on error
  */
 int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *dev_handle,

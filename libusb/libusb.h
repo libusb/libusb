@@ -1187,7 +1187,8 @@ enum libusb_transfer_flags {
 	 *
 	 * This flag is currently only supported on Linux.
 	 * On other systems, libusb_submit_transfer() will return
-	 * LIBUSB_ERROR_NOT_SUPPORTED for every transfer where this flag is set.
+	 * \ref LIBUSB_ERROR_NOT_SUPPORTED for every transfer where this
+	 * flag is set.
 	 *
 	 * Available since libusb-1.0.9.
 	 */
@@ -2036,7 +2037,7 @@ typedef int (LIBUSB_CALL *libusb_hotplug_callback_fn)(libusb_context *ctx,
  * \param[in] cb_fn the function to be invoked on a matching event/device
  * \param[in] user_data user data to pass to the callback function
  * \param[out] callback_handle pointer to store the handle of the allocated callback (can be NULL)
- * \returns LIBUSB_SUCCESS on success LIBUSB_ERROR code on failure
+ * \returns \ref LIBUSB_SUCCESS on success LIBUSB_ERROR code on failure
  */
 int LIBUSB_CALL libusb_hotplug_register_callback(libusb_context *ctx,
 	int events, int flags,
