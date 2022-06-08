@@ -1209,10 +1209,11 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
  * handle for the underlying device. The handle allows you to use libusb to
  * perform I/O on the device in question.
  *
- * Call libusb_set_option(NULL, LIBUSB_OPTION_NO_DEVICE_DISCOVERY) before
- * libusb_init() if you want to skip enumeration of USB devices. In particular,
- * this might be needed on Android if you don't have authority to access USB
- * devices in general.
+ * Call libusb_set_option() with the parameters (NULL,
+ * \ref LIBUSB_OPTION_NO_DEVICE_DISCOVERY) before libusb_init() if you want
+ * to skip enumeration of USB devices. In particular, this might be
+ * needed on Android if you don't have authority to access USB devices
+ * in general.
  *
  * On Linux, the system device handle must be a valid file descriptor opened
  * on the device node.
