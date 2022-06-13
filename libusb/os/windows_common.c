@@ -848,6 +848,7 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
 		return usbi_handle_transfer_completion(itransfer, status);
 }
 
+#ifndef HAVE_CLOCK_GETTIME
 void usbi_get_monotonic_time(struct timespec *tp)
 {
 	static LONG hires_counter_init;
@@ -872,6 +873,7 @@ void usbi_get_monotonic_time(struct timespec *tp)
 	tp->tv_sec = (long)(hires_counter.QuadPart / hires_frequency);
 	tp->tv_nsec = (long)(((hires_counter.QuadPart % hires_frequency) * hires_ticks_to_ps) / UINT64_C(1000));
 }
+#endif
 
 // NB: MSVC6 does not support named initializers.
 const struct usbi_os_backend usbi_backend = {
