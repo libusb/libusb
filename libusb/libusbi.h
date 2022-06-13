@@ -73,11 +73,7 @@
 #endif
 
 /* The following is used to silence warnings for unused variables */
-#if defined(UNREFERENCED_PARAMETER)
-#define UNUSED(var)	UNREFERENCED_PARAMETER(var)
-#else
 #define UNUSED(var)	do { (void)(var); } while(0)
-#endif
 
 /* Macro to align a value up to the next multiple of the size of a pointer */
 #define PTR_ALIGN(v) \
