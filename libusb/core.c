@@ -2237,7 +2237,6 @@ int API_EXPORTED libusb_set_option(libusb_context *ctx,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 		break;
 
-	case LIBUSB_OPTION_MAX:
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
