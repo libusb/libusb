@@ -50,7 +50,9 @@ endif
 endif
 
 if OS_EMSCRIPTEN
-OS_SRC = $(OS_EMSCRIPTEN_SRC)
+noinst_LTLIBRARIES = libusb_emscripten.la
+libusb_emscripten_la_SOURCES = $(OS_EMSCRIPTEN_SRC)
+libusb_1_0_la_LIBADD = libusb_emscripten.la
 endif
 
 if OS_NETBSD
