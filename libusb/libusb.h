@@ -120,8 +120,10 @@ typedef SSIZE_T ssize_t;
  */
 #if defined(_WIN32) || defined(__CYGWIN__)
 #define LIBUSB_CALL WINAPI
+#define LIBUSB_CALLV WINAPIV
 #else
 #define LIBUSB_CALL
+#define LIBUSB_CALLV
 #endif /* _WIN32 || __CYGWIN__ */
 
 /** \def LIBUSB_API_VERSION
@@ -2132,7 +2134,7 @@ enum libusb_option {
 	LIBUSB_OPTION_MAX = 3
 };
 
-int LIBUSB_CALL libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);
+int LIBUSB_CALLV libusb_set_option(libusb_context *ctx, enum libusb_option option, ...);
 
 #ifdef _MSC_VER
 #pragma warning(pop)

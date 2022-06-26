@@ -2183,7 +2183,7 @@ void API_EXPORTED libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb,
  * on this platform
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if LIBUSB_OPTION_USE_USBDK is valid on this platform but UsbDk is not available
  */
-int API_EXPORTED libusb_set_option(libusb_context *ctx,
+int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	enum libusb_option option, ...)
 {
 	int arg = 0, r = LIBUSB_SUCCESS;
