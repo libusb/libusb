@@ -144,7 +144,7 @@ netbsd_get_device_list(struct libusb_context * ctx,
 		if (dev == NULL) {
 			dev = usbi_alloc_device(ctx, session_id);
 			if (dev == NULL)
-				return (LIBUSB_ERROR_NO_MEM);
+				return LIBUSB_ERROR_NO_MEM;
 
 			dev->bus_number = 1 + di.udi_bus;
 			dev->device_address = 1 + di.udi_addr;
@@ -175,12 +175,12 @@ netbsd_get_device_list(struct libusb_context * ctx,
 		close(fd);
 
 		if (discovered_devs_append(*discdevs, dev) == NULL)
-			return (LIBUSB_ERROR_NO_MEM);
+			return LIBUSB_ERROR_NO_MEM;
 
 		libusb_unref_device(dev);
 	}
 
-	return (LIBUSB_SUCCESS);
+	return LIBUSB_SUCCESS;
 
 error:
 	close(fd);
@@ -207,7 +207,7 @@ netbsd_open(struct libusb_device_handle *handle)
 
 	usbi_dbg(HANDLE_CTX(handle), "open %s: fd %d", dpriv->devnode, dpriv->fd);
 
-	return (LIBUSB_SUCCESS);
+	return LIBUSB_SUCCESS;
 }
 
 void
@@ -286,7 +286,7 @@ netbsd_get_configuration(struct libusb_device_handle *handle, uint8_t *config)
 	usbi_dbg(HANDLE_CTX(handle), "configuration %d", tmp);
 	*config = (uint8_t)tmp;
 
-	return (LIBUSB_SUCCESS);
+	return LIBUSB_SUCCESS;
 }
 
 int
@@ -313,7 +313,7 @@ netbsd_claim_interface(struct libusb_device_handle *handle, uint8_t iface)
 	for (i = 0; i < USB_MAX_ENDPOINTS; i++)
 		hpriv->endpoints[i] = -1;
 
-	return (LIBUSB_SUCCESS);
+	return LIBUSB_SUCCESS;
 }
 
 int
@@ -328,7 +328,7 @@ netbsd_release_interface(struct libusb_device_handle *handle, uint8_t iface)
 		if (hpriv->endpoints[i] >= 0)
 			close(hpriv->endpoints[i]);
 
-	return (LIBUSB_SUCCESS);
+	return LIBUSB_SUCCESS;
 }
 
 int
@@ -348,7 +348,7 @@ netbsd_set_interface_altsetting(struct libusb_device_handle *handle, uint8_t ifa
 	if (ioctl(dpriv->fd, USB_SET_ALTINTERFACE, &intf) < 0)
 		return _errno_to_libusb(errno);
 
-	return (LIBUSB_SUCCESS);
+	return LIBUSB_SUCCESS;
 }
 
 int
@@ -368,7 +368,7 @@ netbsd_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 	if (ioctl(dpriv->fd, USB_DO_REQUEST, &req) < 0)
 		return _errno_to_libusb(errno);
 
-	return (LIBUSB_SUCCESS);
+	return LIBUSB_SUCCESS;
 }
 
 void
@@ -418,11 +418,11 @@ netbsd_submit_transfer(struct usbi_transfer *itransfer)
 	}
 
 	if (err)
-		return (err);
+		return err;
 
 	usbi_signal_transfer_completion(itransfer);
 
-	return (LIBUSB_SUCCESS);
+	return LIBUSB_SUCCESS;
 }
 
 int
@@ -432,7 +432,7 @@ netbsd_cancel_transfer(struct usbi_transfer *itransfer)
 
 	usbi_dbg(ITRANSFER_CTX(itransfer), " ");
 
-	return (LIBUSB_ERROR_NOT_SUPPORTED);
+	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 int
@@ -446,21 +446,21 @@ _errno_to_libusb(int err)
 {
 	switch (err) {
 	case EIO:
-		return (LIBUSB_ERROR_IO);
+		return LIBUSB_ERROR_IO;
 	case EACCES:
-		return (LIBUSB_ERROR_ACCESS);
+		return LIBUSB_ERROR_ACCESS;
 	case ENOENT:
-		return (LIBUSB_ERROR_NO_DEVICE);
+		return LIBUSB_ERROR_NO_DEVICE;
 	case ENOMEM:
-		return (LIBUSB_ERROR_NO_MEM);
+		return LIBUSB_ERROR_NO_MEM;
 	case EWOULDBLOCK:
 	case ETIMEDOUT:
-		return (LIBUSB_ERROR_TIMEOUT);
+		return LIBUSB_ERROR_TIMEOUT;
 	}
 
 	usbi_dbg(NULL, "error: %s", strerror(err));
 
-	return (LIBUSB_ERROR_OTHER);
+	return LIBUSB_ERROR_OTHER;
 }
 
 int
@@ -484,7 +484,7 @@ _cache_active_config_descriptor(struct libusb_device *dev, int fd)
 	len = UGETW(ucd.ucd_desc.wTotalLength);
 	buf = malloc((size_t)len);
 	if (buf == NULL)
-		return (LIBUSB_ERROR_NO_MEM);
+		return LIBUSB_ERROR_NO_MEM;
 
 	ufd.ufd_config_index = ucd.ucd_config_index;
 	ufd.ufd_size = len;
@@ -501,7 +501,7 @@ _cache_active_config_descriptor(struct libusb_device *dev, int fd)
 		free(dpriv->cdesc);
 	dpriv->cdesc = buf;
 
-	return (0);
+	return 0;
 }
 
 int
@@ -543,7 +543,7 @@ _sync_control_transfer(struct usbi_transfer *itransfer)
 
 	usbi_dbg(ITRANSFER_CTX(itransfer), "transferred %d", itransfer->transferred);
 
-	return (0);
+	return 0;
 }
 
 int
@@ -572,12 +572,12 @@ _access_endpoint(struct libusb_transfer *transfer)
 		/* We may need to read/write to the same endpoint later. */
 		if (((fd = open(devnode, O_RDWR)) < 0) && (errno == ENXIO))
 			if ((fd = open(devnode, mode)) < 0)
-				return (-1);
+				return -1;
 
 		hpriv->endpoints[endpt] = fd;
 	}
 
-	return (hpriv->endpoints[endpt]);
+	return hpriv->endpoints[endpt];
 }
 
 int
@@ -613,5 +613,5 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 
 	itransfer->transferred = nr;
 
-	return (0);
+	return 0;
 }
