@@ -259,7 +259,7 @@ netbsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 	ufd.ufd_size = len;
 	ufd.ufd_data = buf;
 
-	if ((ioctl(fd, USB_GET_FULL_DESC, &ufd)) < 0) {
+	if (ioctl(fd, USB_GET_FULL_DESC, &ufd) < 0) {
 		err = errno;
 		if (dpriv->fd < 0)
 			close(fd);
@@ -476,7 +476,7 @@ _cache_active_config_descriptor(struct libusb_device *dev, int fd)
 
 	ucd.ucd_config_index = USB_CURRENT_CONFIG_INDEX;
 
-	if ((ioctl(fd, USB_GET_CONFIG_DESC, &ucd)) < 0)
+	if (ioctl(fd, USB_GET_CONFIG_DESC, &ucd) < 0)
 		return _errno_to_libusb(errno);
 
 	usbi_dbg(DEVICE_CTX(dev), "active bLength %d", ucd.ucd_desc.bLength);
@@ -492,7 +492,7 @@ _cache_active_config_descriptor(struct libusb_device *dev, int fd)
 
 	usbi_dbg(DEVICE_CTX(dev), "index %d, len %d", ufd.ufd_config_index, len);
 
-	if ((ioctl(fd, USB_GET_FULL_DESC, &ufd)) < 0) {
+	if (ioctl(fd, USB_GET_FULL_DESC, &ufd) < 0) {
 		free(buf);
 		return _errno_to_libusb(errno);
 	}
@@ -533,10 +533,10 @@ _sync_control_transfer(struct usbi_transfer *itransfer)
 	if ((transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) == 0)
 		req.ucr_flags = USBD_SHORT_XFER_OK;
 
-	if ((ioctl(dpriv->fd, USB_SET_TIMEOUT, &transfer->timeout)) < 0)
+	if (ioctl(dpriv->fd, USB_SET_TIMEOUT, &transfer->timeout) < 0)
 		return _errno_to_libusb(errno);
 
-	if ((ioctl(dpriv->fd, USB_DO_REQUEST, &req)) < 0)
+	if (ioctl(dpriv->fd, USB_DO_REQUEST, &req) < 0)
 		return _errno_to_libusb(errno);
 
 	itransfer->transferred = req.ucr_actlen;
@@ -595,12 +595,12 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 	if ((fd = _access_endpoint(transfer)) < 0)
 		return _errno_to_libusb(errno);
 
-	if ((ioctl(fd, USB_SET_TIMEOUT, &transfer->timeout)) < 0)
+	if (ioctl(fd, USB_SET_TIMEOUT, &transfer->timeout) < 0)
 		return _errno_to_libusb(errno);
 
 	if (IS_XFERIN(transfer)) {
 		if ((transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) == 0)
-			if ((ioctl(fd, USB_SET_SHORT_XFER, &nr)) < 0)
+			if (ioctl(fd, USB_SET_SHORT_XFER, &nr) < 0)
 				return _errno_to_libusb(errno);
 
 		nr = read(fd, transfer->buffer, transfer->length);

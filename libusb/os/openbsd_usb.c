@@ -594,17 +594,17 @@ _sync_control_transfer(struct usbi_transfer *itransfer)
 		if ((fd = _bus_open(transfer->dev_handle->dev->bus_number)) < 0)
 			return _errno_to_libusb(errno);
 
-		if ((ioctl(fd, USB_REQUEST, &req)) < 0) {
+		if (ioctl(fd, USB_REQUEST, &req) < 0) {
 			err = errno;
 			close(fd);
 			return _errno_to_libusb(err);
 		}
 		close(fd);
 	} else {
-		if ((ioctl(dpriv->fd, USB_SET_TIMEOUT, &transfer->timeout)) < 0)
+		if (ioctl(dpriv->fd, USB_SET_TIMEOUT, &transfer->timeout) < 0)
 			return _errno_to_libusb(errno);
 
-		if ((ioctl(dpriv->fd, USB_DO_REQUEST, &req)) < 0)
+		if (ioctl(dpriv->fd, USB_DO_REQUEST, &req) < 0)
 			return _errno_to_libusb(errno);
 	}
 
@@ -668,12 +668,12 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 	if ((fd = _access_endpoint(transfer)) < 0)
 		return _errno_to_libusb(errno);
 
-	if ((ioctl(fd, USB_SET_TIMEOUT, &transfer->timeout)) < 0)
+	if (ioctl(fd, USB_SET_TIMEOUT, &transfer->timeout) < 0)
 		return _errno_to_libusb(errno);
 
 	if (IS_XFERIN(transfer)) {
 		if ((transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) == 0)
-			if ((ioctl(fd, USB_SET_SHORT_XFER, &nr)) < 0)
+			if (ioctl(fd, USB_SET_SHORT_XFER, &nr) < 0)
 				return _errno_to_libusb(errno);
 
 		nr = read(fd, transfer->buffer, transfer->length);
