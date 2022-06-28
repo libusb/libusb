@@ -1,4 +1,3 @@
-LIBRARY "libusb-1.0.dll"
 EXPORTS
   libusb_alloc_streams
   libusb_alloc_streams@16 = libusb_alloc_streams
