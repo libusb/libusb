@@ -1079,6 +1079,33 @@ out:
 	return r;
 }
 
+static const struct libusb_endpoint_descriptor *find_alt_endpoint(
+	struct libusb_config_descriptor *config,
+	int iface_idx, int altsetting_idx, unsigned char endpoint)
+{
+	if (iface_idx >= config->bNumInterfaces) {
+		return NULL;
+	}
+
+	const struct libusb_interface *iface = &config->interface[iface_idx];
+
+	if (altsetting_idx >= iface->num_altsetting) {
+		return NULL;
+	}
+
+	const struct libusb_interface_descriptor *altsetting
+		= &iface->altsetting[altsetting_idx];
+	int ep_idx;
+
+	for (ep_idx = 0; ep_idx < altsetting->bNumEndpoints; ep_idx++) {
+		const struct libusb_endpoint_descriptor *ep =
+			&altsetting->endpoint[ep_idx];
+		if (ep->bEndpointAddress == endpoint)
+			return ep;
+	}
+	return NULL;
+}
+
 static int get_endpoint_max_iso_packet_size(libusb_device *dev,
 	const struct libusb_endpoint_descriptor *ep)
 {
