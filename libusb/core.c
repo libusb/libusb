@@ -1079,6 +1079,38 @@ out:
 	return r;
 }
 
+static int get_endpoint_max_iso_packet_size(libusb_device *dev,
+	const struct libusb_endpoint_descriptor *ep)
+{
+	struct libusb_ss_endpoint_companion_descriptor *ss_ep_cmp;
+	enum libusb_endpoint_transfer_type ep_type;
+	uint16_t val;
+	int r;
+	int speed;
+
+	speed = libusb_get_device_speed(dev);
+	if (speed >= LIBUSB_SPEED_SUPER) {
+		r = libusb_get_ss_endpoint_companion_descriptor(dev->ctx, ep, &ss_ep_cmp);
+		if (r == LIBUSB_SUCCESS) {
+			r = ss_ep_cmp->wBytesPerInterval;
+			libusb_free_ss_endpoint_companion_descriptor(ss_ep_cmp);
+		}
+	}
+
+	/* If the device isn't a SuperSpeed device or retrieving the SS endpoint didn't worked. */
+	if (speed < LIBUSB_SPEED_SUPER || r < 0) {
+		val = ep->wMaxPacketSize;
+		ep_type = (enum libusb_endpoint_transfer_type) (ep->bmAttributes & 0x3);
+
+		r = val & 0x07ff;
+		if (ep_type == LIBUSB_ENDPOINT_TRANSFER_TYPE_ISOCHRONOUS
+		    || ep_type == LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT)
+			r *= (1 + ((val >> 11) & 3));
+	}
+
+	return r;
+}
+
 /** \ingroup libusb_dev
  * Calculate the maximum packet size which a specific endpoint is capable is
  * sending or receiving in the duration of 1 microframe
@@ -1112,11 +1144,7 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 {
 	struct libusb_config_descriptor *config;
 	const struct libusb_endpoint_descriptor *ep;
-	struct libusb_ss_endpoint_companion_descriptor *ss_ep_cmp;
-	enum libusb_endpoint_transfer_type ep_type;
-	uint16_t val;
 	int r;
-	int speed;
 
 	r = libusb_get_active_config_descriptor(dev, &config);
 	if (r < 0) {
@@ -1131,25 +1159,7 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 		goto out;
 	}
 
-	speed = libusb_get_device_speed(dev);
-	if (speed >= LIBUSB_SPEED_SUPER) {
-		r = libusb_get_ss_endpoint_companion_descriptor(dev->ctx, ep, &ss_ep_cmp);
-		if (r == LIBUSB_SUCCESS) {
-			r = ss_ep_cmp->wBytesPerInterval;
-			libusb_free_ss_endpoint_companion_descriptor(ss_ep_cmp);
-		}
-	}
-
-	/* If the device isn't a SuperSpeed device or retrieving the SS endpoint didn't worked. */
-	if (speed < LIBUSB_SPEED_SUPER || r < 0) {
-		val = ep->wMaxPacketSize;
-		ep_type = (enum libusb_endpoint_transfer_type) (ep->bmAttributes & 0x3);
-
-		r = val & 0x07ff;
-		if (ep_type == LIBUSB_ENDPOINT_TRANSFER_TYPE_ISOCHRONOUS
-		    || ep_type == LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT)
-			r *= (1 + ((val >> 11) & 3));
-	}
+	r = get_endpoint_max_iso_packet_size(dev, ep);
 
 out:
 	libusb_free_config_descriptor(config);
