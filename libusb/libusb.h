@@ -1639,6 +1639,8 @@ int LIBUSB_CALL libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint);
 int LIBUSB_CALL libusb_get_max_iso_packet_size(libusb_device *dev,
 	unsigned char endpoint);
+int LIBUSB_CALL libusb_get_max_alt_packet_size(libusb_device *dev,
+	int interface_number, int alternate_setting, unsigned char endpoint);
 
 int LIBUSB_CALL libusb_get_interface_association_descriptors(libusb_device *dev,
 	uint8_t config_index, struct libusb_interface_association_descriptor_array **iad_array);

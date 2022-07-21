@@ -414,6 +414,7 @@ if (cfg != desired)
   * - libusb_get_device_speed()
   * - libusb_get_iso_packet_buffer()
   * - libusb_get_iso_packet_buffer_simple()
+  * - libusb_get_max_alt_packet_size()
   * - libusb_get_max_iso_packet_size()
   * - libusb_get_max_packet_size()
   * - libusb_get_next_timeout()
@@ -1160,6 +1161,10 @@ static int get_endpoint_max_packet_size(libusb_device *dev,
  * libusb_set_iso_packet_lengths() in order to set the length field of every
  * isochronous packet in a transfer.
  *
+ * This function only considers the first alternate setting of the interface.
+ * If the endpoint has different maximum packet sizes for different alternate
+ * settings, you probably want libusb_get_max_alt_packet_size() instead.
+ *
  * Since v1.0.3.
  *
  * \param dev a device
@@ -1167,6 +1172,7 @@ static int get_endpoint_max_packet_size(libusb_device *dev,
  * \returns the maximum packet size which can be sent/received on this endpoint
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
  * \returns \ref LIBUSB_ERROR_OTHER on other failure
+ * \see libusb_get_max_alt_packet_size
  */
 int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 	unsigned char endpoint)
@@ -1183,6 +1189,66 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 	}
 
 	ep = find_endpoint(config, endpoint);
+	if (!ep) {
+		r = LIBUSB_ERROR_NOT_FOUND;
+		goto out;
+	}
+
+	r = get_endpoint_max_packet_size(dev, ep);
+
+out:
+	libusb_free_config_descriptor(config);
+	return r;
+}
+
+/** \ingroup libusb_dev
+ * Calculate the maximum packet size which a specific endpoint is capable of
+ * sending or receiving in the duration of 1 microframe
+ *
+ * Only the active configuration is examined. The calculation is based on the
+ * wMaxPacketSize field in the endpoint descriptor as described in section
+ * 9.6.6 in the USB 2.0 specifications.
+ *
+ * If acting on an isochronous or interrupt endpoint, this function will
+ * multiply the value found in bits 0:10 by the number of transactions per
+ * microframe (determined by bits 11:12). Otherwise, this function just
+ * returns the numeric value found in bits 0:10. For USB 3.0 device, it
+ * will attempts to retrieve the Endpoint Companion Descriptor to return
+ * wBytesPerInterval.
+ *
+ * This function is useful for setting up isochronous transfers, for example
+ * you might pass the return value from this function to
+ * libusb_set_iso_packet_lengths() in order to set the length field of every
+ * isochronous packet in a transfer.
+ *
+ * Since v1.0.27.
+ *
+ * \param dev a device
+ * \param interface_number the <tt>bInterfaceNumber</tt> of the interface
+ * the endpoint belongs to
+ * \param alternate_setting the <tt>bAlternateSetting</tt> of the interface
+ * \param endpoint address of the endpoint in question
+ * \returns the maximum packet size which can be sent/received on this endpoint
+ * \returns \ref LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
+ * \returns \ref LIBUSB_ERROR_OTHER on other failure
+ * \see libusb_get_max_iso_packet_size
+ */
+int API_EXPORTED libusb_get_max_alt_packet_size(libusb_device *dev,
+	int interface_number, int alternate_setting, unsigned char endpoint)
+{
+	struct libusb_config_descriptor *config;
+	const struct libusb_endpoint_descriptor *ep;
+	int r;
+
+	r = libusb_get_active_config_descriptor(dev, &config);
+	if (r < 0) {
+		usbi_err(DEVICE_CTX(dev),
+			"could not retrieve active config descriptor");
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	ep = find_alt_endpoint(config, interface_number,
+		alternate_setting, endpoint);
 	if (!ep) {
 		r = LIBUSB_ERROR_NOT_FOUND;
 		goto out;
