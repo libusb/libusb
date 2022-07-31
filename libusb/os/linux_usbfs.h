@@ -174,10 +174,8 @@ static inline int linux_start_event_monitor(void)
 {
 #if defined(HAVE_LIBUDEV)
 	return linux_udev_start_event_monitor();
-#elif !defined(__ANDROID__)
-	return linux_netlink_start_event_monitor();
 #else
-	return LIBUSB_SUCCESS;
+	return linux_netlink_start_event_monitor();
 #endif
 }
 
@@ -185,7 +183,7 @@ static inline void linux_stop_event_monitor(void)
 {
 #if defined(HAVE_LIBUDEV)
 	linux_udev_stop_event_monitor();
-#elif !defined(__ANDROID__)
+#else
 	linux_netlink_stop_event_monitor();
 #endif
 }
@@ -194,7 +192,7 @@ static inline void linux_hotplug_poll(void)
 {
 #if defined(HAVE_LIBUDEV)
 	linux_udev_hotplug_poll();
-#elif !defined(__ANDROID__)
+#else
 	linux_netlink_hotplug_poll();
 #endif
 }
