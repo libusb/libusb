@@ -6,6 +6,12 @@ stress_SOURCES = stress.c libusb_testlib.h testlib.c
 
 noinst_PROGRAMS = stress
 
+if PLATFORM_POSIX
+stress_mt_SOURCES = stress_mt.c
+
+noinst_PROGRAMS += stress_mt
+endif
+
 if BUILD_UMOCKDEV_TEST
 # NOTE: We add libumockdev-preload.so so that we can run tests in-process
 #       We also use -Wl,-lxxx as the compiler doesn't need it and libtool
