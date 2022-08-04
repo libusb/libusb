@@ -414,7 +414,7 @@ if (cfg != desired)
   * - libusb_get_iso_packet_buffer()
   * - libusb_get_iso_packet_buffer_simple()
   * - libusb_get_max_iso_packet_size()
-  * - libusb_get_max_iso_packet_size_for_alt_setting()
+  * - libusb_get_max_alt_packet_size()
   * - libusb_get_max_packet_size()
   * - libusb_get_next_timeout()
   * - libusb_get_parent()
@@ -1161,8 +1161,7 @@ static int get_endpoint_max_iso_packet_size(libusb_device *dev,
  *
  * This function only considers the first alternate setting of the interface.
  * If the endpoint has different maximum packet sizes for different alternate
- * settings, you probably want libusb_get_max_iso_packet_size_for_alt_setting()
- * instead.
+ * settings, you probably want libusb_get_max_alt_packet_size() instead.
  *
  * Since v1.0.3.
  *
@@ -1171,7 +1170,7 @@ static int get_endpoint_max_iso_packet_size(libusb_device *dev,
  * \returns the maximum packet size which can be sent/received on this endpoint
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
  * \returns \ref LIBUSB_ERROR_OTHER on other failure
- * \see libusb_get_max_iso_packet_size_for_alt_setting
+ * \see libusb_get_max_alt_packet_size
  */
 int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 	unsigned char endpoint)
@@ -1232,9 +1231,8 @@ out:
  * \returns \ref LIBUSB_ERROR_OTHER on other failure
  * \see libusb_get_max_iso_packet_size
  */
-int API_EXPORTED libusb_get_max_iso_packet_size_for_alt_setting(
-	libusb_device *dev,	int interface_number,
-	int alternate_setting, unsigned char endpoint)
+int API_EXPORTED libusb_get_max_alt_packet_size(libusb_device *dev,
+	int interface_number, int alternate_setting, unsigned char endpoint)
 {
 	struct libusb_config_descriptor *config;
 	const struct libusb_endpoint_descriptor *ep;

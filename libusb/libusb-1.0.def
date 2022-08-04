@@ -78,8 +78,8 @@ EXPORTS
   libusb_get_device_speed@4 = libusb_get_device_speed
   libusb_get_max_iso_packet_size
   libusb_get_max_iso_packet_size@8 = libusb_get_max_iso_packet_size
-  libusb_get_max_iso_packet_size_for_alt_setting
-  libusb_get_max_iso_packet_size_for_alt_setting@16 = libusb_get_max_iso_packet_size_for_alt_setting
+  libusb_get_max_alt_packet_size
+  libusb_get_max_alt_packet_size@16 = libusb_get_max_alt_packet_size
   libusb_get_max_packet_size
   libusb_get_max_packet_size@8 = libusb_get_max_packet_size
   libusb_get_next_timeout
