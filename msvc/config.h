@@ -10,8 +10,8 @@
 #error "Visual Studio 2013 or later is required."
 #endif
 
-/* Visual Studio 2013 does not support __func__ */
-#if (_MSC_VER < 1900)
+/* Visual Studio 2013 and 2015 do not support __func__ */
+#if (_MSC_VER <= 1900)
 #define __func__ __FUNCTION__
 #endif
 
