@@ -1107,7 +1107,7 @@ static const struct libusb_endpoint_descriptor *find_alt_endpoint(
 	return NULL;
 }
 
-static int get_endpoint_max_iso_packet_size(libusb_device *dev,
+static int get_endpoint_max_packet_size(libusb_device *dev,
 	const struct libusb_endpoint_descriptor *ep)
 {
 	struct libusb_ss_endpoint_companion_descriptor *ss_ep_cmp;
@@ -1192,7 +1192,7 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 		goto out;
 	}
 
-	r = get_endpoint_max_iso_packet_size(dev, ep);
+	r = get_endpoint_max_packet_size(dev, ep);
 
 out:
 	libusb_free_config_descriptor(config);
@@ -1252,7 +1252,7 @@ int API_EXPORTED libusb_get_max_alt_packet_size(libusb_device *dev,
 		goto out;
 	}
 
-	r = get_endpoint_max_iso_packet_size(dev, ep);
+	r = get_endpoint_max_packet_size(dev, ep);
 
 out:
 	libusb_free_config_descriptor(config);
