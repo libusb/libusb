@@ -22,7 +22,7 @@ configure
 aclocal.m4
 compile
 config.guess
-config.h*
+config.h
 !msvc/config.h
 !android/config.h
 !Xcode/config.h
