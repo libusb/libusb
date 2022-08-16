@@ -71,7 +71,7 @@ configure_file(config.h.in config.h @ONLY)
 
 set(libusb_ROOT ../libusb)
 
-add_library(usb-1.0
+set(common_sources
     "${libusb_ROOT}/core.c"
     "${libusb_ROOT}/descriptor.c"
     "${libusb_ROOT}/hotplug.c"
@@ -86,6 +86,12 @@ add_library(usb-1.0
 
     "${CMAKE_CURRENT_BINARY_DIR}/config.h"
 )
+
+if (libusb_BUILD_SHARED_LIBS)
+    add_library(usb-1.0 SHARED ${common_sources})
+else()
+    add_library(usb-1.0 STATIC ${common_sources})
+endif()
 
 target_include_directories(usb-1.0 PUBLIC "${libusb_ROOT}")
 target_include_directories(usb-1.0 PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
