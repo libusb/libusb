@@ -40,7 +40,7 @@ check_symbol_exists(timerfd_create  "sys/timerfd.h" HAVE_TIMERFD)
 
 check_struct_has_member("struct timespec" tv_sec time.h HAVE_STRUCT_TIMESPEC)
 
-if (BUILD_SHARED_LIBS)
+if(BUILD_SHARED_LIBS)
   set(libusb_BUILD_SHARED_LIBS_DEFAULT ON)
 else (BUILD_SHARED_LIBS)
   set(libusb_BUILD_SHARED_LIBS_DEFAULT OFF)
@@ -61,7 +61,7 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL Clang) OR ("${CMAKE_CXX_COMPILER_ID}" ST
     check_c_compiler_flag("-fvisibility=hidden" HAVE_VISIBILITY)
 endif()
 
-if (HAVE_VISIBILITY)
+if(HAVE_VISIBILITY)
     set(DEFAULT_VISIBILITY "__attribute__((visibility(\"default\")))"  CACHE INTERNAL "")
 else()
     set(DEFAULT_VISIBILITY ""  CACHE INTERNAL "")
@@ -87,7 +87,7 @@ set(common_sources
     "${CMAKE_CURRENT_BINARY_DIR}/config.h"
 )
 
-if (libusb_BUILD_SHARED_LIBS)
+if(libusb_BUILD_SHARED_LIBS)
     add_library(usb-1.0 SHARED ${common_sources})
 else()
     add_library(usb-1.0 STATIC ${common_sources})
@@ -150,7 +150,7 @@ if(ANDROID)
     target_include_directories(usb-1.0 PUBLIC android)
 endif()
 
-if (libusb_BUILD_TESTING AND BUILD_TESTING)
+if(libusb_BUILD_TESTING AND BUILD_TESTING)
     add_executable(testlibusb ../tests/testlib.c ../tests/stress.c)
     target_link_libraries(testlibusb PRIVATE usb-1.0)
     add_test(testlibusb COMMAND testlibusb)
