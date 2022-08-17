@@ -50,10 +50,10 @@ option(libusb_BUILD_SHARED_LIBS "Build Shared Libraries for libusb" ${libusb_BUI
 option(libusb_BUILD_TESTING "Build Tests" ON)
 option(ENABLE_LOGGING "Enable Logging" ON)
 
-if (WIN32)
+if(WIN32)
     set(PLATFORM_WINDOWS 1 CACHE INTERNAL "")
 endif()
-if (UNIX)
+if(UNIX)
     set(PLATFORM_POSIX 1  CACHE INTERNAL "")
 endif()
 
