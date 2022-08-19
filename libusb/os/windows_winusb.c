@@ -525,7 +525,8 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 
 	if (iface >= conf_desc->bNumInterfaces) {
 		usbi_err(HANDLE_CTX(dev_handle), "interface %d out of range for device", iface);
-		return LIBUSB_ERROR_NOT_FOUND;
+		r = LIBUSB_ERROR_NO_MEM;
+		goto end;
 	}
 	if_desc = &conf_desc->interface[iface].altsetting[altsetting];
 	safe_free(priv->usb_interface[iface].endpoint);
@@ -535,8 +536,8 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 	} else {
 		priv->usb_interface[iface].endpoint = malloc(if_desc->bNumEndpoints);
 		if (priv->usb_interface[iface].endpoint == NULL) {
-			libusb_free_config_descriptor(conf_desc);
-			return LIBUSB_ERROR_NO_MEM;
+			r = LIBUSB_ERROR_NO_MEM;
+			goto end;
 		}
 		priv->usb_interface[iface].nb_endpoints = if_desc->bNumEndpoints;
 		for (i = 0; i < if_desc->bNumEndpoints; i++) {
@@ -544,7 +545,6 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 			usbi_dbg(HANDLE_CTX(dev_handle), "(re)assigned endpoint %02X to interface %u", priv->usb_interface[iface].endpoint[i], iface);
 		}
 	}
-	libusb_free_config_descriptor(conf_desc);
 
 	// Extra init may be required to configure endpoints
 	if (priv->apib->configure_endpoints)
@@ -553,6 +553,8 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 	if (r == LIBUSB_SUCCESS)
 		priv->usb_interface[iface].current_altsetting = altsetting;
 
+end:
+	libusb_free_config_descriptor(conf_desc);
 	return r;
 }
 
