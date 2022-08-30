@@ -482,8 +482,8 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 		usbi_mutex_unlock(&ctx->open_devs_lock);
 
 		if (!found) {
-			usbi_dbg(ctx, "ignoring overlapped %p for handle %p (device %u.%u)",
-				overlapped, dev_handle, dev_handle->dev->bus_number, dev_handle->dev->device_address);
+			usbi_dbg(ctx, "ignoring overlapped %p for handle %p",
+				 overlapped, dev_handle);
 			continue;
 		}
 
