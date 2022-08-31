@@ -1398,20 +1398,22 @@ static void do_close(struct libusb_context *ctx,
 	for_each_transfer_safe(ctx, itransfer, tmp) {
 		struct libusb_transfer *transfer =
 			USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		uint32_t state_flags;
 
 		if (transfer->dev_handle != dev_handle)
 			continue;
 
 		usbi_mutex_lock(&itransfer->lock);
-		if (!(itransfer->state_flags & USBI_TRANSFER_DEVICE_DISAPPEARED)) {
+		state_flags = itransfer->state_flags;
+		usbi_mutex_unlock(&itransfer->lock);
+		if (!(state_flags & USBI_TRANSFER_DEVICE_DISAPPEARED)) {
 			usbi_err(ctx, "Device handle closed while transfer was still being processed, but the device is still connected as far as we know");
 
-			if (itransfer->state_flags & USBI_TRANSFER_CANCELLING)
+			if (state_flags & USBI_TRANSFER_CANCELLING)
 				usbi_warn(ctx, "A cancellation for an in-flight transfer hasn't completed but closing the device handle");
 			else
 				usbi_err(ctx, "A cancellation hasn't even been scheduled on the transfer for which the device is closing");
 		}
-		usbi_mutex_unlock(&itransfer->lock);
 
 		/* remove from the list of in-flight transfers and make sure
 		 * we don't accidentally use the device handle in the future
