@@ -64,6 +64,7 @@ tests/umockdev
 
 echo "Running stress tests ..."
 tests/stress
+tests/stress_mt
 EOG
 EOF
 
