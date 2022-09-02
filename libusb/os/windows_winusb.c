@@ -525,7 +525,7 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 
 	if (iface >= conf_desc->bNumInterfaces) {
 		usbi_err(HANDLE_CTX(dev_handle), "interface %d out of range for device", iface);
-		r = LIBUSB_ERROR_NO_MEM;
+		r = LIBUSB_ERROR_NOT_FOUND;
 		goto end;
 	}
 	if_desc = &conf_desc->interface[iface].altsetting[altsetting];
