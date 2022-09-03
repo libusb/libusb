@@ -1379,13 +1379,14 @@ static IOReturn darwin_get_interface (usb_device_t **darwin_device, uint8_t ifc,
 static const struct libusb_interface_descriptor *get_interface_descriptor_by_number(struct libusb_device_handle *dev_handle, struct libusb_config_descriptor *conf_desc, int iface, uint8_t altsetting)
 {
   int i;
+
   for (i = 0; i < conf_desc->bNumInterfaces; i++) {
     if (altsetting < conf_desc->interface[i].num_altsetting && conf_desc->interface[i].altsetting[altsetting].bInterfaceNumber == iface) {
       return &conf_desc->interface[i].altsetting[altsetting];
     }
   }
 
-  usbi_err(HANDLE_CTX(dev_handle), "interface %d not found for device", iface);
+  usbi_err(HANDLE_CTX(dev_handle), "interface %d with altsetting %d not found for device", iface, (int)altsetting);
   return NULL;
 }
 
