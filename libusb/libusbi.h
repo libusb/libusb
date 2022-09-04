@@ -322,10 +322,10 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 
 #else /* ENABLE_LOGGING */
 
-#define usbi_err(ctx, ...)	UNUSED(ctx)
-#define usbi_warn(ctx, ...)	UNUSED(ctx)
-#define usbi_info(ctx, ...)	UNUSED(ctx)
-#define usbi_dbg(ctx, ...)	do {} while (0)
+#define usbi_err(ctx, ...)	do { (void)(ctx); } while(0)
+#define usbi_warn(ctx, ...)	do { (void)(ctx); } while(0)
+#define usbi_info(ctx, ...)	do { (void)(ctx); } while(0)
+#define usbi_dbg(ctx, ...)	do { (void)(ctx); } while(0)
 
 #endif /* ENABLE_LOGGING */
 
