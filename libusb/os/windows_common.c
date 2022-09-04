@@ -331,6 +331,9 @@ static enum windows_version get_windows_version(void)
 	const char *w, *arch;
 	bool ws;
 
+#ifndef ENABLE_LOGGING
+	UNUSED(w); UNUSED(arch);
+#endif
 	memset(&vi, 0, sizeof(vi));
 	vi.dwOSVersionInfoSize = sizeof(vi);
 	if (!GetVersionExA((OSVERSIONINFOA *)&vi)) {

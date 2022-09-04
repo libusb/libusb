@@ -263,6 +263,9 @@ static int get_interface_details(struct libusb_context *ctx, HDEVINFO dev_info,
 	char guid_string[MAX_GUID_STRING_LENGTH];
 	DWORD size;
 
+#ifndef ENABLE_LOGGING
+	UNUSED(*guid_string);
+#endif
 	dev_info_data->cbSize = sizeof(SP_DEVINFO_DATA);
 	dev_interface_data.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
 	for (;;) {
