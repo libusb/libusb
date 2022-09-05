@@ -1,4 +1,4 @@
-project(usb-1.0)
+project(usb-1.0 C)
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_C_USE_RESPONSE_FILE_FOR_INCLUDES   OFF)
 set(CMAKE_CXX_USE_RESPONSE_FILE_FOR_INCLUDES OFF)
