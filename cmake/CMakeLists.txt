@@ -1,7 +1,10 @@
-project(usb-1.0)
+project(usb-1.0 C)
 cmake_minimum_required(VERSION 3.10)
+
+# This is because CMake on mingw can incorrectly use response files for includes
+# instead of passing them directly via -I<dir>
+# Explicitly disable use of response files
 set(CMAKE_C_USE_RESPONSE_FILE_FOR_INCLUDES   OFF)
-set(CMAKE_CXX_USE_RESPONSE_FILE_FOR_INCLUDES OFF)
 
 include(CheckIncludeFiles)
 include(CheckFunctionExists)
@@ -67,7 +70,8 @@ else()
     set(DEFAULT_VISIBILITY ""  CACHE INTERNAL "")
 endif()
 
-configure_file(config.h.in config.h @ONLY)
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/gen_include")
+configure_file(config.h.in "${CMAKE_CURRENT_BINARY_DIR}/gen_include/config.h" @ONLY)
 
 set(libusb_ROOT ../libusb)
 
@@ -84,7 +88,7 @@ set(common_sources
     "${libusb_ROOT}/version_nano.h"
     "${libusb_ROOT}/version.h"
 
-    "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/gen_include/config.h"
 )
 
 if(libusb_BUILD_SHARED_LIBS)
@@ -94,7 +98,7 @@ else()
 endif()
 
 target_include_directories(usb-1.0 PUBLIC "${libusb_ROOT}")
-target_include_directories(usb-1.0 PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
+target_include_directories(usb-1.0 PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/gen_include")
 target_include_directories(usb-1.0 PRIVATE "${libusb_ROOT}/os")
 
 if(WIN32)
@@ -115,7 +119,7 @@ if(WIN32)
     )
     if(MSVC)
         target_sources(usb-1.0 PRIVATE "${libusb_ROOT}/libusb-1.0.rc")
-        target_compile_options(usb-1.0 PRIVATE /await /Zc:twoPhase- /permissive)
+        target_compile_definitions(usb-1.0 PRIVATE _CRT_SECURE_NO_WARNINGS=1)
     endif()
     target_link_libraries(usb-1.0 PRIVATE windowsapp)
 endif()
