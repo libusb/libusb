@@ -50,6 +50,7 @@ else (BUILD_SHARED_LIBS)
 endif (BUILD_SHARED_LIBS)
 
 option(libusb_BUILD_SHARED_LIBS "Build Shared Libraries for libusb" ${libusb_BUILD_SHARED_LIBS_DEFAULT})
+option(libusb_INSTALL_TARGETS "Install libusb targets" ON)
 option(libusb_BUILD_TESTING "Build Tests" ON)
 option(ENABLE_LOGGING "Enable Logging" ON)
 
@@ -160,5 +161,7 @@ if(libusb_BUILD_TESTING AND BUILD_TESTING)
     add_test(testlibusb COMMAND testlibusb)
 endif()
 
-install(TARGETS usb-1.0)
-install(FILES ${libusb_ROOT}/libusb.h DESTINATION include/libusb-1.0)
+if(libusb_INSTALL_TARGETS)
+    install(TARGETS usb-1.0)
+    install(FILES ${libusb_ROOT}/libusb.h DESTINATION include/libusb-1.0)
+endif()
