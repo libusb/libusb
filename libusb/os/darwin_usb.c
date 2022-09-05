@@ -2382,11 +2382,8 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
   return usbi_handle_transfer_completion (itransfer, darwin_transfer_status (itransfer, tpriv->result));
 }
 
+#ifndef HAVE_CLOCK_GETTIME
 void usbi_get_monotonic_time(struct timespec *tp) {
-/* Check if the SDK is new enough to declare clock_gettime(), and the deployment target is at least 10.12. */
-#if ((MAC_OS_X_VERSION_MAX_ALLOWED >= 101200) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 101200))
-  clock_gettime(CLOCK_MONOTONIC, tp);
-#else
   mach_timebase_info_data_t machTimeBaseInfo;
   mach_timebase_info(&machTimeBaseInfo);
 
@@ -2398,20 +2395,15 @@ void usbi_get_monotonic_time(struct timespec *tp) {
 
   tp->tv_sec = uptimeSeconds;
   tp->tv_nsec = uptimeNanoRemainder;
-#endif
 }
 
 void usbi_get_real_time(struct timespec *tp) {
-/* Check if the SDK is new enough to declare clock_gettime(), and the deployment target is at least 10.12. */
-#if ((MAC_OS_X_VERSION_MAX_ALLOWED >= 101200) && (MAC_OS_X_VERSION_MIN_REQUIRED >= 101200))
-  clock_gettime(CLOCK_REALTIME, tp);
-#else
   struct timeval tv;
   gettimeofday(&tv, NULL);
   tp->tv_sec = tv.tv_sec;
   tp->tv_nsec = tv.tv_usec * NSEC_PER_USEC;
-#endif
 }
+#endif
 
 #if InterfaceVersion >= 550
 static int darwin_alloc_streams (struct libusb_device_handle *dev_handle, uint32_t num_streams, unsigned char *endpoints,
