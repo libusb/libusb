@@ -1376,6 +1376,20 @@ static IOReturn darwin_get_interface (usb_device_t **darwin_device, uint8_t ifc,
   return kIOReturnSuccess;
 }
 
+static const struct libusb_interface_descriptor *get_interface_descriptor_by_number(struct libusb_device_handle *dev_handle, struct libusb_config_descriptor *conf_desc, int iface, uint8_t altsetting)
+{
+  int i;
+
+  for (i = 0; i < conf_desc->bNumInterfaces; i++) {
+    if (altsetting < conf_desc->interface[i].num_altsetting && conf_desc->interface[i].altsetting[altsetting].bInterfaceNumber == iface) {
+      return &conf_desc->interface[i].altsetting[altsetting];
+    }
+  }
+
+  usbi_err(HANDLE_CTX(dev_handle), "interface %d with altsetting %d not found for device", iface, (int)altsetting);
+  return NULL;
+}
+
 static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle, uint8_t iface) {
   struct darwin_device_handle_priv *priv = usbi_get_device_handle_priv(dev_handle);
 
@@ -1417,6 +1431,7 @@ static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle,
     if (kresult != kIOReturnSuccess) {
       /* probably a buggy device. try to get the endpoint address from the descriptors */
       struct libusb_config_descriptor *config;
+      const struct libusb_interface_descriptor *if_desc;
       const struct libusb_endpoint_descriptor *endpoint_desc;
       UInt8 alt_setting;
 
@@ -1431,13 +1446,13 @@ static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle,
         return rc;
       }
 
-      if (iface >= config->bNumInterfaces) {
-        usbi_err (HANDLE_CTX (dev_handle), "interface %d out of range for device", iface);
+      if_desc = get_interface_descriptor_by_number (dev_handle, config, iface, alt_setting);
+      if (if_desc == NULL) {
         libusb_free_config_descriptor (config);
         return LIBUSB_ERROR_NOT_FOUND;
       }
 
-      endpoint_desc = config->interface[iface].altsetting[alt_setting].endpoint + i - 1;
+      endpoint_desc = if_desc->endpoint + i - 1;
 
       cInterface->endpoint_addrs[i - 1] = endpoint_desc->bEndpointAddress;
       libusb_free_config_descriptor (config);

@@ -488,6 +488,20 @@ static int get_interface_by_endpoint(struct libusb_config_descriptor *conf_desc,
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
+static const struct libusb_interface_descriptor *get_interface_descriptor_by_number(struct libusb_device_handle *dev_handle, struct libusb_config_descriptor *conf_desc, int iface, uint8_t altsetting)
+{
+	int i;
+
+	for (i = 0; i < conf_desc->bNumInterfaces; i++) {
+		if (altsetting < conf_desc->interface[i].num_altsetting && conf_desc->interface[i].altsetting[altsetting].bInterfaceNumber == iface) {
+			return &conf_desc->interface[i].altsetting[altsetting];
+		}
+	}
+
+	usbi_err(HANDLE_CTX(dev_handle), "interface %d with altsetting %d not found for device", iface, (int)altsetting);
+	return NULL;
+}
+
 /*
  * Open a device and associate the HANDLE with the context's I/O completion port
  */
@@ -526,12 +540,12 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 		return r;
 	}
 
-	if (iface >= conf_desc->bNumInterfaces) {
-		usbi_err(HANDLE_CTX(dev_handle), "interface %d out of range for device", iface);
+	if_desc = get_interface_descriptor_by_number(dev_handle, conf_desc, iface, altsetting);
+	if (if_desc == NULL) {
 		r = LIBUSB_ERROR_NOT_FOUND;
 		goto end;
 	}
-	if_desc = &conf_desc->interface[iface].altsetting[altsetting];
+
 	safe_free(priv->usb_interface[iface].endpoint);
 
 	if (if_desc->bNumEndpoints == 0) {
