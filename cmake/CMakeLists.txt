@@ -122,7 +122,6 @@ if(WIN32)
         target_sources(usb-1.0 PRIVATE "${libusb_ROOT}/libusb-1.0.rc")
         target_compile_definitions(usb-1.0 PRIVATE _CRT_SECURE_NO_WARNINGS=1)
     endif()
-    target_link_libraries(usb-1.0 PRIVATE windowsapp)
 endif()
 
 if(UNIX AND NOT ANDROID)
