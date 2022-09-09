@@ -155,7 +155,6 @@ EXPORTS
   libusb_set_log_cb
   libusb_set_log_cb@12 = libusb_set_log_cb
   libusb_set_option
-  libusb_set_option@8 = libusb_set_option
   libusb_set_pollfd_notifiers
   libusb_set_pollfd_notifiers@16 = libusb_set_pollfd_notifiers
   libusb_setlocale
