@@ -1763,7 +1763,6 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_hand
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	if (!usbi_atomic_load(&dev_handle->dev->attached)) {
-		usbi_mutex_unlock(&dev_handle->lock);
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
 
