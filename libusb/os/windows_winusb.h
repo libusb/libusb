@@ -531,6 +531,13 @@ typedef BOOL (WINAPI *WinUsb_SetPipePolicy_t)(
 	ULONG ValueLength,
 	PVOID Value
 );
+typedef BOOL (WINAPI *WinUsb_GetPipePolicy_t)(
+	WINUSB_INTERFACE_HANDLE InterfaceHandle,
+	UCHAR PipeID,
+	ULONG PolicyType,
+	PULONG ValueLength,
+	PVOID Value
+);
 typedef BOOL (WINAPI *WinUsb_UnregisterIsochBuffer_t)(
 	WINUSB_ISOCH_BUFFER_HANDLE BufferHandle
 );
@@ -662,6 +669,7 @@ struct winusb_interface {
 	WinUsb_ResetPipe_t ResetPipe;
 	WinUsb_SetCurrentAlternateSetting_t SetCurrentAlternateSetting;
 	WinUsb_SetPipePolicy_t SetPipePolicy;
+	WinUsb_GetPipePolicy_t GetPipePolicy;
 	WinUsb_WritePipe_t WritePipe;
 	union {
 		struct {

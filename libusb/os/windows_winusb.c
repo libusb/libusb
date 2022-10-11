@@ -2344,6 +2344,7 @@ static bool winusbx_init(struct libusb_context *ctx)
 		WinUSB_Set(hWinUSB, ResetPipe, true);
 		WinUSB_Set(hWinUSB, SetCurrentAlternateSetting, true);
 		WinUSB_Set(hWinUSB, SetPipePolicy, true);
+		WinUSB_Set(hWinUSB, GetPipePolicy, true);
 		WinUSB_Set(hWinUSB, WritePipe, true);
 
 		// Check for isochronous transfers support (available starting with Windows 8.1)
