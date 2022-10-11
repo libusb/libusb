@@ -721,4 +721,5 @@ const struct windows_backend usbdk_backend = {
 	NULL,	/* cancel_transfer */
 	usbdk_clear_transfer_priv,
 	usbdk_copy_transfer_data,
+	NULL /* usbdk_set_option */,
 };

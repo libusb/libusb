@@ -2233,6 +2233,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		/* Handle all backend-specific options here */
 	case LIBUSB_OPTION_USE_USBDK:
 	case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+	case LIBUSB_OPTION_WINUSB_RAW_IO:
 		if (usbi_backend.set_option)
 			return usbi_backend.set_option(ctx, option, ap);
 
