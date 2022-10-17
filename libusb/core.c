@@ -2306,7 +2306,7 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 	}
 
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-	if (NULL == ctx && default_context_options[LIBUSB_OPTION_LOG_LEVEL].is_set) {
+	if (default_context_options[LIBUSB_OPTION_LOG_LEVEL].is_set) {
 		_ctx->debug = default_context_options[LIBUSB_OPTION_LOG_LEVEL].arg.ival;
 	} else {
 		_ctx->debug = get_env_debug_level();
