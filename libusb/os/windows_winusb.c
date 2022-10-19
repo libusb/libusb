@@ -2808,7 +2808,7 @@ cleanup_winusb:
 		usbi_info(ctx, "WinUSB DLL is not available");
 	}
 
-	hlibusbK = load_system_library(ctx, "libusbK");
+	hlibusbK = LoadLibraryA("libusbK.dll");
 	if (hlibusbK != NULL) {
 		LibK_GetVersion_t pLibK_GetVersion;
 		LibK_GetProcAddress_t pLibK_GetProcAddress;
