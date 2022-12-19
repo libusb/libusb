@@ -2362,7 +2362,7 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 
 		if (!usbi_fallback_context) {
 			usbi_fallback_context = _ctx;
-			usbi_warn(usbi_fallback_context, "installing new context as implicit default");
+			usbi_dbg(usbi_fallback_context, "installing new context as implicit default");
 		}
 	}
 
