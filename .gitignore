@@ -70,3 +70,5 @@ xcuserdata
 *.xcscmblueprint
 *.xcworkspace
 build/
+tags
+cscope.out
