@@ -33,5 +33,37 @@
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+	<ProjectConfiguration Include="Debug-MT|ARM">
+      <Configuration>Debug-MT</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-MT|ARM64">
+      <Configuration>Debug-MT</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-MT|Win32">
+      <Configuration>Debug-MT</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-MT|x64">
+      <Configuration>Debug-MT</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+	 <ProjectConfiguration Include="Release-MT|ARM">
+      <Configuration>Release-MT</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-MT|ARM64">
+      <Configuration>Release-MT</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-MT|Win32">
+      <Configuration>Release-MT</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-MT|x64">
+      <Configuration>Release-MT</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
 </Project>

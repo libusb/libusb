@@ -18,10 +18,10 @@
     <!--<EnableASAN>true</EnableASAN>-->
   </PropertyGroup>
   <ItemDefinitionGroup>
-    <ClCompile Condition="'$(Configuration)'=='Debug'">
+    <ClCompile Condition="$(Configuration.StartsWith('Debug'))">
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
-    <ClCompile Condition="'$(Configuration)'=='Release'">
+    <ClCompile Condition="$(Configuration.StartsWith('Release'))">
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
