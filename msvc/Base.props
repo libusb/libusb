@@ -19,15 +19,15 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DiagnosticsFormat>Caret</DiagnosticsFormat>
     </ClCompile>
-    <!--ClCompile Debug-->
-    <ClCompile Condition="'$(Configuration)'=='Debug'">
+    <!--ClCompile Debug*-->
+    <ClCompile Condition="$(Configuration.StartsWith('Debug'))">
       <Optimization>Disabled</Optimization>
     </ClCompile>
-    <ClCompile Condition="'$(Configuration)'=='Debug' And '$(EnableASAN)'=='true'">
+    <ClCompile Condition="$(Configuration.StartsWith('Debug')) And '$(EnableASAN)'=='true'">
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
-    <!--ClCompile Release-->
-    <ClCompile Condition="'$(Configuration)'=='Release'">
+    <!--ClCompile Release*-->
+    <ClCompile Condition="$(Configuration.StartsWith('Release'))">
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -41,8 +41,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
-    <!--Link Release-->
-    <Link Condition="'$(Configuration)'=='Release'">
+    <!--Link Release*-->
+    <Link Condition="$(Configuration.StartsWith('Release'))">
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
