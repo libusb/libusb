@@ -30,10 +30,6 @@
 #include <IOKit/usb/IOUSBLib.h>
 #include <IOKit/IOCFPlugIn.h>
 
-#if defined(HAVE_IOKIT_USB_IOUSBHOSTFAMILYDEFINITIONS_H)
-#include <IOKit/usb/IOUSBHostFamilyDefinitions.h>
-#endif
-
 /* IOUSBInterfaceInferface */
 
 /* New in macOS 10.12.0. */
