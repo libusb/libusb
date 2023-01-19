@@ -1409,8 +1409,14 @@ enum libusb_option {
 	LIBUSB_OPTION_MAX = 3
 };
 
+/** \ingroup libusb_lib
+ * Structure used for setting options through \ref libusb_init_context.
+ *
+ */
 struct libusb_init_option {
+  /** Which option to set */
   enum libusb_option option;
+  /** An integer value used by the option (if applicable). */
   union {
     int64_t ival;
   } value;
