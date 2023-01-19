@@ -2217,13 +2217,13 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	}
 
 	ctx = usbi_get_context(ctx);
-	if (NULL == ctx) {
-		return LIBUSB_SUCCESS;
-	}
 
 	switch (option) {
 	case LIBUSB_OPTION_LOG_LEVEL:
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
+		if (NULL == ctx) {
+			return LIBUSB_SUCCESS;
+		}
 		if (!ctx->debug_fixed)
 			ctx->debug = (enum libusb_log_level)arg;
 #endif
@@ -2232,12 +2232,14 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		/* Handle all backend-specific options here */
 	case LIBUSB_OPTION_USE_USBDK:
 	case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+	case LIBUSB_OPTION_ANDROID_JNIENV:
+	case LIBUSB_OPTION_ANDROID_JAVAVM:
 		if (usbi_backend.set_option)
 			return usbi_backend.set_option(ctx, option, ap);
 
 		return LIBUSB_ERROR_NOT_SUPPORTED;
-		break;
 
+	case LIBUSB_OPTION_MAX:
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
@@ -2320,14 +2322,24 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
 	list_init(&_ctx->usb_devs);
 	list_init(&_ctx->open_devs);
 
-	/* apply default options to all new contexts */
+	/* apply options to new contexts (also default context being created) */
 	for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
-		if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
+		if (!default_context_options[option].is_set) {
 			continue;
 		}
-		r = libusb_set_option(_ctx, option);
-		if (LIBUSB_SUCCESS != r)
-			goto err_free_ctx;
+		switch (option) {
+		case LIBUSB_OPTION_LOG_LEVEL:
+		case LIBUSB_OPTION_ANDROID_JNIENV:
+		case LIBUSB_OPTION_ANDROID_JAVAVM:
+			continue;
+		case LIBUSB_OPTION_USE_USBDK:
+		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+		case LIBUSB_OPTION_MAX:
+		default:
+			r = libusb_set_option(_ctx, option);
+			if (LIBUSB_SUCCESS != r)
+				goto err_free_ctx;
+		}
 	}
 
 	/* default context must be initialized before calling usbi_dbg */

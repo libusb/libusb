@@ -16,8 +16,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
-/* Define to the attribute for default visibility. */
+ /* Define to the attribute for default visibility. */
 #define DEFAULT_VISIBILITY __attribute__ ((visibility ("default")))
 
 /* Define to 1 to start with debug message logging enabled. */
@@ -32,14 +31,35 @@
 /* Define to 1 if you have the `clock_gettime' function. */
 #define HAVE_CLOCK_GETTIME 1
 
+/* Define to 1 if the system has eventfd functionality. */
+#define HAVE_EVENTFD 1
+
+/* Define to 1 if you have the `udev' library (-ludev). */
+/* #undef #define HAVE_LIBUDEV */
+
 /* Define to 1 if the system has the type `nfds_t'. */
 #define HAVE_NFDS_T 1
 
 /* Define to 1 if you have the `pipe2' function. */
 #define HAVE_PIPE2 1
 
+/* Define to 1 if you have the `pthread_condattr_setclock' function. */
+#define HAVE_PTHREAD_CONDATTR_SETCLOCK 1
+
+/* Define to 1 if you have the `pthread_setname_np' function. */
+#define HAVE_PTHREAD_SETNAME_NP 1
+
+/* Define to 1 if you have the `pthread_threadid_np' function. */
+#define HAVE_PTHREAD_THREADID_NP 1
+
+/* Define to 1 if you have the `syslog' function. */
+/* #undef HAVE_SYSLOG */
+
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define HAVE_SYS_TIME_H 1
+
+/* Define to 1 if the system has timerfd functionality. */
+#define HAVE_TIMERFD 1
 
 /* Define to 1 if compiling for a POSIX platform. */
 #define PLATFORM_POSIX 1
