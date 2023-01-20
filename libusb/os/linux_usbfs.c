@@ -1083,8 +1083,9 @@ retry:
 		goto retry;
 	}
 
-	usbi_dbg(ctx, "dev %p (%s) has parent %p (%s) port %u", dev, sysfs_dir,
-		 dev->parent_dev, parent_sysfs_dir, dev->port_number);
+	usbi_dbg(ctx, "dev %p (%s) has parent %p (%s) port %u",
+		 (void *) dev, sysfs_dir, (void *) dev->parent_dev,
+		 parent_sysfs_dir, dev->port_number);
 
 	free(parent_sysfs_dir);
 

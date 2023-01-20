@@ -1531,7 +1531,7 @@ static void do_close(struct libusb_context *ctx,
 		 * the device handle is invalid
 		 */
 		usbi_dbg(ctx, "Removed transfer %p from the in-flight list because device handle %p closed",
-			 transfer, dev_handle);
+			 (void *) transfer, (void *) dev_handle);
 	}
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 

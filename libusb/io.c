@@ -1342,7 +1342,7 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 	if (!transfer)
 		return;
 
-	usbi_dbg(TRANSFER_CTX(transfer), "transfer %p", transfer);
+	usbi_dbg(TRANSFER_CTX(transfer), "transfer %p", (void *) transfer);
 	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER)
 		free(transfer->buffer);
 
@@ -1504,7 +1504,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	itransfer->dev = libusb_ref_device(transfer->dev_handle->dev);
 
 	ctx = HANDLE_CTX(transfer->dev_handle);
-	usbi_dbg(ctx, "transfer %p", transfer);
+	usbi_dbg(ctx, "transfer %p", (void *) transfer);
 
 	/*
 	 * Important note on locking, this function takes / releases locks
@@ -1615,7 +1615,7 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
 	int r;
 
-	usbi_dbg(ctx, "transfer %p", transfer );
+	usbi_dbg(ctx, "transfer %p", (void *) transfer );
 	usbi_mutex_lock(&itransfer->lock);
 	if (!(itransfer->state_flags & USBI_TRANSFER_IN_FLIGHT)
 			|| (itransfer->state_flags & USBI_TRANSFER_CANCELLING)) {
@@ -1717,7 +1717,8 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	flags = transfer->flags;
 	transfer->status = status;
 	transfer->actual_length = itransfer->transferred;
-	usbi_dbg(ctx, "transfer %p has callback %p", transfer, transfer->callback);
+	usbi_dbg(ctx, "transfer %p has callback %p",
+		 (void *) transfer, transfer->callback);
 	if (transfer->callback)
 		transfer->callback(transfer);
 	/* transfer might have been freed by the above call, do not use from
@@ -2849,7 +2850,7 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 			break;
 
 		usbi_dbg(ctx, "cancelling transfer %p from disconnect",
-			 USBI_TRANSFER_TO_LIBUSB_TRANSFER(to_cancel));
+			 (void *) USBI_TRANSFER_TO_LIBUSB_TRANSFER(to_cancel));
 
 		usbi_mutex_lock(&to_cancel->lock);
 		usbi_backend.clear_transfer_priv(to_cancel);

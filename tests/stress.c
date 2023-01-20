@@ -63,7 +63,7 @@ static libusb_testlib_result test_get_device_list(void)
 		if (list_size < 0 || !device_list) {
 			libusb_testlib_logf(
 				"Failed to get device list on iteration %d: %ld (%p)",
-				i, (long)-list_size, device_list);
+				i, (long) -list_size, (void *) device_list);
 			libusb_exit(ctx);
 			return TEST_STATUS_FAILURE;
 		}
@@ -97,7 +97,7 @@ static libusb_testlib_result test_many_device_lists(void)
 		if (list_size < 0 || !device_lists[i]) {
 			libusb_testlib_logf(
 				"Failed to get device list on iteration %d: %ld (%p)",
-				i, (long)-list_size, device_lists[i]);
+				i, (long) -list_size, (void *) device_lists[i]);
 			result = TEST_STATUS_FAILURE;
 			break;
 		}

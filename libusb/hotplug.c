@@ -311,7 +311,7 @@ void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_
 	for_each_hotplug_cb_safe(ctx, hotplug_cb, next_cb) {
 		if (hotplug_cb->flags & USBI_HOTPLUG_NEEDS_FREE) {
 			usbi_dbg(ctx, "freeing hotplug cb %p with handle %d",
-				hotplug_cb, hotplug_cb->handle);
+				 (void *) hotplug_cb, hotplug_cb->handle);
 			list_del(&hotplug_cb->list);
 			free(hotplug_cb);
 		}
@@ -377,7 +377,8 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 
 	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
 
-	usbi_dbg(ctx, "new hotplug cb %p with handle %d", hotplug_cb, hotplug_cb->handle);
+	usbi_dbg(ctx, "new hotplug cb %p with handle %d",
+		 (void *) hotplug_cb, hotplug_cb->handle);
 
 	if ((flags & LIBUSB_HOTPLUG_ENUMERATE) && (events & LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)) {
 		ssize_t i, len;
