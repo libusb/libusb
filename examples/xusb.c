@@ -465,7 +465,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	unsigned char *data;
 	FILE *fd;
 
-	printf("Reading Max LUN:\n");
+	printf("\nReading Max LUN:\n");
 	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
 		BOMS_GET_MAX_LUN, 0, 0, &lun, 1, 1000);
 	// Some devices send a STALL instead of the actual value.
@@ -478,7 +478,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	printf("   Max LUN = %d\n", lun);
 
 	// Send Inquiry
-	printf("Sending Inquiry:\n");
+	printf("\nSending Inquiry:\n");
 	memset(buffer, 0, sizeof(buffer));
 	memset(cdb, 0, sizeof(cdb));
 	cdb[0] = 0x12;	// Inquiry
@@ -502,7 +502,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	}
 
 	// Read capacity
-	printf("Reading Capacity:\n");
+	printf("\nReading Capacity:\n");
 	memset(buffer, 0, sizeof(buffer));
 	memset(cdb, 0, sizeof(cdb));
 	cdb[0] = 0x25;	// Read Capacity
@@ -526,7 +526,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	}
 
 	// Send Read
-	printf("Attempting to read %u bytes:\n", block_size);
+	printf("\nAttempting to read %u bytes:\n", block_size);
 	memset(cdb, 0, sizeof(cdb));
 
 	cdb[0] = 0x28;	// Read(10)
