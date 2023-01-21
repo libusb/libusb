@@ -1113,7 +1113,7 @@ static int get_endpoint_max_packet_size(libusb_device *dev,
 	struct libusb_ss_endpoint_companion_descriptor *ss_ep_cmp;
 	enum libusb_endpoint_transfer_type ep_type;
 	uint16_t val;
-	int r;
+	int r = 0;
 	int speed;
 
 	speed = libusb_get_device_speed(dev);
