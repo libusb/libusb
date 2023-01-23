@@ -78,6 +78,12 @@
 /* use usbdev*.* device names in /dev instead of the usbfs bus directories */
 static int usbdev_names = 0;
 
+/* Linux 4.18 adds support for reporting USB 3.2 rx_lanes and tx_lanes. Before
+ * that version we assume rx_lanes = 1 and tx_lanes = 1. At version 4.18 or
+ * later we read the rx_lanes and tx_lanes from the usbfs.
+ */
+static int usbfs_supports_num_lanes = -1;
+
 /* Linux has changed the maximum length of an individual isochronous packet
  * over time.  Initially this limit was 1,023 bytes, but Linux 2.6.18
  * (commit 3612242e527eb47ee4756b5350f8bdf791aa5ede) increased this value to
@@ -360,6 +366,11 @@ static int op_init(struct libusb_context *ctx)
 
 	if (get_kernel_version(ctx, &kversion) < 0)
 		return LIBUSB_ERROR_OTHER;
+
+	if (usbfs_supports_num_lanes == -1) {
+		/* usbfs supports tx_lanes and rx_lanes from 4.18 */
+		usbfs_supports_num_lanes = kernel_version_ge(&kversion,4,18,0);
+	}
 
 	if (!kernel_version_ge(&kversion, 2, 6, 32)) {
 		usbi_err(ctx, "kernel version is too old (reported as %d.%d.%d)",
@@ -908,7 +919,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	size_t alloc_len;
-	int fd, speed, r;
+	int fd, speed, r, num_rx_lanes, num_tx_lanes;
 	ssize_t nb;
 
 	dev->bus_number = busnum;
@@ -931,6 +942,21 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 			default:
 				usbi_warn(ctx, "unknown device speed: %d Mbps", speed);
 			}
+		}
+
+		/* Note requires kernel version >= 4.18 for {rx, tx}_lanes support */
+		if (usbfs_supports_num_lanes) {
+			if (read_sysfs_attr(ctx, sysfs_dir, "rx_lanes", INT_MAX, &num_rx_lanes) == 0) {
+				dev->num_rx_lanes = num_rx_lanes;
+			}
+
+			if (read_sysfs_attr(ctx, sysfs_dir, "tx_lanes", INT_MAX, &num_tx_lanes) == 0) {
+				dev->num_tx_lanes = num_tx_lanes;
+			}
+		} else {
+			/* Default to 1 lane only if we don't expect the attr to work */
+			dev->num_rx_lanes = 1;
+			dev->num_tx_lanes = 1;
 		}
 	} else if (wrapped_fd >= 0) {
 		dev->speed = usbfs_get_speed(ctx, wrapped_fd);
