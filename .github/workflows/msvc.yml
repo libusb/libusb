@@ -1,0 +1,20 @@
+name: Visual Studio build
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        platform: [Win32, x64, ARM, ARM64]
+    steps:
+    - uses: actions/checkout@v3
+    - uses: microsoft/setup-msbuild@v1.1
+    - name: MSBuild ${{ matrix.platform }}
+      run: msbuild msvc\libusb.sln /p:Configuration=Release /p:Platform=${{ matrix.platform }}
