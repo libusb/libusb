@@ -474,8 +474,8 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 		lun = 0;
 		printf("   Stalled, setting Max LUN to 0\n");
 	} else if (r < 0) {
-		perr("   Failed: (error %d) %s\n", r, libusb_strerror((enum libusb_error)r));
-		return -1;
+		perr("   Failed.\n");
+		return r;
 	} else {
 		printf("   Max LUN = %d\n", lun);
 	}
