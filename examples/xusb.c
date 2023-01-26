@@ -930,12 +930,25 @@ static int test_device(uint16_t vid, uint16_t pid)
 	libusb_set_auto_detach_kernel_driver(handle, 1);
 	for (iface = 0; iface < nb_ifaces; iface++)
 	{
-		int ret = libusb_kernel_driver_active(handle, iface);
-		printf("\nKernel driver attached for interface %d: %d\n", iface, ret);
+		int ret;
+
+		printf("\nKernel driver attached for interface %d: ", iface);
+		ret = libusb_kernel_driver_active(handle, iface);
+		if (ret == 0)
+			printf("none\n");
+		else if (ret == 1)
+			printf("yes\n");
+		else if (ret == LIBUSB_ERROR_NOT_SUPPORTED)
+			printf("(not supported)\n");
+		else
+			perr("\n   Failed (error %d) %s\n", ret,
+			     libusb_strerror((enum libusb_error) ret));
+
 		printf("\nClaiming interface %d...\n", iface);
 		r = libusb_claim_interface(handle, iface);
 		if (r != LIBUSB_SUCCESS) {
-			perr("   Failed.\n");
+			perr("   Failed (error %d) %s\n", ret,
+			     libusb_strerror((enum libusb_error) ret));
 		}
 	}
 
