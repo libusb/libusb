@@ -470,12 +470,15 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 		BOMS_GET_MAX_LUN, 0, 0, &lun, 1, 1000);
 	// Some devices send a STALL instead of the actual value.
 	// In such cases we should set lun to 0.
-	if (r == 0) {
+	if (r == LIBUSB_ERROR_PIPE) {
 		lun = 0;
+		printf("   Stalled, setting Max LUN to 0\n");
 	} else if (r < 0) {
-		perr("   Failed: %s", libusb_strerror((enum libusb_error)r));
+		perr("   Failed: (error %d) %s\n", r, libusb_strerror((enum libusb_error)r));
+		return -1;
+	} else {
+		printf("   Max LUN = %d\n", lun);
 	}
-	printf("   Max LUN = %d\n", lun);
 
 	// Send Inquiry
 	printf("\nSending Inquiry:\n");
