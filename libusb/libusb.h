@@ -1564,11 +1564,9 @@ struct libusb_init_option {
 typedef void (LIBUSB_CALL *libusb_log_cb)(libusb_context *ctx,
 	enum libusb_log_level level, const char *str);
 
-LIBUSB_DEPRECATED_FOR(libusb_init_context)
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
 int LIBUSB_CALL libusb_init_context(libusb_context **ctx, const struct libusb_init_option options[], int num_options);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
-LIBUSB_DEPRECATED_FOR(libusb_set_option)
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
 void LIBUSB_CALL libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb, int mode);
 const struct libusb_version * LIBUSB_CALL libusb_get_version(void);
