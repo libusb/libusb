@@ -159,9 +159,9 @@ if(ANDROID)
 endif()
 
 if(libusb_BUILD_TESTING AND BUILD_TESTING)
-    add_executable(testlibusb ../tests/testlib.c ../tests/stress.c)
-    target_link_libraries(testlibusb PRIVATE usb-1.0)
-    add_test(testlibusb COMMAND testlibusb)
+    add_executable(stress ../tests/testlib.c ../tests/stress.c)
+    target_link_libraries(stress PRIVATE usb-1.0)
+    add_test(stress COMMAND stress)
 endif()
 
 if(libusb_INSTALL_TARGETS)
