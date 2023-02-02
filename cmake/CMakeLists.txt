@@ -1,6 +1,10 @@
 project(usb-1.0 C)
 cmake_minimum_required(VERSION 3.10)
 
+set_target_properties(usb-1.0
+    PROPERTIES PREFIX "lib"
+)
+
 # This is because CMake on mingw can incorrectly use response files for includes
 # instead of passing them directly via -I<dir>
 # Explicitly disable use of response files
