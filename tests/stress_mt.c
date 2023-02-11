@@ -1,5 +1,9 @@
+#include "config.h"
+
 #include <libusb.h>
 #include <stdio.h>
+
+#if defined (HAVE_PTHREAD_CREATE) || defined(HAVE_WIN_PTHREAD)
 #include <pthread.h>
 
 /* Test that creates and destroys contexts repeatedly */
@@ -43,3 +47,13 @@ int main(void)
 
 	return 0;
 }
+
+#else
+int main(int argc, char **argv)
+{
+	(void) argc;
+	printf("%s: This test requires Posix threads\n", argv[0]);
+	/* return success to not upset CI test runs */
+	return 0;
+}
+#endif /* HAVE_PTHREAD_CREATE */

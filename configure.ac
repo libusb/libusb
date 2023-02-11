@@ -179,6 +179,15 @@ if test "x$platform" = xposix; then
 	fi
 elif test "x$platform" = xwindows; then
 	AC_DEFINE([PLATFORM_WINDOWS], [1], [Define to 1 if compiling for a Windows platform.])
+	dnl windows platforms may have pthread support, use for portable tests only
+	saved_LIBS="${LIBS}"
+	AC_SEARCH_LIBS([pthread_create], [pthread],
+		[win_has_pthread=yes], [], [])
+	WIN_PTHREAD_LIBS="${LIBS}"
+	LIBS="${saved_LIBS}"
+	if test "x$win_has_pthread" = xyes; then
+		AC_DEFINE([HAVE_WIN_PTHREAD], [1], [Windows platform has pthread support])
+	fi
 else
 	AC_MSG_ERROR([Unknown platform])
 fi
@@ -238,6 +247,9 @@ esac
 
 dnl headers not available on all platforms but required on others
 AC_CHECK_HEADERS([sys/time.h])
+
+dnl for detecting general pthread support (non-Windows) in tests
+AC_CHECK_FUNCS([pthread_create])
 
 dnl check availability of clock_gettime(), except don't bother on Darwin, because the result is not used.
 if test "x$platform" = xposix && test "x$backend" != xdarwin; then
@@ -390,6 +402,7 @@ AM_CONDITIONAL([OS_EMSCRIPTEN], [test "x$backend" = xemscripten])
 AM_CONDITIONAL([PLATFORM_POSIX], [test "x$platform" = xposix])
 AM_CONDITIONAL([PLATFORM_WINDOWS], [test "x$platform" = xwindows])
 AM_CONDITIONAL([USE_UDEV], [test "x$use_udev" = xyes])
+AM_CONDITIONAL([WIN_HAS_PTHREAD], [test "x$win_has_pthread" = xyes])
 
 dnl The -Wcast-function-type warning causes a flurry of warnings when compiling
 dnl Windows with GCC 8 or later because of dynamically loaded functions
@@ -429,6 +442,8 @@ AC_SUBST(LT_LDFLAGS)
 AC_SUBST(AM_LDFLAGS)
 
 AC_SUBST([EXTRA_LDFLAGS])
+
+AC_SUBST([WIN_PTHREAD_LIBS])
 
 dnl set name of html output directory for doxygen
 AC_SUBST(DOXYGEN_HTMLDIR, [api-1.0])
