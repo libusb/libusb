@@ -9,7 +9,7 @@
 
 static void *test_init_and_exit(void * arg)
 {
-	long int threadno = (long int) arg;
+	long int threadno = (long int)(intptr_t) arg;
 
 	printf("Thread %ld started\n", threadno);
 	for (int i = 0; i < ITERS; ++i) {
@@ -34,7 +34,7 @@ int main(void)
 
 	printf("Starting multithreaded init and exit test...\n");
 	for(t = 0; t < NTHREADS; t++)
-		pthread_create(&threadId[t], NULL, &test_init_and_exit, (void *) t);
+		pthread_create(&threadId[t], NULL, &test_init_and_exit, (void *)(intptr_t) t);
 
 	for(t = 0; t < NTHREADS; t++)
 		pthread_join(threadId[t], NULL);
