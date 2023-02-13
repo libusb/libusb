@@ -2350,6 +2350,12 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	return LIBUSB_SUCCESS;;
 }
 
+void API_EXPORTED usbi_clear_default_options(void) {
+	for (int option = 0 ; option < LIBUSB_OPTION_MAX ; ++option) {
+		default_context_options[option].is_set = 0;
+	}
+}
+
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 /* returns the log level as defined in the LIBUSB_DEBUG environment variable.
  * if LIBUSB_DEBUG is not present or not a number, returns LIBUSB_LOG_LEVEL_NONE.

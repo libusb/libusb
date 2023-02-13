@@ -12,6 +12,8 @@ EXPORTS
   libusb_cancel_transfer@4 = libusb_cancel_transfer
   libusb_claim_interface
   libusb_claim_interface@8 = libusb_claim_interface
+  usbi_clear_default_options
+  usbi_clear_default_options@0 = usbi_clear_default_options
   libusb_clear_halt
   libusb_clear_halt@8 = libusb_clear_halt
   libusb_close

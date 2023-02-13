@@ -898,6 +898,9 @@ struct discovered_devs {
 struct discovered_devs *discovered_devs_append(
 	struct discovered_devs *discdevs, struct libusb_device *dev);
 
+/* internal test-only method for clearing out all default context options */
+void LIBUSB_CALL usbi_clear_default_options(void);
+
 /* OS abstraction */
 
 /* This is the interface that OS backends need to implement.
