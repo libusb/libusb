@@ -1,7 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * Core functions for libusb
- * Copyright © 2012-2021 Nathan Hjelm <hjelmn@cs.unm.edu>
+ * Copyright © 2012-2023 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  *
@@ -2432,14 +2432,14 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
+	_ctx->debug = LIBUSB_LOG_LEVEL_NONE;
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-	if (default_context_options[LIBUSB_OPTION_LOG_LEVEL].is_set) {
-		_ctx->debug = default_context_options[LIBUSB_OPTION_LOG_LEVEL].arg.ival;
-	} else {
+	if (getenv("LIBUSB_DEBUG")) {
 		_ctx->debug = get_env_debug_level();
-	}
-	if (_ctx->debug != LIBUSB_LOG_LEVEL_NONE)
 		_ctx->debug_fixed = 1;
+	} else if (default_context_options[LIBUSB_OPTION_LOG_LEVEL].is_set) {
+		_ctx->debug = default_context_options[LIBUSB_OPTION_LOG_LEVEL].arg.ival;
+	}
 #endif
 
 	usbi_mutex_init(&_ctx->usb_devs_lock);
