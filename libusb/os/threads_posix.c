@@ -32,8 +32,6 @@
 #elif defined(__NetBSD__)
 # include <lwp.h>
 #elif defined(__OpenBSD__)
-# define _BSD_SOURCE
-# include <sys/syscall.h>
 # include <unistd.h>
 #elif defined(__sun__)
 # include <sys/lwp.h>
@@ -109,9 +107,7 @@ unsigned int usbi_get_tid(void)
 #elif defined(__NetBSD__)
 	tid = _lwp_self();
 #elif defined(__OpenBSD__)
-	/* The following only works with OpenBSD > 5.1 as it requires
-	 * real thread support. For 5.1 and earlier, -1 is returned. */
-	tid = syscall(SYS_getthrid);
+	tid = getthrid();
 #elif defined(__sun__)
 	tid = _lwp_self();
 #else
