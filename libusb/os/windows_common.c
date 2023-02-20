@@ -801,10 +801,13 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
 	enum libusb_transfer_status status, istatus;
 	DWORD result, bytes_transferred;
 
-	if (GetOverlappedResult(transfer_priv->handle, &transfer_priv->overlapped, &bytes_transferred, FALSE))
+	if (GetOverlappedResult(transfer_priv->handle, &transfer_priv->overlapped, &bytes_transferred, FALSE)) {
 		result = (DWORD) transfer_priv->overlapped.Internal;
-	else
+		if (result != ERROR_SUCCESS)
+			usbi_dbg(ctx, "GetOverlappedResult true, but Internal not reset");
+	} else {
 		result = GetLastError();
+	}
 
 	usbi_dbg(ctx, "handling transfer %p completion with errcode %lu, length %lu",
 		 USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer), ULONG_CAST(result), ULONG_CAST(bytes_transferred));
