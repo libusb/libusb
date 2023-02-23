@@ -820,6 +820,17 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 		priv->config_descriptor[i] = cd_data;
 		cd_buf_actual = NULL;
 	}
+
+	/* Some USB devices have broken descriptors in which the
+	   number of descriptors does not match
+	   bNumConfigurations. This can result in "Entity not found"
+	   errors. If this happens simply replicate the first
+	   configuration. */
+	for ( i = 0; i < num_configurations; i++ )
+	  {
+	    if ( priv -> config_descriptor [ i ] == NULL )
+	      priv -> config_descriptor [ i ] = priv -> config_descriptor [ 0 ] ;
+	  }
 }
 
 #define ROOT_HUB_FS_CONFIG_DESC_LENGTH		0x19
