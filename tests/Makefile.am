@@ -3,17 +3,11 @@ LDADD = ../libusb/libusb-1.0.la
 LIBS =
 
 stress_SOURCES = stress.c testlib.c
-
+stress_mt_SOURCES = stress_mt.c
 set_option_SOURCES = set_option.c testlib.c
 
 noinst_HEADERS = libusb_testlib.h
-noinst_PROGRAMS = stress set_option
-
-if PLATFORM_POSIX
-stress_mt_SOURCES = stress_mt.c
-
-noinst_PROGRAMS += stress_mt
-endif
+noinst_PROGRAMS = stress stress_mt set_option
 
 if BUILD_UMOCKDEV_TEST
 # NOTE: We add libumockdev-preload.so so that we can run tests in-process
