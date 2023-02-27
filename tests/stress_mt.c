@@ -77,39 +77,93 @@ static inline void thread_join(thread_t thread)
 #define NTHREADS 8
 #define ITERS 64
 
+struct thread_info {
+	int number;
+	int enumerate;
+	ssize_t devcount;
+	int err;
+	int iteration;
+} tinfo[NTHREADS];
+
 static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 {
-	long int threadno = (long int)(uintptr_t) arg;
+	struct thread_info *ti = (struct thread_info *) arg;
 
-	printf("Thread %ld started\n", threadno);
 	for (int i = 0; i < ITERS; ++i) {
 		libusb_context *ctx = NULL;
 		int r;
 
 		r = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
 		if (r != LIBUSB_SUCCESS) {
-			printf("Failed to init libusb on iteration %d: %d", i, r);
+			ti->err = r;
+			ti->iteration = i;
 			return (thread_return_t) THREAD_RETURN_VALUE;
 		}
+		if (ti->enumerate) {
+			libusb_device **devs;
+			ti->devcount = libusb_get_device_list(ctx, &devs);
+			if (ti->devcount < 0) {
+				libusb_free_device_list(devs, 1);
+				ti->iteration = i;
+				break;
+			}
+			libusb_free_device_list(devs, 1);
+		}
+
 		libusb_exit(ctx);
 	}
-	printf("Thread %ld done\n", threadno);
 	return (thread_return_t) THREAD_RETURN_VALUE;
+}
+
+static int test_multi_init(int enumerate)
+{
+	thread_t threadId[NTHREADS];
+	int errs = 0;
+	int t;
+
+	printf("Starting %d threads\n", NTHREADS);
+	for (t = 0; t < NTHREADS; t++) {
+		tinfo[t].number = t;
+		tinfo[t].enumerate = enumerate;
+		thread_create(&threadId[t], &init_and_exit, (void *) &tinfo[t]);
+	}
+
+	for (t = 0; t < NTHREADS; t++) {
+		thread_join(threadId[t]);
+		if (tinfo[t].err) {
+			errs++;
+			fprintf(stderr,
+				"Thread %d failed (iteration %d): %s\n",
+				tinfo[t].number,
+				tinfo[t].iteration,
+				libusb_error_name(tinfo[t].err));
+		} else if (enumerate) {
+			if (tinfo[t].devcount < 0) {
+				errs++;
+				fprintf(stderr,
+					"Thread %d failed to enumerate devices (iteration %d)\n",
+					tinfo[t].number,
+					tinfo[t].iteration);
+			} else {
+				printf("Thread %d discovered %ld devices\n",
+				       tinfo[t].number,
+				       (long int) tinfo[t].devcount);
+			}
+		}
+	}
+
+	return errs;
 }
 
 int main(void)
 {
-	thread_t threadId[NTHREADS];
-	long int t;
+	int errs = 0;
 
-	printf("Starting multithreaded init and exit test...\n");
-	for(t = 0; t < NTHREADS; t++)
-		thread_create(&threadId[t], &init_and_exit, (void *)(uintptr_t) t);
+	printf("Running multithreaded init/exit test...\n");
+	errs += test_multi_init(0);
+	printf("Running multithreaded init/exit test with enumeration...\n");
+	errs += test_multi_init(1);
+	printf("All done, %d errors\n", errs);
 
-	for(t = 0; t < NTHREADS; t++)
-		thread_join(threadId[t]);
-
-	printf("All Done\n");
-
-	return 0;
+	return errs != 0;
 }
