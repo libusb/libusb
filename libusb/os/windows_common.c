@@ -279,6 +279,7 @@ enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS st
 	case USBD_STATUS_CANCELED:
 		return LIBUSB_TRANSFER_CANCELLED;
 	case USBD_STATUS_ENDPOINT_HALTED:
+	case USBD_STATUS_STALL_PID:
 		return LIBUSB_TRANSFER_STALL;
 	case USBD_STATUS_DEVICE_GONE:
 		return LIBUSB_TRANSFER_NO_DEVICE;
