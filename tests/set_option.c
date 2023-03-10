@@ -29,15 +29,15 @@
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #include <winbase.h>
-/* Windows does not offer unsetenv. To simplify the test code just declare
- * an empty implementation. */
-static void unsetenv(const char *env) {
-  SetEnvironmentVariable(env, NULL);
+
+static int unsetenv(const char *env) {
+  return _putenv_s(env, "");
 }
 
-static void setenv(const char *env, const char *value, int overwrite) {
-  (void)overwrite;
-  SetEnvironmentVariable(env, value);
+static int setenv(const char *env, const char *value, int overwrite) {
+  if (getenv(env) && !overwrite)
+    return 0;
+  return _putenv_s(env, value);
 }
 #endif
 
