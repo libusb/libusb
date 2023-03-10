@@ -161,7 +161,7 @@ static libusb_testlib_result test_set_log_level_env(void) {
 
 static libusb_testlib_result test_no_discovery(void)
 {
-#if defined(OS_LINUX)
+#if defined(__linux__)
   libusb_context *test_ctx;
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, /*options=*/NULL,
                                                   /*num_options=*/0));
@@ -175,8 +175,8 @@ static libusb_testlib_result test_no_discovery(void)
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_set_option(NULL, LIBUSB_OPTION_NO_DEVICE_DISCOVERY));
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, /*options=*/NULL,
                                                   /*num_options=*/0));
-  libusb_device **device_list = NULL;
-  ssize_t num_devices = libusb_get_device_list(test_ctx, &device_list);
+  device_list = NULL;
+  num_devices = libusb_get_device_list(test_ctx, &device_list);
   libusb_free_device_list(device_list, /*unref_devices=*/1);
 
   LIBUSB_EXPECT(==, num_devices, 0);
