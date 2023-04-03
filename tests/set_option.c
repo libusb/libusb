@@ -71,7 +71,7 @@ static int setenv(const char *env, const char *value, int overwrite) {
  */
 #define LIBUSB_EXPECT(operator, lhs, rhs)                               \
   do {                                                                  \
-    int64_t _lhs = (lhs), _rhs = (rhs);                                 \
+    int64_t _lhs = (int64_t)(intptr_t)(lhs), _rhs = (int64_t)(intptr_t)(rhs); \
     if (!(_lhs operator _rhs)) {                                        \
       libusb_testlib_logf("Expected %s (%" PRId64 ") " #operator        \
                           " %s (%" PRId64 ") at %s:%d", #lhs,           \
@@ -185,12 +185,52 @@ static libusb_testlib_result test_no_discovery(void)
 #endif
 }
 
+static void test_log_cb(libusb_context *ctx, enum libusb_log_level level,
+                        const char *str) {
+  UNUSED(ctx);
+  UNUSED(level);
+  UNUSED(str);
+}
+
+
+static libusb_testlib_result test_set_log_cb(void)
+{
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
+  libusb_context *test_ctx = NULL;
+
+  /* set the log callback on the context */
+  LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, /*options=*/NULL,
+                                                  /*num_options=*/0));
+  LIBUSB_TEST_RETURN_ON_ERROR(libusb_set_option(test_ctx, LIBUSB_OPTION_LOG_CB,
+                                                test_log_cb));
+
+  /* check that debug level came from the default */
+  LIBUSB_EXPECT(==, test_ctx->log_handler, test_log_cb);
+
+  libusb_exit(test_ctx);
+  test_ctx = NULL;
+
+  /* set the log callback for all future contexts */
+  LIBUSB_TEST_RETURN_ON_ERROR(libusb_set_option(/*ctx=*/NULL, LIBUSB_OPTION_LOG_CB,
+                                                test_log_cb));
+  LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, /*options=*/NULL,
+                                                  /*num_options=*/0));
+  LIBUSB_EXPECT(==, test_ctx->log_handler, test_log_cb);
+
+
+  LIBUSB_TEST_CLEAN_EXIT(TEST_STATUS_SUCCESS);
+#else
+  return TEST_STATUS_SKIP;
+#endif
+}
+
 static const libusb_testlib_test tests[] = {
   { "test_set_log_level_basic", &test_set_log_level_basic },
   { "test_set_log_level_env", &test_set_log_level_env },
   { "test_no_discovery", &test_no_discovery },
   /* since default options can't be unset, run this one last */
   { "test_set_log_level_default", &test_set_log_level_default },
+  { "test_set_log_cb", &test_set_log_cb },
   LIBUSB_NULL_TEST
 };
 

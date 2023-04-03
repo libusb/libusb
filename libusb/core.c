@@ -2219,6 +2219,29 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 #endif
 }
 
+static void libusb_set_log_cb_internal(libusb_context *ctx, libusb_log_cb cb,
+				       int mode)
+{
+#if defined(ENABLE_LOGGING) && (!defined(ENABLE_DEBUG_LOGGING) || !defined(USE_SYSTEM_LOGGING_FACILITY))
+#if !defined(USE_SYSTEM_LOGGING_FACILITY)
+	if (mode & LIBUSB_LOG_CB_GLOBAL)
+		log_handler = cb;
+#endif
+#if !defined(ENABLE_DEBUG_LOGGING)
+	if (mode & LIBUSB_LOG_CB_CONTEXT) {
+		ctx = usbi_get_context(ctx);
+		ctx->log_handler = cb;
+	}
+#else
+	UNUSED(ctx);
+#endif
+#else
+	UNUSED(ctx);
+	UNUSED(cb);
+	UNUSED(mode);
+#endif
+}
+
 /** \ingroup libusb_lib
  * Set log handler.
  *
@@ -2245,24 +2268,7 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 void API_EXPORTED libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb,
 	int mode)
 {
-#if defined(ENABLE_LOGGING) && (!defined(ENABLE_DEBUG_LOGGING) || !defined(USE_SYSTEM_LOGGING_FACILITY))
-#if !defined(USE_SYSTEM_LOGGING_FACILITY)
-	if (mode & LIBUSB_LOG_CB_GLOBAL)
-		log_handler = cb;
-#endif
-#if !defined(ENABLE_DEBUG_LOGGING)
-	if (mode & LIBUSB_LOG_CB_CONTEXT) {
-		ctx = usbi_get_context(ctx);
-		ctx->log_handler = cb;
-	}
-#else
-	UNUSED(ctx);
-#endif
-#else
-	UNUSED(ctx);
-	UNUSED(cb);
-	UNUSED(mode);
-#endif
+	libusb_set_log_cb_internal(ctx, cb, mode);
 }
 
 /** \ingroup libusb_lib
@@ -2292,6 +2298,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	enum libusb_option option, ...)
 {
 	int arg = 0, r = LIBUSB_SUCCESS;
+	libusb_log_cb log_cb = NULL;
 	va_list ap;
 
 	va_start(ap, option);
@@ -2300,6 +2307,9 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		if (arg < LIBUSB_LOG_LEVEL_NONE || arg > LIBUSB_LOG_LEVEL_DEBUG) {
 			r = LIBUSB_ERROR_INVALID_PARAM;
 		}
+	}
+	if (LIBUSB_OPTION_LOG_CB == option) {
+		log_cb = (libusb_log_cb) va_arg(ap, libusb_log_cb);
 	}
 	va_end(ap);
 
@@ -2316,12 +2326,15 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		default_context_options[option].is_set = 1;
 		if (LIBUSB_OPTION_LOG_LEVEL == option) {
 			default_context_options[option].arg.ival = arg;
+		} else if (LIBUSB_OPTION_LOG_CB) {
+			default_context_options[option].arg.log_cbval = log_cb;
 		}
 		usbi_mutex_static_unlock(&default_context_lock);
 	}
 
 	ctx = usbi_get_context(ctx);
 	if (NULL == ctx) {
+		libusb_set_log_cb_internal(NULL, log_cb, LIBUSB_LOG_CB_GLOBAL);
 		return LIBUSB_SUCCESS;
 	}
 
@@ -2343,6 +2356,9 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 		break;
 
+	case LIBUSB_OPTION_LOG_CB:
+		libusb_set_log_cb_internal(ctx, log_cb, LIBUSB_LOG_CB_CONTEXT);
+		break;
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
@@ -2452,14 +2468,24 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
 			continue;
 		}
-		r = libusb_set_option(_ctx, option);
+		if (LIBUSB_OPTION_LOG_CB != option) {
+			r = libusb_set_option(_ctx, option);
+		} else {
+			r = libusb_set_option(_ctx, option, default_context_options[option].arg.log_cbval);
+		}
 		if (LIBUSB_SUCCESS != r)
 			goto err_free_ctx;
 	}
 
 	/* apply any options provided by the user */
 	for (int i = 0 ; i < num_options ; ++i) {
-		r = libusb_set_option(_ctx, options[i].option, options[i].value.ival);
+		switch(options[i].option) {
+		case LIBUSB_OPTION_LOG_CB:
+			r = libusb_set_option(_ctx, options[i].option, options[i].value.log_cbval);
+			break;
+		default:
+			r = libusb_set_option(_ctx, options[i].option, options[i].value.ival);
+		}
 		if (LIBUSB_SUCCESS != r)
 			goto err_free_ctx;
 	}

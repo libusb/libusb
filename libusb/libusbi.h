@@ -814,6 +814,7 @@ struct usbi_option {
   int is_set;
   union {
     int ival;
+    libusb_log_cb log_cbval;
   } arg;
 };
 
