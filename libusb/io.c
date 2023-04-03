@@ -1719,8 +1719,11 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	transfer->actual_length = itransfer->transferred;
 	usbi_dbg(ctx, "transfer %p has callback %p",
 		 (void *) transfer, transfer->callback);
-	if (transfer->callback)
+	if (transfer->callback) {
+		libusb_lock_event_waiters (ctx);
 		transfer->callback(transfer);
+		libusb_unlock_event_waiters(ctx);
+	}
 	/* transfer might have been freed by the above call, do not use from
 	 * this point. */
 	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER)
