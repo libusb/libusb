@@ -5,9 +5,10 @@ LIBS =
 stress_SOURCES = stress.c testlib.c
 stress_mt_SOURCES = stress_mt.c
 set_option_SOURCES = set_option.c testlib.c
+init_context_SOURCES = init_context.c testlib.c
 
 noinst_HEADERS = libusb_testlib.h
-noinst_PROGRAMS = stress stress_mt set_option
+noinst_PROGRAMS = stress stress_mt set_option init_context
 
 if BUILD_UMOCKDEV_TEST
 # NOTE: We add libumockdev-preload.so so that we can run tests in-process

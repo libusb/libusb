@@ -3,7 +3,7 @@
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
  * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2012 Pete Batard <pete@akeo.ie>
- * Copyright © 2012-2021 Nathan Hjelm <hjelmn@cs.unm.edu>
+ * Copyright © 2012-2023 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2014-2020 Chris Dickens <christopher.a.dickens@gmail.com>
  * For more information, please visit: http://libusb.info
  *
@@ -1534,20 +1534,18 @@ enum libusb_option {
 	 */
 	LIBUSB_OPTION_WINUSB_RAW_IO = 3,
 
-	LIBUSB_OPTION_MAX = 4
-};
+	/** Set the context log callback functon.
+	 *
+	 * Set the log callback function either on a context or globally. This
+	 * option must be provided an argument of type libusb_log_cb. Using this
+	 * option with a NULL context is equivalent to calling libusb_set_log_cb
+	 * with mode LIBUSB_LOG_CB_GLOBAL. Using it with a non-NULL context is
+	 * equivalent to calling libusb_set_log_cb with mode
+	 * LIBUSB_LOG_CB_CONTEXT.
+	 */
+	LIBUSB_OPTION_LOG_CB = 4,
 
-/** \ingroup libusb_lib
- * Structure used for setting options through \ref libusb_init_context.
- *
- */
-struct libusb_init_option {
-  /** Which option to set */
-  enum libusb_option option;
-  /** An integer value used by the option (if applicable). */
-  union {
-    int64_t ival;
-  } value;
+	LIBUSB_OPTION_MAX = 5
 };
 
 /** \ingroup libusb_lib
@@ -1564,10 +1562,25 @@ struct libusb_init_option {
 typedef void (LIBUSB_CALL *libusb_log_cb)(libusb_context *ctx,
 	enum libusb_log_level level, const char *str);
 
+/** \ingroup libusb_lib
+ * Structure used for setting options through \ref libusb_init_context.
+ *
+ */
+struct libusb_init_option {
+  /** Which option to set */
+  enum libusb_option option;
+  /** An integer value used by the option (if applicable). */
+  union {
+    int64_t ival;
+    libusb_log_cb log_cbval;
+  } value;
+};
+
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
 int LIBUSB_CALL libusb_init_context(libusb_context **ctx, const struct libusb_init_option options[], int num_options);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
+/* may be deprecated in the future in favor of lubusb_init_context()+libusb_set_option() */
 void LIBUSB_CALL libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb, int mode);
 const struct libusb_version * LIBUSB_CALL libusb_get_version(void);
 int LIBUSB_CALL libusb_has_capability(uint32_t capability);
