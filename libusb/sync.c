@@ -34,10 +34,15 @@
 
 static void LIBUSB_CALL sync_transfer_cb(struct libusb_transfer *transfer)
 {
+	usbi_dbg(TRANSFER_CTX(transfer), "actual_length=%d", transfer->actual_length);
+
 	int *completed = transfer->user_data;
 	*completed = 1;
-	usbi_dbg(TRANSFER_CTX(transfer), "actual_length=%d", transfer->actual_length);
-	/* caller interprets result and frees transfer */
+	/*
+	 * Right after setting 'completed', another thread might free the transfer, so don't
+	 * access it beyond this point. The instantiating thread (not necessarily the
+	 * current one) interprets the result and frees the transfer.
+	 */
 }
 
 static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
