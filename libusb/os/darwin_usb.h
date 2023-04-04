@@ -1,7 +1,7 @@
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2019 Nathan Hjelm <hjelmn@users.sourceforge.net>
- * Copyright © 2019      Google LLC. All rights reserved.
+ * Copyright © 2008-2023 Nathan Hjelm <hjelmn@users.sourceforge.net>
+ * Copyright © 2019-2023 Google LLC. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -36,67 +36,26 @@
 
 /* IOUSBInterfaceInferface */
 
-/* New in OS 10.12.0. */
-#if defined (kIOUSBInterfaceInterfaceID800)
-
-#define usb_interface_t IOUSBInterfaceInterface800
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID800
-#define InterfaceVersion 800
-
-/* New in OS 10.10.0. */
-#elif defined (kIOUSBInterfaceInterfaceID700)
-
-#define usb_interface_t IOUSBInterfaceInterface700
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID700
-#define InterfaceVersion 700
-
-/* New in OS 10.9.0. */
-#elif defined (kIOUSBInterfaceInterfaceID650)
-
-#define usb_interface_t IOUSBInterfaceInterface650
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID650
-#define InterfaceVersion 650
-
-/* New in OS 10.8.2 but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBInterfaceInterfaceID550)
-
-#define usb_interface_t IOUSBInterfaceInterface550
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID550
-#define InterfaceVersion 550
-
-/* New in OS 10.7.3 but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBInterfaceInterfaceID500)
-
-#define usb_interface_t IOUSBInterfaceInterface500
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID500
-#define InterfaceVersion 500
-
-/* New in OS 10.5.0. */
-#elif defined (kIOUSBInterfaceInterfaceID300)
-
-#define usb_interface_t IOUSBInterfaceInterface300
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID300
-#define InterfaceVersion 300
-
-/* New in OS 10.4.5 (or 10.4.6?) but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBInterfaceInterfaceID245)
-
-#define usb_interface_t IOUSBInterfaceInterface245
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID245
-#define InterfaceVersion 245
-
-/* New in OS 10.4.0. */
-#elif defined (kIOUSBInterfaceInterfaceID220)
-
-#define usb_interface_t IOUSBInterfaceInterface220
-#define InterfaceInterfaceID kIOUSBInterfaceInterfaceID220
-#define InterfaceVersion 220
-
+#if defined(kIOUSBInterfaceInterfaceID800)
+#define MAX_INTERFACE_VERSION 800
+#elif defined(kIOUSBInterfaceInterfaceID700)
+#define	MAX_INTERFACE_VERSION 700
+#elif defined(kIOUSBInterfaceInterfaceID650)
+#define MAX_INTERFACE_VERSION 650
+#elif defined(kIOUSBInterfaceInterfaceID550)
+#define MAX_INTERFACE_VERSION 550
+#elif defined(kIOUSBInterfaceInterfaceID245)
+#define MAX_INTERFACE_VERSION 245
 #else
-
-#error "IOUSBFamily is too old. Please upgrade your SDK and/or deployment target"
-
+#define	MAX_INTERFACE_VERSION 220
 #endif
+
+/* set to the minimum version and casted up as needed. */
+typedef IOUSBInterfaceInterface220 **usb_interface_t;
+
+#define IOINTERFACE0(darwin_interface, version) ((IOUSBInterfaceInterface ## version **) (darwin_interface)->interface)
+#define IOINTERFACE_V(darwin_interface, version) IOINTERFACE0(darwin_interface, version)
+#define IOINTERFACE(darwin_interface) ((darwin_interface)->interface)
 
 /* IOUSBDeviceInterface */
 
@@ -199,7 +158,7 @@ struct darwin_device_handle_priv {
   CFRunLoopSourceRef   cfSource;
 
   struct darwin_interface {
-    usb_interface_t    **interface;
+    usb_interface_t      interface;
     uint8_t              num_endpoints;
     CFRunLoopSourceRef   cfSource;
     uint64_t             frames[256];
