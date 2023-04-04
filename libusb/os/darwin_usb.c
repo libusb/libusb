@@ -170,6 +170,67 @@ static enum libusb_error darwin_to_libusb (IOReturn result) {
   }
 }
 
+uint32_t get_running_version(void) {
+  int ret;
+#if !defined(TARGET_OS_OSX) || TARGET_OS_OSX == 1
+  char os_version_string[64] = {'\0'};;
+  size_t os_version_string_len = sizeof(os_version_string) - 1;
+
+  /* newer versions of macOS provide a sysctl for the OS version but this is not useful for iOS without
+   * code detecting this is iOS and a mapping from iOS -> macOS version. it is still useful to have since
+   * it provides the exact macOS version instead of the approximate version (as below). */
+  ret = sysctlbyname("kern.osproductversion", os_version_string, &os_version_string_len, NULL, 0);
+  if (ret == 0) {
+    int major = 10, minor = 0, patch = 0;
+    ret = sscanf(os_version_string, "%i.%i.%i", &major, &minor, &patch);
+    if (ret < 2) {
+      usbi_err (NULL, "could not determine the running OS version, assuming 10.0, kern.osproductversion=%s", os_version_string);
+      return 100000;
+    }
+    return (major * 10000) + (minor * 100) + patch;
+  }
+#endif
+
+  char os_release_string[64] = {'\0'};
+  size_t os_release_string_len = sizeof(os_release_string) - 1;
+  /* if the version can not be detected libusb assumes 10.0 so ignore any error here */
+  ret = sysctlbyname("kern.osrelease", os_release_string, &os_release_string_len, NULL, 0);
+  if (ret != 0) {
+    usbi_err (NULL, "could not read kern.osrelease, errno=", errno);
+    return 100000;
+  }
+
+  int darwin_major = 1, darwin_minor = 0;
+  ret = sscanf(os_release_string, "%i.%i", &darwin_major, &darwin_minor);
+  if (ret < 1) {
+    usbi_err (NULL, "could not determine the running Darwin version, assuming 1.3 (OS X 10.0), kern.osrelease=%s", os_release_string);
+    return 100000;
+  }
+
+  int major = 10, minor = 0, patch = 0;
+
+  if (1 == darwin_major && darwin_minor < 4) {
+    /* 10.0.x */
+  } else if (darwin_major < 6) {
+    /* assume 10.1 for anything in this range */
+    minor = 1;
+  } else if (darwin_major < 20) {
+    /* from macOS 10.2 through 10.15 the minor version can be calculated from the darwin_major by subtracting 4 and
+     * the patch level almost always matches darwin_minor. when the darwin_minor does not match the OS X patch level
+     * it is usually because Apple did not change it in a particular point release. when darwin_minor is changed it
+     * always matches the OS X/macOS patch level. */
+    minor = darwin_major - 4;
+    patch = darwin_minor;
+  } else {
+    /* unlikely to be used as kern.osproductversion is available from 10.10 on */
+    major = darwin_major - 9;
+    minor = darwin_minor;
+    /* ignore the patch level in this range */
+  }
+
+  return (major * 10000) + (minor * 100) + patch;
+}
+
 /* this function must be called with the darwin_cached_devices_mutex held */
 static void darwin_deref_cached_device(struct darwin_cached_device *cached_dev) {
   cached_dev->refcount--;
@@ -1806,7 +1867,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   }
 
   /* if we need to release capture */
-  if (HAS_CAPTURE_DEVICE()) {
+  if (get_running_version() >= 101000) {
     if (capture) {
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101000
       options |= kUSBReEnumerateCaptureDeviceMask;
@@ -2555,7 +2616,7 @@ static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle,
   enum libusb_error err;
   struct libusb_context *ctx = HANDLE_CTX (dev_handle);
 
-  if (HAS_CAPTURE_DEVICE()) {
+  if (get_running_version() >= 101000) {
   } else {
     return LIBUSB_ERROR_NOT_SUPPORTED;
   }
@@ -2599,7 +2660,7 @@ static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle,
   UNUSED(interface);
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
 
-  if (HAS_CAPTURE_DEVICE()) {
+  if (get_running_version() >= 101000) {
   } else {
     return LIBUSB_ERROR_NOT_SUPPORTED;
   }
