@@ -59,53 +59,25 @@ typedef IOUSBInterfaceInterface220 **usb_interface_t;
 
 /* IOUSBDeviceInterface */
 
-/* New in OS 10.9.0. */
-#if defined (kIOUSBDeviceInterfaceID650)
-
-#define usb_device_t    IOUSBDeviceInterface650
-#define DeviceInterfaceID kIOUSBDeviceInterfaceID650
-#define DeviceVersion 650
-
-/* New in OS 10.7.3 but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBDeviceInterfaceID500)
-
-#define usb_device_t    IOUSBDeviceInterface500
-#define DeviceInterfaceID kIOUSBDeviceInterfaceID500
-#define DeviceVersion 500
-
-/* New in OS 10.5.4 but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBDeviceInterfaceID320)
-
-#define usb_device_t    IOUSBDeviceInterface320
-#define DeviceInterfaceID kIOUSBDeviceInterfaceID320
-#define DeviceVersion 320
-
-/* New in OS 10.5.0. */
-#elif defined (kIOUSBDeviceInterfaceID300)
-
-#define usb_device_t    IOUSBDeviceInterface300
-#define DeviceInterfaceID kIOUSBDeviceInterfaceID300
-#define DeviceVersion 300
-
-/* New in OS 10.4.5 (or 10.4.6?) but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBDeviceInterfaceID245)
-
-#define usb_device_t    IOUSBDeviceInterface245
-#define DeviceInterfaceID kIOUSBDeviceInterfaceID245
-#define DeviceVersion 245
-
-/* New in OS 10.2.3 but can't test deployment target to that granularity, so round up. */
-#elif defined (kIOUSBDeviceInterfaceID197)
-
-#define usb_device_t    IOUSBDeviceInterface197
-#define DeviceInterfaceID kIOUSBDeviceInterfaceID197
-#define DeviceVersion 197
-
+#if defined(kIOUSBDeviceInterfaceID650)
+#define MAX_DEVICE_VERSION 650
+#elif defined(kIOUSBDeviceInterfaceID500)
+#define	MAX_DEVICE_VERSION 500
+#elif defined(kIOUSBDeviceInterfaceID320)
+#define MAX_DEVICE_VERSION 320
+#elif defined(kIOUSBDeviceInterfaceID300)
+#define MAX_DEVICE_VERSION 300
+#elif defined(kIOUSBDeviceInterfaceID245)
+#define MAX_DEVICE_VERSION 245
 #else
-
-#error "IOUSBFamily is too old. Please upgrade your SDK and/or deployment target"
-
+#define	MAX_DEVICE_VERSION 197
 #endif
+
+/* set to the minimum version and casted up as needed */
+typedef IOUSBDeviceInterface197 **usb_device_t;
+
+#define IODEVICE0(darwin_device, version) ((IOUSBDeviceInterface ## version **)(darwin_device))
+#define IODEVICE_V(darwin_device, version) IODEVICE0(darwin_device, version)
 
 #if !defined(kIOUSBHostInterfaceClassName)
 #define kIOUSBHostInterfaceClassName "IOUSBHostInterface"
@@ -139,7 +111,7 @@ struct darwin_cached_device {
   UInt64                session;
   USBDeviceAddress      address;
   char                  sys_path[21];
-  usb_device_t        **device;
+  usb_device_t          device;
   io_service_t          service;
   int                   open_count;
   UInt8                 first_config, active_config, port;
