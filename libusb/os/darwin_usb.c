@@ -94,6 +94,110 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
 static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io_service_t service, struct darwin_cached_device **cached_out,
                                                   UInt64 *old_session_id);
 
+struct darwin_iokit_interface {
+  uint32_t min_os_version;
+  uint32_t version;
+  CFUUIDRef interface_id;
+};
+
+static const struct darwin_iokit_interface *get_interface_interface(void) {
+  const struct darwin_iokit_interface interfaces[] = {
+#if defined(kIOUSBInterfaceInterfaceID800)
+    {
+      .min_os_version = 101200,
+      .version = 800,
+      .interface_id = kIOUSBInterfaceInterfaceID800,
+    },
+#endif
+#if defined(kIOUSBInterfaceInterfaceID700)
+    {
+      .min_os_version = 101000,
+      .version = 700,
+      .interface_id = kIOUSBInterfaceInterfaceID700,
+    },
+#endif
+#if defined(kIOUSBInterfaceInterfaceID650)
+    {
+      .min_os_version = 100900,
+      .version = 650,
+      .interface_id = kIOUSBInterfaceInterfaceID650
+    },
+#endif
+#if defined(kIOUSBInterfaceInterfaceID550)
+    {
+      .min_os_version = 100803,
+      .version = 550,
+      .interface_id = kIOUSBInterfaceInterfaceID550,
+    },
+#endif
+#if defined(kIOUSBInterfaceInterfaceID245)
+    {
+      .min_os_version = 100407,
+      .version = 245,
+      .interface_id = kIOUSBInterfaceInterfaceID245,
+    },
+#endif
+    {
+      .min_os_version = 100000,
+      .version = 220,
+      .interface_id = kIOUSBInterfaceInterfaceID220,
+    },
+    {
+      .version = 0,
+    },
+  };
+  static struct darwin_iokit_interface cached_interface = {.version = 0};
+  if (0 == cached_interface.version) {
+    uint32_t os_version = get_running_version();
+    for (int i = 0 ; interfaces[i].version > 0 ; ++i) {
+      if (os_version >= interfaces[i].min_os_version && cached_interface.min_os_version < interfaces[i].min_os_version) {
+        cached_interface = interfaces[i];
+      }
+    }
+  }
+
+  return &cached_interface;
+}
+
+static CFUUIDRef get_interface_interface_id(void) {
+  return get_interface_interface()->interface_id;
+}
+
+static int get_interface_interface_version(void) {
+  return get_interface_interface()->version;
+}
+
+struct darwin_pipe_properties {
+  uint8_t number;
+  uint8_t direction;
+  uint8_t transfer_type;
+  uint16_t max_packet_size;
+  uint8_t interval;
+};
+typedef struct darwin_pipe_properties darwin_pipe_properties_t;
+
+static IOReturn darwin_get_pipe_properties(struct darwin_interface *cInterface, uint8_t pipe, darwin_pipe_properties_t *out) {
+  IOReturn kresult;
+
+#if (MAX_INTERFACE_VERSION >= 550)
+  if (get_interface_interface_version() >= 550) {
+    IOUSBEndpointProperties pipe_properties = {.bVersion = kUSBEndpointPropertiesVersion3};
+    kresult = (*IOINTERFACE_V(cInterface, 550))->GetPipePropertiesV3 (IOINTERFACE(cInterface), pipe, &pipe_properties);
+    if (kIOReturnSuccess == kresult) {
+      out->number = pipe_properties.bEndpointNumber;
+      out->direction = pipe_properties.bDirection;
+      out->transfer_type = pipe_properties.bTransferType;
+      out->max_packet_size = pipe_properties.wMaxPacketSize;
+      out->interval = pipe_properties.bInterval;
+    }
+    return kresult;
+  }
+#endif
+  return (*IOINTERFACE(cInterface))->GetPipeProperties(IOINTERFACE(cInterface), pipe, &out->direction,
+                                                               &out->number, &out->transfer_type, &out->max_packet_size,
+                                                               &out->interval);
+}
+
 #if defined(ENABLE_LOGGING)
 static const char *darwin_error_str (IOReturn result) {
   static char string_buffer[50];
@@ -1466,24 +1570,15 @@ static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle,
 
   /* current interface */
   struct darwin_interface *cInterface = &priv->interfaces[iface];
-#if InterfaceVersion >= 550
-  IOUSBEndpointProperties pipeProperties = {.bVersion = kUSBEndpointPropertiesVersion3};
-#else
-  UInt8 dont_care1, dont_care3;
-  UInt16 dont_care2;
-#endif
-
   IOReturn kresult;
-
-  UInt8 numep, direction, number;
+  uint8_t numep;
   int rc;
   struct libusb_context *ctx = HANDLE_CTX (dev_handle);
-
 
   usbi_dbg (ctx, "building table of endpoints.");
 
   /* retrieve the total number of endpoints on this interface */
-  kresult = (*(cInterface->interface))->GetNumEndpoints(cInterface->interface, &numep);
+  kresult = (*IOINTERFACE(cInterface))->GetNumEndpoints(IOINTERFACE(cInterface), &numep);
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "can't get number of endpoints for interface: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
@@ -1491,14 +1586,8 @@ static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle,
 
   /* iterate through pipe references */
   for (UInt8 i = 1 ; i <= numep ; i++) {
-#if InterfaceVersion >= 550
-    kresult = (*(cInterface->interface))->GetPipePropertiesV3 (cInterface->interface, i, &pipeProperties);
-    number = pipeProperties.bEndpointNumber;
-    direction = pipeProperties.bDirection;
-#else
-    kresult = (*(cInterface->interface))->GetPipeProperties(cInterface->interface, i, &direction, &number, &dont_care1,
-                                                            &dont_care2, &dont_care3);
-#endif
+    darwin_pipe_properties_t pipe_properties;
+    kresult = darwin_get_pipe_properties(cInterface, i, &pipe_properties);
     if (kresult != kIOReturnSuccess) {
       /* probably a buggy device. try to get the endpoint address from the descriptors */
       struct libusb_config_descriptor *config;
@@ -1506,7 +1595,7 @@ static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle,
       const struct libusb_endpoint_descriptor *endpoint_desc;
       UInt8 alt_setting;
 
-      kresult = (*(cInterface->interface))->GetAlternateSetting (cInterface->interface, &alt_setting);
+      kresult = (*IOINTERFACE(cInterface))->GetAlternateSetting (IOINTERFACE(cInterface), &alt_setting);
       if (kresult != kIOReturnSuccess) {
         usbi_err (HANDLE_CTX (dev_handle), "can't get alternate setting for interface");
         return darwin_to_libusb (kresult);
@@ -1528,7 +1617,8 @@ static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle,
       cInterface->endpoint_addrs[i - 1] = endpoint_desc->bEndpointAddress;
       libusb_free_config_descriptor (config);
     } else {
-      cInterface->endpoint_addrs[i - 1] = (UInt8)(((kUSBIn == direction) << kUSBRqDirnShift) | (number & LIBUSB_ENDPOINT_ADDRESS_MASK));
+      cInterface->endpoint_addrs[i - 1] = (UInt8)(((kUSBIn == pipe_properties.direction) << kUSBRqDirnShift) |
+                                                  (pipe_properties.number & LIBUSB_ENDPOINT_ADDRESS_MASK));
     }
 
     usbi_dbg (ctx, "interface: %i pipe %i: dir: %i number: %i", iface, i, cInterface->endpoint_addrs[i - 1] >> kUSBRqDirnShift,
@@ -1600,18 +1690,18 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
 
   /* Do the actual claim */
   kresult = (*plugInInterface)->QueryInterface(plugInInterface,
-                                               CFUUIDGetUUIDBytes(InterfaceInterfaceID),
-                                               (LPVOID)&cInterface->interface);
+                                               CFUUIDGetUUIDBytes(get_interface_interface_id()),
+                                               (LPVOID)&IOINTERFACE(cInterface));
   /* We no longer need the intermediate plug-in */
   /* Use release instead of IODestroyPlugInInterface to avoid stopping IOServices associated with this device */
   (*plugInInterface)->Release (plugInInterface);
-  if (kresult != kIOReturnSuccess || !cInterface->interface) {
+  if (kresult != kIOReturnSuccess || !IOINTERFACE(cInterface)) {
     usbi_err (ctx, "QueryInterface: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
   }
 
   /* claim the interface */
-  kresult = (*(cInterface->interface))->USBInterfaceOpen(cInterface->interface);
+  kresult = (*IOINTERFACE(cInterface))->USBInterfaceOpen(IOINTERFACE(cInterface));
   if (kresult != kIOReturnSuccess) {
     usbi_info (ctx, "USBInterfaceOpen: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
@@ -1629,7 +1719,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
   cInterface->cfSource = NULL;
 
   /* create async event source */
-  kresult = (*(cInterface->interface))->CreateInterfaceAsyncEventSource (cInterface->interface, &cInterface->cfSource);
+  kresult = (*IOINTERFACE(cInterface))->CreateInterfaceAsyncEventSource (IOINTERFACE(cInterface), &cInterface->cfSource);
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "could not create async event source");
 
@@ -1655,8 +1745,9 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, uin
   struct darwin_interface *cInterface = &priv->interfaces[iface];
 
   /* Check to see if an interface is open */
-  if (!cInterface->interface)
+  if (!IOINTERFACE(cInterface)) {
     return LIBUSB_SUCCESS;
+  }
 
   /* clean up endpoint data */
   cInterface->num_endpoints = 0;
@@ -1668,15 +1759,15 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, uin
     cInterface->cfSource = NULL;
   }
 
-  kresult = (*(cInterface->interface))->USBInterfaceClose(cInterface->interface);
+  kresult = (*IOINTERFACE(cInterface))->USBInterfaceClose(IOINTERFACE(cInterface));
   if (kresult != kIOReturnSuccess)
     usbi_warn (HANDLE_CTX (dev_handle), "USBInterfaceClose: %s", darwin_error_str(kresult));
 
-  kresult = (*(cInterface->interface))->Release(cInterface->interface);
+  kresult = (*IOINTERFACE(cInterface))->Release(IOINTERFACE(cInterface));
   if (kresult != kIOReturnSuccess)
     usbi_warn (HANDLE_CTX (dev_handle), "Release: %s", darwin_error_str(kresult));
 
-  cInterface->interface = (usb_interface_t **) IO_OBJECT_NULL;
+  IOINTERFACE(cInterface) = NULL;
 
   return darwin_to_libusb (kresult);
 }
@@ -1686,7 +1777,7 @@ static int check_alt_setting_and_clear_halt(struct libusb_device_handle *dev_han
   IOReturn kresult;
   uint8_t current_alt_setting;
 
-  kresult = (*(cInterface->interface))->GetAlternateSetting (cInterface->interface, &current_alt_setting);
+  kresult = (*IOINTERFACE(cInterface))->GetAlternateSetting (IOINTERFACE(cInterface), &current_alt_setting);
   if (kresult == kIOReturnSuccess && altsetting != current_alt_setting) {
     return LIBUSB_ERROR_PIPE;
   }
@@ -1713,10 +1804,11 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
   /* current interface */
   struct darwin_interface *cInterface = &priv->interfaces[iface];
 
-  if (!cInterface->interface)
+  if (!IOINTERFACE(cInterface)) {
     return LIBUSB_ERROR_NO_DEVICE;
+  }
 
-  kresult = (*(cInterface->interface))->SetAlternateInterface (cInterface->interface, altsetting);
+  kresult = (*IOINTERFACE(cInterface))->SetAlternateInterface (IOINTERFACE(cInterface), altsetting);
   if (kresult == kIOReturnSuccess) {
     /* update the list of endpoints */
     ret = get_endpoints (dev_handle, iface);
@@ -1768,7 +1860,7 @@ static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
   }
 
   /* newer versions of darwin support clearing additional bits on the device's endpoint */
-  kresult = (*(cInterface->interface))->ClearPipeStallBothEnds(cInterface->interface, pipeRef);
+  kresult = (*IOINTERFACE(cInterface))->ClearPipeStallBothEnds(IOINTERFACE(cInterface), pipeRef);
   if (kresult != kIOReturnSuccess)
     usbi_warn (HANDLE_CTX (dev_handle), "ClearPipeStall: %s", darwin_error_str (kresult));
 
@@ -2035,17 +2127,10 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
   IOReturn               ret;
-  uint8_t                transferType;
   uint8_t                pipeRef;
-  uint16_t               maxPacketSize;
 
   struct darwin_interface *cInterface;
-#if InterfaceVersion >= 550
-  IOUSBEndpointProperties pipeProperties = {.bVersion = kUSBEndpointPropertiesVersion3};
-#else
-  /* None of the values below are used in libusb for bulk transfers */
-  uint8_t                 direction, number, interval;
-#endif
+  darwin_pipe_properties_t pipe_properties;
 
   if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface) != 0) {
     usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
@@ -2053,47 +2138,38 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
-#if InterfaceVersion >= 550
-  ret = (*(cInterface->interface))->GetPipePropertiesV3 (cInterface->interface, pipeRef, &pipeProperties);
-
-  transferType = pipeProperties.bTransferType;
-  maxPacketSize = pipeProperties.wMaxPacketSize;
-#else
-  ret = (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
-                                                       &transferType, &maxPacketSize, &interval);
-#endif
-
-  if (ret) {
+  ret = darwin_get_pipe_properties(cInterface, pipeRef, &pipe_properties);
+  if (kIOReturnSuccess != ret) {
     usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
               darwin_error_str(ret), ret);
     return darwin_to_libusb (ret);
   }
 
-  if (0 != (transfer->length % maxPacketSize)) {
+  if (0 != (transfer->length % pipe_properties.max_packet_size)) {
     /* do not need a zero packet */
     transfer->flags &= ~LIBUSB_TRANSFER_ADD_ZERO_PACKET;
   }
 
   /* submit the request */
   /* timeouts are unavailable on interrupt endpoints */
-  if (transferType == kUSBInterrupt) {
+  if (pipe_properties.transfer_type == kUSBInterrupt) {
     if (IS_XFERIN(transfer))
-      ret = (*(cInterface->interface))->ReadPipeAsync(cInterface->interface, pipeRef, transfer->buffer,
-                                                      (UInt32)transfer->length, darwin_async_io_callback, itransfer);
+      ret = (*IOINTERFACE(cInterface))->ReadPipeAsync(IOINTERFACE(cInterface), pipeRef, transfer->buffer,
+                                                              (UInt32)transfer->length, darwin_async_io_callback, itransfer);
     else
-      ret = (*(cInterface->interface))->WritePipeAsync(cInterface->interface, pipeRef, transfer->buffer,
-                                                       (UInt32)transfer->length, darwin_async_io_callback, itransfer);
+      ret = (*IOINTERFACE(cInterface))->WritePipeAsync(IOINTERFACE(cInterface), pipeRef, transfer->buffer,
+                                                               (UInt32)transfer->length, darwin_async_io_callback, itransfer);
   } else {
     itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
     if (IS_XFERIN(transfer))
-      ret = (*(cInterface->interface))->ReadPipeAsyncTO(cInterface->interface, pipeRef, transfer->buffer,
-                                                        (UInt32)transfer->length, transfer->timeout, transfer->timeout,
-                                                        darwin_async_io_callback, itransfer);
+      ret = (*IOINTERFACE(cInterface))->ReadPipeAsyncTO(IOINTERFACE(cInterface), pipeRef, transfer->buffer,
+                                                                (UInt32)transfer->length, transfer->timeout, transfer->timeout,
+                                                                darwin_async_io_callback, itransfer);
     else
-      ret = (*(cInterface->interface))->WritePipeAsyncTO(cInterface->interface, pipeRef, transfer->buffer,
-                                                         (UInt32)transfer->length, transfer->timeout, transfer->timeout,
-                                                         darwin_async_io_callback, itransfer);
+      ret = (*IOINTERFACE(cInterface))->WritePipeAsyncTO(IOINTERFACE(cInterface), pipeRef, transfer->buffer,
+                                                                 (UInt32)transfer->length, transfer->timeout, transfer->timeout,
+                                                                 darwin_async_io_callback, itransfer);
   }
 
   if (ret)
@@ -2103,7 +2179,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) {
   return darwin_to_libusb (ret);
 }
 
-#if InterfaceVersion >= 550
+#if MAX_INTERFACE_VERSION >= 550
 static int submit_stream_transfer(struct usbi_transfer *itransfer) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_interface *cInterface;
@@ -2116,16 +2192,22 @@ static int submit_stream_transfer(struct usbi_transfer *itransfer) {
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
+  if (get_interface_interface_version() < 550) {
+    usbi_err (TRANSFER_CTX(transfer), "IOUSBFamily version %d does not support bulk stream transfers",
+              get_interface_interface_version());
+    return LIBUSB_ERROR_NOT_SUPPORTED;
+  }
+
   itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
 
   if (IS_XFERIN(transfer))
-    ret = (*(cInterface->interface))->ReadStreamsPipeAsyncTO(cInterface->interface, pipeRef, itransfer->stream_id,
-                                                             transfer->buffer, (UInt32)transfer->length, transfer->timeout,
-                                                             transfer->timeout, darwin_async_io_callback, itransfer);
+    ret = (*IOINTERFACE_V(cInterface, 550))->ReadStreamsPipeAsyncTO(IOINTERFACE(cInterface), pipeRef, itransfer->stream_id,
+                                                                  transfer->buffer, (UInt32)transfer->length, transfer->timeout,
+                                                                  transfer->timeout, darwin_async_io_callback, itransfer);
   else
-    ret = (*(cInterface->interface))->WriteStreamsPipeAsyncTO(cInterface->interface, pipeRef, itransfer->stream_id,
-                                                              transfer->buffer, (UInt32)transfer->length, transfer->timeout,
-                                                              transfer->timeout, darwin_async_io_callback, itransfer);
+    ret = (*IOINTERFACE_V(cInterface, 550))->WriteStreamsPipeAsyncTO(IOINTERFACE(cInterface), pipeRef, itransfer->stream_id,
+                                                                   transfer->buffer, (UInt32)transfer->length, transfer->timeout,
+                                                                   transfer->timeout, darwin_async_io_callback, itransfer);
 
   if (ret)
     usbi_err (TRANSFER_CTX (transfer), "bulk stream transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
@@ -2140,18 +2222,11 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   struct darwin_transfer_priv *tpriv = usbi_get_transfer_priv(itransfer);
 
   IOReturn kresult;
-  uint8_t pipeRef, interval;
+  uint8_t pipeRef;
   UInt64 frame;
   AbsoluteTime atTime;
   int i;
-#if InterfaceVersion >= 550
-  IOUSBEndpointProperties pipeProperties = {.bVersion = kUSBEndpointPropertiesVersion3};
-#else
-  /* None of the values below are used in libusb for iso transfers */
-  uint8_t direction, number, transferType;
-  uint16_t maxPacketSize;
-#endif
-
+  darwin_pipe_properties_t pipe_properties;
   struct darwin_interface *cInterface;
 
   /* construct an array of IOUSBIsocFrames, reuse the old one if the sizes are the same */
@@ -2182,13 +2257,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   }
 
   /* determine the properties of this endpoint and the speed of the device */
-#if InterfaceVersion >= 550
-  kresult = (*(cInterface->interface))->GetPipePropertiesV3 (cInterface->interface, pipeRef, &pipeProperties);
-  interval = pipeProperties.bInterval;
-#else
-  kresult = (*(cInterface->interface))->GetPipeProperties (cInterface->interface, pipeRef, &direction, &number,
-                                                 &transferType, &maxPacketSize, &interval);
-#endif
+  kresult = darwin_get_pipe_properties(cInterface, pipeRef, &pipe_properties);
   if (kresult != kIOReturnSuccess) {
     usbi_err (TRANSFER_CTX (transfer), "failed to get pipe properties: %d", kresult);
     free(tpriv->isoc_framelist);
@@ -2198,7 +2267,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
   }
 
   /* Last but not least we need the bus frame number */
-  kresult = (*(cInterface->interface))->GetBusFrameNumber(cInterface->interface, &frame, &atTime);
+  kresult = (*IOINTERFACE(cInterface))->GetBusFrameNumber(IOINTERFACE(cInterface), &frame, &atTime);
   if (kresult != kIOReturnSuccess) {
     usbi_err (TRANSFER_CTX (transfer), "failed to get bus frame number: %d", kresult);
     free(tpriv->isoc_framelist);
@@ -2215,20 +2284,20 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) {
 
   /* submit the request */
   if (IS_XFERIN(transfer))
-    kresult = (*(cInterface->interface))->ReadIsochPipeAsync(cInterface->interface, pipeRef, transfer->buffer, frame,
-                                                             (UInt32)transfer->num_iso_packets, tpriv->isoc_framelist, darwin_async_io_callback,
-                                                             itransfer);
+    kresult = (*IOINTERFACE(cInterface))->ReadIsochPipeAsync(IOINTERFACE(cInterface), pipeRef, transfer->buffer, frame,
+                                                                     (UInt32)transfer->num_iso_packets, tpriv->isoc_framelist, darwin_async_io_callback,
+                                                                     itransfer);
   else
-    kresult = (*(cInterface->interface))->WriteIsochPipeAsync(cInterface->interface, pipeRef, transfer->buffer, frame,
-                                                              (UInt32)transfer->num_iso_packets, tpriv->isoc_framelist, darwin_async_io_callback,
-                                                              itransfer);
+    kresult = (*IOINTERFACE(cInterface))->WriteIsochPipeAsync(IOINTERFACE(cInterface), pipeRef, transfer->buffer, frame,
+                                                                      (UInt32)transfer->num_iso_packets, tpriv->isoc_framelist, darwin_async_io_callback,
+                                                                      itransfer);
 
   if (LIBUSB_SPEED_FULL == transfer->dev_handle->dev->speed)
     /* Full speed */
-    cInterface->frames[transfer->endpoint] = frame + (UInt32)transfer->num_iso_packets * (1U << (interval - 1));
+    cInterface->frames[transfer->endpoint] = frame + (UInt32)transfer->num_iso_packets * (1U << (pipe_properties.interval - 1));
   else
     /* High/super speed */
-    cInterface->frames[transfer->endpoint] = frame + (UInt32)transfer->num_iso_packets * (1U << (interval - 1)) / 8;
+    cInterface->frames[transfer->endpoint] = frame + (UInt32)transfer->num_iso_packets * (1U << (pipe_properties.interval - 1)) / 8;
 
   if (kresult != kIOReturnSuccess) {
     usbi_err (TRANSFER_CTX (transfer), "isochronous transfer failed (dir: %s): %s", IS_XFERIN(transfer) ? "In" : "Out",
@@ -2276,7 +2345,8 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) {
       return LIBUSB_ERROR_NOT_FOUND;
     }
 
-    kresult = (*(cInterface->interface))->ControlRequestAsyncTO (cInterface->interface, pipeRef, &(tpriv->req), darwin_async_io_callback, itransfer);
+    kresult = (*IOINTERFACE(cInterface))->ControlRequestAsyncTO (IOINTERFACE(cInterface), pipeRef,
+                                                                         &(tpriv->req), darwin_async_io_callback, itransfer);
   } else
     /* control request on endpoint 0 */
     kresult = (*(dpriv->device))->DeviceRequestAsyncTO(dpriv->device, &(tpriv->req), darwin_async_io_callback, itransfer);
@@ -2299,7 +2369,7 @@ static int darwin_submit_transfer(struct usbi_transfer *itransfer) {
   case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
     return submit_iso_transfer(itransfer);
   case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
-#if InterfaceVersion >= 550
+#if MAX_INTERFACE_VERSION >= 550
     return submit_stream_transfer(itransfer);
 #else
     usbi_err (TRANSFER_CTX(transfer), "IOUSBFamily version does not support bulk stream transfers");
@@ -2347,19 +2417,22 @@ static int darwin_abort_transfers (struct usbi_transfer *itransfer) {
   usbi_warn (ctx, "aborting all transactions on interface %d pipe %d", iface, pipeRef);
 
   /* abort transactions */
-#if InterfaceVersion >= 550
-  if (LIBUSB_TRANSFER_TYPE_BULK_STREAM == transfer->type)
-    kresult = (*(cInterface->interface))->AbortStreamsPipe (cInterface->interface, pipeRef, itransfer->stream_id);
-  else
+#if MAX_INTERFACE_VERSION >= 550
+  if (LIBUSB_TRANSFER_TYPE_BULK_STREAM == transfer->type && get_interface_interface_version() >= 550) {
+    kresult = (*IOINTERFACE_V(cInterface, 550))->AbortStreamsPipe (IOINTERFACE(cInterface), pipeRef, itransfer->stream_id);
+  } else
 #endif
-    kresult = (*(cInterface->interface))->AbortPipe (cInterface->interface, pipeRef);
+  {
+    kresult = (*IOINTERFACE(cInterface))->AbortPipe (IOINTERFACE(cInterface), pipeRef);
+  }
 
-#if InterfaceVersion <= 245
-  /* with older releases of IOUSBFamily the OS always clears the host side data toggle. for
-     consistency also clear the data toggle on the device. */
-  usbi_dbg (ctx, "calling ClearPipeStallBothEnds to clear the data toggle bit");
-  kresult = (*(cInterface->interface))->ClearPipeStallBothEnds(cInterface->interface, pipeRef);
-#endif
+
+  if (get_interface_interface_version() <= 245) {
+    /* with older releases of IOUSBFamily the OS always clears the host side data toggle. for
+       consistency also clear the data toggle on the device. */
+    usbi_dbg (ctx, "calling ClearPipeStallBothEnds to clear the data toggle bit");
+    kresult = (*IOINTERFACE(cInterface))->ClearPipeStallBothEnds(IOINTERFACE(cInterface), pipeRef);
+  }
 
   return darwin_to_libusb (kresult);
 }
@@ -2394,7 +2467,7 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 
     (void) ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface);
 
-    (*(cInterface->interface))->WritePipe (cInterface->interface, pipeRef, transfer->buffer, 0);
+    (*IOINTERFACE(cInterface))->WritePipe (IOINTERFACE(cInterface), pipeRef, transfer->buffer, 0);
   }
 
   tpriv->result = result;
@@ -2501,7 +2574,7 @@ void usbi_get_real_time(struct timespec *tp) {
 #endif
 }
 
-#if InterfaceVersion >= 550
+#if MAX_INTERFACE_VERSION >= 550
 static int darwin_alloc_streams (struct libusb_device_handle *dev_handle, uint32_t num_streams, unsigned char *endpoints,
                                  int num_endpoints) {
   struct darwin_interface *cInterface;
@@ -2515,7 +2588,7 @@ static int darwin_alloc_streams (struct libusb_device_handle *dev_handle, uint32
       return rc;
     }
 
-    (*(cInterface->interface))->SupportsStreams (cInterface->interface, pipeRef, &supportsStreams);
+    (*IOINTERFACE_V(cInterface, 550))->SupportsStreams (IOINTERFACE(cInterface), pipeRef, &supportsStreams);
     if (num_streams > supportsStreams)
       num_streams = supportsStreams;
   }
@@ -2528,7 +2601,7 @@ static int darwin_alloc_streams (struct libusb_device_handle *dev_handle, uint32
   for (i = 0 ; i < num_endpoints ; ++i) {
     (void) ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, NULL, &cInterface);
 
-    rc = (*(cInterface->interface))->CreateStreams (cInterface->interface, pipeRef, num_streams);
+    rc = (*IOINTERFACE_V(cInterface, 550))->CreateStreams (IOINTERFACE(cInterface), pipeRef, num_streams);
     if (kIOReturnSuccess != rc)
       return darwin_to_libusb(rc);
   }
@@ -2547,11 +2620,11 @@ static int darwin_free_streams (struct libusb_device_handle *dev_handle, unsigne
     if (0 != (rc = ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, NULL, &cInterface)))
       return rc;
 
-    (*(cInterface->interface))->SupportsStreams (cInterface->interface, pipeRef, &supportsStreams);
+    (*IOINTERFACE_V(cInterface, 550))->SupportsStreams (IOINTERFACE(cInterface), pipeRef, &supportsStreams);
     if (0 == supportsStreams)
       return LIBUSB_ERROR_INVALID_PARAM;
 
-    rc = (*(cInterface->interface))->CreateStreams (cInterface->interface, pipeRef, 0);
+    rc = (*IOINTERFACE_V(cInterface, 550))->CreateStreams (IOINTERFACE(cInterface), pipeRef, 0);
     if (kIOReturnSuccess != rc)
       return darwin_to_libusb(rc);
   }
@@ -2560,7 +2633,7 @@ static int darwin_free_streams (struct libusb_device_handle *dev_handle, unsigne
 }
 #endif
 
-#if InterfaceVersion >= 700
+#if MAX_INTERFACE_VERSION >= 700
 
 /* macOS APIs for getting entitlement values */
 
@@ -2616,8 +2689,7 @@ static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle,
   enum libusb_error err;
   struct libusb_context *ctx = HANDLE_CTX (dev_handle);
 
-  if (get_running_version() >= 101000) {
-  } else {
+  if (get_interface_interface_version() < 700) {
     return LIBUSB_ERROR_NOT_SUPPORTED;
   }
 
@@ -2660,8 +2732,7 @@ static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle,
   UNUSED(interface);
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
 
-  if (get_running_version() >= 101000) {
-  } else {
+  if (get_interface_interface_version() < 700) {
     return LIBUSB_ERROR_NOT_SUPPORTED;
   }
 
@@ -2728,14 +2799,14 @@ const struct usbi_os_backend usbi_backend = {
         .clear_halt = darwin_clear_halt,
         .reset_device = darwin_reset_device,
 
-#if InterfaceVersion >= 550
+#if MAX_INTERFACE_VERSION >= 550
         .alloc_streams = darwin_alloc_streams,
         .free_streams = darwin_free_streams,
 #endif
 
         .kernel_driver_active = darwin_kernel_driver_active,
 
-#if InterfaceVersion >= 700
+#if MAX_INTERFACE_VERSION >= 700
         .detach_kernel_driver = darwin_detach_kernel_driver,
         .attach_kernel_driver = darwin_attach_kernel_driver,
         .claim_interface = darwin_capture_claim_interface,
