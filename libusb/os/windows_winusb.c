@@ -1074,8 +1074,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	DWORD size;
 	uint8_t bus_number, depth;
 	int r;
-	int ginfotimeout;
-
+	
 	priv = usbi_get_device_priv(dev);
 
 	// If the device is already initialized, we can stop here
@@ -1135,61 +1134,45 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 
 		conn_info.ConnectionIndex = (ULONG)port_number;
 		// coverity[tainted_data_argument]
-		ginfotimeout = 20;
-		do {
-			if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
-				&conn_info, sizeof(conn_info), &size, NULL)) {
-				usbi_warn(ctx, "could not get node connection information for device '%s': %s",
-					priv->dev_id, windows_error_str(0));
-				CloseHandle(hub_handle);
-				return LIBUSB_ERROR_NO_DEVICE;
-			}
 
-			if (conn_info.ConnectionStatus == NoDeviceConnected) {
-				usbi_err(ctx, "device '%s' is no longer connected!", priv->dev_id);
-				CloseHandle(hub_handle);
-				return LIBUSB_ERROR_NO_DEVICE;
-			}
+		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
+			&conn_info, sizeof(conn_info), &size, NULL)) {
+			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
+				priv->dev_id, windows_error_str(0));
+			CloseHandle(hub_handle);
+			return LIBUSB_ERROR_NO_DEVICE;
+		}
 
-			if ((conn_info.DeviceDescriptor.bLength != LIBUSB_DT_DEVICE_SIZE)
-				 || (conn_info.DeviceDescriptor.bDescriptorType != LIBUSB_DT_DEVICE)) {
-				SleepEx(50, TRUE);
-				continue;
-			}
-
-			static_assert(sizeof(dev->device_descriptor) == sizeof(conn_info.DeviceDescriptor),
-				      "mismatch between libusb and OS device descriptor sizes");
-			memcpy(&dev->device_descriptor, &conn_info.DeviceDescriptor, LIBUSB_DT_DEVICE_SIZE);
-			usbi_localize_device_descriptor(&dev->device_descriptor);
-
-			priv->active_config = conn_info.CurrentConfigurationValue;
-			if (priv->active_config == 0) {
-				usbi_dbg(ctx, "0x%x:0x%x found %u configurations (not configured)",
-					dev->device_descriptor.idVendor,
-					dev->device_descriptor.idProduct,
-					dev->device_descriptor.bNumConfigurations);
-				SleepEx(50, TRUE);
-			}
-		} while (priv->active_config == 0 && --ginfotimeout >= 0);
+		if (conn_info.ConnectionStatus == NoDeviceConnected) {
+			usbi_err(ctx, "device '%s' is no longer connected!", priv->dev_id);
+			CloseHandle(hub_handle);
+			return LIBUSB_ERROR_NO_DEVICE;
+		}
 
 		if ((conn_info.DeviceDescriptor.bLength != LIBUSB_DT_DEVICE_SIZE)
-			 || (conn_info.DeviceDescriptor.bDescriptorType != LIBUSB_DT_DEVICE)) {
+			|| (conn_info.DeviceDescriptor.bDescriptorType != LIBUSB_DT_DEVICE)) {
 			usbi_err(ctx, "device '%s' has invalid descriptor!", priv->dev_id);
 			CloseHandle(hub_handle);
 			return LIBUSB_ERROR_OTHER;
 		}
 
-		if (priv->active_config == 0) {
-			usbi_info(ctx, "0x%x:0x%x found %u configurations but device isn't configured, "
-				"forcing current configuration to 1",
-				dev->device_descriptor.idVendor,
-				dev->device_descriptor.idProduct,
-				dev->device_descriptor.bNumConfigurations);
-			priv->active_config = 1;
-		} else {
-			usbi_dbg(ctx, "found %u configurations (current config: %u)", dev->device_descriptor.bNumConfigurations, priv->active_config);
+		static_assert(sizeof(dev->device_descriptor) == sizeof(conn_info.DeviceDescriptor),
+			      "mismatch between libusb and OS device descriptor sizes");
+		memcpy(&dev->device_descriptor, &conn_info.DeviceDescriptor, LIBUSB_DT_DEVICE_SIZE);
+		usbi_localize_device_descriptor(&dev->device_descriptor);
+
+		if (conn_info.CurrentConfigurationValue == 0) {
+			usbi_dbg(ctx, "found %u configurations for device '%s' but device is not configured (i.e. current config: 0), ignoring it",
+				dev->device_descriptor.bNumConfigurations,
+				priv->dev_id);
+			CloseHandle(hub_handle);
+			return LIBUSB_ERROR_OTHER;
 		}
 
+		priv->active_config = conn_info.CurrentConfigurationValue;
+		usbi_dbg(ctx, "found %u configurations (current config: %u) for device '%s'", 
+			dev->device_descriptor.bNumConfigurations, priv->active_config,	priv->dev_id);
+		
 		// Cache as many config descriptors as we can
 		cache_config_descriptors(dev, hub_handle);
 
