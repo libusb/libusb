@@ -1,8 +1,8 @@
 /* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
- * Copyright © 2008-2021 Nathan Hjelm <hjelmn@cs.unm.edu>
- * Copyright © 2019-2022 Google LLC. All rights reserved.
+ * Copyright © 2008-2023 Nathan Hjelm <hjelmn@cs.unm.edu>
+ * Copyright © 2019-2023 Google LLC. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -654,12 +654,16 @@ static void darwin_exit (struct libusb_context *ctx) {
   if (0 == --init_count) {
     /* stop the event runloop and wait for the thread to terminate. */
     pthread_mutex_lock (&libusb_darwin_at_mutex);
-    CFRunLoopSourceSignal (libusb_darwin_acfls);
-    CFRunLoopWakeUp (libusb_darwin_acfl);
-    while (libusb_darwin_acfl)
-      pthread_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
-    pthread_mutex_unlock (&libusb_darwin_at_mutex);
-    pthread_join (libusb_darwin_at, NULL);
+    if (NULL != libusb_darwin_acfls && LIBUSB_DARWIN_STARTUP_FAILURE != libusb_darwin_acfls) {
+      CFRunLoopSourceSignal (libusb_darwin_acfls);
+      CFRunLoopWakeUp (libusb_darwin_acfl);
+      while (libusb_darwin_acfl)
+        pthread_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
+      pthread_mutex_unlock (&libusb_darwin_at_mutex);
+      pthread_join (libusb_darwin_at, NULL);
+    } else {
+      pthread_mutex_unlock (&libusb_darwin_at_mutex);
+    }
 
     darwin_cleanup_devices ();
   }
