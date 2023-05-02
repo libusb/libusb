@@ -69,6 +69,11 @@ static usbi_mutex_t darwin_cached_devices_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct list_head darwin_cached_devices;
 static const char *darwin_device_class = "IOUSBDevice";
 
+uint32_t libusb_testonly_fake_running_version __attribute__ ((visibility ("hidden")));
+int libusb_testonly_using_running_interface_version __attribute__ ((visibility ("hidden")));
+int libusb_testonly_using_running_device_version __attribute__ ((visibility ("hidden")));
+bool libusb_testonly_clear_running_version_cache __attribute__ ((visibility ("hidden")));
+
 #define DARWIN_CACHED_DEVICE(a) (((struct darwin_device_priv *)usbi_get_device_priv((a)))->dev)
 
 /* async event thread */
@@ -147,6 +152,9 @@ static const struct darwin_iokit_interface *get_interface_interface(void) {
     },
   };
   static struct darwin_iokit_interface cached_interface = {.version = 0};
+  if (libusb_testonly_clear_running_version_cache) {
+    memset (&cached_interface, 0, sizeof (cached_interface));
+  }
   if (0 == cached_interface.version) {
     uint32_t os_version = get_running_version();
     for (int i = 0 ; interfaces[i].version > 0 ; ++i) {
@@ -154,6 +162,8 @@ static const struct darwin_iokit_interface *get_interface_interface(void) {
         cached_interface = interfaces[i];
       }
     }
+
+    libusb_testonly_using_running_interface_version = cached_interface.version;
   }
 
   return &cached_interface;
@@ -214,6 +224,9 @@ static const struct darwin_iokit_interface *get_device_interface(void) {
     },
   };
   static struct darwin_iokit_interface cached_interface = {.version = 0};
+  if (libusb_testonly_clear_running_version_cache) {
+    memset (&cached_interface, 0, sizeof (cached_interface));
+  }
   if (0 == cached_interface.version) {
     uint32_t os_version = get_running_version();
     for (int i = 0 ; interfaces[i].version > 0 ; ++i) {
@@ -221,6 +234,7 @@ static const struct darwin_iokit_interface *get_device_interface(void) {
         cached_interface = interfaces[i];
       }
     }
+    libusb_testonly_using_running_device_version = cached_interface.version;
   }
 
   return &cached_interface;
@@ -342,6 +356,10 @@ static enum libusb_error darwin_to_libusb (IOReturn result) {
 }
 
 uint32_t get_running_version(void) {
+  if (libusb_testonly_fake_running_version > 0) {
+    return libusb_testonly_fake_running_version;
+  }
+
   int ret;
 #if !defined(TARGET_OS_OSX) || TARGET_OS_OSX == 1
   char os_version_string[64] = {'\0'};;
@@ -828,6 +846,16 @@ static void darwin_cleanup_devices(void) {
 static int darwin_first_time_init(void) {
   if (NULL == darwin_cached_devices.next) {
     list_init (&darwin_cached_devices);
+  }
+
+  /* cache the interface versions that will be used. as a sanity check verify
+   * that the interface versions are non-zero. */
+  const struct darwin_iokit_interface *interface_interface = get_interface_interface();
+  const struct darwin_iokit_interface *device_interface = get_device_interface();
+  if (0 == interface_interface->version || 0 == device_interface->version) {
+    usbi_err(NULL, "could not determine the device or interface interface to use with this version "
+             "of macOS (or MacOS X), current_running_version = %" PRIu32, get_running_version());
+    return LIBUSB_ERROR_OTHER;
   }
 
   if (!list_empty(&darwin_cached_devices)) {

@@ -1,11 +1,12 @@
 AM_CPPFLAGS = -I$(top_srcdir)/libusb
 LDADD = ../libusb/libusb-1.0.la
-LIBS =
+LDFLAGS = -static
 
 stress_SOURCES = stress.c testlib.c
 stress_mt_SOURCES = stress_mt.c
 set_option_SOURCES = set_option.c testlib.c
 init_context_SOURCES = init_context.c testlib.c
+macos_SOURCES = macos.c testlib.c
 
 stress_mt_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 stress_mt_LDADD = $(LDADD) $(THREAD_LIBS)
@@ -20,6 +21,9 @@ endif
 
 noinst_HEADERS = libusb_testlib.h
 noinst_PROGRAMS = stress stress_mt set_option init_context
+if OS_DARWIN
+noinst_PROGRAMS += macos
+endif
 
 if BUILD_UMOCKDEV_TEST
 # NOTE: We add libumockdev-preload.so so that we can run tests in-process
