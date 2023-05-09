@@ -2448,8 +2448,8 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	_ctx->debug = LIBUSB_LOG_LEVEL_NONE;
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
+	_ctx->debug = LIBUSB_LOG_LEVEL_NONE;
 	if (getenv("LIBUSB_DEBUG")) {
 		_ctx->debug = get_env_debug_level();
 		_ctx->debug_fixed = 1;
