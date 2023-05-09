@@ -35,5 +35,9 @@ jobs:
         shell: bash
         run: .private/ci-build.sh --build-dir build-udev -- --enable-udev
 
+      - name: debug-log
+        shell: bash
+        run: .private/ci-build.sh --build-dir build-debug -- --enable-debug-log
+
       - name: umockdev test
         run: .private/ci-container-build.sh docker.io/amd64/ubuntu:rolling
