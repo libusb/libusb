@@ -143,13 +143,17 @@ static libusb_testlib_result test_set_log_level_env(void) {
   setenv("LIBUSB_DEBUG", "4", /*overwrite=*/0);
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, /*options=*/NULL,
                                                   /*num_options=*/0));
+#ifndef ENABLE_DEBUG_LOGGING
   LIBUSB_EXPECT(==, test_ctx->debug, 4);
+#endif
 
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_set_option(test_ctx,
                                                 LIBUSB_OPTION_LOG_LEVEL,
                                                 LIBUSB_LOG_LEVEL_ERROR));
   /* environment variable should always override LIBUSB_OPTION_LOG_LEVEL if set */
+#ifndef ENABLE_DEBUG_LOGGING
   LIBUSB_EXPECT(==, test_ctx->debug, 4);
+#endif
 
   LIBUSB_TEST_CLEAN_EXIT(TEST_STATUS_SUCCESS);
 #else

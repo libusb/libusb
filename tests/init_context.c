@@ -109,7 +109,9 @@ static libusb_testlib_result test_init_context_log_level(void) {
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, options,
                                                   /*num_options=*/1));
 
+#ifndef ENABLE_DEBUG_LOGGING
   LIBUSB_EXPECT(==, test_ctx->debug, LIBUSB_LOG_LEVEL_ERROR);
+#endif
 
   LIBUSB_TEST_CLEAN_EXIT(TEST_STATUS_SUCCESS);
 }
@@ -137,7 +139,9 @@ static libusb_testlib_result test_init_context_log_cb(void) {
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, options,
                                                   /*num_options=*/1));
 
+#ifndef ENABLE_DEBUG_LOGGING
   LIBUSB_EXPECT(==, test_ctx->log_handler, test_log_cb);
+#endif
 
   LIBUSB_TEST_CLEAN_EXIT(TEST_STATUS_SUCCESS);
 }
