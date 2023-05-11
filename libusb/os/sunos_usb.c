@@ -1584,7 +1584,7 @@ sunos_usb_get_status(struct libusb_context *ctx, int fd)
 
 const struct usbi_os_backend usbi_backend = {
         .name = "Solaris",
-        .caps = 0,
+        .caps = USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
         .get_device_list = sunos_get_device_list,
         .get_active_config_descriptor = sunos_get_active_config_descriptor,
         .get_config_descriptor = sunos_get_config_descriptor,
