@@ -29,6 +29,7 @@
 #include <setupapi.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include "libusbi.h"
 #include "windows_winusb.h"
@@ -1387,11 +1388,13 @@ static int set_composite_interface(struct libusb_context *ctx, struct libusb_dev
 	// devices will have only MI_00 & MI_03 for instance), we retrieve the actual
 	// interface number from the path's MI value
 	mi_str = strstr(device_id, "MI_");
-	if ((mi_str != NULL) && isdigit((unsigned char)mi_str[3]) && isdigit((unsigned char)mi_str[4])) {
-		interface_number = ((mi_str[3] - '0') * 10) + (mi_str[4] - '0');
-	} else {
+        // Initialize to default
+        interface_number = 0;
+	if (mi_str != NULL) {
+		interface_number = strtoul(&mi_str[3], NULL, 16);
+	}
+        if (mi_str == NULL || errno != 0) {
 		usbi_warn(ctx, "failure to read interface number for %s, using default value", device_id);
-		interface_number = 0;
 	}
 
 	if (interface_number >= USB_MAXINTERFACES) {
