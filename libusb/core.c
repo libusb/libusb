@@ -2311,7 +2311,6 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	if (LIBUSB_OPTION_LOG_CB == option) {
 		log_cb = (libusb_log_cb) va_arg(ap, libusb_log_cb);
 	}
-	va_end(ap);
 
 	if (LIBUSB_SUCCESS != r) {
 		return r;
@@ -2362,6 +2361,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	default:
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
+	va_end(ap);
 
 	return LIBUSB_SUCCESS;;
 }
