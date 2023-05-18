@@ -1390,11 +1390,14 @@ static int set_composite_interface(struct libusb_context *ctx, struct libusb_dev
 	mi_str = strstr(device_id, "MI_");
         // Initialize to default
         interface_number = 0;
+		errno = 0;
+		char* endptr = NULL;
 	if (mi_str != NULL) {
-		interface_number = strtoul(&mi_str[3], NULL, 16);
+		interface_number = strtoul(&mi_str[3], &endptr, 16);
 	}
-        if (mi_str == NULL || errno != 0) {
+    if (mi_str == NULL || errno != 0 || endptr - &mi_str[3] != 2) {
 		usbi_warn(ctx, "failure to read interface number for %s, using default value", device_id);
+		interface_number = 0;
 	}
 
 	if (interface_number >= USB_MAXINTERFACES) {
