@@ -29,7 +29,6 @@
 #include <setupapi.h>
 #include <ctype.h>
 #include <stdio.h>
-#include <errno.h>
 
 #include "libusbi.h"
 #include "windows_winusb.h"
