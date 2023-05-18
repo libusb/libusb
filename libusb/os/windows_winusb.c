@@ -1381,6 +1381,7 @@ static int set_composite_interface(struct libusb_context *ctx, struct libusb_dev
 	int interface_number;
 	const char *mi_str;
 	int iadi, iadintfi;
+	char* endptr;
 	struct libusb_interface_association_descriptor_array *iad_array;
 	const struct libusb_interface_association_descriptor *iad;
 
@@ -1388,14 +1389,15 @@ static int set_composite_interface(struct libusb_context *ctx, struct libusb_dev
 	// devices will have only MI_00 & MI_03 for instance), we retrieve the actual
 	// interface number from the path's MI value
 	mi_str = strstr(device_id, "MI_");
-        // Initialize to default
-        interface_number = 0;
-		errno = 0;
-		char* endptr = NULL;
+
+	endptr = NULL;
+	interface_number = 0;
+	
 	if (mi_str != NULL) {
 		interface_number = strtoul(&mi_str[3], &endptr, 16);
 	}
-    if (mi_str == NULL || errno != 0 || endptr - &mi_str[3] != 2) {
+
+	if (mi_str == NULL || endptr - &mi_str[3] != 2) {
 		usbi_warn(ctx, "failure to read interface number for %s, using default value", device_id);
 		interface_number = 0;
 	}
