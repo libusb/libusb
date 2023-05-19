@@ -2312,58 +2312,65 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		log_cb = (libusb_log_cb) va_arg(ap, libusb_log_cb);
 	}
 
-	if (LIBUSB_SUCCESS != r) {
-		return r;
-	}
-
-	if (option >= LIBUSB_OPTION_MAX) {
-		return LIBUSB_ERROR_INVALID_PARAM;
-	}
-
-	if (NULL == ctx) {
-		usbi_mutex_static_lock(&default_context_lock);
-		default_context_options[option].is_set = 1;
-		if (LIBUSB_OPTION_LOG_LEVEL == option) {
-			default_context_options[option].arg.ival = arg;
-		} else if (LIBUSB_OPTION_LOG_CB) {
-			default_context_options[option].arg.log_cbval = log_cb;
+	do {
+		if (LIBUSB_SUCCESS != r) {
+			break;
 		}
-		usbi_mutex_static_unlock(&default_context_lock);
-	}
 
-	ctx = usbi_get_context(ctx);
-	if (NULL == ctx) {
-		libusb_set_log_cb_internal(NULL, log_cb, LIBUSB_LOG_CB_GLOBAL);
-		return LIBUSB_SUCCESS;
-	}
+		if (option >= LIBUSB_OPTION_MAX) {
+			r = LIBUSB_ERROR_INVALID_PARAM;
+			break;
+		}
 
-	switch (option) {
-	case LIBUSB_OPTION_LOG_LEVEL:
+		if (NULL == ctx) {
+			usbi_mutex_static_lock(&default_context_lock);
+			default_context_options[option].is_set = 1;
+			if (LIBUSB_OPTION_LOG_LEVEL == option) {
+				default_context_options[option].arg.ival = arg;
+			} else if (LIBUSB_OPTION_LOG_CB) {
+				default_context_options[option].arg.log_cbval = log_cb;
+			}
+			usbi_mutex_static_unlock(&default_context_lock);
+		}
+
+		ctx = usbi_get_context(ctx);
+		if (NULL == ctx) {
+			libusb_set_log_cb_internal(NULL, log_cb, LIBUSB_LOG_CB_GLOBAL);
+			r = LIBUSB_SUCCESS;
+			break;
+		}
+
+		switch (option) {
+		case LIBUSB_OPTION_LOG_LEVEL:
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-		if (!ctx->debug_fixed)
-			ctx->debug = (enum libusb_log_level)arg;
+			if (!ctx->debug_fixed)
+				ctx->debug = (enum libusb_log_level)arg;
 #endif
-		break;
+			break;
 
-		/* Handle all backend-specific options here */
-	case LIBUSB_OPTION_USE_USBDK:
-	case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
-	case LIBUSB_OPTION_WINUSB_RAW_IO:
-		if (usbi_backend.set_option)
-			return usbi_backend.set_option(ctx, option, ap);
+			/* Handle all backend-specific options here */
+		case LIBUSB_OPTION_USE_USBDK:
+		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+		case LIBUSB_OPTION_WINUSB_RAW_IO:
+			if (usbi_backend.set_option) {
+				r = usbi_backend.set_option(ctx, option, ap);
+				break;
+			}
 
-		return LIBUSB_ERROR_NOT_SUPPORTED;
-		break;
+			r = LIBUSB_ERROR_NOT_SUPPORTED;
+			break;
 
-	case LIBUSB_OPTION_LOG_CB:
-		libusb_set_log_cb_internal(ctx, log_cb, LIBUSB_LOG_CB_CONTEXT);
-		break;
-	default:
-		return LIBUSB_ERROR_INVALID_PARAM;
-	}
+		case LIBUSB_OPTION_LOG_CB:
+			libusb_set_log_cb_internal(ctx, log_cb, LIBUSB_LOG_CB_CONTEXT);
+			break;
+		default:
+			r = LIBUSB_ERROR_INVALID_PARAM;
+		}
+	} while (0);
+
 	va_end(ap);
 
-	return LIBUSB_SUCCESS;;
+	return r;
 }
 
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
