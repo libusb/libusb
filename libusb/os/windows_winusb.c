@@ -1390,7 +1390,8 @@ static int set_composite_interface(struct libusb_context *ctx, struct libusb_dev
 	mi_str = strstr(device_id, "MI_");
 
 	endptr = NULL;
-	interface_number = 0;
+	// This initialization, while redundant, is needed to make MSVC happy
+	interface_number = -1;
 	
 	if (mi_str != NULL) {
 		interface_number = strtoul(&mi_str[3], &endptr, 16);
