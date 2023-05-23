@@ -4409,6 +4409,8 @@ static enum libusb_transfer_status hid_copy_transfer_data(int sub_api, struct us
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct winusb_transfer_priv *transfer_priv = get_winusb_transfer_priv(itransfer);
+	struct winusb_device_priv *priv = usbi_get_device_priv(transfer->dev_handle->dev);
+	bool direction_in = IS_XFERIN(transfer);
 	enum libusb_transfer_status r = LIBUSB_TRANSFER_COMPLETED;
 
 	UNUSED(sub_api);
@@ -4423,8 +4425,9 @@ static enum libusb_transfer_status hid_copy_transfer_data(int sub_api, struct us
 					length = (DWORD)transfer_priv->hid_expected_size;
 					r = LIBUSB_TRANSFER_OVERFLOW;
 				}
-
-				if (transfer_priv->hid_buffer[0] == 0) {
+	
+				if (((direction_in) && (!priv->hid->uses_report_ids[0]))
+						|| ((!direction_in) && (!priv->hid->uses_report_ids[1]))) {
 					length--;
 					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer + 1, length);
 				} else {
@@ -4432,7 +4435,8 @@ static enum libusb_transfer_status hid_copy_transfer_data(int sub_api, struct us
 				}
 			}
 			transfer_priv->hid_dest = NULL;
-		} else if ((length > 0) && (transfer_priv->hid_buffer[0] == 0)) {
+		} else if ((length > 0) && (((direction_in) && (!priv->hid->uses_report_ids[0]))
+						|| ((!direction_in) && (!priv->hid->uses_report_ids[1])))) {
 			length--;
 		}
 		// For write, we just need to free the hid buffer
