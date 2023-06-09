@@ -806,9 +806,9 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
  * not to unreference a device you are about to open until after you have
  * opened it.
  *
- * This return value of this function indicates the number of devices in
- * the resultant list. The list is actually one element larger, as it is
- * NULL-terminated.
+ * The return value of this function indicates the number of libusb_device
+ * pointers in the contiguous non-NULL resultant list. The list is
+ * actually one element larger, as it is NULL-terminated.
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \param list output location for a list of devices. Must be later freed with
@@ -880,9 +880,10 @@ out:
 }
 
 /** \ingroup libusb_dev
- * Frees a list of devices previously discovered using
- * libusb_get_device_list(). If the unref_devices parameter is set, the
- * reference count of each device in the list is decremented by 1.
+ * Frees a contiguous NULL-terminated list of libusb_device pointers
+ * previously discovered using libusb_get_device_list(). If the
+ * unref_devices parameter is set, the reference count of each device
+ * in the list is decremented by 1.
  * \param list the list to free
  * \param unref_devices whether to unref the devices in the list
  */
