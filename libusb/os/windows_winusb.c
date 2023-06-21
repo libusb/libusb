@@ -4425,15 +4425,12 @@ static enum libusb_transfer_status hid_copy_transfer_data(int sub_api, struct us
 				}
 
 				if (transfer_priv->hid_buffer[0] == 0) {
-					length--;
 					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer + 1, length);
 				} else {
 					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer, length);
 				}
 			}
 			transfer_priv->hid_dest = NULL;
-		} else if ((length > 0) && (transfer_priv->hid_buffer[0] == 0)) {
-			length--;
 		}
 		// For write, we just need to free the hid buffer
 		safe_free(transfer_priv->hid_buffer);
