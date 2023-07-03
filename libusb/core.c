@@ -1399,6 +1399,7 @@ int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
  * \returns \ref LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
  */
+/* coverity[-free: arg-0] false positive due to error handling path */
 int API_EXPORTED libusb_open(libusb_device *dev,
 	libusb_device_handle **dev_handle)
 {
@@ -2317,10 +2318,6 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		return r;
 	}
 
-	if (option >= LIBUSB_OPTION_MAX) {
-		return LIBUSB_ERROR_INVALID_PARAM;
-	}
-
 	if (NULL == ctx) {
 		usbi_mutex_static_lock(&default_context_lock);
 		default_context_options[option].is_set = 1;
@@ -2807,16 +2804,13 @@ static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 		header_len = 0;
 	}
 
-	text_len = vsnprintf(buf + header_len, sizeof(buf) - (size_t)header_len,
+	text_len = vsnprintf(buf + header_len,
+		sizeof(buf) - (size_t)header_len - (int)sizeof(USBI_LOG_LINE_END),
 		format, args);
-	if (text_len < 0 || text_len + header_len >= (int)sizeof(buf)) {
+	if (text_len < 0 || text_len + header_len + (int)sizeof(USBI_LOG_LINE_END) >= (int)sizeof(buf)) {
 		/* Truncated log output. On some platforms a -1 return value means
-		 * that the output was truncated. */
-		text_len = (int)sizeof(buf) - header_len;
-	}
-	if (header_len + text_len + (int)sizeof(USBI_LOG_LINE_END) >= (int)sizeof(buf)) {
-		/* Need to truncate the text slightly to fit on the terminator. */
-		text_len -= (header_len + text_len + (int)sizeof(USBI_LOG_LINE_END)) - (int)sizeof(buf);
+		 * that the output was truncated (e.g. glibc < 2.1). */
+		text_len = (int)sizeof(buf) - header_len - (int)sizeof(USBI_LOG_LINE_END);
 	}
 	strcpy(buf + header_len + text_len, USBI_LOG_LINE_END);
 

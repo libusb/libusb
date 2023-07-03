@@ -1726,8 +1726,10 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	}
 	/* transfer might have been freed by the above call, do not use from
 	 * this point. */
-	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER)
+	if (flags & LIBUSB_TRANSFER_FREE_TRANSFER) {
+		/* coverity[incorrect_free] is reported incorrectly here due to the memory layout */
 		libusb_free_transfer(transfer);
+	}
 	return r;
 }
 
@@ -1818,6 +1820,7 @@ int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
 		return 1;
 
 	ctx->event_handler_active = 1;
+	/* coverity[missing_unlock] is expected here */
 	return 0;
 }
 

@@ -234,6 +234,10 @@ int usbi_alloc_event_data(struct libusb_context *ctx)
 	for_each_event_source(ctx, ievent_source)
 		ctx->event_data_cnt++;
 
+	/* Silence warning about use of zero allocated memory. */
+	if (ctx->event_data_cnt == 0)
+		return 0;
+
 	fds = calloc(ctx->event_data_cnt, sizeof(*fds));
 	if (!fds)
 		return LIBUSB_ERROR_NO_MEM;

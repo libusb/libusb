@@ -193,11 +193,13 @@ struct list_head {
 
 #define list_empty(entry) ((entry)->next == (entry))
 
+LIBUSB_NONNULL(1)
 static inline void list_init(struct list_head *entry)
 {
 	entry->prev = entry->next = entry;
 }
 
+LIBUSB_NONNULL(1, 2)
 static inline void list_add(struct list_head *entry, struct list_head *head)
 {
 	entry->next = head->next;
@@ -207,6 +209,7 @@ static inline void list_add(struct list_head *entry, struct list_head *head)
 	head->next = entry;
 }
 
+LIBUSB_NONNULL(1, 2)
 static inline void list_add_tail(struct list_head *entry,
 	struct list_head *head)
 {
@@ -217,13 +220,17 @@ static inline void list_add_tail(struct list_head *entry,
 	head->prev = entry;
 }
 
+LIBUSB_NONNULL(1)
 static inline void list_del(struct list_head *entry)
 {
+	assert(entry->next && entry->prev);
+
 	entry->next->prev = entry->prev;
 	entry->prev->next = entry->next;
 	entry->next = entry->prev = NULL;
 }
 
+LIBUSB_NONNULL(1, 2)
 static inline void list_cut(struct list_head *list, struct list_head *head)
 {
 	if (list_empty(head)) {
@@ -249,7 +256,14 @@ static inline void list_splice_front(struct list_head *list, struct list_head *h
 
 static inline void *usbi_reallocf(void *ptr, size_t size)
 {
-	void *ret = realloc(ptr, size);
+	void *ret;
+
+	if (size == 0) {
+		free(ptr);
+		return NULL;
+	}
+
+	ret = realloc(ptr, size);
 
 	if (!ret)
 		free(ptr);
@@ -774,10 +788,10 @@ struct usbi_hotplug_message {
 
 /* shared data and functions */
 
-void usbi_hotplug_init(struct libusb_context *ctx);
-void usbi_hotplug_exit(struct libusb_context *ctx);
+void usbi_hotplug_init(struct libusb_context *ctx) LIBUSB_NONNULL(1);
+void usbi_hotplug_exit(struct libusb_context *ctx) LIBUSB_NONNULL(1);
 void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device *dev,
-	libusb_hotplug_event event);
+	libusb_hotplug_event event) LIBUSB_NONNULL(1);
 void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_msgs);
 
 int usbi_io_init(struct libusb_context *ctx);
@@ -808,7 +822,8 @@ struct usbi_event_source {
 
 int usbi_add_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle,
 	short poll_events);
-void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle);
+void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle)
+	LIBUSB_NONNULL(1);
 
 struct usbi_option {
   int is_set;

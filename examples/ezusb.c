@@ -23,6 +23,7 @@
 
 #include <config.h>
 
+#include <assert.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -303,6 +304,7 @@ static int parse_ihex(FILE *image, void *context,
 		buf[3] = 0;
 		len = strtoul(buf+1, NULL, 16);
 		buf[3] = tmp;
+		assert(len <= sizeof(data));
 
 		/* Read the target offset (address up to 64KB) */
 		tmp = buf[7];
