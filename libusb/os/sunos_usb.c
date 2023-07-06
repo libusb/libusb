@@ -1,6 +1,6 @@
 /*
- *
  * Copyright (c) 2016, Oracle and/or its affiliates.
+ * Copyright 2023 Oxide Computer Company
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -831,7 +831,7 @@ sunos_check_device_and_status_open(struct libusb_device_handle *hdl,
 {
 	char	filename[PATH_MAX + 1], statfilename[PATH_MAX + 1];
 	char	cfg_num[16], alt_num[16];
-	int	fd, fdstat, mode;
+	int	fd, fdstat, mode, e;
 	uint8_t	ifc = 0;
 	uint8_t	ep_index;
 	sunos_dev_handle_priv_t *hpriv;
@@ -870,11 +870,22 @@ sunos_check_device_and_status_open(struct libusb_device_handle *hdl,
 		bzero(alt_num, sizeof(alt_num));
 	}
 
-	(void) snprintf(filename, PATH_MAX, "%s/%sif%d%s%s%d",
+	e = snprintf(filename, sizeof (filename), "%s/%sif%d%s%s%d",
 	    hpriv->dpriv->ugenpath, cfg_num, ifc, alt_num,
-	    (ep_addr & LIBUSB_ENDPOINT_DIR_MASK) ? "in" :
-	    "out", (ep_addr & LIBUSB_ENDPOINT_ADDRESS_MASK));
-	(void) snprintf(statfilename, PATH_MAX, "%sstat", filename);
+	    (ep_addr & LIBUSB_ENDPOINT_DIR_MASK) ? "in" : "out",
+	    ep_addr & LIBUSB_ENDPOINT_ADDRESS_MASK);
+	if (e < 0 || e >= (int)sizeof (filename)) {
+		usbi_dbg(HANDLE_CTX(hdl),
+		    "path buffer overflow for endpoint 0x%02x", ep_addr);
+		return (EINVAL);
+	}
+
+	e = snprintf(statfilename, sizeof (statfilename), "%sstat", filename);
+	if (e < 0 || e >= (int)sizeof (statfilename)) {
+		usbi_dbg(HANDLE_CTX(hdl),
+		    "path buffer overflow for endpoint 0x%02x stat", ep_addr);
+		return (EINVAL);
+	}
 
 	/*
 	 * In case configuration has been switched, the xfer endpoint needs
