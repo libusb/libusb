@@ -495,9 +495,9 @@ _errno_to_libusb(int err)
 		return LIBUSB_ERROR_NO_MEM;
 	case ETIMEDOUT:
 		return LIBUSB_ERROR_TIMEOUT;
+	default:
+		return LIBUSB_ERROR_OTHER;
 	}
-
-	return LIBUSB_ERROR_OTHER;
 }
 
 int
