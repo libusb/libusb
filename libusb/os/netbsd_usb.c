@@ -458,7 +458,7 @@ _errno_to_libusb(int err)
 		return LIBUSB_ERROR_TIMEOUT;
 	}
 
-	usbi_dbg(NULL, "error: %s", strerror(err));
+	usbi_dbg(NULL, "error: %s (%d)", strerror(err), err);
 
 	return LIBUSB_ERROR_OTHER;
 }
