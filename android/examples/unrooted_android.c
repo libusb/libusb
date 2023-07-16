@@ -205,12 +205,13 @@ static void print_device(libusb_device *dev, libusb_device_handle *handle)
     uint8_t i;
 
     switch (libusb_get_device_speed(dev)) {
-        case LIBUSB_SPEED_LOW:		speed = "1.5M"; break;
-        case LIBUSB_SPEED_FULL:		speed = "12M"; break;
-        case LIBUSB_SPEED_HIGH:		speed = "480M"; break;
-        case LIBUSB_SPEED_SUPER:	speed = "5G"; break;
-        case LIBUSB_SPEED_SUPER_PLUS:	speed = "10G"; break;
-        default:			speed = "Unknown";
+        case LIBUSB_SPEED_LOW:			speed = "1.5M"; break;
+        case LIBUSB_SPEED_FULL:			speed = "12M"; break;
+        case LIBUSB_SPEED_HIGH:			speed = "480M"; break;
+        case LIBUSB_SPEED_SUPER:		speed = "5G"; break;
+        case LIBUSB_SPEED_SUPER_PLUS:		speed = "10G"; break;
+        case LIBUSB_SPEED_SUPER_PLUS_BY2:	speed = "20G"; break;
+        default:				speed = "Unknown";
     }
 
     ret = libusb_get_device_descriptor(dev, &desc);

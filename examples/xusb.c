@@ -850,7 +850,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 			printf(" (from root hub)\n");
 		}
 		r = libusb_get_device_speed(dev);
-		if ((r<0) || (r>5)) r=0;
+		if ((r<0) || (r>6)) r=0;
 		printf("             speed: %s\n", speed_name[r]);
 	}
 
