@@ -1160,6 +1160,9 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101200
     case kUSBDeviceSpeedSuperPlus: dev->speed = LIBUSB_SPEED_SUPER_PLUS; break;
 #endif
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101500
+    case kUSBDeviceSpeedSuperPlusBy2: dev->speed = LIBUSB_SPEED_SUPER_PLUS_BY2; break;
+#endif
     default:
       usbi_warn (ctx, "Got unknown device speed %d", devSpeed);
     }
