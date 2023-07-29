@@ -19,10 +19,6 @@ configure
 aclocal.m4
 compile
 config.guess
-config.h*
-!msvc/config.h
-!android/config.h
-!Xcode/config.h
 .vs
 config.log
 config.status
@@ -66,3 +62,5 @@ xcuserdata
 *.xccheckout
 *.xcscmblueprint
 *.xcworkspace
+zig-cache
+zig-out

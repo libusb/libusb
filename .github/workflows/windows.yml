@@ -1,13 +1,12 @@
-name: macos
+name: windows
 on: [push, pull_request]
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [macos-11, macos-12, macos-13]
+        os: [windows-2022, windows-2019]
     runs-on: ${{ matrix.os }}
-
     steps:
       - uses: actions/checkout@v2
       - uses: goto-bus-stop/setup-zig@v2
