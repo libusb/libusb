@@ -5,3 +5,4 @@
 .gitattributes  export-ignore
 .gitignore      export-ignore
 INSTALL_WIN.txt eol=crlf
+*.in            eol=lf
