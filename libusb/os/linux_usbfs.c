@@ -652,13 +652,18 @@ static int seek_to_next_config(struct libusb_context *ctx,
 
 	while (len > 0) {
 		if (len < 2) {
-			usbi_err(ctx, "short descriptor read %zu/2", len);
+			usbi_err(ctx, "remaining descriptors len too small %zu/2", len);
 			return LIBUSB_ERROR_IO;
 		}
 
 		header = (struct usbi_descriptor_header *)buffer;
 		if (header->bDescriptorType == LIBUSB_DT_CONFIG)
 			return offset;
+
+		if (header->bLength < 2) {
+			usbi_err(ctx, "short descriptor read %hhu/2", header->bLength);
+			return LIBUSB_ERROR_IO;
+		}
 
 		if (len < header->bLength) {
 			usbi_err(ctx, "bLength overflow by %zu bytes",
