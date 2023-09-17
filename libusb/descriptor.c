@@ -1220,6 +1220,11 @@ static int parse_iad_array(struct libusb_context *ctx,
 	iad_array->length = 0;
 	while (consumed < size) {
 		parse_descriptor(buf, "bb", &header);
+		if (header.bLength < 2) {
+			usbi_err(ctx, "invalid descriptor bLength %d",
+				 header.bLength);
+			return LIBUSB_ERROR_IO;
+		}
 		if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION)
 			iad_array->length++;
 		buf += header.bLength;
