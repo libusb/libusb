@@ -151,6 +151,11 @@ typedef SSIZE_T ssize_t;
 /* The following is kept for compatibility, but will be deprecated in the future */
 #define LIBUSBX_API_VERSION LIBUSB_API_VERSION
 
+/** \ingroup libusb_dev
+ * Can be used to determine the presence of libusb_get_session_data for
+ * conditional compilation */
+#define LIBUSB_HAS_GET_SESSION_DATA 1
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -1638,6 +1643,7 @@ int LIBUSB_CALL libusb_get_platform_descriptor(libusb_context *ctx,
 	struct libusb_platform_descriptor **platform_descriptor);
 void LIBUSB_CALL libusb_free_platform_descriptor(
 	struct libusb_platform_descriptor *platform_descriptor);
+unsigned long LIBUSB_CALL libusb_get_session_data(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_port_number(libusb_device *dev);
 int LIBUSB_CALL libusb_get_port_numbers(libusb_device *dev, uint8_t *port_numbers, int port_numbers_len);

@@ -62,6 +62,8 @@ EXPORTS
   libusb_get_active_interface_association_descriptors@8 = libusb_get_active_interface_association_descriptors
   libusb_get_bos_descriptor
   libusb_get_bos_descriptor@8 = libusb_get_bos_descriptor
+  libusb_get_session_data
+  libusb_get_session_data@4 = libusb_get_session_data
   libusb_get_bus_number
   libusb_get_bus_number@4 = libusb_get_bus_number
   libusb_get_config_descriptor

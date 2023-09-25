@@ -401,6 +401,7 @@ if (cfg != desired)
   * - libusb_free_usb_2_0_extension_descriptor()
   * - libusb_get_active_config_descriptor()
   * - libusb_get_bos_descriptor()
+  * - libusb_get_session_data()
   * - libusb_get_bus_number()
   * - libusb_get_config_descriptor()
   * - libusb_get_config_descriptor_by_value()
@@ -900,6 +901,17 @@ void API_EXPORTED libusb_free_device_list(libusb_device **list,
 			libusb_unref_device(dev);
 	}
 	free(list);
+}
+
+/** \ingroup libusb_dev
+ * Get the backend-specific handle (session data in terms of libusb) of a device.
+ * Can be used for direct low-level access to the backend when necessary.
+ * \param dev a device
+ * \returns the backend-specific handle (session data)
+ */
+unsigned long API_EXPORTED libusb_get_session_data(libusb_device *dev)
+{
+    return dev->session_data;
 }
 
 /** \ingroup libusb_dev
