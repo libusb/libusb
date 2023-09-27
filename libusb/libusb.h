@@ -1667,6 +1667,13 @@ int LIBUSB_CALL libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
 int LIBUSB_CALL libusb_set_auto_detach_kernel_driver(
 	libusb_device_handle *dev_handle, int enable);
 
+int LIBUSB_CALL libusb_backend_supports_raw_io(void);
+int LIBUSB_CALL libusb_get_max_raw_io_transfer_size(
+	libusb_device_handle *dev_handle,
+	unsigned int endpoint_address);
+int LIBUSB_CALL libusb_set_raw_io(libusb_device_handle *dev_handle,
+	unsigned int endpoint_address, int enable);
+
 /* async I/O */
 
 /** \ingroup libusb_asyncio

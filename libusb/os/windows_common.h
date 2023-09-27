@@ -342,6 +342,11 @@ struct windows_backend {
 	int (*cancel_transfer)(struct usbi_transfer *itransfer);
 	void (*clear_transfer_priv)(struct usbi_transfer *itransfer);
 	enum libusb_transfer_status (*copy_transfer_data)(struct usbi_transfer *itransfer, DWORD length);
+	int (*get_max_raw_io_transfer_size)(
+                struct libusb_device_handle *dev_handle,
+                unsigned int endpoint);
+	int (*set_raw_io)(struct libusb_device_handle *dev_handle,
+                unsigned int endpoint, int enable);
 };
 
 struct windows_context_priv {

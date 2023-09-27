@@ -367,6 +367,7 @@ if (cfg != desired)
   * - libusb_alloc_streams()
   * - libusb_alloc_transfer()
   * - libusb_attach_kernel_driver()
+  * - libusb_backend_supports_raw_io()
   * - libusb_bulk_transfer()
   * - libusb_cancel_transfer()
   * - libusb_claim_interface()
@@ -416,6 +417,7 @@ if (cfg != desired)
   * - libusb_get_iso_packet_buffer_simple()
   * - libusb_get_max_alt_packet_size()
   * - libusb_get_max_iso_packet_size()
+  * - libusb_get_max_raw_io_transfer_size()
   * - libusb_get_max_packet_size()
   * - libusb_get_next_timeout()
   * - libusb_get_parent()
@@ -459,6 +461,7 @@ if (cfg != desired)
   * - libusb_set_option()
   * - libusb_setlocale()
   * - libusb_set_pollfd_notifiers()
+  * - libusb_set_raw_io()
   * - libusb_strerror()
   * - libusb_submit_transfer()
   * - libusb_transfer_get_stream_id()
@@ -2199,6 +2202,67 @@ int API_EXPORTED libusb_set_auto_detach_kernel_driver(
 
 	dev_handle->auto_detach_kernel_driver = enable;
 	return LIBUSB_SUCCESS;
+}
+
+/** \ingroup libusb_dev
+ * Check whether the backend in use supports raw I/O.
+ *
+ * Returns 1 if so, otherwise 0.
+ *
+ * When raw I/O is available, an application must take some extra steps if it
+ * needs to achieve the highest possible inbound throughput on bulk and
+ * interrupt endpoints. See \ref libusb_set_raw_io.
+ *
+ * Since version 1.0.27, \ref LIBUSB_API_VERSION >= 0x0100010A
+ */
+int API_EXPORTED libusb_backend_supports_raw_io(void)
+{
+	return (usbi_backend.set_raw_io != NULL &&
+		usbi_backend.get_max_raw_io_transfer_size != NULL);
+}
+
+/** \ingroup libusb_dev
+ * Retrieve the maximum transfer size supported for raw I/O for an inbound
+ * bulk or interrupt endpoint on an open device.
+ *
+ * Returns a maximum transfer size, or a negative error code.
+ * If the backend does not support raw I/O, returns
+ * \ref LIBUSB_ERROR_NOT_SUPPORTED.
+ *
+ * Since version 1.0.27, \ref LIBUSB_API_VERSION >= 0x0100010A
+ */
+int API_EXPORTED libusb_get_max_raw_io_transfer_size(
+	libusb_device_handle *dev_handle, unsigned int endpoint_address)
+{
+	if (!usbi_backend.get_max_raw_io_transfer_size)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	return usbi_backend.get_max_raw_io_transfer_size(
+		dev_handle, endpoint_address);
+}
+
+/** \ingroup libusb_dev
+ * Enable or disable raw I/O for an inbound bulk or interrupt endpoint on an
+ * open device.
+ *
+ * When raw I/O is in use on an endpoint, all transfers on the endpoint must
+ * have a size that is a multiple of the maximum packet size returned by
+ * \ref libusb_get_max_packet_size, and less than or equal to the maximum
+ * transfer size returned by \ref libusb_get_max_raw_io_transfer_size.
+ *
+ * Returns \ref LIBUSB_SUCCESS or a negative error code.
+ * If the backend does not support raw I/O, returns
+ * \ref LIBUSB_ERROR_NOT_SUPPORTED.
+ *
+ * Since version 1.0.27, \ref LIBUSB_API_VERSION >= 0x0100010A
+ */
+int API_EXPORTED libusb_set_raw_io(libusb_device_handle *dev_handle,
+	unsigned int endpoint_address, int enable)
+{
+	if (!usbi_backend.set_raw_io)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	return usbi_backend.set_raw_io(dev_handle, endpoint_address, enable);
 }
 
 /** \ingroup libusb_lib

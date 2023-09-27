@@ -42,6 +42,8 @@
 		continue;			\
 	}
 
+static int interface_by_endpoint(struct winusb_device_priv *priv,
+	struct winusb_device_handle_priv *handle_priv, uint8_t endpoint_address);
 // WinUSB-like API prototypes
 static bool winusbx_init(struct libusb_context *ctx);
 static void winusbx_exit(void);
@@ -2175,6 +2177,144 @@ static enum libusb_transfer_status winusb_copy_transfer_data(struct usbi_transfe
 	return priv->apib->copy_transfer_data(SUB_API_NOTSET, itransfer, length);
 }
 
+static int winusb_get_max_raw_io_transfer_size(
+	struct libusb_device_handle *dev_handle,
+	unsigned int endpoint)
+{
+	struct libusb_context *ctx;
+	struct winusb_device_handle_priv *handle_priv;
+	struct winusb_device_priv *priv;
+	int interface;
+	HANDLE winusb_handle;
+	int sub_api = SUB_API_NOTSET;
+	ULONG max_transfer_size = 0;
+
+	ctx = HANDLE_CTX(dev_handle);
+
+	if (!ctx) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	if (endpoint & ~(LIBUSB_ENDPOINT_DIR_MASK | LIBUSB_ENDPOINT_ADDRESS_MASK)) {
+		usbi_err(ctx, "invalid endpoint 0x%X passed, cannot get maximum transfer size", endpoint);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	handle_priv = get_winusb_device_handle_priv(dev_handle);
+	priv = usbi_get_device_priv(dev_handle->dev);
+	interface = interface_by_endpoint(priv, handle_priv, (uint8_t) endpoint);
+
+	if (interface < 0) {
+		usbi_err(ctx, "unable to match endpoint 0x%02X to an open interface, cannot get maximum transfer size", endpoint);
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	usbi_dbg(ctx, "matched endpoint 0x%02X to interface %d", endpoint, interface);
+
+	if (priv->usb_interface[interface].apib->id != USB_API_WINUSBX) {
+		usbi_err(ctx, "interface %d is not managed by WinUSB, cannot get maximum transfer size", interface);
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	}
+
+	winusb_handle = handle_priv->interface_handle[interface].api_handle;
+
+	if (!HANDLE_VALID(winusb_handle)) {
+		usbi_err(HANDLE_CTX(dev_handle), "WinUSB handle not valid for interface %d, cannot get maximum transfer size", interface);
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	CHECK_WINUSBX_AVAILABLE(sub_api);
+
+	ULONG size = sizeof(ULONG);
+	if (!WinUSBX[sub_api].GetPipePolicy(winusb_handle, (UCHAR) endpoint,
+		MAXIMUM_TRANSFER_SIZE, &size, &max_transfer_size)) {
+		usbi_err(ctx, "failed to get maximum transfer size for endpoint 0x%02X", endpoint);
+		switch (GetLastError()) {
+		case ERROR_INVALID_HANDLE:
+			return LIBUSB_ERROR_INVALID_PARAM;
+		default:
+			return LIBUSB_ERROR_OTHER;
+		}
+	}
+
+	usbi_dbg(ctx, "maximum transfer size for endpoint 0x%02X is %lu", endpoint, max_transfer_size);
+
+	return LIBUSB_SUCCESS;
+}
+
+static int winusb_set_raw_io(struct libusb_device_handle *dev_handle,
+	unsigned int endpoint, int enable)
+{
+	struct libusb_context *ctx;
+	struct winusb_device_handle_priv *handle_priv;
+	struct winusb_device_priv *priv;
+	UCHAR policy;
+	int interface;
+	HANDLE winusb_handle;
+	int sub_api = SUB_API_NOTSET;
+
+	ctx = HANDLE_CTX(dev_handle);
+
+	if (!ctx) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	if (endpoint & ~(LIBUSB_ENDPOINT_DIR_MASK | LIBUSB_ENDPOINT_ADDRESS_MASK)) {
+		usbi_err(ctx, "invalid endpoint 0x%X passed, cannot set RAW_IO", endpoint);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	if (!(endpoint & LIBUSB_ENDPOINT_DIR_MASK)) {
+		usbi_err(ctx, "endpoint 0x%02X is OUT not IN, cannot set RAW_IO", endpoint);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	handle_priv = get_winusb_device_handle_priv(dev_handle);
+	priv = usbi_get_device_priv(dev_handle->dev);
+	interface = interface_by_endpoint(priv, handle_priv, (uint8_t) endpoint);
+
+	if (interface < 0) {
+		usbi_err(ctx, "unable to match endpoint 0x%02X to an open interface for RAW_IO", endpoint);
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	usbi_dbg(ctx, "matched endpoint 0x%02X to interface %d", endpoint, interface);
+
+	if (priv->usb_interface[interface].apib->id != USB_API_WINUSBX) {
+		usbi_err(ctx, "interface %d is not managed by WinUSB, cannot set RAW_IO", interface);
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	}
+
+	winusb_handle = handle_priv->interface_handle[interface].api_handle;
+
+	if (!HANDLE_VALID(winusb_handle)) {
+		usbi_err(HANDLE_CTX(dev_handle), "WinUSB handle not valid for interface %d, cannot set RAW_IO", interface);
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	CHECK_WINUSBX_AVAILABLE(sub_api);
+
+	policy = enable != 0;
+
+	if (!WinUSBX[sub_api].SetPipePolicy(winusb_handle, (UCHAR) endpoint,
+		RAW_IO, sizeof(UCHAR), &policy)) {
+		usbi_err(ctx, "failed to change RAW_IO for endpoint %02X", endpoint);
+		switch (GetLastError()) {
+		case ERROR_INVALID_HANDLE:
+		case ERROR_INVALID_PARAMETER:
+			return LIBUSB_ERROR_INVALID_PARAM;
+		case ERROR_NOT_ENOUGH_MEMORY:
+			return LIBUSB_ERROR_NO_MEM;
+		default:
+			return LIBUSB_ERROR_OTHER;
+		}
+	}
+
+	usbi_dbg(ctx, "%s RAW_IO for endpoint %02X", enable ? "enabled" : "disabled", endpoint);
+
+	return LIBUSB_SUCCESS;
+}
+
 // NB: MSVC6 does not support named initializers.
 const struct windows_backend winusb_backend = {
 	winusb_init,
@@ -2197,6 +2337,8 @@ const struct windows_backend winusb_backend = {
 	winusb_cancel_transfer,
 	winusb_clear_transfer_priv,
 	winusb_copy_transfer_data,
+	winusb_get_max_raw_io_transfer_size,
+	winusb_set_raw_io,
 };
 
 /*

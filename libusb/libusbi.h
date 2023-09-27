@@ -1323,6 +1323,27 @@ struct usbi_os_backend {
 	int (*attach_kernel_driver)(struct libusb_device_handle *dev_handle,
 		uint8_t interface_number);
 
+	/* Retrieve the maximum transfer size supported for raw I/O for an
+	 * inbound bulk or interrupt endpoint on an open device. Optional.
+	 *
+	 * Return:
+	 * - a positive maximum transfer size on success.
+	 * - a LIBUSB_ERROR code on failure
+	 */
+	int (*get_max_raw_io_transfer_size)(
+		struct libusb_device_handle *dev_handle,
+		unsigned int endpoint);
+
+	/* Enable or disable raw I/O for an inbound bulk or interrupt endpoint
+	 * on an open device. Optional.
+	 *
+	 * Return:
+	 * - 0 on success
+	 * - a LIBUSB_ERROR code on failure
+	 */
+	int (*set_raw_io)(struct libusb_device_handle *dev_handle,
+		unsigned int endpoint, int enable);
+
 	/* Destroy a device. Optional.
 	 *
 	 * This function is called when the last reference to a device is
