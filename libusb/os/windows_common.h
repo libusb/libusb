@@ -342,7 +342,6 @@ struct windows_backend {
 	int (*cancel_transfer)(struct usbi_transfer *itransfer);
 	void (*clear_transfer_priv)(struct usbi_transfer *itransfer);
 	enum libusb_transfer_status (*copy_transfer_data)(struct usbi_transfer *itransfer, DWORD length);
-	int (*set_option)(struct libusb_context *ctx, enum libusb_option option, va_list args);
 };
 
 struct windows_context_priv {

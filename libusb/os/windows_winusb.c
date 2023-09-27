@@ -42,8 +42,6 @@
 		continue;			\
 	}
 
-static int interface_by_endpoint(struct winusb_device_priv *priv,
-	struct winusb_device_handle_priv *handle_priv, uint8_t endpoint_address);
 // WinUSB-like API prototypes
 static bool winusbx_init(struct libusb_context *ctx);
 static void winusbx_exit(void);
@@ -2273,111 +2271,6 @@ static enum libusb_transfer_status winusb_copy_transfer_data(struct usbi_transfe
 	return priv->apib->copy_transfer_data(SUB_API_NOTSET, itransfer, length);
 }
 
-static int winusb_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
-{
-	struct libusb_device_handle *dev_handle;
-	unsigned int endpoint;
-	unsigned int enable;
-	unsigned int *max_transfer_size_ptr;
-	struct winusb_device_handle_priv *handle_priv;
-	struct winusb_device_priv *priv;
-	UCHAR policy;
-	int current_interface;
-	HANDLE winusb_handle;
-	int sub_api = SUB_API_NOTSET;
-	ULONG max_transfer_size = 0;
-
-	switch (option) {
-	case LIBUSB_OPTION_WINUSB_RAW_IO:
-		dev_handle = va_arg(ap, struct libusb_device_handle *);
-		endpoint = va_arg(ap, unsigned int);
-		enable = va_arg(ap, unsigned int);
-		max_transfer_size_ptr = va_arg(ap, unsigned int *);
-
-		policy = enable != 0;
-
-		if (dev_handle == NULL) {
-			usbi_err(ctx, "device handle passed for RAW_IO was NULL");
-			return LIBUSB_ERROR_INVALID_PARAM;
-		}
-
-		if (HANDLE_CTX(dev_handle) != ctx) {
-			usbi_err(ctx, "device handle passed for RAW_IO has wrong context");
-			return LIBUSB_ERROR_INVALID_PARAM;
-		}
-
-		if (endpoint & ~(LIBUSB_ENDPOINT_DIR_MASK | LIBUSB_ENDPOINT_ADDRESS_MASK)) {
-			usbi_err(ctx, "invalid endpoint %X passed for RAW_IO", endpoint);
-			return LIBUSB_ERROR_INVALID_PARAM;
-		}
-
-		if (!(endpoint & LIBUSB_ENDPOINT_DIR_MASK)) {
-			usbi_err(ctx, "endpoint %02X passed for RAW_IO is OUT, not IN", endpoint);
-			return LIBUSB_ERROR_INVALID_PARAM;
-		}
-
-		handle_priv = get_winusb_device_handle_priv(dev_handle);
-		priv = usbi_get_device_priv(dev_handle->dev);
-		current_interface = interface_by_endpoint(priv, handle_priv, (uint8_t) endpoint);
-
-		if (current_interface < 0) {
-			usbi_err(ctx, "unable to match endpoint to an open interface for RAW_IO");
-			return LIBUSB_ERROR_NOT_FOUND;
-		}
-
-		if (priv->usb_interface[current_interface].apib->id != USB_API_WINUSBX) {
-			usbi_err(ctx, "interface is not winusb when setting RAW_IO");
-			return LIBUSB_ERROR_NOT_SUPPORTED;
-		}
-
-		winusb_handle = handle_priv->interface_handle[current_interface].api_handle;
-
-		if (!HANDLE_VALID(winusb_handle)) {
-			usbi_err(HANDLE_CTX(dev_handle), "WinUSB handle not valid when setting RAW_IO");
-			return LIBUSB_ERROR_NOT_FOUND;
-		}
-
-		CHECK_WINUSBX_AVAILABLE(sub_api);
-
-		if (enable && max_transfer_size_ptr != NULL) {
-			ULONG size = sizeof(ULONG);
-			if (!WinUSBX[sub_api].GetPipePolicy(winusb_handle, (UCHAR) endpoint,
-				MAXIMUM_TRANSFER_SIZE, &size, &max_transfer_size)) {
-				usbi_err(ctx, "failed to get MAXIMUM_TRANSFER_SIZE for endpoint %02X", endpoint);
-				switch (GetLastError()) {
-				case ERROR_INVALID_HANDLE:
-					return LIBUSB_ERROR_INVALID_PARAM;
-				default:
-					return LIBUSB_ERROR_OTHER;
-				}
-			}
-		}
-
-		if (!WinUSBX[sub_api].SetPipePolicy(winusb_handle, (UCHAR) endpoint,
-			RAW_IO, sizeof(UCHAR), &policy)) {
-			usbi_err(ctx, "failed to change RAW_IO for endpoint %02X", endpoint);
-			switch (GetLastError()) {
-			case ERROR_INVALID_HANDLE:
-			case ERROR_INVALID_PARAMETER:
-				return LIBUSB_ERROR_INVALID_PARAM;
-			case ERROR_NOT_ENOUGH_MEMORY:
-				return LIBUSB_ERROR_NO_MEM;
-			default:
-				return LIBUSB_ERROR_OTHER;
-			}
-		}
-
-		usbi_dbg(ctx, "%s RAW_IO for endpoint %02X", enable ? "enabled" : "disabled", endpoint);
-
-		if (enable && max_transfer_size_ptr != NULL)
-			*max_transfer_size_ptr = max_transfer_size;
-
-		return LIBUSB_SUCCESS;
-	default:
-		return LIBUSB_ERROR_NOT_SUPPORTED;
-	}
-}
-
 // NB: MSVC6 does not support named initializers.
 const struct windows_backend winusb_backend = {
 	winusb_init,
@@ -2400,7 +2293,6 @@ const struct windows_backend winusb_backend = {
 	winusb_cancel_transfer,
 	winusb_clear_transfer_priv,
 	winusb_copy_transfer_data,
-	winusb_set_option,
 };
 
 /*
