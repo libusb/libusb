@@ -608,6 +608,8 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
 
+	UNUSED(ap);
+
 	if (option == LIBUSB_OPTION_USE_USBDK) {
 		if (!usbdk_available) {
 			usbi_err(ctx, "UsbDk backend not available");
@@ -616,10 +618,6 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 		usbi_dbg(ctx, "switching context %p to use UsbDk backend", ctx);
 		priv->backend = &usbdk_backend;
 		return LIBUSB_SUCCESS;
-	}
-
-	if (priv->backend->set_option) {
-		return priv->backend->set_option(ctx, option, ap);
 	}
 
 	return LIBUSB_ERROR_NOT_SUPPORTED;

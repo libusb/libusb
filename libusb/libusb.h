@@ -1501,39 +1501,6 @@ enum libusb_option {
 
 #define LIBUSB_OPTION_WEAK_AUTHORITY LIBUSB_OPTION_NO_DEVICE_DISCOVERY
 
-	/** Enable or disable WinUSB RAW_IO mode on an endpoint
-	 *
-	 * Requires four additional arguments of:
-	 *
-	 *   libusb_device_handle *dev_handle
-	 *   unsigned int endpoint_address
-	 *   unsigned int enable
-	 *   unsigned int *max_transfer_size_ptr
-	 *
-	 * The dev_handle and endpoint_address parameters must identify a valid
-	 * IN endpoint on an open device. If enable is nonzero, RAW_IO is
-	 * enabled, otherwise it is disabled. Unless max_transfer_size_ptr is
-	 * NULL, then on a successful call to enable RAW_IO, it will be written
-	 * with the MAXIMUM_TRANSFER_SIZE value for the endpoint.
-	 *
-	 * Whilst RAW_IO is enabled for an endpoint, all transfers on that endpoint
-	 * must meet the following two requirements:
-	 *
-	 * * The buffer length must be a multiple of the maximum endpoint packet size.
-	 *
-	 * * The length must be less than or equal to the MAXIMUM_TRANSFER_SIZE value.
-	 *
-	 * This option should not be changed when any transfer is in progress on the
-	 * specified endpoint.
-	 *
-	 * This option only affects the WinUSB backend. On other backends it is ignored
-	 * and returns LIBUSB_OPTION_NOT_SUPPORTED, without modifying the value pointed
-	 * to by max_transfer_size_ptr.
-	 *
-	 *  Since version 1.0.27, \ref LIBUSB_API_VERSION >= 0x0100010A
-	 */
-	LIBUSB_OPTION_WINUSB_RAW_IO = 3,
-
 	/** Set the context log callback functon.
 	 *
 	 * Set the log callback function either on a context or globally. This
@@ -1543,9 +1510,9 @@ enum libusb_option {
 	 * equivalent to calling libusb_set_log_cb with mode
 	 * LIBUSB_LOG_CB_CONTEXT.
 	 */
-	LIBUSB_OPTION_LOG_CB = 4,
+	LIBUSB_OPTION_LOG_CB = 3,
 
-	LIBUSB_OPTION_MAX = 5
+	LIBUSB_OPTION_MAX = 4
 };
 
 /** \ingroup libusb_lib
