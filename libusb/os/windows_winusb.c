@@ -1462,7 +1462,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	GUID hid_guid;
 	int r = LIBUSB_SUCCESS;
 	int api, sub_api;
-	unsigned int pass, i, j;
+	unsigned int pass, pass_type, i, j;
 	char enumerator[16];
 	char dev_id[MAX_PATH_LENGTH];
 	struct libusb_device *dev, *parent_dev;
@@ -1497,13 +1497,14 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	unsigned int unref_cur = 0;
 	DWORD hub_port_nr;
 
-	// PASS 1 : (re)enumerate HCDs (allows for HCD hotplug)
-	// PASS 2 : (re)enumerate HUBS
-	// PASS 3 : (re)enumerate generic USB devices (including driverless)
-	//           and list additional USB device interface GUIDs to explore
-	// PASS 4 : (re)enumerate master USB devices that have a device interface
-	// PASS 5+: (re)enumerate device interfaced GUIDs (including HID) and
-	//           set the device interfaces.
+	// PASS 0 : enumerate HUBs
+	// PASS 1 : (re)enumerate master devices that have a DEVice interface
+	// PASS 2 : (re)enumerate HCDs (allow for HCD hotplug)
+	// PASS 3 : (re)enumerate GENeric devices (including driverless)
+	//           and list additional device interface GUIDs to explore
+	// PASS 4 : (re)enumerate device interface GUIDs (including HID)
+	//           and set the device interfaces
+	// PASS 5+: (re)enumerate additional EXTra GUID devices
 
 	// Init the GUID table
 	guid_list = malloc(guid_size * sizeof(void *));
@@ -1540,10 +1541,11 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	}
 
 	for (pass = 0; ((pass < nb_guids) && (r == LIBUSB_SUCCESS)); pass++) {
+		pass_type = MIN(pass, EXT_PASS);
 //#define ENUM_DEBUG
 #if defined(ENABLE_LOGGING) && defined(ENUM_DEBUG)
 		const char * const passname[] = {"HUB", "DEV", "HCD", "GEN", "HID", "EXT"};
-		usbi_dbg(ctx, "#### PROCESSING %ss %s", passname[MIN(pass, EXT_PASS)], guid_to_string(guid_list[pass], guid_string));
+		usbi_dbg(ctx, "#### PROCESSING %ss %s", passname[pass_type], guid_to_string(guid_list[pass], guid_string));
 #endif
 		if ((pass == HID_PASS) && (guid_list[HID_PASS] == NULL))
 			continue;
@@ -1596,7 +1598,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 			// Set API to use or get additional data from generic pass
 			api = USB_API_UNSUPPORTED;
 			sub_api = SUB_API_NOTSET;
-			switch (pass) {
+			switch (pass_type) {
 			case HCD_PASS:
 				break;
 			case HUB_PASS:
@@ -1696,7 +1698,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 			case HID_PASS:
 				api = USB_API_HID;
 				break;
-			default:
+			case DEV_PASS:
+			case EXT_PASS:
 				// Get the API type (after checking that the driver installation is OK)
 				if ((!pSetupDiGetDeviceRegistryPropertyA(*dev_info, &dev_info_data, SPDRP_INSTALL_STATE,
 					NULL, (PBYTE)&install_state, sizeof(install_state), &size)) || (size != sizeof(install_state))) {
@@ -1709,6 +1712,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				}
 				get_api_type(dev_info, &dev_info_data, &api, &sub_api);
 				break;
+			default:
+				assert(false); // unreachable since all pass types covered explicitly
 			}
 
 			// Find parent device (for the passes that need it)
@@ -1788,7 +1793,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 			}
 
 			// Setup device
-			switch (pass) {
+			switch (pass_type) {
 			case HUB_PASS:
 			case DEV_PASS:
 				// If the device has already been setup, don't do it again
@@ -1857,7 +1862,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					r = LIBUSB_SUCCESS;
 				}
 				break;
-			default: // HID_PASS and later
+			case HID_PASS:
+			case EXT_PASS:
 				if (parent_priv->apib->id == USB_API_HID || parent_priv->apib->id == USB_API_COMPOSITE) {
 					if (parent_priv->apib->id == USB_API_HID) {
 						usbi_dbg(ctx, "setting HID interface for [%lX]:", parent_dev->session_data);
@@ -1881,6 +1887,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				}
 				libusb_unref_device(parent_dev);
 				break;
+			default:
+				assert(false); // unreachable since all pass types covered explicitly
 			}
 		}
 	}
