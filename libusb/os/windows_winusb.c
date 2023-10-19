@@ -1286,37 +1286,24 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 }
 
 static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id,
-	uint8_t bus_number, DEVINST devinst)
+	DEVINST devinst)
 {
-	struct libusb_device *dev;
-	struct winusb_device_priv *priv;
-	unsigned long session_id;
 	DEVINST child_devinst;
+	struct libusb_device* dev;
 
 	if (CM_Get_Child(&child_devinst, devinst, 0) != CR_SUCCESS) {
 		usbi_warn(ctx, "could not get child devinst for '%s'", dev_id);
 		return LIBUSB_SUCCESS;
 	}
 
-	session_id = (unsigned long)child_devinst;
-	dev = usbi_get_device_by_session_id(ctx, session_id);
+	dev = usbi_get_device_by_session_id(ctx, (unsigned long)child_devinst);
 	if (dev == NULL) {
-		usbi_err(ctx, "program assertion failed - HCD '%s' child not found", dev_id);
+		usbi_warn(ctx, "HCD '%s' child not found", dev_id);
 		return LIBUSB_SUCCESS;
 	}
 
-	if (dev->bus_number == 0) {
-		// Only do this once
-		usbi_dbg(ctx, "assigning HCD '%s' bus number %u", dev_id, bus_number);
-		dev->bus_number = bus_number;
-
-		if (sscanf(dev_id, "PCI\\VEN_%04hx&DEV_%04hx%*s", &dev->device_descriptor.idVendor, &dev->device_descriptor.idProduct) != 2)
-			usbi_warn(ctx, "could not infer VID/PID of HCD root hub from '%s'", dev_id);
-
-		priv = usbi_get_device_priv(dev);
-		priv->root_hub = true;
-	}
-
+	if (sscanf(dev_id, "PCI\\VEN_%04hx&DEV_%04hx%*s", &dev->device_descriptor.idVendor, &dev->device_descriptor.idProduct) != 2)
+			usbi_warn(ctx, "could not infer VID/PID of HCD from '%s'", dev_id);
 	libusb_unref_device(dev);
 	return LIBUSB_SUCCESS;
 }
@@ -1500,6 +1487,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	char *dev_interface_path = NULL;
 	unsigned long session_id;
 	DWORD size, port_nr, reg_type, install_state;
+	uint8_t bus_number = 0;
 	HKEY key;
 	char guid_string[MAX_GUID_STRING_LENGTH];
 	GUID *if_guid;
@@ -1524,6 +1512,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	libusb_device **unref_list, **new_unref_list;
 	unsigned int unref_size = UNREF_SIZE_STEP;
 	unsigned int unref_cur = 0;
+	DWORD hub_port_nr;
 
 	// PASS 1 : (re)enumerate HCDs (allows for HCD hotplug)
 	// PASS 2 : (re)enumerate HUBS
@@ -1588,11 +1577,6 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 			// Safe loop: end of loop conditions
 			if (r != LIBUSB_SUCCESS)
 				break;
-
-			if ((pass == HCD_PASS) && (i == UINT8_MAX)) {
-				usbi_warn(ctx, "program assertion failed - found more than %u buses, skipping the rest", UINT8_MAX);
-				break;
-			}
 
 			if (pass != GEN_PASS) {
 				// Except for GEN, all passes deal with device interfaces
@@ -1834,7 +1818,22 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				priv->sub_api = sub_api;
 				switch (api) {
 				case USB_API_COMPOSITE:
+					break;
 				case USB_API_HUB:
+					parent_dev = get_ancestor(ctx, dev_info_data.DevInst, NULL);
+					if (parent_dev == NULL) {
+						if (!get_dev_port_number(*dev_info, &dev_info_data, &hub_port_nr) || hub_port_nr == 0) {
+							if (bus_number == UINT8_MAX) {
+								usbi_warn(ctx, "program assertion failed - found more than %u buses, skipping the rest", UINT8_MAX);
+								break;
+							}
+							priv->root_hub = true;
+							dev->bus_number = ++bus_number;
+							usbi_dbg(ctx, "assigning Root Hub '%s' bus number %u", dev_id, bus_number);
+						}
+					} else {
+						libusb_unref_device(parent_dev);
+					}
 					break;
 				case USB_API_HID:
 					priv->hid = calloc(1, sizeof(struct hid_device_priv));
@@ -1854,7 +1853,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				}
 				break;
 			case HCD_PASS:
-				r = enumerate_hcd_root_hub(ctx, dev_id, (uint8_t)(i + 1), dev_info_data.DevInst);
+				r = enumerate_hcd_root_hub(ctx, dev_id, dev_info_data.DevInst);
 				break;
 			case GEN_PASS:
 				port_nr = 0;
