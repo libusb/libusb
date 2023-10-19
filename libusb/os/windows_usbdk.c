@@ -451,6 +451,13 @@ static int usbdk_set_configuration(struct libusb_device_handle *dev_handle, uint
 	return LIBUSB_SUCCESS;
 }
 
+static int usbdk_initialize_interface(struct libusb_device_handle *dev_handle, uint8_t iface)
+{
+	UNUSED(dev_handle);
+	UNUSED(iface);
+	return LIBUSB_SUCCESS;
+}
+
 static int usbdk_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface)
 {
 	UNUSED(dev_handle);
@@ -711,6 +718,7 @@ const struct windows_backend usbdk_backend = {
 	usbdk_get_config_descriptor_by_value,
 	usbdk_get_configuration,
 	usbdk_set_configuration,
+	usbdk_initialize_interface,
 	usbdk_claim_interface,
 	usbdk_release_interface,
 	usbdk_set_interface_altsetting,

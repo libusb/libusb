@@ -283,7 +283,6 @@ enum WINUSB_ZLP {
 };
 
 struct winusb_device_handle_priv {
-	int active_interface;
 	struct {
 		HANDLE dev_handle; // WinUSB needs an extra handle for the file
 		HANDLE api_handle; // used by the API to communicate with the device
@@ -330,6 +329,7 @@ struct windows_backend {
 		uint8_t bConfigurationValue, void **buffer);
 	int (*get_configuration)(struct libusb_device_handle *dev_handle, uint8_t *config);
 	int (*set_configuration)(struct libusb_device_handle *dev_handle, uint8_t config);
+	int (*initialize_interface)(struct libusb_device_handle *dev_handle, uint8_t interface_number);
 	int (*claim_interface)(struct libusb_device_handle *dev_handle, uint8_t interface_number);
 	int (*release_interface)(struct libusb_device_handle *dev_handle, uint8_t interface_number);
 	int (*set_interface_altsetting)(struct libusb_device_handle *dev_handle,

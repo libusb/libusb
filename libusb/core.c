@@ -1739,6 +1739,31 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
 	return usbi_backend.set_configuration(dev_handle, configuration);
 }
 
+int do_claim_interface(libusb_device_handle *dev_handle,
+	int interface_number, int (*claim_interface_backend)(struct libusb_device_handle *dev_handle_backend, uint8_t interface_number_backend))
+{
+	int r = 0;
+
+	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
+	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	if (!usbi_atomic_load(&dev_handle->dev->attached))
+		return LIBUSB_ERROR_NO_DEVICE;
+
+	usbi_mutex_lock(&dev_handle->lock);
+	if (dev_handle->claimed_interfaces & (1U << interface_number))
+		goto out;
+
+	r = claim_interface_backend(dev_handle, (uint8_t)interface_number);
+	if (r == 0)
+		dev_handle->claimed_interfaces |= 1U << interface_number;
+
+out:
+	usbi_mutex_unlock(&dev_handle->lock);
+	return r;
+}
+
 /** \ingroup libusb_dev
  * Claim an interface on a given device handle. You must claim the interface
  * you wish to use before you can perform I/O on any of its endpoints.
@@ -1770,26 +1795,7 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
 int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
 	int interface_number)
 {
-	int r = 0;
-
-	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
-	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
-		return LIBUSB_ERROR_INVALID_PARAM;
-
-	if (!usbi_atomic_load(&dev_handle->dev->attached))
-		return LIBUSB_ERROR_NO_DEVICE;
-
-	usbi_mutex_lock(&dev_handle->lock);
-	if (dev_handle->claimed_interfaces & (1U << interface_number))
-		goto out;
-
-	r = usbi_backend.claim_interface(dev_handle, (uint8_t)interface_number);
-	if (r == 0)
-		dev_handle->claimed_interfaces |= 1U << interface_number;
-
-out:
-	usbi_mutex_unlock(&dev_handle->lock);
-	return r;
+	return do_claim_interface(dev_handle, interface_number, usbi_backend.claim_interface);
 }
 
 /** \ingroup libusb_dev
