@@ -2518,6 +2518,8 @@ cleanup_winusb:
 			libusbK_Set(sub_api, ControlTransfer, true);
 			libusbK_Set(sub_api, FlushPipe, true);
 			libusbK_Set(sub_api, Free, true);
+			libusbK_Set(sub_api, ClaimInterface, true);
+			libusbK_Set(sub_api, ReleaseInterface, true);
 			libusbK_Set(sub_api, GetAssociatedInterface, true);
 			libusbK_Set(sub_api, Initialize, true);
 			libusbK_Set(sub_api, ReadPipe, true);
@@ -2870,6 +2872,16 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 		}
 		handle_priv->interface_handle[iface].dev_handle = handle_priv->interface_handle[initialized_iface].dev_handle;
 	}
+
+	if(WinUSBX[sub_api].ClaimInterface) {
+		if(!WinUSBX[sub_api].ClaimInterface(winusb_handle, iface, 0)) {
+			usbi_dbg(ctx, "could not claim interface %u: %s", iface, windows_error_str(0));
+			handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
+			winusbx_release_interface(sub_api, dev_handle, iface);
+			return LIBUSB_ERROR_BUSY;				
+		}
+	}
+
 	usbi_dbg(ctx, "claimed interface %u", iface);
 	handle_priv->active_interface = iface;
 
@@ -2887,6 +2899,10 @@ static int winusbx_release_interface(int sub_api, struct libusb_device_handle *d
 	winusb_handle = handle_priv->interface_handle[iface].api_handle;
 	if (!HANDLE_VALID(winusb_handle))
 		return LIBUSB_ERROR_NOT_FOUND;
+
+	if(WinUSBX[sub_api].ReleaseInterface) {
+		WinUSBX[sub_api].ReleaseInterface(winusb_handle, iface, 0);
+	}
 
 	WinUSBX[sub_api].Free(winusb_handle);
 	handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;

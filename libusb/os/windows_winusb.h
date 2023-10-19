@@ -477,6 +477,16 @@ typedef BOOL (WINAPI *WinUsb_FlushPipe_t)(
 typedef BOOL (WINAPI *WinUsb_Free_t)(
 	WINUSB_INTERFACE_HANDLE InterfaceHandle
 );
+typedef BOOL (WINAPI *WinUsb_ClaimInterface_t)(
+	WINUSB_INTERFACE_HANDLE InterfaceHandle,
+	UCHAR NumberOrIndex,
+    BOOL IsIndex
+);
+typedef BOOL (WINAPI *WinUsb_ReleaseInterface_t)(
+	WINUSB_INTERFACE_HANDLE InterfaceHandle,
+	UCHAR NumberOrIndex,
+    BOOL IsIndex
+);
 typedef BOOL (WINAPI *WinUsb_GetAssociatedInterface_t)(
 	WINUSB_INTERFACE_HANDLE InterfaceHandle,
 	UCHAR AssociatedInterfaceIndex,
@@ -663,6 +673,8 @@ struct winusb_interface {
 	WinUsb_ControlTransfer_t ControlTransfer;
 	WinUsb_FlushPipe_t FlushPipe;
 	WinUsb_Free_t Free;
+	WinUsb_ClaimInterface_t ClaimInterface;
+	WinUsb_ReleaseInterface_t ReleaseInterface;
 	WinUsb_GetAssociatedInterface_t GetAssociatedInterface;
 	WinUsb_Initialize_t Initialize;
 	WinUsb_ReadPipe_t ReadPipe;
