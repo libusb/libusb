@@ -43,6 +43,7 @@ static libusb_log_cb log_handler;
 struct libusb_context *usbi_default_context;
 struct libusb_context *usbi_fallback_context;
 static int default_context_refcnt;
+static usbi_atomic_t default_debug_level = -1;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 static struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
 
@@ -2207,16 +2208,7 @@ int API_EXPORTED libusb_set_auto_detach_kernel_driver(
  */
 void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 {
-#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-	ctx = usbi_get_context(ctx);
-	if (!ctx->debug_fixed) {
-		level = CLAMP(level, LIBUSB_LOG_LEVEL_NONE, LIBUSB_LOG_LEVEL_DEBUG);
-		ctx->debug = (enum libusb_log_level)level;
-	}
-#else
-	UNUSED(ctx);
-	UNUSED(level);
-#endif
+	libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, level);
 }
 
 static void libusb_set_log_cb_internal(libusb_context *ctx, libusb_log_cb cb,
@@ -2300,6 +2292,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	int arg = 0, r = LIBUSB_SUCCESS;
 	libusb_log_cb log_cb = NULL;
 	va_list ap;
+	int is_default_context = (NULL == ctx);
 
 	va_start(ap, option);
 
@@ -2343,8 +2336,11 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		switch (option) {
 		case LIBUSB_OPTION_LOG_LEVEL:
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-			if (!ctx->debug_fixed)
+			if (!ctx->debug_fixed) {
 				ctx->debug = (enum libusb_log_level)arg;
+				if (is_default_context)
+					usbi_atomic_store(&default_debug_level, CLAMP(arg, LIBUSB_LOG_LEVEL_NONE, LIBUSB_LOG_LEVEL_DEBUG));
+			}
 #endif
 			break;
 
@@ -2501,6 +2497,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 	if (!ctx) {
 		usbi_default_context = _ctx;
 		default_context_refcnt = 1;
+		usbi_atomic_store(&default_debug_level, _ctx->debug);
 		usbi_dbg(usbi_default_context, "created default context");
 	}
 
@@ -2528,6 +2525,8 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		*ctx = _ctx;
 
 		if (!usbi_fallback_context) {
+			if (usbi_atomic_load(&default_debug_level) == -1)
+				usbi_atomic_store(&default_debug_level, _ctx->debug);
 			usbi_fallback_context = _ctx;
 			usbi_dbg(usbi_fallback_context, "installing new context as implicit default");
 		}
@@ -2754,13 +2753,14 @@ static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	UNUSED(ctx);
 #else
 	enum libusb_log_level ctx_level;
+	long default_level_value;
 
-	ctx = ctx ? ctx : usbi_default_context;
-	ctx = ctx ? ctx : usbi_fallback_context;
-	if (ctx)
+	if (ctx) {
 		ctx_level = ctx->debug;
-	else
-		ctx_level = get_env_debug_level();
+	} else {
+		default_level_value = usbi_atomic_load(&default_debug_level);
+		ctx_level = default_level_value < 0 ? get_env_debug_level() : (enum libusb_log_level)default_level_value;
+	}
 
 	if (ctx_level < level)
 		return;
