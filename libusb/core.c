@@ -43,7 +43,9 @@ static libusb_log_cb log_handler;
 struct libusb_context *usbi_default_context;
 struct libusb_context *usbi_fallback_context;
 static int default_context_refcnt;
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 static usbi_atomic_t default_debug_level = -1;
+#endif
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 static struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
 
@@ -2497,7 +2499,9 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 	if (!ctx) {
 		usbi_default_context = _ctx;
 		default_context_refcnt = 1;
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 		usbi_atomic_store(&default_debug_level, _ctx->debug);
+#endif
 		usbi_dbg(usbi_default_context, "created default context");
 	}
 
@@ -2525,8 +2529,10 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		*ctx = _ctx;
 
 		if (!usbi_fallback_context) {
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 			if (usbi_atomic_load(&default_debug_level) == -1)
 				usbi_atomic_store(&default_debug_level, _ctx->debug);
+#endif
 			usbi_fallback_context = _ctx;
 			usbi_dbg(usbi_fallback_context, "installing new context as implicit default");
 		}
