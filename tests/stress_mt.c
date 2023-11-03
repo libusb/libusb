@@ -249,12 +249,8 @@ int main(void)
 
 	printf("Running multithreaded init/exit test...\n");
 	errs += test_multi_init(0);
-#ifdef __EMSCRIPTEN__
-	printf("Skipping enumeration test on Emscripten. Multithreading is not supported yet.\n");
-#else
 	printf("Running multithreaded init/exit test with enumeration...\n");
 	errs += test_multi_init(1);
-#endif
 	printf("All done, %d errors\n", errs);
 
 	return errs != 0;
