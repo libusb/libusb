@@ -54,6 +54,7 @@ endif
 if OS_EMSCRIPTEN
 noinst_LTLIBRARIES += libusb_emscripten.la
 libusb_emscripten_la_SOURCES = $(OS_EMSCRIPTEN_SRC)
+AM_CXXFLAGS += -std=c++20
 libusb_1_0_la_LIBADD = libusb_emscripten.la
 endif
 

@@ -37,26 +37,21 @@
  *
  * Therefore use a custom event system based on browser event emitters. */
 #include <emscripten.h>
+#include <emscripten/atomic.h>
+#include <emscripten/threading.h>
 
-EM_JS(void, em_libusb_notify, (void), {
-	dispatchEvent(new Event("em-libusb"));
+EM_ASYNC_JS(void, em_libusb_wait_async, (const _Atomic int* ptr, int expected_value, int timeout), {
+	await Atomics.waitAsync(HEAP32, ptr >> 2, expected_value, timeout).value;
 });
 
-EM_ASYNC_JS(int, em_libusb_wait, (int timeout), {
-	let onEvent, timeoutId;
-
-	try {
-		return await new Promise(resolve => {
-			onEvent = () => resolve(0);
-			addEventListener('em-libusb', onEvent);
-
-			timeoutId = setTimeout(resolve, timeout, -1);
-		});
-	} finally {
-		removeEventListener('em-libusb', onEvent);
-		clearTimeout(timeoutId);
+static void em_libusb_wait(const _Atomic int *ptr, int expected_value, int timeout)
+{
+	if (emscripten_is_main_runtime_thread()) {
+		em_libusb_wait_async(ptr, expected_value, timeout);
+	} else {
+		emscripten_atomic_wait_u32((int*)ptr, expected_value, 1000000LL * timeout);
 	}
-});
+}
 #endif
 #include <unistd.h>
 
@@ -162,7 +157,8 @@ void usbi_signal_event(usbi_event_t *event)
 	if (r != sizeof(dummy))
 		usbi_warn(NULL, "event write failed");
 #ifdef __EMSCRIPTEN__
-	em_libusb_notify();
+	event->has_event = 1;
+	emscripten_atomic_notify(&event->has_event, EMSCRIPTEN_NOTIFY_ALL_WAITERS);
 #endif
 }
 
@@ -174,6 +170,9 @@ void usbi_clear_event(usbi_event_t *event)
 	r = read(EVENT_READ_FD(event), &dummy, sizeof(dummy));
 	if (r != sizeof(dummy))
 		usbi_warn(NULL, "event read failed");
+#ifdef __EMSCRIPTEN__
+	event->has_event = 0;
+#endif
 }
 
 #ifdef HAVE_TIMERFD
@@ -257,22 +256,14 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 
 	usbi_dbg(ctx, "poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
 #ifdef __EMSCRIPTEN__
-	/* TODO: improve event system to watch only for fd events we're interested in
-	 * (although a scenario where we have multiple watchers in parallel is very rare
-	 * in real world anyway). */
-	double until_time = emscripten_get_now() + timeout_ms;
-	for (;;) {
-		/* Emscripten `poll` ignores timeout param, but pass 0 explicitly just in case. */
-		num_ready = poll(fds, nfds, 0);
-		if (num_ready != 0) break;
-		int timeout = until_time - emscripten_get_now();
-		if (timeout <= 0) break;
-		int result = em_libusb_wait(timeout);
-		if (result != 0) break;
-	}
-#else
-	num_ready = poll(fds, nfds, timeout_ms);
+	// Emscripten's poll doesn't actually block, so we need to use an out-of-band
+	// waiting signal.
+	em_libusb_wait(&ctx->event.has_event, 0, timeout_ms);
+	// Emscripten ignores timeout_ms, but set it to 0 for future-proofing in case
+	// they ever implement real poll.
+	timeout_ms = 0;
 #endif
+	num_ready = poll(fds, nfds, timeout_ms);
 	usbi_dbg(ctx, "poll() returned %d", num_ready);
 	if (num_ready == 0) {
 		if (usbi_using_timer(ctx))

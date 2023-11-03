@@ -83,10 +83,16 @@ case $host in
 	backend=haiku
 	platform=posix
 	;;
-wasm32-**)
+wasm*-emscripten)
 	AC_MSG_RESULT([Emscripten])
 	backend=emscripten
 	platform=posix
+	;;
+wasm*-unknown-none)
+	AC_MSG_ERROR([
+--host=$host_alias is not accepted as it might become ambiguous in the future.
+Please use an explicit --host=$host_cpu-emscripten instead.
+	])
 	;;
 *-linux* | *-uclinux*)
 	dnl on Android Linux, some functions are in different places
@@ -228,7 +234,9 @@ windows)
 	;;
 emscripten)
 	# Note: LT_LDFLAGS is not enough here because we need link flags for executable.
-	AM_LDFLAGS="${AM_LDFLAGS} --bind -s ASYNCIFY -s ASSERTIONS -s ALLOW_MEMORY_GROWTH"
+	EM_LDFLAGS="--bind -s ASYNCIFY"
+	AM_LDFLAGS="${AM_LDFLAGS} ${EM_LDFLAGS} -s ASSERTIONS -s ALLOW_MEMORY_GROWTH"
+	LIBS="${LIBS} ${EM_LDFLAGS}"
 	;;
 *)
 	dnl no special handling required

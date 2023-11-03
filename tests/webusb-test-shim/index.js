@@ -10,11 +10,3 @@ globalThis.navigator = {
     allowAllDevices: true
   })
 };
-
-// events_posix uses Web events on the global scope (for now), but Node.js doesn't have them.
-
-const fakeEventTarget = new EventTarget();
-
-for (let method in fakeEventTarget) {
-  globalThis[method] = fakeEventTarget[method].bind(fakeEventTarget);
-}
