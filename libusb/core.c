@@ -2363,6 +2363,8 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		case LIBUSB_OPTION_LOG_CB:
 			libusb_set_log_cb_internal(ctx, log_cb, LIBUSB_LOG_CB_CONTEXT);
 			break;
+
+		case LIBUSB_OPTION_MAX: /* unreachable */
 		default:
 			r = LIBUSB_ERROR_INVALID_PARAM;
 		}
