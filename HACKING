@@ -1,0 +1,25 @@
+Contributing to libusb
+**********************
+
+For larger changes or API changes/extensions it may be wise to first
+discuss on the mailing list or in the issue tracker before larger
+coding efforts are initiated.
+
+If you extend or change the API make sure documentation is updated.
+Please run make -C doc and check for any Doxygen warnings.
+
+Commit messages should be formatted to 72 chars width and have a
+free-standing summary line. See for instance "Commit Guidelines" on
+https://git-scm.com/book/en/v2/Distributed-Git-Contributing-to-a-Project
+or https://cbea.ms/git-commit/ about how to make well-formed commit
+messages.
+
+Put detailed information in the commit message itself, which will end
+up in the git history. On the other hand the description that you fill
+in the GitHub pull request web page does not go anywhere.
+
+For copyright reasons it is preferable to have your full name in the
+commit author field. Do not update the AUTHOR file yourself, the
+maintainers will update it as part of the release preparation.
+
+Please don't touch version_nano.h in your patches or pull requests.
