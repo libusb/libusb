@@ -33,12 +33,6 @@
 static int unsetenv(const char *env) {
   return _putenv_s(env, "");
 }
-
-static int setenv(const char *env, const char *value, int overwrite) {
-  if (getenv(env) && !overwrite)
-    return 0;
-  return _putenv_s(env, value);
-}
 #endif
 
 #define LIBUSB_TEST_CLEAN_EXIT(code) \
