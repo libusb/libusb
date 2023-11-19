@@ -230,7 +230,7 @@ emscripten)
 	AC_SUBST(EXEEXT, [.html])
 	# Note: LT_LDFLAGS is not enough here because we need link flags for executable.
 	EXTRA_CFLAGS="${EXTRA_CFLAGS} -fPIC -pthread"
-	AM_LDFLAGS="${AM_LDFLAGS} --bind -s ASYNCIFY -s ASSERTIONS -s ALLOW_MEMORY_GROWTH -s INVOKE_RUN=0 -s SIDE_MODULE"
+	AM_LDFLAGS="${AM_LDFLAGS} --bind -s ASYNCIFY -s ASSERTIONS -s ALLOW_MEMORY_GROWTH -s SIDE_MODULE"
 	;;
 *)
 	dnl no special handling required
