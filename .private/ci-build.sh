@@ -60,6 +60,12 @@ echo ""
 echo "Building ..."
 make -j4 -k
 
+for test in init_context set_option stress stress_mt; do
+	echo ""
+	echo "Running test '${test}' ..."
+	./tests/${test}
+done
+
 if [ "${install}" = "yes" ]; then
 	echo ""
 	echo "Installing ..."
