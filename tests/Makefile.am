@@ -7,6 +7,9 @@ stress_mt_SOURCES = stress_mt.c
 set_option_SOURCES = set_option.c testlib.c
 init_context_SOURCES = init_context.c testlib.c
 
+stress_mt_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
+stress_mt_LDADD = $(LDADD) $(THREAD_LIBS)
+
 if OS_EMSCRIPTEN
 # On the Web you can't block the main thread as this blocks the event loop itself,
 # causing deadlocks when trying to use async APIs like WebUSB.
