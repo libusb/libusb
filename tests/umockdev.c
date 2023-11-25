@@ -876,7 +876,7 @@ transfer_submit_all_retry(TestThreadedSubmit *data)
 	return NULL;
 }
 
-static void
+static void LIBUSB_CALL
 test_threaded_submit_transfer_cb(struct libusb_transfer *transfer)
 {
 	TestThreadedSubmit *data = transfer->user_data;
@@ -955,7 +955,7 @@ test_threaded_submit(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 	g_free (c);
 }
 
-static int
+static int LIBUSB_CALL
 hotplug_count_arrival_cb(libusb_context *ctx,
                          libusb_device  *device,
                          libusb_hotplug_event event,
@@ -972,7 +972,7 @@ hotplug_count_arrival_cb(libusb_context *ctx,
 }
 
 #ifdef UMOCKDEV_HOTPLUG
-static int
+static int LIBUSB_CALL
 hotplug_count_removal_cb(libusb_context *ctx,
                          libusb_device  *device,
                          libusb_hotplug_event event,
