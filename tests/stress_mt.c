@@ -70,6 +70,8 @@ static inline void thread_join(thread_t thread)
 	(void)WaitForSingleObject(thread, INFINITE);
 	(void)CloseHandle(thread);
 }
+
+#pragma warning(disable : 4706) /* assignment within conditional expression */
 #endif /* PLATFORM_WINDOWS */
 
 /* Test that creates and destroys contexts repeatedly */
