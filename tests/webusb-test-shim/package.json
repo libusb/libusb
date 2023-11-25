@@ -1,0 +1,10 @@
+{
+  "name": "webusb-test-runner",
+  "private": true,
+  "license": "LGPL-2.1",
+  "main": "index.js",
+  "author": "Ingvar Stepanyan <me@rreverser.com>",
+  "dependencies": {
+    "usb": "^2.11.0"
+  }
+}
