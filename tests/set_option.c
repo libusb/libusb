@@ -192,7 +192,7 @@ static libusb_testlib_result test_no_discovery(void)
 }
 
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
-static void test_log_cb(libusb_context *ctx, enum libusb_log_level level,
+static void LIBUSB_CALL test_log_cb(libusb_context *ctx, enum libusb_log_level level,
                         const char *str) {
   UNUSED(ctx);
   UNUSED(level);

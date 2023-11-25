@@ -110,8 +110,8 @@ static libusb_testlib_result test_init_context_log_level(void) {
   LIBUSB_TEST_CLEAN_EXIT(TEST_STATUS_SUCCESS);
 }
 
-static void test_log_cb(libusb_context *ctx, enum libusb_log_level level,
-                        const char *str) {
+static void LIBUSB_CALL test_log_cb(libusb_context *ctx, enum libusb_log_level level,
+                                    const char *str) {
   UNUSED(ctx);
   UNUSED(level);
   UNUSED(str);
