@@ -19,4 +19,8 @@ echo "Bootstrapping ..."
 ./bootstrap.sh
 echo ""
 
-exec .private/ci-build.sh --build-dir "${builddir}" --install -- "--prefix=${installdir}"
+extra_args=""
+if [ "${Configuration}" == "Release" ]; then
+	extra_args="--no-asan"
+fi
+exec .private/ci-build.sh --build-dir "${builddir}" --install ${extra_args} -- "--prefix=${installdir}"
