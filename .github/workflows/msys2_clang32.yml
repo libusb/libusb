@@ -18,4 +18,8 @@ jobs:
         run: |
           echo 'Running in MSYS2!'
           ./bootstrap.sh
-          ./.private/ci-build.sh --build-dir build-msys2-clang32
+          # Disabling tests as there is some issue that prevents libtool from
+          # finalizing its executable wrappers.
+          # Perhaps this one https://github.com/msys2/MSYS2-packages/issues/1351
+          # but it only occurs on clang32 configuration.
+          ./.private/ci-build.sh --build-dir build-msys2-clang32 --no-test
