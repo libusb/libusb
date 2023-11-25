@@ -180,5 +180,5 @@ int libusb_testlib_run_tests(int argc, char *argv[],
 	libusb_testlib_logf("Error in %d tests", error_count);
 	libusb_testlib_logf("Skipped %d tests", skip_count);
 
-	return pass_count != run_count;
+	return fail_count + error_count;
 }
