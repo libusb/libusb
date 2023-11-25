@@ -85,27 +85,82 @@ struct thread_info {
 	int iteration;
 } tinfo[NTHREADS];
 
+/* Function called by backend during device initialization to convert
+ * multi-byte fields in the device descriptor to host-endian format.
+ * Copied from libusbi.h as we want test to be realistic and not depend on internals.
+ */
+static inline void usbi_localize_device_descriptor(struct libusb_device_descriptor *desc)
+{
+	desc->bcdUSB = libusb_le16_to_cpu(desc->bcdUSB);
+	desc->idVendor = libusb_le16_to_cpu(desc->idVendor);
+	desc->idProduct = libusb_le16_to_cpu(desc->idProduct);
+	desc->bcdDevice = libusb_le16_to_cpu(desc->bcdDevice);
+}
+
 static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 {
 	struct thread_info *ti = (struct thread_info *) arg;
 
-	for (int i = 0; i < ITERS; ++i) {
+	for (ti->iteration = 0; ti->iteration < ITERS && !ti->err; ti->iteration++) {
 		libusb_context *ctx = NULL;
-		int r;
 
-		r = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
-		if (r != LIBUSB_SUCCESS) {
-			ti->err = r;
-			ti->iteration = i;
-			return (thread_return_t) THREAD_RETURN_VALUE;
+		if ((ti->err = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0))) {
+			break;
 		}
 		if (ti->enumerate) {
 			libusb_device **devs;
 			ti->devcount = libusb_get_device_list(ctx, &devs);
 			if (ti->devcount < 0) {
-				libusb_free_device_list(devs, 1);
-				ti->iteration = i;
+				ti->err = (int)ti->devcount;
 				break;
+			}
+			for (int i = 0; i < ti->devcount; i++) {
+				libusb_device *dev = devs[i];
+				struct libusb_device_descriptor desc;
+				if ((ti->err = libusb_get_device_descriptor(dev, &desc))) {
+					break;
+				}
+				struct libusb_device_descriptor raw_desc;
+				libusb_device_handle *dev_handle;
+				if ((ti->err = libusb_open(dev, &dev_handle))) {
+					break;
+				}
+				/* Request raw descriptor via control transfer.
+				   This tests opening, transferring and closing from multiple threads in parallel. */
+				int raw_desc_len = libusb_get_descriptor(dev_handle, LIBUSB_DT_DEVICE, 0, (unsigned char *)&raw_desc, sizeof(raw_desc));
+				if (raw_desc_len < 0) {
+					ti->err = raw_desc_len;
+					goto close;
+				}
+				if (raw_desc_len != sizeof(raw_desc)) {
+					fprintf(stderr, "Thread %d: device %d: unexpected raw descriptor length %d\n",
+						ti->number, i, raw_desc_len);
+					ti->err = LIBUSB_ERROR_OTHER;
+					goto close;
+				}
+				usbi_localize_device_descriptor(&raw_desc);
+#define ASSERT_EQ(field) if (raw_desc.field != desc.field) { \
+	fprintf(stderr, "Thread %d: device %d: mismatch in field " #field ": %d != %d\n", \
+		ti->number, i, raw_desc.field, desc.field); \
+		ti->err = LIBUSB_ERROR_OTHER; \
+		goto close; \
+}
+				ASSERT_EQ(bLength);
+				ASSERT_EQ(bDescriptorType);
+				ASSERT_EQ(bcdUSB);
+				ASSERT_EQ(bDeviceClass);
+				ASSERT_EQ(bDeviceSubClass);
+				ASSERT_EQ(bDeviceProtocol);
+				ASSERT_EQ(bMaxPacketSize0);
+				ASSERT_EQ(idVendor);
+				ASSERT_EQ(idProduct);
+				ASSERT_EQ(bcdDevice);
+				ASSERT_EQ(iManufacturer);
+				ASSERT_EQ(iProduct);
+				ASSERT_EQ(iSerialNumber);
+				ASSERT_EQ(bNumConfigurations);
+			close:
+				libusb_close(dev_handle);
 			}
 			libusb_free_device_list(devs, 1);
 		}
@@ -123,6 +178,7 @@ static int test_multi_init(int enumerate)
 
 	printf("Starting %d threads\n", NTHREADS);
 	for (t = 0; t < NTHREADS; t++) {
+		tinfo[t].err = 0;
 		tinfo[t].number = t;
 		tinfo[t].enumerate = enumerate;
 		thread_create(&threadId[t], &init_and_exit, (void *) &tinfo[t]);
@@ -138,17 +194,9 @@ static int test_multi_init(int enumerate)
 				tinfo[t].iteration,
 				libusb_error_name(tinfo[t].err));
 		} else if (enumerate) {
-			if (tinfo[t].devcount < 0) {
-				errs++;
-				fprintf(stderr,
-					"Thread %d failed to enumerate devices (iteration %d)\n",
+			printf("Thread %d discovered %ld devices\n",
 					tinfo[t].number,
-					tinfo[t].iteration);
-			} else {
-				printf("Thread %d discovered %ld devices\n",
-				       tinfo[t].number,
-				       (long int) tinfo[t].devcount);
-			}
+					(long int) tinfo[t].devcount);
 		}
 	}
 
