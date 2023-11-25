@@ -62,6 +62,9 @@ cflags+=" -Wpointer-arith"
 cflags+=" -Wredundant-decls"
 cflags+=" -Wswitch-enum"
 
+# Tell tests that we don't have any devices.
+cflags+=" -DCI_WITHOUT_DEVICES"
+
 # enable address sanitizer
 if [ "${asan}" = "yes" ]; then
 	cflags+=" -fsanitize=address"

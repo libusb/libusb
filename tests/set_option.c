@@ -166,7 +166,7 @@ static libusb_testlib_result test_set_log_level_env(void) {
 
 static libusb_testlib_result test_no_discovery(void)
 {
-#if defined(__linux__)
+#if defined(__linux__) && !defined(CI_WITHOUT_DEVICES)
   libusb_context *test_ctx;
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, /*options=*/NULL,
                                                   /*num_options=*/0));
