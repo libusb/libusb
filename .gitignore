@@ -7,6 +7,7 @@ Makefile.in
 *.lo
 *.o
 *.js
+!/tests/webusb-test-shim/*.js
 *.wasm
 *.html
 libtool

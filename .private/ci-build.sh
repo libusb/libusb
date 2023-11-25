@@ -3,6 +3,7 @@
 set -e
 
 builddir=
+scriptdir=$(dirname $(readlink -f "$0"))
 install=no
 test=yes
 asan=yes
@@ -79,6 +80,8 @@ echo "Building ..."
 make -j4 -k
 
 if [ "${test}" = "yes" ]; then
+	# Load custom shim for WebUSB tests that simulates Web environment.
+	export NODE_OPTIONS="--require ${scriptdir}/../tests/webusb-test-shim/"
 	for test_name in init_context set_option stress stress_mt; do
 		echo ""
 		echo "Running test '${test_name}' ..."
