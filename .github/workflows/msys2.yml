@@ -18,4 +18,5 @@ jobs:
         run: |
           echo 'Running in MSYS2!'
           ./bootstrap.sh
-          ./.private/ci-build.sh --build-dir build-msys2
+          # GCC on MSYS2 doesn't have ASAN support (but Clang does).
+          ./.private/ci-build.sh --build-dir build-msys2 --no-asan

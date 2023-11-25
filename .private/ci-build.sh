@@ -5,6 +5,7 @@ set -e
 builddir=
 install=no
 test=yes
+asan=yes
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -22,6 +23,10 @@ while [ $# -gt 0 ]; do
 		;;
 	--no-test)
 		test=no
+		shift
+		;;
+	--no-asan)
+		asan=no
 		shift
 		;;
 	--)
@@ -56,6 +61,11 @@ cflags+=" -Wnested-externs"
 cflags+=" -Wpointer-arith"
 cflags+=" -Wredundant-decls"
 cflags+=" -Wswitch-enum"
+
+# enable address sanitizer
+if [ "${asan}" = "yes" ]; then
+	cflags+=" -fsanitize=address"
+fi
 
 echo ""
 echo "Configuring ..."
