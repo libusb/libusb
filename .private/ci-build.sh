@@ -4,6 +4,7 @@ set -e
 
 builddir=
 install=no
+test=yes
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -17,6 +18,10 @@ while [ $# -gt 0 ]; do
 		;;
 	--install)
 		install=yes
+		shift
+		;;
+	--no-test)
+		test=no
 		shift
 		;;
 	--)
@@ -60,11 +65,13 @@ echo ""
 echo "Building ..."
 make -j4 -k
 
-for test in init_context set_option stress stress_mt; do
-	echo ""
-	echo "Running test '${test}' ..."
-	./tests/${test}
-done
+if [ "${test}" = "yes" ]; then
+	for test_name in init_context set_option stress stress_mt; do
+		echo ""
+		echo "Running test '${test_name}' ..."
+		./tests/${test_name}
+	done
+fi
 
 if [ "${install}" = "yes" ]; then
 	echo ""
