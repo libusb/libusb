@@ -104,7 +104,7 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 	for (ti->iteration = 0; ti->iteration < ITERS && !ti->err; ti->iteration++) {
 		libusb_context *ctx = NULL;
 
-		if ((ti->err = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0))) {
+		if ((ti->err = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0)) != 0) {
 			break;
 		}
 		if (ti->enumerate) {
@@ -117,12 +117,12 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 			for (int i = 0; i < ti->devcount; i++) {
 				libusb_device *dev = devs[i];
 				struct libusb_device_descriptor desc;
-				if ((ti->err = libusb_get_device_descriptor(dev, &desc))) {
+				if ((ti->err = libusb_get_device_descriptor(dev, &desc)) != 0) {
 					break;
 				}
 				struct libusb_device_descriptor raw_desc;
 				libusb_device_handle *dev_handle;
-				if ((ti->err = libusb_open(dev, &dev_handle))) {
+				if ((ti->err = libusb_open(dev, &dev_handle)) != 0) {
 					break;
 				}
 				/* Request raw descriptor via control transfer.
