@@ -60,10 +60,18 @@ static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev,
 
 static int LIBUSB_CALL hotplug_callback_detach(libusb_context *ctx, libusb_device *dev, libusb_hotplug_event event, void *user_data)
 {
+	struct libusb_device_descriptor desc;
+	int rc;
+
 	(void)ctx;
 	(void)dev;
 	(void)event;
 	(void)user_data;
+
+	rc = libusb_get_device_descriptor(dev, &desc);
+	if (LIBUSB_SUCCESS != rc) {
+		fprintf (stderr, "Error getting device descriptor\n");
+	}
 
 	printf ("Device detached: %04x:%04x\n", desc.idVendor, desc.idProduct);
 
