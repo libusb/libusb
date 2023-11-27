@@ -1457,7 +1457,7 @@ static int get_guid(struct libusb_context *ctx, char *dev_id, HDEVINFO *dev_info
 	DWORD size, reg_type;
 	HKEY key;
 	char *guid_string, *new_guid_string;
-	char *guid, *tmp_str;
+	char *guid, *guid_term;
 	LONG s;
 	int pass;
 	int err = LIBUSB_SUCCESS;
@@ -1467,43 +1467,40 @@ static int get_guid(struct libusb_context *ctx, char *dev_id, HDEVINFO *dev_info
 		usbi_warn(ctx, "Cannot get the additional GUIDs for '%s'", dev_id);
 		return LIBUSB_ERROR_ACCESS;
 	}
-	// Reserve buffer large enough to hold GUID with two terminating characters
+	// Reserve buffer large enough to hold one GUID with two terminating characters
 	size = MAX_GUID_STRING_LENGTH + 1;
 	// Allocate memory for storing the guid_string with two extra terminating characters
-	// it is necessary for parsing the REG_MULTI_SZ type bellow
+	// This is necessary for parsing the REG_MULTI_SZ type below
 	guid_string = malloc(size + 2);
 	if (guid_string == NULL) {
 		usbi_err(ctx, "failed to alloc guid_string");
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	// the 1st pass tries to get the guid. if it fails due to ERROR_MORE_DATA
-	// reallocate enough memory for the 2nd pass
-	for(pass = 0; pass < 2; pass++) {
+	// The 1st pass tries to get the guid. If it fails due to ERROR_MORE_DATA
+	// then reallocate enough memory for the 2nd pass
+	for (pass = 0; pass < 2; pass++) {
 		// Look for both DeviceInterfaceGUIDs *and* DeviceInterfaceGUID, in that order
 		// If multiple GUIDs, find the n-th that is indexed by guid_number
 		s = pRegQueryValueExA(key, "DeviceInterfaceGUIDs", NULL, &reg_type,
-			(LPBYTE)guid_string, &size);
+				      (LPBYTE)guid_string, &size);
 		if (s == ERROR_FILE_NOT_FOUND)
 			s = pRegQueryValueExA(key, "DeviceInterfaceGUID", NULL, &reg_type,
-				(LPBYTE)guid_string, &size);
-		if ( s == ERROR_SUCCESS) {
-			//the GUID was read successfully
+					      (LPBYTE)guid_string, &size);
+		if (s == ERROR_SUCCESS) {
+			// The GUID was read successfully
 			break;
-		}
-		else if (s == ERROR_FILE_NOT_FOUND) {
+		} else if (s == ERROR_FILE_NOT_FOUND) {
 			usbi_warn(ctx, "no DeviceInterfaceGUID registered for '%s'", dev_id);
 			err = LIBUSB_ERROR_ACCESS;
 			goto exit;
 		} else if (s == ERROR_MORE_DATA) {
 			if (pass == 1) {
-				//there should have been allocated enough memory, but reading failed
+				// Previous pass should have allocated enough memory, but reading failed
 				usbi_warn(ctx, "unexpected error from pRegQueryValueExA for '%s'", dev_id);
 				err = LIBUSB_ERROR_OTHER;
 				goto exit;
 			}
-			// Allocate enough memory for storing the guid_string with two extra terminating characters
-			// it is necessary for parsing the REG_MULTI_SZ type bellow
 			new_guid_string = realloc((void *)guid_string, size + 2);
 			if (new_guid_string == NULL) {
 				usbi_err(ctx, "failed to realloc guid string");
@@ -1526,14 +1523,14 @@ static int get_guid(struct libusb_context *ctx, char *dev_id, HDEVINFO *dev_info
 	// "{xxx.....xx}\0{xxx.....xx}\0{xxx.....xx}", "{xxx.....xx}{xxx.....xx}{xxx.....xx}",
 	// "{xxx.....xx}\0{xxx.....xx}\0{xxx.....xx}\0\0\0\0"
 	if ((reg_type == REG_SZ ) || (reg_type == REG_MULTI_SZ)) {
-		/* get the n-th guid indexed by guid_number since the DeviceInterfaceGUIDs may
+		/* Get the n-th GUID indexed by guid_number since the DeviceInterfaceGUIDs may
 		   contain more GUIDs */
 		guid = guid_string;
-		// add two terminating chars for not overrunning the allocated memory during iterating the guid
+		// Add two terminating chars for not overrunning the allocated memory while iterating
 		guid[size] = '\0';
 		guid[size + 1] = '\0';
-		// iterating the guid
-		while(guid_number) {
+		// Iterate the GUIDs in the guid string
+		while (guid_number) {
 			guid = strchr(guid, '}');
 			if (guid == NULL) {
 				usbi_warn(ctx, "no GUID with index %d registered for '%s'", guid_number, dev_id);
@@ -1541,25 +1538,24 @@ static int get_guid(struct libusb_context *ctx, char *dev_id, HDEVINFO *dev_info
 				goto exit;
 			}
 			guid++;
-			// skip the terminating char if available
+			// Skip the terminating char if available
 			if (*guid == '\0') {
 				guid++;
 			}
-
 			guid_number--;
 		}
-		// add terminating char to the string
-		tmp_str = strchr(guid, '}');
-		if ((tmp_str == NULL) || (guid_number > 0)) {
+		// Add terminating char to the string
+		guid_term = strchr(guid, '}');
+		if ((guid_term == NULL) || (guid_number > 0)) {
 			usbi_warn(ctx, "no GUID with index %d registered for '%s'", guid_number, dev_id);
 			err = LIBUSB_ERROR_ACCESS;
 			goto exit;
 		}
-		//terminate the current guid string to handle the variant without separators
-		tmp_str++;
-		*tmp_str = '\0';
+		// Terminate the current guid string to handle the variant without separators
+		guid_term++;
+		*guid_term = '\0';
 	} else {
-		usbi_warn(ctx, "unexpected type/size of DeviceInterfaceGUID for '%s'", dev_id);
+		usbi_warn(ctx, "unexpected type of DeviceInterfaceGUID for '%s'", dev_id);
 		err = LIBUSB_ERROR_ACCESS;
 		goto exit;
 	}
@@ -1768,9 +1764,8 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					usbi_info(ctx, "libusb will not be able to access it");
 				}
 				// ...and to add the additional device interface GUIDs
-				// the get_guid() does not check if the driver is installed properly
 				r = get_guid(ctx, dev_id, dev_info, &dev_info_data, 0, &if_guid);
-				if(r == LIBUSB_SUCCESS) {
+				if (r == LIBUSB_SUCCESS) {
 					// Check if we've already seen this GUID
 					for (j = EXT_PASS; j < nb_guids; j++) {
 						if (memcmp(guid_list[j], if_guid, sizeof(*if_guid)) == 0)
@@ -1778,7 +1773,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					}
 					if (j == nb_guids) {
 						usbi_dbg(ctx, "extra GUID: %s", guid_to_string(if_guid, guid_string));
-						// extend the guid_list capacity if needed
+						// Extend the guid_list capacity if needed
 						if (nb_guids == guid_size) {
 							new_guid_list = realloc((void *)guid_list, (guid_size + GUID_SIZE_STEP) * sizeof(void *));
 							if (new_guid_list == NULL) {
@@ -1794,9 +1789,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						// Duplicate, ignore
 						free(if_guid);
 					}
-				} else if(r == LIBUSB_ERROR_ACCESS) {
+				} else if (r == LIBUSB_ERROR_ACCESS) {
 					r = LIBUSB_SUCCESS;
-				} else if(r == LIBUSB_ERROR_NO_MEM) {
+				} else if (r == LIBUSB_ERROR_NO_MEM) {
 					LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 				} else {
 					usbi_warn(ctx, "unexpected error during getting DeviceInterfaceGUID for '%s'", dev_id);
