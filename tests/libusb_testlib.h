@@ -20,7 +20,8 @@
 #ifndef LIBUSB_TESTLIB_H
 #define LIBUSB_TESTLIB_H
 
-#include <config.h>
+#include "config.h"
+#include "libusbi.h"
 
 /** Values returned from a test function to indicate test result */
 typedef enum {

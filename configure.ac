@@ -67,7 +67,6 @@ CFLAGS="${saved_CFLAGS}"
 
 AC_DEFINE([_GNU_SOURCE], [1], [Enable GNU extensions.])
 AC_DEFINE([DEFAULT_VISIBILITY], [__attribute__ ((visibility ("default")))], [Define to the attribute for default visibility.])
-AC_DEFINE([PRINTF_FORMAT(a, b)], [__attribute__ ((__format__ (__printf__, a, b)))], [Define to the attribute for enabling parameter checks on printf-like functions.])
 
 create_import_lib=
 is_android_linux=

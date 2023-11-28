@@ -310,6 +310,8 @@ int usbi_vsnprintf(char *dst, size_t size, const char *format, va_list args);
 #define LIBUSB_PRINTF_WIN32
 #endif /* defined(_MSC_VER) && (_MSC_VER < 1900) */
 
+#define PRINTF_FORMAT(a,b) __attribute__((__format__ (__printf__, a, b)))
+
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, ...) PRINTF_FORMAT(4, 5);
 
