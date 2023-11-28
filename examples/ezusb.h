@@ -100,7 +100,7 @@ extern int ezusb_load_eeprom(libusb_device_handle *device,
 /* Verbosity level (default 1). Can be increased or decreased with options v/q  */
 extern int verbose;
 
-extern void logerror(const char *format, ...) PRINTF_FORMAT(1, 2);
+extern void logerror(const char *format, ...);
 
 #ifdef __cplusplus
 }
