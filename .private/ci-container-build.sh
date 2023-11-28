@@ -50,6 +50,8 @@ CFLAGS+=" -Wredundant-decls"
 CFLAGS+=" -Wswitch-enum"
 export CFLAGS
 
+export CXXFLAGS="\${CFLAGS}"
+
 echo ""
 echo "Configuring ..."
 /source/configure --enable-examples-build --enable-tests-build

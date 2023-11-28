@@ -72,7 +72,7 @@ fi
 
 echo ""
 echo "Configuring ..."
-CFLAGS="${cflags}" ../configure --enable-examples-build --enable-tests-build "$@"
+CFLAGS="${cflags}" CXXFLAGS="${cflags}" ../configure --enable-examples-build --enable-tests-build "$@"
 
 echo ""
 echo "Building ..."
