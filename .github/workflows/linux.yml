@@ -40,5 +40,14 @@ jobs:
         shell: bash
         run: .private/ci-build.sh --build-dir build-debug -- --enable-debug-log
 
+      - uses: mymindstorm/setup-emsdk@v13
+
+      - run: npm ci
+        working-directory: tests/webusb-test-shim
+
+      - name: emscripten
+        shell: bash
+        run: .private/ci-build.sh --build-dir build-emscripten -- --host=wasm32-unknown-emscripten
+
       - name: umockdev test
         run: .private/ci-container-build.sh docker.io/amd64/ubuntu:rolling
