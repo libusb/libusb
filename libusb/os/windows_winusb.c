@@ -1459,7 +1459,7 @@ static int get_guid(struct libusb_context *ctx, char *dev_id, HDEVINFO *dev_info
 	char *guid_string, *new_guid_string;
 	char *guid, *guid_term;
 	LONG s;
-	int pass;
+	int pass, guids_left;
 	int err = LIBUSB_SUCCESS;
 
 	key = pSetupDiOpenDevRegKey(*dev_info, dev_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
@@ -1530,7 +1530,8 @@ static int get_guid(struct libusb_context *ctx, char *dev_id, HDEVINFO *dev_info
 		guid[size] = '\0';
 		guid[size + 1] = '\0';
 		// Iterate the GUIDs in the guid string
-		while (guid_number) {
+		guids_left = guid_number;
+		while (guids_left) {
 			guid = strchr(guid, '}');
 			if (guid == NULL) {
 				usbi_warn(ctx, "no GUID with index %d registered for '%s'", guid_number, dev_id);
@@ -1542,11 +1543,11 @@ static int get_guid(struct libusb_context *ctx, char *dev_id, HDEVINFO *dev_info
 			if (*guid == '\0') {
 				guid++;
 			}
-			guid_number--;
+			guids_left--;
 		}
 		// Add terminating char to the string
 		guid_term = strchr(guid, '}');
-		if ((guid_term == NULL) || (guid_number > 0)) {
+		if (guid_term == NULL) {
 			usbi_warn(ctx, "no GUID with index %d registered for '%s'", guid_number, dev_id);
 			err = LIBUSB_ERROR_ACCESS;
 			goto exit;
