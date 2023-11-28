@@ -47,7 +47,7 @@ jobs:
 
       - name: emscripten
         shell: bash
-        run: .private/ci-build.sh --build-dir build-emscripten -- --host=wasm32-unknown-emscripten
+        run: emconfigure .private/ci-build.sh --build-dir build-emscripten -- --host=wasm32-unknown-emscripten
 
       - name: umockdev test
         run: .private/ci-container-build.sh docker.io/amd64/ubuntu:rolling
