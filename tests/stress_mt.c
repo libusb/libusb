@@ -22,7 +22,6 @@
 #include <libusb.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <stdatomic.h>
 
 #if defined(PLATFORM_POSIX)
 
@@ -42,6 +41,8 @@ static inline void thread_join(thread_t thread)
 {
 	(void)pthread_join(thread, NULL);
 }
+
+#include <stdatomic.h>
 
 #elif defined(PLATFORM_WINDOWS)
 
@@ -72,6 +73,10 @@ static inline void thread_join(thread_t thread)
 	(void)WaitForSingleObject(thread, INFINITE);
 	(void)CloseHandle(thread);
 }
+
+typedef volatile CHAR atomic_bool;
+
+#define atomic_exchange InterlockedExchange8
 #endif /* PLATFORM_WINDOWS */
 
 /* Test that creates and destroys contexts repeatedly */
