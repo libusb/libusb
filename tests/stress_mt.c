@@ -198,7 +198,10 @@ static int test_multi_init(int enumerate)
 {
 	thread_t threadId[NTHREADS];
 	int errs = 0;
-	int t;
+	int t, i;
+	ssize_t last_devcount = 0;
+	int devcount_mismatch = 0;
+	int access_failures = 0;
 
 	printf("Starting %d threads\n", NTHREADS);
 	for (t = 0; t < NTHREADS; t++) {
@@ -218,13 +221,26 @@ static int test_multi_init(int enumerate)
 				tinfo[t].iteration,
 				libusb_error_name(tinfo[t].err));
 		} else if (enumerate) {
-			printf("Thread %d discovered %ld devices\n",
+			if (t > 0 && tinfo[t].devcount != last_devcount) {
+				devcount_mismatch++;
+				printf("Device count mismatch: Thread %d discovered %ld devices instead of %ld\n",
 				       tinfo[t].number,
-				       (long int) tinfo[t].devcount);
+				       (long int) tinfo[t].devcount,
+				       (long int) last_devcount);
+			}
+			last_devcount = tinfo[t].devcount;
 		}
 	}
 
-	return errs;
+	for (i = 0; i < MAX_DEVCOUNT; i++)
+		if (no_access[i])
+			access_failures++;
+
+	if (enumerate && !devcount_mismatch)
+		printf("All threads discovered %ld devices (%i not opened)\n",
+		       (long int) last_devcount, access_failures);
+
+	return errs + devcount_mismatch;
 }
 
 int main(void)
