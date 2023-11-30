@@ -74,9 +74,9 @@ static inline void thread_join(thread_t thread)
 	(void)CloseHandle(thread);
 }
 
-typedef volatile CHAR atomic_bool;
+typedef volatile LONG atomic_bool;
 
-#define atomic_exchange InterlockedExchange8
+#define atomic_exchange InterlockedExchange
 #endif /* PLATFORM_WINDOWS */
 
 /* Test that creates and destroys contexts repeatedly */
