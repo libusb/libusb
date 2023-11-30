@@ -140,7 +140,7 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 					   This is a warning and not a hard error because it should be fine to run tests
 					   even if we don't have access to some devices. */
 					if (!atomic_exchange(&no_access[i], true)) {
-						fprintf(stderr, "No access to device %04X:%04X, skipping transfer tests.\n", desc.idVendor, desc.idProduct);
+						fprintf(stderr, "No access to device %04x:%04x, skipping transfer tests.\n", desc.idVendor, desc.idProduct);
 					}
 					continue;
 				}
