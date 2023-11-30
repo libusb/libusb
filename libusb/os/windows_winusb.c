@@ -1605,7 +1605,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	unsigned long session_id;
 	DWORD size, port_nr, install_state;
 	uint8_t bus_number = 0;
+#if defined(ENABLE_LOGGING)
 	char guid_string[MAX_GUID_STRING_LENGTH];
+#endif
 	GUID *if_guid;
 #define HUB_PASS 0
 #define DEV_PASS 1
@@ -1674,10 +1676,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 
 	for (pass = 0; ((pass < nb_guids) && (r == LIBUSB_SUCCESS)); pass++) {
 		pass_type = MIN(pass, EXT_PASS);
-//#define ENUM_DEBUG
-#if defined(ENABLE_LOGGING) && defined(ENUM_DEBUG)
+#if defined(ENABLE_LOGGING)
 		const char * const passname[] = {"HUB", "DEV", "HCD", "GEN", "HID", "EXT"};
-		usbi_dbg(ctx, "#### PROCESSING %ss %s", passname[pass_type], guid_to_string(guid_list[pass], guid_string));
+		usbi_dbg(ctx, "ENUM pass %s %s", passname[pass_type], guid_to_string(guid_list[pass], guid_string));
 #endif
 		if ((pass == HID_PASS) && (guid_list[HID_PASS] == NULL))
 			continue;
@@ -1723,9 +1724,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				continue;
 			}
 
-#ifdef ENUM_DEBUG
-			usbi_dbg(ctx, "PRO: %s", dev_id);
-#endif
+			usbi_dbg(ctx, "ENUM processing %s", dev_id);
 
 			// Set API to use or get additional data from generic pass
 			api = USB_API_UNSUPPORTED;
