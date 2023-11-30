@@ -12,6 +12,7 @@ if OS_EMSCRIPTEN
 # causing deadlocks when trying to use async APIs like WebUSB.
 # We use the PROXY_TO_PTHREAD Emscripten's feature to move the main app to a separate thread
 # where it can block safely.
+stress_mt_CFLAGS = ${AM_CFLAGS} -pthread
 stress_mt_LDFLAGS = ${AM_LDFLAGS} -s PROXY_TO_PTHREAD -s EXIT_RUNTIME
 endif
 
