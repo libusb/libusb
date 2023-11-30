@@ -21,6 +21,8 @@
 
 #include <libusb.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdatomic.h>
 
 #if defined(PLATFORM_POSIX)
 
@@ -76,6 +78,7 @@ static inline void thread_join(thread_t thread)
 
 #define NTHREADS 8
 #define ITERS 64
+#define MAX_DEVCOUNT 128
 
 struct thread_info {
 	int number;
@@ -84,6 +87,8 @@ struct thread_info {
 	int err;
 	int iteration;
 } tinfo[NTHREADS];
+
+atomic_bool no_access[MAX_DEVCOUNT];
 
 /* Function called by backend during device initialization to convert
  * multi-byte fields in the device descriptor to host-endian format.
@@ -120,13 +125,27 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 				if ((ti->err = libusb_get_device_descriptor(dev, &desc)) != 0) {
 					break;
 				}
-				struct libusb_device_descriptor raw_desc;
+				if (no_access[i]) {
+					continue;
+				}
 				libusb_device_handle *dev_handle;
-				if ((ti->err = libusb_open(dev, &dev_handle)) != 0) {
+				int open_err = libusb_open(dev, &dev_handle);
+				if (open_err == LIBUSB_ERROR_ACCESS) {
+					/* Use atomic swap to ensure we print warning only once across all threads.
+					   This is a warning and not a hard error because it should be fine to run tests
+					   even if we don't have access to some devices. */
+					if (!atomic_exchange(&no_access[i], true)) {
+						fprintf(stderr, "No access to device %04X:%04X, skipping transfer tests.\n", desc.idVendor, desc.idProduct);
+					}
+					continue;
+				}
+				if (open_err != 0) {
+					ti->err = open_err;
 					break;
 				}
 				/* Request raw descriptor via control transfer.
 				   This tests opening, transferring and closing from multiple threads in parallel. */
+				struct libusb_device_descriptor raw_desc;
 				int raw_desc_len = libusb_get_descriptor(dev_handle, LIBUSB_DT_DEVICE, 0, (unsigned char *)&raw_desc, sizeof(raw_desc));
 				if (raw_desc_len < 0) {
 					ti->err = raw_desc_len;
