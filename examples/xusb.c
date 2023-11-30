@@ -870,7 +870,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 	uint8_t string_index[3];	// indexes of the string descriptors
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
 
-	printf("Opening device %04X:%04X...\n", vid, pid);
+	printf("Opening device %04x:%04x ...\n", vid, pid);
 	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
 
 	if (handle == NULL) {
@@ -902,8 +902,8 @@ static int test_device(uint16_t vid, uint16_t pid)
 	printf("            length: %d\n", dev_desc.bLength);
 	printf("      device class: %d\n", dev_desc.bDeviceClass);
 	printf("               S/N: %d\n", dev_desc.iSerialNumber);
-	printf("           VID:PID: %04X:%04X\n", dev_desc.idVendor, dev_desc.idProduct);
-	printf("         bcdDevice: %04X\n", dev_desc.bcdDevice);
+	printf("           VID:PID: %04x:%04x\n", dev_desc.idVendor, dev_desc.idProduct);
+	printf("         bcdDevice: 0x%04x\n", dev_desc.bcdDevice);
 	printf("   iMan:iProd:iSer: %d:%d:%d\n", dev_desc.iManufacturer, dev_desc.iProduct, dev_desc.iSerialNumber);
 	printf("          nb confs: %d\n", dev_desc.bNumConfigurations);
 	// Copy the string descriptors for easier parsing
