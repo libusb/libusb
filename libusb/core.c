@@ -2294,7 +2294,9 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	int arg = 0, r = LIBUSB_SUCCESS;
 	libusb_log_cb log_cb = NULL;
 	va_list ap;
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 	int is_default_context = (NULL == ctx);
+#endif
 
 	va_start(ap, option);
 
