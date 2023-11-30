@@ -1461,6 +1461,9 @@ static int get_guid(struct libusb_context *ctx, char *dev_id, HDEVINFO *dev_info
 	LONG s;
 	int pass, guids_left;
 	int err = LIBUSB_SUCCESS;
+#if !defined(ENABLE_LOGGING)
+	UNUSED(dev_id);
+#endif
 
 	key = pSetupDiOpenDevRegKey(*dev_info, dev_info_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
 	if (key == INVALID_HANDLE_VALUE) {
