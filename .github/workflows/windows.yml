@@ -1,0 +1,32 @@
+name: Windows build and Package
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os:
+          - 'windows-2022'
+          - 'windows-2025'
+        configuration:
+          - 'Debug'
+          - 'Release'
+        architecture:
+          - 'x86'
+          - 'x64'
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.3
+        with:
+          msbuild-architecture: ${{ matrix.architecture }}
+
+      - name: Build solution
+        run: |
+          msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }}
