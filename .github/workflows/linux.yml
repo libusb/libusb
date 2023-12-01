@@ -35,6 +35,9 @@ jobs:
       - name: debug-log
         run: .private/ci-build.sh --build-dir build-debug -- --enable-debug-log
 
+      - name: disable-log
+        run: .private/ci-build.sh --build-dir build-nolog -- --disable-log
+
       - uses: mymindstorm/setup-emsdk@v13
 
       - run: npm ci

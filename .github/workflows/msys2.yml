@@ -14,9 +14,10 @@ jobs:
           msystem: MINGW64
           update: true
           install: git mingw-w64-x86_64-cc mingw-w64-x86_64-autotools
-      - name: CI-Build
-        run: |
-          echo 'Running in MSYS2!'
-          ./bootstrap.sh
-          # GCC on MSYS2 doesn't have ASAN support (but Clang does).
-          ./.private/ci-build.sh --build-dir build-msys2 --no-asan
+      - name: bootstrap
+        run: ./bootstrap.sh
+      - name: Build
+        # GCC on MSYS2 doesn't have ASAN support (but Clang does).
+        run: ./.private/ci-build.sh --build-dir build-msys2 --no-asan
+      - name: Build with logging disabled
+        run: ./.private/ci-build.sh --build-dir build-msys2-nolog --no-asan -- --disable-log
