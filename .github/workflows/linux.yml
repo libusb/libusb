@@ -18,26 +18,21 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: setup prerequisites
-        shell: bash
         run: |
           sudo apt update
           sudo apt install autoconf automake libtool libudev-dev m4
 
       - name: bootstrap
-        shell: bash
         run: ./bootstrap.sh
 
       - name: netlink
-        shell: bash
         # Disable tests for netlink as it doesn't seem to work in the CI environment.
         run: .private/ci-build.sh --build-dir build-netlink --no-test -- --disable-udev
 
       - name: udev
-        shell: bash
         run: .private/ci-build.sh --build-dir build-udev -- --enable-udev
 
       - name: debug-log
-        shell: bash
         run: .private/ci-build.sh --build-dir build-debug -- --enable-debug-log
 
       - uses: mymindstorm/setup-emsdk@v13
@@ -46,7 +41,6 @@ jobs:
         working-directory: tests/webusb-test-shim
 
       - name: emscripten
-        shell: bash
         run: emconfigure .private/ci-build.sh --build-dir build-emscripten -- --host=wasm32-unknown-emscripten
 
       - name: umockdev test
