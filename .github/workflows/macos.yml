@@ -30,7 +30,7 @@ jobs:
       - name: compile
         shell: bash
         env:
-          LIBUSB_DEBUG: 4
+          LIBUSB_DEBUG: 3
         run: .private/ci-build.sh --build-dir build
 
       - name: Xcode
