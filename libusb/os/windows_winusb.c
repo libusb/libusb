@@ -725,7 +725,7 @@ static void winusb_exit(struct libusb_context *ctx)
 	exit_dlls();
 }
 
-BOOL device_io_control(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer, DWORD nOutBufferSize, LPDWORD lpBytesReturned) 
+static BOOL device_io_control(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer, DWORD nOutBufferSize, LPDWORD lpBytesReturned) 
 {
 	OVERLAPPED overlapped;
 	HANDLE io_event;
