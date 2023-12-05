@@ -124,7 +124,7 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 				ti->err = (int)ti->devcount;
 				break;
 			}
-			for (int i = 0; i < ti->devcount; i++) {
+			for (int i = 0; i < ti->devcount && ti->err == 0; i++) {
 				libusb_device *dev = devs[i];
 				struct libusb_device_descriptor desc;
 				if ((ti->err = libusb_get_device_descriptor(dev, &desc)) != 0) {
