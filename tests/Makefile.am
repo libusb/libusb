@@ -31,3 +31,5 @@ umockdev_SOURCES = umockdev.c
 
 noinst_PROGRAMS += umockdev
 endif
+
+TESTS=$(noinst_PROGRAMS)
