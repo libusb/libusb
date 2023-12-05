@@ -82,9 +82,9 @@ make -j4 -k
 if [ "${test}" = "yes" ]; then
 	# Load custom shim for WebUSB tests that simulates Web environment.
 	export NODE_OPTIONS="--require ${scriptdir}/../tests/webusb-test-shim/"
-	make check
-	if test "$?" != "0" ; then
+	if ! make check ; then
 	    cat tests/test-suite.log
+	    exit 1
 	fi
 fi
 
