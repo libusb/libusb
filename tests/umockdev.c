@@ -33,7 +33,7 @@
 #define UNUSED_DATA __attribute__ ((unused)) gconstpointer unused_data
 
 /* avoid leak reports inside assertions; leaking stuff on assertion failures does not matter in tests */
-#if !defined(__clang__)
+#if !defined(__clang__) && __GNUC__ > 9
 #pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
 #pragma GCC diagnostic ignored "-Wanalyzer-file-leak"
 #endif
