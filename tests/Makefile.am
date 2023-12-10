@@ -1,6 +1,6 @@
 AM_CPPFLAGS = -I$(top_srcdir)/libusb
 LDADD = ../libusb/libusb-1.0.la
-LDFLAGS = -static
+AM_LDFLAGS = -static
 
 stress_SOURCES = stress.c testlib.c
 stress_mt_SOURCES = stress_mt.c
@@ -10,13 +10,14 @@ macos_SOURCES = macos.c testlib.c
 
 stress_mt_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
 stress_mt_LDADD = $(LDADD) $(THREAD_LIBS)
+stress_mt_LDFLAGS = $(AM_LDFLAGS)
 
 if OS_EMSCRIPTEN
 # On the Web you can't block the main thread as this blocks the event loop itself,
 # causing deadlocks when trying to use async APIs like WebUSB.
 # We use the PROXY_TO_PTHREAD Emscripten's feature to move the main app to a separate thread
 # where it can block safely.
-stress_mt_LDFLAGS = ${AM_LDFLAGS} -s PROXY_TO_PTHREAD -s EXIT_RUNTIME
+stress_mt_LDFLAGS += ${AM_LDFLAGS} -s PROXY_TO_PTHREAD -s EXIT_RUNTIME
 endif
 
 noinst_HEADERS = libusb_testlib.h
