@@ -174,6 +174,7 @@ static libusb_testlib_result test_no_discovery(void)
   ssize_t num_devices = libusb_get_device_list(test_ctx, &device_list);
   libusb_free_device_list(device_list, /*unref_devices=*/1);
   libusb_exit(test_ctx);
+  test_ctx = NULL;
 
   LIBUSB_EXPECT(>, num_devices, 0);
 
