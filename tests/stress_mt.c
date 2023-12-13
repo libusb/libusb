@@ -176,14 +176,17 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 }
 				ASSERT_EQ(bLength);
 				ASSERT_EQ(bDescriptorType);
+#if !defined(PLATFORM_WINDOWS)
+				/* these are hardcoded by the winusbx HID backend */
 				ASSERT_EQ(bcdUSB);
 				ASSERT_EQ(bDeviceClass);
 				ASSERT_EQ(bDeviceSubClass);
 				ASSERT_EQ(bDeviceProtocol);
 				ASSERT_EQ(bMaxPacketSize0);
+				ASSERT_EQ(bcdDevice);
+#endif
 				ASSERT_EQ(idVendor);
 				ASSERT_EQ(idProduct);
-				ASSERT_EQ(bcdDevice);
 				ASSERT_EQ(iManufacturer);
 				ASSERT_EQ(iProduct);
 				ASSERT_EQ(iSerialNumber);
