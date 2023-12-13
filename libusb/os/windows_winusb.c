@@ -3513,24 +3513,26 @@ static int _hid_wcslen(WCHAR *str)
 	return i;
 }
 
-static int _hid_get_device_descriptor(struct hid_device_priv *hid_priv, void *data, size_t *size)
+static int _hid_get_device_descriptor(struct libusb_device *dev, struct hid_device_priv *hid_priv, void *data, size_t *size)
 {
 	struct libusb_device_descriptor d;
 
+	/* Copy some values from the cached device descriptor
+	 * because we cannot get them through HID */
 	d.bLength = LIBUSB_DT_DEVICE_SIZE;
 	d.bDescriptorType = LIBUSB_DT_DEVICE;
-	d.bcdUSB = 0x0200; /* 2.00 */
-	d.bDeviceClass = 0;
-	d.bDeviceSubClass = 0;
-	d.bDeviceProtocol = 0;
-	d.bMaxPacketSize0 = 64; /* fix this! */
+	d.bcdUSB = dev->device_descriptor.bcdUSB;
+	d.bDeviceClass = dev->device_descriptor.bDeviceClass;
+	d.bDeviceSubClass = dev->device_descriptor.bDeviceSubClass;
+	d.bDeviceProtocol = dev->device_descriptor.bDeviceProtocol;
+	d.bMaxPacketSize0 = dev->device_descriptor.bMaxPacketSize0;
 	d.idVendor = (uint16_t)hid_priv->vid;
 	d.idProduct = (uint16_t)hid_priv->pid;
-	d.bcdDevice = 0x0100;
+	d.bcdDevice = dev->device_descriptor.bcdDevice;
 	d.iManufacturer = hid_priv->string_index[0];
 	d.iProduct = hid_priv->string_index[1];
 	d.iSerialNumber = hid_priv->string_index[2];
-	d.bNumConfigurations = 1;
+	d.bNumConfigurations = dev->device_descriptor.bNumConfigurations;
 
 	if (*size > LIBUSB_DT_DEVICE_SIZE)
 		*size = LIBUSB_DT_DEVICE_SIZE;
@@ -3758,7 +3760,7 @@ static int _hid_get_descriptor(struct libusb_device *dev, HANDLE hid_handle, int
 	switch (type) {
 	case LIBUSB_DT_DEVICE:
 		usbi_dbg(DEVICE_CTX(dev), "LIBUSB_DT_DEVICE");
-		return _hid_get_device_descriptor(priv->hid, data, size);
+		return _hid_get_device_descriptor(dev, priv->hid, data, size);
 	case LIBUSB_DT_CONFIG:
 		usbi_dbg(DEVICE_CTX(dev), "LIBUSB_DT_CONFIG");
 		if (!_index)
