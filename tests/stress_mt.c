@@ -135,7 +135,12 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 				}
 				libusb_device_handle *dev_handle;
 				int open_err = libusb_open(dev, &dev_handle);
-				if (open_err == LIBUSB_ERROR_ACCESS) {
+				if (open_err == LIBUSB_ERROR_ACCESS
+#if defined(PLATFORM_WINDOWS)
+				    || open_err == LIBUSB_ERROR_NOT_SUPPORTED
+				    || open_err == LIBUSB_ERROR_NOT_FOUND
+#endif
+						) {
 					/* Use atomic swap to ensure we print warning only once across all threads.
 					   This is a warning and not a hard error because it should be fine to run tests
 					   even if we don't have access to some devices. */
