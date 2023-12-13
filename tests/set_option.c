@@ -166,7 +166,7 @@ static libusb_testlib_result test_set_log_level_env(void) {
 
 static libusb_testlib_result test_no_discovery(void)
 {
-#if defined(__linux__) && !defined(CI_WITHOUT_DEVICES)
+#if defined(__linux__)
   libusb_context *test_ctx;
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, /*options=*/NULL,
                                                   /*num_options=*/0));
@@ -176,7 +176,11 @@ static libusb_testlib_result test_no_discovery(void)
   libusb_exit(test_ctx);
   test_ctx = NULL;
 
-  LIBUSB_EXPECT(>, num_devices, 0);
+  if (num_devices == 0) {
+    libusb_testlib_logf("Warning: no devices found, the test will only verify that setting LIBUSB_OPTION_NO_DEVICE_DISCOVERY succeeds.");
+  }
+
+  LIBUSB_EXPECT(>=, num_devices, 0);
 
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_set_option(NULL, LIBUSB_OPTION_NO_DEVICE_DISCOVERY));
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, /*options=*/NULL,
