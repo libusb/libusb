@@ -73,7 +73,7 @@
 #endif
 
 /* The following is used to silence warnings for unused variables */
-#if defined(UNREFERENCED_PARAMETER)
+#if defined(UNREFERENCED_PARAMETER) && !defined(__GNUC__)
 #define UNUSED(var)	UNREFERENCED_PARAMETER(var)
 #else
 #define UNUSED(var)	do { (void)(var); } while(0)
