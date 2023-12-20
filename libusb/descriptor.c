@@ -169,8 +169,7 @@ static void clear_interface_descriptor(struct libusb_interface_descriptor *ifp) 
 		uint8_t j;
 
 		for (j = 0; j < ifp->bNumEndpoints; j++)
-			clear_endpoint((struct libusb_endpoint_descriptor *)
-								   ifp->endpoint + j);
+			clear_endpoint((struct libusb_endpoint_descriptor *) ifp->endpoint + j);
 	}
 	free((void *)ifp->endpoint);
 }
