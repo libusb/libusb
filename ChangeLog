@@ -3,7 +3,7 @@ visit: http://log.libusb.info
 
 2023-12-10: v1.0.27-rc1
 * New libusb_init_context API
-* New libusb_get_max_iso_packet_size_for_alt_setting API
+* New libusb_get_max_alt_packet_size API
 * New libusb_get_platform_descriptor API (BOS)
 * New WebAssembly + WebUSB backend using Emscripten
 * Fix regression in libusb_set_interface_alt_setting
