@@ -217,6 +217,7 @@ static int parse_interface(libusb_context *ctx,
 
 		ifp = altsetting + usb_interface->num_altsetting;
 
+		// increment early to ensure we free this in the case of an error
 		usb_interface->num_altsetting++;
 
 		ifp->endpoint = NULL;
@@ -226,6 +227,7 @@ static int parse_interface(libusb_context *ctx,
 		parse_descriptor(buffer, "bbbbbbbbb", ifp);
 
 		// stash in case we have to clear it
+		// bNumEndpoints will represent the number of *initialised* endpoints
 		uint8_t stashedNumEndpoints = ifp->bNumEndpoints;
 		ifp->bNumEndpoints = 0;
 
@@ -312,6 +314,8 @@ static int parse_interface(libusb_context *ctx,
 			}
 
 			ifp->endpoint = endpoint;
+			// loop counter with bNumEndpoints to only update when an endpoint is
+			// initialised and ensure it is freed in the case of an error
 			for (; ifp->bNumEndpoints < stashedNumEndpoints; ifp->bNumEndpoints++) {
 				r = parse_endpoint(ctx, endpoint + ifp->bNumEndpoints, buffer, size);
 				if (r < 0)
@@ -396,6 +400,8 @@ static int parse_configuration(struct libusb_context *ctx,
 	uint8_t stashedNumInterfaces = config->bNumInterfaces;
 	config->bNumInterfaces = 0;
 
+	// loop counter with bNumInterfaces to only update when an interface is initialised
+	// and ensure it is freed in the case of an error
 	for (; config->bNumInterfaces < stashedNumInterfaces; config->bNumInterfaces++) {
 		int len;
 		const uint8_t *begin;
@@ -1229,6 +1235,7 @@ static int parse_iad_array(struct libusb_context *ctx,
 
 	// First pass: Iterate through desc list, count number of IADs
 	iad_array->length = 0;
+	// +1 to avoid off-by-one overflow when parsing descriptor
 	while (consumed + 1 < size) {
 		parse_descriptor(buf, "bb", &header);
 		if (header.bLength < 2) {
@@ -1253,6 +1260,7 @@ static int parse_iad_array(struct libusb_context *ctx,
 		// Second pass: Iterate through desc list, fill IAD structures
 		consumed = 0;
 		i = 0;
+		// +9 to avoid off-by-8 overflow when parsing descriptor
 		while (consumed + 9 < size) {
 		   parse_descriptor(buffer, "bb", &header);
 		   if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION)
