@@ -2333,7 +2333,8 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 
 		ctx = usbi_get_context(ctx);
 		if (NULL == ctx) {
-			libusb_set_log_cb_internal(NULL, log_cb, LIBUSB_LOG_CB_GLOBAL);
+			if (LIBUSB_OPTION_LOG_CB == option)
+				libusb_set_log_cb_internal(NULL, log_cb, LIBUSB_LOG_CB_GLOBAL);
 			break;
 		}
 
