@@ -117,7 +117,7 @@ struct darwin_cached_device {
   UInt8                 first_config, active_config, port;
   int                   can_enumerate;
   int                   refcount;
-  bool                  in_reenumerate;
+  atomic_bool           in_reenumerate;
   int                   capture_count;
 };
 
