@@ -415,6 +415,7 @@ if (cfg != desired)
   * - libusb_get_device_descriptor()
   * - libusb_get_device_list()
   * - libusb_get_device_speed()
+  * - libusb_get_driver_name()
   * - libusb_get_iso_packet_buffer()
   * - libusb_get_iso_packet_buffer_simple()
   * - libusb_get_max_alt_packet_size()
@@ -2925,4 +2926,18 @@ DEFAULT_VISIBILITY
 const struct libusb_version * LIBUSB_CALL libusb_get_version(void)
 {
 	return &libusb_version_internal;
+}
+
+/**
+ * Get backend driver or empty string if it cannot be retrieved.
+ *
+ * @return  Backend driver or empty string if it cannot be retrieved
+ */
+DEFAULT_VISIBILITY
+const char * LIBUSB_CALL libusb_get_driver_name(libusb_device* dev) {
+	if (usbi_backend.get_driver_name) {
+		return usbi_backend.get_driver_name(dev);
+	} else {
+		return "";
+	}
 }

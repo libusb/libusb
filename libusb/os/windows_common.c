@@ -879,6 +879,11 @@ void usbi_get_monotonic_time(struct timespec *tp)
 }
 #endif
 
+static const char* windows_get_driver_name(libusb_device* dev) {
+	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
+	return priv->backend->get_driver_name(dev);
+}
+
 // NB: MSVC6 does not support named initializers.
 const struct usbi_os_backend usbi_backend = {
 	"Windows",
@@ -914,6 +919,7 @@ const struct usbi_os_backend usbi_backend = {
 	NULL,	/* clear_transfer_priv */
 	NULL,	/* handle_events */
 	windows_handle_transfer_completion,
+	windows_get_driver_name,
 	sizeof(struct windows_context_priv),
 	sizeof(union windows_device_priv),
 	sizeof(struct windows_device_handle_priv),
