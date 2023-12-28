@@ -1148,7 +1148,7 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 	uint8_t desc_index, unsigned char *data, int length)
 {
 	union usbi_string_desc_buf str;
-	int r, si, di;
+	int r;
 	uint16_t langid, wdata;
 
 	/* Asking for the zero'th index is special - it returns a string
@@ -1184,20 +1184,26 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 	else if ((str.desc.bLength & 1) || str.desc.bLength != r)
 		usbi_warn(HANDLE_CTX(dev_handle), "suspicious bLength %u for string descriptor (read %d)", str.desc.bLength, r);
 
-	di = 0;
-	for (si = 2; si < str.desc.bLength; si += 2) {
-		if (di >= (length - 1))
-			break;
+	/* Stop one byte before the end to leave room for null termination. */
+	int dest_max = length - 1;
 
-		wdata = libusb_le16_to_cpu(str.desc.wData[di]);
+	/* The descriptor has this number of wide characters */
+	int src_max = (str.desc.bLength - 1 - 1) / 2;
+
+	/* Neither read nor write more than the smallest buffer */
+	int idx_max = MIN(dest_max, src_max);
+
+	int idx;
+	for (idx = 0; idx < idx_max; ++idx) {
+		wdata = libusb_le16_to_cpu(str.desc.wData[idx]);
 		if (wdata < 0x80)
-			data[di++] = (unsigned char)wdata;
+			data[idx] = (unsigned char)wdata;
 		else
-			data[di++] = '?'; /* non-ASCII */
+			data[idx] = '?'; /* non-ASCII */
 	}
 
-	data[di] = 0;
-	return di;
+	data[idx] = 0; /* null-terminate string */
+	return idx;
 }
 
 static int parse_iad_array(struct libusb_context *ctx,
