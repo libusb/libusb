@@ -1359,7 +1359,7 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 
 /* iterates through the flying transfers, and rearms the timer based on the
  * next upcoming timeout.
- * must be called with flying_list locked.
+ * NB: flying_transfers_lock must be held when calling this
  * returns 0 on success or a LIBUSB_ERROR code on failure.
  */
 #ifdef HAVE_OS_TIMER
@@ -1398,7 +1398,8 @@ static inline int arm_timer_for_next_timeout(struct libusb_context *ctx)
 
 /* add a transfer to the (timeout-sorted) active transfers list.
  * This function will return non 0 if fails to update the timer,
- * in which case the transfer is *not* on the flying_transfers list. */
+ * in which case the transfer is *not* on the flying_transfers list. 
+ * NB: flying_transfers_lock MUST be held when calling this. */
 static int add_to_flying_list(struct usbi_transfer *itransfer)
 {
 	struct usbi_transfer *cur;
@@ -1459,20 +1460,19 @@ out:
 /* remove a transfer from the active transfers list.
  * This function will *always* remove the transfer from the
  * flying_transfers list. It will return a LIBUSB_ERROR code
- * if it fails to update the timer for the next timeout. */
+ * if it fails to update the timer for the next timeout. 
+ * NB: flying_transfers_lock MUST be held when calling this. */
 static int remove_from_flying_list(struct usbi_transfer *itransfer)
 {
 	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
 	int rearm_timer;
 	int r = 0;
 
-	usbi_mutex_lock(&ctx->flying_transfers_lock);
 	rearm_timer = (TIMESPEC_IS_SET(&itransfer->timeout) &&
 		list_first_entry(&ctx->flying_transfers, struct usbi_transfer, list) == itransfer);
 	list_del(&itransfer->list);
 	if (rearm_timer)
 		r = arm_timer_for_next_timeout(ctx);
-	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
 	return r;
 }
@@ -1566,8 +1566,11 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	}
 	usbi_mutex_unlock(&itransfer->lock);
 
-	if (r != LIBUSB_SUCCESS)
+	if (r != LIBUSB_SUCCESS) {
+		usbi_mutex_lock(&ctx->flying_transfers_lock);
 		remove_from_flying_list(itransfer);
+		usbi_mutex_unlock(&ctx->flying_transfers_lock);
+	}
 
 	return r;
 }
@@ -1695,7 +1698,9 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	uint8_t flags;
 	int r;
 
+	usbi_mutex_lock(&ctx->flying_transfers_lock);
 	r = remove_from_flying_list(itransfer);
+	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 	if (r < 0)
 		usbi_err(ctx, "failed to set timer for next timeout");
 
@@ -2047,6 +2052,7 @@ int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 	return 0;
 }
 
+// NB: flying_transfers_lock must be held when calling this
 static void handle_timeout(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer =
@@ -2062,6 +2068,7 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 			"async cancel failed %d", r);
 }
 
+// NB: flying_transfers_lock must be held when calling this
 static void handle_timeouts_locked(struct libusb_context *ctx)
 {
 	struct timespec systime;
