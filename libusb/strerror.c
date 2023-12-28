@@ -28,7 +28,7 @@
  * <li> Download the latest \c strerror.c from:<br>
  *      https://raw.github.com/libusb/libusb/master/libusb/strerror.c </li>
  * <li> Open the file in an UTF-8 capable editor </li>
- * <li> Add the 2 letter <a href="http://en.wikipedia.org/wiki/List_of_ISO_639-1_codes">ISO 639-1</a>
+ * <li> Add the 2 letter <a href="https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes">ISO 639-1</a>
  *      code for your locale at the end of \c usbi_locale_supported[]<br>
  *    Eg. for Chinese, you would add "zh" so that:
  *    \code... usbi_locale_supported[] = { "en", "nl", "fr" };\endcode

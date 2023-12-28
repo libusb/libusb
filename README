@@ -16,7 +16,7 @@ be ported to other operating systems. Please see the [PORTING](PORTING)
 file for more information.
 
 libusb homepage:
-http://libusb.info/
+https://libusb.info/
 
 Developers will wish to consult the API documentation:
 http://api.libusb.info

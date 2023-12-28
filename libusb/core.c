@@ -34,7 +34,7 @@
 
 static const struct libusb_version libusb_version_internal =
 	{ LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO,
-	  LIBUSB_RC, "http://libusb.info" };
+	  LIBUSB_RC, "https://libusb.info" };
 static struct timespec timestamp_origin;
 #if defined(ENABLE_LOGGING) && !defined(USE_SYSTEM_LOGGING_FACILITY)
 static libusb_log_cb log_handler;
@@ -60,12 +60,12 @@ struct list_head active_contexts_list;
  *
  * libusb is an open source library that allows you to communicate with USB
  * devices from user space. For more info, see the
- * <a href="http://libusb.info">libusb homepage</a>.
+ * <a href="https://libusb.info">libusb homepage</a>.
  *
  * This documentation is aimed at application developers wishing to
  * communicate with USB peripherals from their own software. After reviewing
  * this documentation, feedback and questions can be sent to the
- * <a href="http://mailing-list.libusb.info">libusb-devel mailing list</a>.
+ * <a href="https://mailing-list.libusb.info">libusb-devel mailing list</a>.
  *
  * This documentation assumes knowledge of how to operate USB devices from
  * a software standpoint (descriptors, configurations, interfaces, endpoints,
