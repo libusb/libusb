@@ -1,0 +1,3 @@
+[codespell]
+skip = strerror.c
+ignore-words-list = hart,maked,mis,mot,numer,ser,xwindows

@@ -1501,7 +1501,7 @@ enum libusb_option {
 
 #define LIBUSB_OPTION_WEAK_AUTHORITY LIBUSB_OPTION_NO_DEVICE_DISCOVERY
 
-	/** Set the context log callback functon.
+	/** Set the context log callback function.
 	 *
 	 * Set the log callback function either on a context or globally. This
 	 * option must be provided an argument of type libusb_log_cb. Using this
