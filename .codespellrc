@@ -1,0 +1,3 @@
+[codespell]
+skip = strerror.c,AUTHORS
+ignore-words-list = numer,ser,xwindows

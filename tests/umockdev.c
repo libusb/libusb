@@ -89,7 +89,7 @@ typedef struct {
 	GList *flying_urbs;
 	GList *discarded_urbs;
 
-	/* GMutex confuses tsan unecessarily */
+	/* GMutex confuses TSan unnecessarily */
 	pthread_mutex_t mutex;
 } UMockdevTestbedFixture;
 
@@ -245,7 +245,7 @@ handle_ioctl_cb (UMockdevIoctlBase *handler, UMockdevIoctlClient *client, UMockd
 	ioctl_arg = umockdev_ioctl_client_get_arg (client);
 
 	/* NOTE: We share the address space, dereferencing pointers *will* work.
-	 * However, to make tsan work, we still stick to the API that resolves
+	 * However, to make TSan work, we still stick to the API that resolves
 	 * the data into a local copy! */
 
 	switch (request) {
@@ -432,7 +432,7 @@ test_fixture_setup_libusb(UMockdevTestbedFixture * fixture, int devcount)
 
 	libusb_init_context(/*ctx=*/&fixture->ctx, /*options=*/NULL, /*num_options=*/0);
 
-	/* Supress global log messages completely
+	/* Suppress global log messages completely
 	 * (though, in some tests it might be interesting to check there are no real ones).
 	 */
 	libusb_set_log_cb (NULL, log_handler_null, LIBUSB_LOG_CB_GLOBAL);

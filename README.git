@@ -11,7 +11,7 @@ configure with a default set of options, and will therefore generate a Makefile,
 whereas the latter does not invoke configure at all. If using autogen.sh, note
 that you can also append options, that will be passed as is to configure.
 
-OS X-specific notes:
+macOS-specific notes:
 -------------------
 
 Starting with Xcode 4.3, neither Xcode.app nor the Xcode 'command line tools'

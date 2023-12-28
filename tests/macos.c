@@ -51,7 +51,7 @@
   } while (0)
 
 /**
- * Use relational operatator to compare two values and fail the test if the
+ * Use relational operator to compare two values and fail the test if the
  * comparison is false. Intended to compare integer or pointer types.
  *
  * Example: LIBUSB_EXPECT(==, 0, 1) -> fail, LIBUSB_EXPECT(==, 0, 0) -> ok.
