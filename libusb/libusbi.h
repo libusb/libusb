@@ -563,8 +563,11 @@ void usbi_get_real_time(struct timespec *tp);
  * 2. struct usbi_transfer
  * 3. struct libusb_transfer (which includes iso packets) [variable size]
  *
- * from a libusb_transfer, you can get the usbi_transfer by rewinding the
- * appropriate number of bytes.
+ * You can convert between them with the macros:
+ *  TRANSFER_PRIV_TO_USBI_TRANSFER
+ *  USBI_TRANSFER_TO_TRANSFER_PRIV
+ *  USBI_TRANSFER_TO_LIBUSB_TRANSFER
+ *  LIBUSB_TRANSFER_TO_USBI_TRANSFER
  */
 
 struct usbi_transfer {
@@ -617,10 +620,21 @@ enum usbi_transfer_timeout_flags {
 	USBI_TRANSFER_TIMED_OUT = 1U << 2,
 };
 
+#define TRANSFER_PRIV_TO_USBI_TRANSFER(transfer_priv) \
+	((struct usbi_transfer *)			\
+	 ((unsigned char *)(transfer_priv)	\
+	  + PTR_ALIGN(sizeof(*transfer_priv))))
+
+#define USBI_TRANSFER_TO_TRANSFER_PRIV(itransfer) \
+	((unsigned char *)			\
+	 ((unsigned char *)(itransfer)	\
+	  - PTR_ALIGN(usbi_backend.transfer_priv_size)))
+
 #define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)	\
 	((struct libusb_transfer *)			\
 	 ((unsigned char *)(itransfer)			\
 	  + PTR_ALIGN(sizeof(struct usbi_transfer))))
+
 #define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)	\
 	((struct usbi_transfer *)			\
 	 ((unsigned char *)(transfer)			\
