@@ -130,11 +130,14 @@ typedef SSIZE_T ssize_t;
  * \ingroup libusb_misc
  * libusb's API version.
  *
- * Since version 1.0.13, to help with feature detection, libusb defines
+ * Since version 1.0.18, to help with feature detection, libusb defines
  * a LIBUSB_API_VERSION macro that gets increased every time there is a
  * significant change to the API, such as the introduction of a new call,
  * the definition of a new macro/enum member, or any other element that
  * libusb applications may want to detect at compilation time.
+ *
+ * Between versions 1.0.13 and 1.0.17 (inclusive) the older spelling of
+ * LIBUSBX_API_VERSION was used.
  *
  * The macro is typically used in an application as follows:
  * \code
@@ -145,10 +148,30 @@ typedef SSIZE_T ssize_t;
  *
  * Internally, LIBUSB_API_VERSION is defined as follows:
  * (libusb major << 24) | (libusb minor << 16) | (16 bit incremental)
+ *
+ * The incremental component has changed as follows:
+ *
+ *  libusbx version 1.0.13: LIBUSBX_API_VERSION = 0x01000100
+ *  libusbx version 1.0.14: LIBUSBX_API_VERSION = 0x010000FF
+ *  libusbx version 1.0.15: LIBUSBX_API_VERSION = 0x01000101
+ *  libusbx version 1.0.16: LIBUSBX_API_VERSION = 0x01000102
+ *  libusbx version 1.0.17: LIBUSBX_API_VERSION = 0x01000102
+ *  libusb version 1.0.18: LIBUSB_API_VERSION = 0x01000102
+ *  libusb version 1.0.19: LIBUSB_API_VERSION = 0x01000103
+ *  libusb version 1.0.20: LIBUSB_API_VERSION = 0x01000104
+ *  libusb version 1.0.21: LIBUSB_API_VERSION = 0x01000105
+ *  libusb version 1.0.22: LIBUSB_API_VERSION = 0x01000106
+ *  libusb version 1.0.23: LIBUSB_API_VERSION = 0x01000107
+ *  libusb version 1.0.24: LIBUSB_API_VERSION = 0x01000108
+ *  libusb version 1.0.25: LIBUSB_API_VERSION = 0x01000109
+ *  libusb version 1.0.26: LIBUSB_API_VERSION = 0x01000109
+ *  libusb version 1.0.27: LIBUSB_API_VERSION = 0x0100010A
  */
 #define LIBUSB_API_VERSION 0x0100010A
 
-/* The following is kept for compatibility, but will be deprecated in the future */
+/* The following is the older spelling, and must be forever kept for
+ * backwards compatibility of code needing to test for older library
+ * versions where the newer spelling did not exist. */
 #define LIBUSBX_API_VERSION LIBUSB_API_VERSION
 
 #if defined(__cplusplus)
@@ -1081,7 +1104,7 @@ struct libusb_version {
  * libusb_exit() will not destroy resources that the other user is still
  * using.
  *
- * Sessions are created by libusb_init() and destroyed through libusb_exit().
+ * Sessions are created by libusb_init_context() and destroyed through libusb_exit().
  * If your application is guaranteed to only ever include a single libusb
  * user (i.e. you), you do not have to worry about contexts: pass NULL in
  * every function call where a context is required, and the default context
@@ -1461,22 +1484,22 @@ enum libusb_option {
 	 * your software.
 	 *
 	 * If the LIBUSB_DEBUG environment variable was set when libusb was
-	 * initialized, this function does nothing: the message verbosity is fixed
+	 * initialized, this option does nothing: the message verbosity is fixed
 	 * to the value in the environment variable.
 	 *
-	 * If libusb was compiled without any message logging, this function does
+	 * If libusb was compiled without any message logging, this option does
 	 * nothing: you'll never get any messages.
 	 *
-	 * If libusb was compiled with verbose debug message logging, this function
+	 * If libusb was compiled with verbose debug message logging, this option
 	 * does nothing: you'll always get messages from all levels.
 	 */
 	LIBUSB_OPTION_LOG_LEVEL = 0,
 
 	/** Use the UsbDk backend for a specific context, if available.
 	 *
-	 * This option should be set immediately after calling libusb_init(), or set at
-	 * initialization with libusb_init_context() otherwise unspecified behavior
-	 * may occur.
+	 * This option should be set at initialization with libusb_init_context()
+	 * (or immediately after calling the deprecated libusb_init()), otherwise
+	 * unspecified behavior may occur.
 	 *
 	 * Only valid on Windows. Ignored on all other platforms.
 	 */

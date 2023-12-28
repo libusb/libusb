@@ -1035,7 +1035,6 @@ static int test_device(uint16_t vid, uint16_t pid)
 
 int main(int argc, char** argv)
 {
-	static char debug_env_str[] = "LIBUSB_DEBUG=4";	// LIBUSB_LOG_LEVEL_DEBUG
 	bool show_help = false;
 	bool debug_mode = false;
 	const struct libusb_version* version;
@@ -1159,17 +1158,17 @@ int main(int argc, char** argv)
 		return 0;
 	}
 
-	// xusb is commonly used as a debug tool, so it's convenient to have debug output during libusb_init(),
-	// but since we can't call on libusb_set_option() before libusb_init(), we use the env variable method
-	old_dbg_str = getenv("LIBUSB_DEBUG");
-	if (debug_mode) {
-		if (putenv(debug_env_str) != 0)
-			printf("Unable to set debug level\n");
-	}
-
 	version = libusb_get_version();
 	printf("Using libusb v%d.%d.%d.%d\n\n", version->major, version->minor, version->micro, version->nano);
-	r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
+
+	// xusb is commonly used as a debug tool, so it's convenient to have debug output during libusb_init_context().
+	if (debug_mode) {
+		const struct libusb_init_option options = {.option = LIBUSB_OPTION_LOG_LEVEL, .value = {.ival = LIBUSB_LOG_LEVEL_DEBUG}};
+		r = libusb_init_context(/*ctx=*/NULL, /*options=*/&options, /*num_options=*/1);
+	} else {
+		r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
+	}
+
 	if (r < 0)
 		return r;
 

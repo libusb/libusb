@@ -2629,11 +2629,11 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
  * To remove notifiers, pass NULL values for the function pointers.
  *
  * Note that file descriptors may have been added even before you register
- * these notifiers (e.g. at libusb_init() time).
+ * these notifiers (e.g. at libusb_init_context() time).
  *
  * Additionally, note that the removal notifier may be called during
  * libusb_exit() (e.g. when it is closing file descriptors that were opened
- * and added to the poll set at libusb_init() time). If you don't want this,
+ * and added to the poll set at libusb_init_context() time). If you don't want this,
  * remove the notifiers immediately before calling libusb_exit().
  *
  * \param ctx the context to operate on, or NULL for the default context

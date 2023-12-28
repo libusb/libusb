@@ -33,7 +33,7 @@
  *
  * \section hotplug_intro Introduction
  *
- * Version 1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102, has added support
+ * Version 1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102, has added support
  * for hotplug events on <b>some</b> platforms (you should test if your platform
  * supports hotplug notification by calling \ref libusb_has_capability() with
  * parameter \ref LIBUSB_CAP_HAS_HOTPLUG).
@@ -117,7 +117,7 @@ int main (void) {
   libusb_hotplug_callback_handle callback_handle;
   int rc;
 
-  libusb_init(NULL);
+  libusb_init_context(NULL, NULL, 0);
 
   rc = libusb_hotplug_register_callback(NULL, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED |
                                         LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT, 0, 0x045a, 0x5005,

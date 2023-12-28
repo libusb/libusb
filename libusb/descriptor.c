@@ -521,7 +521,7 @@ static int get_config_descriptor(struct libusb_device *dev, uint8_t config_idx,
  *
  * This is a non-blocking function; the device descriptor is cached in memory.
  *
- * Note since libusb-1.0.16, \ref LIBUSB_API_VERSION >= 0x01000102, this
+ * Note since libusb-1.0.16, \ref LIBUSBX_API_VERSION >= 0x01000102, this
  * function always succeeds.
  *
  * \param dev the device
@@ -1072,6 +1072,8 @@ void API_EXPORTED libusb_free_container_id_descriptor(
 
 /** \ingroup libusb_desc
  * Get a platform descriptor
+ *
+ * Since version 1.0.27, \ref LIBUSB_API_VERSION >= 0x0100010A
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \param dev_cap Device Capability descriptor with a bDevCapabilityType of

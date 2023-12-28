@@ -160,7 +160,7 @@ static const char * const (*usbi_error_strings)[LIBUSB_ERROR_COUNT] = &usbi_loca
  * If libusb_setlocale() is not called, all messages will be in English.
  *
  * The following functions return translatable strings: libusb_strerror().
- * Note that the libusb log messages controlled through libusb_set_debug()
+ * Note that the libusb log messages controlled through LIBUSB_OPTION_LOG_LEVEL
  * are not translated, they are always in English.
  *
  * For POSIX UTF-8 environments if you want libusb to follow the standard
