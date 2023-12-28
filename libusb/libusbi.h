@@ -693,7 +693,7 @@ struct usbi_interface_descriptor {
 struct usbi_string_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
-	uint16_t wData[ZERO_SIZED_ARRAY];
+	uint16_t wData[LIBUSB_FLEXIBLE_ARRAY];
 } LIBUSB_PACKED;
 
 struct usbi_bos_descriptor {
@@ -907,7 +907,7 @@ static inline void *usbi_get_transfer_priv(struct usbi_transfer *itransfer)
 struct discovered_devs {
 	size_t len;
 	size_t capacity;
-	struct libusb_device *devices[ZERO_SIZED_ARRAY];
+	struct libusb_device *devices[LIBUSB_FLEXIBLE_ARRAY];
 };
 
 struct discovered_devs *discovered_devs_append(
