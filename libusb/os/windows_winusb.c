@@ -725,18 +725,15 @@ static void winusb_exit(struct libusb_context *ctx)
 	exit_dlls();
 }
 
-static BOOL device_io_control(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer, DWORD nOutBufferSize, LPDWORD lpBytesReturned) 
+static BOOL device_io_control(HANDLE event, HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer, DWORD nOutBufferSize, LPDWORD lpBytesReturned)
 {
 	OVERLAPPED overlapped;
-	HANDLE io_event;
 	DWORD error;
 	BOOL ret = TRUE;
 
-	io_event = CreateEvent(NULL, FALSE, FALSE, NULL);
-	if (!io_event || io_event == INVALID_HANDLE_VALUE) return FALSE;
-
+	ResetEvent(event);
 	SecureZeroMemory(&overlapped, sizeof(overlapped));
-	overlapped.hEvent = io_event;
+	overlapped.hEvent = event;
 
 	if (DeviceIoControl(hDevice, dwIoControlCode, lpInBuffer, nInBufferSize, lpOutBuffer, nOutBufferSize, lpBytesReturned, &overlapped)) goto end;
 
@@ -747,7 +744,7 @@ static BOOL device_io_control(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpIn
 		goto end;
 	}
 
-	DWORD wret = WaitForSingleObject(io_event, IO_WAIT_TIME);
+	DWORD wret = WaitForSingleObject(event, IO_WAIT_TIME);
 	if (wret != WAIT_OBJECT_0) {
 		CancelIo(hDevice);
 		ret = FALSE;
@@ -765,14 +762,13 @@ static BOOL device_io_control(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpIn
 	}
 
 end:
-	CloseHandle(io_event);
 	return ret;
 }
 
 /*
  * fetch and cache all the config descriptors through I/O
  */
-static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle)
+static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle, HANDLE event)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
@@ -814,7 +810,7 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 		// Dummy call to get the required data size. Initial failures are reported as info rather
 		// than error as they can occur for non-penalizing situations, such as with some hubs.
 		// coverity[tainted_data_argument]
-		if (!device_io_control(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
+		if (!device_io_control(event, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
 			&cd_buf_short, size, &ret_size)) {
 			usbi_info(ctx, "could not access configuration descriptor %u (dummy) for '%s': %s", i, priv->dev_id, windows_error_str(0));
 			continue;
@@ -840,7 +836,7 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 		cd_buf_actual->SetupPacket.wIndex = 0;
 		cd_buf_actual->SetupPacket.wLength = cd_buf_short.desc.wTotalLength;
 
-		if (!device_io_control(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
+		if (!device_io_control(event, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
 			cd_buf_actual, size, &ret_size)) {
 			usbi_err(ctx, "could not access configuration descriptor %u (actual) for '%s': %s", i, priv->dev_id, windows_error_str(0));
 			continue;
@@ -942,7 +938,7 @@ static int alloc_root_hub_config_desc(struct libusb_device *dev, ULONG num_ports
 	return 0;
 }
 
-static int init_root_hub(struct libusb_device *dev)
+static int init_root_hub(struct libusb_device *dev, HANDLE event)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
@@ -968,7 +964,7 @@ static int init_root_hub(struct libusb_device *dev)
 		return LIBUSB_ERROR_ACCESS;
 	}
 
-	if (!device_io_control(handle, IOCTL_USB_GET_NODE_INFORMATION, NULL, 0, &hub_info, sizeof(hub_info), &size)) {
+	if (!device_io_control(event, handle, IOCTL_USB_GET_NODE_INFORMATION, NULL, 0, &hub_info, sizeof(hub_info), &size)) {
 		usbi_warn(ctx, "could not get root hub info for '%s': %s", priv->dev_id, windows_error_str(0));
 		CloseHandle(handle);
 		return LIBUSB_ERROR_ACCESS;
@@ -986,7 +982,7 @@ static int init_root_hub(struct libusb_device *dev)
 			conn_info_v2.ConnectionIndex = port_number;
 			conn_info_v2.Length = sizeof(conn_info_v2);
 			conn_info_v2.SupportedUsbProtocols.Usb300 = 1;
-			if (!device_io_control(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
+			if (!device_io_control(event, handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
 				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size)) {
 				usbi_warn(ctx, "could not get node connection information (V2) for root hub '%s' port %lu: %s",
 					priv->dev_id, ULONG_CAST(port_number), windows_error_str(0));
@@ -1026,7 +1022,7 @@ static int init_root_hub(struct libusb_device *dev)
 	// highest speed that the root hub supports will not give us the correct speed.
 	for (port_number = 1; port_number <= num_ports; port_number++) {
 		conn_info.ConnectionIndex = port_number;
-		if (!device_io_control(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
+		if (!device_io_control(event, handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
 			&conn_info, sizeof(conn_info), &size)) {
 			usbi_warn(ctx, "could not get node connection information for root hub '%s' port %lu: %s",
 				priv->dev_id, ULONG_CAST(port_number), windows_error_str(0));
@@ -1119,12 +1115,16 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	DWORD size;
 	uint8_t bus_number, depth;
 	int r;
+	HANDLE io_event;
 
 	priv = usbi_get_device_priv(dev);
 
 	// If the device is already initialized, we can stop here
 	if (priv->initialized)
 		return LIBUSB_SUCCESS;
+
+	io_event = CreateEvent(NULL, FALSE, FALSE, NULL);
+	if (!io_event || io_event == INVALID_HANDLE_VALUE) return LIBUSB_ERROR_IO;
 
 	if (parent_dev != NULL) { // Not a HCD root hub
 		ctx = DEVICE_CTX(dev);
@@ -1180,7 +1180,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		conn_info.ConnectionIndex = (ULONG)port_number;
 		// coverity[tainted_data_argument]
 
-		if (!device_io_control(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
+		if (!device_io_control(io_event, hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
 			&conn_info, sizeof(conn_info), &size)) {
 			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
 				priv->dev_id, windows_error_str(0));
@@ -1219,14 +1219,14 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			dev->device_descriptor.bNumConfigurations, priv->active_config,	priv->dev_id);
 
 		// Cache as many config descriptors as we can
-		cache_config_descriptors(dev, hub_handle);
+		cache_config_descriptors(dev, hub_handle, io_event);
 
 		// In their great wisdom, Microsoft decided to BREAK the USB speed report between Windows 7 and Windows 8
 		if (windows_version >= WINDOWS_8) {
 			conn_info_v2.ConnectionIndex = (ULONG)port_number;
 			conn_info_v2.Length = sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2);
 			conn_info_v2.SupportedUsbProtocols.Usb300 = 1;
-			if (!device_io_control(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
+			if (!device_io_control(io_event, hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
 				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size)) {
 				usbi_warn(ctx, "could not get node connection information (V2) for device '%s': %s",
 					priv->dev_id,  windows_error_str(0));
@@ -1255,7 +1255,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			break;
 		}
 	} else {
-		r = init_root_hub(dev);
+		r = init_root_hub(dev, io_event);
 		if (r)
 			return r;
 	}
@@ -1265,6 +1265,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		return r;
 
 	priv->initialized = true;
+	CloseHandle(io_event);
 
 	usbi_dbg(ctx, "(bus: %u, addr: %u, depth: %u, port: %u): '%s'",
 		dev->bus_number, dev->device_address, priv->depth, dev->port_number, priv->dev_id);
