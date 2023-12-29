@@ -36,6 +36,9 @@ typedef struct usbi_event {
 #else
 typedef struct usbi_event {
 	int pipefd[2];
+#ifdef __EMSCRIPTEN__
+	_Atomic int has_event;
+#endif
 } usbi_event_t;
 #define USBI_EVENT_OS_HANDLE(e)	((e)->pipefd[0])
 #define USBI_EVENT_POLL_EVENTS	POLLIN

@@ -13,15 +13,18 @@ Copyright © 2013-2018 Chris Dickens <christopher.a.dickens@gmail.com>
 Other contributors:
 Aaron Luft
 Adam Korcz
+Addison Crump
 Adrian Bunk
 Adrien Destugues
 Akshay Jaggi
 Alan Ott
 Alan Stern
 Aleksandr Mezin
+Alexander Mot
 Alexander Pyhalov
 Alexander Schlarb
 Alexander Stein
+Alex Feinman
 Alex Vatchenko
 Andrew Aldridge
 Andrew Fernandes
@@ -44,6 +47,7 @@ Bence Csokas
 Benjamin Berg
 Benjamin Dobell
 Bohdan Tymkiv
+Brad Smith
 Brent Rector
 Bruno Harbulot
 Carl Karsten
@@ -59,7 +63,9 @@ David Moore
 Dmitry Fleytman
 Dmitry Kostjuchenko
 Dmitry Zakablukov
+Dominik Boehi
 Doug Johnston
+Edgar Fuß
 Evan Hunter
 Evan Miller
 Fabrice Fontaine
@@ -68,6 +74,7 @@ Felipe Balbi
 Florian Albrechtskirchinger
 Francesco Montorsi
 Francisco Facioni
+Francis Hart
 Frank Li
 Frederik Carlier
 Freek Dijkstra
@@ -84,6 +91,7 @@ Ido Yariv
 Igor Anokhin
 Ihor Dutchak
 Ilya Konstantinov
+Ingvar Stepanyan
 Jakub Klama
 James Hanko
 Jeffrey Nichols
@@ -98,6 +106,7 @@ Joost Muller
 Josh Gao
 Joshua Blake
 Joshua Hou
+Joshua M. Clulow
 Juan Cruz Viotti
 Julian Scheel
 Justin Bischoff
@@ -112,11 +121,13 @@ Lars Wirzenius
 Lei Chen
 Léo Lam
 Liang Yunwang
+Lonnie Abelbeck
 Luca Longinotti
 Luz Paz
 Mac Wang
 Marco Trevisan (Treviño)
 Marcus Meissner
+Mario Kleiner
 Mark Kuo
 Markus Heidelberg
 Martin Ettl
@@ -136,20 +147,26 @@ Moritz Fischer
 Nancy Li
 Nia Alarie
 Nicholas Corgan
+Niklas Gürtler
 Omri Iluz
+Orhan aib Kavrakoglu
 Orin Eman
 Ozkan Sezer
+Pablo Prietz
 Patrick Stewart
 Paul Cercueil
 Paul Fertser
 Paul Qureshi
 Pekka Nikander
+Petr Pazourek
 Philémon Favrod
 Pino Toscano
 Rob Walker
 Romain Vimont
 Roman Kalashnikov
+Rosen Penev
 Ryan Hileman
+Ryan Metcalfe
 Ryan Schmidt
 Saleem Rashid
 Sameeh Jubran
@@ -158,6 +175,7 @@ Sebastian Pipping
 Sebastian von Ohr
 Sergey Serb
 Shawn Hoffman
+Simon Chan
 Simon Haggett
 Simon Newton
 Slash Gordon
@@ -165,6 +183,7 @@ Stefan Agner
 Stefan Tauner
 Steinar H. Gunderson
 Stephen Groat
+Sylvain Fasel
 Theo Buehler
 Thomas Röfer
 Tim Hutt
@@ -187,6 +206,7 @@ William Orr
 William Skellenger
 Xiaofan Chen
 Yegor Yefremov
+Zeng Guang
 Zhiqiang Liu
 Zoltán Kovács
 Сергей Валерьевич
@@ -199,4 +219,6 @@ parafin
 RipleyTom
 Seneral
 saur0n
+SomeAlphabetGuy
 winterrace
+xloem

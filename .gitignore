@@ -22,6 +22,7 @@ depcomp
 configure
 aclocal.m4
 compile
+test-driver
 config.guess
 config.h*
 !msvc/config.h
@@ -41,7 +42,13 @@ examples/fxload
 examples/hotplugtest
 examples/sam3u_benchmark
 examples/testlibusb
+tests/init_context
+tests/macos
+tests/set_option
 tests/stress
+tests/stress_mt
+tests/*.log
+tests/*.trs
 android/libs
 android/obj
 *.exe

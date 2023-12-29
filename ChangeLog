@@ -1,6 +1,22 @@
 For detailed information about the changes below, please see the git log or
 visit: http://log.libusb.info
 
+2023-12-10: v1.0.27-rc1
+* New libusb_init_context API
+* New libusb_get_max_iso_packet_size_for_alt_setting API
+* New libusb_get_platform_descriptor API (BOS)
+* New WebAssembly + WebUSB backend using Emscripten
+* Fix regression in libusb_set_interface_alt_setting
+* Fix sync transfer completion race and use-after-free
+* Fix hotplug exit ordering
+* Linux: NO_DEVICE_DISCOVERY option set per context
+* macOS: Fix missing device list cleanup locking
+* macOS: Do not clear device data toggle for newer OS versions
+* macOS: Fix running binaries on older OS than build host
+* Windows: Allow claiming multiple associated interfaces
+* Windows: Ignore non-configured devices instead of waiting
+* Windows: Improved root hub detection
+
 2022-04-10: v1.0.26
 * Fix regression with transfer free's after closing device
 * Fix regression with destroyed context if API is misused

@@ -63,9 +63,6 @@ cflags+=" -Wpointer-arith"
 cflags+=" -Wredundant-decls"
 cflags+=" -Wswitch-enum"
 
-# Tell tests that we don't have any devices.
-cflags+=" -DCI_WITHOUT_DEVICES"
-
 # enable address sanitizer
 if [ "${asan}" = "yes" ]; then
 	cflags+=" -fsanitize=address"
@@ -82,11 +79,10 @@ make -j4 -k
 if [ "${test}" = "yes" ]; then
 	# Load custom shim for WebUSB tests that simulates Web environment.
 	export NODE_OPTIONS="--require ${scriptdir}/../tests/webusb-test-shim/"
-	for test_name in init_context set_option stress stress_mt; do
-		echo ""
-		echo "Running test '${test_name}' ..."
-		./tests/${test_name}
-	done
+	if ! make check ; then
+	    cat tests/test-suite.log
+	    exit 1
+	fi
 fi
 
 if [ "${install}" = "yes" ]; then

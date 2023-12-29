@@ -34,8 +34,10 @@ if OS_DARWIN
 OS_SRC = $(OS_DARWIN_SRC)
 endif
 
+noinst_LTLIBRARIES =
+
 if OS_HAIKU
-noinst_LTLIBRARIES = libusb_haiku.la
+noinst_LTLIBRARIES += libusb_haiku.la
 libusb_haiku_la_SOURCES = $(OS_HAIKU_SRC)
 libusb_1_0_la_LIBADD = libusb_haiku.la
 endif
@@ -50,8 +52,9 @@ endif
 endif
 
 if OS_EMSCRIPTEN
-noinst_LTLIBRARIES = libusb_emscripten.la
+noinst_LTLIBRARIES += libusb_emscripten.la
 libusb_emscripten_la_SOURCES = $(OS_EMSCRIPTEN_SRC)
+AM_CXXFLAGS += -std=c++20
 libusb_1_0_la_LIBADD = libusb_emscripten.la
 endif
 
