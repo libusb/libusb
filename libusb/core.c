@@ -2445,10 +2445,12 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 	}
 
 	/* check for first init */
+	usbi_mutex_static_lock(&active_contexts_lock);
 	if (!active_contexts_list.next) {
 		list_init(&active_contexts_list);
 		usbi_get_monotonic_time(&timestamp_origin);
 	}
+	usbi_mutex_static_unlock(&active_contexts_lock);
 
 	_ctx = calloc(1, PTR_ALIGN(sizeof(*_ctx)) + priv_size);
 	if (!_ctx) {
