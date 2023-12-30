@@ -625,8 +625,6 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
   struct darwin_cached_device *old_device;
 
   io_service_t device;
-  UInt64 session, locationID;
-  int ret;
 
   usbi_mutex_lock(&active_contexts_lock);
 
@@ -634,7 +632,9 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
     bool is_reenumerating = false;
 
     /* get the location from the i/o registry */
-    ret = get_ioregistry_value_number (device, CFSTR("sessionID"), kCFNumberSInt64Type, &session);
+    UInt64 session = 0;
+    bool ret = get_ioregistry_value_number (device, CFSTR("sessionID"), kCFNumberSInt64Type, &session);
+    UInt32 locationID = 0;
     (void) get_ioregistry_value_number (device, CFSTR("locationID"), kCFNumberSInt32Type, &locationID);
     IOObjectRelease (device);
     if (!ret)
@@ -648,7 +648,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
         if (old_device->in_reenumerate) {
           /* device is re-enumerating. do not dereference the device at this time. libusb_reset_device()
            * will deref if needed. */
-          usbi_dbg (NULL, "detected device detached due to re-enumeration. sessionID: 0x%" PRIx64 ", locationID: 0x%" PRIx64,
+          usbi_dbg (NULL, "detected device detached due to re-enumeration. sessionID: 0x%" PRIx64 ", locationID: 0x%" PRIx32,
                     session, locationID);
 
           /* the device object is no longer usable so go ahead and release it */
