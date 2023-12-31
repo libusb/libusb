@@ -2492,7 +2492,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 			r = libusb_set_option(_ctx, options[i].option, options[i].value.log_cbval);
 			break;
 		default:
-			r = libusb_set_option(_ctx, options[i].option, options[i].value.ival);
+			r = libusb_set_option(_ctx, options[i].option, (int)options[i].value.ival);
 		}
 		if (LIBUSB_SUCCESS != r)
 			goto err_free_ctx;
