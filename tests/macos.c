@@ -71,8 +71,8 @@
 
 
 extern uint32_t libusb_testonly_fake_running_version;
-extern int libusb_testonly_using_running_interface_version;
-extern int libusb_testonly_using_running_device_version;
+extern uint32_t libusb_testonly_using_running_interface_version;
+extern uint32_t libusb_testonly_using_running_device_version;
 extern bool libusb_testonly_clear_running_version_cache;
 
 static libusb_testlib_result test_macos_version_fallback(void) {

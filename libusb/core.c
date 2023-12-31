@@ -964,7 +964,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 		dev = dev->parent_dev;
 	}
 	if (i < port_numbers_len)
-		memmove(port_numbers, &port_numbers[i], port_numbers_len - i);
+		memmove(port_numbers, &port_numbers[i], (size_t)(port_numbers_len - i));
 	return port_numbers_len - i;
 }
 
@@ -1014,7 +1014,7 @@ uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
  */
 int API_EXPORTED libusb_get_device_speed(libusb_device *dev)
 {
-	return dev->speed;
+	return (int)(dev->speed);
 }
 
 static const struct libusb_endpoint_descriptor *find_endpoint(
@@ -2457,7 +2457,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		_ctx->debug = get_env_debug_level();
 		_ctx->debug_fixed = 1;
 	} else if (default_context_options[LIBUSB_OPTION_LOG_LEVEL].is_set) {
-		_ctx->debug = default_context_options[LIBUSB_OPTION_LOG_LEVEL].arg.ival;
+		_ctx->debug = (enum libusb_log_level)default_context_options[LIBUSB_OPTION_LOG_LEVEL].arg.ival;
 	}
 #endif
 
