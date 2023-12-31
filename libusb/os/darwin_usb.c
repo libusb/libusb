@@ -40,7 +40,7 @@
 
 /* Default timeout to 10s for reenumerate. This is needed because USBDeviceReEnumerate
  * does not return error status on macOS. */
-#define DARWIN_REENUMERATE_TIMEOUT_US (10 * USEC_PER_SEC)
+#define DARWIN_REENUMERATE_TIMEOUT_US (10ULL * USEC_PER_SEC)
 
 #include <AvailabilityMacros.h>
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060 && MAC_OS_X_VERSION_MIN_REQUIRED < 101200
@@ -70,8 +70,8 @@ static struct list_head darwin_cached_devices;
 static const char *darwin_device_class = "IOUSBDevice";
 
 uint32_t libusb_testonly_fake_running_version __attribute__ ((visibility ("hidden")));
-int libusb_testonly_using_running_interface_version __attribute__ ((visibility ("hidden")));
-int libusb_testonly_using_running_device_version __attribute__ ((visibility ("hidden")));
+uint32_t libusb_testonly_using_running_interface_version __attribute__ ((visibility ("hidden")));
+uint32_t libusb_testonly_using_running_device_version __attribute__ ((visibility ("hidden")));
 bool libusb_testonly_clear_running_version_cache __attribute__ ((visibility ("hidden")));
 
 #define DARWIN_CACHED_DEVICE(a) (((struct darwin_device_priv *)usbi_get_device_priv((a)))->dev)
@@ -173,7 +173,7 @@ static CFUUIDRef get_interface_interface_id(void) {
   return get_interface_interface()->interface_id;
 }
 
-static int get_interface_interface_version(void) {
+static uint32_t get_interface_interface_version(void) {
   return get_interface_interface()->version;
 }
 
@@ -244,7 +244,7 @@ static CFUUIDRef get_device_interface_id(void) {
   return get_device_interface()->interface_id;
 }
 
-static int get_device_interface_version(void) {
+static uint32_t get_device_interface_version(void) {
   return get_device_interface()->version;
 }
 
@@ -370,11 +370,11 @@ uint32_t get_running_version(void) {
    * it provides the exact macOS version instead of the approximate version (as below). */
   ret = sysctlbyname("kern.osproductversion", os_version_string, &os_version_string_len, NULL, 0);
   if (ret == 0) {
-    int major = 10, minor = 0, patch = 0;
-    ret = sscanf(os_version_string, "%i.%i.%i", &major, &minor, &patch);
+    unsigned int major = 10, minor = 0, patch = 0;
+    ret = sscanf(os_version_string, "%u.%u.%u", &major, &minor, &patch);
     if (ret < 2) {
       usbi_err (NULL, "could not determine the running OS version, assuming 10.0, kern.osproductversion=%s", os_version_string);
-      return 100000;
+      return 10 * 10000;
     }
     return (major * 10000) + (minor * 100) + patch;
   }
@@ -386,17 +386,17 @@ uint32_t get_running_version(void) {
   ret = sysctlbyname("kern.osrelease", os_release_string, &os_release_string_len, NULL, 0);
   if (ret != 0) {
     usbi_err (NULL, "could not read kern.osrelease, errno=", errno);
-    return 100000;
+    return 10 * 10000;
   }
 
-  int darwin_major = 1, darwin_minor = 0;
-  ret = sscanf(os_release_string, "%i.%i", &darwin_major, &darwin_minor);
+  unsigned int darwin_major = 1, darwin_minor = 0;
+  ret = sscanf(os_release_string, "%u.%u", &darwin_major, &darwin_minor);
   if (ret < 1) {
     usbi_err (NULL, "could not determine the running Darwin version, assuming 1.3 (OS X 10.0), kern.osrelease=%s", os_release_string);
-    return 100000;
+    return 10 * 10000;
   }
 
-  int major = 10, minor = 0, patch = 0;
+  unsigned int major = 10, minor = 0, patch = 0;
 
   if (1 == darwin_major && darwin_minor < 4) {
     /* 10.0.x */
@@ -1972,7 +1972,7 @@ static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
   return darwin_to_libusb (kresult);
 }
 
-static int darwin_restore_state (struct libusb_device_handle *dev_handle, int8_t active_config,
+static int darwin_restore_state (struct libusb_device_handle *dev_handle, uint8_t active_config,
                                  unsigned long claimed_interfaces) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   struct darwin_device_handle_priv *priv = usbi_get_device_handle_priv(dev_handle);
@@ -2037,7 +2037,7 @@ static int darwin_restore_state (struct libusb_device_handle *dev_handle, int8_t
 static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, bool capture) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   unsigned long claimed_interfaces = dev_handle->claimed_interfaces;
-  int8_t active_config = dpriv->active_config;
+  uint8_t active_config = dpriv->active_config;
   UInt32 options = 0;
   IOUSBDeviceDescriptor descriptor;
   IOUSBConfigurationDescriptorPtr cached_configuration;
@@ -2100,8 +2100,10 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
 
     struct timespec now;
     usbi_get_monotonic_time(&now);
-    unsigned long elapsed_us = (now.tv_sec - start.tv_sec) * USEC_PER_SEC +
-                                (now.tv_nsec - start.tv_nsec) / 1000;
+    long delta_sec = now.tv_sec - start.tv_sec;
+    long delta_nsec = now.tv_nsec - start.tv_nsec;
+    unsigned long long elapsed_us = (unsigned long long)delta_sec * USEC_PER_SEC +
+                                    (unsigned long long)delta_nsec / 1000ULL;
 
     if (elapsed_us >= DARWIN_REENUMERATE_TIMEOUT_US) {
       usbi_err (ctx, "darwin/reenumerate_device: timeout waiting for reenumerate");
@@ -2150,7 +2152,7 @@ static int darwin_reset_device (struct libusb_device_handle *dev_handle) {
   ret = darwin_reenumerate_device (dev_handle, false);
   if ((ret == LIBUSB_SUCCESS || ret == LIBUSB_ERROR_NOT_FOUND) && dpriv->capture_count > 0) {
     int capture_count;
-    int8_t active_config = dpriv->active_config;
+    uint8_t active_config = dpriv->active_config;
     unsigned long claimed_interfaces = dev_handle->claimed_interfaces;
 
     /* save old capture_count */
