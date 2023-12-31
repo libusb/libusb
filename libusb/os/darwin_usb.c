@@ -1868,9 +1868,10 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, uin
   if (kresult != kIOReturnSuccess)
     usbi_warn (HANDLE_CTX (dev_handle), "USBInterfaceClose: %s", darwin_error_str(kresult));
 
-  kresult = (*IOINTERFACE(cInterface))->Release(IOINTERFACE(cInterface));
-  if (kresult != kIOReturnSuccess)
-    usbi_warn (HANDLE_CTX (dev_handle), "Release: %s", darwin_error_str(kresult));
+  ULONG refCount = (*IOINTERFACE(cInterface))->Release(IOINTERFACE(cInterface));
+  if (refCount != 0) {
+    usbi_warn (HANDLE_CTX (dev_handle), "Release final refCount: %u", refCount);
+  }
 
   IOINTERFACE(cInterface) = NULL;
 
