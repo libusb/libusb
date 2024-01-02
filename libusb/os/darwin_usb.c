@@ -1242,17 +1242,18 @@ static bool get_device_port (io_service_t service, UInt8 *port) {
 
 /* Returns 1 on success, 0 on failure. */
 static bool get_device_parent_sessionID(io_service_t service, UInt64 *parent_sessionID) {
-  IOReturn kresult;
-  io_service_t parent;
-
   /* Walk up the tree in the IOService plane until we find a parent that has a sessionID */
-  parent = service;
-  while((kresult = IORegistryEntryGetParentEntry (parent, kIOUSBPlane, &parent)) == kIOReturnSuccess) {
+  io_service_t parent = service;
+  do {
+    IOReturn kresult = IORegistryEntryGetParentEntry (parent, kIOUSBPlane, &parent);
+    if (kresult != kIOReturnSuccess) {
+        break;
+    }
     if (get_ioregistry_value_number (parent, CFSTR("sessionID"), kCFNumberSInt64Type, parent_sessionID)) {
         /* Success */
         return true;
     }
-  }
+  } while (true);
 
   /* We ran out of parents */
   return false;
