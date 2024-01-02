@@ -93,6 +93,6 @@ static inline void usbi_tls_key_delete(usbi_tls_key_t key)
 	PTHREAD_CHECK(pthread_key_delete(key));
 }
 
-unsigned int usbi_get_tid(void);
+unsigned long usbi_get_tid(void);
 
 #endif /* LIBUSB_THREADS_POSIX_H */
