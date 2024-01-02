@@ -2809,7 +2809,7 @@ static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 		TIMESPEC_SUB(&timestamp, &timestamp_origin, &timestamp);
 
 		header_len = snprintf(buf, sizeof(buf),
-			"[%2ld.%06ld] [%08x] libusb: %s [%s] ",
+			"[%2ld.%06ld] [%08lx] libusb: %s [%s] ",
 			(long)timestamp.tv_sec, (long)(timestamp.tv_nsec / 1000L), usbi_get_tid(), prefix, function);
 	} else {
 		header_len = snprintf(buf, sizeof(buf),
