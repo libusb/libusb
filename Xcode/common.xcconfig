@@ -26,6 +26,13 @@ ALWAYS_SEARCH_USER_PATHS = NO
 // Enable weak references for Objective-C
 CLANG_ENABLE_OBJC_WEAK = YES
 
+// Allocate even uninitialized global variables in the data section of the object file, rather than generating them as common blocks. This has the effect that if the same variable is declared (without 'extern') in two different compilations, you will get an error when you link them.
+GCC_NO_COMMON_BLOCKS = YES
+
+// Keep private symbols private.  The first setting is -fvisibility=hidden, the second is -fvisibility-inlines-hidden.
+GCC_SYMBOLS_PRIVATE_EXTERN = YES
+GCC_INLINES_ARE_PRIVATE_EXTERN = YES
+
 // Compiler errors.
 GCC_TREAT_IMPLICIT_FUNCTION_DECLARATIONS_AS_ERRORS = YES
 
