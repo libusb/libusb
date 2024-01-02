@@ -1129,6 +1129,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		parent_priv = usbi_get_device_priv(parent_dev);
 		if (parent_priv->apib->id != USB_API_HUB) {
 			usbi_warn(ctx, "parent for device '%s' is not a hub", priv->dev_id);
+			CloseHandle(io_event);
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
 
@@ -1138,6 +1139,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			tmp_dev = get_ancestor(ctx, devinst, &devinst);
 			if (tmp_dev != parent_dev) {
 				usbi_err(ctx, "program assertion failed - first ancestor is not parent");
+				CloseHandle(io_event);
 				return LIBUSB_ERROR_NOT_FOUND;
 			}
 			libusb_unref_device(tmp_dev);
@@ -1146,6 +1148,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 				tmp_dev = get_ancestor(ctx, devinst, &devinst);
 				if (tmp_dev == NULL) {
 					usbi_warn(ctx, "ancestor for device '%s' not found at depth %u", priv->dev_id, depth);
+					CloseHandle(io_event);
 					return LIBUSB_ERROR_NO_DEVICE;
 				}
 				if (tmp_dev->bus_number != 0) {
@@ -1161,6 +1164,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 
 		if (bus_number == 0) {
 			usbi_err(ctx, "program assertion failed - bus number not found for '%s'", priv->dev_id);
+			CloseHandle(io_event);
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
 
@@ -1172,6 +1176,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		hub_handle = CreateFileA(parent_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 		if (hub_handle == INVALID_HANDLE_VALUE) {
 			usbi_warn(ctx, "could not open hub %s: %s", parent_priv->path, windows_error_str(0));
+			CloseHandle(io_event);
 			return LIBUSB_ERROR_ACCESS;
 		}
 
@@ -1183,12 +1188,14 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
 				priv->dev_id, windows_error_str(0));
 			CloseHandle(hub_handle);
+			CloseHandle(io_event);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
 
 		if (conn_info.ConnectionStatus == NoDeviceConnected) {
 			usbi_err(ctx, "device '%s' is no longer connected!", priv->dev_id);
 			CloseHandle(hub_handle);
+			CloseHandle(io_event);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
 
@@ -1196,6 +1203,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			|| (conn_info.DeviceDescriptor.bDescriptorType != LIBUSB_DT_DEVICE)) {
 			usbi_err(ctx, "device '%s' has invalid descriptor!", priv->dev_id);
 			CloseHandle(hub_handle);
+			CloseHandle(io_event);
 			return LIBUSB_ERROR_OTHER;
 		}
 
@@ -1209,6 +1217,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 				dev->device_descriptor.bNumConfigurations,
 				priv->dev_id);
 			CloseHandle(hub_handle);
+			CloseHandle(io_event);
 			return LIBUSB_ERROR_OTHER;
 		}
 
@@ -1254,13 +1263,17 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		}
 	} else {
 		r = init_root_hub(dev, io_event);
-		if (r)
+		if (r) {
+			CloseHandle(io_event);
 			return r;
+		}
 	}
 
 	r = usbi_sanitize_device(dev);
-	if (r)
+	if (r) {
+		CloseHandle(io_event);
 		return r;
+	}
 
 	priv->initialized = true;
 	CloseHandle(io_event);
