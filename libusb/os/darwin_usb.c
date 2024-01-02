@@ -1362,6 +1362,8 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
 
   usbi_mutex_unlock(&darwin_cached_devices_mutex);
 
+  assert((ret == LIBUSB_SUCCESS) ? (*cached_out != NULL) : true);
+
   return ret;
 }
 
@@ -1472,6 +1474,7 @@ static enum libusb_error darwin_scan_devices(struct libusb_context *ctx) {
 
   while ((service = IOIteratorNext (deviceIterator))) {
     ret = darwin_get_cached_device (ctx, service, &cached_device, &old_session_id);
+    assert((ret >= 0) ? (cached_device != NULL) : true);
     if (ret < 0 || !cached_device->can_enumerate) {
       continue;
     }
