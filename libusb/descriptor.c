@@ -131,7 +131,7 @@ static int parse_endpoint(struct libusb_context *ctx,
 		return LIBUSB_ERROR_NO_MEM;
 
 	memcpy(extra, begin, (size_t)len);
-	endpoint->extra = extra;
+	endpoint->extra = (unsigned char *)extra;
 	endpoint->extra_length = (int)len;
 
 	return parsed;
@@ -176,7 +176,7 @@ static int parse_interface(libusb_context *ctx,
 	while (size >= LIBUSB_DT_INTERFACE_SIZE) {
 		struct libusb_interface_descriptor *altsetting;
 
-		altsetting = realloc((void *)usb_interface->altsetting,
+		altsetting = (struct libusb_interface_descriptor *)realloc((void *)usb_interface->altsetting,
 			sizeof(*altsetting) * (size_t)(usb_interface->num_altsetting + 1));
 		if (!altsetting) {
 			r = LIBUSB_ERROR_NO_MEM;
@@ -268,7 +268,7 @@ static int parse_interface(libusb_context *ctx,
 			}
 
 			memcpy(extra, begin, (size_t)len);
-			ifp->extra = extra;
+			ifp->extra = (unsigned char *)extra;
 			ifp->extra_length = (int)len;
 		}
 
@@ -276,7 +276,7 @@ static int parse_interface(libusb_context *ctx,
 			struct libusb_endpoint_descriptor *endpoint;
 			uint8_t i;
 
-			endpoint = calloc(ifp->bNumEndpoints, sizeof(*endpoint));
+			endpoint = (struct libusb_endpoint_descriptor *)calloc(ifp->bNumEndpoints, sizeof(*endpoint));
 			if (!endpoint) {
 				r = LIBUSB_ERROR_NO_MEM;
 				goto err;
@@ -363,7 +363,7 @@ static int parse_configuration(struct libusb_context *ctx,
 		return LIBUSB_ERROR_IO;
 	}
 
-	usb_interface = calloc(config->bNumInterfaces, sizeof(*usb_interface));
+	usb_interface = (struct libusb_interface *)calloc(config->bNumInterfaces, sizeof(*usb_interface));
 	if (!usb_interface)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -410,7 +410,7 @@ static int parse_configuration(struct libusb_context *ctx,
 		/*  drivers to later parse */
 		ptrdiff_t len = buffer - begin;
 		if (len > 0) {
-			uint8_t *extra = realloc((void *)config->extra,
+			uint8_t *extra = (uint8_t *)realloc((void *)config->extra,
 						 (size_t)(config->extra_length) + (size_t)len);
 
 			if (!extra) {
@@ -445,7 +445,7 @@ err:
 static int raw_desc_to_config(struct libusb_context *ctx,
 	const uint8_t *buf, int size, struct libusb_config_descriptor **config)
 {
-	struct libusb_config_descriptor *_config = calloc(1, sizeof(*_config));
+	struct libusb_config_descriptor *_config = (struct libusb_config_descriptor *)calloc(1, sizeof(*_config));
 	int r;
 
 	if (!_config)
@@ -552,7 +552,7 @@ int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 		return r;
 
 	config_len = libusb_le16_to_cpu(_config.desc.wTotalLength);
-	buf = malloc(config_len);
+	buf = (uint8_t *)malloc(config_len);
 	if (!buf)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -597,7 +597,7 @@ int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 		return r;
 
 	config_len = libusb_le16_to_cpu(_config.desc.wTotalLength);
-	buf = malloc(config_len);
+	buf = (uint8_t *)malloc(config_len);
 	if (!buf)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -640,7 +640,7 @@ int API_EXPORTED libusb_get_config_descriptor_by_value(libusb_device *dev,
 		if (r < 0)
 			return r;
 
-		return raw_desc_to_config(DEVICE_CTX(dev), buf, r, config);
+		return raw_desc_to_config(DEVICE_CTX(dev), (uint8_t *)buf, r, config);
 	}
 
 	usbi_dbg(DEVICE_CTX(dev), "value %u", bConfigurationValue);
@@ -721,7 +721,7 @@ int API_EXPORTED libusb_get_ss_endpoint_companion_descriptor(
 			return LIBUSB_ERROR_IO;
 		}
 
-		*ep_comp = malloc(sizeof(**ep_comp));
+		*ep_comp = (struct libusb_ss_endpoint_companion_descriptor*)malloc(sizeof(**ep_comp));
 		if (!*ep_comp)
 			return LIBUSB_ERROR_NO_MEM;
 		(*ep_comp)->bLength = buffer[0];
@@ -777,7 +777,7 @@ static int parse_bos(struct libusb_context *ctx,
 		return LIBUSB_ERROR_IO;
 	}
 
-	_bos = calloc(1, sizeof(*_bos) + (bos_desc->bNumDeviceCaps * sizeof(void *)));
+	_bos = (struct libusb_bos_descriptor *)calloc(1, sizeof(*_bos) + (bos_desc->bNumDeviceCaps * sizeof(void *)));
 	if (!_bos)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -811,7 +811,7 @@ static int parse_bos(struct libusb_context *ctx,
 			break;
 		}
 
-		_bos->dev_capability[i] = malloc(header->bLength);
+		_bos->dev_capability[i] = (struct libusb_bos_dev_capability_descriptor *)malloc(header->bLength);
 		if (!_bos->dev_capability[i]) {
 			libusb_free_bos_descriptor(_bos);
 			return LIBUSB_ERROR_NO_MEM;
@@ -863,7 +863,7 @@ int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *dev_handle,
 	bos_len = libusb_le16_to_cpu(_bos.desc.wTotalLength);
 	usbi_dbg(ctx, "found BOS descriptor: size %u bytes, %u capabilities",
 		 bos_len, _bos.desc.bNumDeviceCaps);
-	bos_data = calloc(1, bos_len);
+	bos_data = (uint8_t *)calloc(1, bos_len);
 	if (!bos_data)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -930,7 +930,7 @@ int API_EXPORTED libusb_get_usb_2_0_extension_descriptor(
 		return LIBUSB_ERROR_IO;
 	}
 
-	_usb_2_0_extension = malloc(sizeof(*_usb_2_0_extension));
+	_usb_2_0_extension = (struct libusb_usb_2_0_extension_descriptor *)malloc(sizeof(*_usb_2_0_extension));
 	if (!_usb_2_0_extension)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -988,7 +988,7 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
 		return LIBUSB_ERROR_IO;
 	}
 
-	_ss_usb_device_cap = malloc(sizeof(*_ss_usb_device_cap));
+	_ss_usb_device_cap = (struct libusb_ss_usb_device_capability_descriptor *)malloc(sizeof(*_ss_usb_device_cap));
 	if (!_ss_usb_device_cap)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1082,7 +1082,7 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	parsedDescriptor.wReserved = ReadLittleEndian16(&dev_capability_data[7]);
 
 	uint8_t numSublikSpeedAttributes = (parsedDescriptor.bmAttributes & 0xF) + 1;
-	_ssplus_cap = malloc(sizeof(struct libusb_ssplus_usb_device_capability_descriptor) + (numSublikSpeedAttributes * sizeof(struct libusb_ssplus_sublink_attribute)));
+	_ssplus_cap = (struct libusb_ssplus_usb_device_capability_descriptor *)malloc(sizeof(struct libusb_ssplus_usb_device_capability_descriptor) + (numSublikSpeedAttributes * sizeof(struct libusb_ssplus_sublink_attribute)));
 	if (!_ssplus_cap)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1108,7 +1108,7 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 		uint32_t attr = ReadLittleEndian32(base + (i * sizeof(uint32_t)));
 		_ssplus_cap->sublinkSpeedAttributes[i].ssid = attr & 0x0f;
 		_ssplus_cap->sublinkSpeedAttributes[i].mantissa = attr >> 16;
-		_ssplus_cap->sublinkSpeedAttributes[i].exponent = (attr >> 4) & 0x3 ;
+		_ssplus_cap->sublinkSpeedAttributes[i].exponent = (enum libusb_superspeedplus_sublink_attribute_exponent)((attr >> 4) & 0x3);
 		_ssplus_cap->sublinkSpeedAttributes[i].type = attr & 0x40 ? 	LIBUSB_SSPLUS_ATTR_TYPE_ASYM : LIBUSB_SSPLUS_ATTR_TYPE_SYM;
 		_ssplus_cap->sublinkSpeedAttributes[i].direction = attr & 0x80 ? 	LIBUSB_SSPLUS_ATTR_DIR_TX : 	LIBUSB_SSPLUS_ATTR_DIR_RX;
 		_ssplus_cap->sublinkSpeedAttributes[i].protocol = attr & 0x4000 ? LIBUSB_SSPLUS_ATTR_PROT_SSPLUS: LIBUSB_SSPLUS_ATTR_PROT_SS;
@@ -1182,7 +1182,7 @@ int API_EXPORTED libusb_get_container_id_descriptor(libusb_context *ctx,
 		return LIBUSB_ERROR_IO;
 	}
 
-	_container_id = malloc(sizeof(*_container_id));
+	_container_id = (struct libusb_container_id_descriptor *)malloc(sizeof(*_container_id));
 	if (!_container_id)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1242,7 +1242,7 @@ int API_EXPORTED libusb_get_platform_descriptor(libusb_context *ctx,
 		return LIBUSB_ERROR_IO;
 	}
 
-	_platform_descriptor = malloc(dev_cap->bLength);
+	_platform_descriptor = (struct libusb_platform_descriptor *)malloc(dev_cap->bLength);
 	if (!_platform_descriptor)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1388,7 +1388,7 @@ static int parse_iad_array(struct libusb_context *ctx,
 
 	iad_array->iad = NULL;
 	if (iad_array->length > 0) {
-		iad = calloc((size_t)iad_array->length, sizeof(*iad));
+		iad = (struct libusb_interface_association_descriptor *)calloc((size_t)iad_array->length, sizeof(*iad));
 		if (!iad)
 			return LIBUSB_ERROR_NO_MEM;
 
@@ -1427,7 +1427,7 @@ static int raw_desc_to_iad_array(struct libusb_context *ctx, const uint8_t *buf,
 		int size, struct libusb_interface_association_descriptor_array **iad_array)
 {
 	struct libusb_interface_association_descriptor_array *_iad_array
-		= calloc(1, sizeof(*_iad_array));
+		= (struct libusb_interface_association_descriptor_array *)calloc(1, sizeof(*_iad_array));
 	int r;
 
 	if (!_iad_array)
@@ -1483,7 +1483,7 @@ int API_EXPORTED libusb_get_interface_association_descriptors(libusb_device *dev
 		return r;
 
 	config_len = libusb_le16_to_cpu(_config.desc.wTotalLength);
-	buf = malloc(config_len);
+	buf = (uint8_t *)malloc(config_len);
 	if (!buf)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1528,7 +1528,7 @@ int API_EXPORTED libusb_get_active_interface_association_descriptors(libusb_devi
 		return r;
 
 	config_len = libusb_le16_to_cpu(_config.desc.wTotalLength);
-	buf = malloc(config_len);
+	buf = (uint8_t *)malloc(config_len);
 	if (!buf)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1671,7 +1671,7 @@ int API_EXPORTED libusb_get_device_string(libusb_device *dev,
 
 	if (NULL == dev->device_strings_utf8[string_type]) {
 		if (usbi_backend.get_device_string) {
-			s = malloc(LIBUSB_DEVICE_STRING_BYTES_MAX);
+			s = (char *)malloc(LIBUSB_DEVICE_STRING_BYTES_MAX);
 			int rv = usbi_backend.get_device_string(dev, string_type, s, LIBUSB_DEVICE_STRING_BYTES_MAX);
 			if (rv < 0) {
 				free(s);

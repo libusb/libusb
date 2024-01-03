@@ -655,7 +655,7 @@ libusb_free_device_list(list, 1);
 static struct discovered_devs *discovered_devs_alloc(void)
 {
 	struct discovered_devs *ret =
-		malloc(sizeof(*ret) + (sizeof(void *) * DISCOVERED_DEVICES_SIZE_STEP));
+		(struct discovered_devs *)malloc(sizeof(*ret) + (sizeof(void *) * DISCOVERED_DEVICES_SIZE_STEP));
 
 	if (ret) {
 		ret->len = 0;
@@ -695,7 +695,7 @@ struct discovered_devs *discovered_devs_append(
 	capacity = discdevs->capacity + DISCOVERED_DEVICES_SIZE_STEP;
 	/* can't use usbi_reallocf here because in failure cases it would
 	 * free the existing discdevs without unreferencing its devices. */
-	new_discdevs = realloc(discdevs,
+	new_discdevs = (struct discovered_devs *)realloc(discdevs,
 		sizeof(*discdevs) + (sizeof(void *) * capacity));
 	if (!new_discdevs) {
 		discovered_devs_free(discdevs);
@@ -716,7 +716,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	unsigned long session_id)
 {
 	size_t priv_size = usbi_backend.device_priv_size;
-	struct libusb_device *dev = calloc(1, PTR_ALIGN(sizeof(*dev)) + priv_size);
+	struct libusb_device *dev = (struct libusb_device *)calloc(1, PTR_ALIGN(sizeof(*dev)) + priv_size);
 
 	if (!dev)
 		return NULL;
@@ -876,7 +876,7 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 
 	/* convert discovered_devs into a list */
 	len = (ssize_t)discdevs->len;
-	ret = calloc((size_t)len + 1, sizeof(struct libusb_device *));
+	ret = (struct libusb_device **)calloc((size_t)len + 1, sizeof(struct libusb_device *));
 	if (!ret) {
 		len = LIBUSB_ERROR_NO_MEM;
 		goto out;
@@ -1379,7 +1379,7 @@ int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
 	if (!usbi_backend.wrap_sys_device)
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 
-	_dev_handle = calloc(1, PTR_ALIGN(sizeof(*_dev_handle)) + priv_size);
+	_dev_handle = (struct libusb_device_handle *)calloc(1, PTR_ALIGN(sizeof(*_dev_handle)) + priv_size);
 	if (!_dev_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1433,7 +1433,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	if (!usbi_atomic_load(&dev->attached))
 		return LIBUSB_ERROR_NO_DEVICE;
 
-	_dev_handle = calloc(1, PTR_ALIGN(sizeof(*_dev_handle)) + priv_size);
+	_dev_handle = (struct libusb_device_handle *)calloc(1, PTR_ALIGN(sizeof(*_dev_handle)) + priv_size);
 	if (!_dev_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -2060,7 +2060,7 @@ unsigned char * LIBUSB_CALL libusb_dev_mem_alloc(libusb_device_handle *dev_handl
 		return NULL;
 
 	if (usbi_backend.dev_mem_alloc)
-		return usbi_backend.dev_mem_alloc(dev_handle, length);
+		return (unsigned char *)usbi_backend.dev_mem_alloc(dev_handle, length);
 	else
 		return NULL;
 }
@@ -2565,7 +2565,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 	}
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
-	_ctx = calloc(1, PTR_ALIGN(sizeof(*_ctx)) + priv_size);
+	_ctx = (struct libusb_context *)calloc(1, PTR_ALIGN(sizeof(*_ctx)) + priv_size);
 	if (!_ctx) {
 		usbi_mutex_static_unlock(&default_context_lock);
 		return LIBUSB_ERROR_NO_MEM;
