@@ -608,7 +608,7 @@ static int darwin_device_from_service (struct libusb_context *ctx, io_service_t 
   }
 
   (void)(*plugInInterface)->QueryInterface(plugInInterface, CFUUIDGetUUIDBytes(get_device_interface_id()),
-                                           (LPVOID)device);
+                                           (LPVOID *)device);
   /* Use release instead of IODestroyPlugInInterface to avoid stopping IOServices associated with this device */
   (*plugInInterface)->Release (plugInInterface);
 
@@ -1824,7 +1824,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
   /* Do the actual claim */
   kresult = (*plugInInterface)->QueryInterface(plugInInterface,
                                                CFUUIDGetUUIDBytes(get_interface_interface_id()),
-                                               (LPVOID)&IOINTERFACE(cInterface));
+                                               (LPVOID *)&IOINTERFACE(cInterface));
   /* We no longer need the intermediate plug-in */
   /* Use release instead of IODestroyPlugInInterface to avoid stopping IOServices associated with this device */
   (*plugInInterface)->Release (plugInInterface);
