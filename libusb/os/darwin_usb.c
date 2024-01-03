@@ -595,7 +595,8 @@ static int darwin_device_from_service (struct libusb_context *ctx, io_service_t 
     usbi_dbg (ctx, "set up plugin for service retry: %s", darwin_error_str (kresult));
 
     /* sleep for a little while before trying again */
-    nanosleep(&(struct timespec){.tv_sec = 0, .tv_nsec = 1000}, NULL);
+    const struct timespec delay = {.tv_sec = 0, .tv_nsec = 1000};
+    nanosleep(&delay, NULL);
   }
 
   if (kIOReturnSuccess != kresult) {
@@ -1196,7 +1197,8 @@ static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *
     if (kIOReturnSuccess != ret) {
       usbi_dbg(ctx, "kernel responded with code: 0x%08x. sleeping for %ld ms before trying again", ret, delay/1000);
       /* sleep for a little while before trying again */
-      nanosleep(&(struct timespec){delay / 1000000, (delay * 1000) % 1000000000}, NULL);
+      struct timespec full_delay = {delay / 1000000, (delay * 1000) % 1000000000};
+      nanosleep(&full_delay, NULL);
     }
   } while (kIOReturnSuccess != ret && retries--);
 
@@ -2128,7 +2130,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   usbi_get_monotonic_time(&start);
 
   while (dpriv->in_reenumerate) {
-    struct timespec delay = {.tv_sec = 0, .tv_nsec = 1000};
+    const struct timespec delay = {.tv_sec = 0, .tv_nsec = 1000};
     nanosleep (&delay, NULL);
 
     struct timespec now, delta;
