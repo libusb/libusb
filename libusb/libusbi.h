@@ -1182,6 +1182,8 @@ struct usbi_os_backend {
 	 * claiming, no other drivers/applications can use the interface because
 	 * we now "own" it.
 	 *
+	 * This function gets called with dev_handle->lock locked!
+	 *
 	 * Return:
 	 * - 0 on success
 	 * - LIBUSB_ERROR_NOT_FOUND if the interface does not exist
@@ -1200,6 +1202,8 @@ struct usbi_os_backend {
 	 *
 	 * You will only ever be asked to release an interface which was
 	 * successfully claimed earlier.
+	 *
+	 * This function gets called with dev_handle->lock locked!
 	 *
 	 * Return:
 	 * - 0 on success
