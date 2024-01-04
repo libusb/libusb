@@ -2491,6 +2491,11 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		case LIBUSB_OPTION_LOG_CB:
 			r = libusb_set_option(_ctx, options[i].option, options[i].value.log_cbval);
 			break;
+
+		case LIBUSB_OPTION_LOG_LEVEL:
+		case LIBUSB_OPTION_USE_USBDK:
+		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+		case LIBUSB_OPTION_MAX:
 		default:
 			r = libusb_set_option(_ctx, options[i].option, options[i].value.ival);
 		}
