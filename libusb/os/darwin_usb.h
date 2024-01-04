@@ -125,17 +125,19 @@ struct darwin_device_priv {
   struct darwin_cached_device *dev;
 };
 
+struct darwin_interface {
+  usb_interface_t      interface;
+  uint8_t              num_endpoints;
+  CFRunLoopSourceRef   cfSource;
+  uint64_t             frames[256];
+  uint8_t              endpoint_addrs[USB_MAXENDPOINTS];
+};
+
 struct darwin_device_handle_priv {
   bool                 is_open;
   CFRunLoopSourceRef   cfSource;
 
-  struct darwin_interface {
-    usb_interface_t      interface;
-    uint8_t              num_endpoints;
-    CFRunLoopSourceRef   cfSource;
-    uint64_t             frames[256];
-    uint8_t              endpoint_addrs[USB_MAXENDPOINTS];
-  } interfaces[USB_MAXINTERFACES];
+  struct darwin_interface interfaces[USB_MAXINTERFACES];
 };
 
 struct darwin_transfer_priv {

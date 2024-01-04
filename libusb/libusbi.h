@@ -824,11 +824,13 @@ void usbi_signal_transfer_completion(struct usbi_transfer *itransfer);
 void usbi_connect_device(struct libusb_device *dev);
 void usbi_disconnect_device(struct libusb_device *dev);
 
+struct usbi_event_source_data {
+	usbi_os_handle_t os_handle;
+	short poll_events;
+};
+
 struct usbi_event_source {
-	struct usbi_event_source_data {
-		usbi_os_handle_t os_handle;
-		short poll_events;
-	} data;
+	struct usbi_event_source_data data;
 	struct list_head list;
 };
 
