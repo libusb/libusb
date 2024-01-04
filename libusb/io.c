@@ -1793,7 +1793,7 @@ void usbi_signal_transfer_completion(struct usbi_transfer *itransfer)
  * \returns 1 if the lock was not obtained (i.e. another thread holds the lock)
  * \ref libusb_mtasync
  */
-int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
+int API_EXPORTED libusb_try_lock_events(libusb_context *ctx) EXCLUDES(ctx->event_data_lock) TRY_ACQUIRE(0, ctx->events_lock)
 {
 	int r;
 	unsigned int ru;
@@ -1836,7 +1836,7 @@ int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \ref libusb_mtasync
  */
-void API_EXPORTED libusb_lock_events(libusb_context *ctx)
+void API_EXPORTED libusb_lock_events(libusb_context *ctx) ACQUIRE(ctx->events_lock)
 {
 	ctx = usbi_get_context(ctx);
 	usbi_mutex_lock(&ctx->events_lock);
@@ -1851,7 +1851,7 @@ void API_EXPORTED libusb_lock_events(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \ref libusb_mtasync
  */
-void API_EXPORTED libusb_unlock_events(libusb_context *ctx)
+void API_EXPORTED libusb_unlock_events(libusb_context *ctx) REQUIRES(ctx->events_lock) RELEASE(ctx->events_lock)
 {
 	ctx = usbi_get_context(ctx);
 	ctx->event_handler_active = 0;
@@ -1980,7 +1980,7 @@ void API_EXPORTED libusb_interrupt_event_handler(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \ref libusb_mtasync
  */
-void API_EXPORTED libusb_lock_event_waiters(libusb_context *ctx)
+void API_EXPORTED libusb_lock_event_waiters(libusb_context *ctx) ACQUIRE(ctx->event_waiters_lock)
 {
 	ctx = usbi_get_context(ctx);
 	usbi_mutex_lock(&ctx->event_waiters_lock);
@@ -1991,7 +1991,7 @@ void API_EXPORTED libusb_lock_event_waiters(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \ref libusb_mtasync
  */
-void API_EXPORTED libusb_unlock_event_waiters(libusb_context *ctx)
+void API_EXPORTED libusb_unlock_event_waiters(libusb_context *ctx) REQUIRES(ctx->event_waiters_lock) RELEASE(ctx->event_waiters_lock)
 {
 	ctx = usbi_get_context(ctx);
 	usbi_mutex_unlock(&ctx->event_waiters_lock);
@@ -2023,7 +2023,7 @@ void API_EXPORTED libusb_unlock_event_waiters(libusb_context *ctx)
  * \returns \ref LIBUSB_ERROR_INVALID_PARAM if timeval is invalid
  * \ref libusb_mtasync
  */
-int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
+int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv) REQUIRES(ctx->event_waiters_lock)
 {
 	int r;
 
@@ -2094,7 +2094,7 @@ static void handle_timeouts_locked(struct libusb_context *ctx)
 	}
 }
 
-static void handle_timeouts(struct libusb_context *ctx)
+static void handle_timeouts(struct libusb_context *ctx) EXCLUDES(ctx->flying_transfers_lock)
 {
 	ctx = usbi_get_context(ctx);
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
@@ -2184,7 +2184,7 @@ static int handle_event_trigger(struct libusb_context *ctx)
 }
 
 #ifdef HAVE_OS_TIMER
-static int handle_timer_trigger(struct libusb_context *ctx)
+static int handle_timer_trigger(struct libusb_context *ctx) EXCLUDES(ctx->flying_transfers_lock)
 {
 	int r;
 
@@ -2570,7 +2570,7 @@ int API_EXPORTED libusb_pollfds_handle_timeouts(libusb_context *ctx)
  * or \ref LIBUSB_ERROR_OTHER on failure
  */
 int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
-	struct timeval *tv)
+	struct timeval *tv) EXCLUDES(ctx->flying_transfers_lock)
 {
 	struct usbi_transfer *itransfer;
 	struct timespec systime;
