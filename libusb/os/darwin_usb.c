@@ -2895,14 +2895,25 @@ const struct usbi_os_backend usbi_backend = {
         .caps = USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
         .init = darwin_init,
         .exit = darwin_exit,
-        .get_active_config_descriptor = darwin_get_active_config_descriptor,
-        .get_config_descriptor = darwin_get_config_descriptor,
+        .set_option = NULL,
+        .get_device_list = NULL,
         .hotplug_poll = darwin_hotplug_poll,
-
+        .wrap_sys_device = NULL,
         .open = darwin_open,
         .close = darwin_close,
+        .get_active_config_descriptor = darwin_get_active_config_descriptor,
+        .get_config_descriptor = darwin_get_config_descriptor,
+        .get_config_descriptor_by_value = NULL,
         .get_configuration = darwin_get_configuration,
         .set_configuration = darwin_set_configuration,
+
+#if MAX_INTERFACE_VERSION >= 700
+        .claim_interface = darwin_capture_claim_interface,
+        .release_interface = darwin_capture_release_interface,
+#else
+        .claim_interface = darwin_claim_interface,
+        .release_interface = darwin_release_interface,
+#endif
 
         .set_interface_altsetting = darwin_set_interface_altsetting,
         .clear_halt = darwin_clear_halt,
@@ -2913,25 +2924,24 @@ const struct usbi_os_backend usbi_backend = {
         .free_streams = darwin_free_streams,
 #endif
 
+        .dev_mem_alloc = NULL,
+        .dev_mem_free = NULL,
         .kernel_driver_active = darwin_kernel_driver_active,
 
 #if MAX_INTERFACE_VERSION >= 700
         .detach_kernel_driver = darwin_detach_kernel_driver,
         .attach_kernel_driver = darwin_attach_kernel_driver,
-        .claim_interface = darwin_capture_claim_interface,
-        .release_interface = darwin_capture_release_interface,
-#else
-        .claim_interface = darwin_claim_interface,
-        .release_interface = darwin_release_interface,
 #endif
 
         .destroy_device = darwin_destroy_device,
 
         .submit_transfer = darwin_submit_transfer,
         .cancel_transfer = darwin_cancel_transfer,
-
+        .clear_transfer_priv = NULL,
+        .handle_events = NULL,
         .handle_transfer_completion = darwin_handle_transfer_completion,
 
+        .context_priv_size = 0,
         .device_priv_size = sizeof(struct darwin_device_priv),
         .device_handle_priv_size = sizeof(struct darwin_device_handle_priv),
         .transfer_priv_size = sizeof(struct darwin_transfer_priv),
