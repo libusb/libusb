@@ -770,7 +770,7 @@ void usbi_disconnect_device(struct libusb_device *dev)
 /* Perform some final sanity checks on a newly discovered device. If this
  * function fails (negative return code), the device should not be added
  * to the discovered device list. */
-int usbi_sanitize_device(struct libusb_device *dev)
+enum libusb_error usbi_sanitize_device(struct libusb_device *dev)
 {
 	uint8_t num_configurations;
 
@@ -788,7 +788,7 @@ int usbi_sanitize_device(struct libusb_device *dev)
 		usbi_dbg(DEVICE_CTX(dev), "zero configurations, maybe an unauthorized device");
 	}
 
-	return 0;
+	return LIBUSB_SUCCESS;
 }
 
 /* Examine libusb's internal list of known devices, looking for one with
@@ -2587,14 +2587,14 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 	list_init(&_ctx->open_devs);
 
 	/* apply default options to all new contexts */
-	for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
+	for (int option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
 		if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
 			continue;
 		}
 		if (LIBUSB_OPTION_LOG_CB != option) {
-			r = libusb_set_option(_ctx, option);
+			r = libusb_set_option(_ctx, (enum libusb_option)option);
 		} else {
-			r = libusb_set_option(_ctx, option, default_context_options[option].arg.log_cbval);
+			r = libusb_set_option(_ctx, (enum libusb_option)option, default_context_options[option].arg.log_cbval);
 		}
 		if (LIBUSB_SUCCESS != r)
 			goto err_free_ctx;

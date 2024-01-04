@@ -573,7 +573,7 @@ static bool get_ioregistry_value_data (io_service_t service, CFStringRef propert
   return success;
 }
 
-static int darwin_device_from_service (struct libusb_context *ctx, io_service_t service, usb_device_t* device)
+static enum libusb_error darwin_device_from_service (struct libusb_context *ctx, io_service_t service, usb_device_t* device)
 {
   io_cf_plugin_ref_t *plugInInterface = NULL;
   IOReturn kresult;
@@ -1670,7 +1670,7 @@ static int darwin_get_configuration(struct libusb_device_handle *dev_handle, uin
   return LIBUSB_SUCCESS;
 }
 
-static enum libusb_error darwin_set_configuration(struct libusb_device_handle *dev_handle, int config) {
+static int darwin_set_configuration(struct libusb_device_handle *dev_handle, int config) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   IOReturn kresult;
   uint8_t i;
@@ -1749,7 +1749,7 @@ static const struct libusb_interface_descriptor *get_interface_descriptor_by_num
   return NULL;
 }
 
-static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle, uint8_t iface) {
+static int get_endpoints (struct libusb_device_handle *dev_handle, uint8_t iface) {
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
 
   /* current interface */
@@ -1819,7 +1819,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
   io_service_t          usbInterface = IO_OBJECT_NULL;
   IOReturn              kresult;
-  enum libusb_error     ret;
+  int                   ret;
   IOCFPlugInInterface **plugInInterface = NULL;
   SInt32                score;
 
@@ -1962,7 +1962,7 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, uin
 }
 
 static int check_alt_setting_and_clear_halt(struct libusb_device_handle *dev_handle, uint8_t altsetting, struct darwin_interface *cInterface) {
-  enum libusb_error ret;
+  int ret;
   IOReturn kresult;
   uint8_t current_alt_setting;
 
@@ -1988,7 +1988,7 @@ static int check_alt_setting_and_clear_halt(struct libusb_device_handle *dev_han
 static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting) {
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
   IOReturn kresult;
-  enum libusb_error ret;
+  int ret;
 
   /* current interface */
   struct darwin_interface *cInterface = &priv->interfaces[iface];
@@ -2056,8 +2056,8 @@ static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
   return darwin_to_libusb (kresult);
 }
 
-static int darwin_restore_state (struct libusb_device_handle *dev_handle, uint8_t active_config,
-                                 unsigned long claimed_interfaces) {
+static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_handle, uint8_t active_config,
+                                               unsigned long claimed_interfaces) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
   int open_count = dpriv->open_count;
@@ -2220,7 +2220,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
 static int darwin_reset_device (struct libusb_device_handle *dev_handle) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   IOReturn kresult;
-  enum libusb_error ret;
+  int ret;
 
 #if !defined(TARGET_OS_OSX) || TARGET_OS_OSX == 1
   if (dpriv->capture_count > 0) {
@@ -2877,7 +2877,7 @@ static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle,
   UNUSED(interface);
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   IOReturn kresult;
-  enum libusb_error err;
+  int err;
   struct libusb_context *ctx = HANDLE_CTX (dev_handle);
 
   if (get_interface_interface_version() < 700) {
@@ -2939,7 +2939,7 @@ static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle,
 }
 
 static int darwin_capture_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface) {
-  enum libusb_error ret;
+  int ret;
   if (dev_handle->auto_detach_kernel_driver && darwin_kernel_driver_active(dev_handle, iface)) {
     ret = darwin_detach_kernel_driver (dev_handle, iface);
     if (ret != LIBUSB_SUCCESS) {
@@ -2951,7 +2951,7 @@ static int darwin_capture_claim_interface(struct libusb_device_handle *dev_handl
 }
 
 static int darwin_capture_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface) {
-  enum libusb_error ret;
+  int ret;
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
 
   ret = darwin_release_interface (dev_handle, iface);
