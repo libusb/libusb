@@ -1337,7 +1337,7 @@ struct usbi_os_backend {
 	 *
 	 * This function must not block.
 	 *
-	 * This function gets called with the flying_transfers_lock locked!
+	 * This function gets called with itransfer->lock locked!
 	 *
 	 * Return:
 	 * - 0 on success
@@ -1351,6 +1351,8 @@ struct usbi_os_backend {
 	 * This function must not block. The transfer cancellation must complete
 	 * later, resulting in a call to usbi_handle_transfer_cancellation()
 	 * from the context of handle_events.
+	 *
+	 * This function gets called with itransfer->lock locked!
 	 */
 	int (*cancel_transfer)(struct usbi_transfer *itransfer);
 
