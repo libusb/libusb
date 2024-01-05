@@ -1484,12 +1484,11 @@ static enum libusb_error darwin_scan_devices(struct libusb_context *ctx) {
 static int darwin_open (struct libusb_device_handle *dev_handle) {
   struct darwin_device_handle_priv *priv = usbi_get_device_handle_priv(dev_handle);
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
-  usb_device_t darwin_device = dpriv->device;
   IOReturn kresult;
 
   if (0 == dpriv->open_count) {
     /* try to open the device */
-    kresult = (*darwin_device)->USBDeviceOpenSeize (darwin_device);
+    kresult = (*dpriv->device)->USBDeviceOpenSeize (dpriv->device);
     if (kresult != kIOReturnSuccess) {
       usbi_warn (HANDLE_CTX (dev_handle), "USBDeviceOpen: %s", darwin_error_str(kresult));
 
@@ -1504,13 +1503,13 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
     }
 
     /* create async event source */
-    kresult = (*darwin_device)->CreateDeviceAsyncEventSource (darwin_device,
+    kresult = (*dpriv->device)->CreateDeviceAsyncEventSource (dpriv->device,
                                                                                 &priv->cfSource);
     if (kresult != kIOReturnSuccess) {
       usbi_err (HANDLE_CTX (dev_handle), "CreateDeviceAsyncEventSource: %s", darwin_error_str(kresult));
 
       if (priv->is_open) {
-        (*darwin_device)->USBDeviceClose (darwin_device);
+        (*dpriv->device)->USBDeviceClose (dpriv->device);
       }
 
       priv->is_open = false;
@@ -1536,7 +1535,6 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
   struct darwin_device_handle_priv *priv = usbi_get_device_handle_priv(dev_handle);
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   IOReturn kresult;
-  usb_device_t darwin_device = dpriv->device;
   int i;
 
   if (dpriv->open_count == 0) {
@@ -1546,7 +1544,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
   }
 
   dpriv->open_count--;
-  if (NULL == darwin_device) {
+  if (NULL == dpriv->device) {
     usbi_warn (HANDLE_CTX (dev_handle), "darwin_close device missing IOService");
     return;
   }
@@ -1567,7 +1565,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) {
 
     if (priv->is_open) {
       /* close the device */
-      kresult = (*darwin_device)->USBDeviceClose(darwin_device);
+      kresult = (*dpriv->device)->USBDeviceClose(dpriv->device);
       if (kresult != kIOReturnSuccess) {
         /* Log the fact that we had a problem closing the file, however failing a
          * close isn't really an error, so return success anyway */
@@ -2030,7 +2028,6 @@ static int darwin_restore_state (struct libusb_device_handle *dev_handle, int8_t
 
 static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, bool capture) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
-  usb_device_t darwin_device = dpriv->device;
   unsigned long claimed_interfaces = dev_handle->claimed_interfaces;
   int8_t active_config = dpriv->active_config;
   UInt32 options = 0;
@@ -2054,7 +2051,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   cached_configurations = alloca (sizeof (*cached_configurations) * descriptor.bNumConfigurations);
 
   for (i = 0 ; i < descriptor.bNumConfigurations ; ++i) {
-    (*darwin_device)->GetConfigurationDescriptorPtr (darwin_device, i, &cached_configuration);
+    (*dpriv->device)->GetConfigurationDescriptorPtr (dpriv->device, i, &cached_configuration);
     memcpy (cached_configurations + i, cached_configuration, sizeof (cached_configurations[i]));
   }
 
@@ -2070,7 +2067,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   }
 
   /* from macOS 10.11 ResetDevice no longer does anything so just use USBDeviceReEnumerate */
-  kresult = (*darwin_device)->USBDeviceReEnumerate (darwin_device, options);
+  kresult = (*dpriv->device)->USBDeviceReEnumerate (dpriv->device, options);
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "USBDeviceReEnumerate: %s", darwin_error_str (kresult));
     dpriv->in_reenumerate = false;
@@ -2115,7 +2112,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   }
 
   for (i = 0 ; i < descriptor.bNumConfigurations ; ++i) {
-    (void) (*darwin_device)->GetConfigurationDescriptorPtr (darwin_device, i, &cached_configuration);
+    (void) (*dpriv->device)->GetConfigurationDescriptorPtr (dpriv->device, i, &cached_configuration);
     if (memcmp (cached_configuration, cached_configurations + i, sizeof (cached_configurations[i]))) {
       usbi_dbg (ctx, "darwin/reenumerate_device: configuration descriptor %d changed", i);
       return LIBUSB_ERROR_NOT_FOUND;
