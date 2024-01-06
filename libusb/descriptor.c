@@ -59,9 +59,14 @@ static void parse_descriptor(const void *source, const char *descriptor, void *d
 			sp += 2;
 			dp += 2;
 			break;
-		case 'd':	/* 32-bit word, convert from little endian to CPU */
+		case 'd':	/* 32-bit word, convert from little endian to CPU (4-byte align dst before write). */
 			dp += 4 - ((uintptr_t)dp & 3);	/* Align to 32-bit word boundary */
 
+			*((uint32_t *)dp) = READ_LE32(sp);
+			sp += 4;
+			dp += 4;
+			break;
+		case 'i':	/* 32-bit word, convert from little endian to CPU (no dst alignment before write) */
 			*((uint32_t *)dp) = READ_LE32(sp);
 			sp += 4;
 			dp += 4;
@@ -1000,6 +1005,89 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
 	*ss_usb_device_cap = _ss_usb_device_cap;
 	return LIBUSB_SUCCESS;
 }
+
+// We use this private struct ony to parse a superspeed+ device capability
+// descriptor according to section 9.6.2.5 of the USB 3.1 specification.
+// We don't expose it.
+struct internal_ssplus_capability_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint8_t  bDevCapabilityType;
+	uint8_t  bReserved;
+	uint32_t bmAttributes;
+	uint16_t wFunctionalitySupport;
+	uint16_t wReserved;
+};
+
+int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
+	libusb_context *ctx,
+	struct libusb_bos_dev_capability_descriptor *dev_cap,
+	struct libusb_ssplus_usb_device_capability_descriptor **ssplus_usb_device_cap) 
+{
+	struct libusb_ssplus_usb_device_capability_descriptor *_ssplus_cap;
+	
+	// Use a private struct to re-use our descriptor parsing system.
+	struct internal_ssplus_capability_descriptor parsedDescriptor;
+	
+	// Some size/type checks to make sure everything is in order
+	if (dev_cap->bDevCapabilityType != LIBUSB_BT_SUPERSPEED_PLUS_CAPABILITY) {
+		usbi_err(ctx, "unexpected bDevCapabilityType 0x%x (expected 0x%x)",
+			 dev_cap->bDevCapabilityType,
+				 LIBUSB_BT_SUPERSPEED_PLUS_CAPABILITY);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	} else if (dev_cap->bLength < LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE) {
+		usbi_err(ctx, "short dev-cap descriptor read %u/%d",
+			 dev_cap->bLength, LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE);
+		return LIBUSB_ERROR_IO;
+	}
+
+	// We can only parse the non-variable size part of the SuperSpeedPlus descriptor. The attributes
+	// have to be read "manually".
+	parse_descriptor(dev_cap, "bbbbiww", &parsedDescriptor);
+
+	uint8_t numSublikSpeedAttributes = (parsedDescriptor.bmAttributes & 0xF) + 1;
+	_ssplus_cap = malloc(sizeof(struct libusb_ssplus_usb_device_capability_descriptor) + numSublikSpeedAttributes * sizeof(struct libusb_ssplus_sublink_attribute));
+	if (!_ssplus_cap)
+		return LIBUSB_ERROR_NO_MEM;
+	
+	// Parse bmAttributes
+	_ssplus_cap->numSublinkSpeedAttributes = numSublikSpeedAttributes;
+	_ssplus_cap->numSublinkSpeedIDs = ((parsedDescriptor.bmAttributes & 0xF0) >> 4) + 1;
+	
+	// Parse wFunctionalitySupport
+	_ssplus_cap->ssid = parsedDescriptor.wFunctionalitySupport & 0xF;
+	_ssplus_cap->minRxLaneCount = (parsedDescriptor.wFunctionalitySupport & 0x0F00) >> 8;
+	_ssplus_cap->minTxLaneCount = (parsedDescriptor.wFunctionalitySupport & 0xF000) >> 12;
+	
+	// Check that we have enough to read all the sublink attributes
+	if (dev_cap->bLength < LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE + _ssplus_cap->numSublinkSpeedAttributes * sizeof(uint32_t)) {
+		usbi_err(ctx, "short ssplus capability descriptor, unable to read sublinks: Not enough data");
+		return LIBUSB_ERROR_IO;
+	}
+
+	// Read the attributes
+	uint8_t* base = ((uint8_t*)dev_cap) + LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE;
+	for(uint8_t i = 0 ; i < _ssplus_cap->numSublinkSpeedAttributes ; i++) {
+		uint32_t attr = READ_LE32(base + i * sizeof(uint32_t));
+		_ssplus_cap->sublinkSpeedAttributes[i].ssid = attr & 0x0f;
+		_ssplus_cap->sublinkSpeedAttributes[i].mantisa = attr >> 16;
+		_ssplus_cap->sublinkSpeedAttributes[i].exponent = (attr >> 4) & 0x3 ;
+		_ssplus_cap->sublinkSpeedAttributes[i].type = attr & 0x40 ? 	LIBUSB_SSPLUS_ATTR_TYPE_ASYM : LIBUSB_SSPLUS_ATTR_TYPE_SYM;
+		_ssplus_cap->sublinkSpeedAttributes[i].direction = attr & 0x80 ? 	LIBUSB_SSPLUS_ATTR_DIR_TX : 	LIBUSB_SSPLUS_ATTR_DIR_RX;
+		_ssplus_cap->sublinkSpeedAttributes[i].protocol = attr & 0x4000 ? LIBUSB_SSPLUS_ATTR_PROT_SSPLUS: LIBUSB_SSPLUS_ATTR_PROT_SS;
+	}
+
+	*ssplus_usb_device_cap = _ssplus_cap;
+	return LIBUSB_SUCCESS;
+}
+
+void API_EXPORTED libusb_free_ssplus_usb_device_capability_descriptor(
+	struct libusb_ssplus_usb_device_capability_descriptor *ssplus_usb_device_cap)
+{
+	free(ssplus_usb_device_cap);
+}
+
+
 
 /** \ingroup libusb_desc
  * Free a SuperSpeed USB Device Capability descriptor obtained from
