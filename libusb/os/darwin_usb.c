@@ -573,9 +573,13 @@ static int darwin_device_from_service (struct libusb_context *ctx, io_service_t 
     nanosleep(&(struct timespec){.tv_sec = 0, .tv_nsec = 1000}, NULL);
   }
 
-  if (kIOReturnSuccess != kresult || !plugInInterface) {
+  if (kIOReturnSuccess != kresult) {
     usbi_dbg (ctx, "could not set up plugin for service: %s", darwin_error_str (kresult));
     return darwin_to_libusb(kresult);
+  }
+  if (!plugInInterface) {
+    usbi_dbg (ctx, "could not set up plugin for service");
+    return LIBUSB_ERROR_OTHER;
   }
 
   (void)(*plugInInterface)->QueryInterface(plugInInterface, CFUUIDGetUUIDBytes(get_device_interface_id()),
@@ -1792,9 +1796,13 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
   /* We no longer need the intermediate plug-in */
   /* Use release instead of IODestroyPlugInInterface to avoid stopping IOServices associated with this device */
   (*plugInInterface)->Release (plugInInterface);
-  if (kresult != kIOReturnSuccess || !IOINTERFACE(cInterface)) {
+  if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "QueryInterface: %s", darwin_error_str(kresult));
     return darwin_to_libusb (kresult);
+  }
+  if (!IOINTERFACE(cInterface)) {
+    usbi_err (ctx, "QueryInterface: returned null interface");
+    return LIBUSB_ERROR_OTHER;
   }
 
   /* claim the interface */
