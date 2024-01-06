@@ -50,6 +50,8 @@ EXPORTS
   libusb_free_ss_endpoint_companion_descriptor@4 = libusb_free_ss_endpoint_companion_descriptor
   libusb_free_ss_usb_device_capability_descriptor
   libusb_free_ss_usb_device_capability_descriptor@4 = libusb_free_ss_usb_device_capability_descriptor
+  libusb_free_ssplus_usb_device_capability_descriptor
+  libusb_free_ssplus_usb_device_capability_descriptor@4 = libusb_free_ssplus_usb_device_capability_descriptor
   libusb_free_streams
   libusb_free_streams@12 = libusb_free_streams
   libusb_free_transfer
@@ -108,6 +110,8 @@ EXPORTS
   libusb_get_ss_endpoint_companion_descriptor@12 = libusb_get_ss_endpoint_companion_descriptor
   libusb_get_ss_usb_device_capability_descriptor
   libusb_get_ss_usb_device_capability_descriptor@12 = libusb_get_ss_usb_device_capability_descriptor
+  libusb_get_ssplus_usb_device_capability_descriptor
+  libusb_get_ssplus_usb_device_capability_descriptor@12 = libusb_get_ssplus_usb_device_capability_descriptor
   libusb_get_string_descriptor_ascii
   libusb_get_string_descriptor_ascii@16 = libusb_get_string_descriptor_ascii
   libusb_get_usb_2_0_extension_descriptor
