@@ -1538,7 +1538,7 @@ struct libusb_init_option {
   enum libusb_option option;
   /** An integer value used by the option (if applicable). */
   union {
-    int64_t ival;
+    int ival;
     libusb_log_cb log_cbval;
   } value;
 };
