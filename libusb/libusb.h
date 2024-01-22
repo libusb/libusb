@@ -1478,6 +1478,7 @@ enum libusb_log_cb_mode {
 enum libusb_option {
 	/** Set the log message verbosity.
 	 *
+	 * This option must be provided an argument of type \ref libusb_log_level.
 	 * The default level is LIBUSB_LOG_LEVEL_NONE, which means no messages are ever
 	 * printed. If you choose to increase the message verbosity level, ensure
 	 * that your application does not close the stderr file descriptor.
@@ -1533,11 +1534,11 @@ enum libusb_option {
 	/** Set the context log callback function.
 	 *
 	 * Set the log callback function either on a context or globally. This
-	 * option must be provided an argument of type libusb_log_cb. Using this
-	 * option with a NULL context is equivalent to calling libusb_set_log_cb
-	 * with mode LIBUSB_LOG_CB_GLOBAL. Using it with a non-NULL context is
-	 * equivalent to calling libusb_set_log_cb with mode
-	 * LIBUSB_LOG_CB_CONTEXT.
+	 * option must be provided an argument of type \ref libusb_log_cb.
+	 * Using this option with a NULL context is equivalent to calling
+	 * libusb_set_log_cb() with mode \ref LIBUSB_LOG_CB_GLOBAL.
+	 * Using it with a non-NULL context is equivalent to calling
+	 * libusb_set_log_cb() with mode \ref LIBUSB_LOG_CB_CONTEXT.
 	 */
 	LIBUSB_OPTION_LOG_CB = 3,
 
