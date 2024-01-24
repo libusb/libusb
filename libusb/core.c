@@ -2578,8 +2578,7 @@ err_free_ctx:
 void API_EXPORTED libusb_exit(libusb_context *ctx)
 {
 	struct libusb_context *_ctx;
-	struct libusb_device *dev;
-
+	
 	usbi_mutex_static_lock(&default_context_lock);
 
 	/* if working with default context, only actually do the deinitialization
@@ -2626,11 +2625,8 @@ void API_EXPORTED libusb_exit(libusb_context *ctx)
 
 	usbi_io_exit(_ctx);
 
-	for_each_device(_ctx, dev) {
-		usbi_warn(_ctx, "device %d.%d still referenced",
-			dev->bus_number, dev->device_address);
-		DEVICE_CTX(dev) = NULL;
-	}
+	if (!list_empty(&_ctx->usb_devs))
+		usbi_warn(_ctx, "application left some devices referenced");
 
 	if (!list_empty(&_ctx->open_devs))
 		usbi_warn(_ctx, "application left some devices open");
