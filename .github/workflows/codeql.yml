@@ -10,7 +10,7 @@ on:
     - cron: '33 19 * * 3'
 
 jobs:
-  analyze:
+  analyze-ubuntu-latest:
     name: Analyze
     runs-on: ubuntu-latest
     permissions:
