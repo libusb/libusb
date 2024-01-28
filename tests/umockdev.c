@@ -1120,6 +1120,11 @@ test_hotplug_add_remove(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 int
 main(int argc, char **argv)
 {
+#if defined ENABLE_DEBUG_LOGGING
+	fprintf(stderr, "ENABLE_DEBUG_LOGGING is defined and UMockdev doesn't support it since tests rely on per context callbacks, aborting.\n");
+	exit(-1);
+#endif
+
 	g_test_init(&argc, &argv, NULL);
 
 	g_test_add("/libusb/open-close", UMockdevTestbedFixture, NULL,
