@@ -52,7 +52,7 @@ static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev,
 
 	rc = libusb_open (dev, &handle);
 	if (LIBUSB_SUCCESS != rc) {
-		fprintf (stderr, "Error opening device: %s\n",
+		fprintf (stderr, "No access to device: %s\n",
 			 libusb_strerror((enum libusb_error)rc));
 	}
 
