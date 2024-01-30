@@ -161,6 +161,27 @@ void usbi_hotplug_init(struct libusb_context *ctx)
 	usbi_atomic_store(&ctx->hotplug_ready, 1);
 }
 
+static void usbi_recursively_remove_parents(struct libusb_device *dev, struct libusb_device *next_dev)
+{
+	if (dev && dev->parent_dev) {
+		if (usbi_atomic_load(&dev->parent_dev->refcnt) == 1) {
+			/* The parent was processed before this device in the list and
+			 * therefore has its ref count already decremented for its own ref.
+			 * The only remaining counted ref comes from its remaining single child.
+			 * It will thus be released when its child will be released. So we
+			 * can remove it from the list. This is safe as parent_dev cannot be
+			 * equal to next_dev given that we know at this point that it was
+			 * previously seen in the list. */
+			assert (dev->parent_dev != next_dev);
+			if (dev->parent_dev->list.next && dev->parent_dev->list.prev) {
+				list_del(&dev->parent_dev->list);
+			}
+		}
+
+		usbi_recursively_remove_parents(dev->parent_dev, next_dev);
+	}
+}
+
 void usbi_hotplug_exit(struct libusb_context *ctx)
 {
 	struct usbi_hotplug_callback *hotplug_cb, *next_cb;
@@ -193,7 +214,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 		free(msg);
 	}
 
-	/* free all discovered devices. due to parent references loop until no devices are freed. */
+	/* free all discovered devices */
 	for_each_device_safe(ctx, dev, next_dev) {
 		/* remove the device from the usb_devs list only if there are no
 		 * references held, otherwise leave it on the list so that a
@@ -201,13 +222,9 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 		if (usbi_atomic_load(&dev->refcnt) == 1) {
 			list_del(&dev->list);
 		}
-		if (dev->parent_dev && usbi_atomic_load(&dev->parent_dev->refcnt) == 1) {
-			/* the parent was before this device in the list and will be released.
-			   remove it from the list. this is safe as parent_dev can not be
-			   equal to next_dev. */
-			assert (dev->parent_dev != next_dev);
-			list_del(&dev->parent_dev->list);
-		}
+
+		usbi_recursively_remove_parents(dev, next_dev);
+
 		libusb_unref_device(dev);
 	}
 
