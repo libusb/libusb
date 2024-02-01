@@ -22,6 +22,7 @@
 #include <libusb.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #if defined(PLATFORM_POSIX)
 
@@ -81,17 +82,20 @@ typedef volatile LONG atomic_bool;
 
 /* Test that creates and destroys contexts repeatedly */
 
-#define NTHREADS 8
+#define MAX_NTHREADS 8
 #define ITERS 64
 #define MAX_DEVCOUNT 128
 
 struct thread_info {
+	thread_t threadId;
 	int number;
 	int enumerate;
 	ssize_t devcount;
 	int err;
 	int iteration;
-} tinfo[NTHREADS];
+};
+
+struct thread_info *tinfo;
 
 atomic_bool no_access[MAX_DEVCOUNT];
 
@@ -202,25 +206,26 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 	return (thread_return_t) THREAD_RETURN_VALUE;
 }
 
-static int test_multi_init(int enumerate)
+static int test_multi_init(int nthreads, int enumerate)
 {
-	thread_t threadId[NTHREADS];
 	int errs = 0;
 	int t, i;
 	ssize_t last_devcount = 0;
 	int devcount_mismatch = 0;
 	int access_failures = 0;
 
-	printf("Starting %d threads\n", NTHREADS);
-	for (t = 0; t < NTHREADS; t++) {
+	tinfo = calloc(nthreads, sizeof(*tinfo));
+
+	printf("Starting %d threads\n", nthreads);
+	for (t = 0; t < nthreads; t++) {
 		tinfo[t].err = 0;
 		tinfo[t].number = t;
 		tinfo[t].enumerate = enumerate;
-		thread_create(&threadId[t], &init_and_exit, (void *) &tinfo[t]);
+		thread_create(&tinfo[t].threadId, &init_and_exit, (void *) &tinfo[t]);
 	}
 
-	for (t = 0; t < NTHREADS; t++) {
-		thread_join(threadId[t]);
+	for (t = 0; t < nthreads; t++) {
+		thread_join(tinfo[t].threadId);
 		if (tinfo[t].err) {
 			errs++;
 			fprintf(stderr,
@@ -255,10 +260,13 @@ int main(void)
 {
 	int errs = 0;
 
+	printf("Running single-threaded init/exit test...\n");
+	errs += test_multi_init(1, 0);
+
 	printf("Running multithreaded init/exit test...\n");
-	errs += test_multi_init(0);
+	errs += test_multi_init(MAX_NTHREADS, 0);
 	printf("Running multithreaded init/exit test with enumeration...\n");
-	errs += test_multi_init(1);
+	errs += test_multi_init(MAX_NTHREADS, 1);
 	printf("All done, %d errors\n", errs);
 
 	return errs != 0;
