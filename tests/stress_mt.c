@@ -206,11 +206,11 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 	return (thread_return_t) THREAD_RETURN_VALUE;
 }
 
-static int test_multi_init(int nthreads, int enumerate)
+/* single thread will set devcount_ref, otherwise check against it */
+static int test_multi_init(int nthreads, int enumerate, int *devcount_ref)
 {
 	int errs = 0;
 	int t, i;
-	ssize_t last_devcount = 0;
 	int devcount_mismatch = 0;
 	int access_failures = 0;
 
@@ -234,14 +234,13 @@ static int test_multi_init(int nthreads, int enumerate)
 				tinfo[t].iteration,
 				libusb_error_name(tinfo[t].err));
 		} else if (enumerate) {
-			if (t > 0 && tinfo[t].devcount != last_devcount) {
+			if (nthreads != 1 && tinfo[t].devcount != *devcount_ref) {
 				devcount_mismatch++;
 				printf("Device count mismatch: Thread %d discovered %ld devices instead of %ld\n",
 				       tinfo[t].number,
 				       (long int) tinfo[t].devcount,
-				       (long int) last_devcount);
+				       (long int) *devcount_ref);
 			}
-			last_devcount = tinfo[t].devcount;
 		}
 	}
 
@@ -249,25 +248,38 @@ static int test_multi_init(int nthreads, int enumerate)
 		if (no_access[i])
 			access_failures++;
 
-	if (enumerate && !devcount_mismatch)
-		printf("All threads discovered %ld devices (%i not opened)\n",
-		       (long int) last_devcount, access_failures);
+	if (access_failures)
+		printf("%d devices couldn't be accessed\n", access_failures);
+
+	if (enumerate && nthreads == 1)
+		*devcount_ref = tinfo[0].devcount;
+
+	free(tinfo);
 
 	return errs + devcount_mismatch;
 }
 
 int main(void)
 {
-	int errs = 0;
+	int errs, errs_enum, errs_ref;
+	int ndevices;
 
-	printf("Running single-threaded init/exit test...\n");
-	errs += test_multi_init(1, 0);
+	printf("Running single-threaded init/exit test for reference...\n");
+
+	/* single thread with enumeration */
+	errs_ref = test_multi_init(1, 1, &ndevices);
+
+	printf("Single thread discovered %d devices (%d errors)\n", ndevices, errs_ref);
 
 	printf("Running multithreaded init/exit test...\n");
-	errs += test_multi_init(MAX_NTHREADS, 0);
+
+	errs = test_multi_init(MAX_NTHREADS, 0, &ndevices);
+
 	printf("Running multithreaded init/exit test with enumeration...\n");
-	errs += test_multi_init(MAX_NTHREADS, 1);
+
+	errs_enum = test_multi_init(MAX_NTHREADS, 1, &ndevices);
+
 	printf("All done, %d errors\n", errs);
 
-	return errs != 0;
+	return errs != errs_ref || errs_enum != errs_ref;
 }
