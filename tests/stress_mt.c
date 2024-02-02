@@ -89,7 +89,8 @@ typedef volatile LONG atomic_bool;
 struct thread_info {
 	thread_t threadId;
 	int number;
-	int enumerate;
+	bool enumerate;
+	bool opendev;
 	ssize_t devcount;
 	int err;
 	int iteration;
@@ -126,6 +127,11 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 			ti->devcount = libusb_get_device_list(ctx, &devs);
 			if (ti->devcount < 0) {
 				ti->err = (int)ti->devcount;
+				ti->enumerate = false;
+				break;
+			}
+			if (!ti->opendev) {
+				libusb_free_device_list(devs, 1);
 				break;
 			}
 			for (int i = 0; i < ti->devcount && ti->err == 0; i++) {
@@ -206,11 +212,13 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 	return (thread_return_t) THREAD_RETURN_VALUE;
 }
 
-/* single thread will set devcount_ref, otherwise check against it */
-static int test_multi_init(int nthreads, int enumerate, int *devcount_ref)
+/* single thread will set devcount_ref, otherwise check against it
+ * same for access_failures_ref */
+static int test_multi_init(int nthreads, bool enumerate, bool opendev, int *devcount_ref, int *access_failures_ref)
 {
-	int errs = 0;
 	int t, i;
+	int errs = 0;
+	int enum_errs = 0;
 	int devcount_mismatch = 0;
 	int access_failures = 0;
 
@@ -221,6 +229,7 @@ static int test_multi_init(int nthreads, int enumerate, int *devcount_ref)
 		tinfo[t].err = 0;
 		tinfo[t].number = t;
 		tinfo[t].enumerate = enumerate;
+		tinfo[t].opendev = opendev;
 		thread_create(&tinfo[t].threadId, &init_and_exit, (void *) &tinfo[t]);
 	}
 
@@ -234,6 +243,9 @@ static int test_multi_init(int nthreads, int enumerate, int *devcount_ref)
 				tinfo[t].iteration,
 				libusb_error_name(tinfo[t].err));
 		} else if (enumerate) {
+			if (!tinfo[t].enumerate) {
+				enum_errs++;
+			}
 			if (nthreads != 1 && tinfo[t].devcount != *devcount_ref) {
 				devcount_mismatch++;
 				printf("Device count mismatch: Thread %d discovered %ld devices instead of %ld\n",
@@ -248,38 +260,49 @@ static int test_multi_init(int nthreads, int enumerate, int *devcount_ref)
 		if (no_access[i])
 			access_failures++;
 
-	if (access_failures)
-		printf("%d devices couldn't be accessed\n", access_failures);
+	if (nthreads == 1) {
+		if (access_failures)
+			printf("%d devices cannot be accessed\n", access_failures);
+		*access_failures_ref = access_failures;
+	} else if (access_failures != *access_failures_ref) {
+		printf("Multithreaded run couldn't access %d devices\n", access_failures);
+		errs++;
+	}
 
 	if (enumerate && nthreads == 1)
 		*devcount_ref = tinfo[0].devcount;
 
 	free(tinfo);
 
-	return errs + devcount_mismatch;
+	return enum_errs + errs + devcount_mismatch;
 }
 
 int main(void)
 {
-	int errs, errs_enum, errs_ref;
+	int errs, errs_enum, errs_open, errs_ref;
 	int ndevices;
+	int access_errs;
 
-	printf("Running single-threaded init/exit test for reference...\n");
+	printf("Running single-threaded init/exit test for counting devices...\n");
 
 	/* single thread with enumeration */
-	errs_ref = test_multi_init(1, 1, &ndevices);
+	errs_ref = test_multi_init(1, true, true, &ndevices, &access_errs);
 
 	printf("Single thread discovered %d devices (%d errors)\n", ndevices, errs_ref);
 
 	printf("Running multithreaded init/exit test...\n");
 
-	errs = test_multi_init(MAX_NTHREADS, 0, &ndevices);
+	errs = test_multi_init(MAX_NTHREADS, false, false, &ndevices, &access_errs);
 
 	printf("Running multithreaded init/exit test with enumeration...\n");
 
-	errs_enum = test_multi_init(MAX_NTHREADS, 1, &ndevices);
+	errs_enum = test_multi_init(MAX_NTHREADS, true, false, &ndevices, &access_errs);
+
+	printf("Running multithreaded init/exit test with opening devices...\n");
+
+	errs_open = test_multi_init(MAX_NTHREADS, true, true, &ndevices, &access_errs);
 
 	printf("All done, %d errors\n", errs);
 
-	return errs != errs_ref || errs_enum != errs_ref;
+	return errs != errs_ref || errs_enum != errs_ref || errs_open != errs_ref;
 }
