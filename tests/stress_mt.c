@@ -214,7 +214,7 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 
 /* single thread will set devcount_ref, otherwise check against it
  * same for access_failures_ref */
-static int test_multi_init(int nthreads, bool enumerate, bool opendev, int *devcount_ref, int *access_failures_ref)
+static int test_multi_init(int nthreads, bool enumerate, bool opendev, ssize_t *devcount_ref, int *access_failures_ref)
 {
 	int t, i;
 	int errs = 0;
@@ -280,7 +280,7 @@ static int test_multi_init(int nthreads, bool enumerate, bool opendev, int *devc
 int main(void)
 {
 	int errs, errs_enum, errs_open, errs_ref;
-	int ndevices;
+	ssize_t ndevices;
 	int access_errs;
 
 	printf("Running single-threaded init/exit test for counting devices...\n");
@@ -288,7 +288,7 @@ int main(void)
 	/* single thread with enumeration */
 	errs_ref = test_multi_init(1, true, true, &ndevices, &access_errs);
 
-	printf("Single thread discovered %d devices (%d errors)\n", ndevices, errs_ref);
+	printf("Single thread discovered %ld devices (%d errors)\n", (long int) ndevices, errs_ref);
 
 	printf("Running multithreaded init/exit test...\n");
 
