@@ -84,6 +84,11 @@ static int parse_endpoint(struct libusb_context *ctx,
 	endpoint->wMaxPacketSize = ReadLittleEndian16(&buffer[4]);
 	endpoint->bInterval = buffer[6];
 	if (header->bLength >= LIBUSB_DT_ENDPOINT_AUDIO_SIZE) {
+		if (size < LIBUSB_DT_ENDPOINT_AUDIO_SIZE) {
+			usbi_warn(ctx, "short endpoint descriptor read %d/%u",
+				  size, header->bLength);
+			return parsed;
+		}
 		endpoint->bRefresh = buffer[7];
 		endpoint->bSynchAddress = buffer[8];
 	}
