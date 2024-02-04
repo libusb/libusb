@@ -1208,11 +1208,11 @@ int API_EXPORTED libusb_get_platform_descriptor(libusb_context *ctx,
 	_platform_descriptor->bReserved = dev_cap->dev_capability_data[0];
 	memcpy(_platform_descriptor->PlatformCapabilityUUID, &(dev_cap->dev_capability_data[1]), 16);
 
-	/* Capability data is located after reserved byte and 128-bit UUID */
+	/* Capability data is located after reserved byte and 16 byte UUID */
 	uint8_t* capability_data = dev_cap->dev_capability_data + 1 + 16;
 
 	/* Capability data length is total descriptor length minus initial fields */
-	size_t capability_data_length = _platform_descriptor->bLength - (16 + 4);
+	size_t capability_data_length = dev_cap->bLength - (3 + 1 + 16);
 
 	memcpy(_platform_descriptor->CapabilityData, capability_data, capability_data_length);
 
