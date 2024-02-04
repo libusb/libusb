@@ -694,14 +694,14 @@ int API_EXPORTED libusb_get_ss_endpoint_companion_descriptor(
 	const struct libusb_endpoint_descriptor *endpoint,
 	struct libusb_ss_endpoint_companion_descriptor **ep_comp)
 {
-	struct usbi_descriptor_header *header;
+	const struct usbi_descriptor_header *header;
 	const uint8_t *buffer = endpoint->extra;
 	int size = endpoint->extra_length;
 
 	*ep_comp = NULL;
 
 	while (size >= DESC_HEADER_LENGTH) {
-		header = (struct usbi_descriptor_header *)buffer;
+		header = (const struct usbi_descriptor_header *)buffer;
 		if (header->bDescriptorType != LIBUSB_DT_SS_ENDPOINT_COMPANION) {
 			if (header->bLength < DESC_HEADER_LENGTH) {
 				usbi_err(ctx, "invalid descriptor length %u",
