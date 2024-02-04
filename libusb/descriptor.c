@@ -56,7 +56,6 @@ static int parse_endpoint(struct libusb_context *ctx,
 	const uint8_t *begin;
 	void *extra;
 	int parsed = 0;
-	int len;
 
 	if (size < DESC_HEADER_LENGTH) {
 		usbi_err(ctx, "short endpoint descriptor read %d/%d",
@@ -123,7 +122,7 @@ static int parse_endpoint(struct libusb_context *ctx,
 
 	/* Copy any unknown descriptors into a storage area for drivers */
 	/*  to later parse */
-	len = (int)(buffer - begin);
+	ptrdiff_t len = buffer - begin;
 	if (len <= 0)
 		return parsed;
 
@@ -133,7 +132,7 @@ static int parse_endpoint(struct libusb_context *ctx,
 
 	memcpy(extra, begin, (size_t)len);
 	endpoint->extra = extra;
-	endpoint->extra_length = len;
+	endpoint->extra_length = (int)len;
 
 	return parsed;
 }
@@ -166,7 +165,6 @@ static void clear_interface(struct libusb_interface *usb_interface)
 static int parse_interface(libusb_context *ctx,
 	struct libusb_interface *usb_interface, const uint8_t *buffer, int size)
 {
-	int len;
 	int r;
 	int parsed = 0;
 	int interface_number = -1;
@@ -260,7 +258,7 @@ static int parse_interface(libusb_context *ctx,
 
 		/* Copy any unknown descriptors into a storage area for */
 		/*  drivers to later parse */
-		len = (int)(buffer - begin);
+		ptrdiff_t len = buffer - begin;
 		if (len > 0) {
 			void *extra = malloc((size_t)len);
 
@@ -271,7 +269,7 @@ static int parse_interface(libusb_context *ctx,
 
 			memcpy(extra, begin, (size_t)len);
 			ifp->extra = extra;
-			ifp->extra_length = len;
+			ifp->extra_length = (int)len;
 		}
 
 		if (ifp->bNumEndpoints > 0) {
@@ -375,7 +373,6 @@ static int parse_configuration(struct libusb_context *ctx,
 	size -= config->bLength;
 
 	for (i = 0; i < config->bNumInterfaces; i++) {
-		int len;
 		const uint8_t *begin;
 
 		/* Skip over the rest of the Class Specific or Vendor */
@@ -411,7 +408,7 @@ static int parse_configuration(struct libusb_context *ctx,
 
 		/* Copy any unknown descriptors into a storage area for */
 		/*  drivers to later parse */
-		len = (int)(buffer - begin);
+		ptrdiff_t len = buffer - begin;
 		if (len > 0) {
 			uint8_t *extra = realloc((void *)config->extra,
 						 (size_t)(config->extra_length + len));
@@ -423,10 +420,10 @@ static int parse_configuration(struct libusb_context *ctx,
 
 			memcpy(extra + config->extra_length, begin, (size_t)len);
 			config->extra = extra;
-			config->extra_length += len;
+			config->extra_length += (int)len;
 		}
 
-		r = parse_interface(ctx, usb_interface + i, buffer, size);
+		r = parse_interface(ctx, usb_interface + i, buffer, (int)size);
 		if (r < 0)
 			goto err;
 		if (r == 0) {
