@@ -214,6 +214,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 		free(msg);
 	}
 
+	usbi_mutex_lock(&ctx->usb_devs_lock); /* hotplug thread might still be processing an already triggered event, possibly accessing this list as well */
 	/* free all discovered devices */
 	for_each_device_safe(ctx, dev, next_dev) {
 		/* remove the device from the usb_devs list only if there are no
@@ -227,6 +228,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 
 		libusb_unref_device(dev);
 	}
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
 
 	usbi_mutex_destroy(&ctx->hotplug_cbs_lock);
 }
