@@ -1334,6 +1334,11 @@ static int parse_iad_array(struct libusb_context *ctx,
 				 header.bLength);
 			return LIBUSB_ERROR_IO;
 		}
+		else if (header.bLength > size) {
+			usbi_warn(ctx, "short config descriptor read %d/%u",
+					  size, header.bLength);
+			return LIBUSB_ERROR_IO;
+		}
 		if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION)
 			iad_array->length++;
 		buf += header.bLength;
