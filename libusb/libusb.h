@@ -335,6 +335,7 @@ enum libusb_descriptor_type {
 #define LIBUSB_DT_SS_ENDPOINT_COMPANION_SIZE	6
 #define LIBUSB_DT_BOS_SIZE			5
 #define LIBUSB_DT_DEVICE_CAPABILITY_SIZE	3
+#define LIBUSB_DT_INTERFACE_ASSOCIATION_SIZE	8
 
 /* BOS descriptor sizes */
 #define LIBUSB_BT_USB_2_0_EXTENSION_SIZE	7
