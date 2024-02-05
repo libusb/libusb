@@ -1329,7 +1329,7 @@ static int parse_iad_array(struct libusb_context *ctx,
 	while (consumed < size) {
 		header.bLength = buf[0];
 		header.bDescriptorType = buf[1];
-		if (header.bLength < 2) {
+		if (header.bLength < DESC_HEADER_LENGTH) {
 			usbi_err(ctx, "invalid descriptor bLength %d",
 				 header.bLength);
 			return LIBUSB_ERROR_IO;
@@ -1354,12 +1354,12 @@ static int parse_iad_array(struct libusb_context *ctx,
 		iad_array->iad = iad;
 
 		/* Second pass: Iterate through desc list, fill IAD structures */
-		consumed = 0;
+		int remaining = size;
 		i = 0;
-		while (consumed < size) {
+		do {
 			header.bLength = buffer[0];
 			header.bDescriptorType = buffer[1];
-			if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION) {
+			if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION && (remaining >= LIBUSB_DT_INTERFACE_ASSOCIATION_SIZE)) {
 				iad[i].bLength = buffer[0];
 				iad[i].bDescriptorType = buffer[1];
 				iad[i].bFirstInterface = buffer[2];
@@ -1371,9 +1371,12 @@ static int parse_iad_array(struct libusb_context *ctx,
 				i++;
 			}
 
+			remaining -= header.bLength;
+			if (remaining < DESC_HEADER_LENGTH) {
+				break;
+			}
 			buffer += header.bLength;
-			consumed += header.bLength;
-		}
+		} while (1);
 	}
 
 	return LIBUSB_SUCCESS;
