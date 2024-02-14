@@ -86,7 +86,7 @@ static int sunos_get_link(di_devlink_t devlink, void *arg)
 	const char *p;
 	const char *q;
 
-	if (larg->path) {
+	if (link_arg->path) {
 		char *content = (char *)di_devlink_content(devlink);
 		char *start = strstr(content, "/devices/");
 		start += strlen("/devices");
@@ -94,8 +94,8 @@ static int sunos_get_link(di_devlink_t devlink, void *arg)
 
 		/* line content must have minor node */
 		if (start == NULL ||
-		    strncmp(start, larg->path, larg->len) != 0 ||
-		    start[larg->len] != ':')
+		    strncmp(start, link_arg->path, link_arg->len) != 0 ||
+		    start[link_arg->len] != ':')
 			return (DI_WALK_CONTINUE);
 	}
 
@@ -103,7 +103,7 @@ static int sunos_get_link(di_devlink_t devlink, void *arg)
 	q = strrchr(p, '/');
 	usbi_dbg(NULL, "%s", q);
 
-	*(larg->linkpp) = strndup(p, strlen(p) - strlen(q));
+	*(link_arg->linkpp) = strndup(p, strlen(p) - strlen(q));
 
 	return (DI_WALK_TERMINATE);
 }
