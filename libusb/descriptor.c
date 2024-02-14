@@ -163,6 +163,17 @@ static int parse_endpoint(struct libusb_context *ctx,
 	return parsed;
 }
 
+static void clear_interface_descriptor(struct libusb_interface_descriptor *ifp) {
+	free((void *)ifp->extra);
+	if (ifp->endpoint) {
+		uint8_t j;
+
+		for (j = 0; j < ifp->bNumEndpoints; j++)
+			clear_endpoint((struct libusb_endpoint_descriptor *) ifp->endpoint + j);
+	}
+	free((void *)ifp->endpoint);
+}
+
 static void clear_interface(struct libusb_interface *usb_interface)
 {
 	int i;
@@ -173,15 +184,7 @@ static void clear_interface(struct libusb_interface *usb_interface)
 				(struct libusb_interface_descriptor *)
 				usb_interface->altsetting + i;
 
-			free((void *)ifp->extra);
-			if (ifp->endpoint) {
-				uint8_t j;
-
-				for (j = 0; j < ifp->bNumEndpoints; j++)
-					clear_endpoint((struct libusb_endpoint_descriptor *)
-						       ifp->endpoint + j);
-			}
-			free((void *)ifp->endpoint);
+			clear_interface_descriptor(ifp);
 		}
 	}
 	free((void *)usb_interface->altsetting);
@@ -212,7 +215,21 @@ static int parse_interface(libusb_context *ctx,
 		usb_interface->altsetting = altsetting;
 
 		ifp = altsetting + usb_interface->num_altsetting;
+
+		// increment early to ensure we free this in the case of an error
+		usb_interface->num_altsetting++;
+
+		ifp->endpoint = NULL;
+		ifp->extra = NULL;
+		ifp->extra_length = 0;
+
 		parse_descriptor(buffer, "bbbbbbbbb", ifp);
+
+		// stash in case we have to clear it
+		// bNumEndpoints will represent the number of *initialised* endpoints
+		uint8_t stashedNumEndpoints = ifp->bNumEndpoints;
+		ifp->bNumEndpoints = 0;
+
 		if (ifp->bDescriptorType != LIBUSB_DT_INTERFACE) {
 			usbi_err(ctx, "unexpected descriptor 0x%x (expected 0x%x)",
 				 ifp->bDescriptorType, LIBUSB_DT_INTERFACE);
@@ -231,11 +248,6 @@ static int parse_interface(libusb_context *ctx,
 			r = LIBUSB_ERROR_IO;
 			goto err;
 		}
-
-		usb_interface->num_altsetting++;
-		ifp->extra = NULL;
-		ifp->extra_length = 0;
-		ifp->endpoint = NULL;
 
 		if (interface_number == -1)
 			interface_number = ifp->bInterfaceNumber;
@@ -291,23 +303,24 @@ static int parse_interface(libusb_context *ctx,
 			ifp->extra_length = len;
 		}
 
-		if (ifp->bNumEndpoints > 0) {
+		if (stashedNumEndpoints > 0) {
 			struct libusb_endpoint_descriptor *endpoint;
-			uint8_t i;
 
-			endpoint = calloc(ifp->bNumEndpoints, sizeof(*endpoint));
+			endpoint = calloc(stashedNumEndpoints, sizeof(*endpoint));
 			if (!endpoint) {
 				r = LIBUSB_ERROR_NO_MEM;
 				goto err;
 			}
 
 			ifp->endpoint = endpoint;
-			for (i = 0; i < ifp->bNumEndpoints; i++) {
-				r = parse_endpoint(ctx, endpoint + i, buffer, size);
+			// loop counter with bNumEndpoints to only update when an endpoint is
+			// initialised and ensure it is freed in the case of an error
+			for (; ifp->bNumEndpoints < stashedNumEndpoints; ifp->bNumEndpoints++) {
+				r = parse_endpoint(ctx, endpoint + ifp->bNumEndpoints, buffer, size);
 				if (r < 0)
 					goto err;
 				if (r == 0) {
-					ifp->bNumEndpoints = i;
+					ifp->bNumEndpoints++;
 					break;
 				}
 
@@ -347,7 +360,6 @@ static void clear_configuration(struct libusb_config_descriptor *config)
 static int parse_configuration(struct libusb_context *ctx,
 	struct libusb_config_descriptor *config, const uint8_t *buffer, int size)
 {
-	uint8_t i;
 	int r;
 	const struct usbi_descriptor_header *header;
 	struct libusb_interface *usb_interface;
@@ -384,7 +396,12 @@ static int parse_configuration(struct libusb_context *ctx,
 	buffer += config->bLength;
 	size -= config->bLength;
 
-	for (i = 0; i < config->bNumInterfaces; i++) {
+	uint8_t stashedNumInterfaces = config->bNumInterfaces;
+	config->bNumInterfaces = 0;
+
+	// loop counter with bNumInterfaces to only update when an interface is initialised
+	// and ensure it is freed in the case of an error
+	for (; config->bNumInterfaces < stashedNumInterfaces; config->bNumInterfaces++) {
 		int len;
 		const uint8_t *begin;
 
@@ -403,7 +420,6 @@ static int parse_configuration(struct libusb_context *ctx,
 				usbi_warn(ctx,
 					  "short extra config desc read %d/%u",
 					  size, header->bLength);
-				config->bNumInterfaces = i;
 				return size;
 			}
 
@@ -436,11 +452,11 @@ static int parse_configuration(struct libusb_context *ctx,
 			config->extra_length += len;
 		}
 
-		r = parse_interface(ctx, usb_interface + i, buffer, size);
+		r = parse_interface(ctx, usb_interface + config->bNumInterfaces, buffer, size);
 		if (r < 0)
 			goto err;
 		if (r == 0) {
-			config->bNumInterfaces = i;
+			config->bNumInterfaces++;
 			break;
 		}
 
@@ -1226,7 +1242,8 @@ static int parse_iad_array(struct libusb_context *ctx,
 
 	// First pass: Iterate through desc list, count number of IADs
 	iad_array->length = 0;
-	while (consumed < size) {
+	// +1 to avoid off-by-one overflow when parsing descriptor
+	while (consumed + 1 < size) {
 		parse_descriptor(buf, "bb", &header);
 		if (header.bLength < 2) {
 			usbi_err(ctx, "invalid descriptor bLength %d",
@@ -1250,7 +1267,8 @@ static int parse_iad_array(struct libusb_context *ctx,
 		// Second pass: Iterate through desc list, fill IAD structures
 		consumed = 0;
 		i = 0;
-		while (consumed < size) {
+		// +9 to avoid off-by-8 overflow when parsing descriptor
+		while (consumed + 9 < size) {
 		   parse_descriptor(buffer, "bb", &header);
 		   if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION)
 			  parse_descriptor(buffer, "bbbbbbbb", &iad[i++]);
