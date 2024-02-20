@@ -1765,6 +1765,7 @@ int LIBUSB_CALL libusb_get_config_string(libusb_device *dev,
 int LIBUSB_CALL libusb_get_interface_string(libusb_device *dev,
 	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
 	char *data, int length);
+int LIBUSB_CALL libusb_device_connected(libusb_device *dev);
 int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
 	int *config);
 int LIBUSB_CALL libusb_get_device_descriptor(libusb_device *dev,
