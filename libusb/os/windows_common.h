@@ -232,12 +232,29 @@ typedef struct USB_DK_TRANSFER_REQUEST {
 	USB_DK_TRANSFER_RESULT Result;
 } USB_DK_TRANSFER_REQUEST, *PUSB_DK_TRANSFER_REQUEST;
 
+/* track devices that are removed, kept unchanged, added when updating device list
+ * using system enumeration in response to low-level hotplug events */
+ enum hotplug_status {
+	/* device is still in system enumeration as it was in previous enumeration.
+	 * There is no need to take any action */
+	UNCHANGED,
+
+	/* device is newly added to the list, meaning it just appeared in system enumeration.
+	 * A hotplug "device arrived" event shall be triggered */
+	ARRIVED,
+
+	/* device is no longer present in system enumeration.
+	 * A hotplug "device left" event shall be triggered and the device removed from the list */
+	LEFT
+};
+
 struct usbdk_device_priv {
 	USB_DK_DEVICE_ID ID;
 	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptors;
 	HANDLE redirector_handle;
 	HANDLE system_handle;
 	uint8_t active_configuration;
+	enum hotplug_status hotplug_status; /* updated while getting current device list */
 };
 
 struct winusb_device_priv {
@@ -269,6 +286,7 @@ struct winusb_device_priv {
 	struct hid_device_priv *hid;
 	PUSB_CONFIGURATION_DESCRIPTOR *config_descriptor; // list of pointers to the cached config descriptors
 	GUID class_guid; // checked for change during re-enumeration
+	enum hotplug_status hotplug_status; /* updated while getting current device list */
 };
 
 struct usbdk_device_handle_priv {
@@ -318,8 +336,7 @@ struct winusb_transfer_priv {
 struct windows_backend {
 	int (*init)(struct libusb_context *ctx);
 	void (*exit)(struct libusb_context *ctx);
-	int (*get_device_list)(struct libusb_context *ctx,
-		struct discovered_devs **discdevs);
+	int (*get_device_list)(struct libusb_context *ctx); // Refresh ctx device list with devices currently connected to the system and update the `hotplug_status` field of all enumerated devices.
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
 	int (*get_active_config_descriptor)(struct libusb_device *device,

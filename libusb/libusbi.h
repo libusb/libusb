@@ -809,6 +809,9 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 int usbi_handle_transfer_cancellation(struct usbi_transfer *itransfer);
 void usbi_signal_transfer_completion(struct usbi_transfer *itransfer);
 
+void usbi_attach_device(struct libusb_device *dev);
+void usbi_detach_device(struct libusb_device *dev);
+
 void usbi_connect_device(struct libusb_device *dev);
 void usbi_disconnect_device(struct libusb_device *dev);
 
