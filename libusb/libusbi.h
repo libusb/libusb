@@ -1447,6 +1447,12 @@ struct usbi_os_backend {
 	 */
 	int (*handle_transfer_completion)(struct usbi_transfer *itransfer);
 
+	/* Return name of the device driver.
+	*
+	* Providing an implementation for this method is optional
+	*/
+	const char* (*get_driver_name)(struct libusb_device *device);
+
 	/* Number of bytes to reserve for per-context private backend data.
 	 * This private data area is accessible by calling
 	 * usbi_get_context_priv() on the libusb_context instance.

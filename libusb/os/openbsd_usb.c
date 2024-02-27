@@ -81,7 +81,7 @@ static int _sync_gen_transfer(struct usbi_transfer *);
 static int _access_endpoint(struct libusb_transfer *);
 
 static int _bus_open(int);
-
+static const char* obs_get_driver_name(libusb_device* dev);
 
 const struct usbi_os_backend usbi_backend = {
 	.name = "Synchronous OpenBSD backend",
@@ -107,12 +107,18 @@ const struct usbi_os_backend usbi_backend = {
 
 	.handle_transfer_completion = obsd_handle_transfer_completion,
 
+	.get_driver_name = obs_get_driver_name,
+
 	.device_priv_size = sizeof(struct device_priv),
 	.device_handle_priv_size = sizeof(struct handle_priv),
 };
 
 #define DEVPATH	"/dev/"
 #define USBDEV	DEVPATH "usb"
+
+static const char* obs_get_driver_name(libusb_device* dev) {
+	return "usb(4)";
+}
 
 int
 obsd_get_device_list(struct libusb_context * ctx,

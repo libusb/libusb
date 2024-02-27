@@ -2271,6 +2271,15 @@ static enum libusb_transfer_status winusb_copy_transfer_data(struct usbi_transfe
 	return priv->apib->copy_transfer_data(SUB_API_NOTSET, itransfer, length);
 }
 
+static const char* winusb_get_driver_name(libusb_device* dev) {
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	if (priv->sub_api != SUB_API_NOTSET) {
+		return priv->apib->driver_name_list[priv->sub_api];
+	} else {
+		return "";
+	}
+}
+
 // NB: MSVC6 does not support named initializers.
 const struct windows_backend winusb_backend = {
 	winusb_init,
@@ -2293,6 +2302,7 @@ const struct windows_backend winusb_backend = {
 	winusb_cancel_transfer,
 	winusb_clear_transfer_priv,
 	winusb_copy_transfer_data,
+	winusb_get_driver_name,
 };
 
 /*

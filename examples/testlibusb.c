@@ -183,9 +183,9 @@ static void print_device(libusb_device *dev, libusb_device_handle *handle)
 		return;
 	}
 
-	printf("Dev (bus %u, device %u): %04X - %04X speed: %s\n",
-	       libusb_get_bus_number(dev), libusb_get_device_address(dev),
-	       desc.idVendor, desc.idProduct, speed);
+	printf("Dev (bus %u, device %u): %04X - %04X speed: %s driver: %s\n",
+		libusb_get_bus_number(dev), libusb_get_device_address(dev),
+		desc.idVendor, desc.idProduct, speed, libusb_get_driver_name(dev));
 
 	if (!handle)
 		libusb_open(dev, &handle);

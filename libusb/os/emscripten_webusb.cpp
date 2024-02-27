@@ -839,11 +839,15 @@ int em_handle_transfer_completion(usbi_transfer* itransfer) {
 		: usbi_handle_transfer_completion(itransfer, status);
 }
 
+static const char* em_get_driver_name(libusb_device* dev) {
+	return "WebUSB";
+}
+
 }  // namespace
 
 #pragma clang diagnostic ignored "-Wmissing-field-initializers"
 extern "C" const usbi_os_backend usbi_backend = {
-	.name = "Emscripten + WebUSB backend",
+	.name = "Emscripten",
 	.caps = LIBUSB_CAP_HAS_CAPABILITY,
 	.get_device_list = em_get_device_list,
 	.open = em_open,
@@ -863,6 +867,7 @@ extern "C" const usbi_os_backend usbi_backend = {
 	.cancel_transfer = em_cancel_transfer,
 	.clear_transfer_priv = em_clear_transfer_priv,
 	.handle_transfer_completion = em_handle_transfer_completion,
+	.get_driver_name = em_get_driver_name,
 	.device_priv_size = sizeof(CachedDevice),
 	.transfer_priv_size = sizeof(PromiseResult),
 };

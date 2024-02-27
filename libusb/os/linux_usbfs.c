@@ -2770,8 +2770,16 @@ out:
 	return r;
 }
 
+static const char* op_get_driver_name(libusb_device* dev) {
+#if defined(HAVE_LIBUDEV)
+	return "usbfs with libudev";
+#else
+	return "usbfs with netlink";
+#endif
+}
+
 const struct usbi_os_backend usbi_backend = {
-	.name = "Linux usbfs",
+	.name = "Linux",
 	.caps = USBI_CAP_HAS_HID_ACCESS|USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
 	.init = op_init,
 	.exit = op_exit,
@@ -2810,6 +2818,8 @@ const struct usbi_os_backend usbi_backend = {
 	.clear_transfer_priv = op_clear_transfer_priv,
 
 	.handle_events = op_handle_events,
+
+	.get_driver_name = op_get_driver_name,
 
 	.context_priv_size = sizeof(struct linux_context_priv),
 	.device_priv_size = sizeof(struct linux_device_priv),

@@ -1592,6 +1592,10 @@ sunos_usb_get_status(struct libusb_context *ctx, int fd)
 	return (status);
 }
 
+static const char* sunos_get_driver_name(libusb_device* dev) {
+    return "devlink";
+}
+
 const struct usbi_os_backend usbi_backend = {
         .name = "Solaris",
         .caps = 0,
@@ -1613,6 +1617,7 @@ const struct usbi_os_backend usbi_backend = {
         .submit_transfer = sunos_submit_transfer,
         .cancel_transfer = sunos_cancel_transfer,
         .handle_transfer_completion = sunos_handle_transfer_completion,
+        .get_driver_name = sunos_get_driver_name,
         .device_priv_size = sizeof(sunos_dev_priv_t),
         .device_handle_priv_size = sizeof(sunos_dev_handle_priv_t),
         .transfer_priv_size = sizeof(sunos_xfer_priv_t),

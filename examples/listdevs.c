@@ -45,6 +45,9 @@ static void print_devs(libusb_device **devs)
 			for (j = 1; j < r; j++)
 				printf(".%d", path[j]);
 		}
+		
+		printf(" driver: '%s'", libusb_get_driver_name(dev));
+		
 		printf("\n");
 	}
 }

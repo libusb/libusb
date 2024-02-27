@@ -179,6 +179,10 @@ haiku_handle_transfer_completion(struct usbi_transfer *itransfer)
 	return usbi_handle_transfer_completion(itransfer, status);
 }
 
+static const char* haiku_get_driver_name(libusb_device* dev) {
+	return "USBKit";
+}
+
 const struct usbi_os_backend usbi_backend = {
 	/*.name =*/ "Haiku usbfs",
 	/*.caps =*/ 0,
@@ -223,6 +227,8 @@ const struct usbi_os_backend usbi_backend = {
 
 	/*.handle_events =*/ NULL,
 	/*.handle_transfer_completion =*/ haiku_handle_transfer_completion,
+
+	/*.get_driver_info =*/ haiku_get_driver_name,
 
 	/*.context_priv_size =*/ 0,
 	/*.device_priv_size =*/ sizeof(USBDevice *),

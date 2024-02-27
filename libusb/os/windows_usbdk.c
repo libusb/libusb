@@ -700,6 +700,11 @@ static enum libusb_transfer_status usbdk_copy_transfer_data(struct usbi_transfer
 	return usbd_status_to_libusb_transfer_status((USBD_STATUS)transfer_priv->request.Result.GenResult.UsbdStatus);
 }
 
+#pragma warning(disable: 4100) // Allow unreferenced format parameter 'dev'
+static const char* usbdk_get_driver_name(libusb_device* dev) {
+	return "libusbdK";
+}
+
 const struct windows_backend usbdk_backend = {
 	usbdk_init,
 	usbdk_exit,
@@ -721,4 +726,5 @@ const struct windows_backend usbdk_backend = {
 	NULL,	/* cancel_transfer */
 	usbdk_clear_transfer_priv,
 	usbdk_copy_transfer_data,
+	usbdk_get_driver_name,
 };

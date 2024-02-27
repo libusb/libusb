@@ -71,6 +71,8 @@ static int netbsd_submit_transfer(struct usbi_transfer *);
 static int netbsd_cancel_transfer(struct usbi_transfer *);
 static int netbsd_handle_transfer_completion(struct usbi_transfer *);
 
+static const char* netbsd_get_driver_name(libusb_device* dev);
+
 /*
  * Private functions
  */
@@ -106,9 +108,15 @@ const struct usbi_os_backend usbi_backend = {
 
 	.handle_transfer_completion = netbsd_handle_transfer_completion,
 
+	.get_driver_name = netbsd_get_driver_name,
+
 	.device_priv_size = sizeof(struct device_priv),
 	.device_handle_priv_size = sizeof(struct handle_priv),
 };
+
+static const char* netbsd_get_driver_name(libusb_device* dev) {
+	return "ugen";
+}
 
 int
 netbsd_get_device_list(struct libusb_context * ctx,

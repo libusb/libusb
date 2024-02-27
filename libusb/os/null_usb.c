@@ -93,6 +93,10 @@ null_cancel_transfer(struct usbi_transfer *itransfer)
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+static const char* null_get_driver_name(libusb_device* dev) {
+	return "null";
+}
+
 const struct usbi_os_backend usbi_backend = {
 	.name = "Null backend",
 	.caps = 0,
@@ -108,4 +112,5 @@ const struct usbi_os_backend usbi_backend = {
 	.clear_halt = null_clear_halt,
 	.submit_transfer = null_submit_transfer,
 	.cancel_transfer = null_cancel_transfer,
+	.get_driver_name = null_get_driver_name,
 };

@@ -2883,6 +2883,10 @@ static int darwin_capture_release_interface(struct libusb_device_handle *dev_han
 
 #endif
 
+static const char* darwin_get_driver_name(libusb_device* dev){
+  return "IOKit";
+}
+
 const struct usbi_os_backend usbi_backend = {
         .name = "Darwin",
         .caps = USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER,
@@ -2924,6 +2928,8 @@ const struct usbi_os_backend usbi_backend = {
         .cancel_transfer = darwin_cancel_transfer,
 
         .handle_transfer_completion = darwin_handle_transfer_completion,
+
+        .get_driver_name = darwin_get_driver_name,
 
         .device_priv_size = sizeof(struct darwin_device_priv),
         .device_handle_priv_size = sizeof(struct darwin_device_handle_priv),

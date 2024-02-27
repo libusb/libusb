@@ -2309,3 +2309,13 @@ int LIBUSB_CALLV libusb_set_option(libusb_context *ctx, enum libusb_option optio
 #endif
 
 #endif
+
+/** \ingroup libusb_desc
+ * Retrieves the name of the backend driver.
+ *
+ * Since version 1.0.27, \ref LIBUSB_API_VERSION >= 0x0100010B
+ *
+ * @return  The name of the backend driver or empty string if not
+ * implemented / unknown.
+ */
+const char* LIBUSB_CALL libusb_get_driver_name(libusb_device *dev);
