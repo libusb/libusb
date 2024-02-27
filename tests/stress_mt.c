@@ -169,8 +169,8 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 				}
 				usbi_localize_device_descriptor(&raw_desc);
 #define ASSERT_EQ(field) if (raw_desc.field != desc.field) { \
-	fprintf(stderr, "Thread %d: device %d: mismatch in field " #field ": %d != %d\n", \
-		ti->number, i, raw_desc.field, desc.field); \
+	fprintf(stderr, "Thread %d: device %04x:%04x: mismatch in field " #field ": %d != %d\n", \
+		ti->number, desc.idVendor, desc.idProduct, raw_desc.field, desc.field); \
 		ti->err = LIBUSB_ERROR_OTHER; \
 		goto close; \
 }
