@@ -142,11 +142,11 @@ int main (void) {
 \endcode
  */
 
-#define VALID_HOTPLUG_EVENTS			\
-	(LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED |	\
-	 LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
+#define VALID_HOTPLUG_EVENTS               \
+	(LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED | \
+		LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
 
-#define VALID_HOTPLUG_FLAGS			\
+#define VALID_HOTPLUG_FLAGS \
 	(LIBUSB_HOTPLUG_ENUMERATE)
 
 void usbi_hotplug_init(struct libusb_context *ctx)
@@ -175,7 +175,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 		return;
 
 	/* free all registered hotplug callbacks */
-	for_each_hotplug_cb_safe(ctx, hotplug_cb, next_cb) {
+	for_each_hotplug_cb_safe (ctx, hotplug_cb, next_cb) {
 		list_del(&hotplug_cb->list);
 		free(hotplug_cb);
 	}
@@ -194,7 +194,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 	}
 
 	/* free all discovered devices. due to parent references loop until no devices are freed. */
-	for_each_device_safe(ctx, dev, next_dev) {
+	for_each_device_safe (ctx, dev, next_dev) {
 		/* remove the device from the usb_devs list only if there are no
 		 * references held, otherwise leave it on the list so that a
 		 * warning message will be shown */
@@ -205,7 +205,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 			/* the parent was before this device in the list and will be released.
 			   remove it from the list. this is safe as parent_dev can not be
 			   equal to next_dev. */
-			assert (dev->parent_dev != next_dev);
+			assert(dev->parent_dev != next_dev);
 			list_del(&dev->parent_dev->list);
 		}
 		libusb_unref_device(dev);
@@ -222,17 +222,17 @@ static int usbi_hotplug_match_cb(struct libusb_device *dev,
 	}
 
 	if ((hotplug_cb->flags & USBI_HOTPLUG_VENDOR_ID_VALID) &&
-	    hotplug_cb->vendor_id != dev->device_descriptor.idVendor) {
+		hotplug_cb->vendor_id != dev->device_descriptor.idVendor) {
 		return 0;
 	}
 
 	if ((hotplug_cb->flags & USBI_HOTPLUG_PRODUCT_ID_VALID) &&
-	    hotplug_cb->product_id != dev->device_descriptor.idProduct) {
+		hotplug_cb->product_id != dev->device_descriptor.idProduct) {
 		return 0;
 	}
 
 	if ((hotplug_cb->flags & USBI_HOTPLUG_DEV_CLASS_VALID) &&
-	    hotplug_cb->dev_class != dev->device_descriptor.bDeviceClass) {
+		hotplug_cb->dev_class != dev->device_descriptor.bDeviceClass) {
 		return 0;
 	}
 
@@ -283,7 +283,7 @@ void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_
 	while (!list_empty(hotplug_msgs)) {
 		msg = list_first_entry(hotplug_msgs, struct usbi_hotplug_message, list);
 
-		for_each_hotplug_cb_safe(ctx, hotplug_cb, next_cb) {
+		for_each_hotplug_cb_safe (ctx, hotplug_cb, next_cb) {
 			/* skip callbacks that have unregistered */
 			if (hotplug_cb->flags & USBI_HOTPLUG_NEEDS_FREE)
 				continue;
@@ -308,10 +308,10 @@ void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_
 	}
 
 	/* free any callbacks that have unregistered */
-	for_each_hotplug_cb_safe(ctx, hotplug_cb, next_cb) {
+	for_each_hotplug_cb_safe (ctx, hotplug_cb, next_cb) {
 		if (hotplug_cb->flags & USBI_HOTPLUG_NEEDS_FREE) {
 			usbi_dbg(ctx, "freeing hotplug cb %p with handle %d",
-				 (void *) hotplug_cb, hotplug_cb->handle);
+				(void *)hotplug_cb, hotplug_cb->handle);
 			list_del(&hotplug_cb->list);
 			free(hotplug_cb);
 		}
@@ -330,11 +330,11 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 
 	/* check for sane values */
 	if (!events || (~VALID_HOTPLUG_EVENTS & events) ||
-	    (~VALID_HOTPLUG_FLAGS & flags) ||
-	    (LIBUSB_HOTPLUG_MATCH_ANY != vendor_id && (~0xffff & vendor_id)) ||
-	    (LIBUSB_HOTPLUG_MATCH_ANY != product_id && (~0xffff & product_id)) ||
-	    (LIBUSB_HOTPLUG_MATCH_ANY != dev_class && (~0xff & dev_class)) ||
-	    !cb_fn) {
+		(~VALID_HOTPLUG_FLAGS & flags) ||
+		(LIBUSB_HOTPLUG_MATCH_ANY != vendor_id && (~0xffff & vendor_id)) ||
+		(LIBUSB_HOTPLUG_MATCH_ANY != product_id && (~0xffff & product_id)) ||
+		(LIBUSB_HOTPLUG_MATCH_ANY != dev_class && (~0xff & dev_class)) ||
+		!cb_fn) {
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
@@ -378,7 +378,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
 
 	usbi_dbg(ctx, "new hotplug cb %p with handle %d",
-		 (void *) hotplug_cb, hotplug_cb->handle);
+		(void *)hotplug_cb, hotplug_cb->handle);
 
 	if ((flags & LIBUSB_HOTPLUG_ENUMERATE) && (events & LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)) {
 		ssize_t i, len;
@@ -392,8 +392,8 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 
 		for (i = 0; i < len; i++) {
 			usbi_hotplug_match_cb(devs[i],
-					LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
-					hotplug_cb);
+				LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
+				hotplug_cb);
 		}
 
 		libusb_free_device_list(devs, 1);
@@ -420,7 +420,7 @@ void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
 	ctx = usbi_get_context(ctx);
 
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
-	for_each_hotplug_cb(ctx, hotplug_cb) {
+	for_each_hotplug_cb (ctx, hotplug_cb) {
 		if (callback_handle == hotplug_cb->handle) {
 			/* mark this callback for deregistration */
 			hotplug_cb->flags |= USBI_HOTPLUG_NEEDS_FREE;
@@ -443,7 +443,7 @@ void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
 }
 
 DEFAULT_VISIBILITY
-void * LIBUSB_CALL libusb_hotplug_get_user_data(libusb_context *ctx,
+void *LIBUSB_CALL libusb_hotplug_get_user_data(libusb_context *ctx,
 	libusb_hotplug_callback_handle callback_handle)
 {
 	struct usbi_hotplug_callback *hotplug_cb;
@@ -458,7 +458,7 @@ void * LIBUSB_CALL libusb_hotplug_get_user_data(libusb_context *ctx,
 	ctx = usbi_get_context(ctx);
 
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
-	for_each_hotplug_cb(ctx, hotplug_cb) {
+	for_each_hotplug_cb (ctx, hotplug_cb) {
 		if (callback_handle == hotplug_cb->handle) {
 			user_data = hotplug_cb->user_data;
 			break;
