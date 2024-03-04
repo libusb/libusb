@@ -844,7 +844,7 @@ int em_handle_transfer_completion(usbi_transfer* itransfer) {
 #pragma clang diagnostic ignored "-Wmissing-field-initializers"
 extern "C" const usbi_os_backend usbi_backend = {
 	.name = "Emscripten + WebUSB backend",
-	.caps = LIBUSB_CAP_HAS_CAPABILITY,
+	.caps = 0,
 	.get_device_list = em_get_device_list,
 	.open = em_open,
 	.close = em_close,
