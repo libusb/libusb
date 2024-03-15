@@ -18,6 +18,10 @@ if [ -n "$LIBUSB_SKIP_NANO" ]; then
   exit 0
 fi
 
+if [ "$(git branch --show-current)" != "master" ]; then
+  exit 0
+fi
+
 case "$1" in
   amend)
     # Check if a .amend exists. If none, create one and warn user to re-commit.
