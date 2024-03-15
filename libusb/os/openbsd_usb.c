@@ -420,7 +420,7 @@ obsd_destroy_device(struct libusb_device *dev)
 }
 
 int
-obsd_submit_transfer(struct usbi_transfer *itransfer)
+obsd_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct libusb_transfer *transfer;
 	int err = 0;
