@@ -2237,9 +2237,6 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	struct usbfs_urb *urb;
 	int r;
 
-	if (transfer->length - LIBUSB_CONTROL_SETUP_SIZE > MAX_CTRL_BUFFER_LENGTH)
-		return LIBUSB_ERROR_INVALID_PARAM;
-
 	urb = calloc(1, sizeof(*urb));
 	if (!urb)
 		return LIBUSB_ERROR_NO_MEM;
