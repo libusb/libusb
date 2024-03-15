@@ -156,7 +156,7 @@ static int parse_endpoint(struct libusb_context *ctx,
 	if (!extra)
 		return LIBUSB_ERROR_NO_MEM;
 
-	memcpy(extra, begin, len);
+	memcpy(extra, begin, (size_t)len);
 	endpoint->extra = extra;
 	endpoint->extra_length = len;
 
@@ -286,7 +286,7 @@ static int parse_interface(libusb_context *ctx,
 				goto err;
 			}
 
-			memcpy(extra, begin, len);
+			memcpy(extra, begin, (size_t)len);
 			ifp->extra = extra;
 			ifp->extra_length = len;
 		}
@@ -431,7 +431,7 @@ static int parse_configuration(struct libusb_context *ctx,
 				goto err;
 			}
 
-			memcpy(extra + config->extra_length, begin, len);
+			memcpy(extra + config->extra_length, begin, (size_t)len);
 			config->extra = extra;
 			config->extra_length += len;
 		}
@@ -1241,7 +1241,7 @@ static int parse_iad_array(struct libusb_context *ctx,
 
 	iad_array->iad = NULL;
 	if (iad_array->length > 0) {
-		iad = calloc(iad_array->length, sizeof(*iad));
+		iad = calloc((size_t)iad_array->length, sizeof(*iad));
 		if (!iad)
 			return LIBUSB_ERROR_NO_MEM;
 

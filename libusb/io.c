@@ -1714,6 +1714,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	flags = transfer->flags;
 	transfer->status = status;
 	transfer->actual_length = itransfer->transferred;
+	assert(transfer->actual_length >= 0);
 	usbi_dbg(ctx, "transfer %p has callback %p",
 		 (void *) transfer, transfer->callback);
 	if (transfer->callback) {
