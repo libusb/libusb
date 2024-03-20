@@ -1572,7 +1572,6 @@ static int get_guid(struct libusb_context *ctx, char *dev_id, HDEVINFO *dev_info
 		usbi_warn(ctx, "device '%s' has malformed DeviceInterfaceGUID string '%s', skipping", dev_id, guid);
 		free(*if_guid);
 		*if_guid = NULL;
-		err = LIBUSB_ERROR_NO_MEM;
 		goto exit;
 	}
 
@@ -1767,7 +1766,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				}
 				// ...and to add the additional device interface GUIDs
 				r = get_guid(ctx, dev_id, dev_info, &dev_info_data, 0, &if_guid);
-				if (r == LIBUSB_SUCCESS) {
+				if (r == LIBUSB_SUCCESS && if_guid != NULL) {
 					// Check if we've already seen this GUID
 					for (j = EXT_PASS; j < nb_guids; j++) {
 						if (memcmp(guid_list[j], if_guid, sizeof(*if_guid)) == 0)
@@ -1796,7 +1795,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				} else if (r == LIBUSB_ERROR_NO_MEM) {
 					LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 				} else {
-					usbi_warn(ctx, "unexpected error during getting DeviceInterfaceGUID for '%s'", dev_id);
+					if (r != LIBUSB_SUCCESS) {
+						usbi_warn(ctx, "unexpected error during getting DeviceInterfaceGUID for '%s'", dev_id);
+					}
 				}
 				break;
 			case HID_PASS:
