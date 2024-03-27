@@ -553,11 +553,11 @@ static int darwin_device_from_service (struct libusb_context *ctx, io_service_t 
   io_cf_plugin_ref_t *plugInInterface = NULL;
   IOReturn kresult;
   SInt32 score;
-  
+
   const int max_retries = 5;
 
   /* The IOCreatePlugInInterfaceForService function might consistently return
-     an "out of resources" error with certain USB devices the first time we run 
+     an "out of resources" error with certain USB devices the first time we run
      it. The reason is still unclear, but retrying fixes the problem */
   for (int count = 0; count < max_retries; count++) {
     kresult = IOCreatePlugInInterfaceForService(service, kIOUSBDeviceUserClientTypeID,
@@ -1434,6 +1434,9 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
 #endif
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 101200
     case kUSBDeviceSpeedSuperPlus: dev->speed = LIBUSB_SPEED_SUPER_PLUS; break;
+#endif
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 101500
+    case kUSBDeviceSpeedSuperPlusBy2: dev->speed = LIBUSB_SPEED_SUPER_PLUS_X2; break;
 #endif
     default:
       usbi_warn (ctx, "Got unknown device speed %d", devSpeed);
