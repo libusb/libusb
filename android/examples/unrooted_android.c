@@ -210,6 +210,7 @@ static void print_device(libusb_device *dev, libusb_device_handle *handle)
         case LIBUSB_SPEED_HIGH:		speed = "480M"; break;
         case LIBUSB_SPEED_SUPER:	speed = "5G"; break;
         case LIBUSB_SPEED_SUPER_PLUS:	speed = "10G"; break;
+        case LIBUSB_SPEED_SUPER_PLUS_X2:	speed = "20G"; break;
         default:			speed = "Unknown";
     }
 
