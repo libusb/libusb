@@ -933,6 +933,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 			case   480: dev->speed = LIBUSB_SPEED_HIGH; break;
 			case  5000: dev->speed = LIBUSB_SPEED_SUPER; break;
 			case 10000: dev->speed = LIBUSB_SPEED_SUPER_PLUS; break;
+			case 20000: dev->speed = LIBUSB_SPEED_SUPER_PLUS_X2; break;
 			default:
 				usbi_warn(ctx, "unknown device speed: %d Mbps", speed);
 			}
