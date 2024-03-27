@@ -1167,7 +1167,10 @@ enum libusb_speed {
 	LIBUSB_SPEED_SUPER = 4,
 
 	/** The device is operating at super speed plus (10000MBit/s). */
-	LIBUSB_SPEED_SUPER_PLUS = 5
+	LIBUSB_SPEED_SUPER_PLUS = 5,
+
+	/** The device is operating at super speed plus x2 (20000MBit/s). */
+	LIBUSB_SPEED_SUPER_PLUS_X2 = 6,
 };
 
 /** \ingroup libusb_misc
