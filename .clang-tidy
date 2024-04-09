@@ -36,7 +36,6 @@ readability-*,\
 -readability-isolate-declaration,\
 -readability-magic-numbers,\
 -readability-non-const-parameter,\
--readability-uppercase-literal-suffix,\
 "
 #WarningsAsErrors: "*"
 ...
