@@ -3,7 +3,6 @@ Checks: "-*,\
 boost-*,\
 bugprone-*,\
 -bugprone-easily-swappable-parameters,\
--bugprone-implicit-widening-of-multiplication-result,\
 -bugprone-misplaced-widening-cast,\
 -bugprone-narrowing-conversions,\
 -bugprone-signed-char-misuse,\

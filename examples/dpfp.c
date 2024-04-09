@@ -388,7 +388,7 @@ static int save_to_file(unsigned char *data)
 		return -1;
 
 	fputs("P5 384 289 255 ", f);
-	(void)fwrite(data + 64, 1, 384*289, f);
+	(void)fwrite(data + 64, 1, 384L*289L, f);
 	fclose(f);
 	printf("saved image to %s\n", filename);
 	return 0;
