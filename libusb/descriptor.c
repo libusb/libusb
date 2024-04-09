@@ -411,7 +411,7 @@ static int parse_configuration(struct libusb_context *ctx,
 		ptrdiff_t len = buffer - begin;
 		if (len > 0) {
 			uint8_t *extra = realloc((void *)config->extra,
-						 (size_t)(config->extra_length + len));
+						 (size_t)(config->extra_length) + (size_t)len);
 
 			if (!extra) {
 				r = LIBUSB_ERROR_NO_MEM;
