@@ -546,11 +546,14 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 		get_sense(handle, endpoint_in, endpoint_out);
 	} else {
 		display_buffer_hex(data, size);
-		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-			if (fwrite(data, 1, (size_t)size, fd) != (unsigned int)size) {
-				perr("   unable to write binary data\n");
+		if (binary_dump) {
+			fd = fopen(binary_name, "w");
+			if (fd != NULL) {
+				if (fwrite(data, 1, (size_t)size, fd) != (unsigned int)size) {
+					perr("   unable to write binary data\n");
+				}
+				fclose(fd);
 			}
-			fclose(fd);
 		}
 	}
 	free(data);
@@ -628,11 +631,14 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		return -1;
 	}
 	display_buffer_hex(hid_report_descriptor, (unsigned int)descriptor_size);
-	if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-		if (fwrite(hid_report_descriptor, 1, (size_t)descriptor_size, fd) != (size_t)descriptor_size) {
-			printf("   Error writing descriptor to file\n");
+	if (binary_dump) {
+		fd = fopen(binary_name, "w");
+		if (fd != NULL) {
+			if (fwrite(hid_report_descriptor, 1, (size_t)descriptor_size, fd) != (size_t)descriptor_size) {
+				printf("   Error writing descriptor to file\n");
+			}
+			fclose(fd);
 		}
-		fclose(fd);
 	}
 
 	size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_FEATURE);

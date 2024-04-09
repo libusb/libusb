@@ -2701,7 +2701,8 @@ static int darwin_alloc_streams (struct libusb_device_handle *dev_handle, uint32
 
   /* find the minimum number of supported streams on the endpoint list */
   for (i = 0 ; i < num_endpoints ; ++i) {
-    if (0 != (rc = ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, NULL, &cInterface))) {
+    rc = ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, NULL, &cInterface);
+    if (0 != rc) {
       return rc;
     }
 
@@ -2734,7 +2735,8 @@ static int darwin_free_streams (struct libusb_device_handle *dev_handle, unsigne
   int rc;
 
   for (int i = 0 ; i < num_endpoints ; ++i) {
-    if (0 != (rc = ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, NULL, &cInterface)))
+    rc = ep_to_pipeRef (dev_handle, endpoints[i], &pipeRef, NULL, &cInterface);
+    if (0 != rc)
       return rc;
 
     (*IOINTERFACE_V(cInterface, 550))->SupportsStreams (IOINTERFACE(cInterface), pipeRef, &supportsStreams);
