@@ -559,7 +559,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 }
 
 // HID
-static int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int type)
+static int get_hid_record_size(const uint8_t *hid_report_descriptor, int size, int type)
 {
 	uint8_t i, j = 0;
 	uint8_t offset;
