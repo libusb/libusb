@@ -32,7 +32,6 @@ readability-*,\
 -readability-function-cognitive-complexity,\
 -readability-isolate-declaration,\
 -readability-magic-numbers,\
--readability-non-const-parameter,\
 "
 #WarningsAsErrors: "*"
 ...
