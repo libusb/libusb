@@ -66,7 +66,7 @@ static void perr(char const *format, ...)
 	va_end(args);
 }
 
-#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)errcode)); return -1; } while (0)
+#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)(errcode))); return -1; } while (0)
 #define CALL_CHECK(fcall) do { int _r=fcall; if (_r < 0) ERR_EXIT(_r); } while (0)
 #define CALL_CHECK_CLOSE(fcall, hdl) do { int _r=fcall; if (_r < 0) { libusb_close(hdl); ERR_EXIT(_r); } } while (0)
 #define B(x) (((x)!=0)?1:0)

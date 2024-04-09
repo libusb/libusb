@@ -6,7 +6,6 @@ bugprone-*,\
 -bugprone-branch-clone,\
 -bugprone-easily-swappable-parameters,\
 -bugprone-implicit-widening-of-multiplication-result,\
--bugprone-macro-parentheses,\
 -bugprone-misplaced-widening-cast,\
 -bugprone-narrowing-conversions,\
 -bugprone-signed-char-misuse,\
