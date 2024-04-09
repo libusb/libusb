@@ -7,7 +7,6 @@ bugprone-*,\
 -bugprone-narrowing-conversions,\
 -bugprone-signed-char-misuse,\
 -bugprone-switch-missing-default-case,\
--bugprone-too-small-loop-variable,\
 clang-analyzer-*,\
 -clang-analyzer-core.NullDereference,\
 -clang-analyzer-deadcode.DeadStores,\
