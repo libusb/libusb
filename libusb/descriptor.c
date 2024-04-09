@@ -1268,9 +1268,7 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 	r = libusb_get_string_descriptor(dev_handle, 0, 0, str.buf, 4);
 	if (r < 0)
 		return r;
-	else if (r != 4 || str.desc.bLength < 4)
-		return LIBUSB_ERROR_IO;
-	else if (str.desc.bDescriptorType != LIBUSB_DT_STRING)
+	else if (r != 4 || str.desc.bLength < 4 || str.desc.bDescriptorType != LIBUSB_DT_STRING)
 		return LIBUSB_ERROR_IO;
 	else if (str.desc.bLength & 1)
 		usbi_warn(HANDLE_CTX(dev_handle), "suspicious bLength %u for language ID string descriptor", str.desc.bLength);
@@ -1279,9 +1277,7 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 	r = libusb_get_string_descriptor(dev_handle, desc_index, langid, str.buf, sizeof(str.buf));
 	if (r < 0)
 		return r;
-	else if (r < DESC_HEADER_LENGTH || str.desc.bLength > r)
-		return LIBUSB_ERROR_IO;
-	else if (str.desc.bDescriptorType != LIBUSB_DT_STRING)
+	else if (r < DESC_HEADER_LENGTH || str.desc.bLength > r || str.desc.bDescriptorType != LIBUSB_DT_STRING)
 		return LIBUSB_ERROR_IO;
 	else if ((str.desc.bLength & 1) || str.desc.bLength != r)
 		usbi_warn(HANDLE_CTX(dev_handle), "suspicious bLength %u for string descriptor (read %d)", str.desc.bLength, r);
