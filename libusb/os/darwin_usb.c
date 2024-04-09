@@ -2123,7 +2123,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   /* compare descriptors */
   usbi_dbg (ctx, "darwin/reenumerate_device: checking whether descriptors changed");
 
-  if (memcmp (&descriptor, &dpriv->dev_descriptor, sizeof (descriptor))) {
+  if (memcmp (&descriptor, &dpriv->dev_descriptor, sizeof (descriptor)) != 0) {
     /* device descriptor changed. need to return not found. */
     usbi_dbg (ctx, "darwin/reenumerate_device: device descriptor changed");
     return LIBUSB_ERROR_NOT_FOUND;
@@ -2131,7 +2131,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
 
   for (i = 0 ; i < descriptor.bNumConfigurations ; ++i) {
     (void) (*dpriv->device)->GetConfigurationDescriptorPtr (dpriv->device, i, &cached_configuration);
-    if (memcmp (cached_configuration, cached_configurations + i, sizeof (cached_configurations[i]))) {
+    if (memcmp (cached_configuration, cached_configurations + i, sizeof (cached_configurations[i])) != 0) {
       usbi_dbg (ctx, "darwin/reenumerate_device: configuration descriptor %d changed", i);
       return LIBUSB_ERROR_NOT_FOUND;
     }

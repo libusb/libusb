@@ -9,7 +9,6 @@ bugprone-*,\
 -bugprone-misplaced-widening-cast,\
 -bugprone-narrowing-conversions,\
 -bugprone-signed-char-misuse,\
--bugprone-suspicious-string-compare,\
 -bugprone-switch-missing-default-case,\
 clang-analyzer-*,\
 -clang-analyzer-core.NullDereference,\
