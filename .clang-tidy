@@ -37,7 +37,6 @@ readability-*,\
 -readability-magic-numbers,\
 -readability-non-const-parameter,\
 -readability-uppercase-literal-suffix,\
--readability-misleading-indentation,\
 "
 #WarningsAsErrors: "*"
 ...
