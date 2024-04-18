@@ -103,12 +103,24 @@ typedef volatile LONG usbi_atomic_t;
 #define usbi_atomic_inc(a)	InterlockedIncrement((a))
 #define usbi_atomic_dec(a)	InterlockedDecrement((a))
 #else
+#if defined(__HAIKU__) && defined(__GNUC__) && !defined(__clang__)
+/* The Haiku port of libusb has some C++ files and GCC does not define
+ * anything in stdatomic.h when compiled in C++11 (only in C++23).
+ * This appears to be a bug in gcc's stdatomic.h, and should be fixed either
+ * in gcc or in Haiku. Until then, use the gcc builtins. */
+typedef long usbi_atomic_t;
+#define usbi_atomic_load(a)    __atomic_load_n((a), __ATOMIC_SEQ_CST)
+#define usbi_atomic_store(a, v)        __atomic_store_n((a), (v), __ATOMIC_SEQ_CST)
+#define usbi_atomic_inc(a)     __atomic_add_fetch((a), 1, __ATOMIC_SEQ_CST)
+#define usbi_atomic_dec(a)     __atomic_sub_fetch((a), 1, __ATOMIC_SEQ_CST)
+#else
 #include <stdatomic.h>
 typedef atomic_long usbi_atomic_t;
 #define usbi_atomic_load(a)	atomic_load((a))
 #define usbi_atomic_store(a, v)	atomic_store((a), (v))
 #define usbi_atomic_inc(a)	(atomic_fetch_add((a), 1) + 1)
 #define usbi_atomic_dec(a)	(atomic_fetch_add((a), -1) - 1)
+#endif
 #endif
 
 /* Internal abstractions for event handling and thread synchronization */
