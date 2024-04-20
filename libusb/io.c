@@ -1216,7 +1216,7 @@ static void cleanup_removed_event_sources(struct libusb_context *ctx)
 {
 	struct usbi_event_source *ievent_source, *tmp;
 
-	for_each_removed_event_source_safe(ctx, ievent_source, tmp) {
+	for_each_removed_event_source_safe (ctx, ievent_source, tmp) {
 		list_del(&ievent_source->list);
 		free(ievent_source);
 	}
@@ -1286,7 +1286,7 @@ static void calculate_timeout(struct usbi_transfer *itransfer)
  * \returns a newly allocated transfer, or NULL on error
  */
 DEFAULT_VISIBILITY
-struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
+struct libusb_transfer *LIBUSB_CALL libusb_alloc_transfer(
 	int iso_packets)
 {
 	assert(iso_packets >= 0);
@@ -1333,7 +1333,7 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 	if (!transfer)
 		return;
 
-	usbi_dbg(TRANSFER_CTX(transfer), "transfer %p", (void *) transfer);
+	usbi_dbg(TRANSFER_CTX(transfer), "transfer %p", (void *)transfer);
 	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER)
 		free(transfer->buffer);
 
@@ -1360,7 +1360,7 @@ static int arm_timer_for_next_timeout(struct libusb_context *ctx)
 	if (!usbi_using_timer(ctx))
 		return 0;
 
-	for_each_transfer(ctx, itransfer) {
+	for_each_transfer (ctx, itransfer) {
 		struct timespec *cur_ts = &itransfer->timeout;
 
 		/* if we've reached transfers of infinite timeout, then we have no
@@ -1415,7 +1415,7 @@ static int add_to_flying_list(struct usbi_transfer *itransfer)
 	}
 
 	/* otherwise, find appropriate place in list */
-	for_each_transfer(ctx, cur) {
+	for_each_transfer (ctx, cur) {
 		/* find first timeout that occurs after the transfer in question */
 		struct timespec *cur_ts = &cur->timeout;
 
@@ -1496,7 +1496,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 	itransfer->dev = libusb_ref_device(transfer->dev_handle->dev);
 
 	ctx = HANDLE_CTX(transfer->dev_handle);
-	usbi_dbg(ctx, "transfer %p", (void *) transfer);
+	usbi_dbg(ctx, "transfer %p", (void *)transfer);
 
 	/*
 	 * Important note on locking, this function takes / releases locks
@@ -1610,17 +1610,16 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
 	int r;
 
-	usbi_dbg(ctx, "transfer %p", (void *) transfer );
+	usbi_dbg(ctx, "transfer %p", (void *)transfer);
 	usbi_mutex_lock(&itransfer->lock);
-	if (!(itransfer->state_flags & USBI_TRANSFER_IN_FLIGHT)
-			|| (itransfer->state_flags & USBI_TRANSFER_CANCELLING)) {
+	if (!(itransfer->state_flags & USBI_TRANSFER_IN_FLIGHT) || (itransfer->state_flags & USBI_TRANSFER_CANCELLING)) {
 		r = LIBUSB_ERROR_NOT_FOUND;
 		goto out;
 	}
 	r = usbi_backend.cancel_transfer(itransfer);
 	if (r < 0) {
 		if (r != LIBUSB_ERROR_NOT_FOUND &&
-		    r != LIBUSB_ERROR_NO_DEVICE)
+			r != LIBUSB_ERROR_NO_DEVICE)
 			usbi_err(ctx, "cancel transfer failed error %d", r);
 		else
 			usbi_dbg(ctx, "cancel transfer failed error %d", r);
@@ -1700,8 +1699,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	itransfer->state_flags &= ~USBI_TRANSFER_IN_FLIGHT;
 	usbi_mutex_unlock(&itransfer->lock);
 
-	if (status == LIBUSB_TRANSFER_COMPLETED
-			&& transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) {
+	if (status == LIBUSB_TRANSFER_COMPLETED && transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) {
 		int rqlen = transfer->length;
 		if (transfer->type == LIBUSB_TRANSFER_TYPE_CONTROL)
 			rqlen -= LIBUSB_CONTROL_SETUP_SIZE;
@@ -1716,9 +1714,9 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	transfer->actual_length = itransfer->transferred;
 	assert(transfer->actual_length >= 0);
 	usbi_dbg(ctx, "transfer %p has callback %p",
-		 (void *) transfer, transfer->callback);
+		(void *)transfer, transfer->callback);
 	if (transfer->callback) {
-		libusb_lock_event_waiters (ctx);
+		libusb_lock_event_waiters(ctx);
 		transfer->callback(transfer);
 		libusb_unlock_event_waiters(ctx);
 	}
@@ -2075,7 +2073,7 @@ static void handle_timeouts_locked(struct libusb_context *ctx)
 
 	/* iterate through flying transfers list, finding all transfers that
 	 * have expired timeouts */
-	for_each_transfer(ctx, itransfer) {
+	for_each_transfer (ctx, itransfer) {
 		struct timespec *cur_ts = &itransfer->timeout;
 
 		/* if we've reached transfers of infinite timeout, we're all done */
@@ -2153,7 +2151,7 @@ static int handle_event_trigger(struct libusb_context *ctx)
 		list_cut(&completed_transfers, &ctx->completed_transfers);
 		usbi_mutex_unlock(&ctx->event_data_lock);
 
-		__for_each_completed_transfer_safe(&completed_transfers, itransfer, tmp) {
+		__for_each_completed_transfer_safe (&completed_transfers, itransfer, tmp) {
 			list_del(&itransfer->completed_list);
 			r = usbi_backend.handle_transfer_completion(itransfer);
 			if (r) {
@@ -2589,7 +2587,7 @@ int API_EXPORTED libusb_get_next_timeout(libusb_context *ctx,
 	}
 
 	/* find next transfer which hasn't already been processed as timed out */
-	for_each_transfer(ctx, itransfer) {
+	for_each_transfer (ctx, itransfer) {
 		if (itransfer->timeout_flags & (USBI_TRANSFER_TIMEOUT_HANDLED | USBI_TRANSFER_OS_HANDLES_TIMEOUT))
 			continue;
 
@@ -2652,8 +2650,8 @@ void API_EXPORTED libusb_set_pollfd_notifiers(libusb_context *ctx,
 	ctx->fd_removed_cb = removed_cb;
 	ctx->fd_cb_user_data = user_data;
 #else
-	usbi_err(ctx, "external polling of libusb's internal event sources " \
-		"is not yet supported on Windows");
+	usbi_err(ctx, "external polling of libusb's internal event sources "
+				  "is not yet supported on Windows");
 	UNUSED(added_cb);
 	UNUSED(removed_cb);
 	UNUSED(user_data);
@@ -2710,7 +2708,7 @@ void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_ha
 
 	usbi_dbg(ctx, "remove " USBI_OS_HANDLE_FORMAT_STRING, os_handle);
 	usbi_mutex_lock(&ctx->event_data_lock);
-	for_each_event_source(ctx, ievent_source) {
+	for_each_event_source (ctx, ievent_source) {
 		if (ievent_source->data.os_handle == os_handle) {
 			found = 1;
 			break;
@@ -2750,7 +2748,7 @@ void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_ha
  * \returns NULL on platforms where the functionality is not available
  */
 DEFAULT_VISIBILITY
-const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
+const struct libusb_pollfd **LIBUSB_CALL libusb_get_pollfds(
 	libusb_context *ctx)
 {
 #if !defined(PLATFORM_WINDOWS)
@@ -2759,14 +2757,14 @@ const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 	size_t i;
 
 	static_assert(sizeof(struct usbi_event_source_data) == sizeof(struct libusb_pollfd),
-		      "mismatch between usbi_event_source_data and libusb_pollfd sizes");
+		"mismatch between usbi_event_source_data and libusb_pollfd sizes");
 
 	ctx = usbi_get_context(ctx);
 
 	usbi_mutex_lock(&ctx->event_data_lock);
 
 	i = 0;
-	for_each_event_source(ctx, ievent_source)
+	for_each_event_source (ctx, ievent_source)
 		i++;
 
 	ret = calloc(i + 1, sizeof(struct libusb_pollfd *));
@@ -2774,15 +2772,15 @@ const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 		goto out;
 
 	i = 0;
-	for_each_event_source(ctx, ievent_source)
+	for_each_event_source (ctx, ievent_source)
 		ret[i++] = (struct libusb_pollfd *)ievent_source;
 
 out:
 	usbi_mutex_unlock(&ctx->event_data_lock);
 	return (const struct libusb_pollfd **)ret;
 #else
-	usbi_err(ctx, "external polling of libusb's internal event sources " \
-		"is not yet supported on Windows");
+	usbi_err(ctx, "external polling of libusb's internal event sources "
+				  "is not yet supported on Windows");
 	return NULL;
 #endif
 }
@@ -2836,7 +2834,7 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 	while (1) {
 		to_cancel = NULL;
 		usbi_mutex_lock(&ctx->flying_transfers_lock);
-		for_each_transfer(ctx, cur) {
+		for_each_transfer (ctx, cur) {
 			struct libusb_transfer *cur_transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(cur);
 			if (cur_transfer->dev_handle == dev_handle) {
 				usbi_mutex_lock(&cur->lock);
@@ -2855,7 +2853,7 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 
 		struct libusb_transfer *transfer_to_cancel = USBI_TRANSFER_TO_LIBUSB_TRANSFER(to_cancel);
 		usbi_dbg(ctx, "cancelling transfer %p from disconnect",
-			 (void *) transfer_to_cancel);
+			(void *)transfer_to_cancel);
 
 		usbi_mutex_lock(&to_cancel->lock);
 		usbi_backend.clear_transfer_priv(to_cancel);
