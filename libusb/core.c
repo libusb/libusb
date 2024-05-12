@@ -1603,7 +1603,7 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 		 * Clear the event pipe if there are no further pending events. */
 		usbi_mutex_lock(&ctx->event_data_lock);
 		if (!--ctx->device_close)
-			ctx->event_flags &= ~USBI_EVENT_DEVICE_CLOSE;
+			ctx->event_flags &= ~(unsigned int)USBI_EVENT_DEVICE_CLOSE;
 		if (!ctx->event_flags)
 			usbi_clear_event(&ctx->event);
 		usbi_mutex_unlock(&ctx->event_data_lock);
