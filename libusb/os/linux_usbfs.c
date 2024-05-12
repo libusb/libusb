@@ -1628,8 +1628,9 @@ out:
 	return ret;
 }
 
-static int do_streams_ioctl(struct libusb_device_handle *handle, long req,
-	uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
+static int do_streams_ioctl(struct libusb_device_handle *handle,
+	unsigned long req, uint32_t num_streams, unsigned char *endpoints,
+	int num_endpoints)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int r, fd = hpriv->fd;
