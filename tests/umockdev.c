@@ -236,7 +236,7 @@ static gboolean
 handle_ioctl_cb (UMockdevIoctlBase *handler, UMockdevIoctlClient *client, UMockdevTestbedFixture *fixture)
 {
 	UMockdevIoctlData *ioctl_arg;
-	long int request;
+	long unsigned int request;
 	struct usbdevfs_urb *urb;
 
 	(void) handler;
@@ -279,13 +279,13 @@ handle_ioctl_cb (UMockdevIoctlBase *handler, UMockdevIoctlClient *client, UMockd
 		if (!fixture->chat || !fixture->chat->submit)
 			return FALSE;
 
-		buflen = fixture->chat->buffer_length;
+		buflen = (gsize) fixture->chat->buffer_length;
 		if (fixture->chat->type == USBDEVFS_URB_TYPE_CONTROL)
 			buflen = 8;
 
 		urb_data = umockdev_ioctl_data_resolve(ioctl_arg, 0, sizeof(struct usbdevfs_urb), NULL);
 		urb = (struct usbdevfs_urb*) urb_data->data;
-		urb_buffer = umockdev_ioctl_data_resolve(urb_data, G_STRUCT_OFFSET(struct usbdevfs_urb, buffer), urb->buffer_length, NULL);
+		urb_buffer = umockdev_ioctl_data_resolve(urb_data, G_STRUCT_OFFSET(struct usbdevfs_urb, buffer), (gsize) urb->buffer_length, NULL);
 
 		if (fixture->chat->type == urb->type &&
 		    fixture->chat->endpoint == urb->endpoint &&
@@ -319,7 +319,7 @@ handle_ioctl_cb (UMockdevIoctlBase *handler, UMockdevIoctlClient *client, UMockd
 			   fixture->chat->type, fixture->chat->endpoint,
 			   fixture->chat->actual_length, fixture->chat->buffer_length);
 		if (fixture->chat->buffer)
-			dump_buffer(fixture->chat->buffer, buflen);
+			dump_buffer(fixture->chat->buffer, (int) buflen);
 
 		return FALSE;
 	}
@@ -354,7 +354,7 @@ handle_ioctl_cb (UMockdevIoctlBase *handler, UMockdevIoctlClient *client, UMockd
 				if (urb->type == USBDEVFS_URB_TYPE_CONTROL && urb->actual_length)
 					urb->actual_length -= 8;
 				if (fixture->chat->buffer)
-					memcpy(urb->buffer, fixture->chat->buffer, fixture->chat->actual_length);
+					memcpy(urb->buffer, fixture->chat->buffer, (size_t) fixture->chat->actual_length);
 				urb->status = fixture->chat->status;
 
 				urb_ptr = umockdev_ioctl_data_resolve(ioctl_arg, 0, sizeof(gpointer), NULL);
@@ -487,7 +487,7 @@ test_fixture_teardown(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 
 	if (fixture->ctx) {
 		libusb_device **devs = NULL;
-		int count = libusb_get_device_list(fixture->ctx, &devs);
+		int count = (int) libusb_get_device_list(fixture->ctx, &devs);
 		libusb_free_device_list(devs, TRUE);
 
 		libusb_exit (fixture->ctx);
@@ -930,7 +930,7 @@ test_threaded_submit(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 			libusb_fill_bulk_transfer(data.transfers[urb],
 						  handle,
 						  LIBUSB_ENDPOINT_IN,
-						  g_malloc(out_msg.buffer_length),
+						  g_malloc((gsize) out_msg.buffer_length),
 						  out_msg.buffer_length,
 						  test_threaded_submit_transfer_cb,
 						  &data,
