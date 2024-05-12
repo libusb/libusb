@@ -1255,7 +1255,7 @@ static void calculate_timeout(struct usbi_transfer *itransfer)
 	usbi_get_monotonic_time(&itransfer->timeout);
 
 	itransfer->timeout.tv_sec += timeout / 1000U;
-	itransfer->timeout.tv_nsec += (timeout % 1000U) * 1000000L;
+	itransfer->timeout.tv_nsec += (long)(timeout % 1000) * 1000000L;
 	if (itransfer->timeout.tv_nsec >= NSEC_PER_SEC) {
 		++itransfer->timeout.tv_sec;
 		itransfer->timeout.tv_nsec -= NSEC_PER_SEC;
