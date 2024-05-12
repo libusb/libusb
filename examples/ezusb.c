@@ -131,7 +131,7 @@ static int ezusb_write(libusb_device_handle *device, const char *label,
 		logerror("%s, addr 0x%08x len %4u (0x%04x)\n", label, addr, (unsigned)len, (unsigned)len);
 	status = libusb_control_transfer(device,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
-		opcode, addr & 0xFFFF, addr >> 16,
+		opcode, addr & 0xFFFF, (uint16_t)(addr >> 16),
 		(unsigned char*)data, (uint16_t)len, 1000);
 	if (status != (signed)len) {
 		if (status < 0)
@@ -158,7 +158,7 @@ static int ezusb_read(libusb_device_handle *device, const char *label,
 		logerror("%s, addr 0x%08x len %4u (0x%04x)\n", label, addr, (unsigned)len, (unsigned)len);
 	status = libusb_control_transfer(device,
 		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
-		opcode, addr & 0xFFFF, addr >> 16,
+		opcode, addr & 0xFFFF, (uint16_t)(addr >> 16),
 		(unsigned char*)data, (uint16_t)len, 1000);
 	if (status != (signed)len) {
 		if (status < 0)
@@ -186,7 +186,7 @@ static bool ezusb_cpucs(libusb_device_handle *device, uint32_t addr, bool doRun)
 		logerror("%s\n", data ? "stop CPU" : "reset CPU");
 	status = libusb_control_transfer(device,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
-		RW_INTERNAL, addr & 0xFFFF, addr >> 16,
+		RW_INTERNAL, addr & 0xFFFF, (uint16_t)(addr >> 16),
 		&data, 1, 1000);
 	if ((status != 1) &&
 		/* We may get an I/O error from libusb as the device disappears */
@@ -214,7 +214,7 @@ static bool ezusb_fx3_jump(libusb_device_handle *device, uint32_t addr)
 		logerror("transfer execution to Program Entry at 0x%08x\n", addr);
 	status = libusb_control_transfer(device,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
-		RW_INTERNAL, addr & 0xFFFF, addr >> 16,
+		RW_INTERNAL, addr & 0xFFFF, (uint16_t)(addr >> 16),
 		NULL, 0, 1000);
 	/* We may get an I/O error from libusb as the device disappears */
 	if ((status != 0) && (status != LIBUSB_ERROR_IO))
@@ -463,8 +463,8 @@ static int parse_iic(FILE *image, void *context,
 			logerror("unable to read IIC block header\n");
 			return -1;
 		}
-		data_len = (block_header[0] << 8) + block_header[1];
-		data_addr = (block_header[2] << 8) + block_header[3];
+		data_len = (size_t)(block_header[0] << 8) + block_header[1];
+		data_addr = (uint32_t)(block_header[2] << 8) + block_header[3];
 		if (data_len > sizeof(data)) {
 			/* If this is ever reported as an error, switch to using malloc/realloc */
 			logerror("IIC data block too small - please report this error to libusb.info\n");

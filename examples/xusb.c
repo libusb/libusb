@@ -50,7 +50,7 @@ static const char* binary_name = NULL;
 static inline void msleep(int msecs)
 {
 #if defined(_WIN32)
-	Sleep(msecs);
+	Sleep((DWORD)msecs);
 #else
 	const struct timespec ts = { msecs / 1000, (msecs % 1000) * 1000000L };
 	nanosleep(&ts, NULL);
@@ -150,7 +150,7 @@ static enum test_type {
 } test_mode;
 static uint16_t VID, PID;
 
-static void display_buffer_hex(unsigned char *buffer, unsigned size)
+static void display_buffer_hex(unsigned char *buffer, unsigned int size)
 {
 	unsigned i, j, k;
 
@@ -318,7 +318,7 @@ static int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_
 }
 
 static int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, uint8_t lun,
-	uint8_t *cdb, uint8_t direction, int data_length, uint32_t *ret_tag)
+	uint8_t *cdb, uint8_t direction, uint32_t data_length, uint32_t *ret_tag)
 {
 	static uint32_t tag = 1;
 	uint8_t cdb_len;
@@ -540,12 +540,12 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	cdb[8] = 0x01;	// 1 block
 
 	send_mass_storage_command(handle, endpoint_out, lun, cdb, LIBUSB_ENDPOINT_IN, block_size, &expected_tag);
-	libusb_bulk_transfer(handle, endpoint_in, data, block_size, &size, 5000);
+	libusb_bulk_transfer(handle, endpoint_in, data, (int)block_size, &size, 5000);
 	printf("   READ: received %d bytes\n", size);
 	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
 		get_sense(handle, endpoint_in, endpoint_out);
 	} else {
-		display_buffer_hex(data, size);
+		display_buffer_hex(data, (unsigned int)size);
 		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
 			if (fwrite(data, 1, (size_t)size, fd) != (unsigned int)size) {
 				perr("   unable to write binary data\n");
@@ -603,7 +603,7 @@ static int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int typ
 		}
 		if (found_record_marker) {
 			found_record_marker = false;
-			record_size[j] += nb_items*nb_bits;
+			record_size[j] += (int)(nb_items*nb_bits);
 		}
 	}
 	if ((type < HID_REPORT_TYPE_INPUT) || (type > HID_REPORT_TYPE_FEATURE)) {

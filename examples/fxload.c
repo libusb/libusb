@@ -89,7 +89,7 @@ int main(int argc, char*argv[])
 	const char *ext, *img_name[] = IMG_TYPE_NAMES;
 	int fx_type = FX_TYPE_UNDEFINED, img_type[ARRAYSIZE(path)];
 	int opt, status;
-	unsigned int i, j;
+	int i, j;
 	unsigned vid = 0, pid = 0;
 	unsigned busnum = 0, devaddr = 0, _busnum, _devaddr;
 	libusb_device *dev, **devs;
@@ -199,7 +199,7 @@ int main(int argc, char*argv[])
 						logerror("examining %04x:%04x (%d,%d)\n",
 							desc.idVendor, desc.idProduct, _busnum, _devaddr);
 					}
-					for (j=0; j<ARRAYSIZE(known_device); j++) {
+					for (j=0; j<(int)ARRAYSIZE(known_device); j++) {
 						if ((desc.idVendor == known_device[j].vid)
 							&& (desc.idProduct == known_device[j].pid)) {
 							if (// nothing was specified
@@ -219,7 +219,7 @@ int main(int argc, char*argv[])
 							}
 						}
 					}
-					if (j < ARRAYSIZE(known_device)) {
+					if (j < (int)ARRAYSIZE(known_device)) {
 						if (verbose)
 							logerror("found device '%s' [%04x:%04x] (%d,%d)\n",
 								known_device[j].designation, vid, pid, busnum, devaddr);
@@ -260,7 +260,7 @@ int main(int argc, char*argv[])
 	if (verbose)
 		logerror("microcontroller type: %s\n", fx_name[fx_type]);
 
-	for (i=0; i<ARRAYSIZE(path); i++) {
+	for (i=0; i<(int)ARRAYSIZE(path); i++) {
 		if (path[i] != NULL) {
 			ext = path[i] + strlen(path[i]) - 4;
 			if ((_stricmp(ext, ".hex") == 0) || (strcmp(ext, ".ihx") == 0))
