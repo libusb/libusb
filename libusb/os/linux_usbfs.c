@@ -2518,7 +2518,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 			&transfer->iso_packet_desc[tpriv->iso_packet_offset++];
 
 		lib_desc->status = LIBUSB_TRANSFER_COMPLETED;
-		switch (urb_desc->status) {
+		switch ((int)urb_desc->status) {
 		case 0:
 			break;
 		case -ENOENT: /* cancelled */
