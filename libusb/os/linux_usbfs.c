@@ -599,12 +599,13 @@ int linux_get_device_address(struct libusb_context *ctx, int detached,
 		if (!dev_node && fd >= 0) {
 			char *fd_path = alloca(PATH_MAX);
 			char proc_path[32];
+			ssize_t llen;
 
 			/* try to retrieve the device node from fd */
 			snprintf(proc_path, sizeof(proc_path), "/proc/self/fd/%d", fd);
-			r = readlink(proc_path, fd_path, PATH_MAX - 1);
-			if (r > 0) {
-				fd_path[r] = '\0';
+			llen = readlink(proc_path, fd_path, PATH_MAX - 1);
+			if (llen > 0) {
+				fd_path[llen] = '\0';
 				dev_node = fd_path;
 			}
 		}
@@ -822,7 +823,7 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 
 	len = MIN(len, (size_t)r);
 	memcpy(buffer, config_desc, len);
-	return len;
+	return (int)len;
 }
 
 static int op_get_config_descriptor(struct libusb_device *dev,
@@ -837,7 +838,7 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 	config = &priv->config_descriptors[config_index];
 	len = MIN(len, config->actual_len);
 	memcpy(buffer, config->desc, len);
-	return len;
+	return (int)len;
 }
 
 /* send a control message to retrieve active configuration */
@@ -948,9 +949,11 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	} else if (wrapped_fd < 0) {
 		fd = get_usbfs_fd(dev, O_RDONLY, 0);
 	} else {
+		off_t offs;
+
 		fd = wrapped_fd;
-		r = lseek(fd, 0, SEEK_SET);
-		if (r < 0) {
+		offs = lseek(fd, 0, SEEK_SET);
+		if (offs < 0) {
 			usbi_err(ctx, "lseek failed, errno=%d", errno);
 			return LIBUSB_ERROR_IO;
 		}
@@ -1048,7 +1051,7 @@ static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_di
 
 	if ((tmp = strrchr(parent_sysfs_dir, '.')) ||
 	    (tmp = strrchr(parent_sysfs_dir, '-'))) {
-	        dev->port_number = atoi(tmp + 1);
+	        dev->port_number = (uint8_t)atoi(tmp + 1);
 		*tmp = '\0';
 	} else {
 		usbi_warn(ctx, "Can not parse sysfs_dir: %s, no parent info",
@@ -1368,7 +1371,7 @@ static int op_wrap_sys_device(struct libusb_context *ctx,
 		/* There is no ioctl to get the bus number. We choose 0 here
 		 * as linux starts numbering buses from 1. */
 		busnum = 0;
-		devaddr = ci.devnum;
+		devaddr = (uint8_t)ci.devnum;
 	}
 
 	/* Session id is unused as we do not add the device to the list of
