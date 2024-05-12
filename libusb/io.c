@@ -2117,35 +2117,35 @@ static int handle_event_trigger(struct libusb_context *ctx)
 	usbi_mutex_lock(&ctx->event_data_lock);
 
 	/* check if someone modified the event sources */
-	if (ctx->event_flags & (unsigned int)USBI_EVENT_EVENT_SOURCES_MODIFIED)
+	if (ctx->event_flags & USBI_EVENT_EVENT_SOURCES_MODIFIED)
 		usbi_dbg(ctx, "someone updated the event sources");
 
-	if (ctx->event_flags & (unsigned int)USBI_EVENT_USER_INTERRUPT) {
+	if (ctx->event_flags & USBI_EVENT_USER_INTERRUPT) {
 		usbi_dbg(ctx, "someone purposefully interrupted");
-		ctx->event_flags &= ~(unsigned int)USBI_EVENT_USER_INTERRUPT;
+		ctx->event_flags &= ~USBI_EVENT_USER_INTERRUPT;
 	}
 
-	if (ctx->event_flags & (unsigned int)USBI_EVENT_HOTPLUG_CB_DEREGISTERED) {
+	if (ctx->event_flags & USBI_EVENT_HOTPLUG_CB_DEREGISTERED) {
 		usbi_dbg(ctx, "someone unregistered a hotplug cb");
-		ctx->event_flags &= ~(unsigned int)USBI_EVENT_HOTPLUG_CB_DEREGISTERED;
+		ctx->event_flags &= ~USBI_EVENT_HOTPLUG_CB_DEREGISTERED;
 		hotplug_event = 1;
 	}
 
 	/* check if someone is closing a device */
-	if (ctx->event_flags & (unsigned int)USBI_EVENT_DEVICE_CLOSE)
+	if (ctx->event_flags & USBI_EVENT_DEVICE_CLOSE)
 		usbi_dbg(ctx, "someone is closing a device");
 
 	/* check for any pending hotplug messages */
 	if (ctx->event_flags & USBI_EVENT_HOTPLUG_MSG_PENDING) {
 		usbi_dbg(ctx, "hotplug message received");
-		ctx->event_flags &= ~(unsigned int)USBI_EVENT_HOTPLUG_MSG_PENDING;
+		ctx->event_flags &= ~USBI_EVENT_HOTPLUG_MSG_PENDING;
 		hotplug_event = 1;
 		assert(!list_empty(&ctx->hotplug_msgs));
 		list_cut(&hotplug_msgs, &ctx->hotplug_msgs);
 	}
 
 	/* complete any pending transfers */
-	if (ctx->event_flags & (unsigned int)USBI_EVENT_TRANSFER_COMPLETED) {
+	if (ctx->event_flags & USBI_EVENT_TRANSFER_COMPLETED) {
 		struct usbi_transfer *itransfer, *tmp;
 		struct list_head completed_transfers;
 
@@ -2167,7 +2167,7 @@ static int handle_event_trigger(struct libusb_context *ctx)
 			/* an error occurred, put the remaining transfers back on the list */
 			list_splice_front(&completed_transfers, &ctx->completed_transfers);
 		} else if (list_empty(&ctx->completed_transfers)) {
-			ctx->event_flags &= ~(unsigned int)USBI_EVENT_TRANSFER_COMPLETED;
+			ctx->event_flags &= ~USBI_EVENT_TRANSFER_COMPLETED;
 		}
 	}
 
@@ -2232,7 +2232,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 		}
 
 		/* reset the flag now that we have the updated list */
-		ctx->event_flags &= ~(unsigned int)USBI_EVENT_EVENT_SOURCES_MODIFIED;
+		ctx->event_flags &= ~USBI_EVENT_EVENT_SOURCES_MODIFIED;
 
 		/* if no further pending events, clear the event so that we do
 		 * not immediately return from the wait function */

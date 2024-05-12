@@ -471,25 +471,24 @@ static inline struct libusb_context *usbi_get_context(struct libusb_context *ctx
 	return ctx;
 }
 
-enum usbi_event_flags {
-	/* The list of event sources has been modified */
-	USBI_EVENT_EVENT_SOURCES_MODIFIED = 1U << 0,
+/* event flags of the ctx structure */
+/* The list of event sources has been modified */
+#define USBI_EVENT_EVENT_SOURCES_MODIFIED  (1U << 0)
 
-	/* The user has interrupted the event handler */
-	USBI_EVENT_USER_INTERRUPT = 1U << 1,
+/* The user has interrupted the event handler */
+#define USBI_EVENT_USER_INTERRUPT          (1U << 1)
 
-	/* A hotplug callback deregistration is pending */
-	USBI_EVENT_HOTPLUG_CB_DEREGISTERED = 1U << 2,
+/* A hotplug callback deregistration is pending */
+#define USBI_EVENT_HOTPLUG_CB_DEREGISTERED (1U << 2)
 
-	/* One or more hotplug messages are pending */
-	USBI_EVENT_HOTPLUG_MSG_PENDING = 1U << 3,
+/* One or more hotplug messages are pending */
+#define USBI_EVENT_HOTPLUG_MSG_PENDING     (1U << 3)
 
-	/* One or more completed transfers are pending */
-	USBI_EVENT_TRANSFER_COMPLETED = 1U << 4,
+/* One or more completed transfers are pending */
+#define USBI_EVENT_TRANSFER_COMPLETED      (1U << 4)
 
-	/* A device is in the process of being closed */
-	USBI_EVENT_DEVICE_CLOSE = 1U << 5,
-};
+/* A device is in the process of being closed */
+#define USBI_EVENT_DEVICE_CLOSE            (1U << 5)
 
 /* Macros for managing event handling state */
 static inline int usbi_handling_events(struct libusb_context *ctx)
