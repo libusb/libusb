@@ -1642,13 +1642,13 @@ static int do_streams_ioctl(struct libusb_device_handle *handle,
 	if (num_endpoints > 30) /* Max 15 in + 15 out eps */
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	streams = malloc(sizeof(*streams) + num_endpoints);
+	streams = malloc(sizeof(*streams) + (size_t)num_endpoints);
 	if (!streams)
 		return LIBUSB_ERROR_NO_MEM;
 
 	streams->num_streams = num_streams;
-	streams->num_eps = num_endpoints;
-	memcpy(streams->eps, endpoints, num_endpoints);
+	streams->num_eps = (unsigned int)num_endpoints;
+	memcpy(streams->eps, endpoints, (size_t)num_endpoints);
 
 	r = ioctl(fd, req, streams);
 
@@ -1979,7 +1979,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 		num_urbs++;
 	}
 	usbi_dbg(TRANSFER_CTX(transfer), "need %d urbs for new transfer with length %d", num_urbs, transfer->length);
-	urbs = calloc(num_urbs, sizeof(*urbs));
+	urbs = calloc((size_t)num_urbs, sizeof(*urbs));
 	if (!urbs)
 		return LIBUSB_ERROR_NO_MEM;
 	tpriv->urbs = urbs;
@@ -2130,7 +2130,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 	usbi_dbg(TRANSFER_CTX(transfer), "need %d urbs for new transfer with length %d", num_urbs, transfer->length);
 
-	urbs = calloc(num_urbs, sizeof(*urbs));
+	urbs = calloc((size_t)num_urbs, sizeof(*urbs));
 	if (!urbs)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -2149,7 +2149,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		int k;
 
 		alloc_size = sizeof(*urb)
-			+ (num_packets_in_urb * sizeof(struct usbfs_iso_packet_desc));
+			+ ((unsigned int)num_packets_in_urb * sizeof(struct usbfs_iso_packet_desc));
 		urb = calloc(1, alloc_size);
 		if (!urb) {
 			free_iso_urbs(tpriv);
@@ -2160,7 +2160,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		/* populate packet lengths */
 		for (k = 0; k < num_packets_in_urb; j++, k++) {
 			packet_len = transfer->iso_packet_desc[j].length;
-			urb->buffer_length += packet_len;
+			urb->buffer_length += (int)packet_len;
 			urb->iso_frame_desc[k].length = packet_len;
 		}
 
@@ -2351,7 +2351,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 {
 	struct linux_transfer_priv *tpriv = usbi_get_transfer_priv(itransfer);
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	int urb_idx = urb - tpriv->urbs;
+	int urb_idx = (int)(urb - tpriv->urbs);
 
 	usbi_mutex_lock(&itransfer->lock);
 	usbi_dbg(TRANSFER_CTX(transfer), "handling completion status %d of bulk urb %d/%d", urb->status,
@@ -2387,7 +2387,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 				usbi_dbg(TRANSFER_CTX(transfer), "moving surplus data from offset %zu to offset %zu",
 					 (unsigned char *)urb->buffer - transfer->buffer,
 					 target - transfer->buffer);
-				memmove(target, urb->buffer, urb->actual_length);
+				memmove(target, urb->buffer, (size_t)urb->actual_length);
 			}
 			itransfer->transferred += urb->actual_length;
 		}
