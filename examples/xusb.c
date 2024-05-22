@@ -770,7 +770,7 @@ static void print_sublink_speed_attribute(struct libusb_ssplus_sublink_attribute
 	static const char exponent[] = " KMG";
 	printf("                  id=%u speed=%u%cbs %s %s SuperSpeed%s",
 		ss_attr->ssid,
-		ss_attr->mantisa,
+		ss_attr->mantissa,
 		(exponent[ss_attr->exponent]),
 		(ss_attr->type == LIBUSB_SSPLUS_ATTR_TYPE_ASYM)? "Asym" : "Sym",
 		(ss_attr->direction == LIBUSB_SSPLUS_ATTR_DIR_TX)? "TX" : "RX",
