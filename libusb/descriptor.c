@@ -1070,7 +1070,7 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	for(uint8_t i = 0 ; i < _ssplus_cap->numSublinkSpeedAttributes ; i++) {
 		uint32_t attr = READ_LE32(base + i * sizeof(uint32_t));
 		_ssplus_cap->sublinkSpeedAttributes[i].ssid = attr & 0x0f;
-		_ssplus_cap->sublinkSpeedAttributes[i].mantisa = attr >> 16;
+		_ssplus_cap->sublinkSpeedAttributes[i].mantissa = attr >> 16;
 		_ssplus_cap->sublinkSpeedAttributes[i].exponent = (attr >> 4) & 0x3 ;
 		_ssplus_cap->sublinkSpeedAttributes[i].type = attr & 0x40 ? 	LIBUSB_SSPLUS_ATTR_TYPE_ASYM : LIBUSB_SSPLUS_ATTR_TYPE_SYM;
 		_ssplus_cap->sublinkSpeedAttributes[i].direction = attr & 0x80 ? 	LIBUSB_SSPLUS_ATTR_DIR_TX : 	LIBUSB_SSPLUS_ATTR_DIR_RX;
