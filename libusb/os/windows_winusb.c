@@ -1492,7 +1492,7 @@ static int get_guid(struct libusb_context *ctx, char *dev_id, HDEVINFO *dev_info
 			// The GUID was read successfully
 			break;
 		} else if (s == ERROR_FILE_NOT_FOUND) {
-			usbi_info(ctx, "no DeviceInterfaceGUID registered for '%s'", dev_id);
+			usbi_dbg(ctx, "no DeviceInterfaceGUID registered for '%s'", dev_id);
 			err = LIBUSB_ERROR_ACCESS;
 			goto exit;
 		} else if (s == ERROR_MORE_DATA) {
