@@ -854,7 +854,6 @@ static int test_device(uint16_t vid, uint16_t pid)
 	libusb_device_handle *handle;
 	libusb_device *dev;
 	uint8_t bus, port_path[8];
-	struct libusb_bos_descriptor *bos_desc;
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
@@ -908,14 +907,18 @@ static int test_device(uint16_t vid, uint16_t pid)
 	string_index[1] = dev_desc.iProduct;
 	string_index[2] = dev_desc.iSerialNumber;
 
-	printf("\nReading BOS descriptor: ");
-	if (libusb_get_bos_descriptor(handle, &bos_desc) == LIBUSB_SUCCESS) {
-		printf("%d caps\n", bos_desc->bNumDeviceCaps);
-		for (i = 0; i < bos_desc->bNumDeviceCaps; i++)
-			print_device_cap(bos_desc->dev_capability[i]);
-		libusb_free_bos_descriptor(bos_desc);
-	} else {
-		printf("no descriptor\n");
+	if (dev_desc.bcdUSB >= 0x0201) {
+		struct libusb_bos_descriptor *bos_desc;
+
+		printf("\nReading BOS descriptor: ");
+		if (libusb_get_bos_descriptor(handle, &bos_desc) == LIBUSB_SUCCESS) {
+			printf("%d caps\n", bos_desc->bNumDeviceCaps);
+			for (i = 0; i < bos_desc->bNumDeviceCaps; i++)
+				print_device_cap(bos_desc->dev_capability[i]);
+			libusb_free_bos_descriptor(bos_desc);
+		} else {
+			printf("no descriptor\n");
+		}
 	}
 
 	printf("\nReading first configuration descriptor:\n");
