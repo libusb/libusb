@@ -1092,7 +1092,7 @@ static IOReturn darwin_request_descriptor (usb_device_t device, UInt8 desc, UInt
 static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *ctx, struct darwin_cached_device *dev) {
   usb_device_t device = dev->device;
   int retries = 1;
-  long delay = 30000; // microseconds
+  long delay = 30000; /* microseconds */
   int unsuspended = 0, try_unsuspend = 1, try_reconfigure = 1;
   int is_open = 0;
   IOReturn ret = 0, ret2;

@@ -954,7 +954,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 	if (port_numbers_len <= 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	// HCDs can be listed as devices with port #0
+	/* HCDs can be listed as devices with port #0 */
 	while((dev) && (dev->port_number != 0)) {
 		if (--i < 0) {
 			usbi_warn(ctx, "port numbers array is too small");

@@ -1311,7 +1311,7 @@ static int parse_iad_array(struct libusb_context *ctx,
 		return LIBUSB_ERROR_IO;
 	}
 
-	// First pass: Iterate through desc list, count number of IADs
+	/* First pass: Iterate through desc list, count number of IADs */
 	iad_array->length = 0;
 	while (consumed < size) {
 		parse_descriptor(buf, "bb", &header);
@@ -1334,7 +1334,7 @@ static int parse_iad_array(struct libusb_context *ctx,
 
 		iad_array->iad = iad;
 
-		// Second pass: Iterate through desc list, fill IAD structures
+		/* Second pass: Iterate through desc list, fill IAD structures */
 		consumed = 0;
 		i = 0;
 		while (consumed < size) {

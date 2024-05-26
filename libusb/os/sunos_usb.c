@@ -171,7 +171,7 @@ sunos_usb_ioctl(struct libusb_device *dev, int cmd)
 
 	nvlist_alloc(&nvlist, NV_UNIQUE_NAME_TYPE, KM_NOSLEEP);
 	nvlist_add_int32(nvlist, "port", dev->port_number);
-	//find the hub path
+	/* find the hub path */
 	snprintf(path_arg, sizeof(path_arg), "/devices%s:hubd", hubpath);
 	usbi_dbg(DEVICE_CTX(dev), "ioctl hub path: %s", path_arg);
 

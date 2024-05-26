@@ -256,11 +256,11 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 
 	usbi_dbg(ctx, "poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
 #ifdef __EMSCRIPTEN__
-	// Emscripten's poll doesn't actually block, so we need to use an out-of-band
-	// waiting signal.
+	/* Emscripten's poll doesn't actually block, so we need to use an
+	 * out-of-band waiting signal. */
 	em_libusb_wait(&ctx->event.has_event, 0, timeout_ms);
-	// Emscripten ignores timeout_ms, but set it to 0 for future-proofing in case
-	// they ever implement real poll.
+	/* Emscripten ignores timeout_ms, but set it to 0 for future-proofing
+	 * in case they ever implement real poll. */
 	timeout_ms = 0;
 #endif
 	num_ready = poll(fds, nfds, timeout_ms);

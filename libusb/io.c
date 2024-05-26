@@ -2045,7 +2045,7 @@ int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 	return 0;
 }
 
-// NB: flying_transfers_lock must be held when calling this
+/* NB: flying_transfers_lock must be held when calling this */
 static void handle_timeout(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer =
@@ -2061,7 +2061,7 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 			"async cancel failed %d", r);
 }
 
-// NB: flying_transfers_lock must be held when calling this
+/* NB: flying_transfers_lock must be held when calling this */
 static void handle_timeouts_locked(struct libusb_context *ctx)
 {
 	struct timespec systime;
