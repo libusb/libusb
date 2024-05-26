@@ -1006,9 +1006,9 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
 	return LIBUSB_SUCCESS;
 }
 
-// We use this private struct ony to parse a superspeed+ device capability
-// descriptor according to section 9.6.2.5 of the USB 3.1 specification.
-// We don't expose it.
+/* We use this private struct only to parse a SuperSpeedPlus device capability
+   descriptor according to section 9.6.2.5 of the USB 3.1 specification.
+   We don't expose it. */
 struct internal_ssplus_capability_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
@@ -1026,10 +1026,10 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 {
 	struct libusb_ssplus_usb_device_capability_descriptor *_ssplus_cap;
 
-	// Use a private struct to re-use our descriptor parsing system.
+	/* Use a private struct to reuse our descriptor parsing system. */
 	struct internal_ssplus_capability_descriptor parsedDescriptor;
 
-	// Some size/type checks to make sure everything is in order
+	/* Some size/type checks to make sure everything is in order */
 	if (dev_cap->bDevCapabilityType != LIBUSB_BT_SUPERSPEED_PLUS_CAPABILITY) {
 		usbi_err(ctx, "unexpected bDevCapabilityType 0x%x (expected 0x%x)",
 			 dev_cap->bDevCapabilityType,
@@ -1041,8 +1041,7 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 		return LIBUSB_ERROR_IO;
 	}
 
-	// We can only parse the non-variable size part of the SuperSpeedPlus descriptor. The attributes
-	// have to be read "manually".
+	/* We can only parse the non-variable size part of the SuperSpeedPlus descriptor. The attributes have to be read "manually". */
 	parse_descriptor(dev_cap, "bbbbiww", &parsedDescriptor);
 
 	uint8_t numSublikSpeedAttributes = (parsedDescriptor.bmAttributes & 0xF) + 1;
@@ -1050,22 +1049,22 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	if (!_ssplus_cap)
 		return LIBUSB_ERROR_NO_MEM;
 
-	// Parse bmAttributes
+	/* Parse bmAttributes */
 	_ssplus_cap->numSublinkSpeedAttributes = numSublikSpeedAttributes;
 	_ssplus_cap->numSublinkSpeedIDs = ((parsedDescriptor.bmAttributes & 0xF0) >> 4) + 1;
 
-	// Parse wFunctionalitySupport
+	/* Parse wFunctionalitySupport */
 	_ssplus_cap->ssid = parsedDescriptor.wFunctionalitySupport & 0xF;
 	_ssplus_cap->minRxLaneCount = (parsedDescriptor.wFunctionalitySupport & 0x0F00) >> 8;
 	_ssplus_cap->minTxLaneCount = (parsedDescriptor.wFunctionalitySupport & 0xF000) >> 12;
 
-	// Check that we have enough to read all the sublink attributes
+	/* Check that we have enough to read all the sublink attributes */
 	if (dev_cap->bLength < LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE + _ssplus_cap->numSublinkSpeedAttributes * sizeof(uint32_t)) {
 		usbi_err(ctx, "short ssplus capability descriptor, unable to read sublinks: Not enough data");
 		return LIBUSB_ERROR_IO;
 	}
 
-	// Read the attributes
+	/* Read the attributes */
 	uint8_t* base = ((uint8_t*)dev_cap) + LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE;
 	for(uint8_t i = 0 ; i < _ssplus_cap->numSublinkSpeedAttributes ; i++) {
 		uint32_t attr = READ_LE32(base + i * sizeof(uint32_t));
