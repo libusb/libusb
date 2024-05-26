@@ -774,7 +774,7 @@ static void print_sublink_speed_attribute(struct libusb_ssplus_sublink_attribute
 		(exponent[ss_attr->exponent]),
 		(ss_attr->type == LIBUSB_SSPLUS_ATTR_TYPE_ASYM)? "Asym" : "Sym",
 		(ss_attr->direction == LIBUSB_SSPLUS_ATTR_DIR_TX)? "TX" : "RX",
-		(ss_attr->protocol == LIBUSB_SSPLUS_ATTR_PROT_SSPLUS)? "+": "" );
+		(ss_attr->protocol == LIBUSB_SSPLUS_ATTR_PROT_SSPLUS)? "Plus": "" );
 }
 
 static void print_device_cap(struct libusb_bos_dev_capability_descriptor *dev_cap)
