@@ -38,7 +38,7 @@
 // On Windows, address changes everytimes a device is connected. Even if it is the same
 // device on the same port. We use these properties to build an unique key for a connected
 // device.
-uint64_t get_key_for(uint64_t vendor, uint64_t product, uint64_t port, uint64_t address) {
+static uint64_t get_key_for(uint64_t vendor, uint64_t product, uint64_t port, uint64_t address) {
 	return vendor << 32 | product << 16 | port << 8 | address;
 }
 
