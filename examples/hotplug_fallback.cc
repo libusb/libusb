@@ -112,9 +112,9 @@ int main() {
 	// That the thread to run libusb events system.
 	auto event_thread = std::thread([] () {
 		while (true) {
-		  int rc = libusb_handle_events(nullptr);
-		  if (LIBUSB_SUCCESS != rc)
-			  std::cout << "libusb_handle_events() failed:" << libusb_strerror((enum libusb_error)rc) << std::endl;
+		  int ret = libusb_handle_events(nullptr);
+		  if (LIBUSB_SUCCESS != ret)
+			  std::cout << "libusb_handle_events() failed:" << libusb_strerror((enum libusb_error)ret) << std::endl;
 		}
 	});
 
