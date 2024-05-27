@@ -421,12 +421,12 @@ if test "x$backend" = xwindows; then
 	CFLAGS="${saved_CFLAGS}"
 fi
 
-SHARED_CFLAGS="-Wall -Wextra -Wshadow -Wunused -Wwrite-strings -Werror=format-security -Werror=implicit-function-declaration -Werror=implicit-int -Werror=init-self -Werror=missing-prototypes -Werror=strict-prototypes -Werror=undef -Werror=uninitialized"
+SHARED_CFLAGS="-Wall -Wextra -Wshadow -Wunused -Wwrite-strings -Werror=format-security -Werror=init-self -Werror=undef -Werror=uninitialized"
 
 AM_CPPFLAGS="${EXTRA_CPPFLAGS}"
 AC_SUBST(AM_CPPFLAGS)
 
-AM_CFLAGS="-std=${c_dialect}11 ${EXTRA_CFLAGS} ${SHARED_CFLAGS}"
+AM_CFLAGS="-std=${c_dialect}11 ${EXTRA_CFLAGS} ${SHARED_CFLAGS} -Werror=implicit-function-declaration -Werror=implicit-int -Werror=missing-prototypes -Werror=strict-prototypes"
 AC_SUBST(AM_CFLAGS)
 
 AM_CXXFLAGS="-std=${c_dialect}++11 ${EXTRA_CFLAGS} ${SHARED_CFLAGS} -Wmissing-declarations"
