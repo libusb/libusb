@@ -541,7 +541,7 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 
 	errno = 0;
 	value = strtol(buf, &endptr, 10);
-	if (value < 0 || value > (long)max_value || errno) {
+	if (buf == endptr || value < 0 || value > (long)max_value || errno) {
 		usbi_err(ctx, "attribute %s contains an invalid value: '%s'", attr, buf);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	} else if (*endptr != '\0') {
@@ -1033,7 +1033,7 @@ static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_di
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device *it;
-	char *parent_sysfs_dir, *tmp;
+	char *parent_sysfs_dir, *tmp, *end;
 	int ret, add_parent = 1;
 
 	/* XXX -- can we figure out the topology when using usbfs? */
@@ -1048,7 +1048,16 @@ static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_di
 
 	if ((tmp = strrchr(parent_sysfs_dir, '.')) ||
 	    (tmp = strrchr(parent_sysfs_dir, '-'))) {
-	        dev->port_number = atoi(tmp + 1);
+		const char *start = tmp + 1;
+		long port_number = strtol(start, &end, 10);
+		if (port_number < 0 || port_number > INT_MAX || start == end || '\0' != *end) {
+			usbi_warn(ctx, "Can not parse sysfs_dir: %s, unexpected parent info",
+				parent_sysfs_dir);
+			free(parent_sysfs_dir);
+			return LIBUSB_ERROR_OTHER;
+		} else {
+			dev->port_number = (int)port_number;
+		}
 		*tmp = '\0';
 	} else {
 		usbi_warn(ctx, "Can not parse sysfs_dir: %s, no parent info",
