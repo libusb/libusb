@@ -1,4 +1,4 @@
-This file contains the PGP keys of various developers.</p>
+This file contains the PGP keys of libusb release managers.
 Users: pgp < KEYS
 or
        gpg --import KEYS
