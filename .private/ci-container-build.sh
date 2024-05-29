@@ -29,7 +29,7 @@ apt-get install -y eatmydata
 eatmydata apt-get -y --purge dist-upgrade
 
 # install build and test dependencies
-eatmydata apt-get install -y build-essentials make libtool libudev-dev pkg-config umockdev libumockdev-dev
+eatmydata apt-get install -y build-essential make libtool libudev-dev pkg-config umockdev libumockdev-dev
 
 # run build as user
 useradd build
