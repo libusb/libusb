@@ -66,7 +66,7 @@ static void perr(char const *format, ...)
 	va_end(args);
 }
 
-#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)errcode)); return -1; } while (0)
+#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)(errcode))); return -1; } while (0)
 #define CALL_CHECK(fcall) do { int _r=fcall; if (_r < 0) ERR_EXIT(_r); } while (0)
 #define CALL_CHECK_CLOSE(fcall, hdl) do { int _r=fcall; if (_r < 0) { libusb_close(hdl); ERR_EXIT(_r); } } while (0)
 #define B(x) (((x)!=0)?1:0)
@@ -546,11 +546,14 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 		get_sense(handle, endpoint_in, endpoint_out);
 	} else {
 		display_buffer_hex(data, size);
-		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-			if (fwrite(data, 1, (size_t)size, fd) != (unsigned int)size) {
-				perr("   unable to write binary data\n");
+		if (binary_dump) {
+			fd = fopen(binary_name, "w");
+			if (fd != NULL) {
+				if (fwrite(data, 1, (size_t)size, fd) != (unsigned int)size) {
+					perr("   unable to write binary data\n");
+				}
+				fclose(fd);
 			}
-			fclose(fd);
 		}
 	}
 	free(data);
@@ -559,16 +562,16 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 }
 
 // HID
-static int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int type)
+static int get_hid_record_size(const uint8_t *hid_report_descriptor, int size, int type)
 {
-	uint8_t i, j = 0;
+	uint8_t j = 0;
 	uint8_t offset;
 	int record_size[3] = {0, 0, 0};
 	unsigned int nb_bits = 0, nb_items = 0;
 	bool found_record_marker;
 
 	found_record_marker = false;
-	for (i = hid_report_descriptor[0]+1; i < size; i += offset) {
+	for (int i = hid_report_descriptor[0]+1; i < size; i += offset) {
 		offset = (hid_report_descriptor[i]&0x03) + 1;
 		if (offset == 4)
 			offset = 5;
@@ -628,11 +631,14 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		return -1;
 	}
 	display_buffer_hex(hid_report_descriptor, (unsigned int)descriptor_size);
-	if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-		if (fwrite(hid_report_descriptor, 1, (size_t)descriptor_size, fd) != (size_t)descriptor_size) {
-			printf("   Error writing descriptor to file\n");
+	if (binary_dump) {
+		fd = fopen(binary_name, "w");
+		if (fd != NULL) {
+			if (fwrite(hid_report_descriptor, 1, (size_t)descriptor_size, fd) != (size_t)descriptor_size) {
+				printf("   Error writing descriptor to file\n");
+			}
+			fclose(fd);
 		}
-		fclose(fd);
 	}
 
 	size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_FEATURE);
