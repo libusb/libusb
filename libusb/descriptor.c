@@ -1061,7 +1061,7 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	/* Parse wFunctionalitySupport */
 	_ssplus_cap->ssid = parsedDescriptor.wFunctionalitySupport & 0xF;
 	_ssplus_cap->minRxLaneCount = (parsedDescriptor.wFunctionalitySupport & 0x0F00) >> 8;
-	_ssplus_cap->minTxLaneCount = (parsedDescriptor.wFunctionalitySupport & 0xF000) >> 12;
+	_ssplus_cap->minTxLaneCount = (uint8_t)((parsedDescriptor.wFunctionalitySupport & 0xF000) >> 12);
 
 	/* Check that we have enough to read all the sublink attributes */
 	if (dev_cap->bLength < LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE + _ssplus_cap->numSublinkSpeedAttributes * sizeof(uint32_t)) {
@@ -1074,7 +1074,7 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	for(uint8_t i = 0 ; i < _ssplus_cap->numSublinkSpeedAttributes ; i++) {
 		uint32_t attr = ReadLittleEndian32(base + i * sizeof(uint32_t));
 		_ssplus_cap->sublinkSpeedAttributes[i].ssid = attr & 0x0f;
-		_ssplus_cap->sublinkSpeedAttributes[i].mantissa = attr >> 16;
+		_ssplus_cap->sublinkSpeedAttributes[i].mantissa = (uint16_t)(attr >> 16);
 		_ssplus_cap->sublinkSpeedAttributes[i].exponent = (attr >> 4) & 0x3 ;
 		_ssplus_cap->sublinkSpeedAttributes[i].type = attr & 0x40 ? 	LIBUSB_SSPLUS_ATTR_TYPE_ASYM : LIBUSB_SSPLUS_ATTR_TYPE_SYM;
 		_ssplus_cap->sublinkSpeedAttributes[i].direction = attr & 0x80 ? 	LIBUSB_SSPLUS_ATTR_DIR_TX : 	LIBUSB_SSPLUS_ATTR_DIR_RX;

@@ -1255,7 +1255,7 @@ static void calculate_timeout(struct usbi_transfer *itransfer)
 	usbi_get_monotonic_time(&itransfer->timeout);
 
 	itransfer->timeout.tv_sec += timeout / 1000U;
-	itransfer->timeout.tv_nsec += (timeout % 1000U) * 1000000L;
+	itransfer->timeout.tv_nsec += (long)(timeout % 1000) * 1000000L;
 	if (itransfer->timeout.tv_nsec >= NSEC_PER_SEC) {
 		++itransfer->timeout.tv_sec;
 		itransfer->timeout.tv_nsec -= NSEC_PER_SEC;
@@ -1697,14 +1697,14 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 		usbi_err(ctx, "failed to set timer for next timeout");
 
 	usbi_mutex_lock(&itransfer->lock);
-	itransfer->state_flags &= ~USBI_TRANSFER_IN_FLIGHT;
+	itransfer->state_flags &= ~(unsigned int)USBI_TRANSFER_IN_FLIGHT;
 	usbi_mutex_unlock(&itransfer->lock);
 
 	if (status == LIBUSB_TRANSFER_COMPLETED
 			&& transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) {
 		int rqlen = transfer->length;
 		if (transfer->type == LIBUSB_TRANSFER_TYPE_CONTROL)
-			rqlen -= LIBUSB_CONTROL_SETUP_SIZE;
+			rqlen -= (int)LIBUSB_CONTROL_SETUP_SIZE;
 		if (rqlen != itransfer->transferred) {
 			usbi_dbg(ctx, "interpreting short transfer as error");
 			status = LIBUSB_TRANSFER_ERROR;
@@ -2241,7 +2241,7 @@ static int handle_events(struct libusb_context *ctx, struct timeval *tv)
 	}
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
-	timeout_ms = (int)(tv->tv_sec * 1000) + (tv->tv_usec / 1000);
+	timeout_ms = (int)((tv->tv_sec * 1000) + (tv->tv_usec / 1000));
 
 	/* round up to next millisecond */
 	if (tv->tv_usec % 1000)

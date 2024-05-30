@@ -599,12 +599,13 @@ int linux_get_device_address(struct libusb_context *ctx, int detached,
 		if (!dev_node && fd >= 0) {
 			char *fd_path = alloca(PATH_MAX);
 			char proc_path[32];
+			ssize_t llen;
 
 			/* try to retrieve the device node from fd */
 			snprintf(proc_path, sizeof(proc_path), "/proc/self/fd/%d", fd);
-			r = readlink(proc_path, fd_path, PATH_MAX - 1);
-			if (r > 0) {
-				fd_path[r] = '\0';
+			llen = readlink(proc_path, fd_path, PATH_MAX - 1);
+			if (llen > 0) {
+				fd_path[llen] = '\0';
 				dev_node = fd_path;
 			}
 		}
@@ -822,7 +823,7 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 
 	len = MIN(len, (size_t)r);
 	memcpy(buffer, config_desc, len);
-	return len;
+	return (int)len;
 }
 
 static int op_get_config_descriptor(struct libusb_device *dev,
@@ -837,7 +838,7 @@ static int op_get_config_descriptor(struct libusb_device *dev,
 	config = &priv->config_descriptors[config_index];
 	len = MIN(len, config->actual_len);
 	memcpy(buffer, config->desc, len);
-	return len;
+	return (int)len;
 }
 
 /* send a control message to retrieve active configuration */
@@ -948,9 +949,11 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	} else if (wrapped_fd < 0) {
 		fd = get_usbfs_fd(dev, O_RDONLY, 0);
 	} else {
+		off_t offs;
+
 		fd = wrapped_fd;
-		r = lseek(fd, 0, SEEK_SET);
-		if (r < 0) {
+		offs = lseek(fd, 0, SEEK_SET);
+		if (offs < 0) {
 			usbi_err(ctx, "lseek failed, errno=%d", errno);
 			return LIBUSB_ERROR_IO;
 		}
@@ -1048,7 +1051,7 @@ static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_di
 
 	if ((tmp = strrchr(parent_sysfs_dir, '.')) ||
 	    (tmp = strrchr(parent_sysfs_dir, '-'))) {
-	        dev->port_number = atoi(tmp + 1);
+	        dev->port_number = (uint8_t)atoi(tmp + 1);
 		*tmp = '\0';
 	} else {
 		usbi_warn(ctx, "Can not parse sysfs_dir: %s, no parent info",
@@ -1368,7 +1371,7 @@ static int op_wrap_sys_device(struct libusb_context *ctx,
 		/* There is no ioctl to get the bus number. We choose 0 here
 		 * as linux starts numbering buses from 1. */
 		busnum = 0;
-		devaddr = ci.devnum;
+		devaddr = (uint8_t)ci.devnum;
 	}
 
 	/* Session id is unused as we do not add the device to the list of
@@ -1639,13 +1642,13 @@ static int do_streams_ioctl(struct libusb_device_handle *handle,
 	if (num_endpoints > 30) /* Max 15 in + 15 out eps */
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	streams = malloc(sizeof(*streams) + num_endpoints);
+	streams = malloc(sizeof(*streams) + (size_t)num_endpoints);
 	if (!streams)
 		return LIBUSB_ERROR_NO_MEM;
 
 	streams->num_streams = num_streams;
-	streams->num_eps = num_endpoints;
-	memcpy(streams->eps, endpoints, num_endpoints);
+	streams->num_eps = (unsigned int)num_endpoints;
+	memcpy(streams->eps, endpoints, (size_t)num_endpoints);
 
 	r = ioctl(fd, req, streams);
 
@@ -1976,7 +1979,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 		num_urbs++;
 	}
 	usbi_dbg(TRANSFER_CTX(transfer), "need %d urbs for new transfer with length %d", num_urbs, transfer->length);
-	urbs = calloc(num_urbs, sizeof(*urbs));
+	urbs = calloc((size_t)num_urbs, sizeof(*urbs));
 	if (!urbs)
 		return LIBUSB_ERROR_NO_MEM;
 	tpriv->urbs = urbs;
@@ -2127,7 +2130,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 	usbi_dbg(TRANSFER_CTX(transfer), "need %d urbs for new transfer with length %d", num_urbs, transfer->length);
 
-	urbs = calloc(num_urbs, sizeof(*urbs));
+	urbs = calloc((size_t)num_urbs, sizeof(*urbs));
 	if (!urbs)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -2146,7 +2149,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		int k;
 
 		alloc_size = sizeof(*urb)
-			+ (num_packets_in_urb * sizeof(struct usbfs_iso_packet_desc));
+			+ ((unsigned int)num_packets_in_urb * sizeof(struct usbfs_iso_packet_desc));
 		urb = calloc(1, alloc_size);
 		if (!urb) {
 			free_iso_urbs(tpriv);
@@ -2157,7 +2160,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		/* populate packet lengths */
 		for (k = 0; k < num_packets_in_urb; j++, k++) {
 			packet_len = transfer->iso_packet_desc[j].length;
-			urb->buffer_length += packet_len;
+			urb->buffer_length += (int)packet_len;
 			urb->iso_frame_desc[k].length = packet_len;
 		}
 
@@ -2239,7 +2242,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	struct usbfs_urb *urb;
 	int r;
 
-	if (transfer->length - LIBUSB_CONTROL_SETUP_SIZE > MAX_CTRL_BUFFER_LENGTH)
+	if (transfer->length - (int)LIBUSB_CONTROL_SETUP_SIZE > MAX_CTRL_BUFFER_LENGTH)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	urb = calloc(1, sizeof(*urb));
@@ -2348,7 +2351,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 {
 	struct linux_transfer_priv *tpriv = usbi_get_transfer_priv(itransfer);
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	int urb_idx = urb - tpriv->urbs;
+	int urb_idx = (int)(urb - tpriv->urbs);
 
 	usbi_mutex_lock(&itransfer->lock);
 	usbi_dbg(TRANSFER_CTX(transfer), "handling completion status %d of bulk urb %d/%d", urb->status,
@@ -2384,7 +2387,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 				usbi_dbg(TRANSFER_CTX(transfer), "moving surplus data from offset %zu to offset %zu",
 					 (unsigned char *)urb->buffer - transfer->buffer,
 					 target - transfer->buffer);
-				memmove(target, urb->buffer, urb->actual_length);
+				memmove(target, urb->buffer, (size_t)urb->actual_length);
 			}
 			itransfer->transferred += urb->actual_length;
 		}
@@ -2515,7 +2518,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 			&transfer->iso_packet_desc[tpriv->iso_packet_offset++];
 
 		lib_desc->status = LIBUSB_TRANSFER_COMPLETED;
-		switch (urb_desc->status) {
+		switch ((int)urb_desc->status) {
 		case 0:
 			break;
 		case -ENOENT: /* cancelled */

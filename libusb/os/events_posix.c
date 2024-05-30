@@ -303,7 +303,7 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	 * remaining pollfds to the backend. */
 	internal_fds = usbi_using_timer(ctx) ? 2 : 1;
 	fds += internal_fds;
-	nfds -= internal_fds;
+	nfds -= (usbi_nfds_t)internal_fds;
 
 	usbi_mutex_lock(&ctx->event_data_lock);
 	if (ctx->event_flags & USBI_EVENT_EVENT_SOURCES_MODIFIED) {
@@ -335,6 +335,6 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	}
 
 done:
-	reported_events->num_ready = num_ready;
+	reported_events->num_ready = (unsigned int)num_ready;
 	return LIBUSB_SUCCESS;
 }

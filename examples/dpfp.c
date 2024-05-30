@@ -535,7 +535,7 @@ static int do_init(void)
 			return r;
 	}
 
-	status &= ~0x80;
+	status &= (unsigned char)~0x80;
 	r = set_hwstat(status);
 	if (r < 0)
 		return r;
