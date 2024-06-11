@@ -2853,9 +2853,11 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 		if (!to_cancel)
 			break;
 
+#ifdef ENABLE_LOGGING
 		struct libusb_transfer *transfer_to_cancel = USBI_TRANSFER_TO_LIBUSB_TRANSFER(to_cancel);
 		usbi_dbg(ctx, "cancelling transfer %p from disconnect",
 			 (void *) transfer_to_cancel);
+#endif
 
 		usbi_mutex_lock(&to_cancel->lock);
 		usbi_backend.clear_transfer_priv(to_cancel);
