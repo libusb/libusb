@@ -18,16 +18,16 @@ jobs:
 
       - name: netlink
         # Disable tests for netlink as it doesn't seem to work in the CI environment.
-        run: .private/ci-build.sh --build-dir build-netlink --no-test -- --disable-udev
+        run: .private/ci-build.sh --werror --build-dir build-netlink --no-test -- --disable-udev
 
       - name: udev
-        run: .private/ci-build.sh --build-dir build-udev -- --enable-udev
+        run: .private/ci-build.sh --werror --build-dir build-udev -- --enable-udev
 
       - name: debug-log
-        run: .private/ci-build.sh --build-dir build-debug -- --enable-debug-log
+        run: .private/ci-build.sh --werror --build-dir build-debug -- --enable-debug-log
 
       - name: disable-log
-        run: .private/ci-build.sh --build-dir build-nolog -- --disable-log
+        run: .private/ci-build.sh --werror --build-dir build-nolog -- --disable-log
 
       - uses: mymindstorm/setup-emsdk@v13
 
