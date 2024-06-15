@@ -30,6 +30,10 @@ while [ $# -gt 0 ]; do
 		asan=no
 		shift
 		;;
+	--werror)
+		cflags+=" -Werror"
+		shift
+		;;
 	--)
 		shift
 		break;
@@ -53,7 +57,7 @@ fi
 mkdir "${builddir}"
 cd "${builddir}"
 
-cflags="-O2"
+cflags+=" -O2"
 
 # enable extra warnings
 cflags+=" -Winline"
