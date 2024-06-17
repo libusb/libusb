@@ -738,6 +738,37 @@ static void windows_destroy_device(struct libusb_device *dev)
 	priv->backend->destroy_device(dev);
 }
 
+static int windows_endpoint_supports_raw_io(libusb_device_handle* dev_handle,
+	uint8_t endpoint)
+{
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	if (priv->backend->endpoint_supports_raw_io)
+		return priv->backend->endpoint_supports_raw_io(dev_handle, endpoint);
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+static int windows_endpoint_set_raw_io(libusb_device_handle* dev_handle,
+	uint8_t endpoint, int enable)
+{
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+
+	if (priv->backend->endpoint_supports_raw_io == NULL
+		|| priv->backend->endpoint_supports_raw_io(dev_handle, endpoint) != 1
+		|| priv->backend->endpoint_set_raw_io == NULL)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	return priv->backend->endpoint_set_raw_io(dev_handle, endpoint, enable);
+}
+
+static int windows_get_max_raw_io_transfer_size(struct libusb_device_handle *dev_handle,
+	uint8_t endpoint)
+{
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	if (priv->backend->get_max_raw_io_transfer_size)
+		return priv->backend->get_max_raw_io_transfer_size(dev_handle, endpoint);
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 static int windows_submit_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
@@ -935,6 +966,9 @@ const struct usbi_os_backend usbi_backend = {
 	NULL,	/* kernel_driver_active */
 	NULL,	/* detach_kernel_driver */
 	NULL,	/* attach_kernel_driver */
+	windows_endpoint_supports_raw_io,
+	windows_endpoint_set_raw_io,
+	windows_get_max_raw_io_transfer_size,
 	windows_destroy_device,
 	windows_submit_transfer,
 	windows_cancel_transfer,

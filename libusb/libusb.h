@@ -165,9 +165,10 @@ typedef SSIZE_T ssize_t;
  * <li>libusb version 1.0.27: LIBUSB_API_VERSION = 0x0100010A
  * <li>libusb version 1.0.28: LIBUSB_API_VERSION = 0x0100010A
  * <li>libusb version 1.0.29: LIBUSB_API_VERSION = 0x0100010B
+ * <li>libusb version 1.0.30: LIBUSB_API_VERSION = 0x0100010C
  * </ul>
  */
-#define LIBUSB_API_VERSION 0x0100010B
+#define LIBUSB_API_VERSION 0x0100010C
 
 /** \def LIBUSBX_API_VERSION
  * \ingroup libusb_misc
@@ -1803,6 +1804,14 @@ int LIBUSB_CALL libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
 	int interface_number);
 int LIBUSB_CALL libusb_set_auto_detach_kernel_driver(
 	libusb_device_handle *dev_handle, int enable);
+
+int LIBUSB_CALL libusb_endpoint_supports_raw_io(libusb_device_handle* dev_handle,
+	uint8_t endpoint);
+int LIBUSB_CALL libusb_endpoint_set_raw_io(libusb_device_handle *dev_handle,
+	uint8_t endpoint, int enable);
+int LIBUSB_CALL libusb_get_max_raw_io_transfer_size(
+	libusb_device_handle *dev_handle,
+	uint8_t endpoint);
 
 /* async I/O */
 

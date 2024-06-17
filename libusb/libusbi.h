@@ -1358,6 +1358,37 @@ struct usbi_os_backend {
 	int (*attach_kernel_driver)(struct libusb_device_handle *dev_handle,
 		uint8_t interface_number);
 
+	/** Check if RAW_IO is supported by an endpoint.
+	 *
+	 * Return:
+	 * - 1 if yes
+	 * - 0 if no
+	 * - a LIBUSB_ERROR code on failure
+	 */
+	int (*endpoint_supports_raw_io)(struct libusb_device_handle* dev_handle,
+		uint8_t endpoint);
+
+	/** Enable/disable RAW_IO for an endpoint.
+	 *
+	 * Return:
+	 * - 0 on success
+	 * - LIBUSB_ERROR_NOT_SUPPORTED if RAW_IO is not supported by the endpoint
+	 * - another LIBUSB_ERROR code on other failure
+	 */
+	int (*endpoint_set_raw_io)(struct libusb_device_handle* dev_handle,
+		uint8_t endpoint, int enable);
+
+	/* Retrieve the maximum transfer size in bytes supported for WinUSB RAW_IO
+	 * for an inbound bulk or interrupt endpoint on an open device. Optional.
+	 *
+	 * Return:
+	 * - a positive maximum transfer size on success
+	 * - a LIBUSB_ERROR code on failure
+	 */
+	int (*get_max_raw_io_transfer_size)(
+		struct libusb_device_handle *dev_handle,
+		uint8_t endpoint);
+
 	/* Destroy a device. Optional.
 	 *
 	 * This function is called when the last reference to a device is
