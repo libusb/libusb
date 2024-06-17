@@ -335,16 +335,11 @@ static int usbdk_get_device_list(struct libusb_context *ctx)
 				continue;
 			}
 
-			((struct winusb_device_priv *)usbi_get_device_priv(dev))->hotplug_status = ARRIVED;
-
 			usbdk_device_init(dev, &devices[i]);
 			if (usbdk_device_priv_init(ctx, dev, &devices[i]) != LIBUSB_SUCCESS) {
 				libusb_unref_device(dev);
 				continue;
 			}
-		}
-		else {
-			((struct winusb_device_priv *)usbi_get_device_priv(dev))->hotplug_status = UNCHANGED;
 		}
 	}
 

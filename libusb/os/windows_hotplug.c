@@ -79,12 +79,6 @@ int windows_stop_event_monitor(void)
 static int windows_get_device_list(struct libusb_context *ctx)
 {
 	// note: context device list is protected by active_contexts_lock
-	struct libusb_device *dev;
-	for_each_device(ctx, dev)
-	{
-		((struct winusb_device_priv *)usbi_get_device_priv(dev))->hotplug_status = LEFT;
-	}
-
 	return ((struct windows_context_priv *)usbi_get_context_priv(ctx))->backend->get_device_list(ctx);
 }
 
@@ -100,7 +94,7 @@ void windows_initial_scan_devices(struct libusb_context *ctx)
 	usbi_mutex_static_unlock(&active_contexts_lock);
 }
 
-static void windows_refresh_device_list(struct libusb_context *ctx)
+static void windows_refresh_device_list(struct libusb_context *ctx, const bool device_arrived, const char* device_name)
 {
 	const int ret = windows_get_device_list(ctx);
 	if (ret != LIBUSB_SUCCESS)
@@ -115,42 +109,38 @@ static void windows_refresh_device_list(struct libusb_context *ctx)
 	for_each_device_safe(ctx, dev, next_dev)
 	{
 		priv = usbi_get_device_priv(dev);
-		if (priv->hotplug_status != LEFT)
+
+		if(_stricmp(priv->path, device_name) != 0)
 		{
 			continue;
 		}
 
-		if (priv->initialized)
+		if(device_arrived)
 		{
-			usbi_disconnect_device(dev);
+			usbi_hotplug_notification(ctx, dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
 		}
 		else
 		{
-			usbi_detach_device(dev);
+			if (priv->initialized)
+			{
+				usbi_disconnect_device(dev);
+			}
+			else
+			{
+				usbi_detach_device(dev);
+			}
 		}
-	}
-
-	for_each_device(ctx, dev)
-	{
-		priv = usbi_get_device_priv(dev);
-
-		if (priv->hotplug_status != ARRIVED)
-		{
-			continue;
-		}
-
-		usbi_hotplug_notification(ctx, dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
 	}
 }
 
-static void windows_refresh_device_list_for_all_ctx(void)
+static void windows_refresh_device_list_for_all_ctx(const bool device_arrived, const char* device_name)
 {
 	usbi_mutex_static_lock(&active_contexts_lock);
 
 	struct libusb_context *ctx;
 	for_each_context(ctx)
 	{
-		windows_refresh_device_list(ctx);
+		windows_refresh_device_list(ctx, device_arrived, device_name);
 	}
 
 	usbi_mutex_static_unlock(&active_contexts_lock);
@@ -281,7 +271,42 @@ static LRESULT CALLBACK windows_proc_callback(
 		case DBT_DEVICEREMOVECOMPLETE:
 			if (((PDEV_BROADCAST_HDR)lParam)->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE)
 			{
-				windows_refresh_device_list_for_all_ctx();
+#ifdef UNICODE
+				char* device_name = NULL;
+				const WCHAR* w_dbcc_name = ((PDEV_BROADCAST_DEVICEINTERFACE)lParam)->dbcc_name;
+
+				const int len = WideCharToMultiByte(CP_UTF8, 0, w_dbcc_name, -1, NULL, 0, NULL, NULL);
+			    if (len == 0) 
+				{
+			        log_error("Conversion length calculation failed for ((PDEV_BROADCAST_DEVICEINTERFACE)lParam)->dbcc_name conversion from wchar to char");
+			    }
+				else
+				{
+					device_name = (char *)malloc(len);
+				    if (device_name == NULL) 
+					{
+				        log_error("Memory allocation failed for ((PDEV_BROADCAST_DEVICEINTERFACE)lParam)->dbcc_name conversion from wchar to char");
+				    }
+					else
+					{
+					    const int result = WideCharToMultiByte(CP_UTF8, 0, w_dbcc_name, -1, device_name, len, NULL, NULL);
+					    if (result == 0) 
+						{
+					        log_error("Conversion failed for ((PDEV_BROADCAST_DEVICEINTERFACE)lParam)->dbcc_name conversion from wchar to char");
+					        free(device_name);
+							device_name = NULL;						        
+					    }	
+					}
+    			}
+#else
+				const char* device_name = ((PDEV_BROADCAST_DEVICEINTERFACE)lParam)->dbcc_name;
+#endif
+
+				windows_refresh_device_list_for_all_ctx(wParam == DBT_DEVICEARRIVAL ? true : false, device_name);
+
+#ifdef UNICODE
+				free(device_name);
+#endif
 				return TRUE;
 			}
 			break;

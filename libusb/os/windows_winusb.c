@@ -1860,7 +1860,6 @@ static int winusb_get_device_list(struct libusb_context *ctx)
 					usbi_attach_device(dev);
 
 					priv = winusb_device_priv_init(dev);
-					priv->hotplug_status = ARRIVED;
 					priv->dev_id = _strdup(dev_id);
 					priv->class_guid = dev_info_data.ClassGuid;
 					if (priv->dev_id == NULL) {
@@ -1957,7 +1956,6 @@ static int winusb_get_device_list(struct libusb_context *ctx)
 				if (priv->initialized) {
 					libusb_unref_device(parent_dev);
 					r = LIBUSB_SUCCESS;
-					priv->hotplug_status = UNCHANGED;
 				}
 				else {
 					if (!get_dev_port_number(*dev_info, &dev_info_data, &port_nr))
