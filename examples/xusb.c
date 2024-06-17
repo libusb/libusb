@@ -1117,101 +1117,104 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 
-	if ((argc == 1) || (argc > 7)) {
+	if (argc < 2 || argc > 7) {
 		display_help(argv[0]);
 		return EXIT_FAILURE;
 	}
 
-	if (argc >= 2) {
-		for (j = 1; j<argc; j++) {
-			arglen = strlen(argv[j]);
-			if ( ((argv[j][0] == '-') || (argv[j][0] == '/'))
-			  && (arglen >= 2) ) {
-				switch(argv[j][1]) {
-				case 'd':
-					debug_mode = true;
-					break;
-				case 'i':
-					extra_info = true;
-					break;
-				case 'w':
-					force_device_request = true;
-					break;
-				case 'b':
-					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
-						printf("   Option -b requires a file name\n");
-						return EXIT_FAILURE;
-					}
-					binary_name = argv[++j];
-					binary_dump = true;
-					break;
-				case 'l':
-					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
-						printf("   Option -l requires an ISO 639-1 language parameter\n");
-						return EXIT_FAILURE;
-					}
-					error_lang = argv[++j];
-					break;
-				case 'j':
-					// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
-					if (!vid && !pid) {
-						vid = 0x15BA;
-						pid = 0x0004;
-					}
-					break;
-				case 'k':
-					// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
-					if (!vid && !pid) {
-						vid = 0x0204;
-						pid = 0x6025;
-					}
-					break;
-				// The following tests will force VID:PID if already provided
-				case 'p':
-					// Sony PS3 Controller - 1 interface
-					vid = 0x054C;
-					pid = 0x0268;
-					test_mode = USE_PS3;
-					break;
-				case 's':
-					// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
-					vid = 0x045E;
-					pid = 0x0008;
-					test_mode = USE_HID;
-					break;
-				case 'x':
-					// Microsoft XBox Controller Type S - 1 interface
-					vid = 0x045E;
-					pid = 0x0289;
-					test_mode = USE_XBOX;
-					break;
-				case 'h':
-					display_help(argv[0]);
-					return EXIT_SUCCESS;
-				default:
-					display_help(argv[0]);
+	for (j = 1; j < argc; j++) {
+		arglen = strlen(argv[j]);
+		if ( ((argv[j][0] == '-') || (argv[j][0] == '/'))
+		  && (arglen >= 2) ) {
+			switch(argv[j][1]) {
+			case 'd':
+				debug_mode = true;
+				break;
+			case 'i':
+				extra_info = true;
+				break;
+			case 'w':
+				force_device_request = true;
+				break;
+			case 'b':
+				if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
+					printf("   Option -b requires a file name\n");
 					return EXIT_FAILURE;
 				}
-			} else {
-				for (i=0; i<arglen; i++) {
-					if (argv[j][i] == ':')
-						break;
+				binary_name = argv[++j];
+				binary_dump = true;
+				break;
+			case 'l':
+				if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
+					printf("   Option -l requires an ISO 639-1 language parameter\n");
+					return EXIT_FAILURE;
 				}
-				if (i != arglen) {
-					unsigned int tmp_vid, tmp_pid;
+				error_lang = argv[++j];
+				break;
+			case 'j':
+				// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
+				if (!vid && !pid) {
+					vid = 0x15BA;
+					pid = 0x0004;
+				}
+				break;
+			case 'k':
+				// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
+				if (!vid && !pid) {
+					vid = 0x0204;
+					pid = 0x6025;
+				}
+				break;
+			// The following tests will force VID:PID if already provided
+			case 'p':
+				// Sony PS3 Controller - 1 interface
+				vid = 0x054C;
+				pid = 0x0268;
+				test_mode = USE_PS3;
+				break;
+			case 's':
+				// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
+				vid = 0x045E;
+				pid = 0x0008;
+				test_mode = USE_HID;
+				break;
+			case 'x':
+				// Microsoft XBox Controller Type S - 1 interface
+				vid = 0x045E;
+				pid = 0x0289;
+				test_mode = USE_XBOX;
+				break;
+			case 'h':
+				display_help(argv[0]);
+				return EXIT_SUCCESS;
+			default:
+				display_help(argv[0]);
+				return EXIT_FAILURE;
+			}
+		} else {
+			for (i=0; i<arglen; i++) {
+				if (argv[j][i] == ':')
+					break;
+			}
+			if (i != arglen) {
+				unsigned int tmp_vid, tmp_pid;
 
-					if (sscanf(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
-						printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
-						return EXIT_FAILURE;
-					}
-					vid = (uint16_t)tmp_vid;
-					pid = (uint16_t)tmp_pid;
-				} else {
-					display_help(argv[0]);
+				if (sscanf(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
+					printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
 					return EXIT_FAILURE;
 				}
+				vid = (uint16_t)tmp_vid;
+				pid = (uint16_t)tmp_pid;
+			} else {
+				display_help(argv[0]);
+				return EXIT_FAILURE;
 			}
 		}
+	}
+
+	if (vid == 0 && pid == 0) {
+		display_help(argv[0]);
+		return EXIT_FAILURE;
 	}
 
 	version = libusb_get_version();
