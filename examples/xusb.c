@@ -33,7 +33,6 @@
 
 #if defined(_MSC_VER)
 #define snprintf _snprintf
-#define putenv _putenv
 /* Disable: warning C5287: operands are different enum types */
 #if (_MSC_VER > 1800)
 /* Disable: warning C5287: operands are different enum types, supported after Visual Studio 2013 */
@@ -1114,7 +1113,7 @@ int main(int argc, char** argv)
 	size_t i, arglen;
 	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
-	char *error_lang = NULL, *old_dbg_str = NULL, str[256];
+	char *error_lang = NULL;
 
 	// Default to generic, expecting VID:PID
 	VID = 0;
@@ -1237,7 +1236,7 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 
 	// If not set externally, and no debug option was given, use info log level
-	if ((old_dbg_str == NULL) && (!debug_mode))
+	if (getenv("LIBUSB_DEBUG") == NULL && !debug_mode)
 		libusb_set_option(NULL, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_INFO);
 	if (error_lang != NULL) {
 		r = libusb_setlocale(error_lang);
@@ -1251,12 +1250,6 @@ int main(int argc, char** argv)
 
 	if (r < 0)
 		return EXIT_FAILURE;
-
-
-	if (debug_mode) {
-		snprintf(str, sizeof(str), "LIBUSB_DEBUG=%s", (old_dbg_str == NULL)?"":old_dbg_str);
-		str[sizeof(str) - 1] = 0;	// Windows may not NUL terminate the string
-	}
 
 	return EXIT_SUCCESS;
 }
