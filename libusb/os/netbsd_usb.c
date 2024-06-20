@@ -444,6 +444,8 @@ netbsd_handle_transfer_completion(struct usbi_transfer *itransfer)
 int
 _errno_to_libusb(int err)
 {
+	usbi_dbg(NULL, "error: %s (%d)", strerror(err), err);
+
 	switch (err) {
 	case EIO:
 		return LIBUSB_ERROR_IO;
@@ -456,11 +458,9 @@ _errno_to_libusb(int err)
 	case EWOULDBLOCK:
 	case ETIMEDOUT:
 		return LIBUSB_ERROR_TIMEOUT;
+	default:
+		return LIBUSB_ERROR_OTHER;
 	}
-
-	usbi_dbg(NULL, "error: %s (%d)", strerror(err), err);
-
-	return LIBUSB_ERROR_OTHER;
 }
 
 int
