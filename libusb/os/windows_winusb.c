@@ -1902,8 +1902,12 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 			case HUB_PASS:
 			case DEV_PASS:
 				// If the device has already been setup, don't do it again
-				if (priv->path != NULL)
+				if (priv->path != NULL) {
+					// If the skipped device is a root hub, don't reuse its bus number
+					if (api == USB_API_HUB && (get_ancestor(ctx, dev_info_data.DevInst, NULL) == NULL))
+						bus_number++;
 					break;
+				}
 				// Take care of API initialization
 				priv->path = dev_interface_path;
 				dev_interface_path = NULL;
