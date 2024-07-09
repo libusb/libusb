@@ -1557,3 +1557,136 @@ void API_EXPORTED libusb_free_interface_association_descriptors(
 		free((void*)iad_array->iad);
 	free(iad_array);
 }
+
+/*
+ * \brief Copy a UTF-8 string with proper truncation if needed.
+ *
+ * \param tgt The target utf-8 string.  If NULL, then tgt is ignored,
+ *            tgt_size is forced to 0, and this function returns the
+ *            required tgt_size for a subsequent call to this function.
+ * \param src The source utf-8 string.  If NULL, then
+ *            the source string is empty, the return length is 1,
+ *            and, if tgt is not NULL, this function
+ *            sets tgt[0] to the null terminator.
+ * \param tgt_size The size of target in bytes.
+ * \return the length of src in bytes, including the null terminator.
+ *
+ * utf8_copy(NULL, src, 0) is equivalent to strlen(src) + 1.
+ */
+static int usbi_utf8_copy(char *tgt, char const *src, int tgt_size) {
+	uint8_t* t = (uint8_t*)tgt;
+	uint8_t const* s = (uint8_t const*)src;
+
+	if (NULL == src) {
+		if ((NULL != tgt) && (tgt_size > 0)) {
+			tgt[0] = 0;
+		}
+		return 1;
+	}
+
+	if ((NULL == tgt) || (tgt_size <= 0)) {
+		return (int)(strlen(src) + 1);
+	}
+
+	// copy UTF-8 string and compute length
+	int k = 0;
+	for (k = 0; s[k]; ++k) {
+		if (k < tgt_size) {
+			t[k] = s[k];
+		} else {
+			break;
+		}
+	}
+
+	if (k >= tgt_size) {
+		// truncate respecting UTF-8 character boundaries
+		int idx = tgt_size - 1;
+		while (idx && (0x80 == (t[idx] & 0xC0))) {  // utf-8 continuation byte
+			--idx;
+		}
+		t[idx] = 0;
+		return (int)(strlen(src) + 1);
+	} else {
+		t[k++] = 0;
+		return k;
+	}
+}
+
+/** \ingroup libusb_desc
+ * Retrieve a device string without needing to open the device.
+ *
+ * Since version v1.0.30 \ref LIBUSB_API_VERSION >= 0x0100010C
+ *
+ * \param dev the target device
+ * \param string_type the string type to retrieve
+ * \param data the data buffer for the UTF-8 encoded string.
+ * \param length the size of the data buffer in bytes.  
+ *      USB string descriptors cannot be longer than 
+ *      LIBUSB_DEVICE_STRING_BYTES_MAX.
+ * \returns a negative error code or
+ *      the actual string length in bytes including the null terminator.
+ * \see libusb_get_string_descriptor()
+ * \see libusb_get_string_descriptor_ascii()
+ * 
+ * This function works when the device is still closed since it relies
+ * on the operating system to provide the string.  The operating system
+ * normally reads and caches the common string descriptors during
+ * USB enumeration.
+ *
+ * Since the USB string descriptor could be processed by the OS,
+ * this function returns a UTF-8 encoded string.
+ *
+ * The string will be returned untranslated or in the default OS language
+ * when supported by the OS and USB device.
+ * 
+ * One way to call this function is using a buffer on the stack:
+ * 
+ *     char buffer[LIBUSB_DEVICE_STRING_BYTES_MAX];
+ *     int ret = libusb_get_device_string(dev, LIBUSB_DEVICE_STRING_SERIAL_NUMBER, buffer, sizeof(buffer));
+ *     if (ret < 0) {
+ *         // handle error
+ *     }
+ * 
+ * This function is commonly used to get the serial number to allow
+ * for device selection before opening the selected device.
+ */
+int API_EXPORTED libusb_get_device_string(libusb_device *dev,
+	enum libusb_device_string_type string_type, char *data, int length) {
+	char * s;
+	if (NULL == dev) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	if ((string_type < 0) || (string_type >= LIBUSB_DEVICE_STRING_COUNT)) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	if (length < 0) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	if (NULL == data) {
+		length = 0;
+	} else if (length > 0) {
+		*data = 0;  // return an empty string on errors when possible
+	}
+
+	if (NULL == dev->device_strings_utf8[string_type]) {
+		if (usbi_backend.get_device_string) {
+			s = malloc(LIBUSB_DEVICE_STRING_BYTES_MAX);
+			int rv = usbi_backend.get_device_string(dev, string_type, s, LIBUSB_DEVICE_STRING_BYTES_MAX);
+			if (rv < 0) {
+				free(s);
+				return rv;
+			} else {
+				dev->device_strings_utf8[string_type] = s;
+			}
+		} else {
+			return LIBUSB_ERROR_NOT_SUPPORTED;
+		}
+	}
+
+	s = dev->device_strings_utf8[string_type];
+	if (NULL == s) {
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	}
+
+	return usbi_utf8_copy(data, s, length);
+}

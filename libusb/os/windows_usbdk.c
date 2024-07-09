@@ -706,6 +706,7 @@ const struct windows_backend usbdk_backend = {
 	usbdk_init,
 	usbdk_exit,
 	usbdk_get_device_list,
+	NULL,  /* usbdk_get_device_string */
 	usbdk_open,
 	usbdk_close,
 	usbdk_get_active_config_descriptor,

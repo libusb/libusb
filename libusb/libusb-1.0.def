@@ -86,6 +86,8 @@ EXPORTS
   libusb_get_device_list@8 = libusb_get_device_list
   libusb_get_device_speed
   libusb_get_device_speed@4 = libusb_get_device_speed
+  libusb_get_device_string
+  libusb_get_device_string@16 = libusb_get_device_string
   libusb_get_interface_association_descriptors
   libusb_get_interface_association_descriptors@12 = libusb_get_interface_association_descriptors
   libusb_get_max_alt_packet_size

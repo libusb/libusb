@@ -2065,6 +2065,220 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	return r;
 }
 
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
+
+struct string_descriptor_s {
+	UCHAR bLength;
+	UCHAR bDescriptorType;
+	uint8_t bString[252];  // UTF-16LE, must be even length
+} LIBUSB_PACKED;
+
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
+
+struct string_descriptor_req_s {
+	USB_DESCRIPTOR_REQUEST req;
+	struct string_descriptor_s desc;
+};
+
+/*
+ * \brief Convert a UTF-16 little endian string to a UTF-8 string.
+ *
+ * \param src The input UTF-16 little endian string.
+ * \param src_length The length of the src buffer in bytes which
+ *		may or may not include the null terminator.
+ * \param dst The output UTF-8 string.
+ * \param dst_length The length of dst buffer in bytes, which should
+ *		be large enough to fit the string including null terminator.
+ * \return The total number of bytes in the UTF-8 string, including
+ *      the null terminator.
+ *      If this is greater than dst_length, then dst is truncated.
+ * \note From MiniBitty RTOS & framework, currently closed source.
+ */
+static int usbi_utf16le_to_utf8(uint8_t const *src, int src_length, char *dst, int dst_length) {
+    int count = 0;
+    uint32_t codepoint = 0;
+    uint32_t next_codepoint = 0;
+    bool is_surrogate_pair = false;
+    bool overflow = false;
+
+    if (NULL == dst) {
+        dst_length = 0;
+    }
+    if (dst_length > 0) {
+        dst[0] = 0;  // empty string by default
+    }
+    if (src_length & 1) {
+        --src_length;  // odd length not valid, but proceed.
+    }
+    if ((src == NULL) || (src_length <= 0)) {
+        return 1;
+    }
+
+    for (int k = 0; k < src_length; k += 2) {
+        next_codepoint = *src++;
+        next_codepoint |= ((uint16_t)*src++) << 8;
+        if (is_surrogate_pair) {
+            is_surrogate_pair = false;
+            if ((next_codepoint >= 0xDC00) && (next_codepoint <= 0xDFFF)) {
+                // correct encoding
+                codepoint |= (next_codepoint & 0x3ff);
+            } else {
+                // incorrect encoding, skip previous codepoint
+                codepoint = next_codepoint;
+            }
+        } else if ((next_codepoint >= 0xD800) && (next_codepoint <= 0xDBFF)) {
+            is_surrogate_pair = true;
+            codepoint = 0x010000 + ((next_codepoint & 0x3ff) << 10);
+            continue;
+        } else {
+            codepoint = next_codepoint;
+        }
+
+        if (codepoint <= 0x7f) {
+            if (count < dst_length) {
+                dst[count] = (char)codepoint;
+            } else {
+                overflow = true;
+            }
+            count += 1;
+            if (0 == codepoint) {
+                --count;  // add null-terminator below
+                break;
+            }
+        } else if (codepoint <= 0x7ff) {
+            if ((count + 1) < dst_length) {
+                dst[count] = (char)(0xC0 | (codepoint >> 6));
+                dst[count + 1] = (char)(0x80 | (codepoint & 0x3F));
+            } else {
+                overflow = true;
+            }
+            count += 2;
+        } else if (codepoint <= 0xffff) {
+            if ((count + 2) < dst_length) {
+                dst[count] = (char)(0xE0 | (codepoint >> 12));
+                dst[count + 1] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+                dst[count + 2] = (char)(0x80 | (codepoint & 0x3F));
+            } else {
+                overflow = true;
+            }
+            count += 3;
+        } else if (codepoint <= 0x10ffff) {
+            if ((count + 3) < dst_length) {
+                dst[count] = (char)(0xF0 | ((codepoint >> 18) & 7));
+                dst[count + 1] = (char)(0x80 | ((codepoint >> 12) & 0x3F));
+                dst[count + 2] = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+                dst[count + 3] = (char)(0x80 | (codepoint & 0x3F));
+            } else {
+                overflow = true;
+            }
+            count += 4;
+        } else {
+            // invalid codepoint, skip
+        }
+    }
+
+    if (count < dst_length) {
+        dst[count] = 0;
+    }
+    ++count;  // include null terminator
+
+    if (overflow && dst_length) {
+        // truncate respecting UTF-8 character boundaries
+        int idx = dst_length - 1;
+        while (idx && (0x80 == (dst[idx] & 0xC0))) {  // utf-8 continuation byte
+            --idx;
+        }
+        dst[idx] = 0;
+    }
+
+    return count;
+}
+
+/*
+ * Backend implementation for libusb_get_device_string().
+ * 
+ * Windows makes getting the common device strings
+ * very difficult.  DEVPKEY_Device_* does not have SerialNumber,
+ * and it reports the driver manufacturer, not the device manufacturer.
+ * 
+ * We could parse the serial number from the DEVICE_ID string:
+ * https://learn.microsoft.com/en-us/windows-hardware/drivers/install/device-instance-ids
+ * https://learn.microsoft.com/en-us/windows-hardware/drivers/install/standard-usb-identifiers
+ * 
+ * However, using the dev_id for getting the serial number is 
+ * definitely not recommended.
+ *
+ * The following implementation uses an IOCTL
+ * to the parent USB hub to perform the USB control request for the
+ * string descriptor without opening the USB device.
+ * While we would rather not invoke USB IO, we currently lack a 
+ * better option.
+ */
+static int winusb_get_device_string(libusb_device *dev,
+	enum libusb_device_string_type string_type, char *data, int length)
+{
+	struct winusb_device_priv* priv = usbi_get_device_priv(dev);
+	struct libusb_context* ctx = DEVICE_CTX(dev);
+	DWORD size;
+	DWORD ret_size;
+	struct string_descriptor_req_s sd;
+
+	if ((NULL != data) && (length > 0)) {
+		*data = 0;
+	}
+	if (NULL == dev->parent_dev) {
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	}
+
+	uint8_t string_descriptor_idx;
+	switch (string_type) {
+	case LIBUSB_DEVICE_STRING_MANUFACTURER: string_descriptor_idx = dev->device_descriptor.iManufacturer; break;
+	case LIBUSB_DEVICE_STRING_PRODUCT: string_descriptor_idx = dev->device_descriptor.iProduct; break;
+	case LIBUSB_DEVICE_STRING_SERIAL_NUMBER: string_descriptor_idx = dev->device_descriptor.iSerialNumber; break;
+	default: return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	if (0 == string_descriptor_idx) {
+		return 0;
+	}
+
+	struct winusb_device_priv* hub_priv = usbi_get_device_priv(dev->parent_dev);
+	HANDLE hub_handle = CreateFileA(hub_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	if (hub_handle == INVALID_HANDLE_VALUE) {
+		usbi_warn(ctx, "could not open hub %s: %s", hub_priv->path, windows_error_str(0));
+		return LIBUSB_ERROR_ACCESS;
+	}
+
+	size = sizeof(sd);
+	memset(&sd, 0, size);
+	sd.req.ConnectionIndex = (ULONG)dev->port_number;
+	sd.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
+	sd.req.SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
+	sd.req.SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | string_descriptor_idx;
+	sd.req.SetupPacket.wIndex = 0;
+	sd.req.SetupPacket.wLength = (USHORT)sizeof(sd.desc);
+
+	BOOL rv = DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
+		&sd, size, &ret_size, NULL);
+	CloseHandle(hub_handle);
+	if (!rv) {
+		usbi_err(ctx, "could not access string descriptor %u for '%s': %s", string_descriptor_idx,
+			priv->dev_id, windows_error_str(0));
+		return 0;
+	}
+
+	if (sd.desc.bDescriptorType != LIBUSB_DT_STRING) {
+		usbi_err(ctx, "descriptor %u not a string descriptor for '%s'", string_descriptor_idx, priv->dev_id);
+		return 0;
+	}
+
+	return usbi_utf16le_to_utf8(sd.desc.bString, (int) (sd.desc.bLength - 2), data, length);
+}
+
 static int winusb_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len)
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
@@ -2366,6 +2580,7 @@ const struct windows_backend winusb_backend = {
 	winusb_init,
 	winusb_exit,
 	winusb_get_device_list,
+	winusb_get_device_string,
 	winusb_open,
 	winusb_close,
 	winusb_get_active_config_descriptor,

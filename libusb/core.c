@@ -417,6 +417,7 @@ if (cfg != desired)
   * - libusb_get_device_descriptor()
   * - libusb_get_device_list()
   * - libusb_get_device_speed()
+  * - libusb_get_device_string()
   * - libusb_get_iso_packet_buffer()
   * - libusb_get_iso_packet_buffer_simple()
   * - libusb_get_max_alt_packet_size()
@@ -502,6 +503,7 @@ if (cfg != desired)
   * - \ref libusb_capability
   * - \ref libusb_class_code
   * - \ref libusb_descriptor_type
+  * - \ref libusb_device_string_type
   * - \ref libusb_endpoint_direction
   * - \ref libusb_endpoint_transfer_type
   * - \ref libusb_error
@@ -1318,6 +1320,10 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 		if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
 			/* backend does not support hotplug */
 			usbi_disconnect_device(dev);
+		}
+
+		for (int idx = 0; idx < LIBUSB_DEVICE_STRING_COUNT; ++idx) {
+			free(dev->device_strings_utf8[idx]);
 		}
 
 		free(dev);
