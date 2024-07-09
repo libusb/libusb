@@ -523,6 +523,8 @@ struct libusb_device {
 
 	struct libusb_device_descriptor device_descriptor;
 	usbi_atomic_t attached;
+
+	char * device_strings_utf8[LIBUSB_DEVICE_STRING_COUNT];
 };
 
 struct libusb_device_handle {
@@ -1025,6 +1027,31 @@ struct usbi_os_backend {
 	 */
 	int (*get_device_list)(struct libusb_context *ctx,
 		struct discovered_devs **discdevs);
+
+	/* Retrieve a device string without needing to open the device.
+	 *
+	 * The string should be retrieved without opening the device
+	 * and ideally without performing USB transactions to the device.
+	 * Most operating systems read and cache the common string 
+	 * descriptors.  Use the OS-specific calls to retrieve these strings.
+	 *
+	 * Since the USB string descriptor could be processed by the OS,
+	 * this function returns a UTF-8 encoded string.
+	 *
+	 * The string will be returned untranslated or in the default OS language
+	 * when supported by the OS and USB device.
+	 *
+	 * This function must not write more than length bytes into data,
+	 * including the null terminator.
+	 *
+	 * Return:
+	 * - The actual length in bytes including the null termintor on success.
+	 * - LIBUSB_ERROR_NO_DEVICE if device not found.
+	 * - LIBUSB_ERROR_INVALID_PARAM if any parameter is invalid.
+	 * - another LIBUSB_ERROR code on other failure
+	 */
+	int (*get_device_string)(libusb_device *dev,
+		enum libusb_device_string_type string_type, char *data, int length);
 
 	/* Apps which were written before hotplug support, may listen for
 	 * hotplug events on their own and call libusb_get_device_list on

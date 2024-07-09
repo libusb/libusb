@@ -320,6 +320,8 @@ struct windows_backend {
 	void (*exit)(struct libusb_context *ctx);
 	int (*get_device_list)(struct libusb_context *ctx,
 		struct discovered_devs **discdevs);
+	int (*get_device_string)(libusb_device *dev,
+		enum libusb_device_string_type string_type, char *data, int length);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
 	int (*get_active_config_descriptor)(struct libusb_device *device,

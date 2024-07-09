@@ -651,6 +651,16 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 }
 #endif
 
+static int windows_get_device_string(libusb_device *dev,
+	enum libusb_device_string_type string_type, char *data, int length)
+{
+	struct windows_context_priv* priv = usbi_get_context_priv(DEVICE_CTX(dev));
+	if (NULL != priv->backend->get_device_string) {
+		return priv->backend->get_device_string(dev, string_type, data, length);
+	}
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 static int windows_open(struct libusb_device_handle *dev_handle)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
@@ -945,6 +955,7 @@ const struct usbi_os_backend usbi_backend = {
 #else
 	windows_get_device_list,
 #endif
+	windows_get_device_string,
 	NULL,	/* hotplug_poll */
 	NULL,	/* wrap_sys_device */
 	windows_open,

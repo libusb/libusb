@@ -1647,6 +1647,29 @@ enum libusb_option {
 	LIBUSB_OPTION_MAX = 4
 };
 
+/** \ingroup libusb_desc
+ * The device string type.
+ */
+enum libusb_device_string_type {
+	LIBUSB_DEVICE_STRING_MANUFACTURER,
+	LIBUSB_DEVICE_STRING_PRODUCT,
+	LIBUSB_DEVICE_STRING_SERIAL_NUMBER,
+	LIBUSB_DEVICE_STRING_COUNT  /* The total number of string types. */
+};
+
+/** \ingroup libusb_desc
+ * The maximum length for a device string descriptor in UTF-8.
+ * 
+ * 255 max descriptor length with 2 byte header 
+ *  => 253 bytes UTF-16LE, no null termination (USB 2.0 9.6.7)
+ *  => 126.5 codepoints
+ *  => 126 * 3 + 1
+ *  => 382 bytes
+ * 
+ * Stay with 256 * 2/3 = 384 to be safe.
+ */
+#define LIBUSB_DEVICE_STRING_BYTES_MAX  (384U)
+ 
 /** \ingroup libusb_lib
  * Callback function for handling log messages.
  * \param ctx the context which is related to the log message, or NULL if it
@@ -1694,6 +1717,8 @@ void LIBUSB_CALL libusb_free_device_list(libusb_device **list,
 libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev);
 void LIBUSB_CALL libusb_unref_device(libusb_device *dev);
 
+int LIBUSB_CALL libusb_get_device_string(libusb_device *dev,
+	enum libusb_device_string_type string_type, char *data, int length);
 int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
 	int *config);
 int LIBUSB_CALL libusb_get_device_descriptor(libusb_device *dev,

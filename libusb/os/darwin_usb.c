@@ -966,6 +966,55 @@ static void darwin_exit (struct libusb_context *ctx) {
   usbi_mutex_unlock(&darwin_cached_devices_mutex);
 }
 
+static int darwin_get_device_string(struct libusb_device *dev, 
+    enum libusb_device_string_type string_type, char *buffer, int length) {
+  
+  struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
+  io_iterator_t deviceIterator;
+  io_service_t service;
+  kern_return_t kresult;
+  CFStringRef cf;
+
+  kresult = usb_setup_device_iterator (&deviceIterator, priv->location);
+  if (kresult != kIOReturnSuccess)
+    return darwin_to_libusb (kresult);
+
+  service = IOIteratorNext (deviceIterator);
+  IOObjectRelease(deviceIterator);
+  if (service == IO_OBJECT_NULL)
+    return LIBUSB_ERROR_NOT_FOUND;
+
+  switch (string_type) {
+    case LIBUSB_DEVICE_STRING_MANUFACTURER: 
+      cf = IORegistryEntryCreateCFProperty(service, CFSTR(kUSBVendorString), kCFAllocatorDefault, 0);
+      break;
+    case LIBUSB_DEVICE_STRING_PRODUCT: 
+      cf = IORegistryEntryCreateCFProperty(service, CFSTR(kUSBProductString), kCFAllocatorDefault, 0);
+      break;
+    case LIBUSB_DEVICE_STRING_SERIAL_NUMBER: 
+      cf = IORegistryEntryCreateCFProperty(service, CFSTR(kUSBSerialNumberString), kCFAllocatorDefault, 0);
+      break;
+    case LIBUSB_DEVICE_STRING_COUNT: /* intentional fall-through, avoid -Wswitch-enum */
+    default:
+      IOObjectRelease(service);
+      return LIBUSB_ERROR_INVALID_PARAM;
+  }
+
+  IOObjectRelease(service);
+  if (cf == NULL)
+    return LIBUSB_ERROR_NOT_FOUND;
+
+  long cfUsedIndex = 0;
+  CFStringGetBytes(cf, CFRangeMake(0, CFStringGetLength(cf)), kCFStringEncodingUTF8, '?', false,
+    (uint8_t *) buffer, length, &cfUsedIndex);
+  CFRelease(cf);
+
+  if (cfUsedIndex <= 0)
+    return LIBUSB_ERROR_NOT_FOUND;
+
+  return (int) cfUsedIndex;
+}
+
 static int get_configuration_index (struct libusb_device *dev, UInt8 config_value) {
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   UInt8 i, numConfig;
@@ -2930,6 +2979,7 @@ const struct usbi_os_backend usbi_backend = {
         .exit = darwin_exit,
         .set_option = NULL,
         .get_device_list = NULL,
+        .get_device_string = darwin_get_device_string,
         .hotplug_poll = darwin_hotplug_poll,
         .wrap_sys_device = NULL,
         .open = darwin_open,
