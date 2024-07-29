@@ -652,16 +652,15 @@ enum usbi_transfer_timeout_flags {
 	 ((unsigned char *)(transfer)			\
 	  - PTR_ALIGN(sizeof(struct usbi_transfer))))
 
-#ifdef _MSC_VER
-#pragma pack(push, 1)
-#endif
-
 /* All standard descriptors have these 2 fields in common */
+LIBUSB_PACKED_PUSH
 struct usbi_descriptor_header {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
-} LIBUSB_PACKED;
+};
+LIBUSB_PACKED_POP
 
+LIBUSB_PACKED_PUSH
 struct usbi_device_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
@@ -677,8 +676,10 @@ struct usbi_device_descriptor {
 	uint8_t  iProduct;
 	uint8_t  iSerialNumber;
 	uint8_t  bNumConfigurations;
-} LIBUSB_PACKED;
+};
+LIBUSB_PACKED_POP
 
+LIBUSB_PACKED_PUSH
 struct usbi_configuration_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
@@ -688,8 +689,10 @@ struct usbi_configuration_descriptor {
 	uint8_t  iConfiguration;
 	uint8_t  bmAttributes;
 	uint8_t  bMaxPower;
-} LIBUSB_PACKED;
+};
+LIBUSB_PACKED_POP
 
+LIBUSB_PACKED_PUSH
 struct usbi_interface_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
@@ -700,24 +703,25 @@ struct usbi_interface_descriptor {
 	uint8_t  bInterfaceSubClass;
 	uint8_t  bInterfaceProtocol;
 	uint8_t  iInterface;
-} LIBUSB_PACKED;
+};
+LIBUSB_PACKED_POP
 
+LIBUSB_PACKED_PUSH
 struct usbi_string_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
 	uint16_t wData[LIBUSB_FLEXIBLE_ARRAY];
-} LIBUSB_PACKED;
+};
+LIBUSB_PACKED_POP
 
+LIBUSB_PACKED_PUSH
 struct usbi_bos_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
 	uint16_t wTotalLength;
 	uint8_t  bNumDeviceCaps;
-} LIBUSB_PACKED;
-
-#ifdef _MSC_VER
-#pragma pack(pop)
-#endif
+};
+LIBUSB_PACKED_POP
 
 union usbi_config_desc_buf {
         struct usbi_configuration_descriptor desc;
