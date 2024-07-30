@@ -1229,10 +1229,9 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, DWORD *port_nr)
 {
 	char buffer[MAX_KEY_LENGTH];
-	DWORD size;
-	const char *start = NULL;
+	DWORD size, port;
+	const char *start;
 	char *end = NULL;
-	long long port;
 
 	// First try SPDRP_LOCATION_INFORMATION, which returns a REG_SZ. The string *may* have a format
 	// similar to "Port_#0002.Hub_#000D", in which case we can extract the port number. However, we
@@ -1242,11 +1241,11 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 		// Check for the required format.
 		if (strncmp(buffer, "Port_#", 6) == 0) {
 			start = buffer + 6;
-			port = strtoll(start, &end, 10);
-			if (port < 0 || port > ULONG_MAX || end == start || *end != '\0') {
+			port = strtoul(start, &end, 10);
+			if (port == 0 || port == ULONG_MAX || end == start || (*end != '.' && *end != '\0')) {
 				return false;
 			}
-			*port_nr = (DWORD)port;
+			*port_nr = port;
 			return true;
 		}
 	}
@@ -1261,11 +1260,11 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 		for (char *token = strrchr(buffer, '#'); token != NULL; token = strrchr(buffer, '#')) {
 			if (strncmp(token, "#USB(", 5) == 0) {
 				start = token + 5;
-				port = strtoll(start, &end, 10);
-				if (port < 0 || port > ULONG_MAX || end == start || *end != '\0') {
+				port = strtoul(start, &end, 10);
+				if (port == 0 || port == ULONG_MAX || end == start || (*end != ')' && *end != '\0')) {
 					return false;
 				}
-				*port_nr = (DWORD)port;
+				*port_nr = port;
 				return true;
 			}
 			// Shorten the string and try again.
