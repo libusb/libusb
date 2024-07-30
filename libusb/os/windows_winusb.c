@@ -1242,8 +1242,11 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 		// Check for the required format.
 		if (strncmp(buffer, "Port_#", 6) == 0) {
 			start = buffer + 6;
+			// Note that 0 is both strtoll's sentinel return value to indicate failure, as well
+			// as (obviously) the return value for the literal "0". Fortunately we can always treat
+			// 0 as a failure, since Windows USB port numbers are numbered 1..n.
 			port = strtoll(start, &end, 10);
-			if (port < 0 || port > ULONG_MAX || end == start || *end != '\0') {
+			if (port <= 0 || port >= ULONG_MAX || end == start || (*end != '.' && *end != '\0')) {
 				return false;
 			}
 			*port_nr = (DWORD)port;
@@ -1262,7 +1265,7 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 			if (strncmp(token, "#USB(", 5) == 0) {
 				start = token + 5;
 				port = strtoll(start, &end, 10);
-				if (port < 0 || port > ULONG_MAX || end == start || *end != '\0') {
+				if (port <= 0 || port >= ULONG_MAX || end == start || (*end != ')' && *end != '\0')) {
 					return false;
 				}
 				*port_nr = (DWORD)port;
