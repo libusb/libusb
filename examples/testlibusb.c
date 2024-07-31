@@ -184,7 +184,7 @@ static void print_device(libusb_device *dev, libusb_device_handle *handle)
 		return;
 	}
 
-	printf("Dev (bus %u, device %u): %04X - %04X speed: %s\n",
+	printf("Bus %03u Device %03u: ID %04x:%04x Speed: %s\n",
 	       libusb_get_bus_number(dev), libusb_get_device_address(dev),
 	       desc.idVendor, desc.idProduct, speed);
 
