@@ -1298,7 +1298,7 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	size_t libusb_transfer_size = PTR_ALIGN(sizeof(struct libusb_transfer));
 	size_t iso_packets_size = sizeof(struct libusb_iso_packet_descriptor) * (size_t)iso_packets;
 	size_t alloc_size = priv_size + usbi_transfer_size + libusb_transfer_size + iso_packets_size;
-	unsigned char *ptr = calloc(1, alloc_size);
+	unsigned char *ptr = (unsigned char *)calloc(1, alloc_size);
 	if (!ptr)
 		return NULL;
 
@@ -2681,7 +2681,7 @@ static void usbi_event_source_notification(struct libusb_context *ctx)
  * POLLIN and/or POLLOUT. */
 int usbi_add_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle, short poll_events)
 {
-	struct usbi_event_source *ievent_source = malloc(sizeof(*ievent_source));
+	struct usbi_event_source *ievent_source = (struct usbi_event_source *)malloc(sizeof(*ievent_source));
 
 	if (!ievent_source)
 		return LIBUSB_ERROR_NO_MEM;
@@ -2769,7 +2769,7 @@ const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 	for_each_event_source(ctx, ievent_source)
 		i++;
 
-	ret = calloc(i + 1, sizeof(struct libusb_pollfd *));
+	ret = (struct libusb_pollfd **)calloc(i + 1, sizeof(struct libusb_pollfd *));
 	if (!ret)
 		goto out;
 
