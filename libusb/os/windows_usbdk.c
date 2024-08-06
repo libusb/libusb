@@ -310,11 +310,10 @@ static void usbdk_device_init(struct libusb_device *dev, PUSB_DK_DEVICE_INFO inf
 	}
 }
 
-static int usbdk_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs)
+static int usbdk_get_device_list(struct libusb_context *ctx)
 {
 	int r = LIBUSB_SUCCESS;
 	ULONG i;
-	struct discovered_devs *discdevs = NULL;
 	ULONG dev_number;
 	PUSB_DK_DEVICE_INFO devices;
 
@@ -342,19 +341,8 @@ static int usbdk_get_device_list(struct libusb_context *ctx, struct discovered_d
 				continue;
 			}
 		}
-
-		discdevs = discovered_devs_append(*_discdevs, dev);
-		libusb_unref_device(dev);
-		if (!discdevs) {
-			usbi_err(ctx, "cannot append new device to list");
-			r = LIBUSB_ERROR_NO_MEM;
-			goto func_exit;
-		}
-
-		*_discdevs = discdevs;
 	}
 
-func_exit:
 	usbdk_helper.ReleaseDevicesList(devices);
 	return r;
 }
