@@ -27,6 +27,7 @@ OS_OPENBSD_SRC = os/openbsd_usb.c
 OS_SUNOS_SRC = os/sunos_usb.h os/sunos_usb.c
 OS_WINDOWS_SRC = libusb-1.0.def libusb-1.0.rc \
 		 os/windows_common.h os/windows_common.c \
+		 os/windows_hotplug.h os/windows_hotplug.c \
 		 os/windows_usbdk.h os/windows_usbdk.c \
 		 os/windows_winusb.h os/windows_winusb.c
 
