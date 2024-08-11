@@ -1005,9 +1005,12 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
 	return LIBUSB_SUCCESS;
 }
 
-/* We use this private struct only to parse a SuperSpeedPlus device capability
-   descriptor according to section 9.6.2.5 of the USB 3.1 specification.
-   We don't expose it. */
+/// @cond DEV
+/** \internal \ingroup libusb_desc
+ * We use this private struct only to parse a SuperSpeedPlus device capability
+ * descriptor according to section 9.6.2.5 of the USB 3.1 specification.
+ * We don't expose it.
+ */
 struct internal_ssplus_capability_descriptor {
 	/** The length of the descriptor. Must be equal to LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE */
 	uint8_t  bLength;
@@ -1030,6 +1033,7 @@ struct internal_ssplus_capability_descriptor {
 	/** Unused */
 	uint16_t wReserved;
 };
+/// @endcond
 
 int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	libusb_context *ctx,
