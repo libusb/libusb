@@ -932,7 +932,7 @@ struct libusb_usb_2_0_extension_descriptor {
 	uint8_t  bDescriptorType;
 
 	/** Capability type. Will have value
-	 * \ref libusb_capability_type::LIBUSB_BT_USB_2_0_EXTENSION
+	 * \ref libusb_bos_type::LIBUSB_BT_USB_2_0_EXTENSION
 	 * LIBUSB_BT_USB_2_0_EXTENSION in this context. */
 	uint8_t  bDevCapabilityType;
 
@@ -958,7 +958,7 @@ struct libusb_ss_usb_device_capability_descriptor {
 	uint8_t  bDescriptorType;
 
 	/** Capability type. Will have value
-	 * \ref libusb_capability_type::LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
+	 * \ref libusb_bos_type::LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
 	 * LIBUSB_BT_SS_USB_DEVICE_CAPABILITY in this context. */
 	uint8_t  bDevCapabilityType;
 
@@ -1094,7 +1094,7 @@ struct libusb_container_id_descriptor {
 	uint8_t  bDescriptorType;
 
 	/** Capability type. Will have value
-	 * \ref libusb_capability_type::LIBUSB_BT_CONTAINER_ID
+	 * \ref libusb_bos_type::LIBUSB_BT_CONTAINER_ID
 	 * LIBUSB_BT_CONTAINER_ID in this context. */
 	uint8_t  bDevCapabilityType;
 
@@ -1119,7 +1119,7 @@ struct libusb_platform_descriptor {
 	uint8_t  bDescriptorType;
 
 	/** Capability type. Will have value
-	 * \ref libusb_capability_type::LIBUSB_BT_PLATFORM_DESCRIPTOR
+	 * \ref libusb_bos_type::LIBUSB_BT_PLATFORM_DESCRIPTOR
 	 * LIBUSB_BT_CONTAINER_ID in this context. */
 	uint8_t  bDevCapabilityType;
 

@@ -904,7 +904,7 @@ void API_EXPORTED libusb_free_bos_descriptor(struct libusb_bos_descriptor *bos)
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
- * \ref libusb_capability_type::LIBUSB_BT_USB_2_0_EXTENSION
+ * \ref libusb_bos_type::LIBUSB_BT_USB_2_0_EXTENSION
  * LIBUSB_BT_USB_2_0_EXTENSION
  * \param usb_2_0_extension output location for the USB 2.0 Extension
  * descriptor. Only valid if 0 was returned. Must be freed with
@@ -962,7 +962,7 @@ void API_EXPORTED libusb_free_usb_2_0_extension_descriptor(
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
- * \ref libusb_capability_type::LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
+ * \ref libusb_bos_type::LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
  * LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
  * \param ss_usb_device_cap output location for the SuperSpeed USB Device
  * Capability descriptor. Only valid if 0 was returned. Must be freed with
@@ -1130,7 +1130,7 @@ void API_EXPORTED libusb_free_ss_usb_device_capability_descriptor(
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
- * \ref libusb_capability_type::LIBUSB_BT_CONTAINER_ID
+ * \ref libusb_bos_type::LIBUSB_BT_CONTAINER_ID
  * LIBUSB_BT_CONTAINER_ID
  * \param container_id output location for the Container ID descriptor.
  * Only valid if 0 was returned. Must be freed with
@@ -1190,7 +1190,7 @@ void API_EXPORTED libusb_free_container_id_descriptor(
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
- * \ref libusb_capability_type::LIBUSB_BT_PLATFORM_DESCRIPTOR
+ * \ref libusb_bos_type::LIBUSB_BT_PLATFORM_DESCRIPTOR
  * LIBUSB_BT_PLATFORM_DESCRIPTOR
  * \param platform_descriptor output location for the Platform descriptor.
  * Only valid if 0 was returned. Must be freed with
