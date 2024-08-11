@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           brew update
-          brew install autoconf automake libtool m4
+          brew install autoconf automake libtool m4 doxygen
 
       - name: bootstrap
         shell: bash
@@ -29,7 +29,7 @@ jobs:
 
       - name: compile
         shell: bash
-        run: .private/ci-build.sh --build-dir build
+        run: .private/ci-build.sh --build-dir build --build-docs
 
       - name: Xcode
         shell: bash

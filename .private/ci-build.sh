@@ -7,6 +7,7 @@ scriptdir=$(dirname $(readlink -f "$0"))
 install=no
 test=yes
 asan=yes
+docs=no
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -32,6 +33,10 @@ while [ $# -gt 0 ]; do
 		;;
 	--werror)
 		cflags+=" -Werror"
+		shift
+		;;
+	--build-docs)
+		docs=yes
 		shift
 		;;
 	--)
@@ -79,6 +84,10 @@ CFLAGS="${cflags}" CXXFLAGS="${cflags}" ../configure --enable-examples-build --e
 echo ""
 echo "Building ..."
 make -j4 -k
+
+if [ "${docs}" = "yes" ]; then
+	make -C doc
+fi
 
 if [ "${test}" = "yes" ]; then
 	# Load custom shim for WebUSB tests that simulates Web environment.
