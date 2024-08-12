@@ -30,6 +30,7 @@ libusb_device_handle *handle = NULL;
 static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev, libusb_hotplug_event event, void *user_data)
 {
 	struct libusb_device_descriptor desc;
+	libusb_device_handle *new_handle;
 	int rc;
 
 	(void)ctx;
@@ -46,13 +47,13 @@ static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev,
 			 libusb_strerror((enum libusb_error)rc));
 	}
 
-	if (handle) {
-		libusb_close (handle);
-		handle = NULL;
-	}
-
-	rc = libusb_open (dev, &handle);
-	if (LIBUSB_SUCCESS != rc) {
+	rc = libusb_open (dev, &new_handle);
+	if (LIBUSB_SUCCESS == rc) {
+		if (handle) {
+			libusb_close (handle);
+		}
+		handle = new_handle;
+	} else {
 		fprintf (stderr, "No access to device: %s\n",
 			 libusb_strerror((enum libusb_error)rc));
 	}
