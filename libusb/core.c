@@ -372,6 +372,7 @@ if (cfg != desired)
   * - libusb_attach_kernel_driver()
   * - libusb_bulk_transfer()
   * - libusb_cancel_transfer()
+  * - libusb_check_connected()
   * - libusb_claim_interface()
   * - libusb_clear_halt()
   * - libusb_close()
@@ -1436,6 +1437,23 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	list_add(&_dev_handle->list, &ctx->open_devs);
 	usbi_mutex_unlock(&ctx->open_devs_lock);
 	*dev_handle = _dev_handle;
+
+	return 0;
+}
+
+/** \ingroup libusb_dev
+ * Checks if a device handle is still connected to the system.
+ *
+ * This is a non-blocking function; no requests are sent over the bus.
+ *
+ * \param dev_handle device handle to be checked.
+ * \returns 0 if the device is connected
+ * \returns \ref LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
+ */
+int API_EXPORTED libusb_check_connected(libusb_device_handle * dev_handle)
+{
+	if (!usbi_atomic_load(&dev_handle->dev->attached))
+		return LIBUSB_ERROR_NO_DEVICE;
 
 	return 0;
 }
