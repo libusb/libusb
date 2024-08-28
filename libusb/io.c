@@ -2820,7 +2820,7 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 	usbi_dbg(ctx, "device %d.%d",
 		dev_handle->dev->bus_number, dev_handle->dev->device_address);
 
-	/* terminate all pending transfers with the LIBUSB_TRANSFER_NO_DEVICE
+	/* terminate all pending transfers with the LIBUSB_TRANSFER_DISCONNECT
 	 * status code.
 	 *
 	 * when we find a transfer for this device on the list, there are two
@@ -2860,6 +2860,6 @@ void usbi_handle_disconnect(struct libusb_device_handle *dev_handle)
 		usbi_mutex_lock(&to_cancel->lock);
 		usbi_backend.clear_transfer_priv(to_cancel);
 		usbi_mutex_unlock(&to_cancel->lock);
-		usbi_handle_transfer_completion(to_cancel, LIBUSB_TRANSFER_NO_DEVICE);
+		usbi_handle_transfer_completion(to_cancel, LIBUSB_TRANSFER_DISCONNECT);
 	}
 }
