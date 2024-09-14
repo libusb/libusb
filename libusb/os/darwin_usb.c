@@ -1131,16 +1131,18 @@ static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *
   (*device)->GetDeviceProduct (device, &idProduct);
   (*device)->GetDeviceVendor (device, &idVendor);
 
-  /* Try synthesize a device descriptor from OS cached values */
+  /* Try synthesize a device descriptor from OS cached values.
+     If anything fails, fall back to requesting descriptor from device. */
   do {
     IOUSBDeviceDescriptor *desc = &dev->dev_descriptor;
-    UInt16 bcdDevice;
+    UInt16 bcdDevice, bcdUSB;
 
-    /* If anything fails, fall back to requesting descriptor from device */
+    if (!get_ioregistry_value_number (dev->service, CFSTR("bcdUSB"), kCFNumberSInt16Type, &bcdUSB))
+      break;
+    desc->bcdUSB = libusb_cpu_to_le16(bcdUSB); // TODO: verify on BE
+
     if (!get_ioregistry_value_number (dev->service, CFSTR("bMaxPacketSize0"), kCFNumberSInt8Type, &desc->bMaxPacketSize0))
       break;
-
-    desc->bcdUSB = libusb_cpu_to_le16(0x0200); // FIXME get from somewhere
 
     desc->bDeviceClass = bDeviceClass;
     (*device)->GetDeviceSubClass (device, &desc->bDeviceSubClass);
