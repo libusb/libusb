@@ -174,7 +174,17 @@ static inline int linux_start_event_monitor(void)
 {
 #if defined(HAVE_LIBUDEV)
 	return linux_udev_start_event_monitor();
-#elif !defined(__ANDROID__)
+/*
+* __ANDROID__: preprocessor macro defined automatically by GCC for all Android
+*              targets (i.e. both Android native applications, and Android OS-level
+*              services)
+*
+* ANDROID_OS: compilation flag that should be set for using libusb from programs
+*             running on Android at OS level (e.g. Android platform services).
+*             The programs using libusb built with the ANDROID_OS flag must have
+*             permission to access netlink sockets.
+*/
+#elif !defined(__ANDROID__) || defined(ANDROID_OS)
 	return linux_netlink_start_event_monitor();
 #else
 	return LIBUSB_SUCCESS;
@@ -185,7 +195,7 @@ static inline void linux_stop_event_monitor(void)
 {
 #if defined(HAVE_LIBUDEV)
 	linux_udev_stop_event_monitor();
-#elif !defined(__ANDROID__)
+#elif !defined(__ANDROID__) || defined(ANDROID_OS)
 	linux_netlink_stop_event_monitor();
 #endif
 }
@@ -194,7 +204,7 @@ static inline void linux_hotplug_poll(void)
 {
 #if defined(HAVE_LIBUDEV)
 	linux_udev_hotplug_poll();
-#elif !defined(__ANDROID__)
+#elif !defined(__ANDROID__) || defined(ANDROID_OS)
 	linux_netlink_hotplug_poll();
 #endif
 }
