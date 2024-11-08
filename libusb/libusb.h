@@ -566,7 +566,7 @@ enum libusb_bos_type {
 	/** Platform descriptor */
 	LIBUSB_BT_PLATFORM_DESCRIPTOR = 0x05,
 
-	/* SuperSpeedPlus device capability */
+	/** SuperSpeedPlus device capability */
 	LIBUSB_BT_SUPERSPEED_PLUS_CAPABILITY = 0x0A,
 };
 
@@ -1075,7 +1075,7 @@ struct libusb_ssplus_usb_device_capability_descriptor {
 	/** This field indicates the minimum transmit lane count*/
 	uint8_t minTxLaneCount;
 
-	/** num attrtibutes=  \ref libusb_ssplus_usb_device_capability_descriptor.numSublinkSpeedAttributes= */
+	/** Array size is \ref libusb_ssplus_usb_device_capability_descriptor.numSublinkSpeedAttributes */
 	struct libusb_ssplus_sublink_attribute sublinkSpeedAttributes[];
 };
 

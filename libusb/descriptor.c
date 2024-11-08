@@ -1009,12 +1009,25 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
    descriptor according to section 9.6.2.5 of the USB 3.1 specification.
    We don't expose it. */
 struct internal_ssplus_capability_descriptor {
+	/** The length of the descriptor. Must be equal to LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE */
 	uint8_t  bLength;
+
+	/** The type of the descriptor */
 	uint8_t  bDescriptorType;
+
+	/** Must be equal to LIBUSB_BT_SUPERSPEED_PLUS_CAPABILITY */
 	uint8_t  bDevCapabilityType;
+
+	/** Unused */
 	uint8_t  bReserved;
+
+	/** Contains the number of SublinkSpeedIDs */
 	uint32_t bmAttributes;
+
+	/** Contains the ssid, minRxLaneCount, and minTxLaneCount */
 	uint16_t wFunctionalitySupport;
+
+	/** Unused */
 	uint16_t wReserved;
 };
 
