@@ -262,8 +262,16 @@ static IOReturn darwin_get_pipe_properties(struct darwin_interface *cInterface, 
 
 #if (MAX_INTERFACE_VERSION >= 550)
   if (get_interface_interface_version() >= 550) {
+    // GetPipePropertiesV3 returns a "cooked" wMaxPacketSize (premultiplied by burst and mul). This not what we want.
+    // We call GetPipePropertiesV3 to fill the fields needed to call GetEndpointPropertiesV3.
     IOUSBEndpointProperties pipe_properties = {.bVersion = kUSBEndpointPropertiesVersion3};
     kresult = (*IOINTERFACE_V(cInterface, 550))->GetPipePropertiesV3 (IOINTERFACE(cInterface), pipe, &pipe_properties);
+    if (kIOReturnSuccess != kresult) {
+        return kresult;
+    }
+    
+    // GetEndpointPropertiesV3 returns the wMaxPacketSize without burst and mul multipliers.
+    kresult = (*IOINTERFACE_V(cInterface, 550))->GetEndpointPropertiesV3 (IOINTERFACE(cInterface), &pipe_properties);
     if (kIOReturnSuccess == kresult) {
       out->number = pipe_properties.bEndpointNumber;
       out->direction = pipe_properties.bDirection;
@@ -274,9 +282,26 @@ static IOReturn darwin_get_pipe_properties(struct darwin_interface *cInterface, 
     return kresult;
   }
 #endif
-  return (*IOINTERFACE(cInterface))->GetPipeProperties(IOINTERFACE(cInterface), pipe, &out->direction,
+  // GetPipeProperties returns a "cooked" version of max_packet_size which includes burst and mul. What we want is the
+  // original maxPacketSize so we can send zero-length packet when requested by users.
+  // We only call GetPipeProperties to retrieve the parameters needed to call GetEndpointProperties.
+  kresult = (*IOINTERFACE(cInterface))->GetPipeProperties(IOINTERFACE(cInterface), pipe, &out->direction,
                                                                &out->number, &out->transfer_type, &out->max_packet_size,
                                                                &out->interval);
+  if (kIOReturnSuccess != kresult) {
+      return kresult;
+  }
+
+  // To call GetEndpointProperties we also need altSetting
+  UInt8 altSetting;
+  kresult = (*IOINTERFACE(cInterface))->GetAlternateSetting(IOINTERFACE(cInterface), &altSetting);
+  if (kIOReturnSuccess != kresult) {
+     return kresult;
+  }
+  // Retrieve "uncooked" version of maxPacketSize
+  return (*IOINTERFACE(cInterface))->GetEndpointProperties(IOINTERFACE(cInterface), altSetting, out->number,
+                                                           out->direction, &out->transfer_type, &out->max_packet_size,
+                                                           &out->interval);
 }
 
 #if defined(ENABLE_LOGGING)
