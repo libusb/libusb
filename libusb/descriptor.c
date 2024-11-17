@@ -172,6 +172,7 @@ static int parse_interface(libusb_context *ctx,
 	const struct usbi_interface_descriptor *if_desc;
 	struct libusb_interface_descriptor *ifp;
 	const uint8_t *begin;
+	int if_desc_eps;
 
 	while (size >= LIBUSB_DT_INTERFACE_SIZE) {
 		struct libusb_interface_descriptor *altsetting;
@@ -274,15 +275,18 @@ static int parse_interface(libusb_context *ctx,
 
 		if (ifp->bNumEndpoints > 0) {
 			struct libusb_endpoint_descriptor *endpoint;
-			uint8_t i;
+
+			/* Endpoint desciptors reported */
+			if_desc_eps = ifp->bNumEndpoints;
 
 			endpoint = calloc(ifp->bNumEndpoints, sizeof(*endpoint));
 			if (!endpoint) {
 				r = LIBUSB_ERROR_NO_MEM;
 				goto err;
 			}
-
 			ifp->endpoint = endpoint;
+			uint8_t i;
+
 			for (i = 0; i < ifp->bNumEndpoints; i++) {
 				r = parse_endpoint(ctx, endpoint + i, buffer, size);
 				if (r < 0)
@@ -295,6 +299,27 @@ static int parse_interface(libusb_context *ctx,
 				buffer += r;
 				parsed += r;
 				size -= r;
+			}
+
+			/* Skip any extra endpoint desciptors */
+			/* Device 0x04dd:0x9f71 has more endpoint descriptors than reported by bNumEndpoints.*/
+			/* Before we continue, we need to make sure we're pointing at the correct descriptor.*/
+			/* Otherwise we will point at an endpoint and the last interface won't be parsed.*/
+			uint8_t n = 0;
+			while (size > 0) {
+				header = (const struct usbi_descriptor_header *)buffer;
+				if (header->bDescriptorType == LIBUSB_DT_ENDPOINT) {
+					buffer += header->bLength;
+					parsed += header->bLength;
+					size -= header->bLength;
+					n++;
+				} else {
+					break;
+				}
+			}
+			if (n > 0) {
+				usbi_warn(ctx, "interface %d has %d more endpoint descriptor(s) than the interface descriptor's value: %d",interface_number, n, if_desc_eps);
+				usbi_warn(ctx, "Skipped %d endpoint descriptor(s)", n);
 			}
 		}
 
