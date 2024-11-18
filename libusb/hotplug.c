@@ -270,7 +270,7 @@ void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device 
 	if (!usbi_atomic_load(&ctx->hotplug_ready))
 		return;
 
-	msg = calloc(1, sizeof(*msg));
+	msg = (struct usbi_hotplug_message *)calloc(1, sizeof(*msg));
 	if (!msg) {
 		usbi_err(ctx, "error allocating hotplug message");
 		return;
@@ -363,7 +363,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 
 	ctx = usbi_get_context(ctx);
 
-	hotplug_cb = calloc(1, sizeof(*hotplug_cb));
+	hotplug_cb = (struct usbi_hotplug_callback *)calloc(1, sizeof(*hotplug_cb));
 	if (!hotplug_cb)
 		return LIBUSB_ERROR_NO_MEM;
 

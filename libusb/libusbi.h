@@ -813,7 +813,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	unsigned long session_id);
 struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	unsigned long session_id);
-int usbi_sanitize_device(struct libusb_device *dev);
+enum libusb_error usbi_sanitize_device(struct libusb_device *dev);
 void usbi_handle_disconnect(struct libusb_device_handle *dev_handle);
 
 int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
@@ -824,11 +824,13 @@ void usbi_signal_transfer_completion(struct usbi_transfer *itransfer);
 void usbi_connect_device(struct libusb_device *dev);
 void usbi_disconnect_device(struct libusb_device *dev);
 
+struct usbi_event_source_data {
+	usbi_os_handle_t os_handle;
+	short poll_events;
+};
+
 struct usbi_event_source {
-	struct usbi_event_source_data {
-		usbi_os_handle_t os_handle;
-		short poll_events;
-	} data;
+	struct usbi_event_source_data data;
 	struct list_head list;
 };
 
