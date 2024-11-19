@@ -119,6 +119,8 @@ struct config_descriptor {
 struct linux_context_priv {
 	/* no enumeration or hot-plug detection */
 	int no_device_discovery;
+	/* no reap data after disconnection */
+	int no_reap_after_disconnect;
 };
 
 struct linux_device_priv {
@@ -441,11 +443,15 @@ static int op_set_option(struct libusb_context *ctx, enum libusb_option option, 
 {
 	UNUSED(ap);
 
-	if (option == LIBUSB_OPTION_NO_DEVICE_DISCOVERY) {
-		struct linux_context_priv *cpriv = usbi_get_context_priv(ctx);
+	struct linux_context_priv *cpriv = usbi_get_context_priv(ctx);
 
+	if (option == LIBUSB_OPTION_NO_DEVICE_DISCOVERY) {
 		usbi_dbg(ctx, "no device discovery will be performed");
 		cpriv->no_device_discovery = 1;
+		return LIBUSB_SUCCESS;
+	} else if (option == LIBUSB_OPTION_NO_REAP_AFTER_DISCONNECT) {
+		usbi_dbg(ctx, "no reap after disconnection will be performed");
+		cpriv->no_reap_after_disconnect = 1;
 		return LIBUSB_SUCCESS;
 	}
 
@@ -2670,6 +2676,27 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	return usbi_handle_transfer_completion(itransfer, status);
 }
 
+static int check_usb_disconnect(struct libusb_context* ctx, int fd)
+{
+	struct pollfd pfd;
+	pfd.fd = fd;
+	pfd.events = POLLHUP;
+
+	int num_ready = poll(&pfd, 1, 0);
+
+	if (num_ready == 0) {
+		return LIBUSB_SUCCESS;
+	} else if (num_ready > 0) {
+		usbi_dbg(ctx, "device status has changed when handle other events");
+		return LIBUSB_ERROR_NO_DEVICE;
+	} else if (num_ready == -1) {
+		usbi_err(ctx, "poll() failed, error=%d, try again later", errno);
+		return 1;
+	}
+
+	return LIBUSB_ERROR_IO;
+}
+
 static int reap_for_handle(struct libusb_device_handle *handle)
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
@@ -2715,6 +2742,7 @@ static int op_handle_events(struct libusb_context *ctx,
 	struct pollfd *fds = event_data;
 	unsigned int n;
 	int r;
+	struct linux_context_priv *cpriv = usbi_get_context_priv(ctx);
 
 	usbi_mutex_lock(&ctx->open_devs_lock);
 	for (n = 0; n < count && num_ready > 0; n++) {
@@ -2739,6 +2767,19 @@ static int op_handle_events(struct libusb_context *ctx,
 			continue;
 		}
 
+		if (cpriv->no_reap_after_disconnect && pollfd->revents & POLLHUP) {
+			/* remove the fd from the pollfd set so that it doesn't continuously
+			 * trigger an event, and flag that it has been removed so op_close()
+			 * doesn't try to remove it a second time */
+			usbi_remove_event_source(HANDLE_CTX(handle), hpriv->fd);
+			hpriv->fd_removed = 1;
+
+			/* Don't disconnect device here, because the lock in the kernel may
+			 * not have been released yet.
+			 * Wait for the udev event notification, At that time, the lock in
+			 * the kernel has been released. */
+		}
+
 		if (pollfd->revents & POLLERR) {
 			/* remove the fd from the pollfd set so that it doesn't continuously
 			 * trigger an event, and flag that it has been removed so op_close()
@@ -2754,7 +2795,7 @@ static int op_handle_events(struct libusb_context *ctx,
 							  handle->dev->device_address);
 			usbi_mutex_static_unlock(&linux_hotplug_lock);
 
-			if (hpriv->caps & USBFS_CAP_REAP_AFTER_DISCONNECT) {
+			if (hpriv->caps & USBFS_CAP_REAP_AFTER_DISCONNECT && cpriv->no_reap_after_disconnect) {
 				do {
 					r = reap_for_handle(handle);
 				} while (r == 0);
@@ -2766,7 +2807,12 @@ static int op_handle_events(struct libusb_context *ctx,
 
 		reap_count = 0;
 		do {
-			r = reap_for_handle(handle);
+			if (cpriv->no_reap_after_disconnect && (r = check_usb_disconnect(ctx, hpriv->fd) != 0)) {
+				break;
+			}
+			else {
+				r = reap_for_handle(handle);
+			}
 		} while (r == 0 && ++reap_count <= 25);
 
 		if (r == 1 || r == LIBUSB_ERROR_NO_DEVICE)

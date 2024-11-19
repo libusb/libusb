@@ -1644,7 +1644,21 @@ enum libusb_option {
 	 */
 	LIBUSB_OPTION_LOG_CB = 3,
 
-	LIBUSB_OPTION_MAX = 4
+	/** Don't reap data after usb is disconnected
+	 *
+	 * This option will prohibit Reap operation after disconnection, 
+	 * even if the system has USBFS_CAP_REAP_AFTER_DISCONNECT capability. 
+	 * This method is used to avoid data loss issues caused by competition 
+	 * between the Kernel thread and the thread where the 
+	 * \ref libusb_handle_events_timeout_completed related function is located
+	 * after the device is unplugged in some millisecond level communication 
+	 * situations.
+	 * 
+	 * Only valid on Linux. Ignored on all other platforms.
+	 */
+	LIBUSB_OPTION_NO_REAP_AFTER_DISCONNECT = 4,
+
+	LIBUSB_OPTION_MAX = 5
 };
 
 /** \ingroup libusb_lib
