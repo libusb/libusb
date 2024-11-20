@@ -29,6 +29,7 @@
 #include <setupapi.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "libusbi.h"
 #include "windows_winusb.h"
@@ -1229,6 +1230,9 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 {
 	char buffer[MAX_KEY_LENGTH];
 	DWORD size;
+	const char *start = NULL;
+	char *end = NULL;
+	long long port;
 
 	// First try SPDRP_LOCATION_INFORMATION, which returns a REG_SZ. The string *may* have a format
 	// similar to "Port_#0002.Hub_#000D", in which case we can extract the port number. However, we
@@ -1237,7 +1241,15 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 			NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
 		// Check for the required format.
 		if (strncmp(buffer, "Port_#", 6) == 0) {
-			*port_nr = atoi(buffer + 6);
+			start = buffer + 6;
+			// Note that 0 is both strtoll's sentinel return value to indicate failure, as well
+			// as (obviously) the return value for the literal "0". Fortunately we can always treat
+			// 0 as a failure, since Windows USB port numbers are numbered 1..n.
+			port = strtoll(start, &end, 10);
+			if (port <= 0 || port >= ULONG_MAX || end == start || (*end != '.' && *end != '\0')) {
+				return false;
+			}
+			*port_nr = (DWORD)port;
 			return true;
 		}
 	}
@@ -1251,7 +1263,12 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 		// Find the last "#USB(x)" substring
 		for (char *token = strrchr(buffer, '#'); token != NULL; token = strrchr(buffer, '#')) {
 			if (strncmp(token, "#USB(", 5) == 0) {
-				*port_nr = atoi(token + 5);
+				start = token + 5;
+				port = strtoll(start, &end, 10);
+				if (port <= 0 || port >= ULONG_MAX || end == start || (*end != ')' && *end != '\0')) {
+					return false;
+				}
+				*port_nr = (DWORD)port;
 				return true;
 			}
 			// Shorten the string and try again.
@@ -3682,24 +3699,26 @@ static int _hid_wcslen(WCHAR *str)
 	return i;
 }
 
-static int _hid_get_device_descriptor(struct hid_device_priv *hid_priv, void *data, size_t *size)
+static int _hid_get_device_descriptor(struct libusb_device *dev, struct hid_device_priv *hid_priv, void *data, size_t *size)
 {
 	struct libusb_device_descriptor d;
 
+	/* Copy some values from the cached device descriptor
+	 * because we cannot get them through HID */
 	d.bLength = LIBUSB_DT_DEVICE_SIZE;
 	d.bDescriptorType = LIBUSB_DT_DEVICE;
-	d.bcdUSB = 0x0200; /* 2.00 */
-	d.bDeviceClass = 0;
-	d.bDeviceSubClass = 0;
-	d.bDeviceProtocol = 0;
-	d.bMaxPacketSize0 = 64; /* fix this! */
+	d.bcdUSB = dev->device_descriptor.bcdUSB;
+	d.bDeviceClass = dev->device_descriptor.bDeviceClass;
+	d.bDeviceSubClass = dev->device_descriptor.bDeviceSubClass;
+	d.bDeviceProtocol = dev->device_descriptor.bDeviceProtocol;
+	d.bMaxPacketSize0 = dev->device_descriptor.bMaxPacketSize0;
 	d.idVendor = (uint16_t)hid_priv->vid;
 	d.idProduct = (uint16_t)hid_priv->pid;
-	d.bcdDevice = 0x0100;
+	d.bcdDevice = dev->device_descriptor.bcdDevice;
 	d.iManufacturer = hid_priv->string_index[0];
 	d.iProduct = hid_priv->string_index[1];
 	d.iSerialNumber = hid_priv->string_index[2];
-	d.bNumConfigurations = 1;
+	d.bNumConfigurations = dev->device_descriptor.bNumConfigurations;
 
 	if (*size > LIBUSB_DT_DEVICE_SIZE)
 		*size = LIBUSB_DT_DEVICE_SIZE;
@@ -3927,7 +3946,7 @@ static int _hid_get_descriptor(struct libusb_device *dev, HANDLE hid_handle, int
 	switch (type) {
 	case LIBUSB_DT_DEVICE:
 		usbi_dbg(DEVICE_CTX(dev), "LIBUSB_DT_DEVICE");
-		return _hid_get_device_descriptor(priv->hid, data, size);
+		return _hid_get_device_descriptor(dev, priv->hid, data, size);
 	case LIBUSB_DT_CONFIG:
 		usbi_dbg(DEVICE_CTX(dev), "LIBUSB_DT_CONFIG");
 		if (!_index)

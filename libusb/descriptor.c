@@ -32,16 +32,16 @@
 
 static inline uint16_t ReadLittleEndian16(const uint8_t p[2])
 {
-	return (uint16_t)p[1] << 8 |
-	       (uint16_t)p[0];
+	return (uint16_t)((uint16_t)p[1] << 8 |
+			  (uint16_t)p[0]);
 }
 
 static inline uint32_t ReadLittleEndian32(const uint8_t p[4])
 {
-	return (uint32_t)p[3] << 24 |
-	       (uint32_t)p[2] << 16 |
-	       (uint32_t)p[1] << 8 |
-	       (uint32_t)p[0];
+	return (uint32_t)((uint32_t)p[3] << 24 |
+			  (uint32_t)p[2] << 16 |
+			  (uint32_t)p[1] << 8 |
+			  (uint32_t)p[0]);
 }
 
 static void clear_endpoint(struct libusb_endpoint_descriptor *endpoint)
@@ -411,7 +411,7 @@ static int parse_configuration(struct libusb_context *ctx,
 		ptrdiff_t len = buffer - begin;
 		if (len > 0) {
 			uint8_t *extra = realloc((void *)config->extra,
-						 (size_t)(config->extra_length + len));
+						 (size_t)(config->extra_length) + (size_t)len);
 
 			if (!extra) {
 				r = LIBUSB_ERROR_NO_MEM;
@@ -904,7 +904,7 @@ void API_EXPORTED libusb_free_bos_descriptor(struct libusb_bos_descriptor *bos)
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
- * \ref libusb_capability_type::LIBUSB_BT_USB_2_0_EXTENSION
+ * \ref libusb_bos_type::LIBUSB_BT_USB_2_0_EXTENSION
  * LIBUSB_BT_USB_2_0_EXTENSION
  * \param usb_2_0_extension output location for the USB 2.0 Extension
  * descriptor. Only valid if 0 was returned. Must be freed with
@@ -962,7 +962,7 @@ void API_EXPORTED libusb_free_usb_2_0_extension_descriptor(
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
- * \ref libusb_capability_type::LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
+ * \ref libusb_bos_type::LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
  * LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
  * \param ss_usb_device_cap output location for the SuperSpeed USB Device
  * Capability descriptor. Only valid if 0 was returned. Must be freed with
@@ -1005,18 +1005,35 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
 	return LIBUSB_SUCCESS;
 }
 
-/* We use this private struct only to parse a SuperSpeedPlus device capability
-   descriptor according to section 9.6.2.5 of the USB 3.1 specification.
-   We don't expose it. */
+/// @cond DEV
+/** \internal \ingroup libusb_desc
+ * We use this private struct only to parse a SuperSpeedPlus device capability
+ * descriptor according to section 9.6.2.5 of the USB 3.1 specification.
+ * We don't expose it.
+ */
 struct internal_ssplus_capability_descriptor {
+	/** The length of the descriptor. Must be equal to LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE */
 	uint8_t  bLength;
+
+	/** The type of the descriptor */
 	uint8_t  bDescriptorType;
+
+	/** Must be equal to LIBUSB_BT_SUPERSPEED_PLUS_CAPABILITY */
 	uint8_t  bDevCapabilityType;
+
+	/** Unused */
 	uint8_t  bReserved;
+
+	/** Contains the number of SublinkSpeedIDs */
 	uint32_t bmAttributes;
+
+	/** Contains the ssid, minRxLaneCount, and minTxLaneCount */
 	uint16_t wFunctionalitySupport;
+
+	/** Unused */
 	uint16_t wReserved;
 };
+/// @endcond
 
 int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	libusb_context *ctx,
@@ -1113,7 +1130,7 @@ void API_EXPORTED libusb_free_ss_usb_device_capability_descriptor(
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
- * \ref libusb_capability_type::LIBUSB_BT_CONTAINER_ID
+ * \ref libusb_bos_type::LIBUSB_BT_CONTAINER_ID
  * LIBUSB_BT_CONTAINER_ID
  * \param container_id output location for the Container ID descriptor.
  * Only valid if 0 was returned. Must be freed with
@@ -1173,7 +1190,7 @@ void API_EXPORTED libusb_free_container_id_descriptor(
  *
  * \param ctx the context to operate on, or NULL for the default context
  * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
- * \ref libusb_capability_type::LIBUSB_BT_PLATFORM_DESCRIPTOR
+ * \ref libusb_bos_type::LIBUSB_BT_PLATFORM_DESCRIPTOR
  * LIBUSB_BT_PLATFORM_DESCRIPTOR
  * \param platform_descriptor output location for the Platform descriptor.
  * Only valid if 0 was returned. Must be freed with
@@ -1268,9 +1285,7 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 	r = libusb_get_string_descriptor(dev_handle, 0, 0, str.buf, 4);
 	if (r < 0)
 		return r;
-	else if (r != 4 || str.desc.bLength < 4)
-		return LIBUSB_ERROR_IO;
-	else if (str.desc.bDescriptorType != LIBUSB_DT_STRING)
+	else if (r != 4 || str.desc.bLength < 4 || str.desc.bDescriptorType != LIBUSB_DT_STRING)
 		return LIBUSB_ERROR_IO;
 	else if (str.desc.bLength & 1)
 		usbi_warn(HANDLE_CTX(dev_handle), "suspicious bLength %u for language ID string descriptor", str.desc.bLength);
@@ -1279,9 +1294,7 @@ int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_ha
 	r = libusb_get_string_descriptor(dev_handle, desc_index, langid, str.buf, sizeof(str.buf));
 	if (r < 0)
 		return r;
-	else if (r < DESC_HEADER_LENGTH || str.desc.bLength > r)
-		return LIBUSB_ERROR_IO;
-	else if (str.desc.bDescriptorType != LIBUSB_DT_STRING)
+	else if (r < DESC_HEADER_LENGTH || str.desc.bLength > r || str.desc.bDescriptorType != LIBUSB_DT_STRING)
 		return LIBUSB_ERROR_IO;
 	else if ((str.desc.bLength & 1) || str.desc.bLength != r)
 		usbi_warn(HANDLE_CTX(dev_handle), "suspicious bLength %u for string descriptor (read %d)", str.desc.bLength, r);

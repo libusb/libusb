@@ -2,19 +2,10 @@
 Checks: "-*,\
 boost-*,\
 bugprone-*,\
--bugprone-assignment-in-if-condition,\
--bugprone-branch-clone,\
 -bugprone-easily-swappable-parameters,\
--bugprone-implicit-widening-of-multiplication-result,\
--bugprone-macro-parentheses,\
--bugprone-misplaced-widening-cast,\
 -bugprone-narrowing-conversions,\
--bugprone-reserved-identifier,\
 -bugprone-signed-char-misuse,\
--bugprone-suspicious-string-compare,\
 -bugprone-switch-missing-default-case,\
--bugprone-unsafe-functions,\
--bugprone-too-small-loop-variable,\
 clang-analyzer-*,\
 -clang-analyzer-core.NullDereference,\
 -clang-analyzer-deadcode.DeadStores,\
@@ -36,12 +27,8 @@ readability-*,\
 -readability-else-after-return,\
 -readability-identifier-length,\
 -readability-function-cognitive-complexity,\
--readability-inconsistent-declaration-parameter-name,\
 -readability-isolate-declaration,\
 -readability-magic-numbers,\
--readability-non-const-parameter,\
--readability-uppercase-literal-suffix,\
--readability-misleading-indentation,\
 "
 #WarningsAsErrors: "*"
 ...

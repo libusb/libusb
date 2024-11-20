@@ -114,7 +114,8 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 	for (ti->iteration = 0; ti->iteration < ITERS && !ti->err; ti->iteration++) {
 		libusb_context *ctx = NULL;
 
-		if ((ti->err = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0)) != 0) {
+		ti->err = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
+		if (ti->err != 0) {
 			break;
 		}
 		if (ti->enumerate) {
@@ -127,7 +128,8 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 			for (int i = 0; i < ti->devcount && ti->err == 0; i++) {
 				libusb_device *dev = devs[i];
 				struct libusb_device_descriptor desc;
-				if ((ti->err = libusb_get_device_descriptor(dev, &desc)) != 0) {
+				ti->err = libusb_get_device_descriptor(dev, &desc);
+				if (ti->err != 0) {
 					break;
 				}
 				if (no_access[i]) {

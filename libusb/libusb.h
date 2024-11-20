@@ -566,7 +566,7 @@ enum libusb_bos_type {
 	/** Platform descriptor */
 	LIBUSB_BT_PLATFORM_DESCRIPTOR = 0x05,
 
-	/* SuperSpeedPlus device capability */
+	/** SuperSpeedPlus device capability */
 	LIBUSB_BT_SUPERSPEED_PLUS_CAPABILITY = 0x0A,
 };
 
@@ -932,7 +932,7 @@ struct libusb_usb_2_0_extension_descriptor {
 	uint8_t  bDescriptorType;
 
 	/** Capability type. Will have value
-	 * \ref libusb_capability_type::LIBUSB_BT_USB_2_0_EXTENSION
+	 * \ref libusb_bos_type::LIBUSB_BT_USB_2_0_EXTENSION
 	 * LIBUSB_BT_USB_2_0_EXTENSION in this context. */
 	uint8_t  bDevCapabilityType;
 
@@ -958,7 +958,7 @@ struct libusb_ss_usb_device_capability_descriptor {
 	uint8_t  bDescriptorType;
 
 	/** Capability type. Will have value
-	 * \ref libusb_capability_type::LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
+	 * \ref libusb_bos_type::LIBUSB_BT_SS_USB_DEVICE_CAPABILITY
 	 * LIBUSB_BT_SS_USB_DEVICE_CAPABILITY in this context. */
 	uint8_t  bDevCapabilityType;
 
@@ -1075,7 +1075,7 @@ struct libusb_ssplus_usb_device_capability_descriptor {
 	/** This field indicates the minimum transmit lane count*/
 	uint8_t minTxLaneCount;
 
-	/** num attrtibutes=  \ref libusb_ssplus_usb_device_capability_descriptor.numSublinkSpeedAttributes= */
+	/** Array size is \ref libusb_ssplus_usb_device_capability_descriptor.numSublinkSpeedAttributes */
 	struct libusb_ssplus_sublink_attribute sublinkSpeedAttributes[];
 };
 
@@ -1094,7 +1094,7 @@ struct libusb_container_id_descriptor {
 	uint8_t  bDescriptorType;
 
 	/** Capability type. Will have value
-	 * \ref libusb_capability_type::LIBUSB_BT_CONTAINER_ID
+	 * \ref libusb_bos_type::LIBUSB_BT_CONTAINER_ID
 	 * LIBUSB_BT_CONTAINER_ID in this context. */
 	uint8_t  bDevCapabilityType;
 
@@ -1119,7 +1119,7 @@ struct libusb_platform_descriptor {
 	uint8_t  bDescriptorType;
 
 	/** Capability type. Will have value
-	 * \ref libusb_capability_type::LIBUSB_BT_PLATFORM_DESCRIPTOR
+	 * \ref libusb_bos_type::LIBUSB_BT_PLATFORM_DESCRIPTOR
 	 * LIBUSB_BT_CONTAINER_ID in this context. */
 	uint8_t  bDevCapabilityType;
 
@@ -1706,7 +1706,7 @@ void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
 void LIBUSB_CALL libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb, int mode);
 const struct libusb_version * LIBUSB_CALL libusb_get_version(void);
 int LIBUSB_CALL libusb_has_capability(uint32_t capability);
-const char * LIBUSB_CALL libusb_error_name(int errcode);
+const char * LIBUSB_CALL libusb_error_name(int error_code);
 int LIBUSB_CALL libusb_setlocale(const char *locale);
 const char * LIBUSB_CALL libusb_strerror(int errcode);
 
@@ -2168,16 +2168,16 @@ static inline unsigned char *libusb_get_iso_packet_buffer_simple(
 /* sync I/O */
 
 int LIBUSB_CALL libusb_control_transfer(libusb_device_handle *dev_handle,
-	uint8_t request_type, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
+	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	unsigned char *data, uint16_t wLength, unsigned int timeout);
 
 int LIBUSB_CALL libusb_bulk_transfer(libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *data, int length,
-	int *actual_length, unsigned int timeout);
+	int *transferred, unsigned int timeout);
 
 int LIBUSB_CALL libusb_interrupt_transfer(libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *data, int length,
-	int *actual_length, unsigned int timeout);
+	int *transferred, unsigned int timeout);
 
 /** \ingroup libusb_desc
  * Retrieve a descriptor from the default control pipe.

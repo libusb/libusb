@@ -815,7 +815,12 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 		}
 
 		/* at least write the interrupt vectors (at 0x0000) for reset! */
-		rewind(image);
+		status = fseek(image, 0L, SEEK_SET);
+		if (status < 0) {
+			logerror("unable to rewind file %s\n", path);
+			ret = status;
+			goto exit;
+		}
 		if (verbose)
 			logerror("2nd stage: write on-chip memory\n");
 		status = parse_ihex(image, &ctx, is_external, ram_poke);

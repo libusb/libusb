@@ -66,7 +66,7 @@ static void perr(char const *format, ...)
 	va_end(args);
 }
 
-#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)errcode)); return -1; } while (0)
+#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)(errcode))); return -1; } while (0)
 #define CALL_CHECK(fcall) do { int _r=fcall; if (_r < 0) ERR_EXIT(_r); } while (0)
 #define CALL_CHECK_CLOSE(fcall, hdl) do { int _r=fcall; if (_r < 0) { libusb_close(hdl); ERR_EXIT(_r); } } while (0)
 #define B(x) (((x)!=0)?1:0)
@@ -546,11 +546,14 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 		get_sense(handle, endpoint_in, endpoint_out);
 	} else {
 		display_buffer_hex(data, size);
-		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-			if (fwrite(data, 1, (size_t)size, fd) != (unsigned int)size) {
-				perr("   unable to write binary data\n");
+		if (binary_dump) {
+			fd = fopen(binary_name, "w");
+			if (fd != NULL) {
+				if (fwrite(data, 1, (size_t)size, fd) != (unsigned int)size) {
+					perr("   unable to write binary data\n");
+				}
+				fclose(fd);
 			}
-			fclose(fd);
 		}
 	}
 	free(data);
@@ -559,16 +562,16 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 }
 
 // HID
-static int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int type)
+static int get_hid_record_size(const uint8_t *hid_report_descriptor, int size, int type)
 {
-	uint8_t i, j = 0;
+	uint8_t j = 0;
 	uint8_t offset;
 	int record_size[3] = {0, 0, 0};
 	unsigned int nb_bits = 0, nb_items = 0;
 	bool found_record_marker;
 
 	found_record_marker = false;
-	for (i = hid_report_descriptor[0]+1; i < size; i += offset) {
+	for (int i = hid_report_descriptor[0]+1; i < size; i += offset) {
 		offset = (hid_report_descriptor[i]&0x03) + 1;
 		if (offset == 4)
 			offset = 5;
@@ -628,11 +631,14 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		return -1;
 	}
 	display_buffer_hex(hid_report_descriptor, (unsigned int)descriptor_size);
-	if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-		if (fwrite(hid_report_descriptor, 1, (size_t)descriptor_size, fd) != (size_t)descriptor_size) {
-			printf("   Error writing descriptor to file\n");
+	if (binary_dump) {
+		fd = fopen(binary_name, "w");
+		if (fd != NULL) {
+			if (fwrite(hid_report_descriptor, 1, (size_t)descriptor_size, fd) != (size_t)descriptor_size) {
+				printf("   Error writing descriptor to file\n");
+			}
+			fclose(fd);
 		}
-		fclose(fd);
 	}
 
 	size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_FEATURE);
@@ -1077,9 +1083,25 @@ static int test_device(uint16_t vid, uint16_t pid)
 	return 0;
 }
 
+static void display_help(const char *progname)
+{
+	printf("usage: %s [-h] [-d] [-i] [-k] [-b file] [-l lang] [-j] [-x] [-s] [-p] [-w] [vid:pid]\n", progname);
+	printf("   -h      : display usage\n");
+	printf("   -d      : enable debug output\n");
+	printf("   -i      : print topology and speed info\n");
+	printf("   -j      : test composite FTDI based JTAG device\n");
+	printf("   -k      : test Mass Storage device\n");
+	printf("   -b file : dump Mass Storage data to file 'file'\n");
+	printf("   -p      : test Sony PS3 SixAxis controller\n");
+	printf("   -s      : test Microsoft Sidewinder Precision Pro (HID)\n");
+	printf("   -x      : test Microsoft XBox Controller Type S\n");
+	printf("   -l lang : language to report errors in (ISO 639-1)\n");
+	printf("   -w      : force the use of device requests when querying WCID descriptors\n");
+	printf("If only the vid:pid is provided, xusb attempts to run the most appropriate test\n");
+}
+
 int main(int argc, char** argv)
 {
-	bool show_help = false;
 	bool debug_mode = false;
 	const struct libusb_version* version;
 	int j, r;
@@ -1096,7 +1118,12 @@ int main(int argc, char** argv)
 	if (((uint8_t*)&endian_test)[0] == 0xBE) {
 		printf("Despite their natural superiority for end users, big endian\n"
 			"CPUs are not supported with this program, sorry.\n");
-		return 0;
+		return EXIT_FAILURE;
+	}
+
+	if ((argc == 1) || (argc > 7)) {
+		display_help(argv[0]);
+		return EXIT_FAILURE;
 	}
 
 	if (argc >= 2) {
@@ -1117,7 +1144,7 @@ int main(int argc, char** argv)
 				case 'b':
 					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
 						printf("   Option -b requires a file name\n");
-						return 1;
+						return EXIT_FAILURE;
 					}
 					binary_name = argv[++j];
 					binary_dump = true;
@@ -1125,7 +1152,7 @@ int main(int argc, char** argv)
 				case 'l':
 					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
 						printf("   Option -l requires an ISO 639-1 language parameter\n");
-						return 1;
+						return EXIT_FAILURE;
 					}
 					error_lang = argv[++j];
 					break;
@@ -1162,9 +1189,12 @@ int main(int argc, char** argv)
 					PID = 0x0289;
 					test_mode = USE_XBOX;
 					break;
+				case 'h':
+					display_help(argv[0]);
+					return EXIT_SUCCESS;
 				default:
-					show_help = true;
-					break;
+					display_help(argv[0]);
+					return EXIT_FAILURE;
 				}
 			} else {
 				for (i=0; i<arglen; i++) {
@@ -1174,32 +1204,16 @@ int main(int argc, char** argv)
 				if (i != arglen) {
 					if (sscanf(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
 						printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
-						return 1;
+						return EXIT_FAILURE;
 					}
 					VID = (uint16_t)tmp_vid;
 					PID = (uint16_t)tmp_pid;
 				} else {
-					show_help = true;
+					display_help(argv[0]);
+					return EXIT_FAILURE;
 				}
 			}
 		}
-	}
-
-	if ((show_help) || (argc == 1) || (argc > 7)) {
-		printf("usage: %s [-h] [-d] [-i] [-k] [-b file] [-l lang] [-j] [-x] [-s] [-p] [-w] [vid:pid]\n", argv[0]);
-		printf("   -h      : display usage\n");
-		printf("   -d      : enable debug output\n");
-		printf("   -i      : print topology and speed info\n");
-		printf("   -j      : test composite FTDI based JTAG device\n");
-		printf("   -k      : test Mass Storage device\n");
-		printf("   -b file : dump Mass Storage data to file 'file'\n");
-		printf("   -p      : test Sony PS3 SixAxis controller\n");
-		printf("   -s      : test Microsoft Sidewinder Precision Pro (HID)\n");
-		printf("   -x      : test Microsoft XBox Controller Type S\n");
-		printf("   -l lang : language to report errors in (ISO 639-1)\n");
-		printf("   -w      : force the use of device requests when querying WCID descriptors\n");
-		printf("If only the vid:pid is provided, xusb attempts to run the most appropriate test\n");
-		return 0;
 	}
 
 	version = libusb_get_version();
@@ -1214,7 +1228,7 @@ int main(int argc, char** argv)
 	}
 
 	if (r < 0)
-		return r;
+		return EXIT_FAILURE;
 
 	// If not set externally, and no debug option was given, use info log level
 	if ((old_dbg_str == NULL) && (!debug_mode))
@@ -1225,14 +1239,18 @@ int main(int argc, char** argv)
 			printf("Invalid or unsupported locale '%s': %s\n", error_lang, libusb_strerror((enum libusb_error)r));
 	}
 
-	test_device(VID, PID);
+	r = test_device(VID, PID);
 
 	libusb_exit(NULL);
+
+	if (r < 0)
+		return EXIT_FAILURE;
+
 
 	if (debug_mode) {
 		snprintf(str, sizeof(str), "LIBUSB_DEBUG=%s", (old_dbg_str == NULL)?"":old_dbg_str);
 		str[sizeof(str) - 1] = 0;	// Windows may not NUL terminate the string
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
