@@ -546,6 +546,8 @@ test_open_close(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 	/* Open and close */
 	g_assert_cmpint(libusb_open(devs[0], &handle), ==, 0);
 	assert_libusb_log_msg(fixture, LIBUSB_LOG_LEVEL_DEBUG, "usbi_add_event_source");
+	g_assert_cmpint(libusb_check_connected(handle), ==, 0);
+	assert_libusb_log_msg(fixture, LIBUSB_LOG_LEVEL_DEBUG, "libusb_check_connected");
 	g_assert_nonnull(handle);
 	libusb_close(handle);
 	assert_libusb_log_msg(fixture, LIBUSB_LOG_LEVEL_DEBUG, "usbi_remove_event_source");
