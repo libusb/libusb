@@ -82,10 +82,12 @@ The runtime permissions on Android can be transferred from Java to native over t
 1. Initialize libusb on Android:
 
     ```c
-    set_the_native_Descriptor(int fileDescriptor) {
+    #include "libusb.h"
+    
+    void set_the_native_Descriptor(int fileDescriptor) {
         libusb_context *ctx;
         libusb_device_handle *devh;
-        libusb_set_option(&ctx, LIBUSB_OPTION_NO_DEVICE_DISCOVERY, NULL);
+        libusb_set_option(NULL, LIBUSB_OPTION_NO_DEVICE_DISCOVERY, NULL);
         libusb_init(&ctx);
         libusb_wrap_sys_device(NULL, (intptr_t)fileDescriptor, &devh);
     }
@@ -95,7 +97,7 @@ The runtime permissions on Android can be transferred from Java to native over t
 
 #### About `LIBUSB_OPTION_NO_DEVICE_DISCOVERY`
 
-The method `libusb_set_option(&ctx, LIBUSB_OPTION_NO_DEVICE_DISCOVERY, NULL)` does not affect the `ctx`. It allows initializing libusb on unrooted Android devices by skipping device enumeration.
+The method `libusb_set_option(NULL, LIBUSB_OPTION_NO_DEVICE_DISCOVERY, NULL)` does not affect the `ctx`. It allows initializing libusb on unrooted Android devices by skipping device enumeration.
 
 ---
 
