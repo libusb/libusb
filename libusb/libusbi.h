@@ -263,7 +263,7 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 {
 	void *ret = realloc(ptr, size);
 
-	if (!ret)
+	if (!ret && size != 0)
 		free(ptr);
 	return ret;
 }
