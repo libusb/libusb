@@ -2929,6 +2929,7 @@ const struct usbi_os_backend usbi_backend = {
         .get_device_list = NULL,
         .hotplug_poll = darwin_hotplug_poll,
         .wrap_sys_device = NULL,
+        .get_dev_path = NULL,
         .open = darwin_open,
         .close = darwin_close,
         .get_active_config_descriptor = darwin_get_active_config_descriptor,

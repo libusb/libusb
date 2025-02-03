@@ -798,6 +798,12 @@ struct usbi_hotplug_message {
 	struct list_head list;
 };
 
+
+enum usbi_dev_type {
+	USBI_DEV_BLOCK = 1,
+	USBI_DEV_CHAR = 2,
+};
+
 /* shared data and functions */
 
 void usbi_hotplug_init(struct libusb_context *ctx);
@@ -1065,6 +1071,21 @@ struct usbi_os_backend {
 	 */
 	int (*wrap_sys_device)(struct libusb_context *ctx,
 		struct libusb_device_handle *dev_handle, intptr_t sys_dev);
+
+	/* Get the device path of USB resource
+	 *
+	 * A string that contains a block device, char device or file
+	 * that is a associated with the USB resource using the active config
+	 * descriptor.
+	 * An example path on *nix is `/dev/sdX` or `/dev/ttyX`
+	 *
+	 * Return:
+	 * - 0 on success
+	 * - LIBUSB_ERROR_NOT_FOUND the device doesn't have an associated device
+	 * - another LIBUSB_ERROR code on other failure
+	 */
+	int (*get_dev_path)(struct libusb_device *dev, int iface_idx,
+		enum usbi_dev_type dev_type, char **path);
 
 	/* Open a device for I/O and other USB operations. The device handle
 	 * is preallocated for you, you can retrieve the device in question
