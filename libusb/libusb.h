@@ -1743,6 +1743,8 @@ int LIBUSB_CALL libusb_get_platform_descriptor(libusb_context *ctx,
 	struct libusb_platform_descriptor **platform_descriptor);
 void LIBUSB_CALL libusb_free_platform_descriptor(
 	struct libusb_platform_descriptor *platform_descriptor);
+int LIBUSB_CALL libusb_get_blockdev_path(libusb_device *dev, int iface_idx, char **path);
+int LIBUSB_CALL libusb_get_chardev_path(libusb_device *dev, int iface_idx, char **path);
 uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_port_number(libusb_device *dev);
 int LIBUSB_CALL libusb_get_port_numbers(libusb_device *dev, uint8_t *port_numbers, int port_numbers_len);

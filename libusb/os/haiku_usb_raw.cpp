@@ -188,6 +188,7 @@ const struct usbi_os_backend usbi_backend = {
 	/*.get_device_list =*/ NULL,
 	/*.hotplug_poll =*/ NULL,
 	/*.wrap_sys_device =*/ NULL,
+	/*.get_dev_path =*/ NULL,
 	/*.open =*/ haiku_open,
 	/*.close =*/ haiku_close,
 

@@ -891,6 +891,7 @@ const struct usbi_os_backend usbi_backend = {
 	windows_get_device_list,
 	NULL,	/* hotplug_poll */
 	NULL,	/* wrap_sys_device */
+	NULL,	/* get_dev_path */
 	windows_open,
 	windows_close,
 	windows_get_active_config_descriptor,

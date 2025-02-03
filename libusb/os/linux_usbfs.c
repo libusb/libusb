@@ -37,6 +37,7 @@
 #include <sys/utsname.h>
 #include <sys/vfs.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 /* sysfs vs usbfs:
  * opening a usbfs node causes the device to be resumed, so we attempt to
@@ -1405,6 +1406,143 @@ out:
 	if (r < 0)
 		libusb_unref_device(dev);
 	return r;
+}
+
+/*
+ * Check if a sysfs directory matches the given subsystem.
+ * Subsystem being `/sys/class/.*`
+ * Returns 0 if the subsystem matches
+ * Returns 1 if the subsystem does not match
+ * Returns LIBUSB_ERROR code on error
+ */
+static int check_subsystem(const char *sys_path, const char* subsystem)
+{
+	char *path, *subsystem_path;
+	int ret;
+
+	ret = asprintf(&path, "%s/subsystem", sys_path);
+	if (ret < 0)
+		return LIBUSB_ERROR_NO_MEM;
+
+	subsystem_path = realpath(path, NULL);
+	free(path);
+	if (!subsystem_path && errno != ENOENT)
+		return LIBUSB_ERROR_IO;
+
+	if (subsystem_path) {
+		ret = !!strcmp(subsystem_path, subsystem);
+		free(subsystem_path);
+	} else {
+		ret = 1;
+	}
+
+	return ret;
+}
+
+static int get_subsytem(struct libusb_context *ctx, char **buf,
+	const char *dir, const char* subsystem, int depth)
+{
+	DIR *dp;
+	struct dirent *entry;
+	struct stat statbuf;
+	char *path;
+	int ret;
+
+	/* Arbitrary max recursion depth */
+	if (depth >= 20)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	ret = check_subsystem(dir, subsystem);
+	if (ret < 0)
+		return ret;
+
+	if (!ret) {
+		path = strrchr(dir, '/');
+		if(path && strlen(path) > 1) {
+			ret = asprintf(buf, "/dev%s", path);
+			if (ret < 0) {
+				*buf = NULL;
+				return LIBUSB_ERROR_NO_MEM;
+			}
+			return LIBUSB_SUCCESS;
+		}
+	}
+	ret = LIBUSB_ERROR_NOT_FOUND;
+
+	if ((dp = opendir(dir)) == NULL) {
+		usbi_err(ctx, "opendir devices failed, errno=%d", errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	while ((entry = readdir(dp)) != NULL) {
+		if(strcmp(".", entry->d_name) == 0 ||
+		   strcmp("..", entry->d_name) == 0)
+			continue;
+
+		ret = asprintf(&path, "%s/%s", dir, entry->d_name);
+		if (ret < 0) {
+			ret = LIBUSB_ERROR_NO_MEM;
+			break;
+		}
+
+		ret = lstat(path, &statbuf);
+		if (ret < 0) {
+			free(path);
+			ret = LIBUSB_ERROR_IO;
+			break;
+		}
+
+		ret = LIBUSB_ERROR_NOT_FOUND;
+		if (S_ISDIR(statbuf.st_mode))
+			ret = get_subsytem(ctx, buf, path, subsystem, depth + 1);
+		free(path);
+
+		if (ret != LIBUSB_ERROR_NOT_FOUND)
+			break;
+	}
+
+	closedir(dp);
+	return ret;
+}
+
+static int op_get_dev_path(struct libusb_device *dev, int iface_idx,
+	enum usbi_dev_type dev_type, char **path)
+{
+	struct linux_device_priv *priv = usbi_get_device_priv(dev);
+	int ret, active_config;
+	char *dir;
+
+
+	if (!priv->sysfs_dir)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	/* root hub? */
+	if (!strchr(priv->sysfs_dir, '-'))
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	ret = sysfs_get_active_config(dev, &active_config);
+	if (ret < 0)
+		return ret;
+
+	if (active_config == -1) {
+		usbi_err(DEVICE_CTX(dev), "device unconfigured");
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	ret = asprintf(&dir,  SYSFS_DEVICE_PATH "/%s:%d.%d", priv->sysfs_dir,
+		       active_config, iface_idx);
+	if (ret < 0)
+		return LIBUSB_ERROR_NO_MEM;
+
+	if (dev_type == USBI_DEV_BLOCK)
+		ret = get_subsytem(DEVICE_CTX(dev), path, dir, "/sys/class/block", 0);
+	else if(dev_type == USBI_DEV_CHAR)
+		ret = get_subsytem(DEVICE_CTX(dev), path, dir, "/sys/class/tty", 0);
+	else
+		ret = LIBUSB_ERROR_NOT_FOUND;
+	free(dir);
+
+	return ret;
 }
 
 static int op_open(struct libusb_device_handle *handle)
@@ -2793,6 +2931,7 @@ const struct usbi_os_backend usbi_backend = {
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
 
 	.wrap_sys_device = op_wrap_sys_device,
+	.get_dev_path = op_get_dev_path,
 	.open = op_open,
 	.close = op_close,
 	.get_configuration = op_get_configuration,
