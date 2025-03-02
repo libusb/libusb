@@ -2350,6 +2350,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 			/* Handle all backend-specific options here */
 		case LIBUSB_OPTION_USE_USBDK:
 		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+		case LIBUSB_OPTION_NO_REAP_AFTER_DISCONNECT:
 			if (usbi_backend.set_option) {
 				r = usbi_backend.set_option(ctx, option, ap);
 				break;
@@ -2494,6 +2495,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		case LIBUSB_OPTION_LOG_LEVEL:
 		case LIBUSB_OPTION_USE_USBDK:
 		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+		case LIBUSB_OPTION_NO_REAP_AFTER_DISCONNECT:
 		case LIBUSB_OPTION_MAX:
 		default:
 			r = libusb_set_option(_ctx, options[i].option, options[i].value.ival);
