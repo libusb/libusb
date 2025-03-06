@@ -1,6 +1,15 @@
 For detailed information about the changes below, please see the git log
 or visit: http://log.libusb.info
 
+2024-03-06: v1.0.28-rc1
+* New libusb_get_ssplus_usb_device_capability_descriptor API
+  for query of SuperSpeed+ Capability Descriptors
+* API support for reporting USB 3.2 Gen2x2 speeds
+* macOS: Fix Zero-Length Packet for multiple packets per frame
+* Windows: Base HID device descriptor on OS-cached values
+* Build fixes for Haiku and SunOS
+* Many code correctness fixes
+
 2024-01-31: v1.0.27
 * New libusb_init_context API to replace libusb_init
 * New libusb_get_max_alt_packet_size API
