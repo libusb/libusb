@@ -1372,7 +1372,10 @@ enum libusb_transfer_status {
 	LIBUSB_TRANSFER_NO_DEVICE,
 
 	/** Device sent more data than requested */
-	LIBUSB_TRANSFER_OVERFLOW
+	LIBUSB_TRANSFER_OVERFLOW,
+
+	/** Device disconnect */
+	LIBUSB_TRANSFER_DISCONNECT
 
 	/* NB! Remember to update libusb_error_name()
 	   when adding new status codes here. */
