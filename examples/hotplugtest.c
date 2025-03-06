@@ -18,6 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include <config.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -51,7 +53,13 @@ static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev,
 	}
 
 	rc = libusb_open (dev, &handle);
-	if (LIBUSB_SUCCESS != rc) {
+	if (LIBUSB_SUCCESS != rc
+		&& LIBUSB_ERROR_ACCESS != rc
+#if defined(PLATFORM_WINDOWS)
+		&& LIBUSB_ERROR_NOT_SUPPORTED != rc
+		&& LIBUSB_ERROR_NOT_FOUND != rc
+#endif
+		) {
 		fprintf (stderr, "No access to device: %s\n",
 			 libusb_strerror((enum libusb_error)rc));
 	}
