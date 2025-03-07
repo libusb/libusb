@@ -35,6 +35,10 @@
 
 #include "libusb.h"
 
+#if !defined(NSEC_PER_SEC)
+#define NSEC_PER_SEC	1000000000L
+#endif
+
 #define EP_DATA_IN	0x82
 #define EP_ISO_IN	0x86
 
@@ -161,8 +165,14 @@ static void measure(void)
 
 	get_timestamp(&tv_stop);
 
-	diff_msec = (tv_stop.tv_sec - tv_start.tv_sec) * 1000L;
-	diff_msec += (tv_stop.tv_usec - tv_start.tv_usec) / 1000L;
+	long diff_sec = tv_stop.tv_sec - tv_start.tv_sec;
+	long diff_usec = tv_stop.tv_usec - tv_start.tv_usec;
+	if (diff_usec < 0) {
+		diff_usec += NSEC_PER_SEC;
+		diff_sec--;
+	}
+	diff_msec = (unsigned long)diff_sec * 1000UL;
+	diff_msec += (unsigned long)diff_usec / 1000UL;
 
 	printf("%lu transfers (total %lu bytes) in %lu milliseconds => %lu bytes/sec\n",
 		num_xfer, num_bytes, diff_msec, (num_bytes * 1000L) / diff_msec);
