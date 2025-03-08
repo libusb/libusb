@@ -87,6 +87,9 @@ struct windows_usb_api_backend {
 	int (*submit_control_transfer)(int sub_api, struct usbi_transfer *itransfer);
 	int (*cancel_transfer)(int sub_api, struct usbi_transfer *itransfer);
 	enum libusb_transfer_status (*copy_transfer_data)(int sub_api, struct usbi_transfer *itransfer, DWORD length);
+	int (*endpoint_supports_raw_io)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t endpoint);
+	int (*endpoint_set_raw_io)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t endpoint, int enable);
+	int (*get_max_raw_io_transfer_size)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t endpoint);
 };
 
 extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
