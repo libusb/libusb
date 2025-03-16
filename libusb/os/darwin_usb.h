@@ -29,6 +29,8 @@
 #include <IOKit/IOCFBundle.h>
 #include <IOKit/usb/IOUSBLib.h>
 #include <IOKit/IOCFPlugIn.h>
+#include <IOKit/IOBSD.h>
+#include <IOKit/serial/IOSerialKeys.h>
 
 #if defined(HAVE_IOKIT_USB_IOUSBHOSTFAMILYDEFINITIONS_H)
 #include <IOKit/usb/IOUSBHostFamilyDefinitions.h>
