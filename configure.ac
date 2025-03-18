@@ -31,9 +31,9 @@ dnl Library versioning
 dnl These numbers should be tweaked on every release. Read carefully:
 dnl http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 dnl http://sourceware.org/autobook/autobook/autobook_91.html
-lt_current=4
+lt_current=5
 lt_revision=0
-lt_age=4
+lt_age=5
 LT_LDFLAGS="-version-info ${lt_current}:${lt_revision}:${lt_age} -no-undefined"
 
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
