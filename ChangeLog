@@ -1,7 +1,7 @@
 For detailed information about the changes below, please see the git log
 or visit: http://log.libusb.info
 
-2024-03-06: v1.0.28-rc1
+2025-03-18: v1.0.28
 * New libusb_get_ssplus_usb_device_capability_descriptor API
   for query of SuperSpeed+ Capability Descriptors
 * API support for reporting USB 3.2 Gen2x2 speeds
