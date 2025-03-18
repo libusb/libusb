@@ -2383,14 +2383,7 @@ static enum libusb_log_level get_env_debug_level(void)
 	enum libusb_log_level level = LIBUSB_LOG_LEVEL_NONE;
 	const char *dbg = getenv("LIBUSB_DEBUG");
 	if (dbg) {
-		char *end = NULL;
-		long dbg_level = strtol(dbg, &end, 10);
-		if (dbg == end ||
-			*end != '\0' ||
-			dbg_level < LIBUSB_LOG_LEVEL_NONE ||
-			dbg_level > LIBUSB_LOG_LEVEL_DEBUG) {
-			usbi_warn(NULL, "LIBUSB_DEBUG is invalid or out of range; clamping");
-		}
+		long dbg_level = strtol(dbg, NULL, 10);
 		dbg_level = CLAMP(dbg_level, LIBUSB_LOG_LEVEL_NONE, LIBUSB_LOG_LEVEL_DEBUG);
 		level = (enum libusb_log_level)dbg_level;
 	}
