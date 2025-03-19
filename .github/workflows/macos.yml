@@ -9,7 +9,7 @@ on: [push, pull_request]
 jobs:
   # This workflow contains a single job called "build"
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -29,6 +29,8 @@ jobs:
 
       - name: compile
         shell: bash
+        env:
+          LIBUSB_DEBUG: 3
         run: .private/ci-build.sh --build-dir build
 
       - name: Xcode
