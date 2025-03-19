@@ -32,9 +32,8 @@
 #include <syslog.h>
 #endif
 
-static const struct libusb_version libusb_version_internal =
-	{ LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO,
-	  LIBUSB_RC, "https://libusb.info" };
+static const struct libusb_version libusb_version_internal = { LIBUSB_MAJOR, LIBUSB_MINOR, LIBUSB_MICRO, LIBUSB_NANO,
+	LIBUSB_RC, "https://libusb.info" };
 static struct timespec timestamp_origin;
 #if defined(ENABLE_LOGGING) && !defined(USE_SYSTEM_LOGGING_FACILITY)
 static libusb_log_cb log_handler;
@@ -360,7 +359,7 @@ if (cfg != desired)
  * can infer the context from those objects.
  */
 
- /**
+/**
   * \page libusb_api Application Programming Interface
   *
   * This is the complete list of libusb functions, structures and
@@ -762,7 +761,7 @@ int usbi_sanitize_device(struct libusb_device *dev)
 	uint8_t num_configurations;
 
 	if (dev->device_descriptor.bLength != LIBUSB_DT_DEVICE_SIZE ||
-	    dev->device_descriptor.bDescriptorType != LIBUSB_DT_DEVICE) {
+		dev->device_descriptor.bDescriptorType != LIBUSB_DT_DEVICE) {
 		usbi_err(DEVICE_CTX(dev), "invalid device descriptor");
 		return LIBUSB_ERROR_IO;
 	}
@@ -788,7 +787,7 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	struct libusb_device *ret = NULL;
 
 	usbi_mutex_lock(&ctx->usb_devs_lock);
-	for_each_device(ctx, dev) {
+	for_each_device (ctx, dev) {
 		if (dev->session_data == session_id) {
 			ret = libusb_ref_device(dev);
 			break;
@@ -842,7 +841,7 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 			usbi_backend.hotplug_poll();
 
 		usbi_mutex_lock(&ctx->usb_devs_lock);
-		for_each_device(ctx, dev) {
+		for_each_device (ctx, dev) {
 			discdevs = discovered_devs_append(discdevs, dev);
 
 			if (!discdevs) {
@@ -955,7 +954,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	/* HCDs can be listed as devices with port #0 */
-	while((dev) && (dev->port_number != 0)) {
+	while ((dev) && (dev->port_number != 0)) {
 		if (--i < 0) {
 			usbi_warn(ctx, "port numbers array is too small");
 			return LIBUSB_ERROR_OVERFLOW;
@@ -991,7 +990,7 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
  * libusb_get_device_list() - libusb_free_device_list() block.
  */
 DEFAULT_VISIBILITY
-libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev)
+libusb_device *LIBUSB_CALL libusb_get_parent(libusb_device *dev)
 {
 	return dev->parent_dev;
 }
@@ -1026,9 +1025,8 @@ static const struct libusb_endpoint_descriptor *find_endpoint(
 		int altsetting_idx;
 
 		for (altsetting_idx = 0; altsetting_idx < iface->num_altsetting;
-				altsetting_idx++) {
-			const struct libusb_interface_descriptor *altsetting
-				= &iface->altsetting[altsetting_idx];
+			 altsetting_idx++) {
+			const struct libusb_interface_descriptor *altsetting = &iface->altsetting[altsetting_idx];
 			int ep_idx;
 
 			for (ep_idx = 0; ep_idx < altsetting->bNumEndpoints; ep_idx++) {
@@ -1099,8 +1097,7 @@ static const struct libusb_endpoint_descriptor *find_alt_endpoint(
 		return NULL;
 	}
 
-	const struct libusb_interface_descriptor *altsetting
-		= &iface->altsetting[altsetting_idx];
+	const struct libusb_interface_descriptor *altsetting = &iface->altsetting[altsetting_idx];
 	int ep_idx;
 
 	for (ep_idx = 0; ep_idx < altsetting->bNumEndpoints; ep_idx++) {
@@ -1133,11 +1130,10 @@ static int get_endpoint_max_packet_size(libusb_device *dev,
 	/* If the device isn't a SuperSpeed device or retrieving the SS endpoint didn't worked. */
 	if (speed < LIBUSB_SPEED_SUPER || r < 0) {
 		val = ep->wMaxPacketSize;
-		ep_type = (enum libusb_endpoint_transfer_type) (ep->bmAttributes & 0x3);
+		ep_type = (enum libusb_endpoint_transfer_type)(ep->bmAttributes & 0x3);
 
 		r = val & 0x07ff;
-		if (ep_type == LIBUSB_ENDPOINT_TRANSFER_TYPE_ISOCHRONOUS
-		    || ep_type == LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT)
+		if (ep_type == LIBUSB_ENDPOINT_TRANSFER_TYPE_ISOCHRONOUS || ep_type == LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT)
 			r *= (1 + ((val >> 11) & 3));
 	}
 
@@ -1270,7 +1266,7 @@ out:
  * \returns the same device
  */
 DEFAULT_VISIBILITY
-libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev)
+libusb_device *LIBUSB_CALL libusb_ref_device(libusb_device *dev)
 {
 	long refcnt;
 
@@ -1457,7 +1453,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
  * \returns a device handle for the first found device, or NULL on error
  * or if the device could not be found. */
 DEFAULT_VISIBILITY
-libusb_device_handle * LIBUSB_CALL libusb_open_device_with_vid_pid(
+libusb_device_handle *LIBUSB_CALL libusb_open_device_with_vid_pid(
 	libusb_context *ctx, uint16_t vendor_id, uint16_t product_id)
 {
 	struct libusb_device **devs;
@@ -1502,7 +1498,7 @@ static void do_close(struct libusb_context *ctx,
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
 
 	/* safe iteration because transfers may be being deleted */
-	for_each_transfer_safe(ctx, itransfer, tmp) {
+	for_each_transfer_safe (ctx, itransfer, tmp) {
 		struct libusb_transfer *transfer =
 			USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 		uint32_t state_flags;
@@ -1534,7 +1530,7 @@ static void do_close(struct libusb_context *ctx,
 		 * the device handle is invalid
 		 */
 		usbi_dbg(ctx, "Removed transfer %p from the in-flight list because device handle %p closed",
-			 (void *) transfer, (void *) dev_handle);
+			(void *)transfer, (void *)dev_handle);
 	}
 	usbi_mutex_unlock(&ctx->flying_transfers_lock);
 
@@ -1621,7 +1617,7 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
  * \returns the underlying device
  */
 DEFAULT_VISIBILITY
-libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle)
+libusb_device *LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle)
 {
 	return dev_handle->dev;
 }
@@ -1975,7 +1971,7 @@ int API_EXPORTED libusb_alloc_streams(libusb_device_handle *dev_handle,
 
 	if (usbi_backend.alloc_streams)
 		return usbi_backend.alloc_streams(dev_handle, num_streams, endpoints,
-						   num_endpoints);
+			num_endpoints);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
@@ -2005,7 +2001,7 @@ int API_EXPORTED libusb_free_streams(libusb_device_handle *dev_handle,
 
 	if (usbi_backend.free_streams)
 		return usbi_backend.free_streams(dev_handle, endpoints,
-						  num_endpoints);
+			num_endpoints);
 	else
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 }
@@ -2035,8 +2031,8 @@ int API_EXPORTED libusb_free_streams(libusb_device_handle *dev_handle,
  * \returns a pointer to the newly allocated memory, or NULL on failure
  */
 DEFAULT_VISIBILITY
-unsigned char * LIBUSB_CALL libusb_dev_mem_alloc(libusb_device_handle *dev_handle,
-        size_t length)
+unsigned char *LIBUSB_CALL libusb_dev_mem_alloc(libusb_device_handle *dev_handle,
+	size_t length)
 {
 	if (!usbi_atomic_load(&dev_handle->dev->attached))
 		return NULL;
@@ -2214,7 +2210,7 @@ void API_EXPORTED libusb_set_debug(libusb_context *ctx, int level)
 }
 
 static void libusb_set_log_cb_internal(libusb_context *ctx, libusb_log_cb cb,
-				       int mode)
+	int mode)
 {
 #if defined(ENABLE_LOGGING) && (!defined(ENABLE_DEBUG_LOGGING) || !defined(USE_SYSTEM_LOGGING_FACILITY))
 #if !defined(USE_SYSTEM_LOGGING_FACILITY)
@@ -2307,7 +2303,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		}
 	}
 	if (LIBUSB_OPTION_LOG_CB == option) {
-		log_cb = (libusb_log_cb) va_arg(ap, libusb_log_cb);
+		log_cb = (libusb_log_cb)va_arg(ap, libusb_log_cb);
 	}
 
 	do {
@@ -2464,7 +2460,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 	list_init(&_ctx->open_devs);
 
 	/* apply default options to all new contexts */
-	for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
+	for (enum libusb_option option = 0; option < LIBUSB_OPTION_MAX; option++) {
 		if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
 			continue;
 		}
@@ -2478,8 +2474,8 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 	}
 
 	/* apply any options provided by the user */
-	for (int i = 0 ; i < num_options ; ++i) {
-		switch(options[i].option) {
+	for (int i = 0; i < num_options; ++i) {
+		switch (options[i].option) {
 		case LIBUSB_OPTION_LOG_CB:
 			r = libusb_set_option(_ctx, options[i].option, options[i].value.log_cbval);
 			break;
@@ -2623,7 +2619,7 @@ void API_EXPORTED libusb_exit(libusb_context *ctx)
 
 	usbi_io_exit(_ctx);
 
-	for_each_device(_ctx, dev) {
+	for_each_device (_ctx, dev) {
 		usbi_warn(_ctx, "device %d.%d still referenced",
 			dev->bus_number, dev->device_address);
 		DEVICE_CTX(dev) = NULL;
@@ -2710,7 +2706,7 @@ static void log_str(enum libusb_log_level level, const char *str)
 #if defined(__ANDROID__)
 	int priority;
 	switch (level) {
-	case LIBUSB_LOG_LEVEL_NONE: return;	/* Impossible, but keeps compiler happy */
+	case LIBUSB_LOG_LEVEL_NONE: return; /* Impossible, but keeps compiler happy */
 	case LIBUSB_LOG_LEVEL_ERROR: priority = ANDROID_LOG_ERROR; break;
 	case LIBUSB_LOG_LEVEL_WARNING: priority = ANDROID_LOG_WARN; break;
 	case LIBUSB_LOG_LEVEL_INFO: priority = ANDROID_LOG_INFO; break;
@@ -2724,7 +2720,7 @@ static void log_str(enum libusb_log_level level, const char *str)
 #elif defined(HAVE_SYSLOG)
 	int syslog_level;
 	switch (level) {
-	case LIBUSB_LOG_LEVEL_NONE: return;	/* Impossible, but keeps compiler happy */
+	case LIBUSB_LOG_LEVEL_NONE: return; /* Impossible, but keeps compiler happy */
 	case LIBUSB_LOG_LEVEL_ERROR: syslog_level = LOG_ERR; break;
 	case LIBUSB_LOG_LEVEL_WARNING: syslog_level = LOG_WARNING; break;
 	case LIBUSB_LOG_LEVEL_INFO: syslog_level = LOG_INFO; break;
@@ -2775,7 +2771,7 @@ static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 #endif
 
 	switch (level) {
-	case LIBUSB_LOG_LEVEL_NONE:	/* Impossible, but keeps compiler happy */
+	case LIBUSB_LOG_LEVEL_NONE: /* Impossible, but keeps compiler happy */
 		return;
 	case LIBUSB_LOG_LEVEL_ERROR:
 		prefix = "error";
@@ -2864,7 +2860,7 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
  * \returns The error name, or the string **UNKNOWN** if the value of
  * error_code is not a known error / status code.
  */
-DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
+DEFAULT_VISIBILITY const char *LIBUSB_CALL libusb_error_name(int error_code)
 {
 	switch (error_code) {
 	case LIBUSB_ERROR_IO:
@@ -2919,7 +2915,7 @@ DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
  * (major, minor, micro, nano and rc) of the running library.
  */
 DEFAULT_VISIBILITY
-const struct libusb_version * LIBUSB_CALL libusb_get_version(void)
+const struct libusb_version *LIBUSB_CALL libusb_get_version(void)
 {
 	return &libusb_version_internal;
 }
