@@ -278,6 +278,11 @@ int linux_udev_scan_devices(struct libusb_context *ctx)
 		return LIBUSB_ERROR_OTHER;
 	}
 
+	/* Only return initialized devices if udev is running. If it is not
+	 * running, devices will never be marked as "initialized".
+	 */
+	if (access("/run/udev/control", F_OK) == 0)
+		udev_enumerate_add_match_is_initialized(enumerator);
 	udev_enumerate_add_match_subsystem(enumerator, "usb");
 	udev_enumerate_add_match_property(enumerator, "DEVTYPE", "usb_device");
 	udev_enumerate_scan_devices(enumerator);

@@ -409,6 +409,8 @@ test_fixture_add_canon(UMockdevTestbedFixture * fixture)
 		"E: DRIVER=usb\n"
 		"E: BUSNUM=001\n"
 		"E: DEVNUM=001\n"
+		"E: MAJOR=189\n"
+		"E: MINOR=128\n"
 		"E: DEVNAME=/dev/bus/usb/001/001\n"
 		"E: DEVTYPE=usb_device\n"
 		"A: bConfigurationValue=1\\n\n"
@@ -429,8 +431,7 @@ static void
 test_fixture_setup_libusb(UMockdevTestbedFixture * fixture, int devcount)
 {
 	libusb_device **devs = NULL;
-
-	libusb_init_context(/*ctx=*/&fixture->ctx, /*options=*/NULL, /*num_options=*/0);
+	struct timeval zero_tv = { 0 };
 
 	/* Suppress global log messages completely
 	 * (though, in some tests it might be interesting to check there are no real ones).
@@ -440,6 +441,11 @@ test_fixture_setup_libusb(UMockdevTestbedFixture * fixture, int devcount)
 	g_assert_cmpint(libusb_get_device_list(fixture->ctx, &devs), ==, devcount);
 	libusb_free_device_list(devs, TRUE);
 	libusb_set_log_cb (fixture->ctx, log_handler, LIBUSB_LOG_CB_CONTEXT);
+
+	/* Get the udev "add" event out of the way, part of the workaround that
+	 * umockdev does no create udev DB files.
+	 */
+	libusb_handle_events_timeout(fixture->ctx, &zero_tv);
 }
 
 static void
@@ -464,6 +470,8 @@ test_fixture_setup_empty(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 {
 	test_fixture_setup_common(fixture);
 
+	libusb_init_context(/*ctx=*/&fixture->ctx, /*options=*/NULL, /*num_options=*/0);
+
 	test_fixture_setup_libusb(fixture, 0);
 }
 
@@ -471,6 +479,14 @@ static void
 test_fixture_setup_with_canon(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 {
 	test_fixture_setup_common(fixture);
+
+	/* As of umockev 0.19.1 (and probably later) no entries in
+	 * /run/udev/data are created. i.e. udev does not have a database,
+	 * which means libudev will only consider devices as "initialized" if
+	 * it received the uevent and does not need to read the database file.
+	 * Creating the context first means the uevent will be received.
+	 */
+	libusb_init_context(/*ctx=*/&fixture->ctx, /*options=*/NULL, /*num_options=*/0);
 
 	test_fixture_add_canon(fixture);
 
@@ -574,6 +590,11 @@ test_implicit_default(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 	clear_libusb_log(fixture, LIBUSB_LOG_LEVEL_INFO);
 
 	libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
+	/* Work around the missing udev DB in umockdev by sending a "add"
+	 * notification. It is fine if this umockdev quirk changes in the
+	 * future.
+	 */
+	umockdev_testbed_uevent(fixture->testbed, "/sys/devices/usb1", "add");
 	g_assert_cmpint(libusb_get_device_list(NULL, &devs), ==, 1);
 	libusb_exit(NULL);
 
