@@ -971,7 +971,6 @@ hotplug_count_arrival_cb(libusb_context *ctx,
 	return 0;
 }
 
-#ifdef UMOCKDEV_HOTPLUG
 static int LIBUSB_CALL
 hotplug_count_removal_cb(libusb_context *ctx,
                          libusb_device  *device,
@@ -987,7 +986,6 @@ hotplug_count_removal_cb(libusb_context *ctx,
 
 	return 0;
 }
-#endif
 
 static void
 test_hotplug_enumerate(UMockdevTestbedFixture * fixture, UNUSED_DATA)
@@ -1041,7 +1039,6 @@ test_hotplug_enumerate(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 static void
 test_hotplug_add_remove(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 {
-#ifdef UMOCKDEV_HOTPLUG
 	libusb_device **devs = NULL;
 	libusb_hotplug_callback_handle handle_add;
 	libusb_hotplug_callback_handle handle_remove;
@@ -1111,10 +1108,6 @@ test_hotplug_add_remove(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 
 	libusb_hotplug_deregister_callback(fixture->ctx, handle_add);
 	libusb_hotplug_deregister_callback(fixture->ctx, handle_remove);
-#else
-	(void) fixture;
-	g_test_skip("UMockdev is too old to test hotplug");
-#endif
 }
 
 int
