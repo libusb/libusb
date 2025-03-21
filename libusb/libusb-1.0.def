@@ -62,10 +62,14 @@ EXPORTS
   libusb_get_active_config_descriptor@8 = libusb_get_active_config_descriptor
   libusb_get_active_interface_association_descriptors
   libusb_get_active_interface_association_descriptors@8 = libusb_get_active_interface_association_descriptors
+  libusb_get_blockdev_path
+  libusb_get_blockdev_path@12 = libusb_get_blockdev_path
   libusb_get_bos_descriptor
   libusb_get_bos_descriptor@8 = libusb_get_bos_descriptor
   libusb_get_bus_number
   libusb_get_bus_number@4 = libusb_get_bus_number
+  libusb_get_chardev_path
+  libusb_get_chardev_path@12 = libusb_get_chardev_path
   libusb_get_config_descriptor
   libusb_get_config_descriptor@12 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value
