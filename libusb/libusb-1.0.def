@@ -40,6 +40,8 @@ EXPORTS
   libusb_free_container_id_descriptor@4 = libusb_free_container_id_descriptor
   libusb_free_device_list
   libusb_free_device_list@8 = libusb_free_device_list
+  libusb_free_platform_device_id
+  libusb_free_platform_device_id@4 = libusb_free_platform_device_id
   libusb_free_interface_association_descriptors
   libusb_free_interface_association_descriptors@4 = libusb_free_interface_association_descriptors
   libusb_free_platform_descriptor
@@ -98,6 +100,8 @@ EXPORTS
   libusb_get_parent@4 = libusb_get_parent
   libusb_get_platform_descriptor
   libusb_get_platform_descriptor@12 = libusb_get_platform_descriptor
+  libusb_get_platform_device_id
+  libusb_get_platform_device_id@8 = libusb_get_platform_device_id
   libusb_get_pollfds
   libusb_get_pollfds@4 = libusb_get_pollfds
   libusb_get_port_number
