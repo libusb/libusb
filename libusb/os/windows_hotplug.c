@@ -95,7 +95,7 @@ int windows_stop_event_monitor(void)
 static int windows_get_device_list(struct libusb_context *ctx)
 {
 	// note: context device list is protected by active_contexts_lock
-	return ((struct windows_context_priv *)usbi_get_context_priv(ctx))->backend->get_device_list(ctx);
+	return ((struct windows_context_priv *)usbi_get_context_priv(ctx))->backend->get_device_list(ctx, NULL);
 }
 
 void windows_initial_scan_devices(struct libusb_context *ctx)

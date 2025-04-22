@@ -49,7 +49,6 @@ static usbi_atomic_t default_debug_level = -1;
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
 static struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
 
-
 usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
 struct list_head active_contexts_list;
 
@@ -722,7 +721,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	dev->session_data = session_id;
 	dev->speed = LIBUSB_SPEED_UNKNOWN;
 
-	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
+	if (!usbi_hotplug_enabled(ctx))
 		usbi_connect_device(dev);
 
 	return dev;
@@ -842,8 +841,8 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 
 	ctx = usbi_get_context(ctx);
 
-	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
-		/* backend provides hotplug support */
+	if (usbi_hotplug_enabled(ctx)) {
+		/* backend provides hotplug support and enabled for this context */
 		struct libusb_device *dev;
 
 		if (usbi_backend.hotplug_poll)
@@ -1311,8 +1310,8 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 		if (usbi_backend.destroy_device)
 			usbi_backend.destroy_device(dev);
 
-		if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
-			/* backend does not support hotplug */
+		if (!usbi_hotplug_enabled(dev->ctx)) {
+			/* backend does not support hotplug or support disabled for this context*/
 			usbi_disconnect_device(dev);
 		}
 
@@ -2358,7 +2357,16 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 			/* Handle all backend-specific options here */
 		case LIBUSB_OPTION_USE_USBDK:
 		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
-			if (usbi_backend.set_option) {
+		if (usbi_backend.set_option) {
+				r = usbi_backend.set_option(ctx, option, ap);
+				break;
+			}
+
+			r = LIBUSB_ERROR_NOT_SUPPORTED;
+			break;
+
+		case LIBUSB_OPTION_ENABLE_OPT_IN_HOTPLUG:
+		if ((usbi_backend.caps & USBI_CAP_SUPPORTS_OPT_IN_HOTPLUG) && usbi_backend.set_option) {
 				r = usbi_backend.set_option(ctx, option, ap);
 				break;
 			}
@@ -2495,6 +2503,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		case LIBUSB_OPTION_LOG_LEVEL:
 		case LIBUSB_OPTION_USE_USBDK:
 		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+		case LIBUSB_OPTION_ENABLE_OPT_IN_HOTPLUG:
 		case LIBUSB_OPTION_MAX:
 		default:
 			r = libusb_set_option(_ctx, options[i].option, options[i].value.ival);
@@ -2661,6 +2670,8 @@ int API_EXPORTED libusb_has_capability(uint32_t capability)
 		return 1;
 	case LIBUSB_CAP_HAS_HOTPLUG:
 		return !(usbi_backend.get_device_list);
+	case LIBUSB_CAP_HAS_OPT_IN_HOTPLUG:
+		return (usbi_backend.caps & USBI_CAP_SUPPORTS_OPT_IN_HOTPLUG);
 	case LIBUSB_CAP_HAS_HID_ACCESS:
 		return (usbi_backend.caps & USBI_CAP_HAS_HID_ACCESS);
 	case LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER:

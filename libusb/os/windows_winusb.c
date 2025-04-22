@@ -1601,8 +1601,9 @@ exit:
 /*
  * get_device_list: libusb backend device enumeration function
  */
-static int winusb_get_device_list(struct libusb_context *ctx)
+static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_devs **_discdevs)
 {
+	struct discovered_devs *discdevs;
 	HDEVINFO *dev_info, dev_info_intf, dev_info_enum;
 	SP_DEVINFO_DATA dev_info_data;
 	DWORD _index = 0;
@@ -1874,7 +1875,8 @@ static int winusb_get_device_list(struct libusb_context *ctx)
 					if (dev == NULL)
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 
-					usbi_attach_device(dev);
+					if (usbi_hotplug_enabled(ctx))
+						usbi_attach_device(dev);
 
 					priv = winusb_device_priv_init(dev);
 					priv->dev_id = _strdup(dev_id);
@@ -1979,7 +1981,15 @@ static int winusb_get_device_list(struct libusb_context *ctx)
 						usbi_warn(ctx, "could not retrieve port number for device '%s': %s", dev_id, windows_error_str(0));
 					r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_info_data.DevInst);
 				}
-				if (r != LIBUSB_SUCCESS) {
+				if (r == LIBUSB_SUCCESS) {
+					// Append device to the list of discovered devices
+					if (_discdevs) {
+						discdevs = discovered_devs_append(*_discdevs, dev);
+						if (!discdevs)
+							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+						*_discdevs = discdevs;
+					}
+				} else {
 					// Failed to initialize a single device doesn't stop us from enumerating all other devices,
 					// but we skip it (don't add to list of discovered devices)
 					usbi_warn(ctx, "failed to initialize device '%s'", priv->dev_id);

@@ -108,17 +108,30 @@ int main(int argc, char *argv[])
 	product_id = (argc > 2) ? (int)strtol (argv[2], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
 	class_id   = (argc > 3) ? (int)strtol (argv[3], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
 
-	rc = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
-	if (LIBUSB_SUCCESS != rc)
-	{
-		printf ("failed to initialise libusb: %s\n",
-			libusb_strerror((enum libusb_error)rc));
-		return EXIT_FAILURE;
+	if (!libusb_has_capability (LIBUSB_CAP_HAS_HOTPLUG)) {
+		if (!libusb_has_capability (LIBUSB_CAP_HAS_OPT_IN_HOTPLUG)) {
+			printf ("Hotplug capabilities are not supported on this platform\n");
+			libusb_exit (NULL);
+			return EXIT_FAILURE;
+		}
+
+		printf ("Only opt-in hotplug capabilities are supported on this platform\n");
+
+		struct libusb_init_option opt_in_hotplug_option[] = {
+		  {
+		    .option = LIBUSB_OPTION_ENABLE_OPT_IN_HOTPLUG
+		  },
+		};
+
+		rc = libusb_init_context(/*ctx=*/NULL, /*options=*/opt_in_hotplug_option, /*num_options=*/1);
+	}
+	else {
+		rc = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
 	}
 
-	if (!libusb_has_capability (LIBUSB_CAP_HAS_HOTPLUG)) {
-		printf ("Hotplug capabilities are not supported on this platform\n");
-		libusb_exit (NULL);
+	if (LIBUSB_SUCCESS != rc) {
+		printf ("failed to initialise libusb: %s\n",
+			libusb_strerror((enum libusb_error)rc));
 		return EXIT_FAILURE;
 	}
 
