@@ -35,6 +35,8 @@
 #include <sys/time.h>
 #endif
 
+#include <stdbool.h>
+
 #include "libusb.h"
 
 /* Not all C standard library headers define static_assert in assert.h
@@ -153,6 +155,7 @@ extern "C" {
 /* Backend specific capabilities */
 #define USBI_CAP_HAS_HID_ACCESS			0x00010000
 #define USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER	0x00020000
+#define USBI_CAP_SUPPORTS_OPT_IN_HOTPLUG	0x00040000
 
 /* Maximum number of bytes in a log line */
 #define USBI_MAX_LOG_LEN	1024
@@ -376,6 +379,9 @@ struct libusb_context {
 	 */
 	struct list_head open_devs;
 	usbi_mutex_t open_devs_lock;
+
+	/* indicates whether "opt-in" hotplug is enabled */
+	bool opt_in_hotplug_enabled;
 
 	/* A list of registered hotplug callbacks */
 	struct list_head hotplug_cbs;
@@ -800,6 +806,7 @@ struct usbi_hotplug_message {
 
 /* shared data and functions */
 
+bool usbi_hotplug_enabled(struct libusb_context *ctx);
 void usbi_hotplug_init(struct libusb_context *ctx);
 void usbi_hotplug_exit(struct libusb_context *ctx);
 void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device *dev,

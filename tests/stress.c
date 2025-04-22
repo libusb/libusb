@@ -51,7 +51,19 @@ static libusb_testlib_result test_get_device_list(void)
 	libusb_context *ctx;
 	int r;
 
-	r = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
+	if (libusb_has_capability (LIBUSB_CAP_HAS_OPT_IN_HOTPLUG)) {
+		struct libusb_init_option opt_in_hotplug_option[] = {
+		  {
+		    .option = LIBUSB_OPTION_ENABLE_OPT_IN_HOTPLUG
+		  },
+		};
+		
+		r = libusb_init_context(&ctx, /*options=*/opt_in_hotplug_option, /*num_options=*/1);
+	}
+	else {
+		r = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
+	}
+
 	if (r != LIBUSB_SUCCESS) {
 		libusb_testlib_logf("Failed to init libusb: %d", r);
 		return TEST_STATUS_FAILURE;

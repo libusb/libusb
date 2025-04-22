@@ -39,6 +39,7 @@ enum windows_version windows_version = WINDOWS_UNDEFINED;
 
 // Global variables for init/exit
 static unsigned int init_count;
+static unsigned int hotplug_enabled_count;
 static bool usbdk_available;
 
 /*
@@ -566,15 +567,17 @@ static int windows_init(struct libusb_context *ctx)
 
 	r = LIBUSB_SUCCESS;
 
-	if (init_count == 1) {
-		r = windows_start_event_monitor(); // Start up hotplug event handler
-		if (r != LIBUSB_SUCCESS) {
-			usbi_err(ctx, "error starting hotplug event monitor");
-			goto init_exit;
+	if (ctx->opt_in_hotplug_enabled) {
+		if (++hotplug_enabled_count == 1) { 
+			r = windows_start_event_monitor(); // Start up hotplug event handler
+			if (r != LIBUSB_SUCCESS) {
+				usbi_err(ctx, "error starting hotplug event monitor");
+				goto init_exit;
+			}
 		}
-	}
 
-	windows_initial_scan_devices(ctx);
+		windows_initial_scan_devices(ctx);
+	}
 
 init_exit: // Holds semaphore here
 	if ((init_count == 1) && (r != LIBUSB_SUCCESS)) { // First init failed?
@@ -605,9 +608,12 @@ static void windows_exit(struct libusb_context *ctx)
 	CloseHandle(priv->completion_port_thread);
 	CloseHandle(priv->completion_port);
 
+	if (ctx->opt_in_hotplug_enabled && (--hotplug_enabled_count == 0)) {
+		windows_stop_event_monitor();
+	}
+
 	// Only works if exits and inits are balanced exactly
 	if (--init_count == 0) { // Last exit
-		windows_stop_event_monitor();
 		if (usbdk_available) {
 			usbdk_backend.exit(ctx);
 			usbdk_available = false;
@@ -633,7 +639,19 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 		return LIBUSB_SUCCESS;
 	}
 
+	if (option == LIBUSB_OPTION_ENABLE_OPT_IN_HOTPLUG)	{
+		usbi_dbg(ctx, "enable hotplug for context %p", ctx);
+		ctx->opt_in_hotplug_enabled = true;
+		return LIBUSB_SUCCESS;
+	}
+
 	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **discdevs)
+{
+	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
+	return priv->backend->get_device_list(ctx, discdevs);
 }
 
 static int windows_open(struct libusb_device_handle *dev_handle)
@@ -890,12 +908,12 @@ void usbi_get_monotonic_time(struct timespec *tp)
 // NB: MSVC6 does not support named initializers.
 const struct usbi_os_backend usbi_backend = {
 	"Windows",
-	USBI_CAP_HAS_HID_ACCESS,
+	USBI_CAP_HAS_HID_ACCESS | USBI_CAP_SUPPORTS_OPT_IN_HOTPLUG,
 	windows_init,
 	windows_exit,
 	windows_set_option,
-	NULL, /* get_device_list */
-	NULL,	/* hotplug_poll */
+	windows_get_device_list, /* get_device_list */
+		NULL,	/* hotplug_poll */
 	NULL,	/* wrap_sys_device */
 	windows_open,
 	windows_close,

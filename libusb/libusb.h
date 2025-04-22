@@ -1536,7 +1536,13 @@ enum libusb_capability {
 
 	/** The library supports detaching of the default USB driver, using
 	 * \ref libusb_detach_kernel_driver(), if one is set by the OS kernel */
-	LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER = 0x0101U
+	LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER = 0x0101U,
+
+	/** Opt-in hotplug support is available on this platform. 
+	 * This means that while hotplug support is available, it is not
+	 * enabled by default, but must be opted-in using option
+	 * LIBUSB_OPTION_ENABLE_OPT_IN_HOTPLUG when initializing context */
+	LIBUSB_CAP_HAS_OPT_IN_HOTPLUG = 0x0010U
 };
 
 /** \ingroup libusb_lib
@@ -1631,8 +1637,6 @@ enum libusb_option {
 	 */
 	LIBUSB_OPTION_NO_DEVICE_DISCOVERY = 2,
 
-#define LIBUSB_OPTION_WEAK_AUTHORITY LIBUSB_OPTION_NO_DEVICE_DISCOVERY
-
 	/** Set the context log callback function.
 	 *
 	 * Set the log callback function either on a context or globally. This
@@ -1644,7 +1648,14 @@ enum libusb_option {
 	 */
 	LIBUSB_OPTION_LOG_CB = 3,
 
-	LIBUSB_OPTION_MAX = 4
+	/** Enable opt-in hotplug support for a specific context
+	 *
+	 * This option should be set at initialization with libusb_init_context()
+	 * otherwise unspecified behavior may occur.
+	 */
+	LIBUSB_OPTION_ENABLE_OPT_IN_HOTPLUG = 4,
+
+	LIBUSB_OPTION_MAX = 5
 };
 
 /** \ingroup libusb_lib

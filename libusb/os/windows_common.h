@@ -318,7 +318,8 @@ struct winusb_transfer_priv {
 struct windows_backend {
 	int (*init)(struct libusb_context *ctx);
 	void (*exit)(struct libusb_context *ctx);
-	int (*get_device_list)(struct libusb_context *ctx);
+	int (*get_device_list)(struct libusb_context *ctx,
+		struct discovered_devs **discdevs);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
 	int (*get_active_config_descriptor)(struct libusb_device *device,

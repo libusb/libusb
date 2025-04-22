@@ -55,7 +55,19 @@ int main(void)
 	int r;
 	ssize_t cnt;
 
-	r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
+	if (libusb_has_capability (LIBUSB_CAP_HAS_OPT_IN_HOTPLUG)) {
+		struct libusb_init_option opt_in_hotplug_option[] = {
+		  {
+		    .option = LIBUSB_OPTION_ENABLE_OPT_IN_HOTPLUG
+		  },
+		};
+		
+		r = libusb_init_context(/*ctx=*/NULL, /*options=*/opt_in_hotplug_option, /*num_options=*/1);
+	}
+	else {
+		r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
+	}
+
 	if (r < 0)
 		return r;
 
