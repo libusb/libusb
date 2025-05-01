@@ -2133,10 +2133,11 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
 
     struct timespec now;
     usbi_get_monotonic_time(&now);
-    long delta_sec = now.tv_sec - start.tv_sec;
-    long delta_nsec = now.tv_nsec - start.tv_nsec;
-    unsigned long long elapsed_us = (unsigned long long)delta_sec * USEC_PER_SEC +
-                                    (unsigned long long)delta_nsec / 1000ULL;
+
+    struct timespec elapsed;
+    TIMESPEC_SUB(&now, &start, &elapsed);
+    unsigned long long elapsed_us = (unsigned long long)(elapsed.tv_sec * USEC_PER_SEC) +
+                                    (unsigned long long)(elapsed.tv_nsec / NSEC_PER_USEC);
 
     if (elapsed_us >= DARWIN_REENUMERATE_TIMEOUT_US) {
       usbi_err (ctx, "darwin/reenumerate_device: timeout waiting for reenumerate");
