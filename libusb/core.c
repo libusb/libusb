@@ -92,7 +92,7 @@ struct list_head active_contexts_list;
  *
  * \section gettingstarted Getting Started
  *
- * To begin reading the API documentation, start with the Modules page which
+ * To begin reading the API documentation, start with the Topics page which
  * links to the different categories of libusb's functionality.
  *
  * One decision you will have to make is whether to use the synchronous
