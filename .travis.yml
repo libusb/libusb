@@ -23,15 +23,6 @@ matrix:
         - os: linux
           dist: xenial
           compiler: gcc
-        - os: osx
-          osx_image: xcode12.2
-          compiler: clang
-        - os: osx
-          osx_image: xcode11.3
-          compiler: clang
-        - os: osx
-          osx_image: xcode9.4
-          compiler: clang
 
 addons:
     apt:
@@ -52,7 +43,5 @@ before_script:
     - ./bootstrap.sh
 
 script:
-    - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .private/ci-build.sh --build-dir build-netlink -- --disable-udev; fi
-    - if [ "$TRAVIS_OS_NAME" = "linux" ]; then .private/ci-build.sh --build-dir build-udev -- --enable-udev; fi
-    - if [ "$TRAVIS_OS_NAME" = "osx" ]; then .private/ci-build.sh --build-dir build; fi
-    - if [ "$TRAVIS_OS_NAME" = "osx" ]; then cd Xcode && xcodebuild -project libusb.xcodeproj; fi
+    - .private/ci-build.sh --build-dir build-netlink -- --disable-udev
+    - .private/ci-build.sh --build-dir build-udev -- --enable-udev
