@@ -22,6 +22,9 @@
 
 #include <config.h>
 
+/* Needed for MinGW's __MINGW_PRINTF_FORMAT */
+#include <stdio.h>
+
 /** Values returned from a test function to indicate test result */
 typedef enum {
 	/** Indicates that the test ran successfully. */
