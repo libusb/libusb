@@ -166,9 +166,11 @@ typedef SSIZE_T ssize_t;
  * <li>libusb version 1.0.25: LIBUSB_API_VERSION = 0x01000109
  * <li>libusb version 1.0.26: LIBUSB_API_VERSION = 0x01000109
  * <li>libusb version 1.0.27: LIBUSB_API_VERSION = 0x0100010A
+ * <li>libusb version 1.0.28: LIBUSB_API_VERSION = 0x0100010A
+ * <li>libusb version 1.0.29: LIBUSB_API_VERSION = 0x0100010B
  * </ul>
  */
-#define LIBUSB_API_VERSION 0x0100010A
+#define LIBUSB_API_VERSION 0x0100010B
 
 /** \def LIBUSBX_API_VERSION
  * \ingroup libusb_misc
