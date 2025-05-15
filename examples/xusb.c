@@ -719,6 +719,123 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	return 0;
 }
 
+typedef struct __attribute__((packed)) {
+	uint32_t length;
+	uint16_t bcd_version;
+	uint16_t index;
+	uint8_t count;			// One for each interface
+} ms_os_compat_header_t;
+
+typedef struct __attribute__((packed)) {
+	uint32_t length;
+	uint16_t bcd_version;
+	uint16_t index;
+	uint16_t count;			// One for each interface
+} ms_os_extended_header_t;
+
+typedef struct __attribute__((packed)) {
+	uint8_t if_num;
+	uint8_t reserved;				// must be 0x01
+	uint8_t compatible_id[8];
+	uint8_t subcompatible_id[8];
+	uint8_t reserved2[6];
+} compat_id_function_t;
+
+typedef struct __attribute__((packed)) {
+	ms_os_compat_header_t header;
+	uint8_t reserved[7];
+	compat_id_function_t function[];
+} compat_id_desc_t;
+
+static void ms_compat_id_desc_parser(const char * buf, uint16_t len)
+{
+	compat_id_desc_t * descriptor = (compat_id_desc_t *) buf;
+	printf("\nMS OS Compatible ID descriptor:\n  Descriptor length: %d\n", descriptor->header.length);
+	if (descriptor->header.length != len)
+	{
+		printf("WARNING! Declared length does not match actual descriptor length received!\n");
+	}
+	printf("  Version: %d.%02d\n", descriptor->header.bcd_version >> 8, descriptor->header.bcd_version & 0xFF);
+	printf("  Descriptor ID: 0x%02X\n", descriptor->header.index);
+	printf("  Section count: %d\n\n", descriptor->header.count);
+
+	for (unsigned q = 0; q < descriptor->header.count; ++q)
+	{
+		printf("Compatible ID record:\n  Interface number: %d\n", descriptor->function[q].if_num);
+		if (descriptor->function[q].reserved != 1)
+		{
+			printf("WARNING! Reserved byte shall be equal to 0x01 but has value of 0x%02X!\n", descriptor->function[q].reserved);
+		}
+		printf("  Compatible ID: \"%s\"\n", descriptor->function[q].compatible_id);
+		printf("  Sub Compatible ID: \"%s\"\n", descriptor->function[q].subcompatible_id);
+	}
+}
+
+typedef struct __attribute__((packed)) {
+	uint32_t prop_data_length;
+	uint8_t prop_data[];
+} variable_size_prop_t;
+
+typedef struct __attribute__((packed)) {
+	uint32_t length;
+	uint32_t prop_data_format;
+	uint16_t prop_name_length;
+	uint16_t prop_name[];
+} custom_prop_desc_t;
+
+typedef struct __attribute__((packed)) {
+	ms_os_extended_header_t header;
+	custom_prop_desc_t first;
+} extended_desc_t;
+
+static void ms_extended_prop_desc_parser(const  char * buf, uint16_t len)
+{
+	extended_desc_t * descriptor = (extended_desc_t *) buf;
+	printf("\nMS OS Extended Property descriptor:\n  Descriptor length: %d\n", descriptor->header.length);
+	if (descriptor->header.length != len)
+	{
+		printf("WARNING! Declared length does not match actual descriptor length received!\n");
+	}
+	printf("  Version: %d.%02d\n", descriptor->header.bcd_version >> 8, descriptor->header.bcd_version & 0xFF);
+	printf("  Descriptor ID: 0x%02X\n", descriptor->header.index);
+	printf("  Section count: %d\n\n", descriptor->header.count);
+
+	custom_prop_desc_t * property_desc = &descriptor->first;
+
+	for (unsigned q = 0; q < descriptor->header.count; ++q)
+	{
+		printf("Extended Property record:\n  Length: %d (0x%04X)\n", property_desc->length, property_desc->length);
+		const char * fmt = NULL;
+		switch (property_desc->prop_data_format)
+		{
+			case 0: fmt = "RESERVED"; break;
+			case 1: fmt = "REGSZ (Unicode null-terminated string)"; break;
+			case 2: fmt = "REG_EXPAND_SZ (Unicode null-terminated string w/ ENV vars)"; break;
+			case 3: fmt = "binary"; break;
+			case 4: fmt = "32-bit little-endian integer"; break;
+			case 5: fmt = "32-bit big-endian integer"; break;
+			case 6: fmt = "REG_LIN (Unicode null-terminated string containing symbolic link)"; break;
+			case 7: fmt = "REG_MULTI_SZ (multiple Unicode null-terminated strings)"; break;
+			default:
+				fmt = "RESERVED";
+		}
+		printf("  Extended Property data format: %s\n", fmt);
+		printf("  Extended Property name:");
+		display_buffer_hex((uint8_t *) &property_desc->prop_name, property_desc->prop_name_length);
+		variable_size_prop_t * prop_data = (variable_size_prop_t * ) ((uint8_t *) &property_desc->prop_name + property_desc->prop_name_length);
+
+		printf("\n  Extended Property value:");
+		display_buffer_hex((uint8_t *) &prop_data->prop_data, prop_data->prop_data_length);
+
+		property_desc = (custom_prop_desc_t *) (((uint8_t *) property_desc) + property_desc->length);
+
+		if (property_desc != ((uint8_t *) descriptor + len))
+		{
+			printf("WARNING! Extended property size field incorrect!\n");
+		}
+	}
+}
+
 // Read the MS WinUSB Feature Descriptors, that are used on Windows 8 for automated driver installation
 static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uint8_t bRequest, int iface_number)
 {
@@ -732,9 +849,10 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 		uint8_t recipient;
 		uint16_t index;
 		uint16_t header_size;
+		void (*parser)(const char *, uint16_t);
 	} os_fd[2] = {
-		{"Extended Compat ID", LIBUSB_RECIPIENT_DEVICE, 0x0004, 0x10},
-		{"Extended Properties", LIBUSB_RECIPIENT_INTERFACE, 0x0005, 0x0A}
+		{"Extended Compat ID", LIBUSB_RECIPIENT_DEVICE, 0x0004, 0x10, &ms_compat_id_desc_parser },
+		{"Extended Properties", LIBUSB_RECIPIENT_INTERFACE, 0x0005, 0x0A, &ms_extended_prop_desc_parser }
 	};
 
 	if (iface_number < 0) return;
@@ -750,8 +868,13 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 		// Read the header part
 		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient),
 			bRequest, (uint16_t)(((iface_number)<< 8)|0x00), os_fd[i].index, os_desc, os_fd[i].header_size, 1000);
-		if (r < os_fd[i].header_size) {
-			perr("   Failed: %s", (r<0)?libusb_strerror((enum libusb_error)r):"header size is too small");
+		if (r != os_fd[i].header_size) {
+			if (r < 0)
+			{
+				perr("   Failed: %s", libusb_strerror((enum libusb_error)r));
+			} else {
+				fprintf(stderr, "   Failed: %s (%d)\n", "header size is wrong!", r);
+			}
 			return;
 		}
 		le_type_punning_IS_fine = (void*)os_desc;
@@ -768,6 +891,7 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 			return;
 		} else {
 			display_buffer_hex(os_desc, (unsigned int)r);
+			os_fd[i].parser(os_desc, r);
 		}
 	}
 }
@@ -853,6 +977,25 @@ static void print_device_cap(struct libusb_bos_dev_capability_descriptor *dev_ca
 	default:
 		printf("    Unknown BOS device capability %02x:\n", dev_cap->bDevCapabilityType);
 	}
+}
+
+void utf16_to_utf8(const uint16_t * in_string, unsigned char * out_string, unsigned in_length)
+{
+	int str_length = ((in_string[0] & 0xFF) / 2);
+	for (unsigned q = 1; q < str_length; ++q) {
+		if (in_string[q] < 0xFF) {
+			*out_string = in_string[q] & 0xFF;
+			out_string++;
+		} else {
+			if (in_string[q] < 0x7FF) {
+				*out_string = (in_string[q] >> 6) | 0xC0;
+				out_string++;
+				*out_string = (in_string[q] & 0x3F) | 0x80;
+				out_string++;
+			}
+		}
+	}
+	*out_string = 0;
 }
 
 static int test_device(uint16_t vid, uint16_t pid)
@@ -1009,18 +1152,27 @@ static int test_device(uint16_t vid, uint16_t pid)
 		if (string_index[i] == 0) {
 			continue;
 		}
-		if (libusb_get_string_descriptor_ascii(handle, string_index[i], string, sizeof(string)) > 0) {
-			printf("   String (0x%02X): \"%s\"\n", string_index[i], string);
+		if (libusb_get_string_descriptor(handle, string_index[i], 0x0409, string, sizeof(string)) > 0) {
+			char buffer[128];
+			utf16_to_utf8((uint16_t *) string, (uint8_t *) buffer, sizeof(string));
+			printf("   String (0x%02X): \"%s\"\n", string_index[i], buffer);
 		}
 	}
 
-	printf("\nReading OS string descriptor:");
+	printf("\nReading OS string descriptor: ");
 	r = libusb_get_string_descriptor(handle, MS_OS_DESC_STRING_INDEX, 0, string, MS_OS_DESC_STRING_LENGTH);
-	if (r == MS_OS_DESC_STRING_LENGTH && memcmp(ms_os_desc_string, string, sizeof(ms_os_desc_string)) == 0) {
-		// If this is a Microsoft OS String Descriptor,
-		// attempt to read the WinUSB extended Feature Descriptors
-		printf("\n");
-		read_ms_winsub_feature_descriptors(handle, string[MS_OS_DESC_VENDOR_CODE_OFFSET], first_iface);
+	if (r == MS_OS_DESC_STRING_LENGTH) {
+		if (memcmp(ms_os_desc_string, string, sizeof(ms_os_desc_string)) == 0) {
+			display_buffer_hex(string, r);
+			printf("\nMS OS 1.0 string descriptor found\n");
+			// If this is a Microsoft OS String Descriptor,
+			// attempt to read the WinUSB extended Feature Descriptors
+			printf("\n");
+			read_ms_winsub_feature_descriptors(handle, string[MS_OS_DESC_VENDOR_CODE_OFFSET], first_iface);
+		} else {
+			printf(" wrong content / length\n");
+			display_buffer_hex(string, r);
+		}
 	} else {
 		printf(" no descriptor\n");
 	}
@@ -1097,6 +1249,7 @@ static void display_help(const char *progname)
 	printf("   -x      : test Microsoft XBox Controller Type S\n");
 	printf("   -l lang : language to report errors in (ISO 639-1)\n");
 	printf("   -w      : force the use of device requests when querying WCID descriptors\n");
+	printf("   -m      : query MS OS descriptors\n");
 	printf("If only the vid:pid is provided, xusb attempts to run the most appropriate test\n");
 }
 
