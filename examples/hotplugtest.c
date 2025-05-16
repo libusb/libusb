@@ -23,12 +23,14 @@
 
 #include "libusb.h"
 
-int done = 0;
+int done_attach = 0;
+int done_detach = 0;
 libusb_device_handle *handle = NULL;
 
 static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev, libusb_hotplug_event event, void *user_data)
 {
 	struct libusb_device_descriptor desc;
+	libusb_device_handle *new_handle;
 	int rc;
 
 	(void)ctx;
@@ -45,18 +47,18 @@ static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev,
 			 libusb_strerror((enum libusb_error)rc));
 	}
 
-	if (handle) {
-		libusb_close (handle);
-		handle = NULL;
-	}
-
-	rc = libusb_open (dev, &handle);
-	if (LIBUSB_SUCCESS != rc) {
+	rc = libusb_open (dev, &new_handle);
+	if (LIBUSB_SUCCESS == rc) {
+		if (handle) {
+			libusb_close (handle);
+		}
+		handle = new_handle;
+	} else {
 		fprintf (stderr, "No access to device: %s\n",
 			 libusb_strerror((enum libusb_error)rc));
 	}
 
-	done++;
+	done_attach++;
 
 	return 0;
 }
@@ -85,7 +87,7 @@ static int LIBUSB_CALL hotplug_callback_detach(libusb_context *ctx, libusb_devic
 		handle = NULL;
 	}
 
-	done++;
+	done_detach++;
 
 	return 0;
 }
@@ -130,7 +132,7 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	while (done < 2) {
+	while (done_detach < done_attach || done_attach == 0) {
 		rc = libusb_handle_events (NULL);
 		if (LIBUSB_SUCCESS != rc)
 			printf ("libusb_handle_events() failed: %s\n",
@@ -138,6 +140,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (handle) {
+		printf ("Warning: Closing left-over open handle\n");
 		libusb_close (handle);
 	}
 
