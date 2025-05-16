@@ -1,0 +1,14 @@
+BasedOnStyle: WebKit
+AlignTrailingComments: true
+AllowShortCaseLabelsOnASingleLine: true
+BraceWrapping:
+  AfterFunction: true
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Custom
+DerivePointerAlignment: true
+MaxEmptyLinesToKeep: 2
+ReflowComments: false
+SortIncludes: false
+TabWidth: 4
+UseTab: ForContinuationAndIndentation
+ForEachMacros: ['for_each_hotplug_cb_safe', 'for_each_device_safe', 'for_each_device', 'for_each_transfer_safe', 'for_each_removed_event_source_safe', 'for_each_transfer', '__for_each_completed_transfer_safe', 'for_each_event_source', 'for_each_hotplug_cb', 'for_each_context', 'for_each_removed_event_source']
