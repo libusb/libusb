@@ -114,7 +114,18 @@ static thread_return_t THREAD_CALL_TYPE init_and_exit(void * arg)
 	for (ti->iteration = 0; ti->iteration < ITERS && !ti->err; ti->iteration++) {
 		libusb_context *ctx = NULL;
 
-		ti->err = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
+		if (libusb_has_capability (LIBUSB_CAP_HAS_OPT_IN_HOTPLUG)) {
+			struct libusb_init_option opt_in_hotplug_option[] = {
+			  {
+			    .option = LIBUSB_OPTION_ENABLE_OPT_IN_HOTPLUG
+			  },
+			};
+		
+			ti->err = libusb_init_context(&ctx, /*options=*/opt_in_hotplug_option, /*num_options=*/1);
+		}
+		else {
+			ti->err = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
+		}
 		if (ti->err != 0) {
 			break;
 		}
@@ -230,7 +241,8 @@ static int test_multi_init(int enumerate)
 				tinfo[t].number,
 				tinfo[t].iteration,
 				libusb_error_name(tinfo[t].err));
-		} else if (enumerate) {
+		}
+		if (enumerate) {
 			if (t > 0 && tinfo[t].devcount != last_devcount) {
 				devcount_mismatch++;
 				printf("Device count mismatch: Thread %d discovered %ld devices instead of %ld\n",
