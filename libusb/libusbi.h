@@ -1163,6 +1163,15 @@ struct usbi_os_backend {
 	int (*get_config_descriptor_by_value)(struct libusb_device *device,
 		uint8_t bConfigurationValue, void **buffer);
 
+	/* Get the platform specific string handle. Useful for doing hardware queries
+	 * outside of libusb.
+	 *
+	 * Return:
+	 * - 0 on success
+	 * - LIBUSB_ERROR code on failure.
+	 */
+	int (*get_platform_device_id)(struct libusb_device *device, char **data);
+
 	/* Get the bConfigurationValue for the active configuration for a device.
 	 * Optional. This should only be implemented if you can retrieve it from
 	 * cache (don't generate I/O).

@@ -422,6 +422,7 @@ if (cfg != desired)
   * - libusb_get_max_packet_size()
   * - libusb_get_next_timeout()
   * - libusb_get_parent()
+  * - libusb_get_platform_device_id()
   * - libusb_get_pollfds()
   * - libusb_get_port_number()
   * - libusb_get_port_numbers()
@@ -1004,6 +1005,29 @@ libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev)
 uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 {
 	return dev->device_address;
+}
+
+/** \ingroup libusb_dev
+ * Get a platform id string of the device on the bus it is connected to.
+ *
+ * Linux:   udev_device_new_from_subsystem_sysname(,"usb",id);
+ * macOS:   IORegistryEntryIDMatching(id);
+ * Windows: CM_Locate_DevNodeA(,id,);
+ *
+ * \param dev a device
+ * \param data pointer to an allocated string that will contain the id
+ *  the function is successful, or NULL on error
+ * \returns 0 on success
+ * \returns another LIBUSB_ERROR code on error
+ */
+int API_EXPORTED libusb_get_platform_device_id(libusb_device *dev, char **data)
+{
+	*data = NULL;
+
+	if (!usbi_backend.get_platform_device_id)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	return usbi_backend.get_platform_device_id(dev, data);
 }
 
 /** \ingroup libusb_dev
