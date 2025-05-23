@@ -1875,6 +1875,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					if (dev == NULL)
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 
+					if (usbi_hotplug_enabled(ctx))
+						usbi_attach_device(dev);
+
 					priv = winusb_device_priv_init(dev);
 					priv->dev_id = _strdup(dev_id);
 					priv->class_guid = dev_info_data.ClassGuid;
@@ -1882,19 +1885,20 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						libusb_unref_device(dev);
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 					}
+					goto dont_track_unref;
 				} else {
 					usbi_dbg(ctx, "found existing device for session [%lX]", session_id);
 
 					priv = usbi_get_device_priv(dev);
 					if (strcmp(priv->dev_id, dev_id) != 0) {
 						usbi_dbg(ctx, "device instance ID for session [%lX] changed", session_id);
-						usbi_disconnect_device(dev);
+						usbi_detach_device(dev);
 						libusb_unref_device(dev);
 						goto alloc_device;
 					}
 					if (!IsEqualGUID(&priv->class_guid, &dev_info_data.ClassGuid)) {
 						usbi_dbg(ctx, "device class GUID for session [%lX] changed", session_id);
-						usbi_disconnect_device(dev);
+						usbi_detach_device(dev);
 						libusb_unref_device(dev);
 						goto alloc_device;
 					}
@@ -1914,6 +1918,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				unref_list[unref_cur++] = dev;
 			}
 
+		dont_track_unref:
 			// Setup device
 			switch (pass_type) {
 			case HUB_PASS:
@@ -1967,22 +1972,33 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				break;
 			case GEN_PASS:
 				port_nr = 0;
-				if (!get_dev_port_number(*dev_info, &dev_info_data, &port_nr))
-					usbi_warn(ctx, "could not retrieve port number for device '%s': %s", dev_id, windows_error_str(0));
-				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_info_data.DevInst);
+				if (priv->initialized) {
+					libusb_unref_device(parent_dev);
+					r = LIBUSB_SUCCESS;
+				}
+				else {
+					if (!get_dev_port_number(*dev_info, &dev_info_data, &port_nr))
+						usbi_warn(ctx, "could not retrieve port number for device '%s': %s", dev_id, windows_error_str(0));
+					r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_info_data.DevInst);
+				}
 				if (r == LIBUSB_SUCCESS) {
 					// Append device to the list of discovered devices
-					discdevs = discovered_devs_append(*_discdevs, dev);
-					if (!discdevs)
-						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
-
-					*_discdevs = discdevs;
+					if (_discdevs) {
+						discdevs = discovered_devs_append(*_discdevs, dev);
+						if (!discdevs)
+							LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
+						*_discdevs = discdevs;
+					}
 				} else {
 					// Failed to initialize a single device doesn't stop us from enumerating all other devices,
 					// but we skip it (don't add to list of discovered devices)
 					usbi_warn(ctx, "failed to initialize device '%s'", priv->dev_id);
 					r = LIBUSB_SUCCESS;
+
+					usbi_detach_device(dev);
+					libusb_unref_device(dev);
 				}
+
 				break;
 			case HID_PASS:
 			case EXT_PASS:
@@ -2128,8 +2144,8 @@ static int winusb_set_configuration(struct libusb_device_handle *dev_handle, uin
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 	int r = LIBUSB_SUCCESS;
 
-	r = libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_OUT |
-		LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_DEVICE,
+	r = libusb_control_transfer(dev_handle, (uint8_t)LIBUSB_ENDPOINT_OUT |
+		(uint8_t)LIBUSB_REQUEST_TYPE_STANDARD | (uint8_t)LIBUSB_RECIPIENT_DEVICE,
 		LIBUSB_REQUEST_SET_CONFIGURATION, config,
 		0, NULL, 0, 1000);
 

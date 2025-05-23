@@ -149,10 +149,25 @@ int main (void) {
 #define VALID_HOTPLUG_FLAGS			\
 	(LIBUSB_HOTPLUG_ENUMERATE)
 
+bool usbi_hotplug_enabled(struct libusb_context *ctx)
+{
+	if (libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
+	{
+		return true;
+	}
+
+	if (!libusb_has_capability(LIBUSB_CAP_HAS_OPT_IN_HOTPLUG))
+	{
+		return false;
+	}
+
+	return ctx->opt_in_hotplug_enabled;
+}
+
 void usbi_hotplug_init(struct libusb_context *ctx)
 {
 	/* check for hotplug support */
-	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
+	if (!usbi_hotplug_enabled(ctx))
 		return;
 
 	usbi_mutex_init(&ctx->hotplug_cbs_lock);
@@ -189,7 +204,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 	struct libusb_device *dev, *next_dev;
 
 	/* check for hotplug support */
-	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
+	if (!usbi_hotplug_enabled(ctx))
 		return;
 
 	if (!usbi_atomic_load(&ctx->hotplug_ready))
@@ -357,11 +372,11 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
-	/* check for hotplug support */
-	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
-		return LIBUSB_ERROR_NOT_SUPPORTED;
-
 	ctx = usbi_get_context(ctx);
+
+	/* check for hotplug support */
+	if (!usbi_hotplug_enabled(ctx))
+		return LIBUSB_ERROR_NOT_SUPPORTED;
 
 	hotplug_cb = calloc(1, sizeof(*hotplug_cb));
 	if (!hotplug_cb)
@@ -430,13 +445,13 @@ void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
 	struct usbi_hotplug_callback *hotplug_cb;
 	int deregistered = 0;
 
+	ctx = usbi_get_context(ctx);
+
 	/* check for hotplug support */
-	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
+	if (!usbi_hotplug_enabled(ctx))
 		return;
 
 	usbi_dbg(ctx, "deregister hotplug cb %d", callback_handle);
-
-	ctx = usbi_get_context(ctx);
 
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 	for_each_hotplug_cb(ctx, hotplug_cb) {
@@ -468,14 +483,14 @@ void * LIBUSB_CALL libusb_hotplug_get_user_data(libusb_context *ctx,
 	struct usbi_hotplug_callback *hotplug_cb;
 	void *user_data = NULL;
 
+	ctx = usbi_get_context(ctx);
+
 	/* check for hotplug support */
-	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
+	if (!usbi_hotplug_enabled(ctx))
 		return NULL;
 
 	usbi_dbg(ctx, "get hotplug cb %d user data", callback_handle);
-
-	ctx = usbi_get_context(ctx);
-
+	
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 	for_each_hotplug_cb(ctx, hotplug_cb) {
 		if (callback_handle == hotplug_cb->handle) {
