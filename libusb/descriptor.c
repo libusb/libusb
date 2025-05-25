@@ -1035,6 +1035,21 @@ struct internal_ssplus_capability_descriptor {
 };
 /// @endcond
 
+/** \ingroup libusb_desc
+ * Get a SuperSpeedPlus USB Device Capability descriptor
+ *
+ * Since version 1.0.28, \ref LIBUSB_API_VERSION >= 0x0100010B
+ *
+ * \param ctx the context to operate on, or NULL for the default context
+ * \param dev_cap Device Capability descriptor with a bDevCapabilityType of
+ * \ref libusb_bos_type::LIBUSB_BT_SUPERSPEED_PLUS_CAPABILITY
+ * LIBUSB_BT_SUPERSPEED_PLUS_CAPABILITY
+ * \param ssplus_usb_device_cap output location for the SuperSpeedPlus USB Device
+ * Capability descriptor. Only valid if 0 was returned. Must be freed with
+ * libusb_free_ssplus_usb_device_capability_descriptor() after use.
+ * \returns 0 on success
+ * \returns a LIBUSB_ERROR code on error
+ */
 int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	libusb_context *ctx,
 	struct libusb_bos_dev_capability_descriptor *dev_cap,
@@ -1102,6 +1117,17 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	return LIBUSB_SUCCESS;
 }
 
+/** \ingroup libusb_desc
+ * Free a SuperSpeedPlus USB Device Capability descriptor obtained from
+ * libusb_get_ssplus_usb_device_capability_descriptor().
+ * It is safe to call this function with a NULL ssplus_usb_device_cap
+ * parameter, in which case the function simply returns.
+ *
+ * Since version 1.0.28, \ref LIBUSB_API_VERSION >= 0x0100010B
+ *
+ * \param ssplus_usb_device_cap the SuperSpeedPlus USB Device Capability descriptor
+ * to free
+ */
 void API_EXPORTED libusb_free_ssplus_usb_device_capability_descriptor(
 	struct libusb_ssplus_usb_device_capability_descriptor *ssplus_usb_device_cap)
 {
