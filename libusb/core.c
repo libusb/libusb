@@ -728,20 +728,24 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	return dev;
 }
 
-void usbi_connect_device(struct libusb_device *dev)
+void usbi_attach_device(struct libusb_device *dev)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 
 	usbi_atomic_store(&dev->attached, 1);
 
-	usbi_mutex_lock(&dev->ctx->usb_devs_lock);
-	list_add(&dev->list, &dev->ctx->usb_devs);
-	usbi_mutex_unlock(&dev->ctx->usb_devs_lock);
-
-	usbi_hotplug_notification(ctx, dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
+	usbi_mutex_lock(&ctx->usb_devs_lock);
+	list_add(&dev->list, &ctx->usb_devs);
+	usbi_mutex_unlock(&ctx->usb_devs_lock);
 }
 
-void usbi_disconnect_device(struct libusb_device *dev)
+void usbi_connect_device(struct libusb_device *dev)
+{
+	usbi_attach_device(dev);
+	usbi_hotplug_notification(DEVICE_CTX(dev), dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
+}
+
+void usbi_detach_device(struct libusb_device *dev)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 
@@ -750,8 +754,12 @@ void usbi_disconnect_device(struct libusb_device *dev)
 	usbi_mutex_lock(&ctx->usb_devs_lock);
 	list_del(&dev->list);
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
+}
 
-	usbi_hotplug_notification(ctx, dev, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT);
+void usbi_disconnect_device(struct libusb_device *dev)
+{
+	usbi_detach_device(dev);
+	usbi_hotplug_notification(DEVICE_CTX(dev), dev, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT);
 }
 
 /* Perform some final sanity checks on a newly discovered device. If this
