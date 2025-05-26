@@ -138,10 +138,10 @@ static inline void thread_join(thread_t thread)
 #endif
 #endif
 
-#define EP_INTR			(1 | LIBUSB_ENDPOINT_IN)
-#define EP_DATA			(2 | LIBUSB_ENDPOINT_IN)
-#define CTRL_IN			(LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_IN)
-#define CTRL_OUT		(LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT)
+#define EP_INTR			(1 | (uint8_t)LIBUSB_ENDPOINT_IN)
+#define EP_DATA			(2 | (uint8_t)LIBUSB_ENDPOINT_IN)
+#define CTRL_IN			((uint8_t)LIBUSB_REQUEST_TYPE_VENDOR | (uint8_t)LIBUSB_ENDPOINT_IN)
+#define CTRL_OUT		((uint8_t)LIBUSB_REQUEST_TYPE_VENDOR | (uint8_t)LIBUSB_ENDPOINT_OUT)
 #define USB_RQ			0x04
 #define INTR_LENGTH		64
 
