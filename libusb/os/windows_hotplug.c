@@ -120,13 +120,12 @@ static void windows_refresh_device_list(struct libusb_context *ctx, const bool d
 	}
 
 	struct libusb_device *dev, *next_dev;
-	struct winusb_device_priv *priv;
 
 	for_each_device_safe(ctx, dev, next_dev)
 	{
-		priv = usbi_get_device_priv(dev);
+		struct winusb_device_priv* priv = usbi_get_device_priv(dev);
 
-		if(_stricmp(priv->path, device_name) != 0)
+		if(priv->path == NULL || _stricmp(priv->path, device_name) != 0)
 		{
 			continue;
 		}
