@@ -1,6 +1,11 @@
 For detailed information about the changes below, please see the git log
 or visit: http://log.libusb.info
 
+2025-06-01: v1.0.29
+* Fix regression on macOS leading to timeouts in enumeration
+* LIBUSB_API_VERSION bump for the new functions in 1.0.28
+* Fix xusb regression displaying wrong error on claim failure
+
 2025-03-18: v1.0.28
 * New libusb_get_ssplus_usb_device_capability_descriptor API
   for query of SuperSpeed+ Capability Descriptors
