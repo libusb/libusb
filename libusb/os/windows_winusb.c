@@ -25,6 +25,10 @@
 
 #include <config.h>
 
+#if !defined(__CYGWIN__)
+/* Must go before windows.h to avoid conflicts with Winsock v1. */
+#include <winsock2.h>
+#endif
 #include <windows.h>
 #include <setupapi.h>
 #include <ctype.h>
