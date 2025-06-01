@@ -343,15 +343,17 @@ static int usbdk_get_device_list(struct libusb_context *ctx, struct discovered_d
 			}
 		}
 
-		discdevs = discovered_devs_append(*_discdevs, dev);
-		libusb_unref_device(dev);
-		if (!discdevs) {
-			usbi_err(ctx, "cannot append new device to list");
-			r = LIBUSB_ERROR_NO_MEM;
-			goto func_exit;
-		}
+		if (_discdevs) {
+			discdevs = discovered_devs_append(*_discdevs, dev);
+			libusb_unref_device(dev);
+			if (!discdevs) {
+				usbi_err(ctx, "cannot append new device to list");
+				r = LIBUSB_ERROR_NO_MEM;
+				goto func_exit;
+			}
 
-		*_discdevs = discdevs;
+			*_discdevs = discdevs;
+		}
 	}
 
 func_exit:

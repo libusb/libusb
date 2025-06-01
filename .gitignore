@@ -61,6 +61,10 @@ Debug
 Release
 Debug-MT
 Release-MT
+Debug-Hotplug
+Release-Hotplug
+Debug-Hotplug-MT
+Release-Hotplug-MT
 *.db
 *.user
 *.suo
