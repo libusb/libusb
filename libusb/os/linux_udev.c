@@ -278,6 +278,7 @@ int linux_udev_scan_devices(struct libusb_context *ctx)
 		return LIBUSB_ERROR_OTHER;
 	}
 
+	udev_enumerate_add_match_is_initialized(enumerator);
 	udev_enumerate_add_match_subsystem(enumerator, "usb");
 	udev_enumerate_add_match_property(enumerator, "DEVTYPE", "usb_device");
 	udev_enumerate_scan_devices(enumerator);
