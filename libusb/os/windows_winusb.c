@@ -2128,8 +2128,8 @@ static int winusb_set_configuration(struct libusb_device_handle *dev_handle, uin
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 	int r = LIBUSB_SUCCESS;
 
-	r = libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_OUT |
-		LIBUSB_REQUEST_TYPE_STANDARD | LIBUSB_RECIPIENT_DEVICE,
+	r = libusb_control_transfer(dev_handle, (uint8_t)LIBUSB_ENDPOINT_OUT |
+		(uint8_t)LIBUSB_REQUEST_TYPE_STANDARD | (uint8_t)LIBUSB_RECIPIENT_DEVICE,
 		LIBUSB_REQUEST_SET_CONFIGURATION, config,
 		0, NULL, 0, 1000);
 

@@ -198,20 +198,20 @@ static int display_ps3_status(libusb_device_handle *handle)
 	uint8_t device_bt_address[18];
 
 	// Get the controller's bluetooth address of its master device
-	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+	CALL_CHECK(libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_CLASS | (uint8_t)LIBUSB_RECIPIENT_INTERFACE,
 		HID_GET_REPORT, 0x03f5, 0, master_bt_address, sizeof(master_bt_address), 100));
 	printf("\nMaster's bluetooth address: %02X:%02X:%02X:%02X:%02X:%02X\n", master_bt_address[2], master_bt_address[3],
 		master_bt_address[4], master_bt_address[5], master_bt_address[6], master_bt_address[7]);
 
 	// Get the controller's bluetooth address
-	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+	CALL_CHECK(libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_CLASS | (uint8_t)LIBUSB_RECIPIENT_INTERFACE,
 		HID_GET_REPORT, 0x03f2, 0, device_bt_address, sizeof(device_bt_address), 100));
 	printf("\nMaster's bluetooth address: %02X:%02X:%02X:%02X:%02X:%02X\n", device_bt_address[4], device_bt_address[5],
 		device_bt_address[6], device_bt_address[7], device_bt_address[8], device_bt_address[9]);
 
 	// Get the status of the controller's buttons via its HID report
 	printf("\nReading PS3 Input Report...\n");
-	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+	CALL_CHECK(libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_CLASS | (uint8_t)LIBUSB_RECIPIENT_INTERFACE,
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x01, 0, input_report, sizeof(input_report), 1000));
 	switch(input_report[2]){	/** Direction pad plus start, select, and joystick buttons */
 		case 0x01:
@@ -285,7 +285,7 @@ static int display_xbox_status(libusb_device_handle *handle)
 {
 	uint8_t input_report[20];
 	printf("\nReading XBox Input Report...\n");
-	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+	CALL_CHECK(libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_CLASS | (uint8_t)LIBUSB_RECIPIENT_INTERFACE,
 		HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, input_report, 20, 1000));
 	printf("   D-pad: %02X\n", input_report[2]&0x0F);
 	printf("   Start:%d, Back:%d, Left Stick Press:%d, Right Stick Press:%d\n", B(input_report[2]&0x10), B(input_report[2]&0x20),
@@ -312,7 +312,7 @@ static int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_
 	output_report[3] = left;
 	output_report[5] = right;
 
-	CALL_CHECK(libusb_control_transfer(handle, LIBUSB_ENDPOINT_OUT|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+	CALL_CHECK(libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_OUT | (uint8_t)LIBUSB_REQUEST_TYPE_CLASS | (uint8_t)LIBUSB_RECIPIENT_INTERFACE,
 		HID_SET_REPORT, (HID_REPORT_TYPE_OUTPUT<<8)|0x00, 0, output_report, 06, 1000));
 	return 0;
 }
@@ -470,7 +470,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	FILE *fd;
 
 	printf("\nReading Max LUN:\n");
-	r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+	r = libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_CLASS | (uint8_t)LIBUSB_RECIPIENT_INTERFACE,
 		BOMS_GET_MAX_LUN, 0, 0, &lun, 1, 1000);
 	// Some devices send a STALL instead of the actual value.
 	// In such cases we should set lun to 0.
@@ -624,7 +624,7 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	FILE *fd;
 
 	printf("\nReading HID Report Descriptors:\n");
-	descriptor_size = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_STANDARD|LIBUSB_RECIPIENT_INTERFACE,
+	descriptor_size = libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_STANDARD | (uint8_t)LIBUSB_RECIPIENT_INTERFACE,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, LIBUSB_DT_REPORT<<8, 0, hid_report_descriptor, sizeof(hid_report_descriptor), 1000);
 	if (descriptor_size < 0) {
 		printf("   Failed\n");
@@ -653,7 +653,7 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		}
 
 		printf("\nReading Feature Report (length %d)...\n", size);
-		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+		r = libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_CLASS | (uint8_t)LIBUSB_RECIPIENT_INTERFACE,
 			HID_GET_REPORT, (HID_REPORT_TYPE_FEATURE<<8)|0, 0, report_buffer, (uint16_t)size, 5000);
 		if (r >= 0) {
 			display_buffer_hex(report_buffer, (unsigned int)size);
@@ -686,7 +686,7 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		}
 
 		printf("\nReading Input Report (length %d)...\n", size);
-		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
+		r = libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_CLASS | (uint8_t)LIBUSB_RECIPIENT_INTERFACE,
 			HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, report_buffer, (uint16_t)size, 5000);
 		if (r >= 0) {
 			display_buffer_hex(report_buffer, (unsigned int)size);
@@ -748,7 +748,7 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 		printf("\nReading %s OS Feature Descriptor (wIndex = 0x%04d):\n", os_fd[i].desc, os_fd[i].index);
 
 		// Read the header part
-		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient),
+		r = libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_VENDOR | os_fd[i].recipient,
 			bRequest, (uint16_t)(((iface_number)<< 8)|0x00), os_fd[i].index, os_desc, os_fd[i].header_size, 1000);
 		if (r < os_fd[i].header_size) {
 			perr("   Failed: %s", (r<0)?libusb_strerror((enum libusb_error)r):"header size is too small");
@@ -761,7 +761,7 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 		}
 
 		// Read the full feature descriptor
-		r = libusb_control_transfer(handle, (uint8_t)(LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_VENDOR|os_fd[i].recipient),
+		r = libusb_control_transfer(handle, (uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_VENDOR | os_fd[i].recipient,
 			bRequest, (uint16_t)(((iface_number)<< 8)|0x00), os_fd[i].index, os_desc, (uint16_t)length, 1000);
 		if (r < 0) {
 			perr("   Failed: %s", libusb_strerror((enum libusb_error)r));
