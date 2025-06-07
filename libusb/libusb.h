@@ -984,7 +984,7 @@ struct libusb_ss_usb_device_capability_descriptor {
 	uint8_t  bU1DevExitLat;
 
 	/** U2 Device Exit Latency. */
-	uint16_t bU2DevExitLat;
+	uint16_t wU2DevExitLat;
 };
 
 /** \ingroup libusb_desc
