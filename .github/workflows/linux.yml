@@ -39,6 +39,8 @@ jobs:
         run: .private/ci-build.sh --build-dir build-nolog -- --disable-log
 
       - uses: mymindstorm/setup-emsdk@v13
+        with:
+          version: 4.0.8
 
       - run: npm ci
         working-directory: tests/webusb-test-shim
