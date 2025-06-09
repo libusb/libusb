@@ -57,15 +57,15 @@ static const mach_port_t darwin_default_master_port = 0;
 /* async event thread */
 /* if both this mutex and darwin_cached_devices_mutex are to be acquired then
    darwin_cached_devices_mutex must be acquired first. */
-static pthread_mutex_t libusb_darwin_at_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  libusb_darwin_at_cond = PTHREAD_COND_INITIALIZER;
+static usbi_mutex_static_t libusb_darwin_at_mutex = USBI_MUTEX_INITIALIZER;
+static usbi_cond_t libusb_darwin_at_cond = USBI_COND_INITIALIZER;
 
 #define LIBUSB_DARWIN_STARTUP_FAILURE ((CFRunLoopRef) -1)
 
 static CFRunLoopRef libusb_darwin_acfl = NULL; /* event cf loop */
 static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for event cf loop */
 
-static usbi_mutex_t darwin_cached_devices_mutex = PTHREAD_MUTEX_INITIALIZER;
+static usbi_mutex_t darwin_cached_devices_mutex = USBI_MUTEX_INITIALIZER;
 static struct list_head darwin_cached_devices;
 static const char *darwin_device_class = "IOUSBDevice";
 
@@ -736,10 +736,10 @@ static void darwin_clear_iterator (io_iterator_t iter) {
 }
 
 static void darwin_fail_startup(void) {
-  pthread_mutex_lock (&libusb_darwin_at_mutex);
+  usbi_mutex_lock (&libusb_darwin_at_mutex);
   libusb_darwin_acfl = LIBUSB_DARWIN_STARTUP_FAILURE;
-  pthread_cond_signal (&libusb_darwin_at_cond);
-  pthread_mutex_unlock (&libusb_darwin_at_mutex);
+  usbi_cond_signal (&libusb_darwin_at_cond);
+  usbi_mutex_unlock (&libusb_darwin_at_mutex);
   pthread_exit (NULL);
 }
 
@@ -823,11 +823,11 @@ static void *darwin_event_thread_main (void *arg0) {
   usbi_dbg (NULL, "darwin event thread ready to receive events");
 
   /* signal the main thread that the hotplug runloop has been created. */
-  pthread_mutex_lock (&libusb_darwin_at_mutex);
+  usbi_mutex_lock (&libusb_darwin_at_mutex);
   libusb_darwin_acfl = runloop;
   libusb_darwin_acfls = libusb_shutdown_cfsource;
-  pthread_cond_signal (&libusb_darwin_at_cond);
-  pthread_mutex_unlock (&libusb_darwin_at_mutex);
+  usbi_cond_signal (&libusb_darwin_at_cond);
+  usbi_mutex_unlock (&libusb_darwin_at_mutex);
 
   /* run the runloop */
   CFRunLoopRun();
@@ -835,11 +835,11 @@ static void *darwin_event_thread_main (void *arg0) {
   usbi_dbg (NULL, "darwin event thread exiting");
 
   /* signal the main thread that the hotplug runloop has finished. */
-  pthread_mutex_lock (&libusb_darwin_at_mutex);
+  usbi_mutex_lock (&libusb_darwin_at_mutex);
   libusb_darwin_acfls = NULL;
   libusb_darwin_acfl = NULL;
-  pthread_cond_signal (&libusb_darwin_at_cond);
-  pthread_mutex_unlock (&libusb_darwin_at_mutex);
+  usbi_cond_signal (&libusb_darwin_at_cond);
+  usbi_mutex_unlock (&libusb_darwin_at_mutex);
 
   /* remove the notification cfsource */
   CFRunLoopRemoveSource(runloop, libusb_notification_cfsource, kCFRunLoopDefaultMode);
@@ -899,17 +899,17 @@ static int darwin_first_time_init(void) {
     return LIBUSB_ERROR_OTHER;
   }
 
-  pthread_mutex_lock (&libusb_darwin_at_mutex);
+  usbi_mutex_lock (&libusb_darwin_at_mutex);
   libusb_darwin_at_started = true;
   while (NULL == libusb_darwin_acfl) {
-    pthread_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
+    usbi_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
   }
 
   if (libusb_darwin_acfl == LIBUSB_DARWIN_STARTUP_FAILURE) {
     libusb_darwin_acfl = NULL;
     rc = LIBUSB_ERROR_OTHER;
   }
-  pthread_mutex_unlock (&libusb_darwin_at_mutex);
+  usbi_mutex_unlock (&libusb_darwin_at_mutex);
 
   return rc;
 }
@@ -947,19 +947,19 @@ static void darwin_exit (struct libusb_context *ctx) {
   usbi_mutex_lock(&darwin_cached_devices_mutex);
   if (0 == --init_count) {
     /* stop the event runloop and wait for the thread to terminate. */
-    pthread_mutex_lock (&libusb_darwin_at_mutex);
+    usbi_mutex_lock (&libusb_darwin_at_mutex);
     if (NULL != libusb_darwin_acfls) {
       CFRunLoopSourceSignal (libusb_darwin_acfls);
       CFRunLoopWakeUp (libusb_darwin_acfl);
       while (libusb_darwin_acfl)
-        pthread_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
+        usbi_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
     }
 
     if (libusb_darwin_at_started) {
       pthread_join (libusb_darwin_at, NULL);
       libusb_darwin_at_started = false;
     }
-    pthread_mutex_unlock (&libusb_darwin_at_mutex);
+    usbi_mutex_unlock (&libusb_darwin_at_mutex);
 
     darwin_cleanup_devices ();
   }
