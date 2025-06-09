@@ -151,7 +151,7 @@ int main (void) {
 #define VALID_HOTPLUG_FLAGS			\
 	(LIBUSB_HOTPLUG_ENUMERATE)
 
-void usbi_hotplug_init(struct libusb_context *ctx)
+void usbi_hotplug_init(struct libusb_context *ctx) NO_THREAD_SAFETY_ANALYSIS
 {
 	/* check for hotplug support */
 	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
@@ -292,7 +292,7 @@ void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device 
 	usbi_mutex_unlock(&ctx->event_data_lock);
 }
 
-void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_msgs)
+void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_msgs) EXCLUDES(ctx->hotplug_cbs_lock)
 {
 	struct usbi_hotplug_callback *hotplug_cb, *next_cb;
 	struct usbi_hotplug_message *msg;
@@ -345,7 +345,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 	int events, int flags,
 	int vendor_id, int product_id, int dev_class,
 	libusb_hotplug_callback_fn cb_fn, void *user_data,
-	libusb_hotplug_callback_handle *callback_handle)
+	libusb_hotplug_callback_handle *callback_handle) EXCLUDES(ctx->hotplug_cbs_lock)
 {
 	struct usbi_hotplug_callback *hotplug_cb;
 
@@ -427,7 +427,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 }
 
 void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
-	libusb_hotplug_callback_handle callback_handle)
+	libusb_hotplug_callback_handle callback_handle) EXCLUDES(ctx->hotplug_cbs_lock)
 {
 	struct usbi_hotplug_callback *hotplug_cb;
 	int deregistered = 0;
@@ -465,7 +465,7 @@ void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
 
 DEFAULT_VISIBILITY
 void * LIBUSB_CALL libusb_hotplug_get_user_data(libusb_context *ctx,
-	libusb_hotplug_callback_handle callback_handle)
+	libusb_hotplug_callback_handle callback_handle) EXCLUDES(ctx->hotplug_cbs_lock)
 {
 	struct usbi_hotplug_callback *hotplug_cb;
 	void *user_data = NULL;
