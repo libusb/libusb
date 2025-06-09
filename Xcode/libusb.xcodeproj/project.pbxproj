@@ -57,6 +57,16 @@
 		008FC0301628BC7400BC5BE2 /* listdevs.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBFE71628BA0E00BC5BE2 /* listdevs.c */; };
 		1438D77A17A2ED9F00166101 /* hotplug.c in Sources */ = {isa = PBXBuildFile; fileRef = 1438D77817A2ED9F00166101 /* hotplug.c */; };
 		1438D77F17A2F0EA00166101 /* strerror.c in Sources */ = {isa = PBXBuildFile; fileRef = 1438D77E17A2F0EA00166101 /* strerror.c */; };
+		14D9E1DF2FFD5E01005170B1 /* clang_thread_safety.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */; };
+		14D9E1E02FFD5E01005170B1 /* clang_thread_safety.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */; };
+		14D9E1E12FFD5E01005170B1 /* clang_thread_safety.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */; };
+		14D9E1E22FFD5E01005170B1 /* clang_thread_safety.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */; };
+		14D9E1E32FFD5E01005170B1 /* clang_thread_safety.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */; };
+		14D9E1E42FFD5E01005170B1 /* clang_thread_safety.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */; };
+		14D9E1E52FFD5E01005170B1 /* clang_thread_safety.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */; };
+		14D9E1E62FFD5E01005170B1 /* clang_thread_safety.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */; };
+		14D9E1E72FFD5E01005170B1 /* clang_thread_safety.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */; };
+		14D9E1E82FFD5E01005170B1 /* clang_thread_safety.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */; };
 		2018D95F24E453BA001589B2 /* events_posix.c in Sources */ = {isa = PBXBuildFile; fileRef = 2018D95E24E453BA001589B2 /* events_posix.c */; };
 		2018D96124E453D0001589B2 /* events_posix.h in Headers */ = {isa = PBXBuildFile; fileRef = 2018D96024E453D0001589B2 /* events_posix.h */; };
 		20468D70243298C100650534 /* sam3u_benchmark.c in Sources */ = {isa = PBXBuildFile; fileRef = 20468D6E243298C100650534 /* sam3u_benchmark.c */; };
@@ -279,6 +289,7 @@
 		1472E15D2B43D68600850BA3 /* macos.c */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.c; path = macos.c; sourceTree = "<group>"; tabWidth = 2; usesTabs = 0; };
 		1472E15F2B43D68600850BA3 /* set_option.c */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.c; path = set_option.c; sourceTree = "<group>"; tabWidth = 2; usesTabs = 0; };
 		1472E1602B43D69800850BA3 /* umockdev.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = umockdev.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
+		14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = clang_thread_safety.h; sourceTree = "<group>"; };
 		14EC13E12B3D5BA600CF9AD0 /* emscripten_webusb.cpp */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.cpp.cpp; path = emscripten_webusb.cpp; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		14EC13E22B3D5BBE00CF9AD0 /* sunos_usb.h */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = sunos_usb.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		14EC13E32B3D5BBE00CF9AD0 /* openbsd_usb.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = openbsd_usb.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
@@ -455,6 +466,7 @@
 				008FBF561628B7E800BC5BE2 /* io.c */,
 				008FBF5A1628B7E800BC5BE2 /* libusb.h */,
 				008FBF671628B7E800BC5BE2 /* libusbi.h */,
+				14D9E1DE2FFD5E01005170B1 /* clang_thread_safety.h */,
 				008FBF6B1628B7E800BC5BE2 /* os */,
 				1438D77E17A2F0EA00166101 /* strerror.c */,
 				008FBF7A1628B7E800BC5BE2 /* sync.c */,
@@ -561,6 +573,7 @@
 				2018D96124E453D0001589B2 /* events_posix.h in Headers */,
 				008FBF901628B7E800BC5BE2 /* libusbi.h in Headers */,
 				008FBF9B1628B7E800BC5BE2 /* threads_posix.h in Headers */,
+				14D9E1E42FFD5E01005170B1 /* clang_thread_safety.h in Headers */,
 				008FBFA11628B7E800BC5BE2 /* version.h in Headers */,
 				008FBFA21628B7E800BC5BE2 /* version_nano.h in Headers */,
 			);
@@ -570,6 +583,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14D9E1E82FFD5E01005170B1 /* clang_thread_safety.h in Headers */,
 				CEA0F5EF26321FAA00ADF3EC /* config.h in Headers */,
 				20951C152563125200ED6351 /* libusb.h in Headers */,
 			);
@@ -579,6 +593,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14D9E1E12FFD5E01005170B1 /* clang_thread_safety.h in Headers */,
 				CEA0F5F026321FAA00ADF3EC /* config.h in Headers */,
 				CEA0F5F126321FAA00ADF3EC /* libusb.h in Headers */,
 			);
@@ -590,6 +605,7 @@
 			files = (
 				CEA0F5F326321FAA00ADF3EC /* config.h in Headers */,
 				20951C0625630F8F00ED6351 /* ezusb.h in Headers */,
+				14D9E1E52FFD5E01005170B1 /* clang_thread_safety.h in Headers */,
 				CEA0F5F426321FAA00ADF3EC /* libusb.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -598,6 +614,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14D9E1E02FFD5E01005170B1 /* clang_thread_safety.h in Headers */,
 				CEA0F5F626321FAA00ADF3EC /* config.h in Headers */,
 				CEA0F5F726321FAA00ADF3EC /* libusb.h in Headers */,
 			);
@@ -607,6 +624,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14D9E1E22FFD5E01005170B1 /* clang_thread_safety.h in Headers */,
 				CEA0F5F926321FAA00ADF3EC /* config.h in Headers */,
 				CEA0F5FA26321FAA00ADF3EC /* libusb.h in Headers */,
 			);
@@ -616,6 +634,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14D9E1DF2FFD5E01005170B1 /* clang_thread_safety.h in Headers */,
 				CEA0F5FC26321FAA00ADF3EC /* config.h in Headers */,
 				CEA0F5FD26321FAA00ADF3EC /* libusb.h in Headers */,
 			);
@@ -627,6 +646,7 @@
 			files = (
 				CEA0F5FF26321FAA00ADF3EC /* config.h in Headers */,
 				20951C0F25630FD300ED6351 /* libusb_testlib.h in Headers */,
+				14D9E1E62FFD5E01005170B1 /* clang_thread_safety.h in Headers */,
 				CEA0F60026321FAA00ADF3EC /* libusb.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -635,6 +655,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14D9E1E72FFD5E01005170B1 /* clang_thread_safety.h in Headers */,
 				CEA0F60226321FAA00ADF3EC /* config.h in Headers */,
 				CEA0F60326321FAA00ADF3EC /* libusb.h in Headers */,
 			);
@@ -644,6 +665,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14D9E1E32FFD5E01005170B1 /* clang_thread_safety.h in Headers */,
 				CEA0F60526321FAA00ADF3EC /* config.h in Headers */,
 				CEA0F60626321FAA00ADF3EC /* libusb.h in Headers */,
 			);
