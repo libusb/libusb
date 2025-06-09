@@ -51,7 +51,9 @@ static inline void usbi_mutex_unlock(usbi_mutex_t *mutex)
 }
 static inline int usbi_mutex_trylock(usbi_mutex_t *mutex)
 {
-	return pthread_mutex_trylock(mutex) == 0;
+    // TODO: everything else in this file just wraps pthreads exactly, but this one inverts the return value meaning !?!?
+	int success = pthread_mutex_trylock(mutex) == 0;
+	return success;
 }
 static inline void usbi_mutex_destroy(usbi_mutex_t *mutex)
 {
@@ -73,6 +75,10 @@ static inline void usbi_cond_broadcast(usbi_cond_t *cond)
 static inline void usbi_cond_destroy(usbi_cond_t *cond)
 {
 	PTHREAD_CHECK(pthread_cond_destroy(cond));
+}
+static inline void usbi_cond_signal(usbi_cond_t *cond)
+{
+    PTHREAD_CHECK(pthread_cond_signal(cond));
 }
 
 typedef pthread_key_t usbi_tls_key_t;
