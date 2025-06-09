@@ -385,14 +385,14 @@ struct libusb_context {
 	/* A flag to indicate that the context is ready for hotplug notifications */
 	usbi_atomic_t hotplug_ready;
 
+	/* Note paths taking both this and usbi_transfer->lock must always
+	 * take this lock first */
+	usbi_mutex_t flying_transfers_lock;
 	/* this is a list of in-flight transfer handles, sorted by timeout
 	 * expiration. URBs to timeout the soonest are placed at the beginning of
 	 * the list, URBs that will time out later are placed after, and urbs with
 	 * infinite timeout are always placed at the very end. */
 	struct list_head flying_transfers;
-	/* Note paths taking both this and usbi_transfer->lock must always
-	 * take this lock first */
-	usbi_mutex_t flying_transfers_lock; /* for flying_transfers and timeout_flags */
 
 #if !defined(PLATFORM_WINDOWS)
 	/* user callbacks for pollfd changes */
@@ -451,8 +451,8 @@ struct libusb_context {
 extern struct libusb_context *usbi_default_context;
 extern struct libusb_context *usbi_fallback_context;
 
-extern struct list_head active_contexts_list;
 extern usbi_mutex_static_t active_contexts_lock;
+extern struct list_head active_contexts_list;
 
 static inline struct libusb_context *usbi_get_context(struct libusb_context *ctx)
 {
