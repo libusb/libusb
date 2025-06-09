@@ -385,14 +385,14 @@ struct libusb_context {
 	/* A flag to indicate that the context is ready for hotplug notifications */
 	usbi_atomic_t hotplug_ready;
 
+	/* Note paths taking both this and usbi_transfer->lock must always
+	 * take this lock first */
+	usbi_mutex_t flying_transfers_lock;
 	/* this is a list of in-flight transfer handles, sorted by timeout
 	 * expiration. URBs to timeout the soonest are placed at the beginning of
 	 * the list, URBs that will time out later are placed after, and urbs with
 	 * infinite timeout are always placed at the very end. */
 	struct list_head flying_transfers;
-	/* Note paths taking both this and usbi_transfer->lock must always
-	 * take this lock first */
-	usbi_mutex_t flying_transfers_lock; /* for flying_transfers and timeout_flags */
 
 #if !defined(PLATFORM_WINDOWS)
 	/* user callbacks for pollfd changes */
@@ -451,8 +451,8 @@ struct libusb_context {
 extern struct libusb_context *usbi_default_context;
 extern struct libusb_context *usbi_fallback_context;
 
-extern struct list_head active_contexts_list;
 extern usbi_mutex_static_t active_contexts_lock;
+extern struct list_head active_contexts_list;
 
 static inline struct libusb_context *usbi_get_context(struct libusb_context *ctx)
 {
@@ -583,6 +583,17 @@ void usbi_get_real_time(struct timespec *tp);
  */
 
 struct usbi_transfer {
+	/* this lock is held during libusb_submit_transfer() and
+	 * libusb_cancel_transfer() (allowing the OS backend to prevent duplicate
+	 * cancellation, submission-during-cancellation, etc). the OS backend
+	 * should also take this lock in the handle_events path, to prevent the user
+	 * cancelling the transfer from another thread while you are processing
+	 * its completion (presumably there would be races within your OS backend
+	 * if this were possible).
+	 * Note paths taking both this and the flying_transfers_lock must
+	 * always take the flying_transfers_lock first */
+	usbi_mutex_t lock;
+
 	int num_iso_packets;
 	struct list_head list;
 	struct list_head completed_list;
@@ -595,17 +606,6 @@ struct usbi_transfer {
 	/* The device reference is held until destruction for logging
 	 * even after dev_handle is set to NULL.  */
 	struct libusb_device *dev;
-
-	/* this lock is held during libusb_submit_transfer() and
-	 * libusb_cancel_transfer() (allowing the OS backend to prevent duplicate
-	 * cancellation, submission-during-cancellation, etc). the OS backend
-	 * should also take this lock in the handle_events path, to prevent the user
-	 * cancelling the transfer from another thread while you are processing
-	 * its completion (presumably there would be races within your OS backend
-	 * if this were possible).
-	 * Note paths taking both this and the flying_transfers_lock must
-	 * always take the flying_transfers_lock first */
-	usbi_mutex_t lock;
 
 	void *priv;
 };
