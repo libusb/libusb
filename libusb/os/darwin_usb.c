@@ -49,8 +49,6 @@
 
 #include "darwin_usb.h"
 
-static int init_count = 0;
-
 /* Both kIOMasterPortDefault or kIOMainPortDefault are synonyms for 0. */
 static const mach_port_t darwin_default_master_port = 0;
 
@@ -67,6 +65,8 @@ static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for eve
 
 static usbi_mutex_t darwin_cached_devices_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct list_head darwin_cached_devices;
+static int init_count;
+
 static const char *darwin_device_class = "IOUSBDevice";
 
 uint32_t libusb_testonly_fake_running_version __attribute__ ((visibility ("hidden")));
