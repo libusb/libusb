@@ -82,7 +82,7 @@ null_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 }
 
 static int
-null_submit_transfer(struct usbi_transfer *itransfer)
+null_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }

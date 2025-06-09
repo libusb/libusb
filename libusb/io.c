@@ -1794,7 +1794,7 @@ void usbi_signal_transfer_completion(struct usbi_transfer *itransfer)
  * \returns 1 if the lock was not obtained (i.e. another thread holds the lock)
  * \ref libusb_mtasync
  */
-int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
+int API_EXPORTED libusb_try_lock_events(libusb_context *ctx) TRY_ACQUIRE(0, ctx->events_lock)
 {
 	int r;
 	unsigned int ru;
@@ -1837,7 +1837,7 @@ int API_EXPORTED libusb_try_lock_events(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \ref libusb_mtasync
  */
-void API_EXPORTED libusb_lock_events(libusb_context *ctx)
+void API_EXPORTED libusb_lock_events(libusb_context *ctx) ACQUIRE(ctx->events_lock)
 {
 	ctx = usbi_get_context(ctx);
 	usbi_mutex_lock(&ctx->events_lock);
@@ -1852,7 +1852,7 @@ void API_EXPORTED libusb_lock_events(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \ref libusb_mtasync
  */
-void API_EXPORTED libusb_unlock_events(libusb_context *ctx)
+void API_EXPORTED libusb_unlock_events(libusb_context *ctx) RELEASE(ctx->events_lock)
 {
 	ctx = usbi_get_context(ctx);
 	ctx->event_handler_active = 0;
@@ -1981,7 +1981,7 @@ void API_EXPORTED libusb_interrupt_event_handler(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \ref libusb_mtasync
  */
-void API_EXPORTED libusb_lock_event_waiters(libusb_context *ctx)
+void API_EXPORTED libusb_lock_event_waiters(libusb_context *ctx) ACQUIRE(ctx->event_waiters_lock)
 {
 	ctx = usbi_get_context(ctx);
 	usbi_mutex_lock(&ctx->event_waiters_lock);
@@ -1992,7 +1992,7 @@ void API_EXPORTED libusb_lock_event_waiters(libusb_context *ctx)
  * \param ctx the context to operate on, or NULL for the default context
  * \ref libusb_mtasync
  */
-void API_EXPORTED libusb_unlock_event_waiters(libusb_context *ctx)
+void API_EXPORTED libusb_unlock_event_waiters(libusb_context *ctx) RELEASE(ctx->event_waiters_lock)
 {
 	ctx = usbi_get_context(ctx);
 	usbi_mutex_unlock(&ctx->event_waiters_lock);

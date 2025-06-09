@@ -47,11 +47,11 @@ static int default_context_refcnt;
 static usbi_atomic_t default_debug_level = -1;
 #endif
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
-static struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
+static struct usbi_option default_context_options[LIBUSB_OPTION_MAX] GUARDED_BY(default_context_lock);
 
 
 usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
-struct list_head active_contexts_list;
+struct list_head active_contexts_list GUARDED_BY(active_contexts_lock);
 
 /**
  * \mainpage libusb-1.0 API Reference
@@ -1511,7 +1511,7 @@ out:
 }
 
 static void do_close(struct libusb_context *ctx,
-	struct libusb_device_handle *dev_handle)
+	struct libusb_device_handle *dev_handle) EXCLUDES(ctx->flying_transfers_lock)
 {
 	struct usbi_transfer *itransfer;
 	struct usbi_transfer *tmp;
@@ -1789,7 +1789,7 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
  * \see libusb_set_auto_detach_kernel_driver()
  */
 int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
-	int interface_number)
+	int interface_number) EXCLUDES(dev_handle->lock)
 {
 	int r = 0;
 
@@ -1833,7 +1833,7 @@ out:
  * \see libusb_set_auto_detach_kernel_driver()
  */
 int API_EXPORTED libusb_release_interface(libusb_device_handle *dev_handle,
-	int interface_number)
+	int interface_number) EXCLUDES(dev_handle->lock)
 {
 	int r;
 
@@ -1878,7 +1878,7 @@ out:
  * \returns another LIBUSB_ERROR code on other failure
  */
 int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_handle,
-	int interface_number, int alternate_setting)
+	int interface_number, int alternate_setting) EXCLUDES(dev_handle->lock)
 {
 	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d altsetting %d",
 		interface_number, alternate_setting);
@@ -2138,7 +2138,7 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev_handle,
  * \see libusb_kernel_driver_active()
  */
 int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
-	int interface_number)
+	int interface_number) EXCLUDES(dev_handle->lock)
 {
 	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
 
@@ -2174,7 +2174,7 @@ int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
  * \see libusb_kernel_driver_active()
  */
 int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
-	int interface_number)
+	int interface_number) EXCLUDES(dev_handle->lock)
 {
 	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
 
@@ -2213,7 +2213,7 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
  * \see libusb_set_configuration()
  */
 int API_EXPORTED libusb_set_auto_detach_kernel_driver(
-	libusb_device_handle *dev_handle, int enable)
+	libusb_device_handle *dev_handle, int enable) EXCLUDES(dev_handle->lock)
 {
 	if (!(usbi_backend.caps & USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER))
 		return LIBUSB_ERROR_NOT_SUPPORTED;

@@ -1379,7 +1379,7 @@ sunos_destroy_device(struct libusb_device *dev)
 }
 
 int
-sunos_submit_transfer(struct usbi_transfer *itransfer)
+sunos_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct	libusb_transfer *transfer;
 	struct	libusb_device_handle *hdl;

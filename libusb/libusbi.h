@@ -44,6 +44,78 @@
 #define static_assert(cond, msg) _Static_assert(cond, msg)
 #endif
 
+// https://clang.llvm.org/docs/ThreadSafetyAnalysis.html
+// Enable thread safety attributes only with clang.
+// The attributes can be safely erased when compiling with other compilers.
+//
+// https://github.com/llvm/llvm-project/issues/20777
+#if defined(__clang__) && (!defined(SWIG))
+#define THREAD_ANNOTATION_ATTRIBUTE__(x)   __attribute__((x))
+#else
+#define THREAD_ANNOTATION_ATTRIBUTE__(x)   // no-op
+#endif
+
+#define CAPABILITY(x) \
+  THREAD_ANNOTATION_ATTRIBUTE__(capability(x))
+
+#define SCOPED_CAPABILITY \
+  THREAD_ANNOTATION_ATTRIBUTE__(scoped_lockable)
+
+#define GUARDED_BY(x) \
+  THREAD_ANNOTATION_ATTRIBUTE__(guarded_by(x))
+
+#define PT_GUARDED_BY(x) \
+  THREAD_ANNOTATION_ATTRIBUTE__(pt_guarded_by(x))
+
+#define ACQUIRED_BEFORE(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(acquired_before(__VA_ARGS__))
+
+#define ACQUIRED_AFTER(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(acquired_after(__VA_ARGS__))
+
+#define REQUIRES(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(requires_capability(__VA_ARGS__))
+
+#define REQUIRES_SHARED(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(requires_shared_capability(__VA_ARGS__))
+
+#define ACQUIRE(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(acquire_capability(__VA_ARGS__))
+
+#define ACQUIRE_SHARED(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(acquire_shared_capability(__VA_ARGS__))
+
+#define RELEASE(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(release_capability(__VA_ARGS__))
+
+#define RELEASE_SHARED(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(release_shared_capability(__VA_ARGS__))
+
+#define RELEASE_GENERIC(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(release_generic_capability(__VA_ARGS__))
+
+#define TRY_ACQUIRE(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(try_acquire_capability(__VA_ARGS__))
+
+#define TRY_ACQUIRE_SHARED(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(try_acquire_shared_capability(__VA_ARGS__))
+
+#define EXCLUDES(...) \
+  THREAD_ANNOTATION_ATTRIBUTE__(locks_excluded(__VA_ARGS__))
+
+#define ASSERT_CAPABILITY(x) \
+  THREAD_ANNOTATION_ATTRIBUTE__(assert_capability(x))
+
+#define ASSERT_SHARED_CAPABILITY(x) \
+  THREAD_ANNOTATION_ATTRIBUTE__(assert_shared_capability(x))
+
+#define RETURN_CAPABILITY(x) \
+  THREAD_ANNOTATION_ATTRIBUTE__(lock_returned(x))
+
+#define NO_THREAD_SAFETY_ANALYSIS \
+  THREAD_ANNOTATION_ATTRIBUTE__(no_thread_safety_analysis)
+
+
 #ifdef NDEBUG
 #define ASSERT_EQ(expression, value)	(void)expression
 #define ASSERT_NE(expression, value)	(void)expression
@@ -392,7 +464,7 @@ struct libusb_context {
 	 * expiration. URBs to timeout the soonest are placed at the beginning of
 	 * the list, URBs that will time out later are placed after, and urbs with
 	 * infinite timeout are always placed at the very end. */
-	struct list_head flying_transfers;
+	struct list_head flying_transfers GUARDED_BY(flying_transfers_lock);
 
 #if !defined(PLATFORM_WINDOWS)
 	/* user callbacks for pollfd changes */
@@ -452,7 +524,7 @@ extern struct libusb_context *usbi_default_context;
 extern struct libusb_context *usbi_fallback_context;
 
 extern usbi_mutex_static_t active_contexts_lock;
-extern struct list_head active_contexts_list;
+extern struct list_head active_contexts_list GUARDED_BY(active_contexts_lock);
 
 static inline struct libusb_context *usbi_get_context(struct libusb_context *ctx)
 {
@@ -530,7 +602,7 @@ struct libusb_device {
 struct libusb_device_handle {
 	/* lock protects claimed_interfaces */
 	usbi_mutex_t lock;
-	unsigned long claimed_interfaces;
+	unsigned long claimed_interfaces GUARDED_BY(lock);
 
 	struct list_head list;
 	struct libusb_device *dev;
@@ -602,7 +674,7 @@ struct usbi_transfer {
 	struct timespec timeout;
 	int transferred;
 	uint32_t stream_id;
-	uint32_t state_flags;   /* Protected by usbi_transfer->lock */
+	uint32_t state_flags GUARDED_BY(lock);   /* Protected by usbi_transfer->lock */
 	uint32_t timeout_flags; /* Protected by the flying_transfers_lock */
 
 	/* The device reference is held until destruction for logging

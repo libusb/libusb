@@ -740,7 +740,7 @@ void em_destroy_device(libusb_device* dev) {
 	WebUsbDevicePtr(dev).free();
 }
 
-int em_submit_transfer(usbi_transfer* itransfer) {
+int em_submit_transfer(usbi_transfer* itransfer) REQUIRES(itransfer->lock) {
 	return runOnMain([itransfer] {
 		auto transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 		auto& web_usb_device = WebUsbDevicePtr(transfer->dev_handle)
