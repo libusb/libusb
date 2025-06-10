@@ -41,6 +41,7 @@ typedef SSIZE_T ssize_t;
 #endif /* _SSIZE_T_DEFINED */
 #endif /* _MSC_VER */
 
+#include <assert.h>
 #include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -1945,13 +1946,14 @@ uint32_t LIBUSB_CALL libusb_transfer_get_stream_id(
  * \param buffer data buffer. If provided, this function will interpret the
  * first 8 bytes as a setup packet and infer the transfer length from that.
  * This pointer must be aligned to at least 2 bytes boundary.
+ * \param length length of data buffer in bytes
  * \param callback callback function to be invoked on transfer completion
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
 static inline void libusb_fill_control_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
-	unsigned char *buffer, libusb_transfer_cb_fn callback, void *user_data,
+	unsigned char * /*__sized_by_or_null(length)*/ buffer, int length, libusb_transfer_cb_fn callback, void *user_data,
 	unsigned int timeout)
 {
 	struct libusb_control_setup *setup = (struct libusb_control_setup *)(void *)buffer;
@@ -1961,8 +1963,7 @@ static inline void libusb_fill_control_transfer(
 	transfer->timeout = timeout;
 	if (setup)
 	{
-		int length = (int) (LIBUSB_CONTROL_SETUP_SIZE
-			+ libusb_le16_to_cpu(setup->wLength));
+		assert (length >= (int) (LIBUSB_CONTROL_SETUP_SIZE + libusb_le16_to_cpu(setup->wLength));
 		transfer->buffer = buffer;
 		transfer->length = length;
 	}
