@@ -45,6 +45,7 @@ typedef SSIZE_T ssize_t;
 #endif /* _SSIZE_T_DEFINED */
 #endif /* _MSC_VER */
 
+#include <assert.h>
 #include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -1537,7 +1538,7 @@ struct libusb_transfer {
 	 * of the following functions:
 	 * - libusb_fill_bulk_transfer()
 	 * - libusb_fill_bulk_stream_transfer()
-	 * - libusb_fill_control_transfer()
+	 * - libusb_fill_control_transfer2()
 	 * - libusb_fill_interrupt_transfer()
 	 * - libusb_fill_iso_transfer() */
 	void *user_data;
@@ -1962,10 +1963,10 @@ uint32_t LIBUSB_CALL libusb_transfer_get_stream_id(
  * Helper function to populate the required \ref libusb_transfer fields
  * for a control transfer.
  *
- * If you pass a transfer buffer to this function, the first 8 bytes will
- * be interpreted as a control setup packet, and the wLength field will be
- * used to automatically populate the \ref libusb_transfer::length "length"
- * field of the transfer. Therefore the recommended approach is:
+ * If you pass a transfer buffer and its length to this function, they will be
+ * used to populate the \ref libusb_transfer::buffer "buffer" and
+ * \ref libusb_transfer::length "length" fields of the transfer.
+ * The recommended approach is:
  * -# Allocate a suitably sized data buffer (including space for control setup)
  * -# Call libusb_fill_control_setup()
  * -# If this is a host-to-device transfer with a data stage, put the data
@@ -1974,18 +1975,48 @@ uint32_t LIBUSB_CALL libusb_transfer_get_stream_id(
  * -# Call libusb_submit_transfer()
  *
  * It is also legal to pass a NULL buffer to this function, in which case this
- * function will not attempt to populate the length field. Remember that you
- * must then populate the buffer and length fields later.
+ * function will populate the buffer and length fields as NULL and 0.
+ * Remember that you must then populate the buffer and length fields later.
  *
  * \param transfer the transfer to populate
  * \param dev_handle handle of the device that will handle the transfer
- * \param buffer data buffer. If provided, this function will interpret the
- * first 8 bytes as a setup packet and infer the transfer length from that.
+ * \param buffer Optional data buffer.
  * This pointer must be aligned to at least 2 bytes boundary.
+ * \param length length of data buffer in bytes
  * \param callback callback function to be invoked on transfer completion
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
+static inline void libusb_fill_control_transfer2(
+	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
+	unsigned char *buffer, int length, libusb_transfer_cb_fn callback, void *user_data,
+	unsigned int timeout)
+{
+	transfer->dev_handle = dev_handle;
+	transfer->endpoint = 0;
+	transfer->type = LIBUSB_TRANSFER_TYPE_CONTROL;
+	transfer->timeout = timeout;
+	if (buffer)
+	{
+#ifndef NDEBUG
+		struct libusb_control_setup *setup = (struct libusb_control_setup *)(void *)buffer;
+		assert (length == (int) (LIBUSB_CONTROL_SETUP_SIZE
+			+ libusb_le16_to_cpu(setup->wLength)));
+#endif
+
+		transfer->buffer = buffer;
+		transfer->length = length;
+	}
+	else
+	{
+		transfer->buffer = NULL;
+		transfer->length = 0;
+	}
+	transfer->user_data = user_data;
+	transfer->callback = callback;
+}
+
+LIBUSB_DEPRECATED_FOR(libusb_fill_control_transfer2)
 static inline void libusb_fill_control_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char *buffer, libusb_transfer_cb_fn callback, void *user_data,
