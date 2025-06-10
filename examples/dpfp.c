@@ -335,7 +335,7 @@ static int set_mode_async(unsigned char data)
 	printf("async set mode %02x\n", data);
 	libusb_fill_control_setup(buf, CTRL_OUT, USB_RQ, 0x4e, 0, 1);
 	buf[LIBUSB_CONTROL_SETUP_SIZE] = data;
-	libusb_fill_control_transfer(transfer, devh, buf, cb_mode_changed, NULL,
+	libusb_fill_control_transfer(transfer, devh, buf, LIBUSB_CONTROL_SETUP_SIZE + 1, cb_mode_changed, NULL,
 		1000);
 
 	transfer->flags = LIBUSB_TRANSFER_SHORT_NOT_OK
