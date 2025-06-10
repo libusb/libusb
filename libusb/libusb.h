@@ -666,7 +666,7 @@ struct libusb_endpoint_descriptor {
 
 	/** Extra descriptors. If libusb encounters unknown endpoint descriptors,
 	 * it will store them here, should you wish to parse them. */
-	const unsigned char *extra;
+	const unsigned char *extra __counted_by(extra_length);
 
 	/** Length of the extra descriptors, in bytes. Must be non-negative. */
 	int extra_length;
@@ -725,7 +725,7 @@ struct libusb_interface_association_descriptor_array {
 	/** Array of interface association descriptors. The size of this array
 	 * is determined by the length field.
 	 */
-	const struct libusb_interface_association_descriptor *iad;
+	const struct libusb_interface_association_descriptor * __sized_by(length) iad;
 
 	/** Number of interface association descriptors contained. Read-only. */
 	int length;
@@ -771,11 +771,11 @@ struct libusb_interface_descriptor {
 
 	/** Array of endpoint descriptors. This length of this array is determined
 	 * by the bNumEndpoints field. */
-	const struct libusb_endpoint_descriptor *endpoint;
+	const struct libusb_endpoint_descriptor * __counted_by(bNumEndpoints) endpoint;
 
 	/** Extra descriptors. If libusb encounters unknown interface descriptors,
 	 * it will store them here, should you wish to parse them. */
-	const unsigned char *extra;
+	const unsigned char * __sized_by_or_null(extra_length) extra;
 
 	/** Length of the extra descriptors, in bytes. Must be non-negative. */
 	int extra_length;
@@ -787,7 +787,7 @@ struct libusb_interface_descriptor {
 struct libusb_interface {
 	/** Array of interface descriptors. The length of this array is determined
 	 * by the num_altsetting field. */
-	const struct libusb_interface_descriptor *altsetting;
+	const struct libusb_interface_descriptor * __counted_by(num_altsetting) altsetting;
 
 	/** The number of alternate settings that belong to this interface.
 	 * Must be non-negative. */
@@ -831,11 +831,11 @@ struct libusb_config_descriptor {
 
 	/** Array of interfaces supported by this configuration. The length of
 	 * this array is determined by the bNumInterfaces field. */
-	const struct libusb_interface *interface;
+	const struct libusb_interface * __counted_by(bNumInterfaces) interface;
 
 	/** Extra descriptors. If libusb encounters unknown configuration
 	 * descriptors, it will store them here, should you wish to parse them. */
-	const unsigned char *extra;
+	const unsigned char * __sized_by_or_null(extra_length) extra;
 
 	/** Length of the extra descriptors, in bytes. Must be non-negative. */
 	int extra_length;
@@ -889,7 +889,7 @@ struct libusb_bos_dev_capability_descriptor {
 	uint8_t  bDevCapabilityType;
 
 	/** Device Capability data (bLength - 3 bytes) */
-	uint8_t  dev_capability_data[LIBUSB_FLEXIBLE_ARRAY];
+	uint8_t  dev_capability_data[LIBUSB_FLEXIBLE_ARRAY] __counted_by(bLength - 3);
 };
 
 /** \ingroup libusb_desc
@@ -914,7 +914,7 @@ struct libusb_bos_descriptor {
 	uint8_t  bNumDeviceCaps;
 
 	/** bNumDeviceCap Device Capability Descriptors */
-	struct libusb_bos_dev_capability_descriptor *dev_capability[LIBUSB_FLEXIBLE_ARRAY];
+	struct libusb_bos_dev_capability_descriptor *dev_capability[LIBUSB_FLEXIBLE_ARRAY] __counted_by(bNumDeviceCaps);
 };
 
 /** \ingroup libusb_desc
@@ -1076,7 +1076,7 @@ struct libusb_ssplus_usb_device_capability_descriptor {
 	uint8_t minTxLaneCount;
 
 	/** Array size is \ref libusb_ssplus_usb_device_capability_descriptor.numSublinkSpeedAttributes */
-	struct libusb_ssplus_sublink_attribute sublinkSpeedAttributes[];
+	struct libusb_ssplus_sublink_attribute sublinkSpeedAttributes[] __counted_by(numSublinkSpeedAttributes);
 };
 
 /** \ingroup libusb_desc
@@ -1130,7 +1130,7 @@ struct libusb_platform_descriptor {
 	uint8_t  PlatformCapabilityUUID[16];
 
 	/** Capability data (bLength - 20) */
-	uint8_t  CapabilityData[LIBUSB_FLEXIBLE_ARRAY];
+	uint8_t  CapabilityData[LIBUSB_FLEXIBLE_ARRAY] __counted_by(bLength - 20);
 };
 
 /** \ingroup libusb_asyncio
@@ -1481,7 +1481,7 @@ struct libusb_transfer {
 	 * to determine if errors occurred. */
 	enum libusb_transfer_status status;
 
-	/** Length of the data buffer. Must be non-negative. */
+	/** Length of the data buffer in bytes. Must be non-negative. */
 	int length;
 
 	/** Actual length of data that was transferred. Read-only, and only for
@@ -1506,14 +1506,14 @@ struct libusb_transfer {
 	void *user_data;
 
 	/** Data buffer */
-	unsigned char *buffer;
+	unsigned char *buffer __sized_by(length);
 
 	/** Number of isochronous packets. Only used for I/O with isochronous
 	 * endpoints. Must be non-negative. */
 	int num_iso_packets;
 
 	/** Isochronous packet descriptors, for isochronous transfers only. */
-	struct libusb_iso_packet_descriptor iso_packet_desc[LIBUSB_FLEXIBLE_ARRAY];
+	struct libusb_iso_packet_descriptor iso_packet_desc[LIBUSB_FLEXIBLE_ARRAY] __counted_by(num_iso_packets);
 };
 
 /** \ingroup libusb_misc
@@ -1699,7 +1699,7 @@ struct libusb_init_option {
 };
 
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
-int LIBUSB_CALL libusb_init_context(libusb_context **ctx, const struct libusb_init_option options[], int num_options);
+int LIBUSB_CALL libusb_init_context(libusb_context **ctx, const struct libusb_init_option options[__counted_by_or_null(num_options)], int num_options);
 void LIBUSB_CALL libusb_exit(libusb_context *ctx);
 void LIBUSB_CALL libusb_set_debug(libusb_context *ctx, int level);
 /* may be deprecated in the future in favor of lubusb_init_context()+libusb_set_option() */
@@ -1718,7 +1718,7 @@ libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev);
 void LIBUSB_CALL libusb_unref_device(libusb_device *dev);
 
 int LIBUSB_CALL libusb_get_device_string(libusb_device *dev,
-	enum libusb_device_string_type string_type, char *data, int length);
+	enum libusb_device_string_type string_type, char * __sized_by(length) data, int length);
 int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
 	int *config);
 int LIBUSB_CALL libusb_get_device_descriptor(libusb_device *dev,
@@ -1771,9 +1771,9 @@ void LIBUSB_CALL libusb_free_platform_descriptor(
 unsigned long LIBUSB_CALL libusb_get_session_data(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_port_number(libusb_device *dev);
-int LIBUSB_CALL libusb_get_port_numbers(libusb_device *dev, uint8_t *port_numbers, int port_numbers_len);
+int LIBUSB_CALL libusb_get_port_numbers(libusb_device *dev, uint8_t * __counted_by(port_numbers_len) port_numbers, int port_numbers_len);
 LIBUSB_DEPRECATED_FOR(libusb_get_port_numbers)
-int LIBUSB_CALL libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t *path, uint8_t path_length);
+int LIBUSB_CALL libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t * __counted_by(path_length) path, uint8_t path_length);
 libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev);
 uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *dev);
 int LIBUSB_CALL libusb_get_device_speed(libusb_device *dev);
@@ -1975,14 +1975,14 @@ static inline void libusb_fill_control_transfer(
  * \param dev_handle handle of the device that will handle the transfer
  * \param endpoint address of the endpoint where this transfer will be sent
  * \param buffer data buffer
- * \param length length of data buffer
+ * \param length length of data buffer in bytes
  * \param callback callback function to be invoked on transfer completion
  * \param user_data user data to pass to callback function
  * \param timeout timeout for the transfer in milliseconds
  */
 static inline void libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
 	libusb_device_handle *dev_handle, unsigned char endpoint,
-	unsigned char *buffer, int length, libusb_transfer_cb_fn callback,
+	unsigned char * __sized_by_or_null(length) buffer, int length, libusb_transfer_cb_fn callback,
 	void *user_data, unsigned int timeout)
 {
 	transfer->dev_handle = dev_handle;
@@ -2014,7 +2014,7 @@ static inline void libusb_fill_bulk_transfer(struct libusb_transfer *transfer,
 static inline void libusb_fill_bulk_stream_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
 	unsigned char endpoint, uint32_t stream_id,
-	unsigned char *buffer, int length, libusb_transfer_cb_fn callback,
+	unsigned char * __sized_by_or_null(length) buffer, int length, libusb_transfer_cb_fn callback,
 	void *user_data, unsigned int timeout)
 {
 	libusb_fill_bulk_transfer(transfer, dev_handle, endpoint, buffer,
@@ -2038,7 +2038,7 @@ static inline void libusb_fill_bulk_stream_transfer(
  */
 static inline void libusb_fill_interrupt_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
-	unsigned char endpoint, unsigned char *buffer, int length,
+	unsigned char endpoint, unsigned char * __sized_by_or_null(length) buffer, int length,
 	libusb_transfer_cb_fn callback, void *user_data, unsigned int timeout)
 {
 	transfer->dev_handle = dev_handle;
@@ -2067,7 +2067,7 @@ static inline void libusb_fill_interrupt_transfer(
  */
 static inline void libusb_fill_iso_transfer(struct libusb_transfer *transfer,
 	libusb_device_handle *dev_handle, unsigned char endpoint,
-	unsigned char *buffer, int length, int num_iso_packets,
+	unsigned char * __sized_by_or_null(length) buffer, int length, int num_iso_packets,
 	libusb_transfer_cb_fn callback, void *user_data, unsigned int timeout)
 {
 	transfer->dev_handle = dev_handle;
@@ -2178,14 +2178,14 @@ static inline unsigned char *libusb_get_iso_packet_buffer_simple(
 
 int LIBUSB_CALL libusb_control_transfer(libusb_device_handle *dev_handle,
 	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
-	unsigned char *data, uint16_t wLength, unsigned int timeout);
+										unsigned char *__sized_by(wLength) data, uint16_t wLength, unsigned int timeout);
 
 int LIBUSB_CALL libusb_bulk_transfer(libusb_device_handle *dev_handle,
-	unsigned char endpoint, unsigned char *data, int length,
+	unsigned char endpoint, unsigned char *__sized_by(length) data, int length,
 	int *transferred, unsigned int timeout);
 
 int LIBUSB_CALL libusb_interrupt_transfer(libusb_device_handle *dev_handle,
-	unsigned char endpoint, unsigned char *data, int length,
+	unsigned char endpoint, unsigned char *__sized_by(length) data, int length,
 	int *transferred, unsigned int timeout);
 
 /** \ingroup libusb_desc
@@ -2201,7 +2201,7 @@ int LIBUSB_CALL libusb_interrupt_transfer(libusb_device_handle *dev_handle,
  * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
  */
 static inline int libusb_get_descriptor(libusb_device_handle *dev_handle,
-	uint8_t desc_type, uint8_t desc_index, unsigned char *data, int length)
+	uint8_t desc_type, uint8_t desc_index, unsigned char * __sized_by(length) data, int length)
 {
 	return libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_IN,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, (uint16_t) ((desc_type << 8) | desc_index),
@@ -2223,7 +2223,7 @@ static inline int libusb_get_descriptor(libusb_device_handle *dev_handle,
  * \see libusb_get_string_descriptor_ascii()
  */
 static inline int libusb_get_string_descriptor(libusb_device_handle *dev_handle,
-	uint8_t desc_index, uint16_t langid, unsigned char *data, int length)
+	uint8_t desc_index, uint16_t langid, unsigned char * __sized_by(length) data, int length)
 {
 	return libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_IN,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, (uint16_t)((LIBUSB_DT_STRING << 8) | desc_index),
@@ -2231,7 +2231,7 @@ static inline int libusb_get_string_descriptor(libusb_device_handle *dev_handle,
 }
 
 int LIBUSB_CALL libusb_get_string_descriptor_ascii(libusb_device_handle *dev_handle,
-	uint8_t desc_index, unsigned char *data, int length);
+												   uint8_t desc_index, unsigned char *__sized_by(length) data, int length);
 
 /* polling and timeouts */
 

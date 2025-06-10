@@ -684,7 +684,7 @@ static int windows_get_active_config_descriptor(struct libusb_device *dev,
 }
 
 static int windows_get_config_descriptor(struct libusb_device *dev,
-	uint8_t config_index, void *buffer, size_t len)
+	uint8_t config_index, void * __sized_by(len) buffer, size_t len)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
 	return priv->backend->get_config_descriptor(dev, config_index, buffer, len);

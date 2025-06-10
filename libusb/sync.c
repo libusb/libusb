@@ -102,7 +102,7 @@ static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
  */
 int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
-	unsigned char *data, uint16_t wLength, unsigned int timeout)
+	unsigned char * __sized_by(wLength) data, uint16_t wLength, unsigned int timeout)
 {
 	struct libusb_transfer *transfer;
 	unsigned char *buffer;
@@ -173,7 +173,7 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 }
 
 static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
-	unsigned char endpoint, unsigned char *buffer, int length,
+	unsigned char endpoint, unsigned char * __sized_by_or_null(length) buffer, int length,
 	int *transferred, unsigned int timeout, unsigned char type)
 {
 	struct libusb_transfer *transfer;
@@ -280,7 +280,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
  * \returns another LIBUSB_ERROR code on other failures
  */
 int API_EXPORTED libusb_bulk_transfer(libusb_device_handle *dev_handle,
-	unsigned char endpoint, unsigned char *data, int length,
+	unsigned char endpoint, unsigned char * __sized_by(length) data, int length,
 	int *transferred, unsigned int timeout)
 {
 	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
@@ -334,7 +334,7 @@ int API_EXPORTED libusb_bulk_transfer(libusb_device_handle *dev_handle,
  * \returns another LIBUSB_ERROR code on other error
  */
 int API_EXPORTED libusb_interrupt_transfer(libusb_device_handle *dev_handle,
-	unsigned char endpoint, unsigned char *data, int length,
+	unsigned char endpoint, unsigned char * __sized_by(length) data, int length,
 	int *transferred, unsigned int timeout)
 {
 	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,

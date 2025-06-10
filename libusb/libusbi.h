@@ -436,7 +436,7 @@ struct libusb_context {
 
 	/* A pointer and count to platform-specific data used for monitoring event
 	 * sources. Only accessed during event handling. */
-	void *event_data;
+	void *event_data __sized_by_or_null(event_data_cnt);
 	unsigned int event_data_cnt;
 
 	/* A list of pending hotplug messages. Protected by event_data_lock. */
@@ -707,7 +707,7 @@ struct usbi_interface_descriptor {
 struct usbi_string_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
-	uint16_t wData[LIBUSB_FLEXIBLE_ARRAY];
+	uint16_t wData[LIBUSB_FLEXIBLE_ARRAY] __counted_by((bLength - 2) / 2);
 } LIBUSB_PACKED;
 
 struct usbi_bos_descriptor {
@@ -926,7 +926,7 @@ static inline void *usbi_get_transfer_priv(struct usbi_transfer *itransfer)
 struct discovered_devs {
 	size_t len;
 	size_t capacity;
-	struct libusb_device *devices[LIBUSB_FLEXIBLE_ARRAY];
+	struct libusb_device *devices[LIBUSB_FLEXIBLE_ARRAY] __counted_by(capacity);
 };
 
 struct discovered_devs *discovered_devs_append(
@@ -1051,7 +1051,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*get_device_string)(libusb_device *dev,
-		enum libusb_device_string_type string_type, char *data, int length);
+		enum libusb_device_string_type string_type, char * __sized_by(length) data, int length);
 
 	/* Apps which were written before hotplug support, may listen for
 	 * hotplug events on their own and call libusb_get_device_list on
@@ -1155,7 +1155,7 @@ struct usbi_os_backend {
 	 * - another LIBUSB_ERROR code on other failure
 	 */
 	int (*get_active_config_descriptor)(struct libusb_device *device,
-		void *buffer, size_t len);
+		void * __sized_by(len) buffer, size_t len);
 
 	/* Get a specific configuration descriptor for a device.
 	 *
@@ -1178,7 +1178,7 @@ struct usbi_os_backend {
 	 * Return the length read on success or a LIBUSB_ERROR code on failure.
 	 */
 	int (*get_config_descriptor)(struct libusb_device *device,
-		uint8_t config_index, void *buffer, size_t len);
+		uint8_t config_index, void * __sized_by(len) buffer, size_t len);
 
 	/* Like get_config_descriptor but then by bConfigurationValue instead
 	 * of by index.
@@ -1495,7 +1495,7 @@ struct usbi_os_backend {
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */
 	int (*handle_events)(struct libusb_context *ctx,
-		void *event_data, unsigned int count, unsigned int num_ready);
+		void * __sized_by(count) event_data, unsigned int count, unsigned int num_ready);
 
 	/* Handle transfer completion. Optional.
 	 *

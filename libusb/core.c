@@ -980,7 +980,7 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
  * \returns \ref LIBUSB_ERROR_OVERFLOW if the array is too small
  */
 int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
-	uint8_t *port_numbers, int port_numbers_len)
+	uint8_t * __counted_by(port_numbers_len) port_numbers, int port_numbers_len)
 {
 	int i = port_numbers_len;
 	struct libusb_context *ctx = DEVICE_CTX(dev);
@@ -1006,7 +1006,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
  * \deprecated Please use \ref libusb_get_port_numbers() instead.
  */
 int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
-	uint8_t *port_numbers, uint8_t port_numbers_len)
+	uint8_t * __counted_by(port_numbers_len) port_numbers, uint8_t port_numbers_len)
 {
 	UNUSED(ctx);
 
@@ -2563,7 +2563,7 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
  * \see libusb_contexts
  */
-int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_init_option options[], int num_options)
+int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_init_option options[__counted_by_or_null(num_options)], int num_options)
 {
 	size_t priv_size = usbi_backend.context_priv_size;
 	struct libusb_context *_ctx;
