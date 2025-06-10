@@ -130,7 +130,7 @@ static int ezusb_write(libusb_device_handle *device, const char *label,
 	if (verbose > 1)
 		logerror("%s, addr 0x%08x len %4u (0x%04x)\n", label, addr, (unsigned)len, (unsigned)len);
 	status = libusb_control_transfer(device,
-		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
+		(uint8_t)LIBUSB_ENDPOINT_OUT | (uint8_t)LIBUSB_REQUEST_TYPE_VENDOR | (uint8_t)LIBUSB_RECIPIENT_DEVICE,
 		opcode, addr & 0xFFFF, addr >> 16,
 		(unsigned char*)data, (uint16_t)len, 1000);
 	if (status != (signed)len) {
@@ -157,7 +157,7 @@ static int ezusb_read(libusb_device_handle *device, const char *label,
 	if (verbose > 1)
 		logerror("%s, addr 0x%08x len %4u (0x%04x)\n", label, addr, (unsigned)len, (unsigned)len);
 	status = libusb_control_transfer(device,
-		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
+		(uint8_t)LIBUSB_ENDPOINT_IN | (uint8_t)LIBUSB_REQUEST_TYPE_VENDOR | (uint8_t)LIBUSB_RECIPIENT_DEVICE,
 		opcode, addr & 0xFFFF, addr >> 16,
 		(unsigned char*)data, (uint16_t)len, 1000);
 	if (status != (signed)len) {
@@ -185,7 +185,7 @@ static bool ezusb_cpucs(libusb_device_handle *device, uint32_t addr, bool doRun)
 	if (verbose)
 		logerror("%s\n", data ? "stop CPU" : "reset CPU");
 	status = libusb_control_transfer(device,
-		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
+		(uint8_t)LIBUSB_ENDPOINT_OUT | (uint8_t)LIBUSB_REQUEST_TYPE_VENDOR | (uint8_t)LIBUSB_RECIPIENT_DEVICE,
 		RW_INTERNAL, addr & 0xFFFF, addr >> 16,
 		&data, 1, 1000);
 	if ((status != 1) &&
@@ -213,7 +213,7 @@ static bool ezusb_fx3_jump(libusb_device_handle *device, uint32_t addr)
 	if (verbose)
 		logerror("transfer execution to Program Entry at 0x%08x\n", addr);
 	status = libusb_control_transfer(device,
-		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_RECIPIENT_DEVICE,
+		(uint8_t)LIBUSB_ENDPOINT_OUT | (uint8_t)LIBUSB_REQUEST_TYPE_VENDOR | (uint8_t)LIBUSB_RECIPIENT_DEVICE,
 		RW_INTERNAL, addr & 0xFFFF, addr >> 16,
 		NULL, 0, 1000);
 	/* We may get an I/O error from libusb as the device disappears */
