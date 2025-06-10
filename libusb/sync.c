@@ -108,6 +108,7 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 {
 	struct libusb_transfer *transfer;
 	unsigned char *buffer;
+	int buffer_size;
 	int completed = 0;
 	int r;
 
@@ -118,19 +119,17 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 	if (!transfer)
 		return LIBUSB_ERROR_NO_MEM;
 
-	buffer = (unsigned char *)malloc(LIBUSB_CONTROL_SETUP_SIZE + wLength);
+	buffer_size = LIBUSB_CONTROL_SETUP_SIZE + wLength;
+	buffer = (unsigned char *)malloc(buffer_size);
 	if (!buffer) {
 		libusb_free_transfer(transfer);
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	libusb_fill_control_setup(buffer, bmRequestType, bRequest, wValue, wIndex,
-		wLength);
+	libusb_fill_control_transfer3(transfer, dev_handle, buffer, buffer_size,
+		sync_transfer_cb, &completed, timeout, bmRequestType, bRequest, wValue, wIndex);
 	if ((bmRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_OUT)
 		memcpy(buffer + LIBUSB_CONTROL_SETUP_SIZE, data, wLength);
-
-	libusb_fill_control_transfer(transfer, dev_handle, buffer,
-		sync_transfer_cb, &completed, timeout);
 	transfer->flags = LIBUSB_TRANSFER_FREE_BUFFER;
 	r = libusb_submit_transfer(transfer);
 	if (r < 0) {

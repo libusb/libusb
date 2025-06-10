@@ -249,7 +249,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  * callback function, etc.
  *
  * You can either fill the required fields yourself or you can use the
- * helper functions: libusb_fill_control_transfer(), libusb_fill_bulk_transfer()
+ * helper functions: libusb_fill_control_transfer3(), libusb_fill_bulk_transfer()
  * and libusb_fill_interrupt_transfer().
  *
  * \subsection asyncsubmit Submission
@@ -385,16 +385,10 @@ if (r == 0 && actual_length == sizeof(data)) {
  * If you use the helper functions, this is simplified for you:
  * -# Allocate a buffer of size LIBUSB_CONTROL_SETUP_SIZE plus the size of the
  * data you are sending/requesting.
- * -# Call libusb_fill_control_setup() on the data buffer, using the transfer
- * request size as the wLength value (i.e. do not include the extra space you
- * allocated for the control setup).
+ * -# Call libusb_fill_control_transfer3() to associate the data buffer with
+ * the transfer (and to set the remaining details such as callback and timeout).
  * -# If this is a host-to-device transfer, place the data to be transferred
  * in the data buffer, starting at offset LIBUSB_CONTROL_SETUP_SIZE.
- * -# Call libusb_fill_control_transfer() to associate the data buffer with
- * the transfer (and to set the remaining details such as callback and timeout).
- *   - Note that there is no parameter to set the length field of the transfer.
- *     The length is automatically inferred from the wLength field of the setup
- *     packet.
  * -# Submit the transfer.
  *
  * The multi-byte control setup fields (wValue, wIndex and wLength) must
@@ -841,9 +835,8 @@ void myfunc() {
 	int completed = 0;
 
 	transfer = libusb_alloc_transfer(0);
-	libusb_fill_control_setup(buffer,
-		LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT, 0x04, 0x01, 0, 0);
-	libusb_fill_control_transfer(transfer, dev, buffer, cb, &completed, 1000);
+	libusb_fill_control_transfer3(transfer, dev, buffer, sizeof(buffer), cb, &completed, 1000,
+				      LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT, 0x04, 0x01, 0);
 	libusb_submit_transfer(transfer);
 
 	while (!completed) {
@@ -1676,6 +1669,39 @@ uint32_t API_EXPORTED libusb_transfer_get_stream_id(
 		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 
 	return itransfer->stream_id;
+}
+
+void API_EXPORTED libusb_fill_control_transfer3(
+	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
+	unsigned char *buffer, int buffer_len, libusb_transfer_cb_fn callback, void *user_data,
+	unsigned int timeout, uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex)
+{
+	assert(transfer);
+	assert(dev_handle);
+	assert((buffer && buffer_len >= (int)LIBUSB_CONTROL_SETUP_SIZE) ||
+	       (!buffer && buffer_len == 0));
+	assert(buffer_len <= UINT16_MAX + (int)LIBUSB_CONTROL_SETUP_SIZE);
+
+	/* Populate the libusb_control_setup struct from the given parameters. */
+	if (buffer)
+	{
+		struct libusb_control_setup *setup = (struct libusb_control_setup *)(void *)buffer;
+		setup->bmRequestType = bmRequestType;
+		setup->bRequest = bRequest;
+		setup->wValue = libusb_cpu_to_le16(wValue);
+		setup->wIndex = libusb_cpu_to_le16(wIndex);
+		setup->wLength = libusb_cpu_to_le16((uint16_t)buffer_len - (uint16_t)LIBUSB_CONTROL_SETUP_SIZE);
+	}
+
+	/* Populate the libusb_transfer struct from the given parameters. */
+	transfer->dev_handle = dev_handle;
+	transfer->endpoint = 0;
+	transfer->type = LIBUSB_TRANSFER_TYPE_CONTROL;
+	transfer->timeout = timeout;
+	transfer->buffer = buffer;
+	transfer->length = buffer_len;
+	transfer->user_data = user_data;
+	transfer->callback = callback;
 }
 
 /* Handle completion of a transfer (completion might be an error condition).

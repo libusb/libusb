@@ -320,7 +320,8 @@ static void LIBUSB_CALL cb_mode_changed(struct libusb_transfer *transfer)
 
 static int set_mode_async(unsigned char data)
 {
-	unsigned char *buf = (unsigned char *)malloc(LIBUSB_CONTROL_SETUP_SIZE + 1);
+	size_t bufsize = LIBUSB_CONTROL_SETUP_SIZE + 1;
+	unsigned char *buf = (unsigned char *)malloc(bufsize);
 	struct libusb_transfer *transfer;
 
 	if (!buf) {
@@ -336,10 +337,9 @@ static int set_mode_async(unsigned char data)
 	}
 
 	printf("async set mode %02x\n", data);
-	libusb_fill_control_setup(buf, CTRL_OUT, USB_RQ, 0x4e, 0, 1);
+	libusb_fill_control_transfer3(transfer, devh, buf, (int)bufsize, cb_mode_changed, NULL,
+		1000, CTRL_OUT, USB_RQ, 0x4e, 0);
 	buf[LIBUSB_CONTROL_SETUP_SIZE] = data;
-	libusb_fill_control_transfer(transfer, devh, buf, cb_mode_changed, NULL,
-		1000);
 
 	transfer->flags = LIBUSB_TRANSFER_SHORT_NOT_OK
 		| LIBUSB_TRANSFER_FREE_BUFFER | LIBUSB_TRANSFER_FREE_TRANSFER;
