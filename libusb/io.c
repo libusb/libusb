@@ -249,7 +249,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  * callback function, etc.
  *
  * You can either fill the required fields yourself or you can use the
- * helper functions: libusb_fill_control_transfer(), libusb_fill_bulk_transfer()
+ * helper functions: libusb_fill_control_transfer2(), libusb_fill_bulk_transfer()
  * and libusb_fill_interrupt_transfer().
  *
  * \subsection asyncsubmit Submission
@@ -390,11 +390,8 @@ if (r == 0 && actual_length == sizeof(data)) {
  * allocated for the control setup).
  * -# If this is a host-to-device transfer, place the data to be transferred
  * in the data buffer, starting at offset LIBUSB_CONTROL_SETUP_SIZE.
- * -# Call libusb_fill_control_transfer() to associate the data buffer with
+ * -# Call libusb_fill_control_transfer2() to associate the data buffer with
  * the transfer (and to set the remaining details such as callback and timeout).
- *   - Note that there is no parameter to set the length field of the transfer.
- *     The length is automatically inferred from the wLength field of the setup
- *     packet.
  * -# Submit the transfer.
  *
  * The multi-byte control setup fields (wValue, wIndex and wLength) must
@@ -843,7 +840,7 @@ void myfunc() {
 	transfer = libusb_alloc_transfer(0);
 	libusb_fill_control_setup(buffer,
 		LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT, 0x04, 0x01, 0, 0);
-	libusb_fill_control_transfer(transfer, dev, buffer, cb, &completed, 1000);
+	libusb_fill_control_transfer2(transfer, dev, buffer, sizeof(buffer), cb, &completed, 1000);
 	libusb_submit_transfer(transfer);
 
 	while (!completed) {
