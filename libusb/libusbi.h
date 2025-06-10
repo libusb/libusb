@@ -436,7 +436,7 @@ struct libusb_context {
 
 	/* A pointer and count to platform-specific data used for monitoring event
 	 * sources. Only accessed during event handling. */
-	void *event_data;
+	void *event_data __sized_by(event_data_cnt);
 	unsigned int event_data_cnt;
 
 	/* A list of pending hotplug messages. Protected by event_data_lock. */
@@ -705,7 +705,7 @@ struct usbi_interface_descriptor {
 struct usbi_string_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
-	uint16_t wData[LIBUSB_FLEXIBLE_ARRAY];
+	uint16_t wData[LIBUSB_FLEXIBLE_ARRAY] __counted_by((bLength - 2) / 2);
 } LIBUSB_PACKED;
 
 struct usbi_bos_descriptor {
@@ -921,7 +921,7 @@ static inline void *usbi_get_transfer_priv(struct usbi_transfer *itransfer)
 struct discovered_devs {
 	size_t len;
 	size_t capacity;
-	struct libusb_device *devices[LIBUSB_FLEXIBLE_ARRAY];
+	struct libusb_device *devices[LIBUSB_FLEXIBLE_ARRAY] __counted_by(len);
 };
 
 struct discovered_devs *discovered_devs_append(
@@ -1434,7 +1434,7 @@ struct usbi_os_backend {
 	 * Return 0 on success, or a LIBUSB_ERROR code on failure.
 	 */
 	int (*handle_events)(struct libusb_context *ctx,
-		void *event_data, unsigned int count, unsigned int num_ready);
+		void * __sized_by(count) event_data, unsigned int count, unsigned int num_ready);
 
 	/* Handle transfer completion. Optional.
 	 *
