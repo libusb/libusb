@@ -1959,10 +1959,18 @@ static inline void libusb_fill_control_transfer(
 	transfer->endpoint = 0;
 	transfer->type = LIBUSB_TRANSFER_TYPE_CONTROL;
 	transfer->timeout = timeout;
-	transfer->buffer = buffer;
 	if (setup)
-		transfer->length = (int) (LIBUSB_CONTROL_SETUP_SIZE
+	{
+		int length = (int) (LIBUSB_CONTROL_SETUP_SIZE
 			+ libusb_le16_to_cpu(setup->wLength));
+		transfer->buffer = buffer;
+		transfer->length = length;
+	}
+	else
+	{
+		transfer->buffer = NULL;
+		transfer->length = 0;
+	}
 	transfer->user_data = user_data;
 	transfer->callback = callback;
 }
