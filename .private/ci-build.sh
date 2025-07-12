@@ -8,6 +8,7 @@ install=no
 test=yes
 asan=yes
 docs=no
+tidy=no
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -39,6 +40,10 @@ while [ $# -gt 0 ]; do
 		docs=yes
 		shift
 		;;
+	--clang-tidy)
+		tidy=yes
+		shift
+		;;
 	--)
 		shift
 		break;
@@ -57,6 +62,10 @@ fi
 if [ -e "${builddir}" ]; then
 	echo "ERROR: directory entry named '${builddir}' already exists" >&2
 	exit 1
+fi
+
+if [ "${tidy}" = "yes" ]; then
+	gitdir=$(git rev-parse --show-toplevel)
 fi
 
 mkdir "${builddir}"
@@ -80,13 +89,60 @@ fi
 echo ""
 echo "Configuring ..."
 configure_args=(--enable-examples-build --enable-tests-build)
+configure_env=(CFLAGS="${cflags}" CXXFLAGS="${cflags}")
+
 if [ -n "${TESTCORE_CONFIGURE_FLAG:-}" ]; then
 	configure_args+=("${TESTCORE_CONFIGURE_FLAG}")
 fi
-CFLAGS="${cflags}" CXXFLAGS="${cflags}" ../configure "${configure_args[@]}" "$@"
+
+if [ "${tidy}" = "yes" ]; then
+	# Clang-Tidy needs to be run with Clang compiler
+	configure_env+=(CC="clang" CXX="clang++")
+fi
+
+env "${configure_env[@]}" ../configure "${configure_args[@]}" "$@"
 
 echo ""
 echo "Building ..."
+
+if [ "${tidy}" = "yes" ]; then
+	if [ -z "${current_sha}" ]; then
+		echo "ERROR: current_sha environment variable is not set."
+		exit 1
+	fi
+
+	# $(@D) and $(<F) are GNU Make automatic variables.
+	# $(@D): '$(@D)' is equivalent to '$(dirname $@)'.
+	# $(<F): '$(<F)' is equivalent to '$(notdir $<)'.
+	# example: 'src/foo.c' -> 'builddir/src/foo.c.compdb.json'
+	# More info: https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html
+	# add CFLAGS here as automake escapes them
+	cflags+=" -MJ \$(@D)/\$(<F).compdb.json"
+	make -j4 -k CFLAGS="${cflags}" CXXFLAGS="${cflags}"
+
+	# Create compile_commands.json from all the .compdb.json files.
+	echo "[" > compile_commands.json
+	find . -name "*compdb.json" -exec cat {} \; >> compile_commands.json
+	echo "]" >> compile_commands.json
+
+	built_files=$(find . -name "*.compdb.json" -printf "${gitdir}/%P " | \
+		sed 's/.compdb.json//g')
+	reldr=$(realpath --relative-to="$(pwd)" "${gitdir}")
+
+	# Get llvmorg-21.1.0-rc3 clang-tidy-diff.py script from LLVM project.
+	wget https://raw.githubusercontent.com/llvm/llvm-project/refs/tags/llvmorg-21.1.0-rc3/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py
+
+	# Use clang-tidy-diff to check only the files that were built.
+	# clang-tidy-diff expects the files to be relative to the git root.
+	#shellcheck disable=SC2086
+	git diff -U0 "${current_sha}^..${current_sha}" --dst-prefix="b/${reldr}/" \
+		--src-prefix="a/${reldr}/" -- $built_files | \
+		python3 clang-tidy-diff.py -p1 -warnings-as-errors="*" \
+		-config-file="${gitdir}/.clang-tidy"
+
+	exit $?
+fi
+
 make -j4 -k
 
 if [ "${docs}" = "yes" ]; then
