@@ -1,0 +1,29 @@
+name: MSYS2 aarch64 clang64
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: windows-11-arm
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: clangarm64
+          update: true
+          install: git mingw-w64-clang-aarch64-cc mingw-w64-clang-aarch64-autotools
+      - name: CI-Build
+        run: |
+          echo 'Running in MSYS2!'
+          ./bootstrap.sh
+          ./.private/ci-build.sh --no-asan --build-dir build-msys2-clang64-aarch64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-msys2-clang64-aarch64
+          path: |
+            build-msys2-clang64-aarch64/libusb/.libs/libusb-1.0.dll.a
+            build-msys2-clang64-aarch64/libusb/.libs/libusb-1.0.a
+            build-msys2-clang64-aarch64/libusb/.libs/libusb-1.0.dll
