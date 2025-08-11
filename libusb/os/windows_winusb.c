@@ -1226,7 +1226,59 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	return LIBUSB_SUCCESS;
 }
 
-static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, DWORD *port_nr)
+static bool is_bus_and_port_used(struct libusb_device* dev, struct winusb_device_priv* priv) 
+{
+	struct libusb_device* search_dev;
+	
+	usbi_mutex_lock(&dev->ctx->usb_devs_lock);
+
+	for_each_device(dev->ctx, search_dev) {
+
+		if (search_dev == dev) {
+			continue;
+		}
+
+		struct winusb_device_priv* search_priv = usbi_get_device_priv(search_dev);
+
+		if (search_priv == NULL || !search_priv->initialized) {
+			continue;
+		}
+
+		if ( search_dev->parent_dev == dev->parent_dev
+			&& search_dev->bus_number == dev->bus_number && search_dev->port_number == dev->port_number
+			&& search_priv->depth == priv->depth) {
+			
+				usbi_mutex_unlock(&dev->ctx->usb_devs_lock);
+				return true;
+		}
+	}
+
+	usbi_mutex_unlock(&dev->ctx->usb_devs_lock);
+	return false;
+}
+
+static void un_init_device(struct libusb_device* dev, struct winusb_device_priv* priv)
+{
+	if (priv->config_descriptor != NULL) {
+
+		if (dev->device_descriptor.bNumConfigurations > 0) {
+			for (int i = 0; i < dev->device_descriptor.bNumConfigurations; ++i) {
+				if (priv->config_descriptor[i] == NULL)
+					continue;
+
+				free((UCHAR*)priv->config_descriptor[i] - USB_DESCRIPTOR_REQUEST_SIZE);
+			}
+		}
+
+		free(priv->config_descriptor);
+		priv->config_descriptor = NULL;
+	}
+
+	priv->initialized = false;
+}
+
+static bool get_dev_port_number(struct libusb_device* dev, HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data,
+	struct libusb_device *parent_dev, DWORD *port_nr)
 {
 	char buffer[MAX_KEY_LENGTH];
 	DWORD size;
@@ -1279,8 +1331,103 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 	// Lastly, try SPDRP_ADDRESS, which returns a REG_DWORD. The address *may* be the port number,
 	// which is true for the Microsoft driver but may not be true for other drivers. However, we
 	// have no other options here but to accept what it returns.
-	return pSetupDiGetDeviceRegistryPropertyA(dev_info, dev_info_data, SPDRP_ADDRESS,
+	const bool SPDRP_ADDRESS_try_result = pSetupDiGetDeviceRegistryPropertyA(dev_info, dev_info_data, SPDRP_ADDRESS,
 			NULL, (PBYTE)port_nr, sizeof(*port_nr), &size) && (size == sizeof(*port_nr));
+
+	// Since SPDRP_ADDRESS *may* return the actual port number, but not always, try another way
+	// of getting port number by matching VID/PID obtained via IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX
+	// with values encoded in dev_id string.
+	// If we succeed then use this value, else revert to port_nr and return value from SPDRP_ADDRESS 
+
+	if (parent_dev == NULL)	{
+		return SPDRP_ADDRESS_try_result;
+	}
+
+	struct winusb_device_priv *parent_priv = usbi_get_device_priv(parent_dev);
+	if (parent_priv == NULL || parent_priv->apib->id != USB_API_HUB) {
+		return SPDRP_ADDRESS_try_result;
+	}
+
+	const HANDLE hub_handle = CreateFileA(parent_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	if (hub_handle == INVALID_HANDLE_VALUE) {
+		return SPDRP_ADDRESS_try_result;
+	}
+	
+	USB_NODE_INFORMATION hub_info;
+	ULONG n_bytes = 0;
+	
+	if(!DeviceIoControl(hub_handle,
+	  IOCTL_USB_GET_NODE_INFORMATION,
+	  &hub_info,
+	  sizeof(USB_NODE_INFORMATION),
+	  &hub_info,
+	  sizeof(USB_NODE_INFORMATION),
+	  &n_bytes,
+	  NULL)) {
+		return SPDRP_ADDRESS_try_result;
+	}
+
+	const uint8_t num_ports = (uint8_t)hub_info.u.HubInformation.HubDescriptor.bNumberOfPorts;
+	
+	struct winusb_device_priv* priv = usbi_get_device_priv(dev);
+	if (priv == NULL) {
+		return SPDRP_ADDRESS_try_result;
+	}
+
+	unsigned short vid;
+	const char* vid_str = strstr(priv->dev_id, "VID_");
+	if (vid_str != NULL) {
+		vid = (unsigned short)strtoul(vid_str + 4, NULL, 16);
+	}
+	else {
+		return SPDRP_ADDRESS_try_result;
+	}
+
+	unsigned short pid;
+	const char* pid_str = strstr(priv->dev_id, "PID_");
+	if (pid_str != NULL) {
+		pid = (unsigned short)strtoul(pid_str + 4, NULL, 16);
+	}
+	else {
+		return SPDRP_ADDRESS_try_result;
+	}
+
+	for(uint8_t possible_port_number = 1; possible_port_number <= num_ports; ++possible_port_number) {
+		
+		if (init_device(dev, parent_dev, possible_port_number, dev_info_data->DevInst) != LIBUSB_SUCCESS
+			|| dev->device_descriptor.idVendor != vid || dev->device_descriptor.idProduct != pid
+			|| is_bus_and_port_used(dev, priv)) {
+
+			un_init_device(dev, priv);
+			continue;
+		}
+					
+		if (dev->device_descriptor.iSerialNumber == 0) {
+			*port_nr = possible_port_number;
+			return true;
+		}
+
+		libusb_device_handle* handle;
+		unsigned char serial_number_buffer[MAX_USB_STRING_LENGTH];
+
+		if (libusb_open(dev, &handle) != LIBUSB_SUCCESS) {
+			continue;
+		}
+
+		if (libusb_get_string_descriptor_ascii(handle, dev->device_descriptor.iSerialNumber, serial_number_buffer, MAX_USB_STRING_LENGTH) < LIBUSB_SUCCESS 
+			|| strstr(priv->dev_id, (const char*)serial_number_buffer) == NULL) {
+
+			libusb_close(handle);
+			un_init_device(dev, priv);
+			continue;
+		}
+
+		libusb_close(handle);
+		*port_nr = possible_port_number;
+		return true;
+	}
+	
+	return SPDRP_ADDRESS_try_result;
 }
 
 static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id,
@@ -1967,7 +2114,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				break;
 			case GEN_PASS:
 				port_nr = 0;
-				if (!get_dev_port_number(*dev_info, &dev_info_data, &port_nr))
+				if (!get_dev_port_number(dev, *dev_info, &dev_info_data, parent_dev, &port_nr))
 					usbi_warn(ctx, "could not retrieve port number for device '%s': %s", dev_id, windows_error_str(0));
 				r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_info_data.DevInst);
 				if (r == LIBUSB_SUCCESS) {
