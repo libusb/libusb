@@ -30,7 +30,6 @@
 
 #if defined(_MSC_VER)
 #define snprintf _snprintf
-#define putenv _putenv
 #endif
 
 // Future versions of libusb will use usb_interface instead of interface
@@ -148,7 +147,6 @@ static enum test_type {
 	USE_SCSI,
 	USE_HID,
 } test_mode;
-static uint16_t VID, PID;
 
 static void display_buffer_hex(unsigned char *buffer, unsigned size)
 {
@@ -872,7 +870,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 	uint8_t string_index[3];	// indexes of the string descriptors
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
 
-	printf("Opening device %04X:%04X...\n", vid, pid);
+	printf("Opening device %04x:%04x ...\n", vid, pid);
 	handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
 
 	if (handle == NULL) {
@@ -904,8 +902,8 @@ static int test_device(uint16_t vid, uint16_t pid)
 	printf("            length: %d\n", dev_desc.bLength);
 	printf("      device class: %d\n", dev_desc.bDeviceClass);
 	printf("               S/N: %d\n", dev_desc.iSerialNumber);
-	printf("           VID:PID: %04X:%04X\n", dev_desc.idVendor, dev_desc.idProduct);
-	printf("         bcdDevice: %04X\n", dev_desc.bcdDevice);
+	printf("           VID:PID: %04x:%04x\n", dev_desc.idVendor, dev_desc.idProduct);
+	printf("         bcdDevice: 0x%04x\n", dev_desc.bcdDevice);
 	printf("   iMan:iProd:iSer: %d:%d:%d\n", dev_desc.iManufacturer, dev_desc.iProduct, dev_desc.iSerialNumber);
 	printf("          nb confs: %d\n", dev_desc.bNumConfigurations);
 	// Copy the string descriptors for easier parsing
@@ -1104,13 +1102,11 @@ int main(int argc, char** argv)
 	const struct libusb_version* version;
 	int j, r;
 	size_t i, arglen;
-	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
-	char *error_lang = NULL, *old_dbg_str = NULL, str[256];
+	char *error_lang = NULL;
+	uint16_t vid = 0, pid = 0;
 
-	// Default to generic, expecting VID:PID
-	VID = 0;
-	PID = 0;
+	// Default to generic
 	test_mode = USE_GENERIC;
 
 	if (((uint8_t*)&endian_test)[0] == 0xBE) {
@@ -1119,99 +1115,104 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 
-	if ((argc == 1) || (argc > 7)) {
+	if (argc < 2 || argc > 7) {
 		display_help(argv[0]);
 		return EXIT_FAILURE;
 	}
 
-	if (argc >= 2) {
-		for (j = 1; j<argc; j++) {
-			arglen = strlen(argv[j]);
-			if ( ((argv[j][0] == '-') || (argv[j][0] == '/'))
-			  && (arglen >= 2) ) {
-				switch(argv[j][1]) {
-				case 'd':
-					debug_mode = true;
-					break;
-				case 'i':
-					extra_info = true;
-					break;
-				case 'w':
-					force_device_request = true;
-					break;
-				case 'b':
-					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
-						printf("   Option -b requires a file name\n");
-						return EXIT_FAILURE;
-					}
-					binary_name = argv[++j];
-					binary_dump = true;
-					break;
-				case 'l':
-					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
-						printf("   Option -l requires an ISO 639-1 language parameter\n");
-						return EXIT_FAILURE;
-					}
-					error_lang = argv[++j];
-					break;
-				case 'j':
-					// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
-					if (!VID && !PID) {
-						VID = 0x15BA;
-						PID = 0x0004;
-					}
-					break;
-				case 'k':
-					// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
-					if (!VID && !PID) {
-						VID = 0x0204;
-						PID = 0x6025;
-					}
-					break;
-				// The following tests will force VID:PID if already provided
-				case 'p':
-					// Sony PS3 Controller - 1 interface
-					VID = 0x054C;
-					PID = 0x0268;
-					test_mode = USE_PS3;
-					break;
-				case 's':
-					// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
-					VID = 0x045E;
-					PID = 0x0008;
-					test_mode = USE_HID;
-					break;
-				case 'x':
-					// Microsoft XBox Controller Type S - 1 interface
-					VID = 0x045E;
-					PID = 0x0289;
-					test_mode = USE_XBOX;
-					break;
-				case 'h':
-					display_help(argv[0]);
-					return EXIT_SUCCESS;
-				default:
-					display_help(argv[0]);
+	for (j = 1; j < argc; j++) {
+		arglen = strlen(argv[j]);
+		if ( ((argv[j][0] == '-') || (argv[j][0] == '/'))
+		  && (arglen >= 2) ) {
+			switch(argv[j][1]) {
+			case 'd':
+				debug_mode = true;
+				break;
+			case 'i':
+				extra_info = true;
+				break;
+			case 'w':
+				force_device_request = true;
+				break;
+			case 'b':
+				if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
+					printf("   Option -b requires a file name\n");
 					return EXIT_FAILURE;
 				}
+				binary_name = argv[++j];
+				binary_dump = true;
+				break;
+			case 'l':
+				if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
+					printf("   Option -l requires an ISO 639-1 language parameter\n");
+					return EXIT_FAILURE;
+				}
+				error_lang = argv[++j];
+				break;
+			case 'j':
+				// OLIMEX ARM-USB-TINY JTAG, 2 channel composite device - 2 interfaces
+				if (!vid && !pid) {
+					vid = 0x15BA;
+					pid = 0x0004;
+				}
+				break;
+			case 'k':
+				// Generic 2 GB USB Key (SCSI Transparent/Bulk Only) - 1 interface
+				if (!vid && !pid) {
+					vid = 0x0204;
+					pid = 0x6025;
+				}
+				break;
+			// The following tests will force VID:PID if already provided
+			case 'p':
+				// Sony PS3 Controller - 1 interface
+				vid = 0x054C;
+				pid = 0x0268;
+				test_mode = USE_PS3;
+				break;
+			case 's':
+				// Microsoft Sidewinder Precision Pro Joystick - 1 HID interface
+				vid = 0x045E;
+				pid = 0x0008;
+				test_mode = USE_HID;
+				break;
+			case 'x':
+				// Microsoft XBox Controller Type S - 1 interface
+				vid = 0x045E;
+				pid = 0x0289;
+				test_mode = USE_XBOX;
+				break;
+			case 'h':
+				display_help(argv[0]);
+				return EXIT_SUCCESS;
+			default:
+				display_help(argv[0]);
+				return EXIT_FAILURE;
+			}
+		} else {
+			for (i=0; i<arglen; i++) {
+				if (argv[j][i] == ':')
+					break;
+			}
+			if (i != arglen) {
+				unsigned int tmp_vid, tmp_pid;
+
+				if (sscanf(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
+					printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
+					return EXIT_FAILURE;
+				}
+				vid = (uint16_t)tmp_vid;
+				pid = (uint16_t)tmp_pid;
 			} else {
-				for (i=0; i<arglen; i++) {
-					if (argv[j][i] == ':')
-						break;
-				}
-				if (i != arglen) {
-					if (sscanf(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
-						printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
-						return EXIT_FAILURE;
-					}
-					VID = (uint16_t)tmp_vid;
-					PID = (uint16_t)tmp_pid;
-				} else {
-					display_help(argv[0]);
-					return EXIT_FAILURE;
-				}
+				display_help(argv[0]);
+				return EXIT_FAILURE;
 			}
 		}
+	}
+
+	if (vid == 0 && pid == 0) {
+		display_help(argv[0]);
+		return EXIT_FAILURE;
 	}
 
 	version = libusb_get_version();
@@ -1229,7 +1230,7 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 
 	// If not set externally, and no debug option was given, use info log level
-	if ((old_dbg_str == NULL) && (!debug_mode))
+	if (getenv("LIBUSB_DEBUG") == NULL && !debug_mode)
 		libusb_set_option(NULL, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_INFO);
 	if (error_lang != NULL) {
 		r = libusb_setlocale(error_lang);
@@ -1237,18 +1238,12 @@ int main(int argc, char** argv)
 			printf("Invalid or unsupported locale '%s': %s\n", error_lang, libusb_strerror((enum libusb_error)r));
 	}
 
-	r = test_device(VID, PID);
+	r = test_device(vid, pid);
 
 	libusb_exit(NULL);
 
 	if (r < 0)
 		return EXIT_FAILURE;
-
-
-	if (debug_mode) {
-		snprintf(str, sizeof(str), "LIBUSB_DEBUG=%s", (old_dbg_str == NULL)?"":old_dbg_str);
-		str[sizeof(str) - 1] = 0;	// Windows may not NUL terminate the string
-	}
 
 	return EXIT_SUCCESS;
 }
