@@ -22,45 +22,48 @@
 #define LIBUSB_THREADS_POSIX_H
 
 #include <pthread.h>
+#include "libusbi.h"
 
 #define PTHREAD_CHECK(expression)	ASSERT_EQ(expression, 0)
 
 #define USBI_MUTEX_INITIALIZER	PTHREAD_MUTEX_INITIALIZER
-typedef pthread_mutex_t usbi_mutex_static_t;
-static inline void usbi_mutex_static_lock(usbi_mutex_static_t *mutex)
+CAPABILITY("mutex") typedef pthread_mutex_t usbi_mutex_static_t;
+static inline void usbi_mutex_static_lock(usbi_mutex_static_t *mutex) ACQUIRE(*mutex) NO_THREAD_SAFETY_ANALYSIS
 {
 	PTHREAD_CHECK(pthread_mutex_lock(mutex));
 }
-static inline void usbi_mutex_static_unlock(usbi_mutex_static_t *mutex)
+static inline void usbi_mutex_static_unlock(usbi_mutex_static_t *mutex) RELEASE(*mutex) NO_THREAD_SAFETY_ANALYSIS
 {
 	PTHREAD_CHECK(pthread_mutex_unlock(mutex));
 }
 
-typedef pthread_mutex_t usbi_mutex_t;
-static inline void usbi_mutex_init(usbi_mutex_t *mutex)
+CAPABILITY("mutex") typedef pthread_mutex_t usbi_mutex_t;
+static inline void usbi_mutex_init(usbi_mutex_t *mutex) EXCLUDES(*mutex)
 {
 	PTHREAD_CHECK(pthread_mutex_init(mutex, NULL));
 }
-static inline void usbi_mutex_lock(usbi_mutex_t *mutex)
+static inline void usbi_mutex_lock(usbi_mutex_t *mutex) ACQUIRE(*mutex) NO_THREAD_SAFETY_ANALYSIS
 {
 	PTHREAD_CHECK(pthread_mutex_lock(mutex));
 }
-static inline void usbi_mutex_unlock(usbi_mutex_t *mutex)
+static inline void usbi_mutex_unlock(usbi_mutex_t *mutex) RELEASE(*mutex) NO_THREAD_SAFETY_ANALYSIS
 {
 	PTHREAD_CHECK(pthread_mutex_unlock(mutex));
 }
-static inline int usbi_mutex_trylock(usbi_mutex_t *mutex)
+static inline int usbi_mutex_trylock(usbi_mutex_t *mutex) TRY_ACQUIRE(1, *mutex)
 {
-	return pthread_mutex_trylock(mutex) == 0;
+    // TODO: everything else in this file just wraps pthreads exactly, but this one inverts the return value meaning !?!?
+	int success = pthread_mutex_trylock(mutex) == 0;
+	return success;
 }
-static inline void usbi_mutex_destroy(usbi_mutex_t *mutex)
+static inline void usbi_mutex_destroy(usbi_mutex_t *mutex) EXCLUDES(*mutex)
 {
 	PTHREAD_CHECK(pthread_mutex_destroy(mutex));
 }
 
 typedef pthread_cond_t usbi_cond_t;
 void usbi_cond_init(pthread_cond_t *cond);
-static inline void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
+static inline void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex) REQUIRES(*mutex)
 {
 	PTHREAD_CHECK(pthread_cond_wait(cond, mutex));
 }
@@ -73,6 +76,10 @@ static inline void usbi_cond_broadcast(usbi_cond_t *cond)
 static inline void usbi_cond_destroy(usbi_cond_t *cond)
 {
 	PTHREAD_CHECK(pthread_cond_destroy(cond));
+}
+static inline void usbi_cond_signal(usbi_cond_t *cond)
+{
+    PTHREAD_CHECK(pthread_cond_signal(cond));
 }
 
 typedef pthread_key_t usbi_tls_key_t;

@@ -717,7 +717,7 @@ static void windows_destroy_device(struct libusb_device *dev)
 	priv->backend->destroy_device(dev);
 }
 
-static int windows_submit_transfer(struct usbi_transfer *itransfer)
+static int windows_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_device_handle *dev_handle = transfer->dev_handle;
