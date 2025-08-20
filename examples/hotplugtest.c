@@ -53,7 +53,12 @@ static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev,
 			libusb_close (handle);
 		}
 		handle = new_handle;
-	} else {
+	} else if (LIBUSB_ERROR_ACCESS != rc
+#if defined(PLATFORM_WINDOWS)
+		&& LIBUSB_ERROR_NOT_SUPPORTED != rc
+		&& LIBUSB_ERROR_NOT_FOUND != rc
+#endif
+		) {
 		fprintf (stderr, "No access to device: %s\n",
 			 libusb_strerror((enum libusb_error)rc));
 	}
