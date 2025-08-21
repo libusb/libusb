@@ -31,6 +31,11 @@
 #if defined(_MSC_VER)
 #define snprintf _snprintf
 #define putenv _putenv
+/* Disable: warning C5287: operands are different enum types */
+#if (_MSC_VER > 1800)
+/* Disable: warning C5287: operands are different enum types, supported after Visual Studio 2013 */
+#pragma warning(disable:5287)
+#endif
 #endif
 
 // Future versions of libusb will use usb_interface instead of interface
