@@ -29,6 +29,10 @@
 #include "libusbi.h"
 #include "windows_common.h"
 
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+#include "windows_hotplug.h"
+#endif
+
 #define EPOCH_TIME	UINT64_C(116444736000000000)	// 1970.01.01 00:00:000 in MS Filetime
 
 #define STATUS_SUCCESS	((ULONG_PTR)0UL)
@@ -565,6 +569,18 @@ static int windows_init(struct libusb_context *ctx)
 
 	r = LIBUSB_SUCCESS;
 
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+	if (init_count == 1) {
+		r = windows_start_event_monitor(); // Start-up hotplug event handler
+		if (r != LIBUSB_SUCCESS) {
+			usbi_err(ctx, "error starting hotplug event monitor");
+			goto init_exit;
+		}
+	}
+
+	windows_initial_scan_devices(ctx);
+#endif
+
 init_exit: // Holds semaphore here
 	if ((init_count == 1) && (r != LIBUSB_SUCCESS)) { // First init failed?
 		if (usbdk_available) {
@@ -596,6 +612,9 @@ static void windows_exit(struct libusb_context *ctx)
 
 	// Only works if exits and inits are balanced exactly
 	if (--init_count == 0) { // Last exit
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+		windows_stop_event_monitor();
+#endif
 		if (usbdk_available) {
 			usbdk_backend.exit(ctx);
 			usbdk_available = false;
@@ -624,11 +643,13 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+#if !defined(LIBUSB_WINDOWS_HOTPLUG)
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **discdevs)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
 	return priv->backend->get_device_list(ctx, discdevs);
 }
+#endif
 
 static int windows_open(struct libusb_device_handle *dev_handle)
 {
@@ -888,7 +909,11 @@ const struct usbi_os_backend usbi_backend = {
 	windows_init,
 	windows_exit,
 	windows_set_option,
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+	NULL, /* get_device_list */
+#else
 	windows_get_device_list,
+#endif
 	NULL,	/* hotplug_poll */
 	NULL,	/* wrap_sys_device */
 	windows_open,
