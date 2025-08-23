@@ -794,6 +794,18 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
+static int op_get_platform_device_id(libusb_device *dev, char **data)
+{
+	struct linux_device_priv *priv = usbi_get_device_priv(dev);
+
+	if (!priv->sysfs_dir)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	*data = strdup(priv->sysfs_dir);
+
+	return LIBUSB_SUCCESS;
+}
+
 static int op_get_active_config_descriptor(struct libusb_device *dev,
 	void *buffer, size_t len)
 {
@@ -2791,6 +2803,7 @@ const struct usbi_os_backend usbi_backend = {
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
+	.get_platform_device_id = op_get_platform_device_id,
 
 	.wrap_sys_device = op_wrap_sys_device,
 	.open = op_open,

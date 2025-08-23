@@ -435,6 +435,14 @@ static void usbdk_close(struct libusb_device_handle *dev_handle)
 	priv->redirector_handle = NULL;
 }
 
+static int usbdk_get_platform_device_id(struct libusb_device *dev, char **data)
+{
+	UNUSED(dev);
+	UNUSED(data);
+
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 static int usbdk_get_configuration(struct libusb_device_handle *dev_handle, uint8_t *config)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
@@ -709,6 +717,7 @@ const struct windows_backend usbdk_backend = {
 	usbdk_get_active_config_descriptor,
 	usbdk_get_config_descriptor,
 	usbdk_get_config_descriptor_by_value,
+	usbdk_get_platform_device_id,
 	usbdk_get_configuration,
 	usbdk_set_configuration,
 	usbdk_claim_interface,
