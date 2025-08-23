@@ -65,9 +65,6 @@ typedef SSIZE_T ssize_t;
 #if defined(interface)
 #undef interface
 #endif
-#if !defined(__CYGWIN__)
-#include <winsock.h>
-#endif
 #endif /* _WIN32 || __CYGWIN__ */
 
 #if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
