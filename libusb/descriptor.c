@@ -549,7 +549,7 @@ int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
  * \see libusb_get_config_descriptor
  */
 int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
-	struct libusb_config_descriptor **config)
+	struct libusb_config_descriptor * __single *config)
 {
 	union usbi_config_desc_buf _config;
 	uint16_t config_len;
@@ -701,7 +701,7 @@ void API_EXPORTED libusb_free_config_descriptor(
 int API_EXPORTED libusb_get_ss_endpoint_companion_descriptor(
 	libusb_context *ctx,
 	const struct libusb_endpoint_descriptor *endpoint,
-	struct libusb_ss_endpoint_companion_descriptor **ep_comp)
+	struct libusb_ss_endpoint_companion_descriptor * __single * ep_comp)
 {
 	const struct usbi_descriptor_header *header;
 	const uint8_t *buffer = endpoint->extra;
@@ -1702,5 +1702,5 @@ int API_EXPORTED libusb_get_device_string(libusb_device *dev,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
 
-	return usbi_utf8_copy(data, s, length);
+	return usbi_utf8_copy(data, __unsafe_null_terminated_from_indexable(s), length);
 }

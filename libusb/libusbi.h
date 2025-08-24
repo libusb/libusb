@@ -168,6 +168,8 @@ struct list_head {
  *  type - the data type that contains "member"
  *  member - the list_head element in "type"
  */
+//#define container_of(ptr, type, member) \
+//	((type *)((uintptr_t)(ptr) - (uintptr_t)offsetof(type, member)))
 #define list_entry(ptr, type, member) \
 	container_of(ptr, type, member)
 
@@ -898,17 +900,17 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 
 static inline void *usbi_get_context_priv(struct libusb_context *ctx)
 {
-	return (unsigned char *)ctx + PTR_ALIGN(sizeof(*ctx));
+	return 0;//(unsigned char *)ctx + PTR_ALIGN(sizeof(*ctx));
 }
 
 static inline void *usbi_get_device_priv(struct libusb_device *dev)
 {
-	return (unsigned char *)dev + PTR_ALIGN(sizeof(*dev));
+	return 0;//(unsigned char *)dev + PTR_ALIGN(sizeof(*dev));
 }
 
 static inline void *usbi_get_device_handle_priv(struct libusb_device_handle *dev_handle)
 {
-	return (unsigned char *)dev_handle + PTR_ALIGN(sizeof(*dev_handle));
+	return 0;//(unsigned char *)dev_handle + PTR_ALIGN(sizeof(*dev_handle));
 }
 
 static inline void *usbi_get_transfer_priv(struct usbi_transfer *itransfer)

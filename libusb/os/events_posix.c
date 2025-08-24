@@ -220,7 +220,7 @@ int usbi_disarm_timer(usbi_timer_t *timer)
 
 int usbi_alloc_event_data(struct libusb_context *ctx)
 {
-	struct usbi_event_source *ievent_source;
+	struct usbi_event_source * __single ievent_source;
 	struct pollfd *fds;
 	size_t i = 0;
 

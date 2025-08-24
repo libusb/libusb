@@ -37,7 +37,7 @@ static void LIBUSB_CALL sync_transfer_cb(struct libusb_transfer *transfer)
 {
 	usbi_dbg(TRANSFER_CTX(transfer), "actual_length=%d", transfer->actual_length);
 
-	int *completed = transfer->user_data;
+	int * __single completed = transfer->user_data;
 	*completed = 1;
 	/*
 	 * Right after setting 'completed', another thread might free the transfer, so don't
@@ -48,7 +48,8 @@ static void LIBUSB_CALL sync_transfer_cb(struct libusb_transfer *transfer)
 
 static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
 {
-	int r, *completed = transfer->user_data;
+	int r;
+	int * __single completed = transfer->user_data;
 	struct libusb_context *ctx = HANDLE_CTX(transfer->dev_handle);
 
 	while (!*completed) {

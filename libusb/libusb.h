@@ -1,3 +1,5 @@
+#include <ptrcheck.h>
+
 /*
  * Public libusb header file
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
@@ -1712,8 +1714,8 @@ int LIBUSB_CALL libusb_setlocale(const char *locale);
 const char * LIBUSB_CALL libusb_strerror(int errcode);
 
 ssize_t LIBUSB_CALL libusb_get_device_list(libusb_context *ctx,
-	libusb_device ***list);
-void LIBUSB_CALL libusb_free_device_list(libusb_device **list,
+										   libusb_device ** __null_terminated * __single list);
+void LIBUSB_CALL libusb_free_device_list(libusb_device ** __null_terminated list,
 	int unref_devices);
 libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev);
 void LIBUSB_CALL libusb_unref_device(libusb_device *dev);
@@ -1725,7 +1727,7 @@ int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
 int LIBUSB_CALL libusb_get_device_descriptor(libusb_device *dev,
 	struct libusb_device_descriptor *desc);
 int LIBUSB_CALL libusb_get_active_config_descriptor(libusb_device *dev,
-	struct libusb_config_descriptor **config);
+	struct libusb_config_descriptor * __single *config);
 int LIBUSB_CALL libusb_get_config_descriptor(libusb_device *dev,
 	uint8_t config_index, struct libusb_config_descriptor **config);
 int LIBUSB_CALL libusb_get_config_descriptor_by_value(libusb_device *dev,
@@ -1735,7 +1737,7 @@ void LIBUSB_CALL libusb_free_config_descriptor(
 int LIBUSB_CALL libusb_get_ss_endpoint_companion_descriptor(
 	libusb_context *ctx,
 	const struct libusb_endpoint_descriptor *endpoint,
-	struct libusb_ss_endpoint_companion_descriptor **ep_comp);
+	struct libusb_ss_endpoint_companion_descriptor * __single * ep_comp);
 void LIBUSB_CALL libusb_free_ss_endpoint_companion_descriptor(
 	struct libusb_ss_endpoint_companion_descriptor *ep_comp);
 int LIBUSB_CALL libusb_get_bos_descriptor(libusb_device_handle *dev_handle,
@@ -1793,7 +1795,7 @@ void LIBUSB_CALL libusb_free_interface_association_descriptors(
 	struct libusb_interface_association_descriptor_array *iad_array);
 
 int LIBUSB_CALL libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev, libusb_device_handle **dev_handle);
-int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle **dev_handle);
+int LIBUSB_CALL libusb_open(libusb_device *dev, libusb_device_handle * __single *dev_handle);
 void LIBUSB_CALL libusb_close(libusb_device_handle *dev_handle);
 libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle);
 
@@ -1963,7 +1965,7 @@ static inline void libusb_fill_control_transfer(
 	transfer->timeout = timeout;
 	if (setup)
 	{
-		assert (length >= (int) (LIBUSB_CONTROL_SETUP_SIZE + libusb_le16_to_cpu(setup->wLength));
+		assert (length >= (int) (LIBUSB_CONTROL_SETUP_SIZE + libusb_le16_to_cpu(setup->wLength)));
 		transfer->buffer = buffer;
 		transfer->length = length;
 	}
@@ -2085,7 +2087,7 @@ static inline void libusb_fill_iso_transfer(struct libusb_transfer *transfer,
 	transfer->timeout = timeout;
 	transfer->buffer = buffer;
 	transfer->length = length;
-	transfer->num_iso_packets = num_iso_packets;
+//	transfer->num_iso_packets = num_iso_packets;
 	transfer->user_data = user_data;
 	transfer->callback = callback;
 }
