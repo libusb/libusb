@@ -113,12 +113,14 @@ struct darwin_cached_device {
   char                  sys_path[21];
   usb_device_t          device;
   io_service_t          service;
-  int                   open_count;
+  usbi_mutex_t          open_mutex;
+  int                   open_count; // GUARDED_BY(open_mutex)
   UInt8                 first_config, active_config, port;
   int                   can_enumerate;
   int                   refcount;
   bool                  in_reenumerate;
-  int                   capture_count;
+  usbi_mutex_t          capture_mutex;
+  int                   capture_count; // GUARDED_BY(capture_mutex)
 };
 
 struct darwin_device_priv {
