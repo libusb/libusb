@@ -119,6 +119,7 @@ struct darwin_cached_device {
   int                   refcount;
   bool                  in_reenumerate;
   int                   capture_count;
+  usbi_mutex_t          capture_mutex;
 };
 
 struct darwin_device_priv {
