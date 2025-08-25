@@ -13,8 +13,9 @@ jobs:
           - 'Debug'
           - 'Release'
         architecture:
-          - 'x86'
+          - 'Win32'
           - 'x64'
+          - 'ARM64'
 
     runs-on: ${{ matrix.os }}
 
@@ -24,9 +25,7 @@ jobs:
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v1.3
-        with:
-          msbuild-architecture: ${{ matrix.architecture }}
-
+        
       - name: Build solution
         run: |
-          msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }}
+          msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }} -property:Platform=${{ matrix.architecture }}
