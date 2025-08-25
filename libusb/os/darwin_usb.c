@@ -681,12 +681,6 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) {
           usbi_dbg (NULL, "detected device detached due to re-enumeration. sessionID: 0x%" PRIx64
                           ", locationID: 0x%" PRIx32, session, locationID);
 
-          /* the device object is no longer usable so go ahead and release it */
-          if (old_device->device) {
-            (*old_device->device)->Release(old_device->device);
-            old_device->device = NULL;
-          }
-
           is_reenumerating = true;
         } else {
           darwin_deref_cached_device (old_device);
@@ -1292,7 +1286,8 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
   UInt64 sessionID = 0, parent_sessionID = 0;
   UInt32 locationID = 0;
   enum libusb_error ret = LIBUSB_SUCCESS;
-  usb_device_t device;
+  usb_device_t device, old_device = NULL;
+  io_service_t old_service = IO_OBJECT_NULL;
   UInt8 port = 0;
 
   /* assuming sessionID != 0 normally (never seen it be 0) */
@@ -1320,6 +1315,8 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
       if (new_device->location == locationID && new_device->in_reenumerate) {
         usbi_dbg (ctx, "found cached device with matching location that is being re-enumerated");
         *old_session_id = new_device->session;
+        old_device = new_device->device;
+        old_service = new_device->service;
         break;
       }
 
@@ -1358,9 +1355,6 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
       (*device)->GetLocationID (device, &new_device->location);
       new_device->port = port;
       new_device->parent_session = parent_sessionID;
-    } else {
-      /* release the ref to old device's service */
-      IOObjectRelease (new_device->service);
     }
 
     /* keep track of devices regardless of if we successfully enumerate them to
@@ -1373,6 +1367,17 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
 
     /* retain the service */
     IOObjectRetain (service);
+
+    /* release the old device */
+    if (old_device) {
+      (*old_device)->Release (old_device);
+      old_device = NULL;
+    }
+
+    /* release the ref to old device's service */
+    if (old_service) {
+      IOObjectRelease (old_service);
+    }
 
     /* cache the device descriptor */
     ret = darwin_cache_device_descriptor(ctx, new_device);
