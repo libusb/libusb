@@ -120,6 +120,7 @@ struct darwin_cached_device {
   bool                  in_reenumerate;
   int                   capture_count;
   usbi_mutex_t          capture_mutex;
+  usbi_mutex_t          open_mutex;
 };
 
 struct darwin_device_priv {
