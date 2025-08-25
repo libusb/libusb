@@ -98,6 +98,8 @@ static int init_count = 0;
 /* Serialize scan-devices, event-thread, and poll */
 usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 
+static int open_sysfs_attr(struct libusb_context *ctx,
+	const char *sysfs_dir, const char *attr);
 static int linux_scan_devices(struct libusb_context *ctx);
 static int detach_kernel_driver_and_claim(struct libusb_device_handle *, uint8_t);
 
@@ -450,6 +452,44 @@ static int op_set_option(struct libusb_context *ctx, enum libusb_option option, 
 	}
 
 	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+static int op_get_device_string(struct libusb_device *dev, 
+		enum libusb_device_string_type string_type, char *buffer, int length)
+{
+	ssize_t r;
+	int fd;
+	struct linux_device_priv *priv = usbi_get_device_priv(dev);
+	struct libusb_context* ctx = DEVICE_CTX(dev);
+	const char * attr;
+
+	switch (string_type) {
+		case LIBUSB_DEVICE_STRING_MANUFACTURER: attr = "manufacturer"; break;
+		case LIBUSB_DEVICE_STRING_PRODUCT: attr = "product"; break;
+		case LIBUSB_DEVICE_STRING_SERIAL_NUMBER: attr = "serial"; break;
+		default:
+			return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	fd = open_sysfs_attr(ctx, priv->sysfs_dir, attr);
+	if (fd < 0)
+		return LIBUSB_ERROR_IO;
+
+	r = read(fd, buffer, length - 1);  // leave space for null terminator
+	if (r < 0) {
+		r = errno;
+		close(fd);
+		if (r == ENODEV)
+			return LIBUSB_ERROR_NO_DEVICE;
+		usbi_err(ctx, "attribute %s read failed, errno=%zd", attr, r);
+		return LIBUSB_ERROR_IO;
+	}
+	close(fd);
+	buffer[r] = 0;  // add null terminator
+	while (r && ((buffer[r] == 0) || (buffer[r] == '\n'))) {
+		buffer[r--] = 0;
+	}
+	++r;
+	return r;
 }
 
 static int linux_scan_devices(struct libusb_context *ctx)
@@ -2787,6 +2827,7 @@ const struct usbi_os_backend usbi_backend = {
 	.init = op_init,
 	.exit = op_exit,
 	.set_option = op_set_option,
+	.get_device_string = op_get_device_string,
 	.hotplug_poll = op_hotplug_poll,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,
