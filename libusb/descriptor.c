@@ -38,10 +38,10 @@ static inline uint16_t ReadLittleEndian16(const uint8_t p[2])
 
 static inline uint32_t ReadLittleEndian32(const uint8_t p[4])
 {
-	return (uint32_t)((uint32_t)p[3] << 24 |
-			  (uint32_t)p[2] << 16 |
-			  (uint32_t)p[1] << 8 |
-			  (uint32_t)p[0]);
+	return ((uint32_t)p[3] << 24 |
+			(uint32_t)p[2] << 16 |
+			(uint32_t)p[1] << 8 |
+			(uint32_t)p[0]);
 }
 
 static void clear_endpoint(struct libusb_endpoint_descriptor *endpoint)
@@ -423,7 +423,7 @@ static int parse_configuration(struct libusb_context *ctx,
 			config->extra_length += (int)len;
 		}
 
-		r = parse_interface(ctx, usb_interface + i, buffer, (int)size);
+		r = parse_interface(ctx, usb_interface + i, buffer, size);
 		if (r < 0)
 			goto err;
 		if (r == 0) {

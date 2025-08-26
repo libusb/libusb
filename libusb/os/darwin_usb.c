@@ -2024,7 +2024,7 @@ static int darwin_restore_state (struct libusb_device_handle *dev_handle, uint8_
   dpriv->open_count = 1;
 
   /* clean up open interfaces */
-  (void) darwin_close (dev_handle);
+  darwin_close (dev_handle);
 
   /* re-open the device */
   ret = darwin_open (dev_handle);
