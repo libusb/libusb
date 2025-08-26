@@ -503,7 +503,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	for (i=0; i<8; i++) {
 		vid[i] = buffer[8+i];
 		pid[i] = buffer[16+i];
-		rev[i/2] = buffer[32+i/2];	// instead of another loop
+		rev[i/2] = buffer[32+(i/2)];	// instead of another loop
 	}
 	vid[8] = 0;
 	pid[8] = 0;
