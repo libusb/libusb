@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="ShowHotplugState" BeforeTargets="ClCompile">
+    <Message Condition="'$(EnableWindowsHotplug)' == 'true'" Text="EnableWindowsHotplug is enabled" Importance="High" />
+    <Message Condition="'$(EnableWindowsHotplug)' != 'true'" Text="EnableWindowsHotplug is disabled" Importance="High" />
+  </Target>
+  <ItemDefinitionGroup Condition="'$(EnableWindowsHotplug)' == 'true'">
+    <ClCompile>
+      <PreprocessorDefinitions>WINDOWS_HOTPLUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|ARM">
       <Configuration>Debug</Configuration>
@@ -65,5 +74,81 @@
       <Configuration>Release-MT</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+	<ProjectConfiguration Include="Debug-Hotplug|ARM">
+      <Configuration>Debug-Hotplug</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-Hotplug|ARM64">
+      <Configuration>Debug-Hotplug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-Hotplug|Win32">
+      <Configuration>Debug-Hotplug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-Hotplug|x64">
+      <Configuration>Debug-Hotplug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-Hotplug|ARM">
+      <Configuration>Release-Hotplug</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-Hotplug|ARM64">
+      <Configuration>Release-Hotplug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-Hotplug|Win32">
+      <Configuration>Release-Hotplug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-Hotplug|x64">
+      <Configuration>Release-Hotplug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+	  <ProjectConfiguration Include="Debug-Hotplug-MT|ARM">
+      <Configuration>Debug-Hotplug-MT</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-Hotplug-MT|ARM64">
+      <Configuration>Debug-Hotplug-MT</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-Hotplug-MT|Win32">
+      <Configuration>Debug-Hotplug-MT</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-Hotplug-MT|x64">
+      <Configuration>Debug-Hotplug-MT</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+	 <ProjectConfiguration Include="Release-Hotplug-MT|ARM">
+      <Configuration>Release-Hotplug-MT</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-Hotplug-MT|ARM64">
+      <Configuration>Release-Hotplug-MT</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-Hotplug-MT|Win32">
+      <Configuration>Release-Hotplug-MT</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-Hotplug-MT|x64">
+      <Configuration>Release-Hotplug-MT</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug-Hotplug'">
+		<EnableWindowsHotplug>true</EnableWindowsHotplug>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug-Hotplug-MT'">
+		<EnableWindowsHotplug>true</EnableWindowsHotplug>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Release-Hotplug'">
+		<EnableWindowsHotplug>true</EnableWindowsHotplug>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Release-Hotplug-MT'">
+		<EnableWindowsHotplug>true</EnableWindowsHotplug>
+	</PropertyGroup>
 </Project>

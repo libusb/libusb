@@ -24,6 +24,7 @@
     <ClCompile Include="..\libusb\os\events_windows.c" />
     <ClCompile Include="..\libusb\hotplug.c" />
     <ClCompile Include="..\libusb\io.c" />
+    <ClCompile Condition="'$(EnableWindowsHotplug)' == 'true'" Include="..\libusb\os\windows_hotplug.c" />
     <ClCompile Include="..\libusb\strerror.c" />
     <ClCompile Include="..\libusb\sync.c" />
     <ClCompile Include="..\libusb\os\threads_windows.c" />
@@ -32,6 +33,7 @@
     <ClCompile Include="..\libusb\os\windows_winusb.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Condition="'$(EnableWindowsHotplug)' == 'true'" Include="..\libusb\os\windows_hotplug.h" />
     <ClInclude Include=".\config.h" />
     <ClInclude Include="..\libusb\os\events_windows.h" />
     <ClInclude Include="..\libusb\libusb.h" />
