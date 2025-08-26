@@ -51,7 +51,8 @@ static inline void usbi_mutex_unlock(usbi_mutex_t *mutex)
 }
 static inline int usbi_mutex_trylock(usbi_mutex_t *mutex)
 {
-	return pthread_mutex_trylock(mutex) == 0;
+	int mutexIsLocked = pthread_mutex_trylock(mutex) == 0;
+	return mutexIsLocked;
 }
 static inline void usbi_mutex_destroy(usbi_mutex_t *mutex)
 {
