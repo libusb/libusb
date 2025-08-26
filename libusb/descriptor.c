@@ -777,7 +777,7 @@ static int parse_bos(struct libusb_context *ctx,
 		return LIBUSB_ERROR_IO;
 	}
 
-	_bos = calloc(1, sizeof(*_bos) + bos_desc->bNumDeviceCaps * sizeof(void *));
+	_bos = calloc(1, sizeof(*_bos) + (bos_desc->bNumDeviceCaps * sizeof(void *)));
 	if (!_bos)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1082,7 +1082,7 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	parsedDescriptor.wReserved = ReadLittleEndian16(&dev_capability_data[7]);
 
 	uint8_t numSublikSpeedAttributes = (parsedDescriptor.bmAttributes & 0xF) + 1;
-	_ssplus_cap = malloc(sizeof(struct libusb_ssplus_usb_device_capability_descriptor) + numSublikSpeedAttributes * sizeof(struct libusb_ssplus_sublink_attribute));
+	_ssplus_cap = malloc(sizeof(struct libusb_ssplus_usb_device_capability_descriptor) + (numSublikSpeedAttributes * sizeof(struct libusb_ssplus_sublink_attribute)));
 	if (!_ssplus_cap)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1096,7 +1096,7 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	_ssplus_cap->minTxLaneCount = (parsedDescriptor.wFunctionalitySupport & 0xF000) >> 12;
 
 	/* Check that we have enough to read all the sublink attributes */
-	if (dev_cap->bLength < LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE + _ssplus_cap->numSublinkSpeedAttributes * sizeof(uint32_t)) {
+	if (dev_cap->bLength < LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE + (_ssplus_cap->numSublinkSpeedAttributes * sizeof(uint32_t))) {
 		usbi_err(ctx, "short ssplus capability descriptor, unable to read sublinks: Not enough data");
 		return LIBUSB_ERROR_IO;
 	}
@@ -1104,7 +1104,7 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	/* Read the attributes */
 	uint8_t* base = ((uint8_t*)dev_cap) + LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE;
 	for(uint8_t i = 0 ; i < _ssplus_cap->numSublinkSpeedAttributes ; i++) {
-		uint32_t attr = ReadLittleEndian32(base + i * sizeof(uint32_t));
+		uint32_t attr = ReadLittleEndian32(base + (i * sizeof(uint32_t)));
 		_ssplus_cap->sublinkSpeedAttributes[i].ssid = attr & 0x0f;
 		_ssplus_cap->sublinkSpeedAttributes[i].mantissa = attr >> 16;
 		_ssplus_cap->sublinkSpeedAttributes[i].exponent = (attr >> 4) & 0x3 ;
