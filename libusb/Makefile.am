@@ -30,6 +30,10 @@ OS_WINDOWS_SRC = libusb-1.0.def libusb-1.0.rc \
 		 os/windows_usbdk.h os/windows_usbdk.c \
 		 os/windows_winusb.h os/windows_winusb.c
 
+if LIBUSB_WINDOWS_HOTPLUG
+OS_WINDOWS_SRC += os/windows_hotplug.h os/windows_hotplug.c
+endif	 
+
 if OS_DARWIN
 OS_SRC = $(OS_DARWIN_SRC)
 endif
