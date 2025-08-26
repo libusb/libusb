@@ -1097,6 +1097,7 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 
 	/* Check that we have enough to read all the sublink attributes */
 	if (dev_cap->bLength < LIBUSB_BT_SSPLUS_USB_DEVICE_CAPABILITY_SIZE + (_ssplus_cap->numSublinkSpeedAttributes * sizeof(uint32_t))) {
+		free(_ssplus_cap);
 		usbi_err(ctx, "short ssplus capability descriptor, unable to read sublinks: Not enough data");
 		return LIBUSB_ERROR_IO;
 	}
