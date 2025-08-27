@@ -35,6 +35,9 @@
 #include <sys/time.h>
 #endif
 
+/* Needed for MinGW's __MINGW_PRINTF_FORMAT */
+#include <stdio.h>
+
 #include "libusb.h"
 
 /* Not all C standard library headers define static_assert in assert.h
