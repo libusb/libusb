@@ -6,7 +6,7 @@
   </Target>
   <ItemDefinitionGroup Condition="'$(EnableWindowsHotplug)' == 'true'">
     <ClCompile>
-      <PreprocessorDefinitions>WINDOWS_HOTPLUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>LIBUSB_WINDOWS_HOTPLUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup Label="ProjectConfigurations">
