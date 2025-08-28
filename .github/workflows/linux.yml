@@ -16,11 +16,13 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job
       # can access it
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: setup prerequisites
         run: |
           sudo apt update
-          sudo apt install autoconf automake libtool libudev-dev m4
+          sudo apt install autoconf automake libtool libudev-dev m4 clang-tidy wget
 
       - name: bootstrap
         run: ./bootstrap.sh
@@ -48,3 +50,11 @@ jobs:
 
       - name: umockdev test
         run: .private/ci-container-build.sh docker.io/amd64/ubuntu:rolling
+
+      - name: clang-tidy
+        continue-on-error: true
+        env:
+          current_sha: ${{ github.sha }}
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          .private/ci-build.sh --clang-tidy --build-dir build-tidy --no-test -- --disable-udev
