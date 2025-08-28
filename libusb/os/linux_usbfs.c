@@ -2317,7 +2317,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	return 0;
 }
 
-static int op_submit_transfer(struct usbi_transfer *itransfer)
+static int op_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct libusb_transfer *transfer =
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);

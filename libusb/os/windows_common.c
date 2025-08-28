@@ -779,7 +779,7 @@ static int windows_get_max_raw_io_transfer_size(struct libusb_device_handle *dev
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int windows_submit_transfer(struct usbi_transfer *itransfer)
+static int windows_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_device_handle *dev_handle = transfer->dev_handle;
