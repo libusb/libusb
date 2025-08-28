@@ -272,6 +272,8 @@
 		1443EE8716417E63007E0579 /* libusb.xcconfig */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = text.xcconfig; path = libusb.xcconfig; sourceTree = SOURCE_ROOT; tabWidth = 4; usesTabs = 1; };
 		1443EE8816417E63007E0579 /* release.xcconfig */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = text.xcconfig; path = release.xcconfig; sourceTree = SOURCE_ROOT; tabWidth = 4; usesTabs = 1; };
 		1443EE8916417EA6007E0579 /* libusb_release.xcconfig */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = text.xcconfig; path = libusb_release.xcconfig; sourceTree = SOURCE_ROOT; tabWidth = 4; usesTabs = 1; };
+		145F5D8D2E60B46B004ABA5D /* windows_hotplug.h */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = windows_hotplug.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 0; };
+		145F5D8E2E60B46B004ABA5D /* windows_hotplug.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = windows_hotplug.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 0; };
 		14EC13E12B3D5BA600CF9AD0 /* emscripten_webusb.cpp */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.cpp.cpp; path = emscripten_webusb.cpp; sourceTree = "<group>"; tabWidth = 4; usesTabs = 0; };
 		14EC13E22B3D5BBE00CF9AD0 /* sunos_usb.h */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = sunos_usb.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 0; };
 		14EC13E32B3D5BBE00CF9AD0 /* openbsd_usb.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = openbsd_usb.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 0; };
@@ -493,6 +495,8 @@
 				14EC13F72B3D5BC800CF9AD0 /* threads_windows.h */,
 				14EC13F52B3D5BC800CF9AD0 /* windows_common.c */,
 				14EC13F22B3D5BC800CF9AD0 /* windows_common.h */,
+				145F5D8D2E60B46B004ABA5D /* windows_hotplug.h */,
+				145F5D8E2E60B46B004ABA5D /* windows_hotplug.c */,
 				14EC13F92B3D5BC800CF9AD0 /* windows_usbdk.c */,
 				14EC13F82B3D5BC800CF9AD0 /* windows_usbdk.h */,
 				14EC13F42B3D5BC800CF9AD0 /* windows_winusb.c */,
