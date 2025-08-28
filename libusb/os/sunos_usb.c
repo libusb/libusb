@@ -618,12 +618,12 @@ sunos_add_devices(di_devlink_t link, void *arg)
 			dev->bus_number = bus_number;
 
 			if (sunos_fill_in_dev_info(dn, dev) != LIBUSB_SUCCESS) {
-				libusb_unref_device(dev);
+				usbi_unref_device(dev);
 				usbi_dbg(NULL, "get information fail");
 				continue;
 			}
 			if (usbi_sanitize_device(dev) < 0) {
-				libusb_unref_device(dev);
+				usbi_unref_device(dev);
 				usbi_dbg(NULL, "sanitize failed: ");
 				return (DI_WALK_TERMINATE);
 			}
@@ -640,7 +640,7 @@ sunos_add_devices(di_devlink_t link, void *arg)
 		 * we alloc and hence ref this dev. We don't need to ref it
 		 * hereafter. Front end or app should take care of their ref.
 		 */
-		libusb_unref_device(dev);
+		usbi_unref_device(dev);
 
 		usbi_dbg(NULL, "Device %s %s id=0x%" PRIx64 ", devcount:%" PRIuPTR
 		    ", bdf=%" PRIx64,

@@ -338,14 +338,14 @@ static int usbdk_get_device_list(struct libusb_context *ctx, struct discovered_d
 
 			usbdk_device_init(dev, &devices[i]);
 			if (usbdk_device_priv_init(ctx, dev, &devices[i]) != LIBUSB_SUCCESS) {
-				libusb_unref_device(dev);
+				usbi_unref_device(dev);
 				continue;
 			}
 		}
 
 		if (_discdevs) {
 			discdevs = discovered_devs_append(*_discdevs, dev);
-			libusb_unref_device(dev);
+			usbi_unref_device(dev);
 			if (!discdevs) {
 				usbi_err(ctx, "cannot append new device to list");
 				r = LIBUSB_ERROR_NO_MEM;

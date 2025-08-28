@@ -508,6 +508,7 @@ static inline void usbi_end_event_handling(struct libusb_context *ctx)
 }
 
 struct libusb_device {
+	usbi_atomic_t keep_device;
 	usbi_atomic_t refcnt;
 
 	struct libusb_context *ctx;
@@ -828,6 +829,11 @@ void usbi_detach_device(struct libusb_device *dev);
 
 void usbi_connect_device(struct libusb_device *dev);
 void usbi_disconnect_device(struct libusb_device *dev);
+
+libusb_device* usbi_ref_device(libusb_device* dev);
+void usbi_unref_device(libusb_device* dev);
+
+void usbi_destroy_device(libusb_device* dev);
 
 struct usbi_event_source_data {
 	usbi_os_handle_t os_handle;

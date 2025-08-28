@@ -101,7 +101,7 @@ WatchedEntry::WatchedEntry(BMessenger *messenger, entry_ref *ref)
 				struct libusb_device *dev = usbi_get_device_by_session_id(ctx, session_id);
 				if (dev) {
 					usbi_dbg(NULL, "using previously allocated device with location %lu", session_id);
-					libusb_unref_device(dev);
+					usbi_unref_device(dev);
 					continue;
 				}
 				usbi_dbg(NULL, "allocating new device with location %lu", session_id);
@@ -135,7 +135,7 @@ WatchedEntry::WatchedEntry(BMessenger *messenger, entry_ref *ref)
 
 				if (usbi_sanitize_device(dev) < 0) {
 					usbi_dbg(NULL, "device sanitization failed");
-					libusb_unref_device(dev);
+					usbi_unref_device(dev);
 					continue;
 				}
 				usbi_connect_device(dev);
@@ -176,7 +176,7 @@ WatchedEntry::~WatchedEntry()
 			dev = usbi_get_device_by_session_id(ctx, session_id);
 			if (dev != NULL) {
 				usbi_disconnect_device(dev);
-				libusb_unref_device(dev);
+				usbi_unref_device(dev);
 			} else {
 				usbi_dbg(ctx, "device with location %lu not found", session_id);
 			}
