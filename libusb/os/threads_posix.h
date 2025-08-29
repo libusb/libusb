@@ -88,7 +88,7 @@ static inline void usbi_tls_key_create(usbi_tls_key_t *key)
 }
 static inline void *usbi_tls_key_get(usbi_tls_key_t key)
 {
-	return pthread_getspecific(key);
+	return __unsafe_forge_single(void*, pthread_getspecific(key));
 }
 static inline void usbi_tls_key_set(usbi_tls_key_t key, void *ptr)
 {
