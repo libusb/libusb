@@ -74,6 +74,73 @@ static libusb_testlib_result test_get_device_list(void)
 	return TEST_STATUS_SUCCESS;
 }
 
+/** Tests that device ids can be read 1000 times. */
+static libusb_testlib_result test_get_device_id(void)
+{
+	libusb_context *ctx;
+	int r;
+
+	r = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
+	if (r != LIBUSB_SUCCESS) {
+		libusb_testlib_logf("Failed to init libusb: %d", r);
+		return TEST_STATUS_FAILURE;
+	}
+
+	for (int i = 0; i < 1000; ++i) {
+		libusb_device **device_list = NULL;
+		ssize_t list_size = libusb_get_device_list(ctx, &device_list);
+
+		if (list_size < 0 || !device_list) {
+			libusb_testlib_logf(
+				"Failed to get device list on iteration %d: %ld (%p)",
+				i, (long) -list_size, (void *) device_list);
+			libusb_exit(ctx);
+			return TEST_STATUS_FAILURE;
+		}
+
+		for (int j = 0; device_list[j] != NULL; j++) {
+			libusb_device *dev = device_list[j];
+			char *id;
+
+			r = libusb_get_platform_device_id(dev, &id);
+			if (r == LIBUSB_ERROR_NOT_SUPPORTED) {
+				libusb_testlib_logf("Platform device ID not supported skipping");
+				libusb_free_device_list(device_list, 1);
+				libusb_exit(ctx);
+				return TEST_STATUS_SKIP;
+			} else if (r < 0 && r != LIBUSB_ERROR_NOT_FOUND) {
+				libusb_testlib_logf(
+					"Failed to get platform device ID on on device %d, "
+					"iteration %d: %d", j, i, r);
+				libusb_free_device_list(device_list, 1);
+				libusb_exit(ctx);
+				return TEST_STATUS_FAILURE;
+			}  else if (r == LIBUSB_ERROR_NOT_FOUND && id) {
+				libusb_testlib_logf(
+					"Platform device ID not found, but id is not NULL "
+					"on device %d, iteration %d", j, i);
+				libusb_free_device_list(device_list, 1);
+				libusb_exit(ctx);
+				return TEST_STATUS_FAILURE;
+			} else if (r == LIBUSB_SUCCESS && !id) {
+				libusb_testlib_logf(
+					"Platform device ID is NULL on device %d iteration %d", j,
+					i);
+				libusb_free_device_list(device_list, 1);
+				libusb_exit(ctx);
+				return TEST_STATUS_FAILURE;
+			}
+			if (id)
+				libusb_free_platform_device_id(id);
+
+		}
+		libusb_free_device_list(device_list, 1);
+	}
+
+	libusb_exit(ctx);
+	return TEST_STATUS_SUCCESS;
+}
+
 /** Tests that 100 concurrent device lists can be open at a time. */
 static libusb_testlib_result test_many_device_lists(void)
 {
@@ -161,6 +228,7 @@ static libusb_testlib_result test_default_context_change(void)
 static const libusb_testlib_test tests[] = {
 	{ "init_and_exit", &test_init_and_exit },
 	{ "get_device_list", &test_get_device_list },
+	{ "get_device_id", &test_get_device_id },
 	{ "many_device_lists", &test_many_device_lists },
 	{ "default_context_change", &test_default_context_change },
 	LIBUSB_NULL_TEST
