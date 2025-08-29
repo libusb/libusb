@@ -201,19 +201,25 @@ static int get_usbfs_fd(struct libusb_device *dev, int access_mode, int silent)
 	if (fd != -1)
 		return fd; /* Success */
 
+	/* TODO: fix race between netlink and usbfs https://github.com/libusb/libusb/issues/1691 */
 	if (errno == ENOENT) {
 		const long delay_ms = 10L;
 		const struct timespec delay_ts = { 0L, delay_ms * 1000L * 1000L };
+		uint8_t retry = 3;
 
-		if (!silent)
-			usbi_err(ctx, "File doesn't exist, wait %ld ms and try again", delay_ms);
+		while (retry-- > 0) {
+			if (!silent)
+				usbi_err(ctx, "File doesn't exist, wait %ld ms and try again", delay_ms);
 
-		/* Wait 10ms for USB device path creation.*/
-		nanosleep(&delay_ts, NULL);
+			/* Wait 10ms for USB device path creation.*/
+			nanosleep(&delay_ts, NULL);
 
-		fd = open(path, access_mode | O_CLOEXEC);
-		if (fd != -1)
-			return fd; /* Success */
+			fd = open(path, access_mode | O_CLOEXEC);
+			if (fd != -1)
+				return fd; /* Success */
+			if (errno != ENOENT)
+				break;
+		}
 	}
 
 	if (!silent) {
