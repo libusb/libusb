@@ -1104,7 +1104,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 				usbi_err(ctx, "program assertion failed - first ancestor is not parent");
 				return LIBUSB_ERROR_NOT_FOUND;
 			}
-			libusb_unref_device(tmp_dev);
+			usbi_unref_device(tmp_dev);
 
 			for (depth = 1; bus_number == 0; depth++) {
 				tmp_dev = get_ancestor(ctx, devinst, &devinst);
@@ -1117,7 +1117,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 					tmp_priv = usbi_get_device_priv(tmp_dev);
 					depth += tmp_priv->depth;
 				}
-				libusb_unref_device(tmp_dev);
+				usbi_unref_device(tmp_dev);
 			}
 		} else {
 			depth = parent_priv->depth + 1;
@@ -1310,7 +1310,7 @@ static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id
 
 	if (sscanf(dev_id, "PCI\\VEN_%04hx&DEV_%04hx%*s", &dev->device_descriptor.idVendor, &dev->device_descriptor.idProduct) != 2)
 			usbi_warn(ctx, "could not infer VID/PID of HCD from '%s'", dev_id);
-	libusb_unref_device(dev);
+	usbi_unref_device(dev);
 	return LIBUSB_SUCCESS;
 }
 
@@ -1856,7 +1856,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						priv = usbi_get_device_priv(dev);
 						if (priv->root_hub)
 							goto track_unref;
-						libusb_unref_device(dev);
+						usbi_unref_device(dev);
 					}
 
 					usbi_dbg(ctx, "unlisted ancestor for '%s' (non USB HID, newly connected, etc.) - ignoring", dev_id);
@@ -1866,7 +1866,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				parent_priv = usbi_get_device_priv(parent_dev);
 				// virtual USB devices are also listed during GEN - don't process these yet
 				if ((pass == GEN_PASS) && (parent_priv->apib->id != USB_API_HUB)) {
-					libusb_unref_device(parent_dev);
+					usbi_unref_device(parent_dev);
 					continue;
 				}
 			}
@@ -1889,7 +1889,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					priv->dev_id = _strdup(dev_id);
 					priv->class_guid = dev_info_data.ClassGuid;
 					if (priv->dev_id == NULL) {
-						libusb_unref_device(dev);
+						usbi_unref_device(dev);
 						LOOP_BREAK(LIBUSB_ERROR_NO_MEM);
 					}
 #if defined(LIBUSB_WINDOWS_HOTPLUG)
@@ -1902,13 +1902,13 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					if (strcmp(priv->dev_id, dev_id) != 0) {
 						usbi_dbg(ctx, "device instance ID for session [%lX] changed", session_id);
 						usbi_detach_device(dev); // usbi_detach_device is equivalent do usbi_disconnect_device but for the firing of LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT
-						libusb_unref_device(dev);
+						usbi_unref_device(dev);
 						goto alloc_device;
 					}
 					if (!IsEqualGUID(&priv->class_guid, &dev_info_data.ClassGuid)) {
 						usbi_dbg(ctx, "device class GUID for session [%lX] changed", session_id);
 						usbi_detach_device(dev); // usbi_detach_device is equivalent do usbi_disconnect_device but for the firing of LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT
-						libusb_unref_device(dev);
+						usbi_unref_device(dev);
 						goto alloc_device;
 					}
 				}
@@ -1957,7 +1957,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 							usbi_dbg(ctx, "assigning Root Hub '%s' bus number %u", dev_id, bus_number);
 						}
 					} else {
-						libusb_unref_device(parent_dev);
+						usbi_unref_device(parent_dev);
 					}
 					break;
 				case USB_API_HID:
@@ -1984,7 +1984,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				port_nr = 0;
 #if defined(LIBUSB_WINDOWS_HOTPLUG)
 				if (priv->initialized) {
-					libusb_unref_device(parent_dev);
+					usbi_unref_device(parent_dev);
 					r = LIBUSB_SUCCESS;
 				}
 				else {
@@ -2011,7 +2011,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					r = LIBUSB_SUCCESS;
 #if defined(LIBUSB_WINDOWS_HOTPLUG)
 					usbi_detach_device(dev);
-					libusb_unref_device(dev);
+					usbi_unref_device(dev);
 #endif
 				}
 				break;
@@ -2038,7 +2038,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						break;
 					}
 				}
-				libusb_unref_device(parent_dev);
+				usbi_unref_device(parent_dev);
 				break;
 			default:
 				assert(false); // unreachable since all pass types covered explicitly
@@ -2059,7 +2059,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 
 	// Unref newly allocated devs
 	for (i = 0; i < unref_cur; i++)
-		libusb_unref_device(unref_list[i]);
+		usbi_unref_device(unref_list[i]);
 	free(unref_list);
 
 	return r;

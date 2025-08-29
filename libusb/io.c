@@ -1340,7 +1340,7 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 	struct usbi_transfer *itransfer = LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	usbi_mutex_destroy(&itransfer->lock);
 	if (itransfer->dev)
-		libusb_unref_device(itransfer->dev);
+		usbi_unref_device(itransfer->dev);
 
 	unsigned char *ptr = USBI_TRANSFER_TO_TRANSFER_PRIV(itransfer);
 	assert(ptr == itransfer->priv);
@@ -1492,8 +1492,8 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 
 	assert(transfer->dev_handle);
 	if (itransfer->dev)
-		libusb_unref_device(itransfer->dev);
-	itransfer->dev = libusb_ref_device(transfer->dev_handle->dev);
+		usbi_unref_device(itransfer->dev);
+	itransfer->dev = usbi_ref_device(transfer->dev_handle->dev);
 
 	ctx = HANDLE_CTX(transfer->dev_handle);
 	usbi_dbg(ctx, "transfer %p", (void *) transfer);

@@ -494,9 +494,9 @@ test_fixture_teardown(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 
 		/* libusb_exit should result in the correct number of devices being destroyed */
 		for (int i = 0; i < count; i++)
-			assert_libusb_log_msg(fixture, LIBUSB_LOG_LEVEL_DEBUG, "libusb_unref_device");
+			assert_libusb_log_msg(fixture, LIBUSB_LOG_LEVEL_DEBUG, "usbi_destroy_device");
 
-		assert_libusb_no_log_msg(fixture, LIBUSB_LOG_LEVEL_DEBUG, "libusb_unref_device");
+		assert_libusb_no_log_msg(fixture, LIBUSB_LOG_LEVEL_DEBUG, "usbi_destroy_device");
 	}
 	libusb_set_log_cb (NULL, NULL, LIBUSB_LOG_CB_GLOBAL);
 	cur_fixture = NULL;

@@ -620,7 +620,7 @@ libusb_free_device_list(list, 1);
  *
  * New devices presented by the libusb_get_device_list() function all have a
  * reference count of 1. You can increase and decrease reference count using
- * libusb_ref_device() and libusb_unref_device(). A device is destroyed when
+ * usbi_ref_device() and usbi_unref_device(). A device is destroyed when
  * its reference count reaches 0.
  *
  * With the above information in mind, the process of opening a device can
@@ -669,7 +669,7 @@ static void discovered_devs_free(struct discovered_devs *discdevs)
 	size_t i;
 
 	for (i = 0; i < discdevs->len; i++)
-		libusb_unref_device(discdevs->devices[i]);
+		usbi_unref_device(discdevs->devices[i]);
 
 	free(discdevs);
 }
@@ -685,7 +685,7 @@ struct discovered_devs *discovered_devs_append(
 
 	/* if there is space, just append the device */
 	if (len < discdevs->capacity) {
-		discdevs->devices[len] = libusb_ref_device(dev);
+		discdevs->devices[len] = usbi_ref_device(dev);
 		discdevs->len++;
 		return discdevs;
 	}
@@ -704,7 +704,7 @@ struct discovered_devs *discovered_devs_append(
 
 	discdevs = new_discdevs;
 	discdevs->capacity = capacity;
-	discdevs->devices[len] = libusb_ref_device(dev);
+	discdevs->devices[len] = usbi_ref_device(dev);
 	discdevs->len++;
 
 	return discdevs;
@@ -767,6 +767,55 @@ void usbi_disconnect_device(struct libusb_device *dev)
 	usbi_hotplug_notification(DEVICE_CTX(dev), dev, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT);
 }
 
+libusb_device* usbi_ref_device(libusb_device* dev)
+{
+	long refcnt = usbi_atomic_inc(&dev->refcnt);
+	assert(refcnt >= 1);
+	UNUSED(refcnt);
+
+	return dev;
+}
+
+void usbi_unref_device(libusb_device* dev)
+{
+	long refcnt = -1;
+
+	if (!dev)
+		return;
+
+	if (usbi_atomic_load(&dev->refcnt) > 0) { /* decrement only if positive value */
+		refcnt = usbi_atomic_dec(&dev->refcnt);
+		assert(refcnt >= 0);
+	}
+
+	if (refcnt == 0) {
+		usbi_unref_device(dev->parent_dev);
+		usbi_destroy_device(dev);
+	}
+}
+
+
+void usbi_destroy_device(libusb_device* dev)
+{
+	if (!dev->keep_device) {
+		usbi_dbg(DEVICE_CTX(dev), "destroy device %d.%d", dev->bus_number, dev->device_address);
+
+		if (usbi_backend.destroy_device)
+			usbi_backend.destroy_device(dev);
+
+		if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+			/* backend does not support hotplug */
+			usbi_disconnect_device(dev);
+		}
+
+		for (int idx = 0; idx < LIBUSB_DEVICE_STRING_COUNT; ++idx) {
+			free(dev->device_strings_utf8[idx]);
+		}
+
+		free(dev);
+	}
+}
+
 /* Perform some final sanity checks on a newly discovered device. If this
  * function fails (negative return code), the device should not be added
  * to the discovered device list. */
@@ -803,7 +852,7 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	usbi_mutex_lock(&ctx->usb_devs_lock);
 	for_each_device(ctx, dev) {
 		if (dev->session_data == session_id) {
-			ret = libusb_ref_device(dev);
+			ret = usbi_ref_device(dev);
 			break;
 		}
 	}
@@ -885,7 +934,7 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 	ret[len] = NULL;
 	for (i = 0; i < len; i++) {
 		struct libusb_device *dev = discdevs->devices[i];
-		ret[i] = libusb_ref_device(dev);
+		ret[i] = usbi_ref_device(dev);
 	}
 	*list = ret;
 
@@ -913,7 +962,7 @@ void API_EXPORTED libusb_free_device_list(libusb_device **list,
 		struct libusb_device *dev;
 
 		while ((dev = list[i++]) != NULL)
-			libusb_unref_device(dev);
+			usbi_unref_device(dev);
 	}
 	free(list);
 }
@@ -1278,55 +1327,36 @@ out:
 }
 
 /** \ingroup libusb_dev
- * Increment the reference count of a device.
+ * Indicate to keep the handle of a device alive.
  * \param dev the device to reference
  * \returns the same device
  */
 DEFAULT_VISIBILITY
 libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev)
 {
-	long refcnt;
+	usbi_atomic_store(&dev->keep_device, 1);
 
-	refcnt = usbi_atomic_inc(&dev->refcnt);
-	assert(refcnt >= 2);
-	UNUSED(refcnt);
+	if (dev->parent_dev) {
+		libusb_ref_device(dev->parent_dev);
+	}
 
 	return dev;
 }
 
 /** \ingroup libusb_dev
- * Decrement the reference count of a device. If the decrement operation
- * causes the reference count to reach zero, the device shall be destroyed.
+ * Indicate that we don't want to keep anymore the handle of a device.
+ * If the reference count is at zero, the device shall be destroyed.
  * \param dev the device to unreference
  */
 void API_EXPORTED libusb_unref_device(libusb_device *dev)
 {
-	long refcnt;
+	usbi_atomic_store(&dev->keep_device, 0);
 
-	if (!dev)
-		return;
-
-	refcnt = usbi_atomic_dec(&dev->refcnt);
-	assert(refcnt >= 0);
-
-	if (refcnt == 0) {
-		usbi_dbg(DEVICE_CTX(dev), "destroy device %d.%d", dev->bus_number, dev->device_address);
-
-		libusb_unref_device(dev->parent_dev);
-
-		if (usbi_backend.destroy_device)
-			usbi_backend.destroy_device(dev);
-
-		if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
-			/* backend does not support hotplug */
-			usbi_disconnect_device(dev);
+	if (usbi_atomic_load(&dev->refcnt) == 0) {
+		if (dev->parent_dev) {
+			libusb_unref_device(dev->parent_dev);
 		}
-
-		for (int idx = 0; idx < LIBUSB_DEVICE_STRING_COUNT; ++idx) {
-			free(dev->device_strings_utf8[idx]);
-		}
-
-		free(dev);
+		usbi_destroy_device(dev);
 	}
 }
 
@@ -1439,12 +1469,12 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 
 	usbi_mutex_init(&_dev_handle->lock);
 
-	_dev_handle->dev = libusb_ref_device(dev);
+	_dev_handle->dev = usbi_ref_device(dev);
 
 	r = usbi_backend.open(_dev_handle);
 	if (r < 0) {
 		usbi_dbg(DEVICE_CTX(dev), "open %d.%d returns %d", dev->bus_number, dev->device_address, r);
-		libusb_unref_device(dev);
+		usbi_unref_device(dev);
 		usbi_mutex_destroy(&_dev_handle->lock);
 		free(_dev_handle);
 		return r;
@@ -1561,7 +1591,7 @@ static void do_close(struct libusb_context *ctx,
 	usbi_mutex_unlock(&ctx->open_devs_lock);
 
 	usbi_backend.close(dev_handle);
-	libusb_unref_device(dev_handle->dev);
+	usbi_unref_device(dev_handle->dev);
 	usbi_mutex_destroy(&dev_handle->lock);
 	free(dev_handle);
 }

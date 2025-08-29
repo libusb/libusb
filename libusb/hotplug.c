@@ -208,7 +208,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 		/* if the device left, the message holds a reference
 		 * and we must drop it */
 		if (msg->event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
-			libusb_unref_device(msg->device);
+			usbi_unref_device(msg->device);
 
 		list_del(&msg->list);
 		free(msg);
@@ -226,7 +226,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 
 		usbi_recursively_remove_parents(dev, next_dev);
 
-		libusb_unref_device(dev);
+		usbi_unref_device(dev);
 	}
 	usbi_mutex_unlock(&ctx->usb_devs_lock);
 
@@ -320,7 +320,7 @@ void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_
 		/* if the device left, the message holds a reference
 		 * and we must drop it */
 		if (msg->event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
-			libusb_unref_device(msg->device);
+			usbi_unref_device(msg->device);
 
 		list_del(&msg->list);
 		free(msg);

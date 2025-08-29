@@ -1123,7 +1123,7 @@ retry:
 
 		if (priv->sysfs_dir) {
 			if (!strcmp(priv->sysfs_dir, parent_sysfs_dir)) {
-				dev->parent_dev = libusb_ref_device(it);
+				dev->parent_dev = usbi_ref_device(it);
 				break;
 			}
 		}
@@ -1164,7 +1164,7 @@ int linux_enumerate_device(struct libusb_context *ctx,
 	if (dev) {
 		/* device already exists in the context */
 		usbi_dbg(ctx, "session_id %lu already exists", session_id);
-		libusb_unref_device(dev);
+		usbi_unref_device(dev);
 		return LIBUSB_SUCCESS;
 	}
 
@@ -1186,7 +1186,7 @@ int linux_enumerate_device(struct libusb_context *ctx,
 		goto out;
 out:
 	if (r < 0)
-		libusb_unref_device(dev);
+		usbi_unref_device(dev);
 	else
 		usbi_connect_device(dev);
 
@@ -1215,7 +1215,7 @@ void linux_device_disconnected(uint8_t busnum, uint8_t devaddr)
 		dev = usbi_get_device_by_session_id(ctx, session_id);
 		if (dev) {
 			usbi_disconnect_device(dev);
-			libusb_unref_device(dev);
+			usbi_unref_device(dev);
 		} else {
 			usbi_dbg(ctx, "device not found for session %lx", session_id);
 		}
@@ -1443,7 +1443,7 @@ static int op_wrap_sys_device(struct libusb_context *ctx,
 
 out:
 	if (r < 0)
-		libusb_unref_device(dev);
+		usbi_unref_device(dev);
 	return r;
 }
 

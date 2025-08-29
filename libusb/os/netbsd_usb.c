@@ -177,14 +177,14 @@ netbsd_get_device_list(struct libusb_context * ctx,
 		if (discovered_devs_append(*discdevs, dev) == NULL)
 			return LIBUSB_ERROR_NO_MEM;
 
-		libusb_unref_device(dev);
+		usbi_unref_device(dev);
 	}
 
 	return LIBUSB_SUCCESS;
 
 error:
 	close(fd);
-	libusb_unref_device(dev);
+	usbi_unref_device(dev);
 	return _errno_to_libusb(err);
 }
 

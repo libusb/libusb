@@ -613,7 +613,7 @@ val getDeviceList(libusb_context* ctx, discovered_devs** devs) {
 			if (auto error = statusVal.as<int>()) {
 				usbi_err(ctx, "failed to read device information: %s",
 						 libusb_error_name(error));
-				libusb_unref_device(dev);
+				usbi_unref_device(dev);
 				continue;
 			}
 
@@ -625,7 +625,7 @@ val getDeviceList(libusb_context* ctx, discovered_devs** devs) {
 			dev->device_address = dev->port_number = (uint8_t)session_id;
 		}
 		*devs = discovered_devs_append(*devs, dev);
-		libusb_unref_device(dev);
+		usbi_unref_device(dev);
 	}
 	co_return (int) LIBUSB_SUCCESS;
 }
