@@ -2506,6 +2506,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	}
 
 cancel_remaining:
+	int prev_reap_status = tpriv->reap_status;
 	if (tpriv->reap_action == ERROR && tpriv->reap_status == LIBUSB_TRANSFER_COMPLETED)
 		tpriv->reap_status = LIBUSB_TRANSFER_ERROR;
 
@@ -2524,9 +2525,12 @@ completed:
 	free(tpriv->urbs);
 	tpriv->urbs = NULL;
 	usbi_mutex_unlock(&itransfer->lock);
-	return tpriv->reap_action == CANCELLED ?
-		usbi_handle_transfer_cancellation(itransfer) :
+	
+	int r = tpriv->reap_action == CANCELLED ? usbi_handle_transfer_cancellation(itransfer) :
 		usbi_handle_transfer_completion(itransfer, tpriv->reap_status);
+
+	return tpriv->reap_action == ERROR && prev_reap_status == LIBUSB_TRANSFER_COMPLETED ? 
+		1 : r;
 }
 
 static int handle_iso_completion(struct usbi_transfer *itransfer,
