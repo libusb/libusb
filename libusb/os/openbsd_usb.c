@@ -182,7 +182,7 @@ obsd_get_device_list(struct libusb_context * ctx,
 				dd.udd_bus = di.udi_bus;
 				dd.udd_addr = di.udi_addr;
 				if (ioctl(fd, USB_DEVICE_GET_DDESC, &dd) < 0) {
-					libusb_unref_device(dev);
+					usbi_unref_device(dev);
 					continue;
 				}
 
@@ -192,12 +192,12 @@ obsd_get_device_list(struct libusb_context * ctx,
 				usbi_localize_device_descriptor(&dev->device_descriptor);
 
 				if (_cache_active_config_descriptor(dev)) {
-					libusb_unref_device(dev);
+					usbi_unref_device(dev);
 					continue;
 				}
 
 				if (usbi_sanitize_device(dev)) {
-					libusb_unref_device(dev);
+					usbi_unref_device(dev);
 					continue;
 				}
 			}
@@ -207,7 +207,7 @@ obsd_get_device_list(struct libusb_context * ctx,
 				close(fd);
 				return LIBUSB_ERROR_NO_MEM;
 			}
-			libusb_unref_device(dev);
+			usbi_unref_device(dev);
 
 			*discdevs = ddd;
 			devices[addr] = 1;
