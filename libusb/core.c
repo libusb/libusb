@@ -47,11 +47,11 @@ static int default_context_refcnt;
 static usbi_atomic_t default_debug_level = -1;
 #endif
 static usbi_mutex_static_t default_context_lock = USBI_MUTEX_INITIALIZER;
-static struct usbi_option default_context_options[LIBUSB_OPTION_MAX];
+static struct usbi_option default_context_options[LIBUSB_OPTION_MAX] GUARDED_BY(default_context_lock);
 
 
 usbi_mutex_static_t active_contexts_lock = USBI_MUTEX_INITIALIZER;
-struct list_head active_contexts_list;
+struct list_head active_contexts_list GUARDED_BY(active_contexts_lock);
 
 /**
  * \mainpage libusb-1.0 API Reference
@@ -655,7 +655,7 @@ libusb_free_device_list(list, 1);
 static struct discovered_devs *discovered_devs_alloc(void)
 {
 	struct discovered_devs *ret =
-		malloc(sizeof(*ret) + (sizeof(void *) * DISCOVERED_DEVICES_SIZE_STEP));
+		(struct discovered_devs *)malloc(sizeof(*ret) + (sizeof(void *) * DISCOVERED_DEVICES_SIZE_STEP));
 
 	if (ret) {
 		ret->len = 0;
@@ -695,7 +695,7 @@ struct discovered_devs *discovered_devs_append(
 	capacity = discdevs->capacity + DISCOVERED_DEVICES_SIZE_STEP;
 	/* can't use usbi_reallocf here because in failure cases it would
 	 * free the existing discdevs without unreferencing its devices. */
-	new_discdevs = realloc(discdevs,
+	new_discdevs = (struct discovered_devs *)realloc(discdevs,
 		sizeof(*discdevs) + (sizeof(void *) * capacity));
 	if (!new_discdevs) {
 		discovered_devs_free(discdevs);
@@ -716,7 +716,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	unsigned long session_id)
 {
 	size_t priv_size = usbi_backend.device_priv_size;
-	struct libusb_device *dev = calloc(1, PTR_ALIGN(sizeof(*dev)) + priv_size);
+	struct libusb_device *dev = (struct libusb_device *)calloc(1, PTR_ALIGN(sizeof(*dev)) + priv_size);
 
 	if (!dev)
 		return NULL;
@@ -770,7 +770,7 @@ void usbi_disconnect_device(struct libusb_device *dev)
 /* Perform some final sanity checks on a newly discovered device. If this
  * function fails (negative return code), the device should not be added
  * to the discovered device list. */
-int usbi_sanitize_device(struct libusb_device *dev)
+enum libusb_error usbi_sanitize_device(struct libusb_device *dev)
 {
 	uint8_t num_configurations;
 
@@ -788,7 +788,7 @@ int usbi_sanitize_device(struct libusb_device *dev)
 		usbi_dbg(DEVICE_CTX(dev), "zero configurations, maybe an unauthorized device");
 	}
 
-	return 0;
+	return LIBUSB_SUCCESS;
 }
 
 /* Examine libusb's internal list of known devices, looking for one with
@@ -876,7 +876,7 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 
 	/* convert discovered_devs into a list */
 	len = (ssize_t)discdevs->len;
-	ret = calloc((size_t)len + 1, sizeof(struct libusb_device *));
+	ret = (struct libusb_device **)calloc((size_t)len + 1, sizeof(struct libusb_device *));
 	if (!ret) {
 		len = LIBUSB_ERROR_NO_MEM;
 		goto out;
@@ -1379,7 +1379,7 @@ int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
 	if (!usbi_backend.wrap_sys_device)
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 
-	_dev_handle = calloc(1, PTR_ALIGN(sizeof(*_dev_handle)) + priv_size);
+	_dev_handle = (struct libusb_device_handle *)calloc(1, PTR_ALIGN(sizeof(*_dev_handle)) + priv_size);
 	if (!_dev_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1433,7 +1433,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	if (!usbi_atomic_load(&dev->attached))
 		return LIBUSB_ERROR_NO_DEVICE;
 
-	_dev_handle = calloc(1, PTR_ALIGN(sizeof(*_dev_handle)) + priv_size);
+	_dev_handle = (struct libusb_device_handle *)calloc(1, PTR_ALIGN(sizeof(*_dev_handle)) + priv_size);
 	if (!_dev_handle)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -1511,7 +1511,7 @@ out:
 }
 
 static void do_close(struct libusb_context *ctx,
-	struct libusb_device_handle *dev_handle)
+	struct libusb_device_handle *dev_handle) EXCLUDES(ctx->flying_transfers_lock)
 {
 	struct usbi_transfer *itransfer;
 	struct usbi_transfer *tmp;
@@ -1789,7 +1789,7 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
  * \see libusb_set_auto_detach_kernel_driver()
  */
 int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
-	int interface_number)
+	int interface_number) EXCLUDES(dev_handle->lock)
 {
 	int r = 0;
 
@@ -1833,7 +1833,7 @@ out:
  * \see libusb_set_auto_detach_kernel_driver()
  */
 int API_EXPORTED libusb_release_interface(libusb_device_handle *dev_handle,
-	int interface_number)
+	int interface_number) EXCLUDES(dev_handle->lock)
 {
 	int r;
 
@@ -1878,7 +1878,7 @@ out:
  * \returns another LIBUSB_ERROR code on other failure
  */
 int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_handle,
-	int interface_number, int alternate_setting)
+	int interface_number, int alternate_setting) EXCLUDES(dev_handle->lock)
 {
 	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d altsetting %d",
 		interface_number, alternate_setting);
@@ -2060,7 +2060,7 @@ unsigned char * LIBUSB_CALL libusb_dev_mem_alloc(libusb_device_handle *dev_handl
 		return NULL;
 
 	if (usbi_backend.dev_mem_alloc)
-		return usbi_backend.dev_mem_alloc(dev_handle, length);
+		return (unsigned char *)usbi_backend.dev_mem_alloc(dev_handle, length);
 	else
 		return NULL;
 }
@@ -2138,7 +2138,7 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev_handle,
  * \see libusb_kernel_driver_active()
  */
 int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
-	int interface_number)
+	int interface_number) EXCLUDES(dev_handle->lock)
 {
 	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
 
@@ -2174,7 +2174,7 @@ int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
  * \see libusb_kernel_driver_active()
  */
 int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
-	int interface_number)
+	int interface_number) EXCLUDES(dev_handle->lock)
 {
 	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
 
@@ -2213,7 +2213,7 @@ int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
  * \see libusb_set_configuration()
  */
 int API_EXPORTED libusb_set_auto_detach_kernel_driver(
-	libusb_device_handle *dev_handle, int enable)
+	libusb_device_handle *dev_handle, int enable) EXCLUDES(dev_handle->lock)
 {
 	if (!(usbi_backend.caps & USBI_CAP_SUPPORTS_DETACH_KERNEL_DRIVER))
 		return LIBUSB_ERROR_NOT_SUPPORTED;
@@ -2565,7 +2565,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 	}
 	usbi_mutex_static_unlock(&active_contexts_lock);
 
-	_ctx = calloc(1, PTR_ALIGN(sizeof(*_ctx)) + priv_size);
+	_ctx = (struct libusb_context *)calloc(1, PTR_ALIGN(sizeof(*_ctx)) + priv_size);
 	if (!_ctx) {
 		usbi_mutex_static_unlock(&default_context_lock);
 		return LIBUSB_ERROR_NO_MEM;
@@ -2587,14 +2587,14 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 	list_init(&_ctx->open_devs);
 
 	/* apply default options to all new contexts */
-	for (enum libusb_option option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
+	for (int option = 0 ; option < LIBUSB_OPTION_MAX ; option++) {
 		if (LIBUSB_OPTION_LOG_LEVEL == option || !default_context_options[option].is_set) {
 			continue;
 		}
 		if (LIBUSB_OPTION_LOG_CB != option) {
-			r = libusb_set_option(_ctx, option);
+			r = libusb_set_option(_ctx, (enum libusb_option)option);
 		} else {
-			r = libusb_set_option(_ctx, option, default_context_options[option].arg.log_cbval);
+			r = libusb_set_option(_ctx, (enum libusb_option)option, default_context_options[option].arg.log_cbval);
 		}
 		if (LIBUSB_SUCCESS != r)
 			goto err_free_ctx;

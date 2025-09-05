@@ -233,7 +233,7 @@ int usbi_alloc_event_data(struct libusb_context *ctx)
 	for_each_event_source(ctx, ievent_source)
 		ctx->event_data_cnt++;
 
-	fds = calloc(ctx->event_data_cnt, sizeof(*fds));
+	fds = (struct pollfd *)calloc(ctx->event_data_cnt, sizeof(*fds));
 	if (!fds)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -250,7 +250,7 @@ int usbi_alloc_event_data(struct libusb_context *ctx)
 int usbi_wait_for_events(struct libusb_context *ctx,
 	struct usbi_reported_events *reported_events, int timeout_ms)
 {
-	struct pollfd *fds = ctx->event_data;
+	struct pollfd *fds = (struct pollfd *)ctx->event_data;
 	usbi_nfds_t nfds = (usbi_nfds_t)ctx->event_data_cnt;
 	int internal_fds, num_ready;
 
