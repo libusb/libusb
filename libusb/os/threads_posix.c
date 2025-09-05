@@ -38,7 +38,7 @@
 # include <sys/lwp.h>
 #endif
 
-void usbi_cond_init(pthread_cond_t *cond)
+void usbi_cond_init(usbi_cond_t *cond)
 {
 #ifdef HAVE_PTHREAD_CONDATTR_SETCLOCK
 	pthread_condattr_t condattr;
@@ -52,8 +52,8 @@ void usbi_cond_init(pthread_cond_t *cond)
 #endif
 }
 
-int usbi_cond_timedwait(pthread_cond_t *cond,
-	pthread_mutex_t *mutex, const struct timeval *tv)
+int usbi_cond_timedwait(usbi_cond_t *cond,
+	usbi_mutex_t *mutex, const struct timeval *tv)
 {
 	struct timespec timeout;
 	int r;
