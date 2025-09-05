@@ -401,7 +401,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 
 	if ((flags & LIBUSB_HOTPLUG_ENUMERATE) && (events & LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)) {
 		ssize_t i, len;
-		struct libusb_device **devs;
+		struct libusb_device ** __null_terminated devs;
 
 		len = libusb_get_device_list(ctx, &devs);
 		if (len < 0) {
@@ -409,8 +409,9 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 			return (int)len;
 		}
 
+		struct libusb_device ** indexableDevs = __null_terminated_to_indexable(devs);
 		for (i = 0; i < len; i++) {
-			usbi_hotplug_match_cb(devs[i],
+			usbi_hotplug_match_cb(indexableDevs[i],
 					LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
 					hotplug_cb);
 		}
