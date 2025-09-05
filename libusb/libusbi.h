@@ -369,18 +369,18 @@ struct libusb_context {
 	usbi_timer_t timer;
 #endif
 
-	struct list_head usb_devs;
 	usbi_mutex_t usb_devs_lock;
+	struct list_head usb_devs;
 
 	/* A list of open handles. Backends are free to traverse this if required.
 	 */
-	struct list_head open_devs;
 	usbi_mutex_t open_devs_lock;
+	struct list_head open_devs;
 
 	/* A list of registered hotplug callbacks */
+	usbi_mutex_t hotplug_cbs_lock;
 	struct list_head hotplug_cbs;
 	libusb_hotplug_callback_handle next_hotplug_cb_handle;
-	usbi_mutex_t hotplug_cbs_lock;
 
 	/* A flag to indicate that the context is ready for hotplug notifications */
 	usbi_atomic_t hotplug_ready;
