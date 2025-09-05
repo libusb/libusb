@@ -20,7 +20,7 @@ jobs:
       - name: setup prerequisites
         run: |
           sudo apt update
-          sudo apt install autoconf automake libtool libudev-dev m4
+          sudo apt install autoconf automake libtool libudev-dev m4 doxygen
 
       - name: bootstrap
         run: ./bootstrap.sh
@@ -30,7 +30,7 @@ jobs:
         run: .private/ci-build.sh --build-dir build-netlink --no-test -- --disable-udev
 
       - name: udev
-        run: .private/ci-build.sh --build-dir build-udev -- --enable-udev
+        run: .private/ci-build.sh --build-dir build-udev --build-docs -- --enable-udev
 
       - name: debug-log
         run: .private/ci-build.sh --build-dir build-debug -- --enable-debug-log
