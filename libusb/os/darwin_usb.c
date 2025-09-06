@@ -477,6 +477,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
 
   usbi_dbg (ctx, "converting ep address 0x%02x to pipeRef and interface", ep);
 
+  usbi_mutex_lock(&dev_handle->lock);
   for (iface = 0 ; iface < USB_MAXINTERFACES ; iface++) {
     cInterface = &priv->interfaces[iface];
 
@@ -492,6 +493,7 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
             *interface_out = cInterface;
 
           usbi_dbg (ctx, "pipe %d on interface %d matches", *pipep, iface);
+          usbi_mutex_unlock(&dev_handle->lock);
           return LIBUSB_SUCCESS;
         }
       }
@@ -500,6 +502,8 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
 
   /* No pipe found with the correct endpoint address */
   usbi_warn (HANDLE_CTX(dev_handle), "no pipeRef found with endpoint address 0x%02x.", ep);
+
+  usbi_mutex_unlock(&dev_handle->lock);
 
   return LIBUSB_ERROR_NOT_FOUND;
 }
