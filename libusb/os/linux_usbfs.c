@@ -2806,7 +2806,7 @@ static int op_handle_events(struct libusb_context *ctx,
 				} while (r == 0);
 			}
 
-			usbi_handle_disconnect(handle);
+			usbi_handle_disconnect(ctx, handle);
 			continue;
 		}
 
