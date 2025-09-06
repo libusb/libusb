@@ -814,7 +814,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	unsigned long session_id);
 int usbi_sanitize_device(struct libusb_device *dev);
-void usbi_handle_disconnect(struct libusb_device_handle *dev_handle);
+void usbi_handle_disconnect(struct libusb_context *ctx, struct libusb_device_handle *dev_handle);
 
 int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
