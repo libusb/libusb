@@ -406,6 +406,7 @@ if (cfg != desired)
   * - libusb_free_usb_2_0_extension_descriptor()
   * - libusb_get_active_config_descriptor()
   * - libusb_get_bos_descriptor()
+  * - libusb_get_session_data()
   * - libusb_get_bus_number()
   * - libusb_get_config_descriptor()
   * - libusb_get_config_descriptor_by_value()
@@ -916,6 +917,26 @@ void API_EXPORTED libusb_free_device_list(libusb_device **list,
 			libusb_unref_device(dev);
 	}
 	free(list);
+}
+
+/** \ingroup libusb_dev
+ * Returns the backend-specific identifier of the underlying system device tree
+ * node. Can be used to find the corresponding system device and directly query
+ * it (or access it otherwise) when and if necessary.
+ *
+ * Relevant backends:
+ * - Darwin: IOKit `sessionID`
+ * - Windows WinUSB: `DEVINST`
+ * - Linux, BSD: `busnum << 8 | devnum`
+ *
+ * Since version 1.0.30, \ref LIBUSB_API_VERSION >= 0x0100010C
+ *
+ * \param dev a device (must not be null)
+ * \returns the backend-specific device identifier
+ */
+unsigned long API_EXPORTED libusb_get_session_data(libusb_device *dev)
+{
+    return dev->session_data;
 }
 
 /** \ingroup libusb_dev
