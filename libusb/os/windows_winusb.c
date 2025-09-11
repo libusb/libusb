@@ -1899,6 +1899,12 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					usbi_dbg(ctx, "found existing device for session [%lX]", session_id);
 
 					priv = usbi_get_device_priv(dev);
+
+					if (priv->root_hub && dev->bus_number == bus_number + 1) {
+						// The bus number has already been assigned
+						bus_number++;
+					}
+
 					if (strcmp(priv->dev_id, dev_id) != 0) {
 						usbi_dbg(ctx, "device instance ID for session [%lX] changed", session_id);
 						usbi_detach_device(dev); // usbi_detach_device is equivalent do usbi_disconnect_device but for the firing of LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT
