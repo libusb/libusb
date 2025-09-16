@@ -1309,7 +1309,15 @@ static bool get_device_port (io_service_t service, UInt8 *port) {
 
   kresult = IORegistryEntryGetParentEntry (service, kIOServicePlane, &parent);
   if (kIOReturnSuccess == kresult) {
-    ret = get_ioregistry_value_data (parent, CFSTR("port"), 1, port);
+    /*
+       macOS 10 to 15 always had port number property as "port".
+       macOS 26 has changed it to "usb-port-number".
+       For the same binaries to run correctly on both macOS 15 and macOS 26+,
+       we have to detect os version at runtime and use correct port name property.
+     */
+    uint32_t os_version = get_running_version();
+    CFStringRef cfstrPort = os_version < 260000 ? CFSTR("port") : CFSTR("usb-port-number");
+    ret = get_ioregistry_value_data (parent, cfstrPort, 1, port);
     IOObjectRelease (parent);
   }
 
