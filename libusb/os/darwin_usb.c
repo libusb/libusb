@@ -2143,7 +2143,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
 
   struct libusb_context *ctx = HANDLE_CTX (dev_handle);
 
-  if (!dpriv || !dpriv->device) {
+  if (!dpriv->device) {
     usbi_warn(ctx, "darwin_reenumerate_device: device interface is NULL");
     return LIBUSB_ERROR_NO_DEVICE;
   }
