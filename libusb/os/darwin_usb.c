@@ -1582,6 +1582,10 @@ static int darwin_open (struct libusb_device_handle *dev_handle) {
   IOReturn kresult;
 
   if (0 == dpriv->open_count) {
+    if (!dpriv->device) {
+      usbi_err(HANDLE_CTX(dev_handle), "device interface is NULL, cannot open");
+      return LIBUSB_ERROR_NO_DEVICE;
+    }
     /* try to open the device */
     kresult = (*dpriv->device)->USBDeviceOpenSeize (dpriv->device);
     if (kresult != kIOReturnSuccess) {
@@ -2139,6 +2143,11 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
 
   struct libusb_context *ctx = HANDLE_CTX (dev_handle);
 
+  if (!dpriv->device) {
+    usbi_warn(ctx, "darwin_reenumerate_device: device interface is NULL");
+    return LIBUSB_ERROR_NO_DEVICE;
+  }
+  
   if (dpriv->in_reenumerate) {
     /* ack, two (or more) threads are trying to reset the device! abort! */
     return LIBUSB_ERROR_NOT_FOUND;
