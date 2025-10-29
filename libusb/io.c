@@ -2646,7 +2646,7 @@ void API_EXPORTED libusb_set_pollfd_notifiers(libusb_context *ctx,
 	libusb_pollfd_added_cb added_cb, libusb_pollfd_removed_cb removed_cb,
 	void *user_data)
 {
-#if !defined(PLATFORM_WINDOWS)
+#if !defined(PLATFORM_WINDOWS) && !defined(PLATFORM_CPP_STL)
 	ctx = usbi_get_context(ctx);
 	ctx->fd_added_cb = added_cb;
 	ctx->fd_removed_cb = removed_cb;
@@ -2694,7 +2694,7 @@ int usbi_add_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle
 	usbi_event_source_notification(ctx);
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
-#if !defined(PLATFORM_WINDOWS)
+#if !defined(PLATFORM_WINDOWS) && !defined(PLATFORM_CPP_STL)
 	if (ctx->fd_added_cb)
 		ctx->fd_added_cb(os_handle, poll_events, ctx->fd_cb_user_data);
 #endif
@@ -2728,7 +2728,7 @@ void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_ha
 	usbi_event_source_notification(ctx);
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
-#if !defined(PLATFORM_WINDOWS)
+#if !defined(PLATFORM_WINDOWS) && !defined(PLATFORM_CPP_STL)
 	if (ctx->fd_removed_cb)
 		ctx->fd_removed_cb(os_handle, ctx->fd_cb_user_data);
 #endif
@@ -2753,7 +2753,7 @@ DEFAULT_VISIBILITY
 const struct libusb_pollfd ** LIBUSB_CALL libusb_get_pollfds(
 	libusb_context *ctx)
 {
-#if !defined(PLATFORM_WINDOWS)
+#if !defined(PLATFORM_WINDOWS) && !defined(PLATFORM_CPP_STL)
 	struct libusb_pollfd **ret = NULL;
 	struct usbi_event_source *ievent_source;
 	size_t i;
@@ -2800,7 +2800,7 @@ out:
  */
 void API_EXPORTED libusb_free_pollfds(const struct libusb_pollfd **pollfds)
 {
-#if !defined(PLATFORM_WINDOWS)
+#if !defined(PLATFORM_WINDOWS) && !defined(PLATFORM_CPP_STL)
 	free((void *)pollfds);
 #else
 	UNUSED(pollfds);

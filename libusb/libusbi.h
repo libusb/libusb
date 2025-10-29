@@ -127,6 +127,9 @@ typedef atomic_long usbi_atomic_t;
 #if defined(PLATFORM_POSIX)
 #include "os/events_posix.h"
 #include "os/threads_posix.h"
+#elif defined(PLATFORM_CPP_STL)
+#include "os/events_cpp_stl.h"
+#include "os/threads_cpp_stl.h"
 #elif defined(PLATFORM_WINDOWS)
 #include "os/events_windows.h"
 #include "os/threads_windows.h"
@@ -1032,7 +1035,7 @@ struct usbi_os_backend {
 	 *
 	 * The string should be retrieved without opening the device
 	 * and ideally without performing USB transactions to the device.
-	 * Most operating systems read and cache the common string 
+	 * Most operating systems read and cache the common string
 	 * descriptors.  Use the OS-specific calls to retrieve these strings.
 	 *
 	 * Since the USB string descriptor could be processed by the OS,
