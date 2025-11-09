@@ -9,6 +9,11 @@
       <PreprocessorDefinitions>LIBUSB_WINDOWS_HOTPLUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(EnableWinRt)' == 'true'">
+    <ClCompile>
+      <PreprocessorDefinitions>PLATFORM_CPP_STL=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|ARM">
       <Configuration>Debug</Configuration>
@@ -150,5 +155,11 @@
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)' == 'Release-Hotplug-MT'">
 		<EnableWindowsHotplug>true</EnableWindowsHotplug>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug-WinRt'">
+		<EnableWinRt>true</EnableWinRt>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Release-WinRt'">
+		<EnableWinRt>true</EnableWinRt>
 	</PropertyGroup>
 </Project>

@@ -51,8 +51,10 @@
 /* Define to 1 to enable message logging. */
 #define ENABLE_LOGGING 1
 
-/* Define to 1 if compiling for a Windows platform. */
+/* Define to 1 if compiling for a Windows platform and not using C++ STL platform. */
+#ifndef PLATFORM_CPP_STL
 #define PLATFORM_WINDOWS 1
+#endif
 
 /* Define to the attribute for enabling parameter checks on printf-like
    functions. */
