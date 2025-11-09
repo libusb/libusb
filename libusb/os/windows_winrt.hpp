@@ -48,7 +48,7 @@ struct winrt_context_priv
 struct winrt_transfer_queue
 {
     //! Currently processing transfer
-    usbi_transfer* active_transfer;
+    usbi_transfer* active_transfer = nullptr;
     //! Queue of transfers waiting to be processed
     std::list<usbi_transfer*> transfer_queue;
 };
@@ -76,7 +76,22 @@ struct winrt_device_priv
     //! Keeps track of all current control transfers
     winrt_transfer_queue control_transfers;
     //! Mutex serializing access to transfer queues
-    std::mutex transfer_mutex;
+    std::recursive_mutex transfer_mutex;
+};
+
+struct winrt_interrupt_in_data
+{
+    //! The interrupt input pipe
+    winrt::Windows::Devices::Usb::UsbInterruptInPipe pipe;
+    //! Callback function set to the pipe
+    std::function<
+        void(
+            winrt::Windows::Devices::Usb::UsbInterruptInPipe pipe,
+            winrt::Windows::Devices::Usb::UsbInterruptInEventArgs args
+        )
+    > cb;
+    //! Token which uniquely identifies the callback handle in the pipe
+    winrt::event_token cb_token;
 };
 
 struct winrt_interface
@@ -88,7 +103,7 @@ struct winrt_interface
     //! Maps endpoint number to bulk output pipe
     std::unordered_map<uint8_t, winrt::Windows::Devices::Usb::UsbBulkOutPipe> bulk_out_pipes;
     //! Maps endpoint number to interrupt input pipe
-    std::unordered_map<uint8_t, winrt::Windows::Devices::Usb::UsbInterruptInPipe> interrupt_in_pipes;
+    std::unordered_map<uint8_t, winrt_interrupt_in_data> interrupt_in_pipes;
     //! Maps endpoint number to interrupt output pipe
     std::unordered_map<uint8_t, winrt::Windows::Devices::Usb::UsbInterruptOutPipe> interrupt_out_pipes;
 };
