@@ -28,7 +28,7 @@ extern "C" {
 void usbi_get_monotonic_time(struct timespec *tp);
 #endif
 
-typedef void* usbi_os_handle_t;
+typedef void** usbi_os_handle_t;
 #define USBI_OS_HANDLE_FORMAT_STRING	"HANDLE %p"
 
 typedef struct cpp_stl_usbi_event* usbi_event_t;

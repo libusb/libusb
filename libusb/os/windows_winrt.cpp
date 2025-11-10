@@ -239,7 +239,7 @@ winrt::Windows::Foundation::AsyncStatus winrt_handle_async_action(
                 return status;
 
             }
-            catch(const winrt::hresult_error& e)
+            catch(const winrt::hresult_error&)
             {
                 status = winrt::Windows::Foundation::AsyncStatus::Error;
                 if (asyncOp)
@@ -366,6 +366,7 @@ static int winrt_init(libusb_context *ctx)
 {
     // Use placement new to properly construct the private structure
     winrt_context_priv *priv = new (usbi_get_context_priv(ctx)) winrt_context_priv();
+    static_cast<void>(priv);
     return LIBUSB_SUCCESS;
 }
 
@@ -374,37 +375,6 @@ static void winrt_exit(libusb_context *ctx)
     // Explicitly call destructor
     winrt_context_priv *priv = static_cast<winrt_context_priv*>(usbi_get_context_priv(ctx));
     priv->~winrt_context_priv();
-}
-
-static int winrt_is_device_connected(libusb_context *ctx, const std::wstring& path)
-{
-    winrt::Windows::Foundation::AsyncStatus status = winrt::Windows::Foundation::AsyncStatus::Started;
-    DeviceInformationCollection deviceInfos = winrt_handle_async<DeviceInformationCollection>(
-        status,
-        {
-            ctx,
-            [&]()
-            {
-                return DeviceInformation::FindAllAsync(
-                    L"System.Devices.InterfaceEnabled:=System.StructuredQueryType.Boolean#True"
-                    L" AND System.Devices.DeviceInstanceId:=\"" + path + L"\""
-                );
-            }
-        }
-    );
-
-    if (status == winrt::Windows::Foundation::AsyncStatus::Canceled)
-    {
-        usbi_warn(ctx, "Timeout occurred querying checking if device is connected: %s", path.c_str());
-        return LIBUSB_ERROR_TIMEOUT;
-    }
-    else if (status != winrt::Windows::Foundation::AsyncStatus::Completed)
-    {
-        usbi_warn(ctx, "Error occurred querying checking if device is connected: %s", path.c_str());
-        return LIBUSB_ERROR_IO;
-    }
-
-    return (deviceInfos.Size() > 0) ? LIBUSB_SUCCESS : LIBUSB_ERROR_NO_DEVICE;
 }
 
 static int winrt_get_device_list(libusb_context *ctx, struct discovered_devs **_discdevs)
@@ -545,6 +515,7 @@ static int winrt_open(libusb_device_handle* dev_handle)
 {
     // Use placement new to properly construct the private structure
     winrt_device_handle_priv *handle_priv = new (usbi_get_device_handle_priv(dev_handle)) winrt_device_handle_priv();
+    static_cast<void>(handle_priv);
     winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(dev_handle->dev));
 
     usbi_dbg(dev_handle->dev->ctx, "Finding devices with container ID %s", priv->container_id.c_str());
@@ -882,8 +853,12 @@ static void winrt_handle_interrupt(
         {
             status = LIBUSB_TRANSFER_COMPLETED;
             auto dataReader = Streams::DataReader::FromBuffer(data);
-            std::size_t len = data.Length();
-            if (len > transfer->length)
+            typename winrt::array_view<uint8_t>::size_type len = data.Length();
+            if (transfer->length < 0)
+            {
+                len = 0;
+            }
+            else if (len > static_cast<typename winrt::array_view<uint8_t>::size_type>(transfer->length))
             {
                 len = transfer->length;
             }
@@ -991,17 +966,17 @@ static int winrt_claim_interface(libusb_device_handle *dev_handle, uint8_t iface
             std::wstring path(deviceInfo.Properties().Lookup(L"System.Devices.DeviceInstanceId").as<hstring>());
             winrt_interface itfDef{winrt_device_data{winrtDev, id, path}};
 
-            for (auto& bulkEpIn: winrtDev.DefaultInterface().BulkInPipes())
+            for (auto bulkEpIn: winrtDev.DefaultInterface().BulkInPipes())
             {
                 itfDef.bulk_in_pipes.insert_or_assign(bulkEpIn.EndpointDescriptor().EndpointNumber() | LIBUSB_ENDPOINT_IN, std::move(bulkEpIn));
             }
 
-            for (auto& bulkEpOut: winrtDev.DefaultInterface().BulkOutPipes())
+            for (auto bulkEpOut: winrtDev.DefaultInterface().BulkOutPipes())
             {
                 itfDef.bulk_out_pipes.insert_or_assign(bulkEpOut.EndpointDescriptor().EndpointNumber(), std::move(bulkEpOut));
             }
 
-            for (auto& intEpIn: winrtDev.DefaultInterface().InterruptInPipes())
+            for (auto intEpIn: winrtDev.DefaultInterface().InterruptInPipes())
             {
                 const uint8_t epNum = intEpIn.EndpointDescriptor().EndpointNumber() | LIBUSB_ENDPOINT_IN;
 
@@ -1015,7 +990,7 @@ static int winrt_claim_interface(libusb_device_handle *dev_handle, uint8_t iface
                     inData->cb =
                         [dev_handle, epNum]
                         (
-                            winrt::Windows::Devices::Usb::UsbInterruptInPipe pipe,
+                            winrt::Windows::Devices::Usb::UsbInterruptInPipe,
                             winrt::Windows::Devices::Usb::UsbInterruptInEventArgs args
                         )
                         {
@@ -1039,7 +1014,7 @@ static int winrt_claim_interface(libusb_device_handle *dev_handle, uint8_t iface
                 }
             }
 
-            for (auto& intEpOut: winrtDev.DefaultInterface().InterruptOutPipes())
+            for (auto intEpOut: winrtDev.DefaultInterface().InterruptOutPipes())
             {
                 itfDef.interrupt_out_pipes.insert_or_assign(intEpOut.EndpointDescriptor().EndpointNumber(), std::move(intEpOut));
             }
@@ -1127,7 +1102,7 @@ static int winrt_set_interface_altsetting(libusb_device_handle *dev_handle, uint
 
     try
     {
-        for (auto& itf : priv->default_device.device.Configuration().UsbInterfaces())
+        for (auto itf : priv->default_device.device.Configuration().UsbInterfaces())
         {
             if (itf.InterfaceNumber() == iface)
             {
@@ -1282,7 +1257,6 @@ static int winrt_submit_control_transfer(usbi_transfer *itransfer)
     winrt_transfer_priv *tpriv = static_cast<winrt_transfer_priv*>(usbi_get_transfer_priv(itransfer));
     winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(transfer->dev_handle->dev));
     libusb_control_setup *setup = reinterpret_cast<libusb_control_setup*>(transfer->buffer);
-    winrt_transfer_priv *transfer_priv = static_cast<winrt_transfer_priv*>(usbi_get_transfer_priv(itransfer));
 
     auto setupPacket = UsbSetupPacket();
     setupPacket.RequestType().Direction(BM_REQUEST_TO_WINRT_DIR(setup->bmRequestType));
@@ -1316,7 +1290,7 @@ static int winrt_submit_control_transfer(usbi_transfer *itransfer)
         // This is capturing by value to keep the reference back to async operation
         tpriv->cancel_fn = [asyncOp](){asyncOp.Cancel();};
 
-        asyncOp.Completed([itransfer](auto const& sender, auto const& args) {
+        asyncOp.Completed([itransfer](auto const& sender, auto const&) {
             libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
             libusb_transfer_status status = LIBUSB_TRANSFER_ERROR;
             if (sender.Status() == winrt::Windows::Foundation::AsyncStatus::Completed)
@@ -1371,8 +1345,7 @@ static int winrt_submit_control_transfer(usbi_transfer *itransfer)
         // This is capturing by value to keep the reference back to async operation
         tpriv->cancel_fn = [asyncOp](){asyncOp.Cancel();};
 
-        asyncOp.Completed([itransfer](auto const& sender, auto const& args) {
-            libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+        asyncOp.Completed([itransfer](auto const& sender, auto const&) {
             libusb_transfer_status status = LIBUSB_TRANSFER_ERROR;
             if (sender.Status() == winrt::Windows::Foundation::AsyncStatus::Completed)
             {
@@ -1405,8 +1378,6 @@ static int winrt_submit_bulk_transfer(usbi_transfer *itransfer)
     libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
     winrt_transfer_priv *tpriv = static_cast<winrt_transfer_priv*>(usbi_get_transfer_priv(itransfer));
     winrt_device_handle_priv *handle_priv = static_cast<winrt_device_handle_priv*>(usbi_get_device_handle_priv(transfer->dev_handle));
-    winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(transfer->dev_handle->dev));
-    winrt_transfer_priv *transfer_priv = static_cast<winrt_transfer_priv*>(usbi_get_transfer_priv(itransfer));
 
     if (IS_IN_ENDPOINT(transfer->endpoint))
     {
@@ -1443,14 +1414,14 @@ static int winrt_submit_bulk_transfer(usbi_transfer *itransfer)
                     // This is capturing by value to keep the reference back to async operation
                     tpriv->cancel_fn = [asyncOp](){asyncOp.Cancel();};
 
-                    asyncOp.Completed([itransfer](auto const& sender, auto const& args) {
+                    asyncOp.Completed([itransfer](auto const& sender, auto const&) {
                         libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
                         libusb_transfer_status status = LIBUSB_TRANSFER_ERROR;
                         if (sender.Status() == winrt::Windows::Foundation::AsyncStatus::Completed)
                         {
                             try {
                                 auto buffer = sender.GetResults();
-                                if (buffer && buffer.Length() <= transfer->length)
+                                if (buffer && transfer->length >= 0 && buffer.Length() <= static_cast<std::size_t>(transfer->length))
                                 {
                                     auto dataReader = Streams::DataReader::FromBuffer(buffer);
                                     dataReader.ReadBytes(winrt::array_view<uint8_t>(transfer->buffer, buffer.Length()));
@@ -1511,8 +1482,7 @@ static int winrt_submit_bulk_transfer(usbi_transfer *itransfer)
                     // This is capturing by value to keep the reference back to async operation
                     tpriv->cancel_fn = [asyncOp](){asyncOp.Cancel();};
 
-                    asyncOp.Completed([itransfer](auto const& sender, auto const& args) {
-                        libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+                    asyncOp.Completed([itransfer](auto const& sender, auto const&) {
                         libusb_transfer_status status = LIBUSB_TRANSFER_ERROR;
                         if (sender.Status() == winrt::Windows::Foundation::AsyncStatus::Completed)
                         {
@@ -1550,8 +1520,6 @@ static int winrt_submit_interrupt_transfer(usbi_transfer *itransfer)
     libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
     winrt_transfer_priv *tpriv = static_cast<winrt_transfer_priv*>(usbi_get_transfer_priv(itransfer));
     winrt_device_handle_priv *handle_priv = static_cast<winrt_device_handle_priv*>(usbi_get_device_handle_priv(transfer->dev_handle));
-    winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(transfer->dev_handle->dev));
-    winrt_transfer_priv *transfer_priv = static_cast<winrt_transfer_priv*>(usbi_get_transfer_priv(itransfer));
 
     if (IS_IN_ENDPOINT(transfer->endpoint))
     {
@@ -1607,8 +1575,7 @@ static int winrt_submit_interrupt_transfer(usbi_transfer *itransfer)
                     // This is capturing by value to keep the reference back to async operation
                     tpriv->cancel_fn = [asyncOp](){asyncOp.Cancel();};
 
-                    asyncOp.Completed([itransfer](auto const& sender, auto const& args) {
-                        libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+                    asyncOp.Completed([itransfer](auto const& sender, auto const&) {
                         libusb_transfer_status status = LIBUSB_TRANSFER_ERROR;
                         if (sender.Status() == winrt::Windows::Foundation::AsyncStatus::Completed)
                         {
@@ -1646,6 +1613,7 @@ static int winrt_submit_transfer(usbi_transfer *itransfer)
     libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
     // Use placement new to properly construct the private structure
     winrt_transfer_priv *tpriv = new (usbi_get_transfer_priv(itransfer)) winrt_transfer_priv();
+    static_cast<void>(tpriv);
     winrt_device_handle_priv *handle_priv = static_cast<winrt_device_handle_priv*>(usbi_get_device_handle_priv(transfer->dev_handle));
     winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(transfer->dev_handle->dev));
 
@@ -1897,7 +1865,6 @@ static int winrt_cancel_transfer_from_queue(usbi_transfer *itransfer, winrt_tran
             queue.transfer_queue.erase(iter);
             lock.unlock();
 
-            winrt_context_priv *pctx = static_cast<winrt_context_priv*>(usbi_get_context_priv(itransfer->dev->ctx));
             tpriv->status = LIBUSB_TRANSFER_CANCELLED;
             usbi_signal_transfer_completion(itransfer);
 
@@ -1911,7 +1878,6 @@ static int winrt_cancel_transfer_from_queue(usbi_transfer *itransfer, winrt_tran
 static int winrt_cancel_transfer(usbi_transfer *itransfer)
 {
     libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-    winrt_transfer_priv *tpriv = static_cast<winrt_transfer_priv*>(usbi_get_transfer_priv(itransfer));
     winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(transfer->dev_handle->dev));
 
     int r = winrt_cancel_transfer_from_queue(itransfer, priv->control_transfers);

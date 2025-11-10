@@ -27,8 +27,7 @@
 #include <thread>
 #include <unordered_map>
 
-// The static mutex to serialize check-and-set logic for mutex_static
-static std::mutex static_mutex;
+
 
 struct cpp_stl_usbi_mutex_static
 {
@@ -42,27 +41,30 @@ static std::list<std::unique_ptr<cpp_stl_usbi_mutex_static>> static_mutex_list;
 static usbi_mutex_static_t new_usbi_mutex_static()
 {
     auto unique_static_mutex = std::unique_ptr<cpp_stl_usbi_mutex_static>(new cpp_stl_usbi_mutex_static);
-    usbi_mutex_static_t static_mutex = unique_static_mutex.get();
+    usbi_mutex_static_t new_static_mutex = unique_static_mutex.get();
     static_mutex_list.push_back(std::move(unique_static_mutex));
-    return static_mutex;
+    return new_static_mutex;
 }
 
 void usbi_mutex_static_lock(usbi_mutex_static_t *mutex)
 {
     {
         // Need to serialize check-and-set logic
-        std::lock_guard<std::mutex> lock(static_mutex);
+        static std::mutex static_mutex_mutex;
+        std::lock_guard<std::mutex> lock(static_mutex_mutex);
         if (!(*mutex))
         {
             (*mutex) = new_usbi_mutex_static();
         }
     }
 
+    #pragma warning(suppress: 26115)
     (*mutex)->mtx.lock();
 }
 void usbi_mutex_static_unlock(usbi_mutex_static_t *mutex)
 {
     assert((*mutex) != NULL);
+    #pragma warning(suppress: 26110)
     (*mutex)->mtx.unlock();
 }
 
@@ -81,6 +83,7 @@ void usbi_mutex_lock(usbi_mutex_t *mutex)
 }
 void usbi_mutex_unlock(usbi_mutex_t *mutex)
 {
+    #pragma warning(suppress: 26110)
 	(*mutex)->mtx.unlock();
 }
 int usbi_mutex_trylock(usbi_mutex_t *mutex)
@@ -106,6 +109,7 @@ void usbi_cond_init(usbi_cond_t *cond)
 }
 void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
 {
+    #pragma warning(suppress: 26110)
 	std::unique_lock<std::mutex> lock((*mutex)->mtx, std::adopt_lock);
     (*cond)->cv.wait(lock, [&cond](){return (*cond)->signaled;});
     (*cond)->signaled = false;
@@ -113,6 +117,7 @@ void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
 }
 int usbi_cond_timedwait(usbi_cond_t *cond, usbi_mutex_t *mutex, const struct timeval *tv)
 {
+    #pragma warning(suppress: 26110)
 	std::unique_lock<std::mutex> lock((*mutex)->mtx, std::adopt_lock);
     std::cv_status status = (*cond)->cv.wait_for(
         lock,

@@ -43,7 +43,7 @@ void usbi_get_monotonic_time(struct timespec *tp)
     std::chrono::seconds seconds = std::chrono::duration_cast<std::chrono::seconds>(duration);
     std::chrono::nanoseconds nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(duration - seconds);
     tp->tv_sec = seconds.count();
-    tp->tv_nsec = nanoseconds.count();
+    tp->tv_nsec = static_cast<long>(nanoseconds.count());
 }
 #endif
 
@@ -160,9 +160,15 @@ int usbi_alloc_event_data(struct libusb_context *ctx)
 
 	for_each_event_source(ctx, ievent_source)
     {
+        // This isn't needed, but it cleans up a silly compiler warning
+        if (i >= ctx->event_data_cnt)
+        {
+            break;
+        }
+
         // ievent_source->data.os_handle holds pointers to allocated pointers to event and timer
-		handles[i] = *static_cast<void**>(ievent_source->data.os_handle);
-		i++;
+        handles[i] = *(ievent_source->data.os_handle);
+        i++;
 	}
 
 	ctx->event_data = handles;
