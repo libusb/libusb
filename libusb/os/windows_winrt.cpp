@@ -817,6 +817,12 @@ static int winrt_set_configuration(libusb_device_handle *dev_handle, int config)
 {
 	winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(dev_handle->dev));
 
+    int r = winrt_request_active_config(dev_handle->dev);
+    if (r != LIBUSB_SUCCESS)
+    {
+        return r;
+    }
+
     if (config == priv->active_config)
     {
         // Already the active configuration
@@ -834,7 +840,7 @@ static int winrt_set_configuration(libusb_device_handle *dev_handle, int config)
     setupPacket.Index(0);
     setupPacket.Length(0);
 
-    int r = winrt_send_control_transfer_out(dev_handle->dev->ctx, priv->default_device.device, setupPacket);
+    r = winrt_send_control_transfer_out(dev_handle->dev->ctx, priv->default_device.device, setupPacket);
 
     if (r != LIBUSB_SUCCESS)
     {
