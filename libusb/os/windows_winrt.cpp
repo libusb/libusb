@@ -57,8 +57,63 @@ static constexpr const uint8_t WINRT_BM_REQUEST_RECIPIENT_MASK = 0x1F;
 #define BM_REQUEST_TO_WINRT_TRANSFER_TYPE(bmRequestType) (static_cast<UsbControlTransferType>((bmRequestType& WINRT_BM_REQUEST_TYPE_MASK) >> WINRT_BM_REQUEST_TYPE_SHIFT))
 #define BM_REQUEST_TO_WINRT_RECIPIENT(bmRequestType) (static_cast<UsbControlRecipient>(bmRequestType & WINRT_BM_REQUEST_RECIPIENT_MASK))
 
+// Forward declarations of static functions
+static int winrt_init(libusb_context *ctx);
+static void winrt_exit(libusb_context *ctx);
+static int winrt_get_device_list(libusb_context *ctx, struct discovered_devs **_discdevs);
+static int winrt_get_device_string(
+    libusb_device *dev,
+    enum libusb_device_string_type string_type,
+    char *data,
+    int length
+);
+static int winrt_open(libusb_device_handle* dev_handle);
+static void winrt_close(libusb_device_handle *dev_handle);
+static int winrt_request_descriptors(libusb_device *dev);
+static int winrt_get_config_descriptor_by_value(
+    libusb_device *dev,
+    uint8_t bConfigurationValue,
+    void **buffer
+);
+static int winrt_request_active_config(libusb_device *dev);
+static int winrt_get_active_config_descriptor(libusb_device *dev, void *buffer, size_t len);
+static int winrt_get_config_descriptor(libusb_device *dev, uint8_t config_index, void *buffer, size_t len);
+static int winrt_get_configuration(libusb_device_handle *dev_handle, uint8_t *config);
+static int winrt_set_configuration(libusb_device_handle *dev_handle, int config);
+static void winrt_handle_interrupt(
+    libusb_device_handle *dev_handle,
+    uint8_t epNum,
+    winrt::Windows::Storage::Streams::IBuffer data
+);
+static int winrt_claim_interface(libusb_device_handle *dev_handle, uint8_t iface);
+static int winrt_release_interface(libusb_device_handle *dev_handle, uint8_t iface);
+static int winrt_set_interface_altsetting(libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting);
+static int winrt_clear_halt(libusb_device_handle *dev_handle, unsigned char endpoint);
+static int winrt_reset_device(libusb_device_handle *dev_handle);
+static void winrt_destroy_device(libusb_device *dev);
+static int winrt_submit_control_transfer(usbi_transfer *itransfer);
+static int winrt_submit_bulk_transfer(usbi_transfer *itransfer);
+static int winrt_submit_interrupt_transfer(usbi_transfer *itransfer);
+static int winrt_submit_transfer(usbi_transfer *itransfer);
+static int winrt_pop_transfer_from_queue(usbi_transfer *itransfer, winrt_transfer_queue& queue);
+static int winrt_pop_transfer(usbi_transfer *itransfer);
 static void winrt_transfer_completed(usbi_transfer *itransfer, libusb_transfer_status status, bool signal = true);
+static int winrt_handle_transfer_completion(usbi_transfer *itransfer);
+static int winrt_cancel_transfer_from_queue(usbi_transfer *itransfer, winrt_transfer_queue& queue);
+static int winrt_cancel_transfer(usbi_transfer *itransfer);
 
+//! Convert 16-bit little endian array of bytes to uint16 value
+//! @param[in] p Array of 2 bytes
+//! @return the equivalent uint16 value
+static inline uint16_t ReadLittleEndian16(const uint8_t p[2])
+{
+    return (uint16_t)((uint16_t)p[1] << 8 | (uint16_t)p[0]);
+}
+
+//! Converts a container GUID to an arbitrary but unique session ID
+//! @param[in] ctx Context to use for the lookup
+//! @param[in] container_id The container ID to convert
+//! @return an arbitrary but unique session ID linked to the given container ID
 static unsigned long container_id_to_session_id(libusb_context *ctx, const guid& container_id)
 {
     winrt_context_priv *priv = static_cast<winrt_context_priv*>(usbi_get_context_priv(ctx));
@@ -259,7 +314,7 @@ winrt::Windows::Foundation::AsyncStatus winrt_handle_async_action(
 //! @param[in] dev winrt UsbDevice to execute the control transfer on
 //! @param[in] setupPacket Control transfer header data
 //! @param[out] dat The retrieved data
-//! @return a libusb error code
+//! @return a libusb error code if negative or size if positive
 static int winrt_send_control_transfer_in(
     libusb_context *ctx,
     winrt::Windows::Devices::Usb::UsbDevice& dev,
@@ -302,10 +357,12 @@ static int winrt_send_control_transfer_in(
         return LIBUSB_ERROR_IO;
     }
 
+    int len = static_cast<int>(buf.Length());
+
     auto dataReader = winrt::Windows::Storage::Streams::DataReader::FromBuffer(buf);
     dataReader.ReadBytes(dat);
 
-    return LIBUSB_SUCCESS;
+    return len;
 }
 
 //! Executes a control transfer OUT, blocking until complete, timeout, or error
@@ -472,7 +529,7 @@ static int winrt_get_device_list(libusb_context *ctx, struct discovered_devs **_
                 std::vector<uint8_t> data(LIBUSB_DT_DEVICE_SIZE);
                 int r = winrt_send_control_transfer_in(ctx, winrtDev, setupPacket, data);
 
-                if (r != LIBUSB_SUCCESS)
+                if (r < 0)
                 {
                     libusb_unref_device(dev);
                     continue;
@@ -506,9 +563,118 @@ static int winrt_get_device_list(libusb_context *ctx, struct discovered_devs **_
     return LIBUSB_SUCCESS;
 }
 
-static inline uint16_t ReadLittleEndian16(const uint8_t p[2])
+static int winrt_get_device_string(
+    libusb_device *dev,
+    enum libusb_device_string_type string_type,
+    char *data,
+    int length
+)
 {
-    return (uint16_t)((uint16_t)p[1] << 8 | (uint16_t)p[0]);
+    winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(dev));
+
+    if ((NULL != data) && (length > 0))
+    {
+        *data = 0;
+    }
+
+    if (NULL == dev->parent_dev)
+    {
+        return LIBUSB_ERROR_NOT_SUPPORTED;
+    }
+
+    uint8_t string_descriptor_idx;
+    switch (string_type)
+    {
+        case LIBUSB_DEVICE_STRING_MANUFACTURER: string_descriptor_idx = dev->device_descriptor.iManufacturer; break;
+        case LIBUSB_DEVICE_STRING_PRODUCT: string_descriptor_idx = dev->device_descriptor.iProduct; break;
+        case LIBUSB_DEVICE_STRING_SERIAL_NUMBER: string_descriptor_idx = dev->device_descriptor.iSerialNumber; break;
+        default: return LIBUSB_ERROR_INVALID_PARAM;
+    }
+
+    if (0 == string_descriptor_idx)
+    {
+        return 0;
+    }
+
+    // Get the string
+    uint8_t strBuf[255];
+    auto setupPacket = UsbSetupPacket();
+    setupPacket.RequestType().Direction(UsbTransferDirection::In);
+    setupPacket.RequestType().ControlTransferType(UsbControlTransferType::Standard);
+    setupPacket.RequestType().Recipient(UsbControlRecipient::Device);
+    setupPacket.Request(LIBUSB_REQUEST_GET_DESCRIPTOR);
+    setupPacket.Value((LIBUSB_DT_STRING << 8) | string_descriptor_idx);
+    setupPacket.Index(0);
+    setupPacket.Length(sizeof(strBuf));
+
+    std::vector<std::uint8_t> dataVec(sizeof(strBuf));
+    int r = winrt_send_control_transfer_in(
+        dev->ctx,
+        priv->default_device.device,
+        setupPacket,
+        dataVec
+    );
+
+    if (r < 0)
+    {
+        return r;
+    }
+
+    std::size_t rcvLen = static_cast<std::size_t>(r);
+    if (rcvLen > sizeof(strBuf))
+    {
+        rcvLen = sizeof(strBuf);
+    }
+    memcpy(strBuf, dataVec.data(), rcvLen);
+
+    if (rcvLen < 2 || strBuf[0] < 2 || strBuf[1] != LIBUSB_DT_STRING)
+    {
+        return LIBUSB_ERROR_IO;
+    }
+
+    // String descriptors contain UTF-16LE encoded strings
+    // The first two bytes are bLength and bDescriptorType
+    uint8_t bLength = strBuf[0];
+    if (bLength > rcvLen)
+    {
+        bLength = static_cast<uint8_t>(rcvLen);
+    }
+
+    // Calculate the number of UTF-16 characters (excluding the header)
+    int utf16_len = (bLength - 2) / 2;
+    if (utf16_len <= 0)
+    {
+        return 0;
+    }
+
+    // Convert UTF-16LE to UTF-8
+    const uint16_t* utf16_str = reinterpret_cast<const uint16_t*>(&strBuf[2]);
+    std::wstring wide_str;
+    wide_str.reserve(utf16_len);
+
+    for (int i = 0; i < utf16_len; ++i)
+    {
+        wide_str.push_back(ReadLittleEndian16(reinterpret_cast<const uint8_t*>(&utf16_str[i])));
+    }
+
+    // Convert to UTF-8 using WinRT
+    hstring hstr(wide_str);
+    std::string utf8_str = winrt::to_string(hstr);
+
+    // Copy to output buffer
+    int copy_len = static_cast<int>(utf8_str.length());
+    if (copy_len >= length)
+    {
+        copy_len = length - 1;
+    }
+
+    if (copy_len > 0)
+    {
+        memcpy(data, utf8_str.c_str(), copy_len);
+    }
+    data[copy_len] = '\0';
+
+    return copy_len;
 }
 
 static int winrt_open(libusb_device_handle* dev_handle)
@@ -581,8 +747,6 @@ static int winrt_open(libusb_device_handle* dev_handle)
     return commFail ? LIBUSB_ERROR_IO : LIBUSB_ERROR_BUSY;
 }
 
-static int winrt_release_interface(libusb_device_handle *dev_handle, uint8_t iface);
-
 static void winrt_close(libusb_device_handle *dev_handle)
 {
     winrt_device_handle_priv *handle_priv = static_cast<winrt_device_handle_priv*>(usbi_get_device_handle_priv(dev_handle));
@@ -627,7 +791,7 @@ static int winrt_request_descriptors(libusb_device *dev)
             priv->config_descriptors[i]
         );
 
-        if (r != LIBUSB_SUCCESS)
+        if (r < 0)
         {
             usbi_warn(
                 dev->ctx,
@@ -653,7 +817,7 @@ static int winrt_request_descriptors(libusb_device *dev)
             priv->config_descriptors[i]
         );
 
-        if (r != LIBUSB_SUCCESS)
+        if (r < 0)
         {
             usbi_warn(
                 dev->ctx,
@@ -714,7 +878,7 @@ static int winrt_request_active_config(libusb_device *dev)
         std::vector<uint8_t> activeConfigData(1);
         int r = winrt_send_control_transfer_in(dev->ctx, priv->default_device.device, setupPacket, activeConfigData);
 
-        if (r != LIBUSB_SUCCESS)
+        if (r < 0)
         {
             return r;
         }
@@ -749,7 +913,7 @@ static int winrt_get_active_config_descriptor(libusb_device *dev, void *buffer, 
 
 static int winrt_get_config_descriptor(libusb_device *dev, uint8_t config_index, void *buffer, size_t len)
 {
-	winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(dev));
+    winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(dev));
 
     int r = winrt_request_descriptors(dev);
     if (r != LIBUSB_SUCCESS)
@@ -765,9 +929,9 @@ static int winrt_get_config_descriptor(libusb_device *dev, uint8_t config_index,
     const uint8_t *config_header = &priv->config_descriptors[config_index][0];
     const std::size_t totalLength = priv->config_descriptors[config_index].size();
 
-	len = MIN(len, totalLength);
-	memcpy(buffer, config_header, len);
-	return (int)len;
+    len = MIN(len, totalLength);
+    memcpy(buffer, config_header, len);
+    return (int)len;
 }
 
 static int winrt_get_configuration(libusb_device_handle *dev_handle, uint8_t *config)
@@ -786,7 +950,7 @@ static int winrt_get_configuration(libusb_device_handle *dev_handle, uint8_t *co
 
 static int winrt_set_configuration(libusb_device_handle *dev_handle, int config)
 {
-	winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(dev_handle->dev));
+    winrt_device_priv *priv = static_cast<winrt_device_priv*>(usbi_get_device_priv(dev_handle->dev));
 
     int r = winrt_request_active_config(dev_handle->dev);
     if (r != LIBUSB_SUCCESS)
@@ -819,7 +983,7 @@ static int winrt_set_configuration(libusb_device_handle *dev_handle, int config)
         return r;
     }
 
-	return LIBUSB_SUCCESS;
+    return LIBUSB_SUCCESS;
 }
 
 static void winrt_handle_interrupt(
@@ -1903,7 +2067,7 @@ const usbi_os_backend usbi_backend = {
     winrt_exit, // exit
     NULL, // set_option
     winrt_get_device_list, // get_device_list
-    NULL, // get_device_string (TODO: does this need to be supported?)
+    winrt_get_device_string, // get_device_string
     NULL, // hotplug_poll
     NULL, // wrap_sys_device
     winrt_open, // open
@@ -1930,9 +2094,9 @@ const usbi_os_backend usbi_backend = {
     NULL, // detach_kernel_driver
     NULL, // attach_kernel_driver
 
-    NULL, // endpoint_supports_raw_io (TODO: does this need to be supported?)
-    NULL, // endpoint_set_raw_io (TODO: does this need to be supported?)
-    NULL, // get_max_raw_io_transfer_size (TODO: does this need to be supported?)
+    NULL, // endpoint_supports_raw_io
+    NULL, // endpoint_set_raw_io
+    NULL, // get_max_raw_io_transfer_size
 
     winrt_destroy_device, // destroy_device
 
