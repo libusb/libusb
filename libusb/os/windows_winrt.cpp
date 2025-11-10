@@ -541,7 +541,7 @@ static inline uint16_t ReadLittleEndian16(const uint8_t p[2])
     return (uint16_t)((uint16_t)p[1] << 8 | (uint16_t)p[0]);
 }
 
-static int winrt_open(libusb_device_handle *dev_handle)
+static int winrt_open(libusb_device_handle* dev_handle)
 {
     // Use placement new to properly construct the private structure
     winrt_device_handle_priv *handle_priv = new (usbi_get_device_handle_priv(dev_handle)) winrt_device_handle_priv();
@@ -1931,6 +1931,7 @@ const usbi_os_backend usbi_backend = {
     winrt_exit, // exit
     NULL, // set_option
     winrt_get_device_list, // get_device_list
+    NULL, // get_device_string (TODO: does this need to be supported?)
     NULL, // hotplug_poll
     NULL, // wrap_sys_device
     winrt_open, // open
@@ -1956,6 +1957,10 @@ const usbi_os_backend usbi_backend = {
 
     NULL, // detach_kernel_driver
     NULL, // attach_kernel_driver
+
+    NULL, // endpoint_supports_raw_io (TODO: does this need to be supported?)
+    NULL, // endpoint_set_raw_io (TODO: does this need to be supported?)
+    NULL, // get_max_raw_io_transfer_size (TODO: does this need to be supported?)
 
     winrt_destroy_device, // destroy_device
 

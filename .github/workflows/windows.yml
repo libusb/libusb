@@ -18,6 +18,8 @@ jobs:
           - 'Release-Hotplug'
           - 'Debug-Hotplug-MT'
           - 'Release-Hotplug-MT'
+          - 'Debug-WinRt'
+          - 'Release-WinRt'
         architecture:
           - 'Win32'
           - 'x64'
@@ -31,7 +33,7 @@ jobs:
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v1.3
-        
+
       - name: Build solution
         run: |
           msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }} -property:Platform=${{ matrix.architecture }}

@@ -176,7 +176,7 @@ int usbi_wait_for_events(struct libusb_context *ctx, struct usbi_reported_events
 
 	usbi_dbg(ctx, "wait for %lu HANDLEs with timeout in %dms", static_cast<unsigned long>(num_handles), timeout_ms);
 
-    std::chrono::time_point expiration = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+    std::chrono::steady_clock::time_point expiration = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
 
     // This value will remain 0 because events don't need to be handled by back-end using this platform
     reported_events->num_ready = 0;

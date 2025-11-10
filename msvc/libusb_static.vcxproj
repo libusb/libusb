@@ -18,6 +18,12 @@
     <OutDir>$(IntDir)..\lib\</OutDir>
     <TargetName>libusb-1.0</TargetName>
   </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-WinRt|x64'">
+    <ClCompile>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\libusb\core.c" />
     <ClCompile Include="..\libusb\descriptor.c" />
