@@ -357,10 +357,18 @@ static int winrt_send_control_transfer_in(
         return LIBUSB_ERROR_IO;
     }
 
-    int len = static_cast<int>(buf.Length());
-
+    int len = 0;
     auto dataReader = winrt::Windows::Storage::Streams::DataReader::FromBuffer(buf);
-    dataReader.ReadBytes(dat);
+    for (uint8_t& b : dat)
+    {
+        if (dataReader.UnconsumedBufferLength() <= 0)
+        {
+            break;
+        }
+
+        b = dataReader.ReadByte();
+        ++len;
+    }
 
     return len;
 }
@@ -575,11 +583,6 @@ static int winrt_get_device_string(
     if ((NULL != data) && (length > 0))
     {
         *data = 0;
-    }
-
-    if (NULL == dev->parent_dev)
-    {
-        return LIBUSB_ERROR_NOT_SUPPORTED;
     }
 
     uint8_t string_descriptor_idx;
