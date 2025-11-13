@@ -482,9 +482,15 @@ static int winrt_get_device_list(libusb_context *ctx, struct discovered_devs **_
     {
         guid containerId;
         deviceInfo.Properties().Lookup(L"System.Devices.ContainerId").as(containerId);
-        hstring deviceInstanceId;
-        if (foundContainerIds.count(containerId) == 0)
+        // Note: container ID of {00000000-0000-0000-ffff-ffffffffffff} is a system container ID
+        //       container ID of {00000000-0000-0000-0000-000000000000} is invalid
+        if (
+            foundContainerIds.count(containerId) == 0 &&
+            containerId != guid(L"{00000000-0000-0000-ffff-ffffffffffff}") &&
+            containerId != guid(L"{00000000-0000-0000-0000-000000000000}")
+        )
         {
+            // New container ID
             unsigned long session_id = container_id_to_session_id(ctx, containerId);
             libusb_device *dev = usbi_get_device_by_session_id(ctx, session_id);
 
