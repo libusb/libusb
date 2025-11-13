@@ -44,7 +44,7 @@ struct timeval {
 #define timerclear(tvp)         (tvp)->tv_sec = (tvp)->tv_usec = 0
 #endif
 
-#define USBI_MUTEX_INITIALIZER	(NULL)
+#define USBI_MUTEX_INITIALIZER (NULL)
 typedef struct cpp_stl_usbi_mutex_static* usbi_mutex_static_t;
 
 void usbi_mutex_static_lock(usbi_mutex_static_t *mutex);
@@ -62,8 +62,8 @@ void usbi_mutex_destroy(usbi_mutex_t *mutex);
 #define HAVE_STRUCT_TIMESPEC 1
 #define _TIMESPEC_DEFINED 1
 struct timespec {
-	long tv_sec;
-	long tv_nsec;
+    long tv_sec;
+    long tv_nsec;
 };
 #endif /* HAVE_STRUCT_TIMESPEC || _TIMESPEC_DEFINED */
 

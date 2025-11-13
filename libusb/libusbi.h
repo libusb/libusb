@@ -299,7 +299,7 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 		}							\
 	} while (0)
 
-#if defined(PLATFORM_WINDOWS)
+#if defined(PLATFORM_WINDOWS) || defined(PLATFORM_CPP_STL)
 #define TIMEVAL_TV_SEC_TYPE	long
 #else
 #define TIMEVAL_TV_SEC_TYPE	time_t
