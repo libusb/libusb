@@ -18,7 +18,7 @@
     <OutDir>$(IntDir)..\lib\</OutDir>
     <TargetName>libusb-1.0</TargetName>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-WinRt|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-WinRt|x64' or '$(Configuration)|$(Platform)'=='Release-WinRt|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>

@@ -24,7 +24,7 @@
       <ModuleDefinitionFile>..\libusb\libusb-1.0.def</ModuleDefinitionFile>
     </Link>
     <ClCompile>
-      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug-WinRt|x64'">stdcpp17</LanguageStandard>
+      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug-WinRt|x64' or '$(Configuration)|$(Platform)'=='Release-WinRt|x64'">stdcpp17</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
