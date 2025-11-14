@@ -859,7 +859,7 @@ static int winrt_get_config_descriptor_by_value(
         return (r < 0) ? r : -1;
     }
 
-    if (bConfigurationValue == 0 || (bConfigurationValue - 1) >= priv->config_descriptors.size())
+    if (bConfigurationValue == 0 || static_cast<uint8_t>(bConfigurationValue - 1) >= priv->config_descriptors.size())
     {
         return -1;
     }
