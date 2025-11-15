@@ -262,8 +262,26 @@ enum libusb_class_code {
 	/** Personal Healthcare */
 	LIBUSB_CLASS_PERSONAL_HEALTHCARE = 0x0f,
 
+	/** Audio & Video */
+	 LIBUSB_CLASS_AUDIO_VIDEO = 0x10,
+
+	/** Billboard */
+	LIBUSB_CLASS_BILLBOARD = 0x11,
+
+	/** Interface class */
+	LIBUSB_CLASS_INTERFACE = 0x12,
+
 	/** Diagnostic Device */
 	LIBUSB_CLASS_DIAGNOSTIC_DEVICE = 0xdc,
+
+	/** Bulk display */
+	LIBUSB_CLASS_BULK_DISPLAY_PROTOCOL = 0x13,
+
+	/** MCTP */
+	LIBUSB_CLASS_MCTP = 0x14,
+
+	/** I3C */
+	LIBUSB_CLASS_I3C = 0x3c,
 
 	/** Wireless class */
 	LIBUSB_CLASS_WIRELESS = 0xe0,
