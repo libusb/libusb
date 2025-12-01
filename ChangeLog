@@ -1,5 +1,15 @@
-For detailed information about the changes below, please see the git log
-or visit: http://log.libusb.info
+For detailed information about the changes below, please see the git log.
+
+202?-??-??: v1.0.30
+* Add hotplug support on Microsoft Windows
+* Add RAW_IO support in WinUSB backend
+* Work around a macOS 26 Tahoe compatibility breakage due to Apple changing kUSBHostPortPropertyPortNumber
+* Add new API libusb_get_device_string() to access device strings without opening the device
+* Add new API libusb_get_session_data() which returns the OS-specific handle
+* On Android, fix intermittent failures in get_usbfs_fd()
+* On Windows, fix bus number assignment for root hub device, preventing duplicate bus number assignments
+* Fix compilation with Microsoft Visual Studio 2026
+* Fix various compiler warnings, improved tests and examples
 
 2025-06-01: v1.0.29
 * Fix regression on macOS leading to timeouts in enumeration
