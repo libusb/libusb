@@ -1395,12 +1395,11 @@ static int parse_iad_array(struct libusb_context *ctx,
 		iad_array->iad = iad;
 
 		/* Second pass: Iterate through desc list, fill IAD structures */
-		int remaining = size;
 		i = 0;
 		do {
 			header.bLength = buffer[0];
 			header.bDescriptorType = buffer[1];
-			if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION && (remaining >= LIBUSB_DT_INTERFACE_ASSOCIATION_SIZE)) {
+			if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION && (size >= LIBUSB_DT_INTERFACE_ASSOCIATION_SIZE)) {
 				iad[i].bLength = buffer[0];
 				iad[i].bDescriptorType = buffer[1];
 				iad[i].bFirstInterface = buffer[2];
@@ -1412,10 +1411,11 @@ static int parse_iad_array(struct libusb_context *ctx,
 				i++;
 			}
 
-			remaining -= header.bLength;
-			if (remaining < DESC_HEADER_LENGTH) {
+			if (size - header.bLength < DESC_HEADER_LENGTH) {
 				break;
 			}
+
+			size -= header.bLength;
 			buffer += header.bLength;
 		} while (1);
 	}
