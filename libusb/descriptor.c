@@ -148,6 +148,8 @@ static void clear_interface(struct libusb_interface *usb_interface)
 				usb_interface->altsetting + i;
 
 			free((void *)ifp->extra);
+			ifp->extra = NULL;
+			ifp->extra_length = 0;
 			if (ifp->endpoint) {
 				uint8_t j;
 
@@ -156,10 +158,13 @@ static void clear_interface(struct libusb_interface *usb_interface)
 						       ifp->endpoint + j);
 			}
 			free((void *)ifp->endpoint);
+			ifp->endpoint = NULL;
+			ifp->bNumEndpoints = 0;
 		}
 	}
 	free((void *)usb_interface->altsetting);
 	usb_interface->altsetting = NULL;
+	usb_interface->num_altsetting = 0;
 }
 
 static int parse_interface(libusb_context *ctx,
@@ -322,7 +327,11 @@ static void clear_configuration(struct libusb_config_descriptor *config)
 					config->interface + i);
 	}
 	free((void *)config->interface);
+	config->interface = NULL;
+	config->bNumInterfaces = 0;
 	free((void *)config->extra);
+	config->extra = NULL;
+	config->extra_length = 0;
 }
 
 static int parse_configuration(struct libusb_context *ctx,
