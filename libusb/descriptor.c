@@ -1665,6 +1665,7 @@ int API_EXPORTED libusb_get_device_string(libusb_device *dev,
 	}
 	if (NULL == data) {
 		length = 0;
+		data = NULL;
 	} else if (length > 0) {
 		*data = 0;  // return an empty string on errors when possible
 	}
