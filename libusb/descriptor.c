@@ -1371,6 +1371,10 @@ static int parse_iad_array(struct libusb_context *ctx,
 	int consumed = 0;
 	const uint8_t *buf = buffer;
 	struct libusb_interface_association_descriptor *iad;
+	int iad_length = 0;
+
+	iad_array->iad = NULL;
+	iad_array->length = 0;
 
 	if (size < LIBUSB_DT_CONFIG_SIZE) {
 		usbi_err(ctx, "short config descriptor read %d/%d",
@@ -1379,7 +1383,6 @@ static int parse_iad_array(struct libusb_context *ctx,
 	}
 
 	/* First pass: Iterate through desc list, count number of IADs */
-	iad_array->length = 0;
 	while (size - consumed >= DESC_HEADER_LENGTH) {
 		header.bLength = buf[0];
 		header.bDescriptorType = buf[1];
@@ -1394,18 +1397,18 @@ static int parse_iad_array(struct libusb_context *ctx,
 			return LIBUSB_ERROR_IO;
 		}
 		if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION)
-			iad_array->length++;
+			iad_length++;
 		buf += header.bLength;
 		consumed += header.bLength;
 	}
 
-	iad_array->iad = NULL;
-	if (iad_array->length > 0) {
-		iad = calloc((size_t)iad_array->length, sizeof(*iad));
+	if (iad_length > 0) {
+		iad = calloc((size_t)iad_length, sizeof(*iad));
 		if (!iad)
 			return LIBUSB_ERROR_NO_MEM;
 
 		iad_array->iad = iad;
+		iad_array->length = iad_length;
 
 		/* Second pass: Iterate through desc list, fill IAD structures */
 		i = 0;
