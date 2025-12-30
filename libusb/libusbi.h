@@ -341,18 +341,6 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 
 #endif /* ENABLE_LOGGING */
 
-#define DEVICE_CTX(dev)		((dev)->ctx)
-#define HANDLE_CTX(handle)	((handle) ? DEVICE_CTX((handle)->dev) : NULL)
-#define ITRANSFER_CTX(itransfer) \
-	((itransfer)->dev ? DEVICE_CTX((itransfer)->dev) : NULL)
-#define TRANSFER_CTX(transfer) \
-	(ITRANSFER_CTX(LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)))
-
-#define IS_EPIN(ep)		(0 != ((ep) & LIBUSB_ENDPOINT_IN))
-#define IS_EPOUT(ep)		(!IS_EPIN(ep))
-#define IS_XFERIN(xfer)		(0 != ((xfer)->endpoint & LIBUSB_ENDPOINT_IN))
-#define IS_XFEROUT(xfer)	(!IS_XFERIN(xfer))
-
 struct libusb_context {
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 	enum libusb_log_level debug;
@@ -631,26 +619,6 @@ enum usbi_transfer_timeout_flags {
 	/* The transfer timeout was successfully processed */
 	USBI_TRANSFER_TIMED_OUT = 1U << 2,
 };
-
-#define TRANSFER_PRIV_TO_USBI_TRANSFER(transfer_priv) \
-	((struct usbi_transfer *)			\
-	 ((unsigned char *)(transfer_priv)	\
-	  + PTR_ALIGN(sizeof(*transfer_priv))))
-
-#define USBI_TRANSFER_TO_TRANSFER_PRIV(itransfer) \
-	((unsigned char *)			\
-	 ((unsigned char *)(itransfer)	\
-	  - PTR_ALIGN(usbi_backend.transfer_priv_size)))
-
-#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)	\
-	((struct libusb_transfer *)			\
-	 ((unsigned char *)(itransfer)			\
-	  + PTR_ALIGN(sizeof(struct usbi_transfer))))
-
-#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)	\
-	((struct usbi_transfer *)			\
-	 ((unsigned char *)(transfer)			\
-	  - PTR_ALIGN(sizeof(struct usbi_transfer))))
 
 #ifdef _MSC_VER
 #pragma pack(push, 1)
@@ -1490,6 +1458,38 @@ struct usbi_os_backend {
 };
 
 extern const struct usbi_os_backend usbi_backend;
+
+#define TRANSFER_PRIV_TO_USBI_TRANSFER(transfer_priv) \
+	((struct usbi_transfer *)			\
+	 ((unsigned char *)(transfer_priv)	\
+	  + PTR_ALIGN(sizeof(*transfer_priv))))
+
+#define USBI_TRANSFER_TO_TRANSFER_PRIV(itransfer) \
+	((unsigned char *)			\
+	 ((unsigned char *)(itransfer)	\
+	  - PTR_ALIGN(usbi_backend.transfer_priv_size)))
+
+#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)	\
+	((struct libusb_transfer *)			\
+	 ((unsigned char *)(itransfer)			\
+	  + PTR_ALIGN(sizeof(struct usbi_transfer))))
+
+#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)	\
+	((struct usbi_transfer *)			\
+	 ((unsigned char *)(transfer)			\
+	  - PTR_ALIGN(sizeof(struct usbi_transfer))))
+
+#define DEVICE_CTX(dev)		((dev)->ctx)
+#define HANDLE_CTX(handle)	((handle) ? DEVICE_CTX((handle)->dev) : NULL)
+#define ITRANSFER_CTX(itransfer) \
+	((itransfer)->dev ? DEVICE_CTX((itransfer)->dev) : NULL)
+#define TRANSFER_CTX(transfer) \
+	(ITRANSFER_CTX(LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)))
+
+#define IS_EPIN(ep)		(0 != ((ep) & LIBUSB_ENDPOINT_IN))
+#define IS_EPOUT(ep)		(!IS_EPIN(ep))
+#define IS_XFERIN(xfer)		(0 != ((xfer)->endpoint & LIBUSB_ENDPOINT_IN))
+#define IS_XFEROUT(xfer)	(!IS_XFERIN(xfer))
 
 #define for_each_context(c) \
 	for_each_helper(c, &active_contexts_list, struct libusb_context)
