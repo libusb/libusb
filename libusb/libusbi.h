@@ -1580,14 +1580,14 @@ int usbi_get_interface_string_index(libusb_device *dev,
 	  + PTR_ALIGN(sizeof(*transfer_priv))))
 
 #define USBI_TRANSFER_TO_TRANSFER_PRIV(itransfer) \
-	((unsigned char *)			\
+	((void *)			\
 	 ((unsigned char *)(itransfer)	\
 	  - PTR_ALIGN(usbi_backend.transfer_priv_size)))
 
 #define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)	\
 	((struct libusb_transfer *)			\
 	 ((unsigned char *)(itransfer)			\
-	  + PTR_ALIGN(sizeof(struct usbi_transfer))))
+	  + PTR_ALIGN(usbi_backend.transfer_priv_size)))
 
 #define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)	\
 	((struct usbi_transfer *)			\
