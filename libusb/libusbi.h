@@ -1032,7 +1032,7 @@ struct usbi_os_backend {
 	 *
 	 * The string should be retrieved without opening the device
 	 * and ideally without performing USB transactions to the device.
-	 * Most operating systems read and cache the common string 
+	 * Most operating systems read and cache the common string
 	 * descriptors.  Use the OS-specific calls to retrieve these strings.
 	 *
 	 * Since the USB string descriptor could be processed by the OS,
