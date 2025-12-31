@@ -439,8 +439,6 @@ static int parse_iic(FILE *image, void *context,
 	int (*poke)(void *context, uint32_t addr, bool external, const unsigned char *data, size_t len))
 {
 	unsigned char data[4096];
-	uint32_t data_addr = 0;
-	size_t data_len = 0, read_len;
 	uint8_t block_header[4];
 	int rc;
 	bool external = false;
@@ -463,14 +461,14 @@ static int parse_iic(FILE *image, void *context,
 			logerror("unable to read IIC block header\n");
 			return -1;
 		}
-		data_len = (block_header[0] << 8) + block_header[1];
-		data_addr = (block_header[2] << 8) + block_header[3];
+		size_t data_len = (size_t)((block_header[0] << 8) + block_header[1]);
+		uint32_t data_addr = (uint32_t)((block_header[2] << 8) + block_header[3]);
 		if (data_len > sizeof(data)) {
 			/* If this is ever reported as an error, switch to using malloc/realloc */
 			logerror("IIC data block too small - please report this error to libusb.info\n");
 			return -1;
 		}
-		read_len = fread(data, 1, data_len, image);
+		size_t read_len = fread(data, 1, data_len, image);
 		if (read_len != data_len) {
 			logerror("read error\n");
 			return -1;
