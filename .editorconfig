@@ -1,0 +1,14 @@
+# This is the top most EditorConfig file.
+root = true
+
+# General defaults: UNIX style newlines, newline ending every file, UTF-8 encoding, no trailing whitespace.
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+
+[*.vcxproj, INSTALL_WIN.txt]
+end_of_line = crlf
+charset = utf-8-bom
+insert_final_newline = false
