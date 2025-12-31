@@ -460,7 +460,7 @@ static int op_set_option(struct libusb_context *ctx, enum libusb_option option, 
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int op_get_device_string(struct libusb_device *dev, 
+static int op_get_device_string(struct libusb_device *dev,
 		enum libusb_device_string_type string_type, char *buffer, int length)
 {
 	ssize_t r;

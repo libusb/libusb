@@ -25,7 +25,7 @@ DEBUG_INFORMATION_FORMAT = dwarf
 // No optimizations in debug.
 GCC_OPTIMIZATION_LEVEL = 0
 
-// 
+//
 GCC_PREPROCESSOR_DEFINITIONS = $(inherited) DEBUG=1
 
 // No need for Universal Binaries in debug.

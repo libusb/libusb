@@ -31,7 +31,7 @@ jobs:
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v1.3
-        
+
       - name: Build solution
         run: |
           msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }} -property:Platform=${{ matrix.architecture }}

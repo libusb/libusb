@@ -1621,14 +1621,14 @@ static int usbi_utf8_copy(char *tgt, char const *src, int tgt_size) {
  * \param dev the target device
  * \param string_type the string type to retrieve
  * \param data the data buffer for the UTF-8 encoded string.
- * \param length the size of the data buffer in bytes.  
- *      USB string descriptors cannot be longer than 
+ * \param length the size of the data buffer in bytes.
+ *      USB string descriptors cannot be longer than
  *      LIBUSB_DEVICE_STRING_BYTES_MAX.
  * \returns a negative error code or
  *      the actual string length in bytes including the null terminator.
  * \see libusb_get_string_descriptor()
  * \see libusb_get_string_descriptor_ascii()
- * 
+ *
  * This function works when the device is still closed since it relies
  * on the operating system to provide the string.  The operating system
  * normally reads and caches the common string descriptors during
@@ -1639,15 +1639,15 @@ static int usbi_utf8_copy(char *tgt, char const *src, int tgt_size) {
  *
  * The string will be returned untranslated or in the default OS language
  * when supported by the OS and USB device.
- * 
+ *
  * One way to call this function is using a buffer on the stack:
- * 
+ *
  *     char buffer[LIBUSB_DEVICE_STRING_BYTES_MAX];
  *     int ret = libusb_get_device_string(dev, LIBUSB_DEVICE_STRING_SERIAL_NUMBER, buffer, sizeof(buffer));
  *     if (ret < 0) {
  *         // handle error
  *     }
- * 
+ *
  * This function is commonly used to get the serial number to allow
  * for device selection before opening the selected device.
  */
