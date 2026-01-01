@@ -1,3 +1,4 @@
+/* -*- Mode: C++; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Haiku Backend for libusb
  * Copyright © 2014 Akshay Jaggi <akshay1994.leo@gmail.com>

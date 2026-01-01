@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
 * Test suite program based of libusb-0.1-compat testlibusb
 * Copyright (c) 2013 Nathan Hjelm <hjelmn@mac.ccom>

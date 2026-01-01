@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * darwin backend for libusb 1.0
  * Copyright © 2008-2023 Nathan Hjelm <hjelmn@users.sourceforge.net>
