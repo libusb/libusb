@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb strerror code
  * Copyright © 2013 Hans de Goede <hdegoede@redhat.com>

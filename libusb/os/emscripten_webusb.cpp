@@ -1,3 +1,4 @@
+/* -*- Mode: C++; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Copyright © 2021 Google LLC
  * Copyright © 2023 Ingvar Stepanyan <me@rreverser.com>
