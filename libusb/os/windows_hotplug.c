@@ -312,7 +312,7 @@ static LRESULT CALLBACK windows_proc_callback(
 							device_name = NULL;
 					    }
 					}
-    			}
+				}
 #else
 				const char* device_name = ((PDEV_BROADCAST_DEVICEINTERFACE)lParam)->dbcc_name;
 #endif

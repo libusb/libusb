@@ -580,10 +580,10 @@ if (r == 0 && actual_length == sizeof(data)) {
 \code
 void *event_thread_func(void *ctx)
 {
-    while (event_thread_run)
-        libusb_handle_events(ctx);
+	while (event_thread_run)
+		libusb_handle_events(ctx);
 
-    return NULL;
+	return NULL;
 }
 \endcode
  *
@@ -601,15 +601,15 @@ void *event_thread_func(void *ctx)
 \code
 void my_close_handle(libusb_device_handle *dev_handle)
 {
-    if (open_devs == 1)
-        event_thread_run = 0;
+	if (open_devs == 1)
+		event_thread_run = 0;
 
-    libusb_close(dev_handle); // This wakes up libusb_handle_events()
+	libusb_close(dev_handle); // This wakes up libusb_handle_events()
 
-    if (open_devs == 1)
-        pthread_join(event_thread);
+	if (open_devs == 1)
+		pthread_join(event_thread);
 
-    open_devs--;
+	open_devs--;
 }
 \endcode
  *
@@ -619,10 +619,10 @@ void my_close_handle(libusb_device_handle *dev_handle)
 \code
 void my_libusb_exit(void)
 {
-    event_thread_run = 0;
-    libusb_hotplug_deregister_callback(ctx, hotplug_cb_handle); // This wakes up libusb_handle_events()
-    pthread_join(event_thread);
-    libusb_exit(ctx);
+	event_thread_run = 0;
+	libusb_hotplug_deregister_callback(ctx, hotplug_cb_handle); // This wakes up libusb_handle_events()
+	pthread_join(event_thread);
+	libusb_exit(ctx);
 }
 \endcode
  */

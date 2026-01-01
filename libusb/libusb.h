@@ -1033,17 +1033,17 @@ struct libusb_ssplus_sublink_attribute {
 
 	/** This field defines the
 	 base 10 exponent times 3, that shall be applied to the
-     mantissa. */
+	 mantissa. */
 	enum libusb_superspeedplus_sublink_attribute_exponent exponent;
 
 	/** This field identifies whether the
 	 Sublink Speed Attribute defines a symmetric or
-     asymmetric bit rate.*/
+	 asymmetric bit rate.*/
 	enum libusb_superspeedplus_sublink_attribute_sublink_type type;
 
 	/** This field  indicates if this
 	 Sublink Speed Attribute defines the receive or
-     transmit bit rate. */
+	 transmit bit rate. */
 	enum libusb_superspeedplus_sublink_attribute_sublink_direction direction;
 
 	/** This field identifies the protocol
@@ -1051,7 +1051,7 @@ struct libusb_ssplus_sublink_attribute {
 	enum libusb_superspeedplus_sublink_attribute_link_protocol protocol;
 
 	/** This field defines the mantissa that shall be applied to the exponent when
-     calculating the maximum bit rate. */
+	 calculating the maximum bit rate. */
 	uint16_t mantissa;
 };
 
@@ -1689,13 +1689,13 @@ typedef void (LIBUSB_CALL *libusb_log_cb)(libusb_context *ctx,
  *
  */
 struct libusb_init_option {
-  /** Which option to set */
-  enum libusb_option option;
-  /** An integer value used by the option (if applicable). */
-  union {
-    int ival;
-    libusb_log_cb log_cbval;
-  } value;
+	/** Which option to set */
+	enum libusb_option option;
+	/** An integer value used by the option (if applicable). */
+	union {
+		int ival;
+		libusb_log_cb log_cbval;
+	} value;
 };
 
 int LIBUSB_CALL libusb_init(libusb_context **ctx);

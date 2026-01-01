@@ -9,8 +9,8 @@ am__v_RC_0 = @echo "  RC      " $@;
 am__v_RC_1 =
 
 LTRC = $(LIBTOOL) $(AM_V_lt) --tag=RC $(AM_LIBTOOLFLAGS) \
-       $(LIBTOOLFLAGS) --mode=compile $(RC) $(AM_RCFLAGS) \
-       $(RCFLAGS)
+		$(LIBTOOLFLAGS) --mode=compile $(RC) $(AM_RCFLAGS) \
+		$(RCFLAGS)
 
 RCPPARGS = \
 	--preprocessor-arg -MT \

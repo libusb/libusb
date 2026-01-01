@@ -722,21 +722,21 @@ struct usbi_bos_descriptor {
 #endif
 
 union usbi_config_desc_buf {
-        struct usbi_configuration_descriptor desc;
-        uint8_t buf[LIBUSB_DT_CONFIG_SIZE];
-        uint16_t align;         /* Force 2-byte alignment */
+	struct usbi_configuration_descriptor desc;
+	uint8_t buf[LIBUSB_DT_CONFIG_SIZE];
+	uint16_t align;         /* Force 2-byte alignment */
 };
 
 union usbi_string_desc_buf {
-        struct usbi_string_descriptor desc;
-        uint8_t buf[255];       /* Some devices choke on size > 255 */
-        uint16_t align;         /* Force 2-byte alignment */
+	struct usbi_string_descriptor desc;
+	uint8_t buf[255];       /* Some devices choke on size > 255 */
+	uint16_t align;         /* Force 2-byte alignment */
 };
 
 union usbi_bos_desc_buf {
-        struct usbi_bos_descriptor desc;
-        uint8_t buf[LIBUSB_DT_BOS_SIZE];
-        uint16_t align;         /* Force 2-byte alignment */
+	struct usbi_bos_descriptor desc;
+	uint8_t buf[LIBUSB_DT_BOS_SIZE];
+	uint16_t align;         /* Force 2-byte alignment */
 };
 
 enum usbi_hotplug_flags {
@@ -844,11 +844,11 @@ int usbi_add_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle
 void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle);
 
 struct usbi_option {
-  int is_set;
-  union {
-    int ival;
-    libusb_log_cb log_cbval;
-  } arg;
+	int is_set;
+	union {
+		int ival;
+		libusb_log_cb log_cbval;
+	} arg;
 };
 
 /* OS event abstraction */

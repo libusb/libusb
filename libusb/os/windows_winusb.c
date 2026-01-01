@@ -2614,8 +2614,8 @@ const struct windows_backend winusb_backend = {
  */
 
 static const char * const composite_driver_names[] = {
-  "USBCCGP", // (Windows built-in) USB Composite Device
-  "dg_ssudbus" // SAMSUNG Mobile USB Composite Device
+	"USBCCGP", // (Windows built-in) USB Composite Device
+	"dg_ssudbus" // SAMSUNG Mobile USB Composite Device
 };
 static const char * const winusbx_driver_names[] = {"libusbK", "libusb0", "WinUSB"};
 static const char * const hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};
