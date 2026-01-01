@@ -1,0 +1,8 @@
+# Add missing newlines at the end of files
+042d12470c70f7f04221c3821a2b8e6b55356a77
+
+# Remove trailing whitespace from all files
+f60e73fa1e425f51565ee83930504406d37d9149
+
+# Convert tabs<->spaces, making files self-consistent
+c6dd91363112f4084c85e9cc2903983c286a79d0
