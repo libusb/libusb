@@ -957,9 +957,9 @@ test_threaded_submit(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 
 static int LIBUSB_CALL
 hotplug_count_arrival_cb(libusb_context *ctx,
-                         libusb_device  *device,
-                         libusb_hotplug_event event,
-                         void *user_data)
+						 libusb_device  *device,
+						 libusb_hotplug_event event,
+						 void *user_data)
 {
 	g_assert_cmpint(event, ==, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
 
@@ -974,9 +974,9 @@ hotplug_count_arrival_cb(libusb_context *ctx,
 #ifdef UMOCKDEV_HOTPLUG
 static int LIBUSB_CALL
 hotplug_count_removal_cb(libusb_context *ctx,
-                         libusb_device  *device,
-                         libusb_hotplug_event event,
-                         void *user_data)
+						 libusb_device  *device,
+						 libusb_hotplug_event event,
+						 void *user_data)
 {
 	g_assert_cmpint(event, ==, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT);
 
