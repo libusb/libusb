@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 #ifndef ezusb_H
 #define ezusb_H
 /*

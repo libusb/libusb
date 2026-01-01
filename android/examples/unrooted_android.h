@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  *  Copyright 2021 Peter Stoiber
  *
