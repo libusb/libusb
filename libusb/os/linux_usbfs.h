@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * usbfs header structures
  * Copyright © 2007 Daniel Drake <dsd@gentoo.org>

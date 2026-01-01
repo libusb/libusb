@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb example program to measure Atmel SAM3U isochronous performance
  * Copyright (C) 2012 Harald Welte <laforge@gnumonks.org>

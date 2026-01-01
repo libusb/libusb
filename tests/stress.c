@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb stress test program to perform simple stress tests
  * Copyright © 2012 Toby Gray <toby.gray@realvnc.com>

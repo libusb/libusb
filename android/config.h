@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  * Android build config for libusb
  * Copyright © 2012-2013 RealVNC Ltd. <toby.gray@realvnc.com>
