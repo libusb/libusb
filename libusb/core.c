@@ -449,6 +449,7 @@ if (cfg != desired)
   * - libusb_init_context()
   * - libusb_interrupt_event_handler()
   * - libusb_interrupt_transfer()
+  *	- libusb_keep_device()
   * - libusb_kernel_driver_active()
   * - libusb_lock_events()
   * - libusb_lock_event_waiters()
@@ -472,6 +473,7 @@ if (cfg != desired)
   * - libusb_transfer_get_stream_id()
   * - libusb_transfer_set_stream_id()
   * - libusb_try_lock_events()
+  *	- libusb_unkeep_device()
   * - libusb_unlock_events()
   * - libusb_unlock_event_waiters()
   * - libusb_unref_device()
@@ -1335,16 +1337,59 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 
 		libusb_unref_device(dev->parent_dev);
 
-		if (usbi_backend.destroy_device)
-			usbi_backend.destroy_device(dev);
+		if (usbi_atomic_load(&dev->keep_device) == 0) {
+			if (usbi_backend.destroy_device)
+				usbi_backend.destroy_device(dev);
 
-		if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
-			/* backend does not support hotplug */
-			usbi_disconnect_device(dev);
+			if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+				/* backend does not support hotplug */
+				usbi_disconnect_device(dev);
+			}
+
+			for (int idx = 0; idx < LIBUSB_DEVICE_STRING_COUNT; ++idx) {
+				free(dev->device_strings_utf8[idx]);
+			}
+
+			free(dev);
 		}
+	}
+}
 
-		for (int idx = 0; idx < LIBUSB_DEVICE_STRING_COUNT; ++idx) {
-			free(dev->device_strings_utf8[idx]);
+/** \ingroup libusb_dev
+ * Keep the reference of a device.
+ * \param dev the device to reference
+ * \returns the same device
+ */
+libusb_device* LIBUSB_CALL libusb_keep_device(libusb_device* dev)
+{
+	usbi_atomic_store(&dev->keep_device, 1);
+
+	if (dev->parent_dev) {
+		libusb_keep_device(dev->parent_dev);
+	}
+
+	return dev;
+}
+
+/** \ingroup libusb_dev
+ * Stop keeping the reference of a device. If the reference count
+ * is zero, the device shall be destroyed.
+ * \param dev the device to unkeep
+ */
+void API_EXPORTED libusb_unkeep_device(libusb_device* dev)
+{
+	long refcnt;
+
+	usbi_atomic_store(&dev->keep_device, 0);
+
+	refcnt = usbi_atomic_load(&dev->refcnt);
+	assert(refcnt >= 0);
+
+	if (refcnt == 0) {
+		usbi_dbg(DEVICE_CTX(dev), "destroy device %d.%d", dev->bus_number, dev->device_address);
+
+		if (dev->parent_dev) {
+			libusb_unkeep_device(dev->parent_dev);
 		}
 
 		free(dev);

@@ -508,6 +508,7 @@ static inline void usbi_end_event_handling(struct libusb_context *ctx)
 }
 
 struct libusb_device {
+	usbi_atomic_t keep_device;
 	usbi_atomic_t refcnt;
 
 	struct libusb_context *ctx;

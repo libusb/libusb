@@ -1714,8 +1714,10 @@ ssize_t LIBUSB_CALL libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list);
 void LIBUSB_CALL libusb_free_device_list(libusb_device **list,
 	int unref_devices);
-libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev);
-void LIBUSB_CALL libusb_unref_device(libusb_device *dev);
+libusb_device* LIBUSB_CALL libusb_ref_device(libusb_device* dev);
+void LIBUSB_CALL libusb_unref_device(libusb_device* dev);
+libusb_device* LIBUSB_CALL libusb_keep_device(libusb_device* dev);
+void LIBUSB_CALL libusb_unkeep_device(libusb_device* dev);
 
 int LIBUSB_CALL libusb_get_device_string(libusb_device *dev,
 	enum libusb_device_string_type string_type, char *data, int length);
