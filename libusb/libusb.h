@@ -41,6 +41,7 @@ typedef SSIZE_T ssize_t;
 #endif /* _SSIZE_T_DEFINED */
 #endif /* _MSC_VER */
 
+#include <assert.h>
 #include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -1509,8 +1510,13 @@ struct libusb_transfer {
 	unsigned char *buffer;
 
 	/** Number of isochronous packets. Only used for I/O with isochronous
-	 * endpoints. Must be non-negative. */
+	 * endpoints. Must be non-negative and <= max_num_iso_packets. */
 	int num_iso_packets;
+
+#ifdef __has_ptrcheck
+	/** The count of the iso_packet_desc array below (its actual memory size). */
+	int max_num_iso_packets;
+#endif
 
 	/** Isochronous packet descriptors, for isochronous transfers only. */
 	struct libusb_iso_packet_descriptor iso_packet_desc[LIBUSB_FLEXIBLE_ARRAY];
@@ -2070,6 +2076,10 @@ static inline void libusb_fill_iso_transfer(struct libusb_transfer *transfer,
 	unsigned char *buffer, int length, int num_iso_packets,
 	libusb_transfer_cb_fn callback, void *user_data, unsigned int timeout)
 {
+#ifdef __has_ptrcheck
+	assert(num_iso_packets <= transfer->max_num_iso_packets);
+#endif
+	
 	transfer->dev_handle = dev_handle;
 	transfer->endpoint = endpoint;
 	transfer->type = LIBUSB_TRANSFER_TYPE_ISOCHRONOUS;
