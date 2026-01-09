@@ -55,6 +55,20 @@ typedef SSIZE_T ssize_t;
 #define LIBUSB_FLEXIBLE_ARRAY	0	/* [0] - non-standard, but usually working code */
 #endif /* __STDC_VERSION__ */
 
+/* gcc > 14 and clang > 17 support the counted_by attribute,
+ * used to indicate the size of struct flexible array members.
+ * This helps detected buffer overruns.
+ * See: https://people.kernel.org/kees/bounded-flexible-arrays-in-c */
+#if defined __has_attribute
+#if __has_attribute(__counted_by__)
+#define LIBUSB_COUNTED_BY(member) __attribute__((counted_by(member)))
+#else
+#define LIBUSB_COUNTED_BY(member)
+#endif
+#else
+#define LIBUSB_COUNTED_BY(member)
+#endif
+
 /* 'interface' might be defined as a macro on Windows, so we need to
  * undefine it so as not to break the current libusb API, because
  * libusb_config_descriptor has an 'interface' member
@@ -889,7 +903,7 @@ struct libusb_bos_dev_capability_descriptor {
 	uint8_t  bDevCapabilityType;
 
 	/** Device Capability data (bLength - 3 bytes) */
-	uint8_t  dev_capability_data[LIBUSB_FLEXIBLE_ARRAY];
+	uint8_t  dev_capability_data[LIBUSB_FLEXIBLE_ARRAY] LIBUSB_COUNTED_BY(bLength - 3);
 };
 
 /** \ingroup libusb_desc
@@ -914,7 +928,7 @@ struct libusb_bos_descriptor {
 	uint8_t  bNumDeviceCaps;
 
 	/** bNumDeviceCap Device Capability Descriptors */
-	struct libusb_bos_dev_capability_descriptor *dev_capability[LIBUSB_FLEXIBLE_ARRAY];
+	struct libusb_bos_dev_capability_descriptor *dev_capability[LIBUSB_FLEXIBLE_ARRAY] LIBUSB_COUNTED_BY(bNumDeviceCaps);
 };
 
 /** \ingroup libusb_desc
@@ -1130,7 +1144,7 @@ struct libusb_platform_descriptor {
 	uint8_t  PlatformCapabilityUUID[16];
 
 	/** Capability data (bLength - 20) */
-	uint8_t  CapabilityData[LIBUSB_FLEXIBLE_ARRAY];
+	uint8_t  CapabilityData[LIBUSB_FLEXIBLE_ARRAY] LIBUSB_COUNTED_BY(bLength - 20);
 };
 
 /** \ingroup libusb_asyncio
@@ -1513,7 +1527,7 @@ struct libusb_transfer {
 	int num_iso_packets;
 
 	/** Isochronous packet descriptors, for isochronous transfers only. */
-	struct libusb_iso_packet_descriptor iso_packet_desc[LIBUSB_FLEXIBLE_ARRAY];
+	struct libusb_iso_packet_descriptor iso_packet_desc[LIBUSB_FLEXIBLE_ARRAY] LIBUSB_COUNTED_BY(num_iso_packets);
 };
 
 /** \ingroup libusb_misc
