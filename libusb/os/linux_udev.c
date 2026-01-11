@@ -267,6 +267,8 @@ int linux_udev_scan_devices(struct libusb_context *ctx)
 	struct udev_enumerate *enumerator;
 	struct udev_list_entry *devices, *entry;
 	struct udev_device *udev_dev;
+	int require_initialized = 0;
+	const char *udev_devpath = NULL;
 	const char *sys_name;
 	int r;
 
@@ -278,6 +280,17 @@ int linux_udev_scan_devices(struct libusb_context *ctx)
 		return LIBUSB_ERROR_OTHER;
 	}
 
+	/* We should just add udev_enumerate_add_match_is_initialized when
+	 * udev is running. However, e.g. libmtp is buggy and relies on being
+	 * able to enumerate the device from within a udev rule.
+	 */
+	if (access("/run/udev/control", F_OK) == 0) {
+		require_initialized = 1;
+
+		/* Check we are running from a udev rule and store DEVPATH */
+		if (getenv("DEVTYPE") && getenv("DRIVER"))
+			udev_devpath = getenv("DEVPATH");
+	}
 	udev_enumerate_add_match_subsystem(enumerator, "usb");
 	udev_enumerate_add_match_property(enumerator, "DEVTYPE", "usb_device");
 	udev_enumerate_scan_devices(enumerator);
@@ -289,6 +302,24 @@ int linux_udev_scan_devices(struct libusb_context *ctx)
 		uint8_t busnum = 0, devaddr = 0;
 
 		udev_dev = udev_device_new_from_syspath(udev_ctx, path);
+
+		if (require_initialized &&
+		    !udev_device_get_is_initialized(udev_dev)) {
+			/* The device should not be reported as it is not
+			 * initialized by udev.
+			 * However, as a work around, let the API user discover
+			 * the device if we seem to be running from within a
+			 * udev rule and this is the device from the
+			 * environment.
+			 */
+			if (udev_devpath && strcmp(udev_devpath, path) == 0)
+				usbi_warn(ctx,
+					  "Allowing device %s to be discovered from within udev rule. "
+					  "Please fix the application to disable device discovery and use libusb_wrap_sys_device",
+					  udev_devpath);
+			else
+				continue;
+		}
 
 		r = udev_device_info(ctx, 0, udev_dev, &busnum, &devaddr, &sys_name);
 		if (r) {

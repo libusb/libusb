@@ -209,14 +209,10 @@ linux)
 		AC_CHECK_HEADER([libudev.h], [], [AC_MSG_ERROR([udev support requested but libudev header not installed])])
 		AC_CHECK_LIB([udev], [udev_new], [], [AC_MSG_ERROR([udev support requested but libudev not installed])])
 
-		# We can build umockdev tests (if available)
+		# We can build umockdev tests (if available); need 0.17.7 because hotplug was racy before
 		m4_ifdef([PKG_PROG_PKG_CONFIG],[
 			PKG_PROG_PKG_CONFIG
-		   	PKG_CHECK_MODULES([UMOCKDEV], [umockdev-1.0 >= 0.16.0], [ac_have_umockdev=yes], [ac_have_umockdev=no])
-		   	PKG_CHECK_MODULES([UMOCKDEV_HOTPLUG], [umockdev-1.0 >= 0.17.7], [ac_umockdev_hotplug=yes], [ac_umockdev_hotplug=no])
-			if test $ac_umockdev_hotplug = yes; then
-			   AC_DEFINE([UMOCKDEV_HOTPLUG], [1], [UMockdev hotplug code is not racy])
-			fi
+			PKG_CHECK_MODULES([UMOCKDEV], [umockdev-1.0 >= 0.17.7], [ac_have_umockdev=yes], [ac_have_umockdev=no])
 		], [])
 	else
 		AC_CHECK_HEADERS([asm/types.h])
