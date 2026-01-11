@@ -1105,7 +1105,7 @@ static void display_help(const char *progname)
 	printf("If only the vid:pid is provided, xusb attempts to run the most appropriate test\n");
 }
 
-int main(int argc, char** argv)
+int main(int argc, const char* argv[])
 {
 	bool debug_mode = false;
 	const struct libusb_version* version;
@@ -1113,7 +1113,8 @@ int main(int argc, char** argv)
 	size_t i, arglen;
 	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
-	char *error_lang = NULL, *old_dbg_str = NULL, str[256];
+	const char *error_lang = NULL;
+	char *old_dbg_str = NULL, str[256];
 
 	// Default to generic, expecting VID:PID
 	VID = 0;
