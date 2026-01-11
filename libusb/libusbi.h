@@ -596,7 +596,6 @@ struct usbi_transfer {
 	 * always take the flying_transfers_lock first */
 	usbi_mutex_t lock;
 
-	int num_iso_packets;
 	struct list_head list;
 	struct list_head completed_list;
 	struct timespec timeout;
