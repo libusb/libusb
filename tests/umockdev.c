@@ -1121,7 +1121,7 @@ test_hotplug_add_remove(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 }
 
 int
-main(int argc, char **argv)
+main(int argc, char *argv[])
 {
 	g_test_init(&argc, &argv, NULL);
 
