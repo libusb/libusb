@@ -2909,7 +2909,7 @@ static int winusbx_open(int sub_api, struct libusb_device_handle *dev_handle)
 {
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
 	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
-	HANDLE file_handle;
+	HANDLE file_handle = INVALID_HANDLE_VALUE;
 	int i;
 
 	CHECK_WINUSBX_AVAILABLE(sub_api);
@@ -2918,8 +2918,8 @@ static int winusbx_open(int sub_api, struct libusb_device_handle *dev_handle)
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
 		if ((priv->usb_interface[i].path != NULL)
 				&& (priv->usb_interface[i].apib->id == USB_API_WINUSBX)) {
-			file_handle = windows_open(dev_handle, priv->usb_interface[i].path, GENERIC_READ | GENERIC_WRITE);
-			if (file_handle == INVALID_HANDLE_VALUE) {
+			HANDLE file_handle_local = windows_open(dev_handle, priv->usb_interface[i].path, GENERIC_READ | GENERIC_WRITE);
+			if (file_handle_local == INVALID_HANDLE_VALUE && file_handle == INVALID_HANDLE_VALUE) {
 				usbi_err(HANDLE_CTX(dev_handle), "could not open device %s (interface %d): %s", priv->usb_interface[i].path, i, windows_error_str(0));
 				switch (GetLastError()) {
 				case ERROR_FILE_NOT_FOUND: // The device was disconnected
@@ -2929,9 +2929,11 @@ static int winusbx_open(int sub_api, struct libusb_device_handle *dev_handle)
 				default:
 					return LIBUSB_ERROR_IO;
 				}
+			} else if (INVALID_HANDLE_VALUE == file_handle){
+				file_handle = file_handle_local;
 			}
 
-			handle_priv->interface_handle[i].dev_handle = file_handle;
+			handle_priv->interface_handle[i].dev_handle = file_handle_local;
 		}
 	}
 
