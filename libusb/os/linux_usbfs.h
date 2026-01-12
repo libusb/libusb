@@ -71,7 +71,6 @@ struct usbfs_iso_packet_desc {
 };
 
 #define MAX_BULK_BUFFER_LENGTH		16384
-#define MAX_CTRL_BUFFER_LENGTH		4096
 
 #define MAX_ISO_PACKETS_PER_URB		128
 
