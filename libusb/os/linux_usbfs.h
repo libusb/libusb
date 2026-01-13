@@ -91,7 +91,7 @@ struct usbfs_urb {
 	int error_count;
 	unsigned int signr;
 	void *usercontext;
-	struct usbfs_iso_packet_desc iso_frame_desc[0];
+	struct usbfs_iso_packet_desc iso_frame_desc[];
 };
 
 struct usbfs_connectinfo {
@@ -124,7 +124,7 @@ struct usbfs_disconnect_claim {
 struct usbfs_streams {
 	unsigned int num_streams; /* Not used by USBDEVFS_FREE_STREAMS */
 	unsigned int num_eps;
-	unsigned char eps[0];
+	unsigned char eps[];
 };
 
 #define USBFS_SPEED_UNKNOWN			0
