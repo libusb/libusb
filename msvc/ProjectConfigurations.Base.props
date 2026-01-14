@@ -9,6 +9,11 @@
       <PreprocessorDefinitions>LIBUSB_WINDOWS_HOTPLUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(EnableWinRt)' == 'true'">
+    <ClCompile>
+      <PreprocessorDefinitions>PLATFORM_CPP_STL=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|ARM">
       <Configuration>Debug</Configuration>
@@ -138,6 +143,38 @@
       <Configuration>Release-Hotplug-MT</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+	  <ProjectConfiguration Include="Debug-WinRt|ARM">
+      <Configuration>Debug-WinRt</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-WinRt|ARM64">
+      <Configuration>Debug-WinRt</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-WinRt|Win32">
+      <Configuration>Debug-WinRt</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-WinRt|x64">
+      <Configuration>Debug-WinRt</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+	 <ProjectConfiguration Include="Release-WinRt|ARM">
+      <Configuration>Release-WinRt</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-WinRt|ARM64">
+      <Configuration>Release-WinRt</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-WinRt|Win32">
+      <Configuration>Release-WinRt</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-WinRt|x64">
+      <Configuration>Release-WinRt</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
 	<PropertyGroup Condition="'$(Configuration)' == 'Debug-Hotplug'">
 		<EnableWindowsHotplug>true</EnableWindowsHotplug>
@@ -150,5 +187,11 @@
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)' == 'Release-Hotplug-MT'">
 		<EnableWindowsHotplug>true</EnableWindowsHotplug>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug-WinRt'">
+		<EnableWinRt>true</EnableWinRt>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Release-WinRt'">
+		<EnableWinRt>true</EnableWinRt>
 	</PropertyGroup>
 </Project>
