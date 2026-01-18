@@ -706,7 +706,7 @@ int em_get_config_descriptor_by_value(libusb_device* dev,
 }
 
 int em_set_configuration(libusb_device_handle* dev_handle, int config) {
-	return WebUsbDevicePtr(dev_handle)->awaitOnMain("setConfiguration", config);
+	return WebUsbDevicePtr(dev_handle)->awaitOnMain("selectConfiguration", config);
 }
 
 int em_claim_interface(libusb_device_handle* handle, uint8_t iface) {
