@@ -3330,15 +3330,15 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 			usbi_warn(TRANSFER_CTX(transfer), "cannot set configuration other than the default one");
 			return LIBUSB_ERROR_NOT_SUPPORTED;
 		}
-		windows_force_sync_completion(itransfer, 0);
+		windows_force_sync_completion(itransfer, 0, ERROR_SUCCESS);
 	} else {
 		if (!WinUSBX[sub_api].ControlTransfer(winusb_handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, &transferred, overlapped)) {
 			if (GetLastError() != ERROR_IO_PENDING) {
-				usbi_warn(TRANSFER_CTX(transfer), "ControlTransfer failed: %s", windows_error_str(0));
-				return LIBUSB_ERROR_IO;
+				usbi_dbg(TRANSFER_CTX(transfer), "ControlTransfer returned: %s", windows_error_str(0));
+				windows_force_sync_completion(itransfer, 0, GetLastError());
 			}
 		} else {
-			windows_force_sync_completion(itransfer, transferred);
+			windows_force_sync_completion(itransfer, transferred, ERROR_SUCCESS);
 		}
 	}
 
@@ -4787,7 +4787,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 
 	if (r == LIBUSB_COMPLETED) {
 		// Force request to be completed synchronously. Transferred size has been set by previous call
-		windows_force_sync_completion(itransfer, (ULONG)size);
+		windows_force_sync_completion(itransfer, (ULONG)size, ERROR_SUCCESS);
 		r = LIBUSB_SUCCESS;
 	}
 

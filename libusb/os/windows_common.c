@@ -296,7 +296,7 @@ enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS st
 /*
  * Make a transfer complete synchronously
  */
-void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size)
+void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size, DWORD error_code)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct windows_context_priv *priv = usbi_get_context_priv(TRANSFER_CTX(transfer));
@@ -305,7 +305,7 @@ void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size)
 
 	usbi_dbg(TRANSFER_CTX(transfer), "transfer %p, length %lu", transfer, ULONG_CAST(size));
 
-	overlapped->Internal = (ULONG_PTR)STATUS_SUCCESS;
+	overlapped->Internal = (ULONG_PTR)error_code;
 	overlapped->InternalHigh = (ULONG_PTR)size;
 
 	if (!PostQueuedCompletionStatus(priv->completion_port, (DWORD)size, (ULONG_PTR)transfer->dev_handle, overlapped))
@@ -863,10 +863,13 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
 	enum libusb_transfer_status status, istatus;
 	DWORD result, bytes_transferred;
 
-	if (GetOverlappedResult(transfer_priv->handle, &transfer_priv->overlapped, &bytes_transferred, FALSE))
-		result = NO_ERROR;
-	else
+	if (GetOverlappedResult(transfer_priv->handle, &transfer_priv->overlapped, &bytes_transferred, FALSE)) {
+		result = (DWORD) transfer_priv->overlapped.Internal;
+		if (result != ERROR_SUCCESS)
+			usbi_dbg(ctx, "GetOverlappedResult true, but Internal not reset");
+	} else {
 		result = GetLastError();
+	}
 
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	usbi_dbg(ctx, "handling transfer %p completion with errcode %lu, length %lu",

@@ -424,7 +424,7 @@ extern const struct windows_backend winusb_backend;
 HMODULE load_system_library(struct libusb_context *ctx, const char *name);
 unsigned long htab_hash(const char *str);
 enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS status);
-void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size);
+void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size, DWORD error_code);
 
 #if defined(ENABLE_LOGGING)
 const char *windows_error_str(DWORD error_code);
