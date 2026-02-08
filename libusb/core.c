@@ -2310,7 +2310,7 @@ int API_EXPORTED libusb_endpoint_supports_raw_io(libusb_device_handle* dev_handl
  * \returns another LIBUSB_ERROR code on other failure
  *
  * \see libusb_endpoint_supports_raw_io()
- * \seealso https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/winusb-functions-for-pipe-policy-modification
+ * \see also https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/winusb-functions-for-pipe-policy-modification
  *
  * Since version 1.0.30, \ref LIBUSB_API_VERSION >= 0x0100010C
  */
