@@ -354,18 +354,6 @@ enum libusb_descriptor_type {
 #define LIBUSB_ENDPOINT_ADDRESS_MASK		0x0f	/* in bEndpointAddress */
 #define LIBUSB_ENDPOINT_DIR_MASK		0x80
 
-/** \ingroup libusb_desc
- * Endpoint direction. Values for bit 7 of the
- * \ref libusb_endpoint_descriptor::bEndpointAddress "endpoint address" scheme.
- */
-enum libusb_endpoint_direction {
-	/** Out: host-to-device */
-	LIBUSB_ENDPOINT_OUT = 0x00,
-
-	/** In: device-to-host */
-	LIBUSB_ENDPOINT_IN = 0x80
-};
-
 #define LIBUSB_TRANSFER_TYPE_MASK		0x03	/* in bmAttributes */
 
 /** \ingroup libusb_desc
@@ -435,10 +423,25 @@ enum libusb_standard_request {
 };
 
 /** \ingroup libusb_misc
- * Request type bits of the
+ * Bits for constructing values of the
  * \ref libusb_control_setup::bmRequestType "bmRequestType" field in control
  * transfers. */
-enum libusb_request_type {
+enum libusb_request {
+
+	/** Endpoint direction. Values for bit 7 of the
+	* \ref libusb_endpoint_descriptor::bEndpointAddress "endpoint address" scheme.
+	*/
+
+	/** Out: host-to-device */
+	LIBUSB_ENDPOINT_OUT = 0x00,
+
+	/** In: device-to-host */
+	LIBUSB_ENDPOINT_IN = 0x80,
+
+	/** Request type bits of the
+	* \ref libusb_control_setup::bmRequestType "bmRequestType" field in control
+	* transfers. */
+
 	/** Standard */
 	LIBUSB_REQUEST_TYPE_STANDARD = (0x00 << 5),
 
@@ -449,14 +452,12 @@ enum libusb_request_type {
 	LIBUSB_REQUEST_TYPE_VENDOR = (0x02 << 5),
 
 	/** Reserved */
-	LIBUSB_REQUEST_TYPE_RESERVED = (0x03 << 5)
-};
+	LIBUSB_REQUEST_TYPE_RESERVED = (0x03 << 5),
 
-/** \ingroup libusb_misc
- * Recipient bits of the
- * \ref libusb_control_setup::bmRequestType "bmRequestType" field in control
- * transfers. Values 4 through 31 are reserved. */
-enum libusb_request_recipient {
+	/** Recipient bits of the
+	* \ref libusb_control_setup::bmRequestType "bmRequestType" field in control
+	* transfers. Values 4 through 31 are reserved. */
+
 	/** Device */
 	LIBUSB_RECIPIENT_DEVICE = 0x00,
 
