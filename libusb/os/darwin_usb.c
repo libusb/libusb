@@ -1027,9 +1027,9 @@ static int get_configuration_index (struct libusb_device *dev, UInt8 config_valu
     return darwin_to_libusb (kresult);
 
   for (i = 0 ; i < numConfig ; i++) {
-    (*priv->device)->GetConfigurationDescriptorPtr (priv->device, i, &desc);
+    kresult = (*priv->device)->GetConfigurationDescriptorPtr (priv->device, i, &desc);
 
-    if (desc->bConfigurationValue == config_value)
+    if (kresult == kIOReturnSuccess && desc->bConfigurationValue == config_value)
       return i;
   }
 
@@ -2160,7 +2160,11 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   cached_configurations = alloca (sizeof (*cached_configurations) * descriptor.bNumConfigurations);
 
   for (i = 0 ; i < descriptor.bNumConfigurations ; ++i) {
-    (*dpriv->device)->GetConfigurationDescriptorPtr (dpriv->device, i, &cached_configuration);
+    kresult = (*dpriv->device)->GetConfigurationDescriptorPtr (dpriv->device, i, &cached_configuration);
+    if (kresult != kIOReturnSuccess) {
+      dpriv->in_reenumerate = false;
+      return LIBUSB_ERROR_NOT_FOUND;
+    }
     memcpy (cached_configurations + i, cached_configuration, sizeof (cached_configurations[i]));
   }
 
@@ -2222,8 +2226,8 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   }
 
   for (i = 0 ; i < descriptor.bNumConfigurations ; ++i) {
-    (void) (*dpriv->device)->GetConfigurationDescriptorPtr (dpriv->device, i, &cached_configuration);
-    if (memcmp (cached_configuration, cached_configurations + i, sizeof (cached_configurations[i])) != 0) {
+    kresult = (*dpriv->device)->GetConfigurationDescriptorPtr (dpriv->device, i, &cached_configuration);
+    if (kresult != kIOReturnSuccess || memcmp (cached_configuration, cached_configurations + i, sizeof (cached_configurations[i])) != 0) {
       usbi_dbg (ctx, "darwin/reenumerate_device: configuration descriptor %d changed", i);
       return LIBUSB_ERROR_NOT_FOUND;
     }
