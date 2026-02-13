@@ -1549,6 +1549,9 @@ struct usbi_os_backend {
 
 extern const struct usbi_os_backend usbi_backend;
 
+int do_claim_interface(libusb_device_handle *dev_handle,
+	int interface_number, int (*claim_interface_backend)(struct libusb_device_handle *dev_handle_backend, uint8_t interface_number_backend));
+
 #define for_each_context(c) \
 	for_each_helper(c, &active_contexts_list, struct libusb_context)
 
