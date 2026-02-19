@@ -1857,7 +1857,7 @@ static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
 	int r, fd = hpriv->fd;
 
 	dc.interface = interface;
-	strcpy(dc.driver, "usbfs");
+	snprintf(dc.driver, sizeof(dc.driver), "%s", "usbfs");
 	dc.flags = USBFS_DISCONNECT_CLAIM_EXCEPT_DRIVER;
 	r = ioctl(fd, IOCTL_USBFS_DISCONNECT_CLAIM, &dc);
 	if (r == 0)
