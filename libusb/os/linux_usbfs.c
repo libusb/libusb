@@ -473,6 +473,8 @@ static int op_get_device_string(struct libusb_device *dev,
 		case LIBUSB_DEVICE_STRING_MANUFACTURER: attr = "manufacturer"; break;
 		case LIBUSB_DEVICE_STRING_PRODUCT: attr = "product"; break;
 		case LIBUSB_DEVICE_STRING_SERIAL_NUMBER: attr = "serial"; break;
+		case LIBUSB_DEVICE_STRING_COUNT:
+			/* intentional fall-through, avoid -Wswitch-enum */
 		default:
 			return LIBUSB_ERROR_INVALID_PARAM;
 	}
