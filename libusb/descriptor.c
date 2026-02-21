@@ -1008,7 +1008,7 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
 	_ss_usb_device_cap->wSpeedSupported = ReadLittleEndian16(&dev_cap->dev_capability_data[1]);
 	_ss_usb_device_cap->bFunctionalitySupport = dev_cap->dev_capability_data[3];
 	_ss_usb_device_cap->bU1DevExitLat = dev_cap->dev_capability_data[4];
-	_ss_usb_device_cap->bU2DevExitLat = ReadLittleEndian16(&dev_cap->dev_capability_data[5]);
+	_ss_usb_device_cap->wU2DevExitLat = ReadLittleEndian16(&dev_cap->dev_capability_data[5]);
 
 	*ss_usb_device_cap = _ss_usb_device_cap;
 	return LIBUSB_SUCCESS;

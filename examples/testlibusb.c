@@ -92,7 +92,7 @@ static void print_ss_usb_cap(struct libusb_ss_usb_device_capability_descriptor *
 	printf("      wSpeedSupported:       %u\n", ss_usb_cap->wSpeedSupported);
 	printf("      bFunctionalitySupport: %u\n", ss_usb_cap->bFunctionalitySupport);
 	printf("      bU1devExitLat:         %u\n", ss_usb_cap->bU1DevExitLat);
-	printf("      bU2devExitLat:         %u\n", ss_usb_cap->bU2DevExitLat);
+	printf("      wU2devExitLat:         %u\n", ss_usb_cap->wU2DevExitLat);
 }
 
 static void print_bos(libusb_device_handle *handle)

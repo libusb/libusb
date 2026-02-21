@@ -999,8 +999,14 @@ struct libusb_ss_usb_device_capability_descriptor {
 	/** U1 Device Exit Latency. */
 	uint8_t  bU1DevExitLat;
 
-	/** U2 Device Exit Latency. */
-	uint16_t bU2DevExitLat;
+        /** U2 Device Exit Latency.
+         * The correct naming convention should be wU2DevEcitLat
+         * as it is a 2 byte member.
+         * To prevent API breakage, we use a macro as a workaroud
+         * and preserve the default name.
+         */
+#define wU2DevExitLat bU2DevExitLat
+        uint16_t bU2DevExitLat;
 };
 
 /** \ingroup libusb_desc
