@@ -91,7 +91,7 @@ int main(int argc, char*argv[])
 	const char *ext, *img_name[] = IMG_TYPE_NAMES;
 	int fx_type = FX_TYPE_UNDEFINED, img_type[ARRAYSIZE(path)];
 	int opt, status;
-	unsigned int i, j;
+	unsigned int j;
 	unsigned vid = 0, pid = 0;
 	unsigned busnum = 0, devaddr = 0, _busnum, _devaddr;
 	libusb_device *dev, **devs;
@@ -161,6 +161,7 @@ int main(int argc, char*argv[])
 
 	/* determine the target type */
 	if (type != NULL) {
+		int i;
 		for (i=0; i<FX_TYPE_MAX; i++) {
 			if (strcmp(type, fx_name[i]) == 0) {
 				fx_type = i;
@@ -187,7 +188,7 @@ int main(int argc, char*argv[])
 			logerror("libusb_get_device_list() failed: %s\n", libusb_error_name(status));
 			goto err;
 		}
-		for (i=0; (dev=devs[i]) != NULL; i++) {
+		for (unsigned int i=0; (dev=devs[i]) != NULL; i++) {
 			_busnum = libusb_get_bus_number(dev);
 			_devaddr = libusb_get_device_address(dev);
 			if ((type != NULL) && (device_path != NULL)) {
@@ -262,7 +263,7 @@ int main(int argc, char*argv[])
 	if (verbose)
 		logerror("microcontroller type: %s\n", fx_name[fx_type]);
 
-	for (i=0; i<ARRAYSIZE(path); i++) {
+	for (unsigned int i=0; i<ARRAYSIZE(path); i++) {
 		if (path[i] != NULL) {
 			ext = path[i] + strlen(path[i]) - 4;
 			if ((libusb_strcasecmp(ext, ".hex") == 0) || (libusb_strcasecmp(ext, ".ihx") == 0))
