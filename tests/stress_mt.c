@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb multi-thread test program
  * Copyright 2022-2023 Tormod Volden

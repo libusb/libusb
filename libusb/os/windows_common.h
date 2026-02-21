@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Windows backend common header for libusb 1.0
  *
@@ -275,7 +276,7 @@ struct usbdk_device_handle_priv {
 	// Not currently used
 	char dummy;
 };
- 
+
 enum WINUSB_ZLP {
 	WINUSB_ZLP_UNSET = 0,
 	WINUSB_ZLP_OFF = 1,

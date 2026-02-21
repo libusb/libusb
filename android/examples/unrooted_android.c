@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  *  libusb example program for reading out USB descriptors on unrooted Android
  *  (based on testlibusb.c)

@@ -360,169 +360,169 @@ if (cfg != desired)
  * can infer the context from those objects.
  */
 
- /**
-  * \page libusb_api Application Programming Interface
-  *
-  * This is the complete list of libusb functions, structures and
-  * enumerations in alphabetical order.
-  *
-  * \section Functions
-  * - libusb_alloc_streams()
-  * - libusb_alloc_transfer()
-  * - libusb_attach_kernel_driver()
-  * - libusb_bulk_transfer()
-  * - libusb_cancel_transfer()
-  * - libusb_claim_interface()
-  * - libusb_clear_halt()
-  * - libusb_close()
-  * - libusb_control_transfer()
-  * - libusb_control_transfer_get_data()
-  * - libusb_control_transfer_get_setup()
-  * - libusb_cpu_to_le16()
-  * - libusb_detach_kernel_driver()
-  * - libusb_dev_mem_alloc()
-  * - libusb_dev_mem_free()
-  * - libusb_endpoint_set_raw_io()
-  * - libusb_endpoint_supports_raw_io()
-  * - libusb_error_name()
-  * - libusb_event_handler_active()
-  * - libusb_event_handling_ok()
-  * - libusb_exit()
-  * - libusb_fill_bulk_stream_transfer()
-  * - libusb_fill_bulk_transfer()
-  * - libusb_fill_control_setup()
-  * - libusb_fill_control_transfer()
-  * - libusb_fill_interrupt_transfer()
-  * - libusb_fill_iso_transfer()
-  * - libusb_free_bos_descriptor()
-  * - libusb_free_config_descriptor()
-  * - libusb_free_container_id_descriptor()
-  * - libusb_free_device_list()
-  * - libusb_free_pollfds()
-  * - libusb_free_ss_endpoint_companion_descriptor()
-  * - libusb_free_ss_usb_device_capability_descriptor()
-  * - libusb_free_streams()
-  * - libusb_free_transfer()
-  * - libusb_free_usb_2_0_extension_descriptor()
-  * - libusb_get_active_config_descriptor()
-  * - libusb_get_bos_descriptor()
-  * - libusb_get_session_data()
-  * - libusb_get_bus_number()
-  * - libusb_get_config_descriptor()
-  * - libusb_get_config_descriptor_by_value()
-  * - libusb_get_configuration()
-  * - libusb_get_container_id_descriptor()
-  * - libusb_get_descriptor()
-  * - libusb_get_device()
-  * - libusb_get_device_address()
-  * - libusb_get_device_descriptor()
-  * - libusb_get_device_list()
-  * - libusb_get_device_speed()
-  * - libusb_get_device_string()
-  * - libusb_get_iso_packet_buffer()
-  * - libusb_get_iso_packet_buffer_simple()
-  * - libusb_get_max_alt_packet_size()
-  * - libusb_get_max_iso_packet_size()
-  * - libusb_get_max_raw_io_transfer_size()
-  * - libusb_get_max_packet_size()
-  * - libusb_get_next_timeout()
-  * - libusb_get_parent()
-  * - libusb_get_pollfds()
-  * - libusb_get_port_number()
-  * - libusb_get_port_numbers()
-  * - libusb_get_port_path()
-  * - libusb_get_ss_endpoint_companion_descriptor()
-  * - libusb_get_ss_usb_device_capability_descriptor()
-  * - libusb_get_string_descriptor()
-  * - libusb_get_string_descriptor_ascii()
-  * - libusb_get_usb_2_0_extension_descriptor()
-  * - libusb_get_version()
-  * - libusb_handle_events()
-  * - libusb_handle_events_completed()
-  * - libusb_handle_events_locked()
-  * - libusb_handle_events_timeout()
-  * - libusb_handle_events_timeout_completed()
-  * - libusb_has_capability()
-  * - libusb_hotplug_deregister_callback()
-  * - libusb_hotplug_register_callback()
-  * - libusb_init()
-  * - libusb_init_context()
-  * - libusb_interrupt_event_handler()
-  * - libusb_interrupt_transfer()
-  * - libusb_kernel_driver_active()
-  * - libusb_lock_events()
-  * - libusb_lock_event_waiters()
-  * - libusb_open()
-  * - libusb_open_device_with_vid_pid()
-  * - libusb_pollfds_handle_timeouts()
-  * - libusb_ref_device()
-  * - libusb_release_interface()
-  * - libusb_reset_device()
-  * - libusb_set_auto_detach_kernel_driver()
-  * - libusb_set_configuration()
-  * - libusb_set_debug()
-  * - libusb_set_log_cb()
-  * - libusb_set_interface_alt_setting()
-  * - libusb_set_iso_packet_lengths()
-  * - libusb_set_option()
-  * - libusb_setlocale()
-  * - libusb_set_pollfd_notifiers()
-  * - libusb_strerror()
-  * - libusb_submit_transfer()
-  * - libusb_transfer_get_stream_id()
-  * - libusb_transfer_set_stream_id()
-  * - libusb_try_lock_events()
-  * - libusb_unlock_events()
-  * - libusb_unlock_event_waiters()
-  * - libusb_unref_device()
-  * - libusb_wait_for_event()
-  * - libusb_wrap_sys_device()
-  *
-  * \section Structures
-  * - libusb_bos_descriptor
-  * - libusb_bos_dev_capability_descriptor
-  * - libusb_config_descriptor
-  * - libusb_container_id_descriptor
-  * - \ref libusb_context
-  * - libusb_control_setup
-  * - \ref libusb_device
-  * - libusb_device_descriptor
-  * - \ref libusb_device_handle
-  * - libusb_endpoint_descriptor
-  * - libusb_interface
-  * - libusb_interface_descriptor
-  * - libusb_iso_packet_descriptor
-  * - libusb_pollfd
-  * - libusb_ss_endpoint_companion_descriptor
-  * - libusb_ss_usb_device_capability_descriptor
-  * - libusb_transfer
-  * - libusb_usb_2_0_extension_descriptor
-  * - libusb_version
-  *
-  * \section Enums
-  * - \ref libusb_bos_type
-  * - \ref libusb_capability
-  * - \ref libusb_class_code
-  * - \ref libusb_descriptor_type
-  * - \ref libusb_device_string_type
-  * - \ref libusb_endpoint_direction
-  * - \ref libusb_endpoint_transfer_type
-  * - \ref libusb_error
-  * - \ref libusb_iso_sync_type
-  * - \ref libusb_iso_usage_type
-  * - \ref libusb_log_level
-  * - \ref libusb_option
-  * - \ref libusb_request_recipient
-  * - \ref libusb_request_type
-  * - \ref libusb_speed
-  * - \ref libusb_ss_usb_device_capability_attributes
-  * - \ref libusb_standard_request
-  * - \ref libusb_supported_speed
-  * - \ref libusb_transfer_flags
-  * - \ref libusb_transfer_status
-  * - \ref libusb_transfer_type
-  * - \ref libusb_usb_2_0_extension_attributes
-  */
+/**
+ * \page libusb_api Application Programming Interface
+ *
+ * This is the complete list of libusb functions, structures and
+ * enumerations in alphabetical order.
+ *
+ * \section Functions
+ * - libusb_alloc_streams()
+ * - libusb_alloc_transfer()
+ * - libusb_attach_kernel_driver()
+ * - libusb_bulk_transfer()
+ * - libusb_cancel_transfer()
+ * - libusb_claim_interface()
+ * - libusb_clear_halt()
+ * - libusb_close()
+ * - libusb_control_transfer()
+ * - libusb_control_transfer_get_data()
+ * - libusb_control_transfer_get_setup()
+ * - libusb_cpu_to_le16()
+ * - libusb_detach_kernel_driver()
+ * - libusb_dev_mem_alloc()
+ * - libusb_dev_mem_free()
+ * - libusb_endpoint_set_raw_io()
+ * - libusb_endpoint_supports_raw_io()
+ * - libusb_error_name()
+ * - libusb_event_handler_active()
+ * - libusb_event_handling_ok()
+ * - libusb_exit()
+ * - libusb_fill_bulk_stream_transfer()
+ * - libusb_fill_bulk_transfer()
+ * - libusb_fill_control_setup()
+ * - libusb_fill_control_transfer()
+ * - libusb_fill_interrupt_transfer()
+ * - libusb_fill_iso_transfer()
+ * - libusb_free_bos_descriptor()
+ * - libusb_free_config_descriptor()
+ * - libusb_free_container_id_descriptor()
+ * - libusb_free_device_list()
+ * - libusb_free_pollfds()
+ * - libusb_free_ss_endpoint_companion_descriptor()
+ * - libusb_free_ss_usb_device_capability_descriptor()
+ * - libusb_free_streams()
+ * - libusb_free_transfer()
+ * - libusb_free_usb_2_0_extension_descriptor()
+ * - libusb_get_active_config_descriptor()
+ * - libusb_get_bos_descriptor()
+ * - libusb_get_session_data()
+ * - libusb_get_bus_number()
+ * - libusb_get_config_descriptor()
+ * - libusb_get_config_descriptor_by_value()
+ * - libusb_get_configuration()
+ * - libusb_get_container_id_descriptor()
+ * - libusb_get_descriptor()
+ * - libusb_get_device()
+ * - libusb_get_device_address()
+ * - libusb_get_device_descriptor()
+ * - libusb_get_device_list()
+ * - libusb_get_device_speed()
+ * - libusb_get_device_string()
+ * - libusb_get_iso_packet_buffer()
+ * - libusb_get_iso_packet_buffer_simple()
+ * - libusb_get_max_alt_packet_size()
+ * - libusb_get_max_iso_packet_size()
+ * - libusb_get_max_raw_io_transfer_size()
+ * - libusb_get_max_packet_size()
+ * - libusb_get_next_timeout()
+ * - libusb_get_parent()
+ * - libusb_get_pollfds()
+ * - libusb_get_port_number()
+ * - libusb_get_port_numbers()
+ * - libusb_get_port_path()
+ * - libusb_get_ss_endpoint_companion_descriptor()
+ * - libusb_get_ss_usb_device_capability_descriptor()
+ * - libusb_get_string_descriptor()
+ * - libusb_get_string_descriptor_ascii()
+ * - libusb_get_usb_2_0_extension_descriptor()
+ * - libusb_get_version()
+ * - libusb_handle_events()
+ * - libusb_handle_events_completed()
+ * - libusb_handle_events_locked()
+ * - libusb_handle_events_timeout()
+ * - libusb_handle_events_timeout_completed()
+ * - libusb_has_capability()
+ * - libusb_hotplug_deregister_callback()
+ * - libusb_hotplug_register_callback()
+ * - libusb_init()
+ * - libusb_init_context()
+ * - libusb_interrupt_event_handler()
+ * - libusb_interrupt_transfer()
+ * - libusb_kernel_driver_active()
+ * - libusb_lock_events()
+ * - libusb_lock_event_waiters()
+ * - libusb_open()
+ * - libusb_open_device_with_vid_pid()
+ * - libusb_pollfds_handle_timeouts()
+ * - libusb_ref_device()
+ * - libusb_release_interface()
+ * - libusb_reset_device()
+ * - libusb_set_auto_detach_kernel_driver()
+ * - libusb_set_configuration()
+ * - libusb_set_debug()
+ * - libusb_set_log_cb()
+ * - libusb_set_interface_alt_setting()
+ * - libusb_set_iso_packet_lengths()
+ * - libusb_set_option()
+ * - libusb_setlocale()
+ * - libusb_set_pollfd_notifiers()
+ * - libusb_strerror()
+ * - libusb_submit_transfer()
+ * - libusb_transfer_get_stream_id()
+ * - libusb_transfer_set_stream_id()
+ * - libusb_try_lock_events()
+ * - libusb_unlock_events()
+ * - libusb_unlock_event_waiters()
+ * - libusb_unref_device()
+ * - libusb_wait_for_event()
+ * - libusb_wrap_sys_device()
+ *
+ * \section Structures
+ * - libusb_bos_descriptor
+ * - libusb_bos_dev_capability_descriptor
+ * - libusb_config_descriptor
+ * - libusb_container_id_descriptor
+ * - \ref libusb_context
+ * - libusb_control_setup
+ * - \ref libusb_device
+ * - libusb_device_descriptor
+ * - \ref libusb_device_handle
+ * - libusb_endpoint_descriptor
+ * - libusb_interface
+ * - libusb_interface_descriptor
+ * - libusb_iso_packet_descriptor
+ * - libusb_pollfd
+ * - libusb_ss_endpoint_companion_descriptor
+ * - libusb_ss_usb_device_capability_descriptor
+ * - libusb_transfer
+ * - libusb_usb_2_0_extension_descriptor
+ * - libusb_version
+ *
+ * \section Enums
+ * - \ref libusb_bos_type
+ * - \ref libusb_capability
+ * - \ref libusb_class_code
+ * - \ref libusb_descriptor_type
+ * - \ref libusb_device_string_type
+ * - \ref libusb_endpoint_direction
+ * - \ref libusb_endpoint_transfer_type
+ * - \ref libusb_error
+ * - \ref libusb_iso_sync_type
+ * - \ref libusb_iso_usage_type
+ * - \ref libusb_log_level
+ * - \ref libusb_option
+ * - \ref libusb_request_recipient
+ * - \ref libusb_request_type
+ * - \ref libusb_speed
+ * - \ref libusb_ss_usb_device_capability_attributes
+ * - \ref libusb_standard_request
+ * - \ref libusb_supported_speed
+ * - \ref libusb_transfer_flags
+ * - \ref libusb_transfer_status
+ * - \ref libusb_transfer_type
+ * - \ref libusb_usb_2_0_extension_attributes
+ */
 
 /**
  * @defgroup libusb_lib Library initialization/deinitialization
@@ -936,7 +936,7 @@ void API_EXPORTED libusb_free_device_list(libusb_device **list,
  */
 unsigned long API_EXPORTED libusb_get_session_data(libusb_device *dev)
 {
-    return dev->session_data;
+	return dev->session_data;
 }
 
 /** \ingroup libusb_dev
@@ -2075,7 +2075,7 @@ int API_EXPORTED libusb_free_streams(libusb_device_handle *dev_handle,
  */
 DEFAULT_VISIBILITY
 unsigned char * LIBUSB_CALL libusb_dev_mem_alloc(libusb_device_handle *dev_handle,
-        size_t length)
+	size_t length)
 {
 	if (!usbi_atomic_load(&dev_handle->dev->attached))
 		return NULL;

@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 #ifndef ezusb_H
 #define ezusb_H
 /*
@@ -75,7 +76,7 @@ typedef struct {
 /*
  * This function uploads the firmware from the given file into RAM.
  * Stage == 0 means this is a single stage load (or the first of
- * two stages).  Otherwise it's the second of two stages; the 
+ * two stages).  Otherwise it's the second of two stages; the
  * caller having preloaded the second stage loader.
  *
  * The target processor is reset at the end of this upload.

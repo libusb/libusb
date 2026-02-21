@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * windows hotplug backend for libusb 1.0
  * Copyright © 2024 Sylvain Fasel <sylvain@sonatique.net>
@@ -312,7 +313,7 @@ static LRESULT CALLBACK windows_proc_callback(
 							device_name = NULL;
 					    }
 					}
-    			}
+				}
 #else
 				const char* device_name = ((PDEV_BROADCAST_DEVICEINTERFACE)lParam)->dbcc_name;
 #endif

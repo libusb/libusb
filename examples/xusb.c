@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * xusb: Generic USB test program
  * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>

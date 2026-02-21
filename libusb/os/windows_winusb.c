@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * windows backend for libusb 1.0
  * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
@@ -2206,22 +2207,22 @@ static int usbi_utf16le_to_utf8(uint8_t const *src, int src_length, char *dst, i
 
 /*
  * Backend implementation for libusb_get_device_string().
- * 
+ *
  * Windows makes getting the common device strings
  * very difficult.  DEVPKEY_Device_* does not have SerialNumber,
  * and it reports the driver manufacturer, not the device manufacturer.
- * 
+ *
  * We could parse the serial number from the DEVICE_ID string:
  * https://learn.microsoft.com/en-us/windows-hardware/drivers/install/device-instance-ids
  * https://learn.microsoft.com/en-us/windows-hardware/drivers/install/standard-usb-identifiers
- * 
- * However, using the dev_id for getting the serial number is 
+ *
+ * However, using the dev_id for getting the serial number is
  * definitely not recommended.
  *
  * The following implementation uses an IOCTL
  * to the parent USB hub to perform the USB control request for the
  * string descriptor without opening the USB device.
- * While we would rather not invoke USB IO, we currently lack a 
+ * While we would rather not invoke USB IO, we currently lack a
  * better option.
  */
 static int winusb_get_device_string(libusb_device *dev,
@@ -2614,8 +2615,8 @@ const struct windows_backend winusb_backend = {
  */
 
 static const char * const composite_driver_names[] = {
-  "USBCCGP", // (Windows built-in) USB Composite Device
-  "dg_ssudbus" // SAMSUNG Mobile USB Composite Device
+	"USBCCGP", // (Windows built-in) USB Composite Device
+	"dg_ssudbus" // SAMSUNG Mobile USB Composite Device
 };
 static const char * const winusbx_driver_names[] = {"libusbK", "libusb0", "WinUSB"};
 static const char * const hid_driver_names[] = {"HIDUSB", "MOUHID", "KBDHID"};

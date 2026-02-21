@@ -32,7 +32,7 @@ OS_WINDOWS_SRC = libusb-1.0.def libusb-1.0.rc \
 
 if LIBUSB_WINDOWS_HOTPLUG
 OS_WINDOWS_SRC += os/windows_hotplug.h os/windows_hotplug.c
-endif	 
+endif
 
 if OS_DARWIN
 OS_SRC = $(OS_DARWIN_SRC)

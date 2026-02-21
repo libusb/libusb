@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Copyright © 2001 Stephen Williams (steve@icarus.com)
  * Copyright © 2001-2002 David Brownell (dbrownell@users.sourceforge.net)
