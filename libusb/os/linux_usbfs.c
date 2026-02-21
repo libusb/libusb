@@ -2758,7 +2758,7 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 }
 
 static int op_handle_events(struct libusb_context *ctx,
-	void *event_data, unsigned int count, unsigned int num_ready)
+	void * __sized_by(count) event_data, unsigned int count, unsigned int num_ready)
 {
 	struct pollfd *fds = event_data;
 	unsigned int n;
