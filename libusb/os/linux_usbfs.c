@@ -1297,6 +1297,10 @@ static int usbfs_get_device_list(struct libusb_context *ctx)
 		buses = opendir(USB_DEVTMPFS_PATH);
 
 	if (!buses) {
+		if (!usbdev_names && errno == ENOENT) {
+			/* The path does not exist if there are no devices plugged in */
+			return LIBUSB_SUCCESS;
+		}
 		usbi_err(ctx, "opendir buses failed, errno=%d", errno);
 		return LIBUSB_ERROR_IO;
 	}
@@ -1374,10 +1378,10 @@ static int linux_default_scan_devices(struct libusb_context *ctx)
 	 * any autosuspended USB devices. however, sysfs is not available
 	 * everywhere, so we need a usbfs fallback too.
 	 */
-	if (sysfs_available)
-		return sysfs_get_device_list(ctx);
-	else
-		return usbfs_get_device_list(ctx);
+	if (sysfs_available && sysfs_get_device_list(ctx) == LIBUSB_SUCCESS)
+		return LIBUSB_SUCCESS;
+
+    return usbfs_get_device_list(ctx);
 }
 #endif
 
