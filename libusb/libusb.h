@@ -1504,7 +1504,7 @@ struct libusb_transfer {
 
 	/** Actual length of data that was transferred. Read-only, and only for
 	 * use within transfer callback function. Not valid for isochronous
-	 * endpoint transfers. */
+	 * endpoint transfers. Never negative. */
 	int actual_length;
 
 	/** Callback function. This will be invoked when the transfer completes,
