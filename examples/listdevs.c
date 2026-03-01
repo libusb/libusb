@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb example program to list devices on the bus
  * Copyright © 2007 Daniel Drake <dsd@gentoo.org>
@@ -26,7 +27,7 @@ static void print_devs(libusb_device **devs, int verbose)
 {
 	libusb_device *dev;
 	int i = 0, j = 0;
-	uint8_t path[8]; 
+	uint8_t path[8];
 	char string_buffer[LIBUSB_DEVICE_STRING_BYTES_MAX];
 
 	while ((dev = devs[i++]) != NULL) {

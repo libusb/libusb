@@ -1,0 +1,19 @@
+{
+  "Verbose": false,
+  "Debug": false,
+  "IgnoreDefaults": false,
+  "SpacesAfterTabs": true,
+  "NoColor": false,
+  "Exclude": ["INSTALL_WIN.txt", "msvc", "fuzz/corpus"],
+  "AllowedContentTypes": [],
+  "PassedFiles": [],
+  "Disable": {
+    "EndOfLine": false,
+    "Indentation": false,
+    "IndentSize": true,
+    "InsertFinalNewline": false,
+    "TrimTrailingWhitespace": false,
+    "MaxLineLength": true,
+    "Charset": false
+  }
+}

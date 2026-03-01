@@ -578,11 +578,11 @@ static int darwin_device_from_service (struct libusb_context *ctx, io_service_t 
   io_cf_plugin_ref_t *plugInInterface = NULL;
   IOReturn kresult;
   SInt32 score;
-  
+
   const int max_retries = 5;
 
   /* The IOCreatePlugInInterfaceForService function might consistently return
-     an "out of resources" error with certain USB devices the first time we run 
+     an "out of resources" error with certain USB devices the first time we run
      it. The reason is still unclear, but retrying fixes the problem */
   for (int count = 0; count < max_retries; count++) {
     kresult = IOCreatePlugInInterfaceForService(service, kIOUSBDeviceUserClientTypeID,
@@ -966,9 +966,9 @@ static void darwin_exit (struct libusb_context *ctx) {
   usbi_mutex_unlock(&darwin_cached_devices_mutex);
 }
 
-static int darwin_get_device_string(struct libusb_device *dev, 
+static int darwin_get_device_string(struct libusb_device *dev,
     enum libusb_device_string_type string_type, char *buffer, int length) {
-  
+
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   io_iterator_t deviceIterator;
   io_service_t service;
@@ -985,13 +985,13 @@ static int darwin_get_device_string(struct libusb_device *dev,
     return LIBUSB_ERROR_NOT_FOUND;
 
   switch (string_type) {
-    case LIBUSB_DEVICE_STRING_MANUFACTURER: 
+    case LIBUSB_DEVICE_STRING_MANUFACTURER:
       cf = IORegistryEntryCreateCFProperty(service, CFSTR(kUSBVendorString), kCFAllocatorDefault, 0);
       break;
-    case LIBUSB_DEVICE_STRING_PRODUCT: 
+    case LIBUSB_DEVICE_STRING_PRODUCT:
       cf = IORegistryEntryCreateCFProperty(service, CFSTR(kUSBProductString), kCFAllocatorDefault, 0);
       break;
-    case LIBUSB_DEVICE_STRING_SERIAL_NUMBER: 
+    case LIBUSB_DEVICE_STRING_SERIAL_NUMBER:
       cf = IORegistryEntryCreateCFProperty(service, CFSTR(kUSBSerialNumberString), kCFAllocatorDefault, 0);
       break;
     case LIBUSB_DEVICE_STRING_COUNT: /* intentional fall-through, avoid -Wswitch-enum */
