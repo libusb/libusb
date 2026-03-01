@@ -20,6 +20,11 @@
       <DisableSpecificWarnings Condition="'$(PlatformToolsetVersion)'&lt;='120'">4127;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug-WinRt' or '$(Configuration)'=='Release-WinRt'">
+    <Link>
+      <AdditionalDependencies>windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\examples\xusb.c" />
   </ItemGroup>

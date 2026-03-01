@@ -14,6 +14,11 @@
     <Import Project="Base.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug-WinRt' or '$(Configuration)'=='Release-WinRt'">
+    <Link>
+      <AdditionalDependencies>windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\examples\testlibusb.c" />
   </ItemGroup>

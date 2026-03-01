@@ -20,6 +20,11 @@
       <PreprocessorDefinitions>__GNU_LIBRARY__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug-WinRt' or '$(Configuration)'=='Release-WinRt'">
+    <Link>
+      <AdditionalDependencies>windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\examples\ezusb.c" />
     <ClCompile Include="..\examples\fxload.c" />

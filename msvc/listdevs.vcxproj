@@ -4,6 +4,11 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{F4938DB0-3DE7-4737-9C5A-EAD1BE819F87}</ProjectGuid>
   </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug-WinRt' or '$(Configuration)'=='Release-WinRt'">
+    <Link>
+      <AdditionalDependencies>windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <Import Project="Configuration.Application.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
