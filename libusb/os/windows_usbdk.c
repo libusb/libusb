@@ -543,7 +543,7 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 
 	switch (transResult) {
 	case TransferSuccess:
-		windows_force_sync_completion(itransfer, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred);
+		windows_force_sync_completion(itransfer, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred, ERROR_SUCCESS);
 		break;
 	case TransferSuccessAsync:
 		break;
@@ -585,7 +585,7 @@ static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 
 	switch (transferRes) {
 	case TransferSuccess:
-		windows_force_sync_completion(itransfer, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred);
+		windows_force_sync_completion(itransfer, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred, ERROR_SUCCESS);
 		break;
 	case TransferSuccessAsync:
 		break;
@@ -637,7 +637,7 @@ static int usbdk_do_iso_transfer(struct usbi_transfer *itransfer)
 
 	switch (transferRes) {
 	case TransferSuccess:
-		windows_force_sync_completion(itransfer, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred);
+		windows_force_sync_completion(itransfer, (ULONG)transfer_priv->request.Result.GenResult.BytesTransferred, ERROR_SUCCESS);
 		break;
 	case TransferSuccessAsync:
 		break;
