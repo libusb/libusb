@@ -179,14 +179,24 @@ int API_EXPORTED libusb_setlocale(const char *locale)
 {
 	size_t i;
 
-	if (!locale || strlen(locale) < 2
-	    || (locale[2] != '\0' && locale[2] != '-' && locale[2] != '_' && locale[2] != '.'))
+	size_t length = strlen(locale);
+	if (!locale || length < 2)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	const char * idxLocale = __terminated_by_to_indexable(locale);
+
+	if (length > 2 && idxLocale[2] != '-' && idxLocale[2] != '_' && idxLocale[2] != '.')
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	for (i = 0; i < ARRAYSIZE(usbi_locale_supported); i++) {
-		if (usbi_locale_supported[i][0] == tolower((unsigned char)locale[0])
-		    && usbi_locale_supported[i][1] == tolower((unsigned char)locale[1]))
+#if defined(_WIN32)
+		if (_strnicmp(locale, usbi_locale_supported[i], 2) == 0)
+#else
+		if (strncasecmp(locale, usbi_locale_supported[i], 2) == 0)
+#endif
+		{
 			break;
+		}
 	}
 
 	if (i == ARRAYSIZE(usbi_locale_supported))

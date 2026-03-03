@@ -1,3 +1,5 @@
+#include <ptrcheck.h>
+
 /* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * Core functions for libusb
@@ -834,9 +836,9 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
  * \ref libusb_error according to errors encountered by the backend.
  */
 ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
-	libusb_device ***list)
+	libusb_device ** __null_terminated * __single list)
 {
-	struct discovered_devs *discdevs = discovered_devs_alloc();
+	struct discovered_devs *__single discdevs = discovered_devs_alloc();
 	struct libusb_device **ret;
 	int r = 0;
 	ssize_t i, len;
@@ -888,7 +890,7 @@ ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 		struct libusb_device *dev = discdevs->devices[i];
 		ret[i] = libusb_ref_device(dev);
 	}
-	*list = ret;
+	*list = __unsafe_null_terminated_from_indexable(ret);
 
 out:
 	if (discdevs)
@@ -897,13 +899,13 @@ out:
 }
 
 /** \ingroup libusb_dev
- * Frees a list of devices previously discovered using
+ * Frees a (null-terminated) list of devices previously discovered using
  * libusb_get_device_list(). If the unref_devices parameter is set, the
  * reference count of each device in the list is decremented by 1.
  * \param list the list to free
  * \param unref_devices whether to unref the devices in the list
  */
-void API_EXPORTED libusb_free_device_list(libusb_device **list,
+void API_EXPORTED libusb_free_device_list(libusb_device ** __null_terminated list,
 	int unref_devices)
 {
 	if (!list)
@@ -913,7 +915,8 @@ void API_EXPORTED libusb_free_device_list(libusb_device **list,
 		int i = 0;
 		struct libusb_device *dev;
 
-		while ((dev = list[i++]) != NULL)
+		libusb_device ** indexableList = __null_terminated_to_indexable(list);
+		while ((dev = indexableList[i++]) != NULL)
 			libusb_unref_device(dev);
 	}
 	free(list);
@@ -980,7 +983,7 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
  * \returns \ref LIBUSB_ERROR_OVERFLOW if the array is too small
  */
 int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
-	uint8_t *port_numbers, int port_numbers_len)
+	uint8_t * __counted_by(port_numbers_len) port_numbers, int port_numbers_len)
 {
 	int i = port_numbers_len;
 	struct libusb_context *ctx = DEVICE_CTX(dev);
@@ -1006,7 +1009,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
  * \deprecated Please use \ref libusb_get_port_numbers() instead.
  */
 int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
-	uint8_t *port_numbers, uint8_t port_numbers_len)
+	uint8_t * __counted_by(port_numbers_len) port_numbers, uint8_t port_numbers_len)
 {
 	UNUSED(ctx);
 
@@ -1095,7 +1098,7 @@ static const struct libusb_endpoint_descriptor *find_endpoint(
 int API_EXPORTED libusb_get_max_packet_size(libusb_device *dev,
 	unsigned char endpoint)
 {
-	struct libusb_config_descriptor *config;
+	struct libusb_config_descriptor *__single config;
 	const struct libusb_endpoint_descriptor *ep;
 	int r;
 
@@ -1149,7 +1152,7 @@ static const struct libusb_endpoint_descriptor *find_alt_endpoint(
 static int get_endpoint_max_packet_size(libusb_device *dev,
 	const struct libusb_endpoint_descriptor *ep)
 {
-	struct libusb_ss_endpoint_companion_descriptor *ss_ep_cmp;
+	struct libusb_ss_endpoint_companion_descriptor * __single ss_ep_cmp;
 	enum libusb_endpoint_transfer_type ep_type;
 	uint16_t val;
 	int r = 0;
@@ -1214,7 +1217,7 @@ static int get_endpoint_max_packet_size(libusb_device *dev,
 int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 	unsigned char endpoint)
 {
-	struct libusb_config_descriptor *config;
+	struct libusb_config_descriptor *__single config;
 	const struct libusb_endpoint_descriptor *ep;
 	int r;
 
@@ -1273,7 +1276,7 @@ out:
 int API_EXPORTED libusb_get_max_alt_packet_size(libusb_device *dev,
 	int interface_number, int alternate_setting, unsigned char endpoint)
 {
-	struct libusb_config_descriptor *config;
+	struct libusb_config_descriptor *__single config;
 	const struct libusb_endpoint_descriptor *ep;
 	int r;
 
@@ -1442,7 +1445,7 @@ int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
  * \returns another LIBUSB_ERROR code on other failure
  */
 int API_EXPORTED libusb_open(libusb_device *dev,
-	libusb_device_handle **dev_handle)
+	libusb_device_handle * __single *dev_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device_handle *_dev_handle;
@@ -1499,17 +1502,18 @@ DEFAULT_VISIBILITY
 libusb_device_handle * LIBUSB_CALL libusb_open_device_with_vid_pid(
 	libusb_context *ctx, uint16_t vendor_id, uint16_t product_id)
 {
-	struct libusb_device **devs;
+	struct libusb_device ** __null_terminated devs;
 	struct libusb_device *found = NULL;
 	struct libusb_device *dev;
-	struct libusb_device_handle *dev_handle = NULL;
+	struct libusb_device_handle *__single dev_handle = NULL;
 	size_t i = 0;
 	int r;
 
 	if (libusb_get_device_list(ctx, &devs) < 0)
 		return NULL;
 
-	while ((dev = devs[i++]) != NULL) {
+	struct libusb_device ** indexableDevs = __null_terminated_to_indexable(devs);
+	while ((dev = indexableDevs[i++]) != NULL) {
 		struct libusb_device_descriptor desc;
 		r = libusb_get_device_descriptor(dev, &desc);
 		if (r < 0)
@@ -2451,7 +2455,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		}
 	}
 	if (LIBUSB_OPTION_LOG_CB == option) {
-		log_cb = (libusb_log_cb) va_arg(ap, libusb_log_cb);
+		log_cb = (libusb_log_cb) __unsafe_forge_single(libusb_log_cb, va_arg(ap, libusb_log_cb));
 	}
 
 	do {
@@ -2525,7 +2529,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 static enum libusb_log_level get_env_debug_level(void)
 {
 	enum libusb_log_level level = LIBUSB_LOG_LEVEL_NONE;
-	const char *dbg = getenv("LIBUSB_DEBUG");
+	const char * __null_terminated dbg = __unsafe_forge_null_terminated(const char*, getenv("LIBUSB_DEBUG"));
 	if (dbg) {
 		long dbg_level = strtol(dbg, NULL, 10);
 		dbg_level = CLAMP(dbg_level, LIBUSB_LOG_LEVEL_NONE, LIBUSB_LOG_LEVEL_DEBUG);
@@ -2563,7 +2567,7 @@ int API_EXPORTED libusb_init(libusb_context **ctx)
  * \returns 0 on success, or a LIBUSB_ERROR code on failure
  * \see libusb_contexts
  */
-int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_init_option options[], int num_options)
+int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_init_option options[__counted_by_or_null(num_options)], int num_options)
 {
 	size_t priv_size = usbi_backend.context_priv_size;
 	struct libusb_context *_ctx;
@@ -2977,12 +2981,12 @@ static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	}
 	strcpy(buf + header_len + text_len, USBI_LOG_LINE_END);
 
-	log_str(level, buf);
+	log_str(level, __unsafe_null_terminated_from_indexable(buf));
 
 	/* Per-context log handler */
 #ifndef ENABLE_DEBUG_LOGGING
 	if (ctx && ctx->log_handler)
-		ctx->log_handler(ctx, level, buf);
+		ctx->log_handler(ctx, level, __unsafe_null_terminated_from_indexable(buf));
 #endif
 }
 
