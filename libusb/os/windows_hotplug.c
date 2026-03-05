@@ -263,8 +263,6 @@ static LRESULT CALLBACK windows_proc_callback(
 	WPARAM wParam,
 	LPARAM lParam)
 {
-	UNUSED(lParam);
-
 	static HDEVNOTIFY device_notify_handle;
 
 	switch (message)
@@ -317,7 +315,8 @@ static LRESULT CALLBACK windows_proc_callback(
 				const char* device_name = ((PDEV_BROADCAST_DEVICEINTERFACE)lParam)->dbcc_name;
 #endif
 
-				windows_refresh_device_list_for_all_ctx(wParam == DBT_DEVICEARRIVAL ? true : false, device_name);
+				if (device_name != NULL)
+					windows_refresh_device_list_for_all_ctx(wParam == DBT_DEVICEARRIVAL ? true : false, device_name);
 
 #ifdef UNICODE
 				free(device_name);
