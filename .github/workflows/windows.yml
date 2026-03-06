@@ -31,7 +31,19 @@ jobs:
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v1.3
-        
+
       - name: Build solution
         run: |
           msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }} -property:Platform=${{ matrix.architecture }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}-${{ matrix.configuration }}-${{ matrix.architecture }}
+          path: |
+            build/**/*.exe
+            build/**/dll/libusb-1.0.dll
+            build/**/dll/libusb-1.0.lib
+            build/**/dll/libusb-1.0.exp
+            build/**/dll/libusb-1.0.pdb
+            build/**/lib/libusb-1.0.lib
