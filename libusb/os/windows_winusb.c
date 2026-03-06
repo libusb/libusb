@@ -1886,6 +1886,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					usbi_attach_device(dev);
 #endif
 					priv = winusb_device_priv_init(dev);
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+					priv->seen_during_scan = true;
+#endif
 					priv->dev_id = _strdup(dev_id);
 					priv->class_guid = dev_info_data.ClassGuid;
 					if (priv->dev_id == NULL) {
@@ -1917,6 +1920,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						libusb_unref_device(dev);
 						goto alloc_device;
 					}
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+					priv->seen_during_scan = true;
+#endif
 				}
 
 			track_unref:
