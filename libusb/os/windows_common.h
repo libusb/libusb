@@ -275,7 +275,7 @@ struct usbdk_device_handle_priv {
 	// Not currently used
 	char dummy;
 };
- 
+
 enum WINUSB_ZLP {
 	WINUSB_ZLP_UNSET = 0,
 	WINUSB_ZLP_OFF = 1,
