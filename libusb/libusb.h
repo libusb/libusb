@@ -1,10 +1,9 @@
 /*
  * Public libusb header file
- * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
- * Copyright © 2007-2008 Daniel Drake <dsd@gentoo.org>
- * Copyright © 2012 Pete Batard <pete@akeo.ie>
- * Copyright © 2012-2023 Nathan Hjelm <hjelmn@cs.unm.edu>
- * Copyright © 2014-2020 Chris Dickens <christopher.a.dickens@gmail.com>
+ *
+ * SPDX-FileCopyrightText: © 2001 Johannes Erdfelt, 2007-2008 Daniel Drake, 2012 Pete Batard, 2012-2023 Nathan Hjelm, 2014-2020 Chris Dickens
+ * SPDX-License-Identifier: LGPL-2.1+
+ *
  * For more information, please visit: https://libusb.info
  *
  * This library is free software; you can redistribute it and/or
