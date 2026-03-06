@@ -1158,7 +1158,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 
 		if ((conn_info.DeviceDescriptor.bLength != LIBUSB_DT_DEVICE_SIZE)
 			|| (conn_info.DeviceDescriptor.bDescriptorType != LIBUSB_DT_DEVICE)) {
-			usbi_err(ctx, "device '%s' has invalid descriptor!", priv->dev_id);
+			usbi_warn(ctx, "device '%s' has invalid descriptor!", priv->dev_id);
 			CloseHandle(hub_handle);
 			return LIBUSB_ERROR_OTHER;
 		}
@@ -1886,6 +1886,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					usbi_attach_device(dev);
 #endif
 					priv = winusb_device_priv_init(dev);
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+					priv->seen_during_scan = true;
+#endif
 					priv->dev_id = _strdup(dev_id);
 					priv->class_guid = dev_info_data.ClassGuid;
 					if (priv->dev_id == NULL) {
@@ -1917,6 +1920,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						libusb_unref_device(dev);
 						goto alloc_device;
 					}
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+					priv->seen_during_scan = true;
+#endif
 				}
 
 			track_unref:
@@ -2201,22 +2207,22 @@ static int usbi_utf16le_to_utf8(uint8_t const *src, int src_length, char *dst, i
 
 /*
  * Backend implementation for libusb_get_device_string().
- * 
+ *
  * Windows makes getting the common device strings
  * very difficult.  DEVPKEY_Device_* does not have SerialNumber,
  * and it reports the driver manufacturer, not the device manufacturer.
- * 
+ *
  * We could parse the serial number from the DEVICE_ID string:
  * https://learn.microsoft.com/en-us/windows-hardware/drivers/install/device-instance-ids
  * https://learn.microsoft.com/en-us/windows-hardware/drivers/install/standard-usb-identifiers
- * 
- * However, using the dev_id for getting the serial number is 
+ *
+ * However, using the dev_id for getting the serial number is
  * definitely not recommended.
  *
  * The following implementation uses an IOCTL
  * to the parent USB hub to perform the USB control request for the
  * string descriptor without opening the USB device.
- * While we would rather not invoke USB IO, we currently lack a 
+ * While we would rather not invoke USB IO, we currently lack a
  * better option.
  */
 static int winusb_get_device_string(libusb_device *dev,
