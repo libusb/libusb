@@ -862,8 +862,17 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
 	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
 	enum libusb_transfer_status status, istatus;
 	DWORD result, bytes_transferred;
+	HANDLE transfer_handle;
 
-	if (GetOverlappedResult(transfer_priv->handle, &transfer_priv->overlapped, &bytes_transferred, FALSE))
+	/*
+	 * The submit path runs with itransfer->lock held. Grab the handle under
+	 * the same lock so we do not race with submission/completion bookkeeping.
+	 */
+	usbi_mutex_lock(&itransfer->lock);
+	transfer_handle = transfer_priv->handle;
+	usbi_mutex_unlock(&itransfer->lock);
+
+	if (GetOverlappedResult(transfer_handle, &transfer_priv->overlapped, &bytes_transferred, FALSE))
 		result = NO_ERROR;
 	else
 		result = GetLastError();
@@ -905,7 +914,9 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
 		break;
 	}
 
+	usbi_mutex_lock(&itransfer->lock);
 	transfer_priv->handle = NULL;
+	usbi_mutex_unlock(&itransfer->lock);
 
 	// Backend-specific cleanup
 	backend->clear_transfer_priv(itransfer);
