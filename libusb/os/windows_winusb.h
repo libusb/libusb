@@ -31,17 +31,10 @@
 
 #define MAX_CTRL_BUFFER_LENGTH	4096
 #define MAX_USB_STRING_LENGTH	128
-#define MAX_HID_REPORT_SIZE	1024
-#define MAX_HID_DESCRIPTOR_SIZE	256
 #define MAX_GUID_STRING_LENGTH	39
 #define MAX_PATH_LENGTH		256
 #define MAX_KEY_LENGTH		256
 #define LIST_SEPARATOR		';'
-
-// Handle code for HID interface that have been claimed ("dibs")
-#define INTERFACE_CLAIMED	((HANDLE)(intptr_t)0xD1B5)
-// Additional return code for HID operations that completed synchronously
-#define LIBUSB_COMPLETED	(LIBUSB_SUCCESS + 1)
 
 // libusb0 Filter Device Interface GUID
 DEFINE_GUID(GUID_DEVINTERFACE_LIBUSB0_FILTER, 0xF9F3FF14, 0xAE21, 0x48A0, 0x8A, 0x25, 0x80, 0x11, 0xA7, 0xA9, 0x31, 0xD9);
@@ -56,8 +49,7 @@ DEFINE_GUID(GUID_DEVINTERFACE_LIBUSB0_FILTER, 0xF9F3FF14, 0xAE21, 0x48A0, 0x8A, 
 #define USB_API_HUB		1
 #define USB_API_COMPOSITE	2
 #define USB_API_WINUSBX		3
-#define USB_API_HID		4
-#define USB_API_MAX		5
+#define USB_API_MAX		4
 
 // Sub-APIs for WinUSB-like driver APIs (WinUSB, libusbK, libusb-win32 through the libusbK DLL)
 // Must have the same values as the KUSB_DRVID enum from libusbk.h
@@ -111,68 +103,11 @@ extern const struct windows_usb_api_backend usb_api_backend[USB_API_MAX];
  * with inline pseudo constructors/destructors
  */
 
-// TODO (v2+): move hid desc to libusb.h?
-struct libusb_hid_descriptor {
-	uint8_t bLength;
-	uint8_t bDescriptorType;
-	uint16_t bcdHID;
-	uint8_t bCountryCode;
-	uint8_t bNumDescriptors;
-	uint8_t bClassDescriptorType;
-	uint16_t wClassDescriptorLength;
-};
-
-#define LIBUSB_DT_HID_SIZE		9
-#define HID_MAX_CONFIG_DESC_SIZE (LIBUSB_DT_CONFIG_SIZE + LIBUSB_DT_INTERFACE_SIZE \
-	+ LIBUSB_DT_HID_SIZE + 2 * LIBUSB_DT_ENDPOINT_SIZE)
-#define HID_MAX_REPORT_SIZE		1024
-#define HID_IN_EP			0x81
-#define HID_OUT_EP			0x02
 #define LIBUSB_REQ_RECIPIENT(request_type)	((request_type) & 0x1F)
 #define LIBUSB_REQ_TYPE(request_type)		((request_type) & (0x03 << 5))
 #define LIBUSB_REQ_IN(request_type)		((request_type) & LIBUSB_ENDPOINT_IN)
 #define LIBUSB_REQ_OUT(request_type)		(!LIBUSB_REQ_IN(request_type))
 
-// The following are used for HID reports IOCTLs
-#define HID_IN_CTL_CODE(id) \
-	CTL_CODE(FILE_DEVICE_KEYBOARD, (id), METHOD_IN_DIRECT, FILE_ANY_ACCESS)
-#define HID_OUT_CTL_CODE(id) \
-	CTL_CODE(FILE_DEVICE_KEYBOARD, (id), METHOD_OUT_DIRECT, FILE_ANY_ACCESS)
-
-#define IOCTL_HID_GET_FEATURE		HID_OUT_CTL_CODE(100)
-#define IOCTL_HID_GET_INPUT_REPORT	HID_OUT_CTL_CODE(104)
-#define IOCTL_HID_SET_FEATURE		HID_IN_CTL_CODE(100)
-#define IOCTL_HID_SET_OUTPUT_REPORT	HID_IN_CTL_CODE(101)
-
-enum libusb_hid_request_type {
-	HID_REQ_GET_REPORT = 0x01,
-	HID_REQ_GET_IDLE = 0x02,
-	HID_REQ_GET_PROTOCOL = 0x03,
-	HID_REQ_SET_REPORT = 0x09,
-	HID_REQ_SET_IDLE = 0x0A,
-	HID_REQ_SET_PROTOCOL = 0x0B
-};
-
-enum libusb_hid_report_type {
-	HID_REPORT_TYPE_INPUT = 0x01,
-	HID_REPORT_TYPE_OUTPUT = 0x02,
-	HID_REPORT_TYPE_FEATURE = 0x03
-};
-
-struct hid_device_priv {
-	uint16_t vid;
-	uint16_t pid;
-	uint8_t config;
-	uint8_t nb_interfaces;
-	bool uses_report_ids[3]; // input, ouptput, feature
-	uint16_t input_report_size;
-	uint16_t output_report_size;
-	uint16_t feature_report_size;
-	uint16_t usage;
-	uint16_t usagePage;
-	WCHAR string[3][MAX_USB_STRING_LENGTH];
-	uint8_t string_index[3]; // man, prod, ser
-};
 
 static inline struct winusb_device_priv *winusb_device_priv_init(struct libusb_device *dev)
 {
@@ -204,7 +139,6 @@ static inline void winusb_device_priv_release(struct libusb_device *dev)
 		}
 	}
 	free(priv->config_descriptor);
-	free(priv->hid);
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
 		free(priv->usb_interface[i].path);
 		free(priv->usb_interface[i].endpoint);
@@ -692,99 +626,5 @@ struct winusb_interface {
 		};
 	};
 };
-
-/* hid.dll interface */
-
-#define HIDP_STATUS_SUCCESS	0x110000
-typedef void * PHIDP_PREPARSED_DATA;
-
-#include <pshpack1.h>
-
-typedef struct _HIDD_ATTIRBUTES {
-	ULONG Size;
-	USHORT VendorID;
-	USHORT ProductID;
-	USHORT VersionNumber;
-} HIDD_ATTRIBUTES, *PHIDD_ATTRIBUTES;
-
-#include <poppack.h>
-
-typedef USHORT USAGE;
-typedef struct _HIDP_CAPS {
-	USAGE Usage;
-	USAGE UsagePage;
-	USHORT InputReportByteLength;
-	USHORT OutputReportByteLength;
-	USHORT FeatureReportByteLength;
-	USHORT Reserved[17];
-	USHORT NumberLinkCollectionNodes;
-	USHORT NumberInputButtonCaps;
-	USHORT NumberInputValueCaps;
-	USHORT NumberInputDataIndices;
-	USHORT NumberOutputButtonCaps;
-	USHORT NumberOutputValueCaps;
-	USHORT NumberOutputDataIndices;
-	USHORT NumberFeatureButtonCaps;
-	USHORT NumberFeatureValueCaps;
-	USHORT NumberFeatureDataIndices;
-} HIDP_CAPS, *PHIDP_CAPS;
-
-typedef enum _HIDP_REPORT_TYPE {
-	HidP_Input,
-	HidP_Output,
-	HidP_Feature
-} HIDP_REPORT_TYPE;
-
-typedef struct _HIDP_VALUE_CAPS {
-	USAGE UsagePage;
-	UCHAR ReportID;
-	BOOLEAN IsAlias;
-	USHORT BitField;
-	USHORT LinkCollection;
-	USAGE LinkUsage;
-	USAGE LinkUsagePage;
-	BOOLEAN IsRange;
-	BOOLEAN IsStringRange;
-	BOOLEAN IsDesignatorRange;
-	BOOLEAN IsAbsolute;
-	BOOLEAN HasNull;
-	UCHAR Reserved;
-	USHORT BitSize;
-	USHORT ReportCount;
-	USHORT Reserved2[5];
-	ULONG UnitsExp;
-	ULONG Units;
-	LONG LogicalMin, LogicalMax;
-	LONG PhysicalMin, PhysicalMax;
-	union {
-		struct {
-			USAGE UsageMin, UsageMax;
-			USHORT StringMin, StringMax;
-			USHORT DesignatorMin, DesignatorMax;
-			USHORT DataIndexMin, DataIndexMax;
-		} Range;
-		struct {
-			USAGE Usage, Reserved1;
-			USHORT StringIndex, Reserved2;
-			USHORT DesignatorIndex, Reserved3;
-			USHORT DataIndex, Reserved4;
-		} NotRange;
-	} u;
-} HIDP_VALUE_CAPS, *PHIDP_VALUE_CAPS;
-
-DLL_DECLARE_HANDLE(hid);
-DLL_DECLARE_FUNC(WINAPI, VOID, HidD_GetHidGuid, (LPGUID));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetAttributes, (HANDLE, PHIDD_ATTRIBUTES));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetPreparsedData, (HANDLE, PHIDP_PREPARSED_DATA *));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_FreePreparsedData, (PHIDP_PREPARSED_DATA));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetManufacturerString, (HANDLE, PVOID, ULONG));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetProductString, (HANDLE, PVOID, ULONG));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetSerialNumberString, (HANDLE, PVOID, ULONG));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetIndexedString, (HANDLE, ULONG, PVOID, ULONG));
-DLL_DECLARE_FUNC(WINAPI, LONG, HidP_GetCaps, (PHIDP_PREPARSED_DATA, PHIDP_CAPS));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_SetNumInputBuffers, (HANDLE, ULONG));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_GetPhysicalDescriptor, (HANDLE, PVOID, ULONG));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidD_FlushQueue, (HANDLE));
-DLL_DECLARE_FUNC(WINAPI, BOOL, HidP_GetValueCaps, (HIDP_REPORT_TYPE, PHIDP_VALUE_CAPS, PULONG, PHIDP_PREPARSED_DATA));
 
 #endif
