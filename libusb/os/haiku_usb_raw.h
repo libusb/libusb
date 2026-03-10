@@ -1,3 +1,4 @@
+/* -*- Mode: C++; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Copyright 2006-2008, Haiku Inc. All rights reserved.
  * Distributed under the terms of the MIT License.

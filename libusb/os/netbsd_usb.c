@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Copyright © 2011 Martin Pieuchot <mpi@openbsd.org>
  *
