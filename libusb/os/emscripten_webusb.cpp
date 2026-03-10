@@ -510,8 +510,8 @@ private:
 		{
 			auto result = co_await_try(
 				requestDescriptor(LIBUSB_DT_DEVICE, 0, LIBUSB_DT_DEVICE_SIZE));
-			if (getTransferStatus(result) != LIBUSB_TRANSFER_COMPLETED) {
-				co_return LIBUSB_ERROR_IO;
+			if (auto error = getTransferStatus(result)) {
+				co_return error;
 			}
 			copyFromDataView(&dev->device_descriptor, result["data"]);
 		}
@@ -541,18 +541,11 @@ private:
 			// Read descriptor header first to discover target length.
 			auto config_header_result = co_await_try(
 				requestDescriptor(LIBUSB_DT_CONFIG, j, LIBUSB_DT_CONFIG_SIZE));
-			if (getTransferStatus(config_header_result) !=
-				LIBUSB_TRANSFER_COMPLETED) {
-				co_return LIBUSB_ERROR_IO;
-			}
-
-			auto config_header_data = config_header_result["data"];
-			if (config_header_data["byteLength"].as<size_t>() <
-				LIBUSB_DT_CONFIG_SIZE) {
-				co_return LIBUSB_ERROR_IO;
+			if (auto error = getTransferStatus(config_header_result)) {
+				co_return error;
 			}
 			union usbi_config_desc_buf config_header = {};
-			copyFromDataView(config_header.buf, config_header_data);
+			copyFromDataView(config_header.buf, config_header_result["data"]);
 			if (config_header.desc.bDescriptorType != LIBUSB_DT_CONFIG ||
 				config_header.desc.bLength < LIBUSB_DT_CONFIG_SIZE) {
 				co_return LIBUSB_ERROR_IO;
@@ -566,9 +559,8 @@ private:
 
 			auto config_result = co_await_try(
 				requestDescriptor(LIBUSB_DT_CONFIG, j, config_total_length));
-			if (getTransferStatus(config_result) !=
-				LIBUSB_TRANSFER_COMPLETED) {
-				co_return LIBUSB_ERROR_IO;
+			if (auto error = getTransferStatus(config_result)) {
+				co_return error;
 			}
 
 			auto configVal = config_result["data"];
