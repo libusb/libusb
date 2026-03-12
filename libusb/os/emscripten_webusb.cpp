@@ -538,17 +538,36 @@ private:
 		auto configurations_len = dev->device_descriptor.bNumConfigurations;
 		configurations.reserve(configurations_len);
 		for (uint8_t j = 0; j < configurations_len; j++) {
-			// Note: requesting more than (platform-specific limit) bytes
-			// here will cause the transfer to fail, see
-			// https://crbug.com/1489414. Use the most common limit of 4096
-			// bytes for now.
-			constexpr uint16_t MAX_CTRL_BUFFER_LENGTH = 4096;
-			auto result = co_await_try(
-				requestDescriptor(LIBUSB_DT_CONFIG, j, MAX_CTRL_BUFFER_LENGTH));
-			if (auto error = getTransferStatus(result)) {
+			// Read descriptor header first to discover target length.
+			auto config_header_result = co_await_try(
+				requestDescriptor(LIBUSB_DT_CONFIG, j, LIBUSB_DT_CONFIG_SIZE));
+			if (auto error = getTransferStatus(config_header_result)) {
 				co_return error;
 			}
-			auto configVal = result["data"];
+			union usbi_config_desc_buf config_header = {};
+			copyFromDataView(config_header.buf, config_header_result["data"]);
+			if (config_header.desc.bDescriptorType != LIBUSB_DT_CONFIG ||
+				config_header.desc.bLength < LIBUSB_DT_CONFIG_SIZE) {
+				co_return LIBUSB_ERROR_IO;
+			}
+
+			auto config_total_length =
+				libusb_le16_to_cpu(config_header.desc.wTotalLength);
+			if (config_total_length < LIBUSB_DT_CONFIG_SIZE) {
+				co_return LIBUSB_ERROR_IO;
+			}
+
+			auto config_result = co_await_try(
+				requestDescriptor(LIBUSB_DT_CONFIG, j, config_total_length));
+			if (auto error = getTransferStatus(config_result)) {
+				co_return error;
+			}
+
+			auto configVal = config_result["data"];
+			if (configVal["byteLength"].as<size_t>() < config_total_length) {
+				co_return LIBUSB_ERROR_IO;
+			}
+
 			auto configLen = configVal["byteLength"].as<size_t>();
 			auto& config = configurations.emplace_back(
 				(usbi_configuration_descriptor*)::operator new(configLen));
