@@ -18,6 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include <config.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
@@ -300,7 +302,7 @@ int main(int argc, char *argv[])
 	callback_registered[1] = 1;
 
 	while (!state.quit) {
-		struct timeval tv = { 0, 250000 };
+		struct timeval tv = { 0, 50000 };
 
 		rc = libusb_handle_events_timeout_completed(ctx, &tv, NULL);
 		if (LIBUSB_SUCCESS != rc && LIBUSB_ERROR_INTERRUPTED != rc)
