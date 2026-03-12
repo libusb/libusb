@@ -21,6 +21,7 @@
 #include <config.h>
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <signal.h>
 #include <inttypes.h>
@@ -45,7 +46,7 @@ struct hotplug_state {
 static volatile sig_atomic_t signal_exit_requested = 0;
 
 #if defined(PLATFORM_POSIX)
-static int terminal_configured = 0;
+static bool terminal_configured = false;
 static struct termios terminal_saved;
 #endif
 
@@ -121,14 +122,14 @@ static void print_device_event(const char *event_name, libusb_device *dev, const
 	print_counters(state);
 }
 
-static int check_for_quit_key(void)
+static bool check_for_quit_key(void)
 {
 #if defined(PLATFORM_WINDOWS)
 	if (_kbhit()) {
 		int c = _getch();
 		return c == 'q' || c == 'Q';
 	}
-	return 0;
+	return false;
 #elif defined(PLATFORM_POSIX)
 	fd_set read_fds;
 	struct timeval timeout = { 0, 0 };
@@ -141,15 +142,15 @@ static int check_for_quit_key(void)
 	rc = select(STDIN_FILENO + 1, &read_fds, NULL, NULL, &timeout);
 	if (rc < 0) {
 		if (errno == EINTR)
-			return 0;
-		return 0;
+			return false;
+		return false;
 	}
 	if (rc > 0 && FD_ISSET(STDIN_FILENO, &read_fds) && read(STDIN_FILENO, &c, 1) == 1)
 		return c == 'q' || c == 'Q';
 
-	return 0;
+	return false;
 #else
-	return 0;
+	return false;
 #endif
 }
 
@@ -171,7 +172,7 @@ static int setup_terminal(void)
 	if (tcsetattr(STDIN_FILENO, TCSANOW, &new_termios) != 0)
 		return -1;
 
-	terminal_configured = 1;
+	terminal_configured = true;
 	return 0;
 }
 
@@ -179,7 +180,7 @@ static void restore_terminal(void)
 {
 	if (terminal_configured) {
 		(void)tcsetattr(STDIN_FILENO, TCSANOW, &terminal_saved);
-		terminal_configured = 0;
+		terminal_configured = false;
 	}
 }
 #else
@@ -247,7 +248,7 @@ int main(int argc, char *argv[])
 	libusb_context *ctx = NULL;
 	struct hotplug_state state = { 0, 0, 0 };
 	libusb_hotplug_callback_handle hp[2];
-	int callback_registered[2] = { 0, 0 };
+	bool callback_registered[2] = { false, false };
 	int product_id, vendor_id, class_id;
 	int arrival_flags;
 	int rc;
@@ -288,7 +289,7 @@ int main(int argc, char *argv[])
 		libusb_exit (ctx);
 		return EXIT_FAILURE;
 	}
-	callback_registered[0] = 1;
+	callback_registered[0] = true;
 
 	rc = libusb_hotplug_register_callback (ctx, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT, 0, vendor_id,
 		product_id,class_id, hotplug_callback_detach, &state, &hp[1]);
@@ -299,7 +300,7 @@ int main(int argc, char *argv[])
 		libusb_exit (ctx);
 		return EXIT_FAILURE;
 	}
-	callback_registered[1] = 1;
+	callback_registered[1] = true;
 
 	while (!state.quit) {
 		struct timeval tv = { 0, 50000 };
