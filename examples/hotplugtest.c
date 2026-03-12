@@ -78,9 +78,9 @@ static const char *speed_name(int speed)
 
 static void print_counters(const struct hotplug_state *state)
 {
-	int64_t balance = (int64_t)state->arrived - (int64_t)state->departed;
+	int64_t difference = (int64_t)state->arrived - (int64_t)state->departed;
 	printf("[arrived=%" PRIu64 " departed=%" PRIu64 " delta=%" PRId64"]\n",
-		state->arrived, state->departed, balance);
+		state->arrived, state->departed, difference);
 }
 
 static void print_device_event(const char *event_name, libusb_device *dev, struct hotplug_state *state)
