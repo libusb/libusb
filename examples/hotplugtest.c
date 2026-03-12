@@ -83,7 +83,7 @@ static void print_counters(const struct hotplug_state *state)
 		state->arrived, state->departed, difference);
 }
 
-static void print_device_event(const char *event_name, libusb_device *dev, struct hotplug_state *state)
+static void print_device_event(const char *event_name, libusb_device *dev, const struct hotplug_state *state)
 {
 	struct libusb_device_descriptor desc;
 	char string_buffer[LIBUSB_DEVICE_STRING_BYTES_MAX];
