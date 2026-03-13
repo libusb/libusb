@@ -1,6 +1,7 @@
 $toolsets = "v120", "v140", "v141", "v142", "v143", "v145"
-$platforms = "Win32", "x64", "ARM", "ARM64"
-$configurations = "Debug", "Release"
+$platforms = "Win32", "x64", "ARM64"
+$configurations = "Debug", "Release", "Debug-MT", "Release-MT",
+                  "Debug-Hotplug", "Release-Hotplug", "Debug-Hotplug-MT", "Release-Hotplug-MT"
 
 foreach ($toolset in $toolsets) {
     foreach ($plat in $platforms) {
