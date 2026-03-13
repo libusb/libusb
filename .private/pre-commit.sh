@@ -38,6 +38,10 @@ fi
 
 eval $TYPE_CMD || { echo "git command not found. Aborting." >&2; exit 1; }
 
+if [ "$(git branch --show-current)" != "master" ]; then
+  exit 0
+fi
+
 NANO=`git log --oneline | wc -l`
 NANO=`expr $NANO + $BRANCH_OFFSET`
 # Amended commits need to have the nano corrected. Current versions of git hooks
