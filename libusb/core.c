@@ -2958,24 +2958,38 @@ static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 			"libusb: %s [%s] ", prefix, function);
 	}
 
-	if (header_len < 0 || header_len >= (int)sizeof(buf)) {
-		/* Somehow snprintf() failed to write to the buffer,
+	if (header_len < 0) {
+		/* If somehow an error occurred, give up. */
+		return;
+	}
+
+	if (header_len >= (int)sizeof(buf)) {
+		/* The buffer was too small and the write was truncated;
 		 * remove the header so something useful is output. */
 		header_len = 0;
 	}
 
-	text_len = vsnprintf(buf + header_len, sizeof(buf) - (size_t)header_len,
-		format, args);
-	if (text_len < 0 || text_len + header_len >= (int)sizeof(buf)) {
-		/* Truncated log output. On some platforms a -1 return value means
-		 * that the output was truncated. */
-		text_len = (int)sizeof(buf) - header_len;
+	/* starting right after the end of the header, append the rest, but leave room for the terminator. */
+	int space = (int)sizeof(buf) - header_len - (int)strlen(USBI_LOG_LINE_END);
+	text_len = vsnprintf(buf + header_len, space, format, args);
+
+	if (text_len < 0) {
+		/* If somehow an error occurred, give up. */
+		return;
 	}
-	if (header_len + text_len + (int)sizeof(USBI_LOG_LINE_END) >= (int)sizeof(buf)) {
-		/* Need to truncate the text slightly to fit on the terminator. */
-		text_len -= (header_len + text_len + (int)sizeof(USBI_LOG_LINE_END)) - (int)sizeof(buf);
+
+	if (text_len >= space) {
+		/* The space was too small and the write was truncated.
+		 * Add our terminator in the space we left at the end. */
+		(void)snprintf(buf + sizeof(buf) - 1 - strlen(USBI_LOG_LINE_END),
+				 1 + strlen(USBI_LOG_LINE_END),
+				 "%s", USBI_LOG_LINE_END);
+	} else {
+		/* Just append the terminator. */
+		(void)snprintf(buf + header_len + text_len,
+				 sizeof(buf) - (size_t)header_len - (size_t)text_len,
+				 "%s", USBI_LOG_LINE_END);
 	}
-	strcpy(buf + header_len + text_len, USBI_LOG_LINE_END);
 
 	log_str(level, buf);
 
