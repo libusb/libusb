@@ -1338,7 +1338,8 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 		if (usbi_backend.destroy_device)
 			usbi_backend.destroy_device(dev);
 
-		if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+		if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG) &&
+		    usbi_atomic_load(&dev->attached)) {
 			/* backend does not support hotplug */
 			usbi_disconnect_device(dev);
 		}
