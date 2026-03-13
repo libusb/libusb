@@ -29,6 +29,7 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #ifdef HAVE_SYS_TIME_H
@@ -341,18 +342,6 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 
 #endif /* ENABLE_LOGGING */
 
-#define DEVICE_CTX(dev)		((dev)->ctx)
-#define HANDLE_CTX(handle)	((handle) ? DEVICE_CTX((handle)->dev) : NULL)
-#define ITRANSFER_CTX(itransfer) \
-	((itransfer)->dev ? DEVICE_CTX((itransfer)->dev) : NULL)
-#define TRANSFER_CTX(transfer) \
-	(ITRANSFER_CTX(LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)))
-
-#define IS_EPIN(ep)		(0 != ((ep) & LIBUSB_ENDPOINT_IN))
-#define IS_EPOUT(ep)		(!IS_EPIN(ep))
-#define IS_XFERIN(xfer)		(0 != ((xfer)->endpoint & LIBUSB_ENDPOINT_IN))
-#define IS_XFEROUT(xfer)	(!IS_XFERIN(xfer))
-
 struct libusb_context {
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 	enum libusb_log_level debug;
@@ -577,7 +566,7 @@ void usbi_get_real_time(struct timespec *tp);
  * 2. struct usbi_transfer
  * 3. struct libusb_transfer (which includes iso packets) [variable size]
  *
- * You can convert between them with the macros:
+ * You can convert between them with the functions:
  *  TRANSFER_PRIV_TO_USBI_TRANSFER
  *  USBI_TRANSFER_TO_TRANSFER_PRIV
  *  USBI_TRANSFER_TO_LIBUSB_TRANSFER
@@ -633,26 +622,6 @@ enum usbi_transfer_timeout_flags {
 	/* The transfer timeout was successfully processed */
 	USBI_TRANSFER_TIMED_OUT = 1U << 2,
 };
-
-#define TRANSFER_PRIV_TO_USBI_TRANSFER(transfer_priv) \
-	((struct usbi_transfer *)			\
-	 ((unsigned char *)(transfer_priv)	\
-	  + PTR_ALIGN(sizeof(*transfer_priv))))
-
-#define USBI_TRANSFER_TO_TRANSFER_PRIV(itransfer) \
-	((unsigned char *)			\
-	 ((unsigned char *)(itransfer)	\
-	  - PTR_ALIGN(usbi_backend.transfer_priv_size)))
-
-#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)	\
-	((struct libusb_transfer *)			\
-	 ((unsigned char *)(itransfer)			\
-	  + PTR_ALIGN(sizeof(struct usbi_transfer))))
-
-#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)	\
-	((struct usbi_transfer *)			\
-	 ((unsigned char *)(transfer)			\
-	  - PTR_ALIGN(sizeof(struct usbi_transfer))))
 
 #ifdef _MSC_VER
 #pragma pack(push, 1)
@@ -1548,6 +1517,66 @@ struct usbi_os_backend {
 };
 
 extern const struct usbi_os_backend usbi_backend;
+
+static inline struct usbi_transfer * TRANSFER_PRIV_TO_USBI_TRANSFER(void * transfer_priv)
+{
+	return (struct usbi_transfer *)((unsigned char *)(transfer_priv) + PTR_ALIGN(usbi_backend.transfer_priv_size));
+}
+
+static inline void * USBI_TRANSFER_TO_TRANSFER_PRIV (const struct usbi_transfer * itransfer)
+{
+	return (void *)((unsigned char *)(itransfer) - PTR_ALIGN(usbi_backend.transfer_priv_size));
+}
+
+static inline struct libusb_transfer * USBI_TRANSFER_TO_LIBUSB_TRANSFER (const struct usbi_transfer * itransfer)
+{
+	return (struct libusb_transfer *)((unsigned char *)(itransfer) + PTR_ALIGN(sizeof(struct usbi_transfer)));
+}
+
+static inline struct usbi_transfer * LIBUSB_TRANSFER_TO_USBI_TRANSFER (const struct libusb_transfer * transfer)
+{
+	return (struct usbi_transfer *)((unsigned char *)(transfer) - PTR_ALIGN(sizeof(struct usbi_transfer)));
+}
+
+static inline struct libusb_context * DEVICE_CTX(const struct libusb_device *dev)
+{
+	return dev->ctx;
+}
+
+static inline struct libusb_context * HANDLE_CTX(const struct libusb_device_handle *handle)
+{
+	return handle ? DEVICE_CTX(handle->dev) : NULL;
+}
+
+static inline struct libusb_context * ITRANSFER_CTX(const struct usbi_transfer *itransfer)
+{
+	return itransfer->dev ? DEVICE_CTX(itransfer->dev) : NULL;
+}
+
+static inline struct libusb_context * TRANSFER_CTX(const struct libusb_transfer *transfer)
+{
+	return ITRANSFER_CTX(LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer));
+}
+
+static inline bool IS_EPIN (uint8_t ep)
+{
+	return (0 != (ep & LIBUSB_ENDPOINT_IN));
+}
+
+static inline bool IS_EPOUT (uint8_t ep)
+{
+	return !IS_EPIN(ep);
+}
+
+static inline bool IS_XFERIN (const struct libusb_transfer * xfer)
+{
+	return (0 != (xfer->endpoint & LIBUSB_ENDPOINT_IN));
+}
+
+static inline bool IS_XFEROUT (const struct libusb_transfer * xfer)
+{
+	return !IS_XFERIN(xfer);
+}
 
 #define for_each_context(c) \
 	for_each_helper(c, &active_contexts_list, struct libusb_context)
