@@ -1180,6 +1180,39 @@ static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *
   (*device)->GetDeviceProduct (device, &idProduct);
   (*device)->GetDeviceVendor (device, &idVendor);
 
+  /* Try to synthesize device descriptor from OS-cached values (no USB I/O).
+   * If any value is unavailable, fall back to requesting descriptor from device. */
+  do {
+    IOUSBDeviceDescriptor *desc = &dev->dev_descriptor;
+    UInt16 bcdDevice, bcdUSB;
+
+    if (!get_ioregistry_value_number (dev->service, CFSTR("bcdUSB"), kCFNumberSInt16Type, &bcdUSB))
+      break;
+    if (!get_ioregistry_value_number (dev->service, CFSTR("bMaxPacketSize0"), kCFNumberSInt8Type, &desc->bMaxPacketSize0))
+      break;
+
+    desc->bcdUSB = libusb_cpu_to_le16 (bcdUSB);
+    desc->bDeviceClass = bDeviceClass;
+    (*device)->GetDeviceSubClass (device, &desc->bDeviceSubClass);
+    (*device)->GetDeviceProtocol (device, &desc->bDeviceProtocol);
+    desc->idVendor = libusb_cpu_to_le16 (idVendor);
+    desc->idProduct = libusb_cpu_to_le16 (idProduct);
+    (*device)->GetDeviceReleaseNumber (device, &bcdDevice);
+    desc->bcdDevice = libusb_cpu_to_le16 (bcdDevice);
+    (*device)->USBGetManufacturerStringIndex (device, &desc->iManufacturer);
+    (*device)->USBGetProductStringIndex (device, &desc->iProduct);
+    (*device)->USBGetSerialNumberStringIndex (device, &desc->iSerialNumber);
+    (*device)->GetNumberOfConfigurations (device, &desc->bNumConfigurations);
+
+    desc->bDescriptorType = LIBUSB_DT_DEVICE;
+    desc->bLength = LIBUSB_DT_DEVICE_SIZE;
+
+    usbi_dbg (ctx, "using cached device descriptor for %.4x:%.4x", idVendor, idProduct);
+    goto descriptor_ready;
+  } while (0);
+
+  usbi_dbg (ctx, "requesting device descriptor from device %.4x:%.4x", idVendor, idProduct);
+
   /* According to Apple's documentation the device must be open for DeviceRequest but we may not be able to open some
    * devices and Apple's USB Prober doesn't bother to open the device before issuing a descriptor request.  Still,
    * to follow the spec as closely as possible, try opening the device */
@@ -1277,6 +1310,7 @@ static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *
     return LIBUSB_ERROR_NO_DEVICE;
   }
 
+descriptor_ready:
   usbi_dbg (ctx, "cached device descriptor:");
   usbi_dbg (ctx, "  bDescriptorType:    0x%02x", dev->dev_descriptor.bDescriptorType);
   usbi_dbg (ctx, "  bcdUSB:             0x%04x", libusb_le16_to_cpu (dev->dev_descriptor.bcdUSB));
