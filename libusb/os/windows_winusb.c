@@ -2265,8 +2265,22 @@ static int winusb_get_device_string(libusb_device *dev,
 	sd.req.ConnectionIndex = (ULONG)dev->port_number;
 	sd.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
 	sd.req.SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
-	sd.req.SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | string_descriptor_idx;
+	sd.req.SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | 0;
 	sd.req.SetupPacket.wIndex = 0;
+	sd.req.SetupPacket.wLength = (USHORT)sizeof(sd.desc);
+
+	BOOL result = DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
+		&sd, size, &ret_size, NULL);
+
+	USHORT langId = result ? (USHORT)(sd.desc.bString[0] | (sd.desc.bString[1] << 8)) : 0;
+
+	size = sizeof(sd);
+	memset(&sd, 0, size);
+	sd.req.ConnectionIndex = (ULONG)dev->port_number;
+	sd.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
+	sd.req.SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
+	sd.req.SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | string_descriptor_idx;
+	sd.req.SetupPacket.wIndex = langId;
 	sd.req.SetupPacket.wLength = (USHORT)sizeof(sd.desc);
 
 	BOOL rv = DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
