@@ -2272,7 +2272,20 @@ static int winusb_get_device_string(libusb_device *dev,
 	BOOL result = DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
 		&sd, size, &ret_size, NULL);
 
-	USHORT langId = result ? (USHORT)(sd.desc.bString[0] | (sd.desc.bString[1] << 8)) : 0;
+	if (!result) {
+		usbi_err(ctx, "could not access string descriptor 0 for '%s': %s", priv->dev_id, windows_error_str(0));
+		CloseHandle(hub_handle);
+		return LIBUSB_ERROR_ACCESS;
+	}
+
+	USHORT langId = 0;
+	if (sd.desc.bDescriptorType != LIBUSB_DT_STRING) {
+		usbi_warn(ctx, "descriptor 0 not a string descriptor for '%s'", priv->dev_id);
+	} else if (sd.desc.bLength < 4) {
+		usbi_warn(ctx, "string descriptor 0 too short for '%s'", priv->dev_id);
+	} else {
+		langId = (USHORT)(sd.desc.bString[0] | (sd.desc.bString[1] << 8));
+	}
 
 	size = sizeof(sd);
 	memset(&sd, 0, size);
