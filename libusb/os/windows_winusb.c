@@ -2265,8 +2265,35 @@ static int winusb_get_device_string(libusb_device *dev,
 	sd.req.ConnectionIndex = (ULONG)dev->port_number;
 	sd.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
 	sd.req.SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
-	sd.req.SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | string_descriptor_idx;
+	sd.req.SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | 0;
 	sd.req.SetupPacket.wIndex = 0;
+	sd.req.SetupPacket.wLength = (USHORT)sizeof(sd.desc);
+
+	BOOL result = DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
+		&sd, size, &ret_size, NULL);
+
+	if (!result) {
+		usbi_err(ctx, "could not access string descriptor 0 for '%s': %s", priv->dev_id, windows_error_str(0));
+		CloseHandle(hub_handle);
+		return LIBUSB_ERROR_ACCESS;
+	}
+
+	USHORT langId = 0;
+	if (sd.desc.bDescriptorType != LIBUSB_DT_STRING) {
+		usbi_warn(ctx, "descriptor 0 not a string descriptor for '%s'", priv->dev_id);
+	} else if (sd.desc.bLength < 4) {
+		usbi_warn(ctx, "string descriptor 0 too short for '%s'", priv->dev_id);
+	} else {
+		langId = (USHORT)(sd.desc.bString[0] | (sd.desc.bString[1] << 8));
+	}
+
+	size = sizeof(sd);
+	memset(&sd, 0, size);
+	sd.req.ConnectionIndex = (ULONG)dev->port_number;
+	sd.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
+	sd.req.SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
+	sd.req.SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | string_descriptor_idx;
+	sd.req.SetupPacket.wIndex = langId;
 	sd.req.SetupPacket.wLength = (USHORT)sizeof(sd.desc);
 
 	BOOL rv = DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
