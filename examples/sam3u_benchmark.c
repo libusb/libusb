@@ -103,7 +103,7 @@ static void LIBUSB_CALL cb_xfr(struct libusb_transfer *xfr)
 		else
 			printf(" ");
 	}
-	num_bytes += xfr->actual_length;
+	num_bytes += (unsigned long)xfr->actual_length;
 	num_xfer++;
 
 	if (libusb_submit_transfer(xfr) < 0) {
@@ -130,7 +130,7 @@ static int benchmark_in(uint8_t ep)
 	if (ep == EP_ISO_IN) {
 		libusb_fill_iso_transfer(xfr, devh, ep, buf,
 				sizeof(buf), num_iso_pack, cb_xfr, NULL, 0);
-		libusb_set_iso_packet_lengths(xfr, sizeof(buf)/num_iso_pack);
+		libusb_set_iso_packet_lengths(xfr, sizeof(buf)/(unsigned int)num_iso_pack);
 	} else
 		libusb_fill_bulk_transfer(xfr, devh, ep, buf,
 				sizeof(buf), cb_xfr, NULL, 0);
@@ -157,15 +157,13 @@ static int benchmark_in(uint8_t ep)
 static void measure(void)
 {
 	struct timeval tv_stop;
-	unsigned long diff_msec;
-
 	get_timestamp(&tv_stop);
 
-	diff_msec = (tv_stop.tv_sec - tv_start.tv_sec) * 1000L;
+	long diff_msec = (tv_stop.tv_sec - tv_start.tv_sec) * 1000L;
 	diff_msec += (tv_stop.tv_usec - tv_start.tv_usec) / 1000L;
 
 	printf("%lu transfers (total %lu bytes) in %lu milliseconds => %lu bytes/sec\n",
-		num_xfer, num_bytes, diff_msec, (num_bytes * 1000L) / diff_msec);
+		num_xfer, num_bytes, diff_msec, (num_bytes * 1000L) / (unsigned long)diff_msec);
 }
 
 static void sig_hdlr(int signum)
