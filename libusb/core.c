@@ -982,24 +982,32 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
 int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 	uint8_t *port_numbers, int port_numbers_len)
 {
-	int i = port_numbers_len;
+	int depth, i;
+	struct libusb_device *iter;
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 
 	if (port_numbers_len <= 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
-	/* HCDs can be listed as devices with port #0 */
-	while((dev) && (dev->port_number != 0)) {
-		if (--i < 0) {
-			usbi_warn(ctx, "port numbers array is too small");
-			return LIBUSB_ERROR_OVERFLOW;
-		}
-		port_numbers[i] = dev->port_number;
+	/* count the port depth first to avoid modifying the buffer on overflow.
+	 * HCDs can be listed as devices with port #0 */
+	depth = 0;
+	for (iter = dev; iter && iter->port_number != 0; iter = iter->parent_dev)
+		depth++;
+
+	if (depth > port_numbers_len) {
+		usbi_warn(ctx, "port numbers array is too small");
+		return LIBUSB_ERROR_OVERFLOW;
+	}
+
+	/* fill port numbers directly into the correct positions */
+	i = depth;
+	while (dev && dev->port_number != 0) {
+		port_numbers[--i] = dev->port_number;
 		dev = dev->parent_dev;
 	}
-	if (i < port_numbers_len)
-		memmove(port_numbers, &port_numbers[i], (size_t)(port_numbers_len - i));
-	return port_numbers_len - i;
+
+	return depth;
 }
 
 /** \ingroup libusb_dev
