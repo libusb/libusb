@@ -439,7 +439,7 @@ if (r == 0 && actual_length == sizeof(data)) {
  * \ref libusb_transfer_type::LIBUSB_TRANSFER_TYPE_ISOCHRONOUS
  * "LIBUSB_TRANSFER_TYPE_ISOCHRONOUS", and set
  * \ref libusb_transfer::num_iso_packets "num_iso_packets" to a value less than
- * or equal to the number of packets you requested during allocation.
+ * or equal to the number of packets you requested during allocation (max_num_iso_packets).
  * libusb_alloc_transfer() does not set either of these fields for you, given
  * that you might not even use the transfer on an isochronous endpoint.
  *
@@ -1268,35 +1268,37 @@ static void calculate_timeout(struct usbi_transfer *itransfer)
  * transfer is no longer needed, it should be freed with
  * libusb_free_transfer().
  *
- * Transfers intended for non-isochronous endpoints (e.g. control, bulk,
- * interrupt) should specify an iso_packets count of zero.
+ * Transfers intended only for non-isochronous endpoints (e.g. control, bulk,
+ * interrupt) should specify a max_num_iso_packets count of zero.
  *
  * For transfers intended for isochronous endpoints, specify an appropriate
- * number of packet descriptors to be allocated as part of the transfer.
+ * maximum number of packet descriptors to be allocated as part of the transfer.
  * The returned transfer is not specially initialized for isochronous I/O;
  * you are still required to set the
  * \ref libusb_transfer::num_iso_packets "num_iso_packets" and
  * \ref libusb_transfer::type "type" fields accordingly.
  *
- * It is safe to allocate a transfer with some isochronous packets and then
- * use it on a non-isochronous endpoint. If you do this, ensure that at time
- * of submission, num_iso_packets is 0 and that type is set appropriately.
+ * max_num_iso_packets only serves to allocate space. It is therefore safe to
+ * allocate a transfer with max_num_iso_packets greater than zero and then use
+ * it on a non-isochronous endpoint. If you do this, ensure that at the time
+ * of submission, libusb_transfer::num_iso_packets is 0 and that
+ * libusb_transfer::type is set appropriately.
  *
- * \param iso_packets number of isochronous packet descriptors to allocate. Must be non-negative.
+ * \param max_num_iso_packets number of isochronous packet descriptors to allocate space for. Must be non-negative.
  * \returns a newly allocated transfer, or NULL on error
  */
 DEFAULT_VISIBILITY
 struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
-	int iso_packets)
+	int max_num_iso_packets)
 {
-	assert(iso_packets >= 0);
-	if (iso_packets < 0)
+	assert(max_num_iso_packets >= 0);
+	if (max_num_iso_packets < 0)
 		return NULL;
 
 	size_t priv_size = PTR_ALIGN(usbi_backend.transfer_priv_size);
 	size_t usbi_transfer_size = PTR_ALIGN(sizeof(struct usbi_transfer));
 	size_t libusb_transfer_size = PTR_ALIGN(sizeof(struct libusb_transfer));
-	size_t iso_packets_size = sizeof(struct libusb_iso_packet_descriptor) * (size_t)iso_packets;
+	size_t iso_packets_size = sizeof(struct libusb_iso_packet_descriptor) * (size_t)max_num_iso_packets;
 	size_t alloc_size = priv_size + usbi_transfer_size + libusb_transfer_size + iso_packets_size;
 	unsigned char *ptr = calloc(1, alloc_size);
 	if (!ptr)
@@ -1306,8 +1308,12 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	itransfer->num_iso_packets = iso_packets;
 	itransfer->priv = ptr;
 	usbi_mutex_init(&itransfer->lock);
-	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 
+	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+#ifdef __has_ptrcheck
+	transfer->num_iso_packets = max_num_iso_packets;
+#endif
+	
 	return transfer;
 }
 
