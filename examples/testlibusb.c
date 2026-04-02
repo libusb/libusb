@@ -268,7 +268,7 @@ static int test_wrapped_device(const char *device_name)
 }
 #endif
 
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 {
 	const char *device_name = NULL;
 	libusb_device **devs;

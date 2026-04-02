@@ -71,7 +71,7 @@ void libusb_testlib_logf(const char *fmt, ...)
 	fflush(stdout);
 }
 
-int libusb_testlib_run_tests(int argc, char *argv[],
+int libusb_testlib_run_tests(int argc, const char *argv[],
 	const libusb_testlib_test *tests)
 {
 	int run_count = 0;

@@ -80,7 +80,7 @@ static int print_usage(int error_code) {
 
 #define FIRMWARE 0
 #define LOADER 1
-int main(int argc, char*argv[])
+int main(int argc, const char*argv[])
 {
 	fx_known_device known_device[] = FX_KNOWN_DEVICES;
 	const char *path[] = { NULL, NULL };
