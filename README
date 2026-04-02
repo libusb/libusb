@@ -20,10 +20,13 @@ http://api.libusb.info
 Use the mailing list for questions, comments, etc:
 http://mailing-list.libusb.info
 
-- Hans de Goede <hdegoede@redhat.com>
-- Xiaofan Chen <xiaofanc@gmail.com>
-- Ludovic Rousseau <ludovic.rousseau@gmail.com>
-- Nathan Hjelm <hjelmn@cs.unm.edu>
-- Chris Dickens <christopher.a.dickens@gmail.com>
+- Tormod Volden
+- Sylvain Fasel
+- Sean McBride
+- Nathan Hjelm
+- Xiaofan Chen
+- Hans de Goede
+- Ludovic Rousseau
+- Chris Dickens
 
 (Please use the mailing list rather than mailing developers directly)
