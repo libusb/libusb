@@ -13,7 +13,6 @@ clang-analyzer-*,\
 -clang-analyzer-deadcode.DeadStores,\
 -clang-analyzer-optin.portability.UnixAPI,\
 -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,\
--clang-analyzer-security.insecureAPI.strcpy,\
 -clang-analyzer-unix.Malloc,\
 misc-*,\
 -misc-no-recursion,\
