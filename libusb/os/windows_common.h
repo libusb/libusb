@@ -248,6 +248,7 @@ struct winusb_device_priv {
 #endif
 	bool root_hub;
 	uint8_t active_config;
+	uint16_t langid; // cached USB language ID for string descriptor requests
 	uint8_t depth; // distance to HCD
 	const struct windows_usb_api_backend *apib;
 	char *dev_id;
