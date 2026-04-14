@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * windows hotplug backend for libusb 1.0
  * Copyright © 2024 Sylvain Fasel <sylvain@sonatique.net>
