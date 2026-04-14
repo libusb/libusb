@@ -53,7 +53,7 @@ void usbi_cond_init(usbi_cond_t *cond)
 }
 
 int usbi_cond_timedwait(usbi_cond_t *cond,
-	usbi_mutex_t *mutex, const struct timeval *tv)
+	usbi_mutex_t *mutex, const struct timeval *tv) REQUIRES(*mutex)
 {
 	struct timespec timeout;
 	int r;
