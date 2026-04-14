@@ -6,6 +6,8 @@ bugprone-*,\
 -bugprone-narrowing-conversions,\
 -bugprone-signed-char-misuse,\
 -bugprone-switch-missing-default-case,\
+-bugprone-multi-level-implicit-pointer-conversion,\
+-bugprone-branch-clone,\
 clang-analyzer-*,\
 -clang-analyzer-core.NullDereference,\
 -clang-analyzer-deadcode.DeadStores,\
@@ -16,11 +18,11 @@ clang-analyzer-*,\
 misc-*,\
 -misc-no-recursion,\
 -misc-include-cleaner,\
+-misc-unused-parameters,\
 modernize-*,\
 -modernize-macro-to-enum,\
 performance-*,\
 -performance-no-int-to-ptr,\
--performance-type-promotion-in-math-fn,\
 portability-*,\
 readability-*,\
 -readability-braces-around-statements,\
@@ -29,6 +31,6 @@ readability-*,\
 -readability-function-cognitive-complexity,\
 -readability-isolate-declaration,\
 -readability-magic-numbers,\
+-readability-non-const-parameter,\
+-readability-use-concise-preprocessor-directives,\
 "
-#WarningsAsErrors: "*"
-...

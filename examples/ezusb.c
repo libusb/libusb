@@ -816,7 +816,7 @@ int ezusb_load_ram(libusb_device_handle *device, const char *path, int fx_type, 
 
 		/* at least write the interrupt vectors (at 0x0000) for reset! */
 		status = fseek(image, 0L, SEEK_SET);
-		if (ret < 0) {
+		if (status < 0) {
 			logerror("unable to rewind file %s\n", path);
 			ret = status;
 			goto exit;

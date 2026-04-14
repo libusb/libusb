@@ -51,21 +51,27 @@ static inline void usbi_mutex_unlock(usbi_mutex_t *mutex)
 }
 static inline int usbi_mutex_trylock(usbi_mutex_t *mutex)
 {
-	return pthread_mutex_trylock(mutex) == 0;
+	int mutexIsLocked = pthread_mutex_trylock(mutex) == 0;
+	return mutexIsLocked;
 }
 static inline void usbi_mutex_destroy(usbi_mutex_t *mutex)
 {
 	PTHREAD_CHECK(pthread_mutex_destroy(mutex));
 }
 
+#define USBI_COND_INITIALIZER	PTHREAD_COND_INITIALIZER
 typedef pthread_cond_t usbi_cond_t;
-void usbi_cond_init(pthread_cond_t *cond);
+void usbi_cond_init(usbi_cond_t *cond);
 static inline void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
 {
 	PTHREAD_CHECK(pthread_cond_wait(cond, mutex));
 }
 int usbi_cond_timedwait(usbi_cond_t *cond,
 	usbi_mutex_t *mutex, const struct timeval *tv);
+static inline void usbi_cond_signal(usbi_cond_t *cond)
+{
+	PTHREAD_CHECK(pthread_cond_signal(cond));
+}
 static inline void usbi_cond_broadcast(usbi_cond_t *cond)
 {
 	PTHREAD_CHECK(pthread_cond_broadcast(cond));

@@ -343,15 +343,17 @@ static int usbdk_get_device_list(struct libusb_context *ctx, struct discovered_d
 			}
 		}
 
-		discdevs = discovered_devs_append(*_discdevs, dev);
-		libusb_unref_device(dev);
-		if (!discdevs) {
-			usbi_err(ctx, "cannot append new device to list");
-			r = LIBUSB_ERROR_NO_MEM;
-			goto func_exit;
-		}
+		if (_discdevs) {
+			discdevs = discovered_devs_append(*_discdevs, dev);
+			libusb_unref_device(dev);
+			if (!discdevs) {
+				usbi_err(ctx, "cannot append new device to list");
+				r = LIBUSB_ERROR_NO_MEM;
+				goto func_exit;
+			}
 
-		*_discdevs = discdevs;
+			*_discdevs = discdevs;
+		}
 	}
 
 func_exit:
@@ -704,6 +706,7 @@ const struct windows_backend usbdk_backend = {
 	usbdk_init,
 	usbdk_exit,
 	usbdk_get_device_list,
+	NULL,  /* usbdk_get_device_string */
 	usbdk_open,
 	usbdk_close,
 	usbdk_get_active_config_descriptor,
@@ -721,4 +724,7 @@ const struct windows_backend usbdk_backend = {
 	NULL,	/* cancel_transfer */
 	usbdk_clear_transfer_priv,
 	usbdk_copy_transfer_data,
+	NULL,	/* endpoint_supports_raw_io */
+	NULL,	/* endpoint_set_raw_io */
+	NULL,	/* get_max_raw_io_transfer_size */
 };

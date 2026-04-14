@@ -24,6 +24,10 @@ EXPORTS
   libusb_dev_mem_alloc@8 = libusb_dev_mem_alloc
   libusb_dev_mem_free
   libusb_dev_mem_free@12 = libusb_dev_mem_free
+  libusb_endpoint_set_raw_io
+  libusb_endpoint_set_raw_io@12 = libusb_endpoint_set_raw_io
+  libusb_endpoint_supports_raw_io
+  libusb_endpoint_supports_raw_io@8 = libusb_endpoint_supports_raw_io
   libusb_error_name
   libusb_error_name@4 = libusb_error_name
   libusb_event_handler_active
@@ -84,6 +88,8 @@ EXPORTS
   libusb_get_device_list@8 = libusb_get_device_list
   libusb_get_device_speed
   libusb_get_device_speed@4 = libusb_get_device_speed
+  libusb_get_device_string
+  libusb_get_device_string@16 = libusb_get_device_string
   libusb_get_interface_association_descriptors
   libusb_get_interface_association_descriptors@12 = libusb_get_interface_association_descriptors
   libusb_get_max_alt_packet_size
@@ -92,6 +98,8 @@ EXPORTS
   libusb_get_max_iso_packet_size@8 = libusb_get_max_iso_packet_size
   libusb_get_max_packet_size
   libusb_get_max_packet_size@8 = libusb_get_max_packet_size
+  libusb_get_max_raw_io_transfer_size
+  libusb_get_max_raw_io_transfer_size@8 = libusb_get_max_raw_io_transfer_size
   libusb_get_next_timeout
   libusb_get_next_timeout@8 = libusb_get_next_timeout
   libusb_get_parent
@@ -106,6 +114,8 @@ EXPORTS
   libusb_get_port_numbers@12 = libusb_get_port_numbers
   libusb_get_port_path
   libusb_get_port_path@16 = libusb_get_port_path
+  libusb_get_session_data
+  libusb_get_session_data@4 = libusb_get_session_data
   libusb_get_ss_endpoint_companion_descriptor
   libusb_get_ss_endpoint_companion_descriptor@12 = libusb_get_ss_endpoint_companion_descriptor
   libusb_get_ss_usb_device_capability_descriptor

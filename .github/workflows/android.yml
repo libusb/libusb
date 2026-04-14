@@ -1,0 +1,55 @@
+name: Android
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+        api: [21]
+    env:
+      ANDROID_ABI: ${{ matrix.abi }}
+      ANDROID_API: ${{ matrix.api }}
+      NDK_OUT_DIR: ${{ github.workspace }}/out/${{ matrix.abi }}
+      NDK_LIBS_DIR: ${{ github.workspace }}/libs/${{ matrix.abi }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show ANDROID_NDK_ROOT
+        run: |
+          echo "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT}"
+          test -d "${ANDROID_NDK_ROOT}" || (echo "ANDROID_NDK_ROOT not set or invalid" && exit 1)
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y file
+
+      - name: Build with ndk-build
+        working-directory: android/jni
+        run: |
+          mkdir -p "${NDK_OUT_DIR}" "${NDK_LIBS_DIR}"
+          "${ANDROID_NDK_ROOT}/ndk-build" -j \
+            APP_ABI="${ANDROID_ABI}" \
+            APP_PLATFORM="android-${ANDROID_API}" \
+            NDK_OUT="${NDK_OUT_DIR}" \
+            NDK_LIBS_OUT="${NDK_LIBS_DIR}"
+
+      - name: Show outputs
+        run: |
+          set -euxo pipefail
+          find "${NDK_LIBS_DIR}" -maxdepth 2 -type f -print0 | xargs -0 ls -lh || true
+          file "${NDK_LIBS_DIR}/"* || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libusb-android-${{ matrix.abi }}-api${{ matrix.api }}
+          path: |
+            libs/${{ matrix.abi }}/
+          if-no-files-found: error

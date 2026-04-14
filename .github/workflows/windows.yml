@@ -1,0 +1,49 @@
+name: Windows build and Package
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os:
+          - 'windows-2022'
+          - 'windows-2025'
+        configuration:
+          - 'Debug'
+          - 'Release'
+          - 'Debug-MT'
+          - 'Release-MT'
+          - 'Debug-Hotplug'
+          - 'Release-Hotplug'
+          - 'Debug-Hotplug-MT'
+          - 'Release-Hotplug-MT'
+        architecture:
+          - 'Win32'
+          - 'x64'
+          - 'ARM64'
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.3
+
+      - name: Build solution
+        run: |
+          msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }} -property:Platform=${{ matrix.architecture }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}-${{ matrix.configuration }}-${{ matrix.architecture }}
+          path: |
+            build/**/*.exe
+            build/**/dll/libusb-1.0.dll
+            build/**/dll/libusb-1.0.lib
+            build/**/dll/libusb-1.0.exp
+            build/**/dll/libusb-1.0.pdb
+            build/**/lib/libusb-1.0.lib

@@ -15,7 +15,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <!--Treat sources as utf-8-->
-      <AdditionalOptions Condition="'$(PlatformToolsetVersion)'&gt;'120'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(LibusbPlatformToolsetVersion)'&gt;'120'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DiagnosticsFormat>Caret</DiagnosticsFormat>
     </ClCompile>

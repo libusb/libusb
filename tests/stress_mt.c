@@ -230,7 +230,8 @@ static int test_multi_init(int enumerate)
 				tinfo[t].number,
 				tinfo[t].iteration,
 				libusb_error_name(tinfo[t].err));
-		} else if (enumerate) {
+		}
+		if (enumerate) {
 			if (t > 0 && tinfo[t].devcount != last_devcount) {
 				devcount_mismatch++;
 				printf("Device count mismatch: Thread %d discovered %ld devices instead of %ld\n",

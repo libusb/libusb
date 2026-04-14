@@ -5,8 +5,9 @@
 
 const { WebUSB } = require('usb');
 
-globalThis.navigator = {
-  usb: new WebUSB({
-    allowAllDevices: true
-  })
-};
+// Node.js 21 introduced a global `navigator` object, so assign an empty one only if it's not present yet.
+globalThis.navigator ??= {};
+
+navigator.usb = new WebUSB({
+  allowAllDevices: true
+});

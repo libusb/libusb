@@ -1,5 +1,29 @@
-For detailed information about the changes below, please see the git log
-or visit: http://log.libusb.info
+For detailed information about the changes below, please see the git log.
+
+2026-02-22: v1.0.30-rc1
+* Add hotplug support on Microsoft Windows
+* Add RAW_IO support in WinUSB backend
+* Work around a macOS 26 Tahoe compatibility breakage due to Apple changing kUSBHostPortPropertyPortNumber
+* Add new API libusb_get_device_string() to access device strings without opening the device
+* Add new API libusb_get_session_data() which returns the OS-specific handle
+* On Android, fix intermittent failures in get_usbfs_fd()
+* On Windows, fix bus number assignment for root hub device, preventing duplicate bus number assignments
+* Fix compilation with Microsoft Visual Studio 2026
+* Fix various compiler warnings, improved tests and examples
+
+2025-06-01: v1.0.29
+* Fix regression on macOS leading to timeouts in enumeration
+* LIBUSB_API_VERSION bump for the new functions in 1.0.28
+* Fix xusb regression displaying wrong error on claim failure
+
+2025-03-18: v1.0.28
+* New libusb_get_ssplus_usb_device_capability_descriptor API
+  for query of SuperSpeed+ Capability Descriptors
+* API support for reporting USB 3.2 Gen2x2 speeds
+* macOS: Fix Zero-Length Packet for multiple packets per frame
+* Windows: Base HID device descriptor on OS-cached values
+* Build fixes for Haiku and SunOS
+* Many code correctness fixes
 
 2024-01-31: v1.0.27
 * New libusb_init_context API to replace libusb_init

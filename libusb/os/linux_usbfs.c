@@ -98,6 +98,8 @@ static int init_count = 0;
 /* Serialize scan-devices, event-thread, and poll */
 usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 
+static int open_sysfs_attr(struct libusb_context *ctx,
+	const char *sysfs_dir, const char *attr);
 static int linux_scan_devices(struct libusb_context *ctx);
 static int detach_kernel_driver_and_claim(struct libusb_device_handle *, uint8_t);
 
@@ -199,19 +201,25 @@ static int get_usbfs_fd(struct libusb_device *dev, int access_mode, int silent)
 	if (fd != -1)
 		return fd; /* Success */
 
+	/* TODO: fix race between netlink and usbfs https://github.com/libusb/libusb/issues/1691 */
 	if (errno == ENOENT) {
 		const long delay_ms = 10L;
 		const struct timespec delay_ts = { 0L, delay_ms * 1000L * 1000L };
+		uint8_t retry = 3;
 
-		if (!silent)
-			usbi_err(ctx, "File doesn't exist, wait %ld ms and try again", delay_ms);
+		while (retry-- > 0) {
+			if (!silent)
+				usbi_err(ctx, "File doesn't exist, wait %ld ms and try again", delay_ms);
 
-		/* Wait 10ms for USB device path creation.*/
-		nanosleep(&delay_ts, NULL);
+			/* Wait 10ms for USB device path creation.*/
+			nanosleep(&delay_ts, NULL);
 
-		fd = open(path, access_mode | O_CLOEXEC);
-		if (fd != -1)
-			return fd; /* Success */
+			fd = open(path, access_mode | O_CLOEXEC);
+			if (fd != -1)
+				return fd; /* Success */
+			if (errno != ENOENT)
+				break;
+		}
 	}
 
 	if (!silent) {
@@ -293,16 +301,7 @@ static const char *find_usbfs_path(void)
 		}
 	}
 
-/* On udev based systems without any usb-devices /dev/bus/usb will not
- * exist. So if we've not found anything and we're using udev for hotplug
- * simply assume /dev/bus/usb rather then making libusb_init fail.
- * Make the same assumption for Android where SELinux policies might block us
- * from reading /dev on newer devices. */
-#if defined(HAVE_LIBUDEV) || defined(__ANDROID__)
-	return USB_DEVTMPFS_PATH;
-#else
 	return NULL;
-#endif
 }
 
 static int get_kernel_version(struct libusb_context *ctx,
@@ -370,11 +369,15 @@ static int op_init(struct libusb_context *ctx)
 
 	usbfs_path = find_usbfs_path();
 	if (!usbfs_path) {
-		usbi_err(ctx, "could not find usbfs");
-		return LIBUSB_ERROR_OTHER;
+		/* On udev based systems without any usb devices /dev/bus/usb will not
+		* exist. On android and other systems SELinux policies might block us
+		* from reading /dev. Nonetheless it's the default for most modern linux
+		systems including those using udev alternatives such as busybox's mdev. */
+		usbfs_path = USB_DEVTMPFS_PATH;
+		usbi_dbg(ctx, "could not find usbfs, defaulting to %s", usbfs_path);
+	} else {
+		usbi_dbg(ctx, "found usbfs at %s", usbfs_path);
 	}
-
-	usbi_dbg(ctx, "found usbfs at %s", usbfs_path);
 
 	if (!max_iso_packet_len) {
 		if (kernel_version_ge(&kversion, 5, 2, 0))
@@ -450,6 +453,46 @@ static int op_set_option(struct libusb_context *ctx, enum libusb_option option, 
 	}
 
 	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+static int op_get_device_string(struct libusb_device *dev, 
+		enum libusb_device_string_type string_type, char *buffer, int length)
+{
+	ssize_t r;
+	int fd;
+	struct linux_device_priv *priv = usbi_get_device_priv(dev);
+	struct libusb_context* ctx = DEVICE_CTX(dev);
+	const char * attr;
+
+	switch (string_type) {
+		case LIBUSB_DEVICE_STRING_MANUFACTURER: attr = "manufacturer"; break;
+		case LIBUSB_DEVICE_STRING_PRODUCT: attr = "product"; break;
+		case LIBUSB_DEVICE_STRING_SERIAL_NUMBER: attr = "serial"; break;
+		case LIBUSB_DEVICE_STRING_COUNT:
+			/* intentional fall-through, avoid -Wswitch-enum */
+		default:
+			return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	fd = open_sysfs_attr(ctx, priv->sysfs_dir, attr);
+	if (fd < 0)
+		return LIBUSB_ERROR_IO;
+
+	r = read(fd, buffer, length - 1);  // leave space for null terminator
+	if (r < 0) {
+		r = errno;
+		close(fd);
+		if (r == ENODEV)
+			return LIBUSB_ERROR_NO_DEVICE;
+		usbi_err(ctx, "attribute %s read failed, errno=%zd", attr, r);
+		return LIBUSB_ERROR_IO;
+	}
+	close(fd);
+	buffer[r] = 0;  // add null terminator
+	while (r && ((buffer[r] == 0) || (buffer[r] == '\n'))) {
+		buffer[r--] = 0;
+	}
+	++r;
+	return r;
 }
 
 static int linux_scan_devices(struct libusb_context *ctx)
@@ -541,7 +584,7 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 
 	errno = 0;
 	value = strtol(buf, &endptr, 10);
-	if (value < 0 || value > (long)max_value || errno) {
+	if (buf == endptr || value < 0 || value > (long)max_value || errno) {
 		usbi_err(ctx, "attribute %s contains an invalid value: '%s'", attr, buf);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	} else if (*endptr != '\0') {
@@ -1033,7 +1076,7 @@ static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_di
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct libusb_device *it;
-	char *parent_sysfs_dir, *tmp;
+	char *parent_sysfs_dir, *tmp, *end;
 	int ret, add_parent = 1;
 
 	/* XXX -- can we figure out the topology when using usbfs? */
@@ -1048,7 +1091,16 @@ static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_di
 
 	if ((tmp = strrchr(parent_sysfs_dir, '.')) ||
 	    (tmp = strrchr(parent_sysfs_dir, '-'))) {
-	        dev->port_number = atoi(tmp + 1);
+		const char *start = tmp + 1;
+		long port_number = strtol(start, &end, 10);
+		if (port_number < 0 || port_number > INT_MAX || start == end || '\0' != *end) {
+			usbi_warn(ctx, "Can not parse sysfs_dir: %s, unexpected parent info",
+				parent_sysfs_dir);
+			free(parent_sysfs_dir);
+			return LIBUSB_ERROR_OTHER;
+		} else {
+			dev->port_number = (int)port_number;
+		}
 		*tmp = '\0';
 	} else {
 		usbi_warn(ctx, "Can not parse sysfs_dir: %s, no parent info",
@@ -1245,6 +1297,10 @@ static int usbfs_get_device_list(struct libusb_context *ctx)
 		buses = opendir(USB_DEVTMPFS_PATH);
 
 	if (!buses) {
+		if (!usbdev_names && errno == ENOENT) {
+			/* The path does not exist if there are no devices plugged in */
+			return LIBUSB_SUCCESS;
+		}
 		usbi_err(ctx, "opendir buses failed, errno=%d", errno);
 		return LIBUSB_ERROR_IO;
 	}
@@ -1322,10 +1378,10 @@ static int linux_default_scan_devices(struct libusb_context *ctx)
 	 * any autosuspended USB devices. however, sysfs is not available
 	 * everywhere, so we need a usbfs fallback too.
 	 */
-	if (sysfs_available)
-		return sysfs_get_device_list(ctx);
-	else
-		return usbfs_get_device_list(ctx);
+	if (sysfs_available && sysfs_get_device_list(ctx) == LIBUSB_SUCCESS)
+		return LIBUSB_SUCCESS;
+
+    return usbfs_get_device_list(ctx);
 }
 #endif
 
@@ -2751,7 +2807,7 @@ static int op_handle_events(struct libusb_context *ctx,
 				} while (r == 0);
 			}
 
-			usbi_handle_disconnect(handle);
+			usbi_handle_disconnect(ctx, handle);
 			continue;
 		}
 
@@ -2778,6 +2834,7 @@ const struct usbi_os_backend usbi_backend = {
 	.init = op_init,
 	.exit = op_exit,
 	.set_option = op_set_option,
+	.get_device_string = op_get_device_string,
 	.hotplug_poll = op_hotplug_poll,
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,

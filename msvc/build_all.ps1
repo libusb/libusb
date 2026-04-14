@@ -1,4 +1,4 @@
-$toolsets = "v120", "v140", "v141", "v142", "v143"
+$toolsets = "v120", "v140", "v141", "v142", "v143", "v145"
 $platforms = "Win32", "x64", "ARM", "ARM64"
 $configurations = "Debug", "Release"
 
