@@ -55,6 +55,16 @@ typedef SSIZE_T ssize_t;
 #define LIBUSB_FLEXIBLE_ARRAY	0	/* [0] - non-standard, but usually working code */
 #endif /* __STDC_VERSION__ */
 
+/* In C23 and later we can specify the underlying type of an enum. This is also
+ * supported by C++ and by clang in earlier versions of C as an extension. */
+#if (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)) || \
+     defined(__cplusplus) || \
+     defined(__clang__)
+#define LIBUSB_ENUM_SIZE(x) : x
+#else
+#define LIBUSB_ENUM_SIZE(x)
+#endif /* __STDC_VERSION__ */
+
 /* 'interface' might be defined as a macro on Windows, so we need to
  * undefine it so as not to break the current libusb API, because
  * libusb_config_descriptor has an 'interface' member
@@ -215,7 +225,7 @@ static inline uint16_t libusb_cpu_to_le16(uint16_t x)
 
 /** \ingroup libusb_desc
  * Device and/or Interface Class codes */
-enum libusb_class_code {
+enum libusb_class_code LIBUSB_ENUM_SIZE(uint8_t) {
 	/** In the context of a \ref libusb_device_descriptor "device descriptor",
 	 * this bDeviceClass value indicates that each interface specifies its
 	 * own class information and all interfaces operate independently.
@@ -298,7 +308,7 @@ enum libusb_class_code {
 
 /** \ingroup libusb_desc
  * Descriptor types as defined by the USB specification. */
-enum libusb_descriptor_type {
+enum libusb_descriptor_type LIBUSB_ENUM_SIZE(uint8_t) {
 	/** Device descriptor. See libusb_device_descriptor. */
 	LIBUSB_DT_DEVICE = 0x01,
 
@@ -376,7 +386,7 @@ enum libusb_descriptor_type {
  * Endpoint direction. Values for bit 7 of the
  * \ref libusb_endpoint_descriptor::bEndpointAddress "endpoint address" scheme.
  */
-enum libusb_endpoint_direction {
+enum libusb_endpoint_direction LIBUSB_ENUM_SIZE(uint8_t) {
 	/** Out: host-to-device */
 	LIBUSB_ENDPOINT_OUT = 0x00,
 
@@ -390,7 +400,7 @@ enum libusb_endpoint_direction {
  * Endpoint transfer type. Values for bits 0:1 of the
  * \ref libusb_endpoint_descriptor::bmAttributes "endpoint attributes" field.
  */
-enum libusb_endpoint_transfer_type {
+enum libusb_endpoint_transfer_type LIBUSB_ENUM_SIZE(unsigned) {
 	/** Control endpoint */
 	LIBUSB_ENDPOINT_TRANSFER_TYPE_CONTROL = 0x0,
 
@@ -406,7 +416,7 @@ enum libusb_endpoint_transfer_type {
 
 /** \ingroup libusb_misc
  * Standard requests, as defined in table 9-5 of the USB 3.0 specifications */
-enum libusb_standard_request {
+enum libusb_standard_request LIBUSB_ENUM_SIZE(uint8_t) {
 	/** Request status of the specific recipient */
 	LIBUSB_REQUEST_GET_STATUS = 0x00,
 
@@ -456,7 +466,7 @@ enum libusb_standard_request {
  * Request type bits of the
  * \ref libusb_control_setup::bmRequestType "bmRequestType" field in control
  * transfers. */
-enum libusb_request_type {
+enum libusb_request_type LIBUSB_ENUM_SIZE(uint8_t) {
 	/** Standard */
 	LIBUSB_REQUEST_TYPE_STANDARD = (0x00 << 5),
 
@@ -474,7 +484,7 @@ enum libusb_request_type {
  * Recipient bits of the
  * \ref libusb_control_setup::bmRequestType "bmRequestType" field in control
  * transfers. Values 4 through 31 are reserved. */
-enum libusb_request_recipient {
+enum libusb_request_recipient LIBUSB_ENUM_SIZE(uint8_t) {
 	/** Device */
 	LIBUSB_RECIPIENT_DEVICE = 0x00,
 
@@ -495,7 +505,7 @@ enum libusb_request_recipient {
  * \ref libusb_endpoint_descriptor::bmAttributes "bmAttributes" field in
  * libusb_endpoint_descriptor.
  */
-enum libusb_iso_sync_type {
+enum libusb_iso_sync_type LIBUSB_ENUM_SIZE(uint8_t) {
 	/** No synchronization */
 	LIBUSB_ISO_SYNC_TYPE_NONE = 0x0,
 
@@ -516,7 +526,7 @@ enum libusb_iso_sync_type {
  * \ref libusb_endpoint_descriptor::bmAttributes "bmAttributes" field in
  * libusb_endpoint_descriptor.
  */
-enum libusb_iso_usage_type {
+enum libusb_iso_usage_type LIBUSB_ENUM_SIZE(uint8_t) {
 	/** Data endpoint */
 	LIBUSB_ISO_USAGE_TYPE_DATA = 0x0,
 
@@ -531,7 +541,7 @@ enum libusb_iso_usage_type {
  * Supported speeds (wSpeedSupported) bitfield. Indicates what
  * speeds the device supports.
  */
-enum libusb_supported_speed {
+enum libusb_supported_speed LIBUSB_ENUM_SIZE(uint16_t) {
 	/** Low speed operation supported (1.5MBit/s). */
 	LIBUSB_LOW_SPEED_OPERATION = (1 << 0),
 
@@ -550,7 +560,7 @@ enum libusb_supported_speed {
  * \ref libusb_usb_2_0_extension_descriptor::bmAttributes "bmAttributes" field
  * of the USB 2.0 Extension descriptor.
  */
-enum libusb_usb_2_0_extension_attributes {
+enum libusb_usb_2_0_extension_attributes LIBUSB_ENUM_SIZE(uint32_t) {
 	/** Supports Link Power Management (LPM) */
 	LIBUSB_BM_LPM_SUPPORT = (1 << 1)
 };
@@ -560,7 +570,7 @@ enum libusb_usb_2_0_extension_attributes {
  * \ref libusb_ss_usb_device_capability_descriptor::bmAttributes "bmAttributes" field
  * field of the SuperSpeed USB Device Capability descriptor.
  */
-enum libusb_ss_usb_device_capability_attributes {
+enum libusb_ss_usb_device_capability_attributes LIBUSB_ENUM_SIZE(uint8_t) {
 	/** Supports Latency Tolerance Messages (LTM) */
 	LIBUSB_BM_LTM_SUPPORT = (1 << 1)
 };
@@ -568,7 +578,7 @@ enum libusb_ss_usb_device_capability_attributes {
 /** \ingroup libusb_desc
  * USB capability types
  */
-enum libusb_bos_type {
+enum libusb_bos_type LIBUSB_ENUM_SIZE(uint8_t) {
 	/** Wireless USB device capability */
 	LIBUSB_BT_WIRELESS_USB_DEVICE_CAPABILITY = 0x01,
 
@@ -1026,7 +1036,7 @@ enum libusb_superspeedplus_sublink_attribute_sublink_direction {
  *   Mb = Mbps
  *   Gb = Gbps
  */
-enum libusb_superspeedplus_sublink_attribute_exponent {
+enum libusb_superspeedplus_sublink_attribute_exponent LIBUSB_ENUM_SIZE(unsigned) {
 	LIBUSB_SSPLUS_ATTR_EXP_BPS = 0,
 	LIBUSB_SSPLUS_ATTR_EXP_KBS = 1,
 	LIBUSB_SSPLUS_ATTR_EXP_MBS = 2,
@@ -1036,7 +1046,7 @@ enum libusb_superspeedplus_sublink_attribute_exponent {
 /** \ingroup libusb_desc
  *  enum used in \ref libusb_ssplus_sublink_attribute
  */
-enum libusb_superspeedplus_sublink_attribute_link_protocol {
+enum libusb_superspeedplus_sublink_attribute_link_protocol LIBUSB_ENUM_SIZE(unsigned) {
 	LIBUSB_SSPLUS_ATTR_PROT_SS = 0,
 	LIBUSB_SSPLUS_ATTR_PROT_SSPLUS = 1,
 };
@@ -1297,7 +1307,7 @@ enum libusb_speed {
  * error code or libusb_strerror() to get an end-user suitable description of
  * an error code.
  */
-enum libusb_error {
+enum libusb_error LIBUSB_ENUM_SIZE(int) {
 	/** Success (no error) */
 	LIBUSB_SUCCESS = 0,
 
@@ -1539,7 +1549,7 @@ struct libusb_transfer {
  * platform. Test if the loaded library supports a given capability by calling
  * \ref libusb_has_capability().
  */
-enum libusb_capability {
+enum libusb_capability LIBUSB_ENUM_SIZE(uint32_t) {
 	/** The libusb_has_capability() API is available. */
 	LIBUSB_CAP_HAS_CAPABILITY = 0x0000U,
 
@@ -1560,7 +1570,7 @@ enum libusb_capability {
 /** \ingroup libusb_lib
  *  Log message levels.
  */
-enum libusb_log_level {
+enum libusb_log_level LIBUSB_ENUM_SIZE(int) {
 	/** (0) : No messages ever emitted by the library (default) */
 	LIBUSB_LOG_LEVEL_NONE = 0,
 
@@ -1584,7 +1594,7 @@ enum libusb_log_level {
  *
  * \see libusb_set_log_cb()
  */
-enum libusb_log_cb_mode {
+enum libusb_log_cb_mode LIBUSB_ENUM_SIZE(int) {
 	/** Callback function handling all log messages. */
 	LIBUSB_LOG_CB_GLOBAL = (1 << 0),
 
