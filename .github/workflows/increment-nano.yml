@@ -89,7 +89,7 @@ jobs:
           echo "num_commits=$NUM_COMMITS" >> "$GITHUB_OUTPUT"
           echo "Detected $NUM_COMMITS commit(s) in this push"
 
-      - name: Determine commit message
+      - name: Determine commit message context
         id: msg
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -114,7 +114,7 @@ jobs:
             echo "last_commit_subject=$LAST_MSG" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Increment version_nano.h and commit
+      - name: Increment version_nano.h, commit and push
         env:
           NUM_COMMITS: ${{ steps.count.outputs.num_commits }}
           SOURCE: ${{ steps.msg.outputs.source }}
@@ -124,56 +124,44 @@ jobs:
         run: |
           NANO_FILE="libusb/version_nano.h"
 
-          # Read current nano value.
-          CURRENT=$(grep -oP '(?<=#define LIBUSB_NANO )\d+' "$NANO_FILE")
-          if [ -z "$CURRENT" ]; then
-            echo "::error::Could not parse LIBUSB_NANO from $NANO_FILE"
-            exit 1
-          fi
-
-          NEXT=$((CURRENT + NUM_COMMITS))
-          echo "Bumping LIBUSB_NANO: $CURRENT -> $NEXT (+$NUM_COMMITS)"
-
-          # Write the new value.
-          echo "#define LIBUSB_NANO $NEXT" > "$NANO_FILE"
-
-          # Build commit message.
+          # Build the descriptive part of the commit message (stable across retries).
           if [ "$SOURCE" = "pr" ]; then
-            COMMIT_MSG="Bump nano version to $NEXT (+$NUM_COMMITS) for PR #${PR_NUMBER} - ${PR_TITLE}"
+            DESCRIPTION="for PR #${PR_NUMBER} - ${PR_TITLE}"
           else
-            COMMIT_MSG="Bump nano version to $NEXT (+$NUM_COMMITS) for ${LAST_COMMIT_SUBJECT}"
+            DESCRIPTION="for ${LAST_COMMIT_SUBJECT}"
           fi
 
-          git add "$NANO_FILE"
-          git commit -m "$COMMIT_MSG"
-
-      - name: Push (with retry on conflict)
-        env:
-          NUM_COMMITS: ${{ steps.count.outputs.num_commits }}
-        run: |
           MAX_ATTEMPTS=5
           for i in $(seq 1 $MAX_ATTEMPTS); do
+            # Always start from a clean, up-to-date master.
+            git fetch origin master
+            git reset --hard origin/master
+
+            # Read current nano value from the fresh master.
+            CURRENT=$(grep -oP '(?<=#define LIBUSB_NANO )\d+' "$NANO_FILE")
+            if [ -z "$CURRENT" ]; then
+              echo "::error::Could not parse LIBUSB_NANO from $NANO_FILE"
+              exit 1
+            fi
+
+            NEXT=$((CURRENT + NUM_COMMITS))
+            echo "Attempt $i: Bumping LIBUSB_NANO $CURRENT -> $NEXT (+$NUM_COMMITS)"
+
+            # Write the new value.
+            echo "#define LIBUSB_NANO $NEXT" > "$NANO_FILE"
+
+            # Commit.
+            COMMIT_MSG="Bump nano version to $NEXT (+$NUM_COMMITS) $DESCRIPTION"
+            git add "$NANO_FILE"
+            git commit -m "$COMMIT_MSG"
+
+            # Try to push.
             if git push origin master; then
               echo "Push succeeded on attempt $i"
               exit 0
             fi
 
-            echo "Push failed (attempt $i/$MAX_ATTEMPTS), rebasing on latest master..."
-            git pull --rebase origin master
-
-            # After rebase, re-read and re-increment by the same amount.
-            NANO_FILE="libusb/version_nano.h"
-            CURRENT=$(grep -oP '(?<=#define LIBUSB_NANO )\d+' "$NANO_FILE")
-            NEXT=$((CURRENT + NUM_COMMITS))
-            echo "Re-bumping LIBUSB_NANO after rebase: $CURRENT -> $NEXT (+$NUM_COMMITS)"
-
-            echo "#define LIBUSB_NANO $NEXT" > "$NANO_FILE"
-            git add "$NANO_FILE"
-
-            # Update the version number in the commit message.
-            OLD_MSG=$(git log -1 --format=%s)
-            NEW_MSG=$(echo "$OLD_MSG" | sed -E "s/to [0-9]+ \(\+[0-9]+\)/to $NEXT (+$NUM_COMMITS)/")
-            git commit --amend -m "$NEW_MSG"
+            echo "Push failed (attempt $i/$MAX_ATTEMPTS), retrying..."
           done
 
           echo "::error::Failed to push after $MAX_ATTEMPTS attempts"
