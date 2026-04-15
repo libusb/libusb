@@ -1,0 +1,181 @@
+# Auto-increment version_nano.h after each push to master.
+#
+# This replaces the local pre-commit / post-rewrite git hooks that
+# maintainers previously had to configure manually, and allows the
+# standard GitHub "Rebase and merge" button to be used on PRs.
+#
+# Behaviour:
+#
+#   PR merged via "Rebase and merge" (N commits):
+#     Bumps nano by N, adds ONE commit after the last rebased commit:
+#       "Bump nano version to 12349 (+3) for PR #1789 - Fix hotplug on macOS"
+#
+#   Direct push (N commits):
+#     Bumps nano by N, adds ONE commit after the pushed commits:
+#       "Bump nano version to 12349 (+3) for Fix hotplug on macOS"
+#
+# This preserves the original semantic: every commit that lands on
+# master "consumes" one nano number, even though the actual bump is
+# recorded in a single trailing commit.
+#
+# No force-push is involved.
+#
+# Loop prevention:
+#   Commits made with the default GITHUB_TOKEN do not trigger further
+#   workflow runs (GitHub policy).  As a belt-and-suspenders measure,
+#   the job also skips if the HEAD commit message starts with
+#   "Bump nano version".
+#
+# Concurrency:
+#   Only one instance runs at a time.  If two PRs are merged in quick
+#   succession, the second run queues and sees the already-bumped nano.
+
+name: Increment version nano
+
+on:
+  push:
+    branches:
+      - master
+
+# Serialize to avoid two runs reading the same nano value.
+concurrency:
+  group: version-nano-increment
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  increment-nano:
+    runs-on: ubuntu-latest
+
+    # Do not run on our own nano-bump commits.
+    if: >-
+      !startsWith(github.event.head_commit.message, 'Bump nano version')
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v5
+        with:
+          # GITHUB_TOKEN: commits pushed with this token do NOT
+          # trigger further workflow runs — natural loop prevention.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Count commits in this push
+        id: count
+        run: |
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.event.after }}"
+
+          # If 'before' is all zeros, this is a new branch (shouldn't
+          # happen on master, but handle it gracefully).
+          if echo "$BEFORE" | grep -qE '^0+$'; then
+            NUM_COMMITS=1
+          else
+            NUM_COMMITS=$(git rev-list --count "$BEFORE".."$AFTER")
+          fi
+
+          # Sanity: at least 1.
+          if [ "$NUM_COMMITS" -lt 1 ]; then
+            NUM_COMMITS=1
+          fi
+
+          echo "num_commits=$NUM_COMMITS" >> "$GITHUB_OUTPUT"
+          echo "Detected $NUM_COMMITS commit(s) in this push"
+
+      - name: Determine commit message context
+        id: msg
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Use the GitHub CLI to search for a merged PR that contains
+          # the commit SHA from this push event.  The CLI is more
+          # reliable than the REST endpoint for rebase-merged commits.
+          PR_INFO=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --search "${{ github.sha }}" \
+            --state merged \
+            --json number,title \
+            --jq '.[0] // empty' \
+          ) || true
+
+          if [ -n "$PR_INFO" ]; then
+            PR_NUMBER=$(echo "$PR_INFO" | jq -r '.number')
+            PR_TITLE=$(echo "$PR_INFO" | jq -r '.title')
+            echo "source=pr" >> "$GITHUB_OUTPUT"
+            echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            # Sanitize title: remove characters that could break the
+            # commit message or git commands.
+            PR_TITLE_SAFE=$(echo "$PR_TITLE" | tr -d '\n\r' | head -c 200)
+            echo "pr_title=$PR_TITLE_SAFE" >> "$GITHUB_OUTPUT"
+            echo "Found PR #$PR_NUMBER - $PR_TITLE_SAFE"
+          else
+            # Direct push — use the first line of the triggering
+            # commit message (from the event payload, not from
+            # whatever is currently on master).
+            LAST_MSG=$(git log -1 --format=%s "${{ github.sha }}")
+            echo "source=push" >> "$GITHUB_OUTPUT"
+            echo "last_commit_subject=$LAST_MSG" >> "$GITHUB_OUTPUT"
+            echo "No associated PR found; using commit subject: $LAST_MSG"
+          fi
+
+      - name: Increment version_nano.h, commit and push
+        env:
+          NUM_COMMITS: ${{ steps.count.outputs.num_commits }}
+          SOURCE: ${{ steps.msg.outputs.source }}
+          PR_NUMBER: ${{ steps.msg.outputs.pr_number }}
+          PR_TITLE: ${{ steps.msg.outputs.pr_title }}
+          LAST_COMMIT_SUBJECT: ${{ steps.msg.outputs.last_commit_subject }}
+        run: |
+          NANO_FILE="libusb/version_nano.h"
+
+          # Build the descriptive part of the commit message (stable across retries).
+          if [ "$SOURCE" = "pr" ]; then
+            DESCRIPTION="for PR #${PR_NUMBER} - ${PR_TITLE}"
+          else
+            DESCRIPTION="for ${LAST_COMMIT_SUBJECT}"
+          fi
+
+          MAX_ATTEMPTS=5
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            # Always start from a clean, up-to-date master.
+            # This avoids any rebase/merge conflicts: we simply
+            # throw away our previous attempt and redo from scratch.
+            git fetch origin master
+            git reset --hard origin/master
+
+            # Read current nano value from the fresh master.
+            CURRENT=$(grep -oP '(?<=#define LIBUSB_NANO )\d+' "$NANO_FILE")
+            if [ -z "$CURRENT" ]; then
+              echo "::error::Could not parse LIBUSB_NANO from $NANO_FILE"
+              exit 1
+            fi
+
+            NEXT=$((CURRENT + NUM_COMMITS))
+            echo "Attempt $i: Bumping LIBUSB_NANO $CURRENT -> $NEXT (+$NUM_COMMITS)"
+
+            # Write the new value.
+            echo "#define LIBUSB_NANO $NEXT" > "$NANO_FILE"
+
+            # Commit.
+            COMMIT_MSG="Bump nano version to $NEXT (+$NUM_COMMITS) $DESCRIPTION"
+            git add "$NANO_FILE"
+            git commit -m "$COMMIT_MSG"
+
+            # Try to push.
+            if git push origin master; then
+              echo "Push succeeded on attempt $i"
+              exit 0
+            fi
+
+            echo "Push failed (attempt $i/$MAX_ATTEMPTS), retrying..."
+          done
+
+          echo "::error::Failed to push after $MAX_ATTEMPTS attempts"
+          exit 1
