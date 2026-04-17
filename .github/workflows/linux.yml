@@ -28,7 +28,6 @@ jobs:
           mkdir build-release && cd build-release
           ../configure --enable-udev --enable-man-pages
           make -j$(nproc)
-          make -C doc man
           make install DESTDIR="$PWD/staging"
 
       - name: Upload Release build artifact
