@@ -371,7 +371,7 @@ fi
 
 dnl Man page generation
 AC_ARG_ENABLE([man-pages],
-	[AS_HELP_STRING([--disable-man-pages], [do not generate and install man pages [default=auto]])],
+	[AS_HELP_STRING([--enable-man-pages], [generate and install man pages (requires doxygen) [default=auto]])],
 	[build_man_pages=$enableval],
 	[build_man_pages=auto])
 if test "x$build_man_pages" != xno; then
