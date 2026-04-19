@@ -369,6 +369,30 @@ if test "x$system_log_enabled" != xno; then
 	fi
 fi
 
+dnl Man page generation
+AC_ARG_ENABLE([man-pages],
+	[AS_HELP_STRING([--enable-man-pages], [generate and install man pages (requires doxygen) [default=auto]])],
+	[build_man_pages=$enableval],
+	[build_man_pages=auto])
+if test "x$build_man_pages" != xno; then
+	AC_PATH_PROG([DOXYGEN], [doxygen])
+	if test "x$DOXYGEN" = x; then
+		if test "x$build_man_pages" = xyes; then
+			AC_MSG_ERROR([doxygen is required for man page generation])
+		fi
+		build_man_pages=no
+	else
+		build_man_pages=yes
+	fi
+fi
+if test "x$build_man_pages" = xyes; then
+	AC_SUBST([GENERATE_MAN], [YES])
+	AC_SUBST([MAN_LINKS], [NO])
+else
+	AC_SUBST([GENERATE_MAN], [NO])
+	AC_SUBST([MAN_LINKS], [NO])
+fi
+
 dnl Examples build
 AC_ARG_ENABLE([examples-build],
 	[AS_HELP_STRING([--enable-examples-build], [build example applications [default=no]])],
@@ -383,6 +407,7 @@ AC_ARG_ENABLE([tests-build],
 
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != xno])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != xno])
+AM_CONDITIONAL([BUILD_MAN_PAGES], [test "x$build_man_pages" = xyes])
 AM_CONDITIONAL([BUILD_UMOCKDEV_TEST], [test "x$ac_have_umockdev" = xyes -a "x$log_enabled" != xno -a "x$debug_log_enabled" != xyes])
 AM_CONDITIONAL([CREATE_IMPORT_LIB], [test "x$create_import_lib" = xyes])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = xdarwin])

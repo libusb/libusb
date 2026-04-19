@@ -11,7 +11,7 @@ jobs:
       - name: setup prerequisites
         run: |
           sudo apt update
-          sudo apt install -y autoconf automake libtool libudev-dev m4 pkg-config clang llvm
+          sudo apt install -y autoconf automake libtool libudev-dev m4 pkg-config clang llvm doxygen
 
       - name: bootstrap
         run: ./bootstrap.sh
@@ -22,6 +22,19 @@ jobs:
 
       - name: udev
         run: .private/ci-build.sh --werror --build-dir build-udev -- --enable-udev
+
+      - name: Release build
+        run: |
+          mkdir build-release && cd build-release
+          ../configure --enable-udev --enable-man-pages
+          make -j$(nproc)
+          make install DESTDIR="$PWD/staging"
+
+      - name: Upload Release build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-release
+          path: build-release/staging/
 
       - name: debug-log
         run: .private/ci-build.sh --werror --build-dir build-debug -- --enable-debug-log
