@@ -387,7 +387,7 @@ if test "x$build_man_pages" != xno; then
 fi
 if test "x$build_man_pages" = xyes; then
 	AC_SUBST([GENERATE_MAN], [YES])
-	AC_SUBST([MAN_LINKS], [YES])
+	AC_SUBST([MAN_LINKS], [NO])
 else
 	AC_SUBST([GENERATE_MAN], [NO])
 	AC_SUBST([MAN_LINKS], [NO])
