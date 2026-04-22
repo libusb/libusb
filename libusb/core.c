@@ -728,8 +728,11 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	dev->session_data = session_id;
 	dev->speed = LIBUSB_SPEED_UNKNOWN;
 
-	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
-		usbi_connect_device(dev);
+	/* Note: the device is NOT added to ctx->usb_devs here. The caller
+	 * (backend) must call usbi_connect_device() after fully initializing
+	 * the device's private data. This prevents a concurrent
+	 * usbi_get_device_by_session_id() from finding a half-initialized
+	 * device. */
 
 	return dev;
 }
@@ -1327,8 +1330,27 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 	if (!dev)
 		return;
 
-	refcnt = usbi_atomic_dec(&dev->refcnt);
-	assert(refcnt >= 0);
+	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+		/* Non-hotplug path: the decrement and conditional list removal
+		 * must be atomic with respect to usbi_get_device_by_session_id(),
+		 * which searches the list and refs the device under the same lock.
+		 * Without this, a concurrent search could find a device whose
+		 * refcnt has already reached zero and hit the assert in
+		 * libusb_ref_device(). */
+		struct libusb_context *ctx = DEVICE_CTX(dev);
+
+		usbi_mutex_lock(&ctx->usb_devs_lock);
+		refcnt = usbi_atomic_dec(&dev->refcnt);
+		assert(refcnt >= 0);
+		if (refcnt == 0 && usbi_atomic_load(&dev->attached)) {
+			list_del(&dev->list);
+			usbi_atomic_store(&dev->attached, 0);
+		}
+		usbi_mutex_unlock(&ctx->usb_devs_lock);
+	} else {
+		refcnt = usbi_atomic_dec(&dev->refcnt);
+		assert(refcnt >= 0);
+	}
 
 	if (refcnt == 0) {
 		usbi_dbg(DEVICE_CTX(dev), "destroy device %d.%d", dev->bus_number, dev->device_address);
@@ -1337,12 +1359,6 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 
 		if (usbi_backend.destroy_device)
 			usbi_backend.destroy_device(dev);
-
-		if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG) &&
-		    usbi_atomic_load(&dev->attached)) {
-			/* backend does not support hotplug */
-			usbi_disconnect_device(dev);
-		}
 
 		for (int idx = 0; idx < LIBUSB_DEVICE_STRING_COUNT; ++idx) {
 			free(dev->device_strings_utf8[idx]);

@@ -642,6 +642,8 @@ val getDeviceList(libusb_context* ctx, discovered_devs** devs) {
 			// This can wrap around but it's the best approximation of a stable
 			// device address and port number we can provide.
 			dev->device_address = dev->port_number = (uint8_t)session_id;
+
+			usbi_connect_device(dev);
 		}
 		*devs = discovered_devs_append(*devs, dev);
 		libusb_unref_device(dev);
