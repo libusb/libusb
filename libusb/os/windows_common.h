@@ -254,6 +254,11 @@ struct winusb_device_priv {
 	char *dev_id;
 	char *path;  // device interface path
 	int sub_api; // for WinUSB-like APIs
+	usbi_mutex_t interface_lock; // protects usb_interface[] against concurrent
+	                             // claim/release/altsetting from different handles,
+	                             // and concurrent enumeration setup
+	                             // (set_composite_interface, set_hid_interface,
+	                             // and HUB_PASS/DEV_PASS in winusb_get_device_list)
 	struct {
 		char *path; // each interface needs a device interface path,
 		const struct windows_usb_api_backend *apib; // an API backend (multiple drivers support),

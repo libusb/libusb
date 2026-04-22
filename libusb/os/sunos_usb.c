@@ -627,6 +627,8 @@ sunos_add_devices(di_devlink_t link, void *arg)
 				usbi_dbg(NULL, "sanitize failed: ");
 				return (DI_WALK_TERMINATE);
 			}
+
+			usbi_connect_device(dev);
 		} else {
 			devpriv = usbi_get_device_priv(dev);
 			usbi_dbg(NULL, "Dev %s exists", devpriv->ugenpath);

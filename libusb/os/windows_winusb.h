@@ -179,6 +179,7 @@ static inline struct winusb_device_priv *winusb_device_priv_init(struct libusb_d
 	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
 	int i;
 
+	usbi_mutex_init(&priv->interface_lock);
 	priv->apib = &usb_api_backend[USB_API_UNSUPPORTED];
 	priv->sub_api = SUB_API_NOTSET;
 	for (i = 0; i < USB_MAXINTERFACES; i++) {
@@ -209,6 +210,7 @@ static inline void winusb_device_priv_release(struct libusb_device *dev)
 		free(priv->usb_interface[i].path);
 		free(priv->usb_interface[i].endpoint);
 	}
+	usbi_mutex_destroy(&priv->interface_lock);
 }
 
 // used to match a device driver (including filter drivers) against a supported API
