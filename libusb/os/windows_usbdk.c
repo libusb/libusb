@@ -341,6 +341,8 @@ static int usbdk_get_device_list(struct libusb_context *ctx, struct discovered_d
 				libusb_unref_device(dev);
 				continue;
 			}
+
+			usbi_connect_device(dev);
 		}
 
 		if (_discdevs) {

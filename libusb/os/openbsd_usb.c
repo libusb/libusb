@@ -200,6 +200,8 @@ obsd_get_device_list(struct libusb_context * ctx,
 					libusb_unref_device(dev);
 					continue;
 				}
+
+				usbi_connect_device(dev);
 			}
 
 			ddd = discovered_devs_append(*discdevs, dev);

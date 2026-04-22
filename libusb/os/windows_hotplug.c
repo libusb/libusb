@@ -158,6 +158,10 @@ static void windows_refresh_device_list(struct libusb_context *ctx)
 			else
 			{
 				usbi_detach_device(dev);
+				// No DEVICE_LEFT message is posted for uninitialized
+				// devices, so no message handler will drop the initial
+				// ref. We must drop it here to avoid a leak.
+				libusb_unref_device(dev);
 			}
 		}
 		else if (!priv->seen_before_scan)
