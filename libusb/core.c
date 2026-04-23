@@ -1836,8 +1836,13 @@ out:
 }
 
 /** \ingroup libusb_dev
- * Release an interface previously claimed with libusb_claim_interface(). You
- * should release all claimed interfaces before closing a device handle.
+ * Release an interface previously claimed with libusb_claim_interface(). If
+ * the device is still connected, you should release all claimed interfaces
+ * before closing a device handle. This step is not required, and not useful,
+ * for a device that has been disconnected (for example, when handling a
+ * \ref LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT event): the call will fail with
+ * \ref LIBUSB_ERROR_NO_DEVICE and the kernel/backend will have already
+ * released the interfaces associated with the disconnected device.
  *
  * This is a blocking function. A SET_INTERFACE control request will be sent
  * to the device, resetting interface state to the first alternate setting.
