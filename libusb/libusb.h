@@ -2345,7 +2345,8 @@ typedef enum {
 
 	/** A device has left and is no longer available.
 	 * It is the user's responsibility to call libusb_close on any handle associated with a disconnected device.
-	 * It is safe to call libusb_get_device_descriptor on a device that has left */
+	 * See \ref libusb_hotplug for the set of libusb functions that are safe to call
+	 * from within a LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT callback. */
 	LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT = (1 << 1)
 } libusb_hotplug_event;
 
