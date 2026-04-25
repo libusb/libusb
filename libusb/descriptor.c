@@ -246,6 +246,10 @@ static int parse_interface(libusb_context *ctx,
 				usbi_warn(ctx,
 					  "short extra intf desc read %d/%u",
 					  size, header->bLength);
+				/* Keep the invariant: bNumEndpoints > 0 implies
+				 * endpoint != NULL. The endpoint array isn't
+				 * allocated yet on this early return. */
+				ifp->bNumEndpoints = 0;
 				return parsed;
 			}
 
@@ -1376,7 +1380,7 @@ static int parse_iad_array(struct libusb_context *ctx,
 
 	/* First pass: Iterate through desc list, count number of IADs */
 	iad_array->length = 0;
-	while (consumed < size) {
+	while (size - consumed >= DESC_HEADER_LENGTH) {
 		header.bLength = buf[0];
 		header.bDescriptorType = buf[1];
 		if (header.bLength < DESC_HEADER_LENGTH) {
@@ -1384,9 +1388,9 @@ static int parse_iad_array(struct libusb_context *ctx,
 				 header.bLength);
 			return LIBUSB_ERROR_IO;
 		}
-		else if (header.bLength > size) {
+		else if (header.bLength > size - consumed) {
 			usbi_warn(ctx, "short config descriptor read %d/%u",
-					  size, header.bLength);
+					  size - consumed, header.bLength);
 			return LIBUSB_ERROR_IO;
 		}
 		if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION)
