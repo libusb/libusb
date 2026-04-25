@@ -8,12 +8,9 @@
 #include "winresrc.h"
 
 #include "version.h"
+#include "version_describe.h"
 #ifndef LIBUSB_VERSIONSTRING
-#define LU_STR(s) #s
-#define LU_XSTR(s) LU_STR(s)
-#define LIBUSB_VERSIONSTRING \
-	LU_XSTR(LIBUSB_MAJOR) "." LU_XSTR(LIBUSB_MINOR) "." \
-	LU_XSTR(LIBUSB_MICRO) "." LU_XSTR(LIBUSB_NANO) LIBUSB_RC "\0"
+#define LIBUSB_VERSIONSTRING LIBUSB_DESCRIBE "\0"
 #endif
 
 VS_VERSION_INFO VERSIONINFO

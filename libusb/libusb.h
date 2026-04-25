@@ -1206,13 +1206,27 @@ struct libusb_version {
 	/** Library micro version. */
 	uint16_t micro;
 
-	/** Library nano version. */
+	/** Library nano version. Deprecated: frozen since 1.0.30; use \ref
+	 * libusb_version::describe for a unique-per-build identifier. */
 	uint16_t nano;
 
 	/** Library release candidate suffix string, e.g. "-rc4". */
 	const char *rc;
 
-	/** For ABI compatibility only. */
+	/** Human-readable build identifier. Examples: "v1.0.30" (release),
+	 * "v1.0.30-42-g77503a7" (git build), "v1.0.30-42-g77503a7-dirty"
+	 * (git build with uncommitted changes), or "Unknown source (...)"
+	 * (built outside both a git checkout and a release tarball).
+	 *
+	 * Guarantees:
+	 *   - never NULL;
+	 *   - intended for display, logs and bug reports; the overall format
+	 *     is not stable, do not parse;
+	 *   - if the string does not start with "Unknown" and does not end
+	 *     with "-dirty", it is a valid revision identifier accepted by
+	 *     `git rev-parse` / `git checkout` against the libusb repository,
+	 *     allowing the exact source tree to be recovered.
+	 */
 	const char *describe;
 };
 
