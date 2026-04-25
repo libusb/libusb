@@ -2,6 +2,11 @@ AUTOMAKE_OPTIONS = subdir-objects
 
 AM_CFLAGS += -fvisibility=hidden $(THREAD_CFLAGS)
 AM_CXXFLAGS += -fvisibility=hidden $(THREAD_CFLAGS)
+# version_describe.h is generated into $(builddir)/libusb. libusb-1.0.rc
+# does `#include "version_describe.h"`, so the windres preprocessor must
+# search the build directory for it (out-of-tree builds otherwise fail
+# because the file lives outside the .rc's source dir).
+AM_RCFLAGS = --include-dir=$(top_builddir)/libusb
 
 lib_LTLIBRARIES = libusb-1.0.la
 
@@ -98,5 +103,21 @@ libusb_1_0_la_LDFLAGS = $(LT_LDFLAGS) $(EXTRA_LDFLAGS)
 libusb_1_0_la_SOURCES = libusbi.h version.h version_nano.h \
 	core.c descriptor.c hotplug.c io.c strerror.c sync.c \
 	$(PLATFORM_SRC) $(OS_SRC)
+
+# version_describe.h is regenerated on every build by build-aux/gen-describe.sh.
+# It only rewrites the file when its content changed, so unchanged builds
+# stay incremental. core.c and libusb-1.0.rc include it to populate the
+# `describe` field of struct libusb_version (and the Windows resource
+# version string respectively).
+BUILT_SOURCES = version_describe.h
+CLEANFILES = version_describe.h
+nodist_libusb_1_0_la_SOURCES = version_describe.h
+
+.PHONY: regen-version-describe
+regen-version-describe:
+	$(AM_V_GEN)$(SHELL) $(top_srcdir)/build-aux/gen-describe.sh \
+		$(top_srcdir) $(builddir)/version_describe.h
+
+version_describe.h: regen-version-describe
 
 pkginclude_HEADERS = libusb.h

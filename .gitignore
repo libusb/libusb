@@ -34,6 +34,8 @@ config.status
 config.sub
 *.swp
 doxygen.cfg
+libusb/version_describe.h
+.tarball-version
 examples/listdevs
 examples/xusb
 examples/dpfp

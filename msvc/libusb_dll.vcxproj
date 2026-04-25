@@ -19,6 +19,10 @@
     <TargetName>libusb-1.0</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup>
+    <PreBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(SolutionDir)..\build-aux\gen-describe.ps1" "$(SolutionDir).." "$(SolutionDir)..\libusb\version_describe.h"</Command>
+      <Message>Generating version_describe.h</Message>
+    </PreBuildEvent>
     <Link>
       <EmbedManagedResourceFile>libusb-1.0.rc;%(EmbedManagedResourceFile)</EmbedManagedResourceFile>
       <ModuleDefinitionFile>..\libusb\libusb-1.0.def</ModuleDefinitionFile>
@@ -47,6 +51,7 @@
     <ClInclude Include="..\libusb\os\threads_windows.h" />
     <ClInclude Include="..\libusb\version.h" />
     <ClInclude Include="..\libusb\version_nano.h" />
+    <ClInclude Include="..\libusb\version_describe.h" />
     <ClInclude Include="..\libusb\os\windows_common.h" />
     <ClInclude Include="..\libusb\os\windows_usbdk.h" />
     <ClInclude Include="..\libusb\os\windows_winusb.h" />

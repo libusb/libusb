@@ -22,4 +22,7 @@ For copyright reasons it is preferable to have your full name in the
 commit author field. Do not update the AUTHOR file yourself, the
 maintainers will update it as part of the release preparation.
 
-Please don't touch version_nano.h in your patches or pull requests.
+Unique-per-build identification is provided by the LIBUSB_DESCRIBE
+string (see struct libusb_version::describe), generated from
+`git describe --tags --always --dirty` at build time. Contributors do
+not need to touch any version file in their patches or pull requests.

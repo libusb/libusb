@@ -28,6 +28,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+        with:
+          # Full history + tags so the MSVC PreBuildEvent's call to
+          # build-aux/gen-describe.cmd can produce a tag-prefixed
+          # `git describe` string.
+          fetch-depth: 0
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v1.3

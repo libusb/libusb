@@ -19,6 +19,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history + tags so build-aux/gen-describe.sh can produce a
+          # tag-prefixed describe string.
+          fetch-depth: 0
 
       - name: Show ANDROID_NDK_ROOT
         run: |

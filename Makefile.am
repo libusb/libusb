@@ -1,7 +1,8 @@
 AUTOMAKE_OPTIONS = dist-bzip2 no-dist-gzip
 ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = INSTALL_WIN.txt PORTING doc/libusb.png \
-	     android msvc Xcode
+	     android msvc Xcode \
+	     build-aux/gen-describe.sh build-aux/gen-describe.ps1
 SUBDIRS = libusb
 
 if BUILD_EXAMPLES
@@ -27,6 +28,9 @@ clean-local:
 # Use dist-hook to accomplish the following things for the dist recipe:
 #   1) Remove the GitHub Markdown from the README file
 #   2) Remove the .gitattributes file from the msvc directory
+#   3) Freeze the git-describe output into .tarball-version so that builds
+#      from the resulting tarball produce a stable, reproducible
+#      LIBUSB_DESCRIBE string without needing git at build time.
 dist-hook:
 	chmod u+w $(distdir)/README $(distdir)/msvc
 	$(SED) -i.orig -e '/Build Status/d' $(distdir)/README
@@ -34,6 +38,13 @@ dist-hook:
 	$(SED) -i.orig -e 's/\[\([A-Z]*\)\](\1)/\1/' $(distdir)/README
 	rm -f $(distdir)/README.orig
 	rm -f $(distdir)/msvc/.gitattributes
+	@if test -e "$(top_srcdir)/.git"; then \
+		git -C "$(top_srcdir)" describe --tags --always --dirty \
+			> $(distdir)/.tarball-version || \
+			rm -f $(distdir)/.tarball-version; \
+	elif test -f "$(top_srcdir)/.tarball-version"; then \
+		cp "$(top_srcdir)/.tarball-version" $(distdir)/.tarball-version; \
+	fi
 
 reldir = .release/$(distdir)
 sfurl = frs.sourceforge.net:/home/frs/project/libusb/libusb-1.0
