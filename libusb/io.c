@@ -1,10 +1,9 @@
 /* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * I/O functions for libusb
- * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
- * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
- * Copyright © 2019-2022 Nathan Hjelm <hjelmn@cs.unm.edu>
- * Copyright © 2019-2022 Google LLC. All rights reserved.
+ *
+ * SPDX-FileCopyrightText: © 2007-2009 Daniel Drake, 2001 Johannes Erdfelt, 2019-2022 Nathan Hjelm, 2019-2022 Google LLC.
+ * SPDX-License-Identifier: LGPL-2.1+
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

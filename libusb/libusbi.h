@@ -1,10 +1,8 @@
 /*
  * Internal header for libusb
- * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
- * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
- * Copyright © 2019 Nathan Hjelm <hjelmn@cs.umm.edu>
- * Copyright © 2019-2020 Google LLC. All rights reserved.
- * Copyright © 2020 Chris Dickens <christopher.a.dickens@gmail.com>
+ *
+ * SPDX-FileCopyrightText: © 2007-2009 Daniel Drake, 2001 Johannes Erdfelt, 2019 Nathan Hjelm, 2019-2020 Google LLC., 2020 Chris Dickens
+ * SPDX-License-Identifier: LGPL-2.1+
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

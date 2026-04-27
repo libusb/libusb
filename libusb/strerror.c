@@ -1,6 +1,8 @@
 /*
  * libusb strerror code
- * Copyright © 2013 Hans de Goede <hdegoede@redhat.com>
+ *
+ * SPDX-FileCopyrightText: © 2013 Hans de Goede
+ * SPDX-License-Identifier: LGPL-2.1+
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

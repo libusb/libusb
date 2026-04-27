@@ -1,8 +1,9 @@
 /* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:8 -*- */
 /*
  * Hotplug functions for libusb
- * Copyright © 2012-2021 Nathan Hjelm <hjelmn@mac.com>
- * Copyright © 2012-2013 Peter Stuge <peter@stuge.se>
+ *
+ * SPDX-FileCopyrightText: © 2012-2021 Nathan Hjelm, 2012-2013 Peter Stuge
+ * SPDX-License-Identifier: LGPL-2.1+
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
