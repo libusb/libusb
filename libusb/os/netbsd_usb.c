@@ -171,6 +171,8 @@ netbsd_get_device_list(struct libusb_context * ctx,
 
 			if ((err = usbi_sanitize_device(dev)))
 				goto error;
+
+			usbi_connect_device(dev);
 		}
 		close(fd);
 

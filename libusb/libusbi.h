@@ -1002,7 +1002,9 @@ struct usbi_os_backend {
 	 * this point, you should be ready to provide device descriptors and so
 	 * on through the get_*_descriptor functions. Finally, call
 	 * usbi_sanitize_device() to perform some final sanity checks on the
-	 * device. Assuming all of the above succeeded, we can now continue.
+	 * device. Assuming all of the above succeeded, call
+	 * usbi_connect_device() to add the device to the context's device list
+	 * and make it discoverable by usbi_get_device_by_session_id().
 	 * If any of the above failed, remember to unreference the device that
 	 * was returned by usbi_alloc_device().
 	 *
