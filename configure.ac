@@ -89,6 +89,12 @@ case $host in
 	backend=windows
 	threads=posix
 	;;
+*-qnx* | *-nto*)
+	AC_MSG_RESULT([QNX])
+	backend=qnx
+	poll=posix
+	threads=posix
+	;;
 *-haiku*)
 	AC_MSG_RESULT([Haiku])
 	backend=haiku
@@ -170,6 +176,12 @@ netbsd)
 	AC_CHECK_HEADERS([poll.h])
 	AC_DEFINE([POLL_NFDS_TYPE],[nfds_t],[type of second poll() argument])
 	;;
+qnx)
+	AC_DEFINE(OS_QNX, 1, [QNX backend])
+	AC_SUBST(OS_QNX)
+	AC_CHECK_HEADERS([poll.h])
+	AC_DEFINE([POLL_NFDS_TYPE],[int],[type of second poll() argument])
+	;;
 windows)
 	AC_DEFINE(OS_WINDOWS, 1, [Windows backend])
 	AC_SUBST(OS_WINDOWS)
@@ -196,6 +208,7 @@ AM_CONDITIONAL(OS_OPENBSD, test "x$backend" = xopenbsd)
 AM_CONDITIONAL(OS_SUNOS, test "x$backend" = xsunos)
 AM_CONDITIONAL(OS_NETBSD, test "x$backend" = xnetbsd)
 AM_CONDITIONAL(OS_WINDOWS, test "x$backend" = xwindows)
+AM_CONDITIONAL(OS_QNX, test "x$backend" = xqnx)
 AM_CONDITIONAL(OS_HAIKU, test "x$backend" = xhaiku)
 AM_CONDITIONAL(THREADS_POSIX, test "x$threads" = xposix)
 AM_CONDITIONAL(CREATE_IMPORT_LIB, test "x$create_import_lib" = xyes)

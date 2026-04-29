@@ -21,7 +21,7 @@
  */
 
 #include "config.h"
-
+#include <unistd.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
