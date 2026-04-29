@@ -86,3 +86,20 @@ xcuserdata
 build/
 tags
 cscope.out
+
+# Claude Code: commit shared config/memory, ignore local-only artifacts
+.claude/settings.local.json
+.claude/*.local.*
+.claude/**/*.local.*
+.claude/cache/
+.claude/logs/
+.claude/sessions/
+.claude/transcripts/
+.claude/tmp/
+.claude/worktrees/
+CLAUDE.local.md
+
+# Git worktrees (e.g. Claude Code isolation worktrees, local dev worktrees)
+worktrees/
+.worktrees/
+.git-worktrees/
