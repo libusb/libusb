@@ -61,24 +61,41 @@ Windows (https://gitforwindows.org/) or put bash.exe on PATH.
 $scriptDir = Split-Path -Parent $PSCommandPath
 $shScript  = Join-Path $scriptDir 'gen-describe.sh'
 
-# Convert a Windows path (`D:\_Projects\C++\libusb\...` or
-# `D:/_Projects/C++/libusb/...`) to MSYS / Git Bash form
-# (`/d/_Projects/C++/libusb/...`). Git Bash does not recognise drive
-# letters in argv: with backslashes it silently strips them as escape
-# characters, and with forward slashes it treats `D:/...` as a relative
-# path under a directory literally named `D:` (see issue #1815). The
-# `/<drive>/<rest>` form is what MSYS expects internally and works for
-# all downstream operations in gen-describe.sh (`git -C`, `mkdir -p`,
-# `mv -f`, ...).
-function ConvertTo-MsysPath {
-    param([Parameter(Mandatory)] [string] $Path)
-    $abs = [System.IO.Path]::GetFullPath($Path)
-    if ($abs -match '^([A-Za-z]):[\\/](.*)$') {
-        $drive = $Matches[1].ToLowerInvariant()
-        $rest  = $Matches[2] -replace '\\', '/'
-        return "/$drive/$rest"
+# Locate cygpath.exe (ships with Git for Windows / MSYS2 next to bash).
+# Used to convert Windows paths to MSYS form (`D:\_Projects\...` or
+# `D:/_Projects/...` -> `/d/_Projects/...`); Git Bash does not recognise
+# drive letters in argv otherwise (see issue #1815). If cygpath is not
+# available we fall back to the pre-#1815 behaviour of passing the raw
+# Windows paths to bash, which matches how this launcher worked when
+# CI on the libusb runners was already passing.
+function Find-Cygpath {
+    param([string] $BashPath)
+    $bashDir = Split-Path -Parent $BashPath
+    $parent  = Split-Path -Parent $bashDir
+    $candidates = @(
+        (Join-Path $bashDir 'cygpath.exe'),
+        (Join-Path $parent  'bin\cygpath.exe'),
+        (Join-Path $parent  'usr\bin\cygpath.exe')
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path -LiteralPath $c) { return $c }
     }
-    return ($abs -replace '\\', '/')
+    $cmd = Get-Command -Name 'cygpath.exe' -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Path }
+    return $null
+}
+
+$cygpath = Find-Cygpath -BashPath $bash
+if ($cygpath) {
+    Write-Host "gen-describe.ps1: using cygpath at $cygpath to convert paths to MSYS form"
+    # `cygpath -u path1 path2 path3` emits one MSYS path per line.
+    $bashArgs = @(& $cygpath -u $shScript $SrcDir $Out)
+    Write-Host ("gen-describe.ps1:   script  : {0} -> {1}" -f $shScript, $bashArgs[0])
+    Write-Host ("gen-describe.ps1:   srcdir  : {0} -> {1}" -f $SrcDir,   $bashArgs[1])
+    Write-Host ("gen-describe.ps1:   out     : {0} -> {1}" -f $Out,      $bashArgs[2])
+} else {
+    Write-Host "gen-describe.ps1: cygpath not found next to bash ($bash); passing raw paths"
+    $bashArgs = @($shScript, $SrcDir, $Out)
 }
 
 # Cross-process serialization: when msbuild runs projects in parallel
@@ -88,7 +105,7 @@ function ConvertTo-MsysPath {
 $mutex = New-Object System.Threading.Mutex($false, "Global\libusb-gen-describe")
 try {
     [void] $mutex.WaitOne()
-    & $bash (ConvertTo-MsysPath $shScript) (ConvertTo-MsysPath $SrcDir) (ConvertTo-MsysPath $Out)
+    & $bash $bashArgs[0] $bashArgs[1] $bashArgs[2]
     $rc = $LASTEXITCODE
 } finally {
     $mutex.ReleaseMutex()
