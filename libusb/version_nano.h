@@ -1,6 +1,8 @@
-/* Deprecated: LIBUSB_NANO is frozen since 1.0.30. Use the LIBUSB_DESCRIBE
- * string exposed via struct libusb_version::describe for a unique-per-build
- * identifier. The macro is kept at its last value to preserve the ABI of the
- * `nano` field in struct libusb_version and to avoid breaking downstream
- * users that currently #ifdef LIBUSB_NANO. */
+/* LIBUSB_NANO is the per-commit version counter, bumped by the
+ * maintainer pre-commit hook (.private/pre-commit.sh). It is a
+ * candidate to be frozen and eventually deprecated once the
+ * LIBUSB_DESCRIBE identifier (see struct libusb_version::describe)
+ * has been through at least one release and developers agree to
+ * retire it. Until then it remains active and downstream users that
+ * currently #ifdef LIBUSB_NANO continue to work as before. */
 #define LIBUSB_NANO 12029
