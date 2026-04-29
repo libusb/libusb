@@ -68,7 +68,12 @@ $shScript  = Join-Path $scriptDir 'gen-describe.sh'
 $mutex = New-Object System.Threading.Mutex($false, "Global\libusb-gen-describe")
 try {
     [void] $mutex.WaitOne()
-    & $bash $shScript $SrcDir $Out
+    # Pass forward-slash paths to bash. Git Bash on Windows treats
+    # backslashes as escape characters in argv, which silently mangles
+    # paths like `D:\_Projects\C++\libusb\...` into
+    # `D:_ProjectsC++libusb...` (see issue #1815). Forward-slash paths
+    # are accepted by both Git Bash and the Win32 file APIs.
+    & $bash ($shScript -replace '\\','/') ($SrcDir -replace '\\','/') ($Out -replace '\\','/')
     $rc = $LASTEXITCODE
 } finally {
     $mutex.ReleaseMutex()
