@@ -61,6 +61,26 @@ Windows (https://gitforwindows.org/) or put bash.exe on PATH.
 $scriptDir = Split-Path -Parent $PSCommandPath
 $shScript  = Join-Path $scriptDir 'gen-describe.sh'
 
+# Convert a Windows path (`D:\_Projects\C++\libusb\...` or
+# `D:/_Projects/C++/libusb/...`) to MSYS / Git Bash form
+# (`/d/_Projects/C++/libusb/...`). Git Bash does not recognise drive
+# letters in argv: with backslashes it silently strips them as escape
+# characters, and with forward slashes it treats `D:/...` as a relative
+# path under a directory literally named `D:` (see issue #1815). The
+# `/<drive>/<rest>` form is what MSYS expects internally and works for
+# all downstream operations in gen-describe.sh (`git -C`, `mkdir -p`,
+# `mv -f`, ...).
+function ConvertTo-MsysPath {
+    param([Parameter(Mandatory)] [string] $Path)
+    $abs = [System.IO.Path]::GetFullPath($Path)
+    if ($abs -match '^([A-Za-z]):[\\/](.*)$') {
+        $drive = $Matches[1].ToLowerInvariant()
+        $rest  = $Matches[2] -replace '\\', '/'
+        return "/$drive/$rest"
+    }
+    return ($abs -replace '\\', '/')
+}
+
 # Cross-process serialization: when msbuild runs projects in parallel
 # (`/m`), libusb_dll and libusb_static both fire this PreBuildEvent at
 # roughly the same time and would otherwise race on the output file.
@@ -68,12 +88,7 @@ $shScript  = Join-Path $scriptDir 'gen-describe.sh'
 $mutex = New-Object System.Threading.Mutex($false, "Global\libusb-gen-describe")
 try {
     [void] $mutex.WaitOne()
-    # Pass forward-slash paths to bash. Git Bash on Windows treats
-    # backslashes as escape characters in argv, which silently mangles
-    # paths like `D:\_Projects\C++\libusb\...` into
-    # `D:_ProjectsC++libusb...` (see issue #1815). Forward-slash paths
-    # are accepted by both Git Bash and the Win32 file APIs.
-    & $bash ($shScript -replace '\\','/') ($SrcDir -replace '\\','/') ($Out -replace '\\','/')
+    & $bash (ConvertTo-MsysPath $shScript) (ConvertTo-MsysPath $SrcDir) (ConvertTo-MsysPath $Out)
     $rc = $LASTEXITCODE
 } finally {
     $mutex.ReleaseMutex()
