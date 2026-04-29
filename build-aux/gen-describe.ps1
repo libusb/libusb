@@ -5,21 +5,28 @@
 
 .DESCRIPTION
     The MSVC PreBuildEvent invokes this script. It locates a `bash.exe`
-    bundled with Git for Windows (the de-facto git distribution on
-    Windows), then delegates the actual logic to gen-describe.sh, so the
-    .sh remains the single source of truth across all supported build
-    systems.
+    bundled with Git for Windows or MSYS2, then delegates the actual
+    logic to gen-describe.sh, so the .sh remains the single source of
+    truth across all supported build systems.
 
-    Search order for bash:
-      1. bash.exe on PATH (covers users who explicitly added Git's bin
-         directory; PowerShell, MSYS2, Cygwin, etc.).
-      2. `bash.exe` next to the resolved git.exe (Git for Windows
-         installed with the "Git Bash Here" option puts both in the
-         same `bin\` directory).
-      3. `bin\bash.exe` and `usr\bin\bash.exe` relative to the parent
-         of git.exe's directory (covers the default Git for Windows
-         layout where git.exe lives in `cmd\` and bash.exe in `bin\`
-         or `usr\bin\`).
+    The launcher must pick a *consistent* bash + cygpath pair from one
+    install: cygpath converts Windows paths to MSYS form
+    (`D:\foo` -> `/d/foo`), and bash must understand that mount table.
+    Mixing e.g. MSYS2's cygpath with Windows' WSL `bash.exe` produces
+    `/d/...` paths that the chosen bash cannot resolve (see #1815).
+
+    Search order:
+      1. Git for Windows: locate `git.exe` and look for sibling
+         `bash.exe` + `cygpath.exe` under `bin\` or `usr\bin\`.
+      2. Any non-WSL `bash.exe` on PATH whose install dir contains a
+         sibling `cygpath.exe`.
+      3. Any non-WSL `bash.exe` on PATH (without cygpath) - falls back
+         to passing raw Windows paths, the pre-#1815 behaviour.
+      4. Git for Windows bash without cygpath - same fallback.
+
+    `C:\Windows\System32\bash.exe` (the WSL launcher) is always
+    skipped because its `/d/...` namespace is the WSL rootfs, not the
+    Windows D: drive.
 #>
 param(
     [Parameter(Mandatory = $true, Position = 0)] [string] $SrcDir,
@@ -28,73 +35,95 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Find-Bash {
-    $cmd = Get-Command -Name 'bash.exe' -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Path }
+$WslBash = Join-Path $env:WINDIR 'System32\bash.exe'
 
+function Pair-If-Exists {
+    param([string] $Bash)
+    if (-not $Bash) { return $null }
+    if (-not (Test-Path -LiteralPath $Bash)) { return $null }
+    if ($Bash -ieq $WslBash) { return $null }
+    $bashDir = Split-Path -Parent $Bash
+    $parent  = Split-Path -Parent $bashDir
+    foreach ($c in @(
+        (Join-Path $bashDir 'cygpath.exe'),
+        (Join-Path $parent  'bin\cygpath.exe'),
+        (Join-Path $parent  'usr\bin\cygpath.exe'))) {
+        if (Test-Path -LiteralPath $c) {
+            return @{ Bash = $Bash; Cygpath = $c }
+        }
+    }
+    return @{ Bash = $Bash; Cygpath = $null }
+}
+
+function Find-BashAndCygpath {
+    # Priority 1: Git for Windows next to git.exe (prefer paired).
     $git = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue
-    if (-not $git) {
-        return $null
+    $gitBashCandidates = @()
+    if ($git) {
+        $gitDir = Split-Path -Parent $git.Path
+        $parent = Split-Path -Parent $gitDir
+        $gitBashCandidates = @(
+            (Join-Path $gitDir 'bash.exe'),
+            (Join-Path $parent  'bin\bash.exe'),
+            (Join-Path $parent  'usr\bin\bash.exe')
+        )
+        foreach ($b in $gitBashCandidates) {
+            $p = Pair-If-Exists $b
+            if ($p -and $p.Cygpath) { return $p }
+        }
     }
-    $gitDir = Split-Path -Parent $git.Path
-    $parent = Split-Path -Parent $gitDir
-    $candidates = @(
-        (Join-Path $gitDir 'bash.exe'),
-        (Join-Path $parent  'bin\bash.exe'),
-        (Join-Path $parent  'usr\bin\bash.exe')
+
+    # Priority 2: any non-WSL bash on PATH whose install has cygpath.
+    $pathBashes = @(
+        Get-Command -Name 'bash.exe' -All -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.Path }
     )
-    foreach ($c in $candidates) {
-        if (Test-Path -LiteralPath $c) { return $c }
+    foreach ($b in $pathBashes) {
+        $p = Pair-If-Exists $b
+        if ($p -and $p.Cygpath) { return $p }
     }
+
+    # Priority 3: non-WSL bash on PATH without cygpath (raw-path fallback).
+    foreach ($b in $pathBashes) {
+        $p = Pair-If-Exists $b
+        if ($p) { return $p }
+    }
+
+    # Priority 4: Git for Windows bash without cygpath sibling.
+    foreach ($b in $gitBashCandidates) {
+        $p = Pair-If-Exists $b
+        if ($p) { return $p }
+    }
+
     return $null
 }
 
-$bash = Find-Bash
-if (-not $bash) {
+$found = Find-BashAndCygpath
+if (-not $found) {
     Write-Error @"
-gen-describe.ps1: could not locate bash.exe.
-Looked on PATH and next to git.exe (Git for Windows). Install Git for
-Windows (https://gitforwindows.org/) or put bash.exe on PATH.
+gen-describe.ps1: could not locate a usable bash.exe.
+Looked next to git.exe (Git for Windows) and on PATH (excluding the
+WSL launcher at $WslBash). Install Git for Windows
+(https://gitforwindows.org/) or put a non-WSL bash.exe on PATH.
 "@
 }
+$bash    = $found.Bash
+$cygpath = $found.Cygpath
+
+Write-Host "gen-describe.ps1: using bash $bash"
 
 $scriptDir = Split-Path -Parent $PSCommandPath
 $shScript  = Join-Path $scriptDir 'gen-describe.sh'
 
-# Locate cygpath.exe (ships with Git for Windows / MSYS2 next to bash).
-# Used to convert Windows paths to MSYS form (`D:\_Projects\...` or
-# `D:/_Projects/...` -> `/d/_Projects/...`); Git Bash does not recognise
-# drive letters in argv otherwise (see issue #1815). If cygpath is not
-# available we fall back to the pre-#1815 behaviour of passing the raw
-# Windows paths to bash, which matches how this launcher worked when
-# CI on the libusb runners was already passing.
-function Find-Cygpath {
-    param([string] $BashPath)
-    $bashDir = Split-Path -Parent $BashPath
-    $parent  = Split-Path -Parent $bashDir
-    $candidates = @(
-        (Join-Path $bashDir 'cygpath.exe'),
-        (Join-Path $parent  'bin\cygpath.exe'),
-        (Join-Path $parent  'usr\bin\cygpath.exe')
-    )
-    foreach ($c in $candidates) {
-        if (Test-Path -LiteralPath $c) { return $c }
-    }
-    $cmd = Get-Command -Name 'cygpath.exe' -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Path }
-    return $null
-}
-
-$cygpath = Find-Cygpath -BashPath $bash
 if ($cygpath) {
-    Write-Host "gen-describe.ps1: using cygpath at $cygpath to convert paths to MSYS form"
+    Write-Host "gen-describe.ps1: using cygpath $cygpath to convert paths to MSYS form"
     # `cygpath -u path1 path2 path3` emits one MSYS path per line.
     $bashArgs = @(& $cygpath -u $shScript $SrcDir $Out)
     Write-Host ("gen-describe.ps1:   script  : {0} -> {1}" -f $shScript, $bashArgs[0])
     Write-Host ("gen-describe.ps1:   srcdir  : {0} -> {1}" -f $SrcDir,   $bashArgs[1])
     Write-Host ("gen-describe.ps1:   out     : {0} -> {1}" -f $Out,      $bashArgs[2])
 } else {
-    Write-Host "gen-describe.ps1: cygpath not found next to bash ($bash); passing raw paths"
+    Write-Host "gen-describe.ps1: no cygpath sibling found for $bash; passing raw paths"
     $bashArgs = @($shScript, $SrcDir, $Out)
 }
 
