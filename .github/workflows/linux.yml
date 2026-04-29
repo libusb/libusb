@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - name: setup prerequisites
         run: |
@@ -29,7 +29,7 @@ jobs:
       - name: disable-log
         run: .private/ci-build.sh --werror --build-dir build-nolog -- --disable-log
 
-      - uses: mymindstorm/setup-emsdk@v13
+      - uses: mymindstorm/setup-emsdk@v16
 
       - run: npm ci
         working-directory: tests/webusb-test-shim

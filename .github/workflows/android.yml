@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Show ANDROID_NDK_ROOT
         run: |
@@ -47,7 +47,7 @@ jobs:
           file "${NDK_LIBS_DIR}/"* || true
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: libusb-android-${{ matrix.abi }}-api${{ matrix.api }}
           path: |

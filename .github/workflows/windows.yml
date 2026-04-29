@@ -27,17 +27,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v1.3
+        uses: microsoft/setup-msbuild@v3
 
       - name: Build solution
         run: |
           msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }} -property:Platform=${{ matrix.architecture }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-${{ matrix.os }}-${{ matrix.configuration }}-${{ matrix.architecture }}
           path: |
