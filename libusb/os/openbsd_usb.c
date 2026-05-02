@@ -80,7 +80,7 @@ static int _sync_control_transfer(struct usbi_transfer *);
 static int _sync_gen_transfer(struct usbi_transfer *);
 static int _access_endpoint(struct libusb_transfer *);
 
-static int _bus_open(int);
+static int _bus_open(struct libusb_context *, int);
 
 
 const struct usbi_os_backend usbi_backend = {
@@ -135,9 +135,13 @@ obsd_get_device_list(struct libusb_context * ctx,
 		snprintf(busnode, sizeof(busnode), USBDEV "%d", i);
 
 		if ((fd = open(busnode, O_RDWR)) < 0) {
-			if (errno != ENOENT && errno != ENXIO)
+			if ((errno == ENOENT) || (errno == ENXIO)) {
+				continue;
+			}
+			if ((fd = open(busnode, O_RDONLY)) < 0) {
 				usbi_err(ctx, "could not open %s", busnode);
-			continue;
+				continue;
+			}
 		}
 
 		bzero(devices, sizeof(devices));
@@ -236,8 +240,15 @@ obsd_open(struct libusb_device_handle *handle)
 		snprintf(devnode, sizeof(devnode), DEVPATH "%s.00",
 		    dpriv->devname);
 		fd = open(devnode, O_RDWR);
-		if (fd < 0)
-			return _errno_to_libusb(errno);
+		if (fd < 0) {
+			if (errno != EPERM) {
+				return _errno_to_libusb(errno);
+			}
+			fd = open(devnode, O_RDONLY);
+			if (fd < 0) {
+				return _errno_to_libusb(errno);
+			}
+		}
 		dpriv->fd = fd;
 
 		usbi_dbg(HANDLE_CTX(handle), "open %s: fd %d", devnode, dpriv->fd);
@@ -281,7 +292,7 @@ obsd_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
 	struct usb_device_fdesc udf;
 	int fd, err;
 
-	if ((fd = _bus_open(dev->bus_number)) < 0)
+	if ((fd = _bus_open(DEVICE_CTX(dev), dev->bus_number)) < 0)
 		return _errno_to_libusb(errno);
 
 	udf.udf_bus = dev->bus_number;
@@ -388,7 +399,7 @@ obsd_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 	struct usb_ctl_request req;
 	int fd, err;
 
-	if ((fd = _bus_open(handle->dev->bus_number)) < 0)
+	if ((fd = _bus_open(HANDLE_CTX(handle), handle->dev->bus_number)) < 0)
 		return _errno_to_libusb(errno);
 
 	usbi_dbg(HANDLE_CTX(handle), " ");
@@ -511,7 +522,7 @@ _cache_active_config_descriptor(struct libusb_device *dev)
 	void *buf;
 	int fd, len, err;
 
-	if ((fd = _bus_open(dev->bus_number)) < 0)
+	if ((fd = _bus_open(DEVICE_CTX(dev), dev->bus_number)) < 0)
 		return _errno_to_libusb(errno);
 
 	usbi_dbg(DEVICE_CTX(dev), "fd %d, addr %d", fd, dev->device_address);
@@ -593,7 +604,9 @@ _sync_control_transfer(struct usbi_transfer *itransfer)
 		 */
 		int fd, err;
 
-		if ((fd = _bus_open(transfer->dev_handle->dev->bus_number)) < 0)
+
+		if ((fd = _bus_open(ITRANSFER_CTX(itransfer),
+				transfer->dev_handle->dev->bus_number)) < 0)
 			return _errno_to_libusb(errno);
 
 		if (ioctl(fd, USB_REQUEST, &req) < 0) {
@@ -692,11 +705,23 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 }
 
 int
-_bus_open(int number)
+_bus_open(struct libusb_context * ctx, int number)
 {
 	char busnode[16];
 
 	snprintf(busnode, sizeof(busnode), USBDEV "%d", number);
+	int fd;
 
-	return open(busnode, O_RDWR);
+	fd = open(busnode, O_RDWR);
+	if (fd < 0) {
+		if (errno != EPERM) {
+			usbi_err(ctx, "could not open %s", busnode);
+			return fd;
+		}
+		fd = open(busnode, O_RDONLY);
+		if (fd < 0) {
+			usbi_err(ctx, "could not open %s", busnode);
+		}
+	}
+	return fd;
 }
