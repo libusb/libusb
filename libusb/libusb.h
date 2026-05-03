@@ -5,6 +5,9 @@
  * Copyright © 2012 Pete Batard <pete@akeo.ie>
  * Copyright © 2012-2023 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2014-2020 Chris Dickens <christopher.a.dickens@gmail.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1+
+ *
  * For more information, please visit: https://libusb.info
  *
  * This library is free software; you can redistribute it and/or

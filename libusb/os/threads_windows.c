@@ -4,6 +4,8 @@
  * Copyright © 2010 Michael Plante <michael.plante@gmail.com>
  * Copyright © 2020 Chris Dickens <christopher.a.dickens@gmail.com>
  *
+ * SPDX-License-Identifier: LGPL-2.1+
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either

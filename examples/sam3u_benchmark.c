@@ -2,6 +2,8 @@
  * libusb example program to measure Atmel SAM3U isochronous performance
  * Copyright (C) 2012 Harald Welte <laforge@gnumonks.org>
  *
+ * SPDX-License-Identifier: LGPL-2.1+
+ *
  * Copied with the author's permission under LGPL-2.1 from
  * http://git.gnumonks.org/cgi-bin/gitweb.cgi?p=sam3u-tests.git;a=blob;f=usb-benchmark-project/host/benchmark.c;h=74959f7ee88f1597286cd435f312a8ff52c56b7e
  *

@@ -4,6 +4,8 @@
  * Copyright © 2016 Nathan Hjelm <hjelmn@mac.com>
  * Copyright © 2020 Chris Dickens <christopher.a.dickens@gmail.com>
  *
+ * SPDX-License-Identifier: LGPL-2.1+
+ *
  * Basic image capture program only, does not consider the powerup quirks or
  * the fact that image encryption may be enabled. Not expected to work
  * flawlessly all of the time.
