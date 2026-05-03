@@ -946,26 +946,34 @@ static int darwin_init(struct libusb_context *ctx) {
 
 static void darwin_exit (struct libusb_context *ctx) {
   UNUSED(ctx);
+  bool last_exit = false;
 
   usbi_mutex_lock(&darwin_cached_devices_mutex);
-  if (0 == --init_count) {
-    /* stop the event runloop and wait for the thread to terminate. */
-    usbi_mutex_lock (&libusb_darwin_at_mutex);
-    if (NULL != libusb_darwin_acfls) {
-      CFRunLoopSourceSignal (libusb_darwin_acfls);
-      CFRunLoopWakeUp (libusb_darwin_acfl);
-      while (libusb_darwin_acfl)
-        usbi_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
-    }
+  last_exit = (0 == --init_count);
+  usbi_mutex_unlock(&darwin_cached_devices_mutex);
 
-    if (libusb_darwin_at_started) {
-      pthread_join (libusb_darwin_at, NULL);
-      libusb_darwin_at_started = false;
-    }
-    usbi_mutex_unlock (&libusb_darwin_at_mutex);
+  if (!last_exit)
+    return;
 
-    darwin_cleanup_devices ();
+  /* Stop the event runloop and wait for the thread to terminate.
+   * Do not hold darwin_cached_devices_mutex while waiting, since hotplug
+   * callbacks can take that mutex and would deadlock on shutdown. */
+  usbi_mutex_lock (&libusb_darwin_at_mutex);
+  if (NULL != libusb_darwin_acfls) {
+    CFRunLoopSourceSignal (libusb_darwin_acfls);
+    CFRunLoopWakeUp (libusb_darwin_acfl);
+    while (libusb_darwin_acfl)
+      usbi_cond_wait (&libusb_darwin_at_cond, &libusb_darwin_at_mutex);
   }
+
+  if (libusb_darwin_at_started) {
+    pthread_join (libusb_darwin_at, NULL);
+    libusb_darwin_at_started = false;
+  }
+  usbi_mutex_unlock (&libusb_darwin_at_mutex);
+
+  usbi_mutex_lock(&darwin_cached_devices_mutex);
+  darwin_cleanup_devices ();
   usbi_mutex_unlock(&darwin_cached_devices_mutex);
 }
 
