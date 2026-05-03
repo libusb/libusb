@@ -1,11 +1,14 @@
 For detailed information about the changes below, please see the git log.
 
-2026-02-22: v1.0.30-rc1
+2026-05-03: v1.0.30-rc2
 * Add hotplug support on Microsoft Windows
 * Add RAW_IO support in WinUSB backend
 * Work around a macOS 26 Tahoe compatibility breakage due to Apple changing kUSBHostPortPropertyPortNumber
 * Add new API libusb_get_device_string() to access device strings without opening the device
 * Add new API libusb_get_session_data() which returns the OS-specific handle
+* Fix device removal races on non-hotplug builds
+* Improve descriptor parsing memory safety
+* On Darwin, fix concurrency issues
 * On Android, fix intermittent failures in get_usbfs_fd()
 * On Windows, fix bus number assignment for root hub device, preventing duplicate bus number assignments
 * Fix compilation with Microsoft Visual Studio 2026
