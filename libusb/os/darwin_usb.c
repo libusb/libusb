@@ -2162,7 +2162,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   for (i = 0 ; i < descriptor.bNumConfigurations ; ++i) {
     kresult = (*dpriv->device)->GetConfigurationDescriptorPtr (dpriv->device, i, &cached_configuration);
     if (kresult != kIOReturnSuccess) {
-      dpriv->in_reenumerate = false;
+      atomic_store(&dpriv->in_reenumerate, false);
       return LIBUSB_ERROR_NOT_FOUND;
     }
     memcpy (cached_configurations + i, cached_configuration, sizeof (cached_configurations[i]));
