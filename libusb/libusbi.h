@@ -44,6 +44,8 @@
 #define static_assert(cond, msg) _Static_assert(cond, msg)
 #endif
 
+#include "clang_thread_safety.h"
+
 #ifdef NDEBUG
 #define ASSERT_EQ(expression, value)	(void)expression
 #define ASSERT_NE(expression, value)	(void)expression
@@ -370,16 +372,16 @@ struct libusb_context {
 #endif
 
 	usbi_mutex_t usb_devs_lock;
-	struct list_head usb_devs;
+	struct list_head usb_devs GUARDED_BY(usb_devs_lock);
 
 	/* A list of open handles. Backends are free to traverse this if required.
 	 */
 	usbi_mutex_t open_devs_lock;
-	struct list_head open_devs;
+	struct list_head open_devs GUARDED_BY(open_devs_lock);
 
 	/* A list of registered hotplug callbacks */
 	usbi_mutex_t hotplug_cbs_lock;
-	struct list_head hotplug_cbs;
+	struct list_head hotplug_cbs GUARDED_BY(hotplug_cbs_lock);
 	libusb_hotplug_callback_handle next_hotplug_cb_handle;
 
 	/* A flag to indicate that the context is ready for hotplug notifications */
@@ -392,7 +394,7 @@ struct libusb_context {
 	 * expiration. URBs to timeout the soonest are placed at the beginning of
 	 * the list, URBs that will time out later are placed after, and urbs with
 	 * infinite timeout are always placed at the very end. */
-	struct list_head flying_transfers;
+	struct list_head flying_transfers GUARDED_BY(flying_transfers_lock);
 
 #if !defined(PLATFORM_WINDOWS)
 	/* user callbacks for pollfd changes */
@@ -405,7 +407,7 @@ struct libusb_context {
 	usbi_mutex_t events_lock;
 
 	/* used to see if there is an active thread doing event handling */
-	int event_handler_active;
+	int event_handler_active GUARDED_BY(events_lock);
 
 	/* A thread-local storage key to track which thread is performing event
 	 * handling */
@@ -421,18 +423,18 @@ struct libusb_context {
 
 	/* A bitmask of flags that are set to indicate specific events that need to
 	 * be handled. Protected by event_data_lock. */
-	unsigned int event_flags;
+	unsigned int event_flags GUARDED_BY(event_data_lock);
 
 	/* A counter that is set when we want to interrupt and prevent event handling,
 	 * in order to safely close a device. Protected by event_data_lock. */
-	unsigned int device_close;
+	unsigned int device_close GUARDED_BY(event_data_lock);
 
 	/* A list of currently active event sources. Protected by event_data_lock. */
-	struct list_head event_sources;
+	struct list_head event_sources GUARDED_BY(event_data_lock);
 
 	/* A list of event sources that have been removed since the last time
 	 * event sources were waited on. Protected by event_data_lock. */
-	struct list_head removed_event_sources;
+	struct list_head removed_event_sources GUARDED_BY(event_data_lock);
 
 	/* A pointer and count to platform-specific data used for monitoring event
 	 * sources. Only accessed during event handling. */
@@ -440,10 +442,10 @@ struct libusb_context {
 	unsigned int event_data_cnt;
 
 	/* A list of pending hotplug messages. Protected by event_data_lock. */
-	struct list_head hotplug_msgs;
+	struct list_head hotplug_msgs GUARDED_BY(event_data_lock);
 
 	/* A list of pending completed transfers. Protected by event_data_lock. */
-	struct list_head completed_transfers;
+	struct list_head completed_transfers GUARDED_BY(event_data_lock);
 
 	struct list_head list;
 };
@@ -452,7 +454,7 @@ extern struct libusb_context *usbi_default_context;
 extern struct libusb_context *usbi_fallback_context;
 
 extern usbi_mutex_static_t active_contexts_lock;
-extern struct list_head active_contexts_list;
+extern struct list_head active_contexts_list GUARDED_BY(active_contexts_lock);
 
 static inline struct libusb_context *usbi_get_context(struct libusb_context *ctx)
 {
@@ -530,7 +532,7 @@ struct libusb_device {
 struct libusb_device_handle {
 	/* lock protects claimed_interfaces */
 	usbi_mutex_t lock;
-	unsigned long claimed_interfaces;
+	unsigned long claimed_interfaces GUARDED_BY(lock);
 
 	struct list_head list;
 	struct libusb_device *dev;
@@ -601,7 +603,7 @@ struct usbi_transfer {
 	struct timespec timeout;
 	int transferred;
 	uint32_t stream_id;
-	uint32_t state_flags;   /* Protected by usbi_transfer->lock */
+	uint32_t state_flags GUARDED_BY(lock);   /* Protected by usbi_transfer->lock */
 	uint32_t timeout_flags; /* Protected by the flying_transfers_lock */
 
 	/* The device reference is held until destruction for logging
