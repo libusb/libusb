@@ -22,4 +22,13 @@ For copyright reasons it is preferable to have your full name in the
 commit author field. Do not update the AUTHOR file yourself, the
 maintainers will update it as part of the release preparation.
 
-Please don't touch version_nano.h in your patches or pull requests.
+Please don't touch libusb/version_nano.h in your patches or pull
+requests; LIBUSB_NANO is bumped by the maintainer pre-commit hook on
+every commit.
+
+A finer-grained, unique-per-build identifier is also exposed via the
+LIBUSB_DESCRIBE string in struct libusb_version::describe, generated
+from `git describe --tags --always --dirty` at build time. LIBUSB_NANO
+may be frozen and eventually deprecated in a future release (after at
+least one release with LIBUSB_DESCRIBE in it) in favour of
+LIBUSB_DESCRIBE, once developers agree to retire it.

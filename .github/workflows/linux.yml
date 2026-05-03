@@ -7,6 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          # Fetch full history + tags so build-aux/gen-describe.sh can
+          # produce a tag-prefixed `git describe` string.
+          fetch-depth: 0
 
       - name: setup prerequisites
         run: |

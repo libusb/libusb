@@ -14,8 +14,11 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job
-      # can access it
+      # can access it. Full history + tags are needed by
+      # build-aux/gen-describe.sh.
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: setup prerequisites
         shell: bash

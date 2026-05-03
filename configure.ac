@@ -27,6 +27,21 @@ AM_INIT_AUTOMAKE
 LT_INIT
 LT_LANG([Windows Resource])
 
+dnl Source identification: the LIBUSB_DESCRIBE string baked into
+dnl libusb_version::describe is generated at build time by
+dnl build-aux/gen-describe.sh, which is the single source of truth for
+dnl the classification. We invoke its --classify mode here only to fail
+dnl early at configure time (e.g. when .git exists but git is missing)
+dnl and to surface the source kind in the configure log.
+LIBUSB_DESCRIBE_SOURCE=`$SHELL "$srcdir/build-aux/gen-describe.sh" --classify "$srcdir"` || \
+	AC_MSG_ERROR([gen-describe.sh failed to classify source; see error above])
+AC_MSG_CHECKING([source identification for LIBUSB_DESCRIBE])
+AC_MSG_RESULT([$LIBUSB_DESCRIBE_SOURCE])
+AS_IF([test "x$LIBUSB_DESCRIBE_SOURCE" = "xunknown"], [
+	AC_MSG_WARN([source is neither a git checkout nor a release tarball; LIBUSB_DESCRIBE will be marked "Unknown source ..."])
+])
+AC_SUBST([LIBUSB_DESCRIBE_SOURCE])
+
 dnl Library versioning
 dnl These numbers should be tweaked on every release. Read carefully:
 dnl http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html

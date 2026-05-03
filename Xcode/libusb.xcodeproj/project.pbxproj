@@ -692,6 +692,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 008FBF351628B79300BC5BE2 /* Build configuration list for PBXNativeTarget "libusb" */;
 			buildPhases = (
+				DE5C12BE0000000000000001 /* Generate version_describe.h */,
 				008FBF2F1628B79300BC5BE2 /* Headers */,
 				008FBF2D1628B79300BC5BE2 /* Sources */,
 				008FBF2E1628B79300BC5BE2 /* Frameworks */,
@@ -881,6 +882,24 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		DE5C12BE0000000000000001 /* Generate version_describe.h */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate version_describe.h";
+			outputPaths = (
+				"$(SRCROOT)/../libusb/version_describe.h",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "sh \"${SRCROOT}/../build-aux/gen-describe.sh\" \"${SRCROOT}/..\" \"${SRCROOT}/../libusb/version_describe.h\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		006AD4181C8C5A90007F8C6A /* Sources */ = {

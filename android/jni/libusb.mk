@@ -20,6 +20,15 @@ LOCAL_PATH := $(call my-dir)
 LIBUSB_ROOT_REL := ../..
 LIBUSB_ROOT_ABS := $(LOCAL_PATH)/../..
 
+# Generate libusb/version_describe.h before any compilation. Evaluated at
+# makefile parse time so the header is present once the build starts.
+LIBUSB_DESCRIBE_HEADER := $(LIBUSB_ROOT_ABS)/libusb/version_describe.h
+LIBUSB_DESCRIBE_GEN := $(shell sh $(LIBUSB_ROOT_ABS)/build-aux/gen-describe.sh \
+	$(LIBUSB_ROOT_ABS) $(LIBUSB_DESCRIBE_HEADER) 1>&2 && echo ok)
+ifneq ($(LIBUSB_DESCRIBE_GEN),ok)
+  $(error build-aux/gen-describe.sh failed; see messages above)
+endif
+
 # libusb
 
 include $(CLEAR_VARS)
