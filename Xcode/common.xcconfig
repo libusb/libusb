@@ -20,6 +20,9 @@
 // Use GNU11 dialect.
 GCC_C_LANGUAGE_STANDARD = gnu11
 
+//
+ENABLE_C_BOUNDS_SAFETY = YES
+
 // Don't search user paths with <> style #includes.
 ALWAYS_SEARCH_USER_PATHS = NO
 

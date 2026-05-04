@@ -390,9 +390,6 @@ if (r == 0 && actual_length == sizeof(data)) {
  * in the data buffer, starting at offset LIBUSB_CONTROL_SETUP_SIZE.
  * -# Call libusb_fill_control_transfer() to associate the data buffer with
  * the transfer (and to set the remaining details such as callback and timeout).
- *   - Note that there is no parameter to set the length field of the transfer.
- *     The length is automatically inferred from the wLength field of the setup
- *     packet.
  * -# Submit the transfer.
  *
  * The multi-byte control setup fields (wValue, wIndex and wLength) must
@@ -841,7 +838,7 @@ void myfunc() {
 	transfer = libusb_alloc_transfer(0);
 	libusb_fill_control_setup(buffer,
 		LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT, 0x04, 0x01, 0, 0);
-	libusb_fill_control_transfer(transfer, dev, buffer, cb, &completed, 1000);
+	libusb_fill_control_transfer(transfer, dev, buffer, LIBUSB_CONTROL_SETUP_SIZE, cb, &completed, 1000);
 	libusb_submit_transfer(transfer);
 
 	while (!completed) {
