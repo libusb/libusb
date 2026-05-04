@@ -4,6 +4,8 @@
  * Copyright © 2008-2023 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2019-2023 Google LLC. All rights reserved.
  *
+ * SPDX-License-Identifier: LGPL-2.1+
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either

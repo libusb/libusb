@@ -2,6 +2,8 @@
  * windows hotplug backend for libusb 1.0
  * Copyright © 2024 Sylvain Fasel <sylvain@sonatique.net>
  *
+ * SPDX-License-Identifier: LGPL-2.1+
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
