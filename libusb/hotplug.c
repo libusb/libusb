@@ -75,8 +75,24 @@
  * functions that retrieve various \ref libusb_desc "USB descriptors". These functions must
  * be used outside of the context of the hotplug callback.
  *
- * When handling a LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT event the only safe function
- * is libusb_get_device_descriptor().
+ * When handling a LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT event it is safe to call
+ * read-only \ref libusb_dev "device" functions (e.g. libusb_get_device_descriptor())
+ * and cleanup functions such as libusb_close(), libusb_cancel_transfer(),
+ * and libusb_free_transfer(). It is also safe to call libusb_unref_device()
+ * to release references that the application previously acquired (e.g. via
+ * libusb_ref_device() or libusb_get_device_list()); however, the
+ * libusb_device passed to the hotplug callback is not an application-owned
+ * reference and must not be passed to libusb_unref_device() unless the
+ * application has separately taken its own reference to it.
+ *
+ * libusb_release_interface() is also safe to call on a disconnected device
+ * but serves no purpose: any bus operation it would perform will fail with
+ * LIBUSB_ERROR_NO_DEVICE, and the kernel/backend releases claimed interfaces
+ * automatically when the device is disconnected. Applications do not need to
+ * release interfaces before calling libusb_close() in a DEVICE_LEFT callback.
+ *
+ * The \ref libusb_syncio "synchronous API" functions and libusb_handle_events()
+ * are <b>not</b> safe to call.
  *
  * The following code provides an example of the usage of the hotplug interface:
 \code
