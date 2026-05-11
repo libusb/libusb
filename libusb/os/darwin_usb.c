@@ -972,6 +972,9 @@ static void darwin_exit (struct libusb_context *ctx) {
 static int darwin_get_device_string(struct libusb_device *dev, 
     enum libusb_device_string_type string_type, char *buffer, int length) {
   
+  if (length <= 0)
+    return LIBUSB_ERROR_INVALID_PARAM;
+
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   io_iterator_t deviceIterator;
   io_service_t service;

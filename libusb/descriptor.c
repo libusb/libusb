@@ -1673,7 +1673,7 @@ int API_EXPORTED libusb_get_device_string(libusb_device *dev,
 	if ((string_type < 0) || (string_type >= LIBUSB_DEVICE_STRING_COUNT)) {
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-	if (length < 0) {
+	if (length <= 0) {
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 	if (NULL == data) {
