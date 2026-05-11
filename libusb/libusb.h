@@ -1934,6 +1934,8 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(int iso_packets);
 int LIBUSB_CALL libusb_submit_transfer(struct libusb_transfer *transfer);
 int LIBUSB_CALL libusb_cancel_transfer(struct libusb_transfer *transfer);
 void LIBUSB_CALL libusb_free_transfer(struct libusb_transfer *transfer);
+int LIBUSB_CALL libusb_prealloc_bulk_urbs(struct libusb_transfer *transfer);
+int LIBUSB_CALL libusb_prealloc_iso_urbs(struct libusb_transfer *transfer);
 void LIBUSB_CALL libusb_transfer_set_stream_id(
 	struct libusb_transfer *transfer, uint32_t stream_id);
 uint32_t LIBUSB_CALL libusb_transfer_get_stream_id(
