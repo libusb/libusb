@@ -43,6 +43,8 @@
 #define HOTPLUG_DEBOUNCE_MS             10
 #define HOTPLUG_DEBOUNCE_MAX_DELAY_MS   100
 
+#define WND_CLASS_NAME TEXT("libusb-1.0-windows-hotplug")
+
 static ULONGLONG first_debounce_tick;
 static HWND windows_event_hwnd;
 static HANDLE windows_event_thread_handle;
@@ -97,6 +99,13 @@ int windows_stop_event_monitor(void)
 		log_error("CloseHandle");
 		return LIBUSB_ERROR_OTHER;
 	}
+
+	/* Symmetric with RegisterClass in init_wnd_class. Without this, a
+    * subsequent libusb_init in the same process fails to recreate
+    * the class and the event thread dies silently. */
+    UnregisterClass(WND_CLASS_NAME, GetModuleHandle(NULL));
+    windows_event_hwnd = NULL;
+    windows_event_thread_handle = NULL;
 
 	return LIBUSB_SUCCESS;
 }
@@ -187,7 +196,6 @@ static void windows_refresh_device_list_for_all_ctx(void)
 	usbi_mutex_static_unlock(&active_contexts_lock);
 }
 
-#define WND_CLASS_NAME TEXT("libusb-1.0-windows-hotplug")
 
 static bool init_wnd_class(void)
 {
