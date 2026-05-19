@@ -1206,11 +1206,7 @@ struct libusb_version {
 	/** Library micro version. */
 	uint16_t micro;
 
-	/** Library nano version. Bumped on every commit. May be frozen
-	 * and eventually deprecated in a future release (after at least
-	 * one release with \ref libusb_version::describe in it) in favour
-	 * of the unique-per-build identifier carried by \ref
-	 * libusb_version::describe, once developers agree to retire it. */
+	/** Library nano version. */
 	uint16_t nano;
 
 	/** Library release candidate suffix string, e.g. "-rc4". */
