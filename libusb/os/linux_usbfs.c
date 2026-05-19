@@ -169,6 +169,20 @@ struct linux_transfer_priv {
 	int iso_packet_offset;
 };
 
+#define MAX_IOCTL_TRIES 16
+
+/* try ioctl up to MAX_IOCTL_TRIES times, retrying if r < 0 and errno is set to EINTR */
+static inline int ioctl_retry(int fd, unsigned long int request, void *extra) {
+	int r;
+	for (unsigned int i = 0; i < MAX_IOCTL_TRIES; i++) {
+		r = ioctl(fd, request, extra);
+		if (r >= 0 || errno != EINTR) {
+			break;
+		}
+	}
+	return r;
+}
+
 static int dev_has_config0(struct libusb_device *dev)
 {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
@@ -900,7 +914,7 @@ static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 		.data = &active_config
 	};
 
-	r = ioctl(fd, IOCTL_USBFS_CONTROL, &ctrl);
+	r = ioctl_retry(fd, IOCTL_USBFS_CONTROL, &ctrl);
 	if (r < 0) {
 		if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
@@ -934,7 +948,7 @@ static enum libusb_speed usbfs_get_speed(struct libusb_context *ctx, int fd)
 {
 	int r;
 
-	r = ioctl(fd, IOCTL_USBFS_GET_SPEED, NULL);
+	r = ioctl_retry(fd, IOCTL_USBFS_GET_SPEED, NULL);
 	switch (r) {
 	case USBFS_SPEED_UNKNOWN:	return LIBUSB_SPEED_UNKNOWN;
 	case USBFS_SPEED_LOW:		return LIBUSB_SPEED_LOW;
@@ -1392,7 +1406,7 @@ static int initialize_handle(struct libusb_device_handle *handle, int fd)
 
 	hpriv->fd = fd;
 
-	r = ioctl(fd, IOCTL_USBFS_GET_CAPABILITIES, &hpriv->caps);
+	r = ioctl_retry(fd, IOCTL_USBFS_GET_CAPABILITIES, &hpriv->caps);
 	if (r < 0) {
 		if (errno == ENOTTY)
 			usbi_dbg(HANDLE_CTX(handle), "getcap not available");
@@ -1416,7 +1430,7 @@ static int op_wrap_sys_device(struct libusb_context *ctx,
 
 	r = linux_get_device_address(ctx, 1, &busnum, &devaddr, NULL, NULL, fd);
 	if (r < 0) {
-		r = ioctl(fd, IOCTL_USBFS_CONNECTINFO, &ci);
+		r = ioctl_retry(fd, IOCTL_USBFS_CONNECTINFO, &ci);
 		if (r < 0) {
 			usbi_err(ctx, "connectinfo failed, errno=%d", errno);
 			return LIBUSB_ERROR_IO;
@@ -1526,7 +1540,7 @@ static int op_set_configuration(struct libusb_device_handle *handle, int config)
 	struct linux_device_priv *priv = usbi_get_device_priv(handle->dev);
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
-	int r = ioctl(fd, IOCTL_USBFS_SETCONFIGURATION, &config);
+	int r = ioctl_retry(fd, IOCTL_USBFS_SETCONFIGURATION, &config);
 
 	if (r < 0) {
 		if (errno == EINVAL)
@@ -1555,7 +1569,7 @@ static int claim_interface(struct libusb_device_handle *handle, unsigned int ifa
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
-	int r = ioctl(fd, IOCTL_USBFS_CLAIMINTERFACE, &iface);
+	int r = ioctl_retry(fd, IOCTL_USBFS_CLAIMINTERFACE, &iface);
 
 	if (r < 0) {
 		if (errno == ENOENT)
@@ -1575,7 +1589,7 @@ static int release_interface(struct libusb_device_handle *handle, unsigned int i
 {
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
-	int r = ioctl(fd, IOCTL_USBFS_RELEASEINTERFACE, &iface);
+	int r = ioctl_retry(fd, IOCTL_USBFS_RELEASEINTERFACE, &iface);
 
 	if (r < 0) {
 		if (errno == ENODEV)
@@ -1597,7 +1611,7 @@ static int op_set_interface(struct libusb_device_handle *handle, uint8_t interfa
 
 	setintf.interface = interface;
 	setintf.altsetting = altsetting;
-	r = ioctl(fd, IOCTL_USBFS_SETINTERFACE, &setintf);
+	r = ioctl_retry(fd, IOCTL_USBFS_SETINTERFACE, &setintf);
 	if (r < 0) {
 		if (errno == EINVAL)
 			return LIBUSB_ERROR_NOT_FOUND;
@@ -1617,7 +1631,7 @@ static int op_clear_halt(struct libusb_device_handle *handle,
 	struct linux_device_handle_priv *hpriv = usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
 	unsigned int _endpoint = endpoint;
-	int r = ioctl(fd, IOCTL_USBFS_CLEAR_HALT, &_endpoint);
+	int r = ioctl_retry(fd, IOCTL_USBFS_CLEAR_HALT, &_endpoint);
 
 	if (r < 0) {
 		if (errno == ENOENT)
@@ -1650,7 +1664,7 @@ static int op_reset_device(struct libusb_device_handle *handle)
 	}
 
 	usbi_mutex_lock(&handle->lock);
-	r = ioctl(fd, IOCTL_USBFS_RESET, NULL);
+	r = ioctl_retry(fd, IOCTL_USBFS_RESET, NULL);
 	if (r < 0) {
 		if (errno == ENODEV) {
 			ret = LIBUSB_ERROR_NOT_FOUND;
@@ -1703,7 +1717,7 @@ static int do_streams_ioctl(struct libusb_device_handle *handle,
 	streams->num_eps = num_endpoints;
 	memcpy(streams->eps, endpoints, num_endpoints);
 
-	r = ioctl(fd, req, streams);
+	r = ioctl_retry(fd, req, streams);
 
 	free(streams);
 
@@ -1768,7 +1782,7 @@ static int op_kernel_driver_active(struct libusb_device_handle *handle,
 	int r;
 
 	getdrv.interface = interface;
-	r = ioctl(fd, IOCTL_USBFS_GETDRIVER, &getdrv);
+	r = ioctl_retry(fd, IOCTL_USBFS_GETDRIVER, &getdrv);
 	if (r < 0) {
 		if (errno == ENODATA)
 			return 0;
@@ -1796,11 +1810,11 @@ static int op_detach_kernel_driver(struct libusb_device_handle *handle,
 	command.data = NULL;
 
 	getdrv.interface = interface;
-	r = ioctl(fd, IOCTL_USBFS_GETDRIVER, &getdrv);
+	r = ioctl_retry(fd, IOCTL_USBFS_GETDRIVER, &getdrv);
 	if (r == 0 && !strcmp(getdrv.driver, "usbfs"))
 		return LIBUSB_ERROR_NOT_FOUND;
 
-	r = ioctl(fd, IOCTL_USBFS_IOCTL, &command);
+	r = ioctl_retry(fd, IOCTL_USBFS_IOCTL, &command);
 	if (r < 0) {
 		if (errno == ENODATA)
 			return LIBUSB_ERROR_NOT_FOUND;
@@ -1828,7 +1842,7 @@ static int op_attach_kernel_driver(struct libusb_device_handle *handle,
 	command.ioctl_code = IOCTL_USBFS_CONNECT;
 	command.data = NULL;
 
-	r = ioctl(fd, IOCTL_USBFS_IOCTL, &command);
+	r = ioctl_retry(fd, IOCTL_USBFS_IOCTL, &command);
 	if (r < 0) {
 		if (errno == ENODATA)
 			return LIBUSB_ERROR_NOT_FOUND;
@@ -1858,7 +1872,7 @@ static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
 	dc.interface = interface;
 	strcpy(dc.driver, "usbfs");
 	dc.flags = USBFS_DISCONNECT_CLAIM_EXCEPT_DRIVER;
-	r = ioctl(fd, IOCTL_USBFS_DISCONNECT_CLAIM, &dc);
+	r = ioctl_retry(fd, IOCTL_USBFS_DISCONNECT_CLAIM, &dc);
 	if (r == 0)
 		return 0;
 	switch (errno) {
@@ -1932,7 +1946,7 @@ static int discard_urbs(struct usbi_transfer *itransfer, int first, int last_plu
 		else
 			urb = &tpriv->urbs[i];
 
-		if (ioctl(hpriv->fd, IOCTL_USBFS_DISCARDURB, urb) == 0)
+		if (ioctl_retry(hpriv->fd, IOCTL_USBFS_DISCARDURB, urb) == 0)
 			continue;
 
 		if (errno == EINVAL) {
@@ -2080,7 +2094,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 		    (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET))
 			urb->flags |= USBFS_URB_ZERO_PACKET;
 
-		r = ioctl(hpriv->fd, IOCTL_USBFS_SUBMITURB, urb);
+		r = ioctl_retry(hpriv->fd, IOCTL_USBFS_SUBMITURB, urb);
 		if (r == 0)
 			continue;
 
@@ -2231,7 +2245,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 	/* submit URBs */
 	for (i = 0; i < num_urbs; i++) {
-		int r = ioctl(hpriv->fd, IOCTL_USBFS_SUBMITURB, urbs[i]);
+		int r = ioctl_retry(hpriv->fd, IOCTL_USBFS_SUBMITURB, urbs[i]);
 
 		if (r == 0)
 			continue;
@@ -2311,7 +2325,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	urb->buffer = transfer->buffer;
 	urb->buffer_length = transfer->length;
 
-	r = ioctl(hpriv->fd, IOCTL_USBFS_SUBMITURB, urb);
+	r = ioctl_retry(hpriv->fd, IOCTL_USBFS_SUBMITURB, urb);
 	if (r < 0) {
 		free(urb);
 		tpriv->urbs = NULL;
@@ -2725,7 +2739,7 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 	struct usbi_transfer *itransfer;
 	struct libusb_transfer *transfer;
 
-	r = ioctl(hpriv->fd, IOCTL_USBFS_REAPURBNDELAY, &urb);
+	r = ioctl_retry(hpriv->fd, IOCTL_USBFS_REAPURBNDELAY, &urb);
 	if (r < 0) {
 		if (errno == EAGAIN)
 			return 1;
