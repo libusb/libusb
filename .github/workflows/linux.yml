@@ -6,12 +6,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job
+      # can access it
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: setup prerequisites
         run: |
           sudo apt update
-          sudo apt install -y autoconf automake libtool libudev-dev m4 pkg-config clang llvm
+          sudo apt install -y autoconf automake libtool libudev-dev m4 pkg-config clang llvm clang-tidy wget
 
       - name: bootstrap
         run: ./bootstrap.sh
@@ -80,3 +84,11 @@ jobs:
           ./fuzz_bos_descriptor tests/fuzz/corpus/bos \
             -seed=1 -runs=200 -max_total_time=15 -timeout=5 -rss_limit_mb=1536 -print_final_stats=1
       # --- end sanitizers + fuzzer smoke ---
+
+      - name: clang-tidy
+        continue-on-error: true
+        env:
+          current_sha: ${{ github.sha }}
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          .private/ci-build.sh --clang-tidy --build-dir build-tidy --no-test -- --disable-udev
