@@ -1206,7 +1206,9 @@ struct libusb_version {
 	/** Library micro version. */
 	uint16_t micro;
 
-	/** Library nano version. */
+	/** Library nano version. Deprecated since 1.0.31: this value is
+	 * frozen and no longer updated per build. Use \ref
+	 * libusb_version::describe for a unique-per-build identifier. */
 	uint16_t nano;
 
 	/** Library release candidate suffix string, e.g. "-rc4". */
