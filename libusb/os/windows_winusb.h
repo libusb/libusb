@@ -144,7 +144,7 @@ struct libusb_hid_descriptor {
 #define IOCTL_HID_SET_FEATURE		HID_IN_CTL_CODE(100)
 #define IOCTL_HID_SET_OUTPUT_REPORT	HID_IN_CTL_CODE(101)
 
-enum libusb_hid_request_type {
+enum libusb_hid_request_type LIBUSB_ENUM_SIZE(int) {
 	HID_REQ_GET_REPORT = 0x01,
 	HID_REQ_GET_IDLE = 0x02,
 	HID_REQ_GET_PROTOCOL = 0x03,
