@@ -77,10 +77,23 @@ typedef SSIZE_T ssize_t;
 #define LIBUSB_DEPRECATED_FOR(f)
 #endif /* __GNUC__ */
 
+/* Deprecated, use LIBUSB_PACKED_PUSH/LIBUSB_PACKED_POP instead. */
 #if defined(__GNUC__)
 #define LIBUSB_PACKED __attribute__ ((packed))
 #else
 #define LIBUSB_PACKED
+#endif /* __GNUC__ */
+
+#if defined(__GNUC__)
+#define LIBUSB_PACKED_PUSH _Pragma("pack(push, 1)")
+#define LIBUSB_PACKED_POP _Pragma("pack(pop)")
+#elif defined(_MSC_VER) || defined(__WATCOMC__)
+#define LIBUSB_PACKED_PUSH __pragma("pack(push, 1)")
+#define LIBUSB_PACKED_POP __pragma("pack(pop)")
+#else
+#warning Compiler not recognised; therefore not possible to pack structs.
+#define LIBUSB_PACKED_PUSH
+#define LIBUSB_PACKED_POP
 #endif /* __GNUC__ */
 
 /** \def LIBUSB_CALL
@@ -1153,9 +1166,7 @@ struct libusb_platform_descriptor {
 
 /** \ingroup libusb_asyncio
  * Setup packet for control transfers. */
-#if defined(_MSC_VER) || defined(__WATCOMC__)
-#pragma pack(push, 1)
-#endif
+LIBUSB_PACKED_PUSH
 struct libusb_control_setup {
 	/** Request type. Bits 0:4 determine recipient, see
 	 * \ref libusb_request_recipient. Bits 5:6 determine type, see
@@ -1180,10 +1191,8 @@ struct libusb_control_setup {
 
 	/** Number of bytes to transfer */
 	uint16_t wLength;
-} LIBUSB_PACKED;
-#if defined(_MSC_VER) || defined(__WATCOMC__)
-#pragma pack(pop)
-#endif
+};
+LIBUSB_PACKED_POP
 
 #define LIBUSB_CONTROL_SETUP_SIZE (sizeof(struct libusb_control_setup))
 
