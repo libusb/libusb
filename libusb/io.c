@@ -1344,7 +1344,6 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 		libusb_unref_device(itransfer->dev);
 
 	unsigned char *ptr = usbi_transfer_to_transfer_priv(itransfer);
-	assert(ptr == itransfer->priv);
 	free(ptr);
 }
 

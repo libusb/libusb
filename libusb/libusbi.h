@@ -577,11 +577,11 @@ void usbi_get_real_time(struct timespec *tp);
  * 2. struct usbi_transfer
  * 3. struct libusb_transfer (which includes iso packets) [variable size]
  *
- * You can convert between them with the functions:
- *  usbi_transfer_priv_to_usbi_transfer
- *  usbi_transfer_to_transfer_priv
- *  usbi_transfer_to_libusb_transfer
- *  usbi_libusb_transfer_to_usbi_transfer
+ * You can convert between them with the macros:
+ *  TRANSFER_PRIV_TO_USBI_TRANSFER (1 to 2)
+ *  USBI_TRANSFER_TO_TRANSFER_PRIV (2 to 1)
+ *  USBI_TRANSFER_TO_LIBUSB_TRANSFER (2 to 3)
+ *  LIBUSB_TRANSFER_TO_USBI_TRANSFER (3 to 2)
  */
 
 struct usbi_transfer {
