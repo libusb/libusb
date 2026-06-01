@@ -1308,6 +1308,7 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	itransfer->priv = ptr;
 	usbi_mutex_init(&itransfer->lock);
 	struct libusb_transfer *transfer = usbi_transfer_to_libusb_transfer(itransfer);
+	itransfer->transfer = transfer;
 
 	return transfer;
 }

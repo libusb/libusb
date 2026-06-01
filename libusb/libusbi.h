@@ -625,6 +625,8 @@ struct usbi_transfer {
 	 * happen-before the store. Zeroed by the transfer allocation; the
 	 * loaded value is unused, only the ordering matters. */
 	usbi_atomic_t submit_fence;
+
+	struct libusb_transfer* transfer;
 };
 
 enum usbi_transfer_state_flags {
