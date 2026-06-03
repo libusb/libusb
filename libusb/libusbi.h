@@ -261,9 +261,20 @@ static inline void list_splice_front(struct list_head *list, struct list_head *h
 
 static inline void *usbi_reallocf(void *ptr, size_t size)
 {
-	void *ret = realloc(ptr, size);
+	void *ret;
 
-	if (!ret && size != 0)
+	/*
+	 * Never call realloc(ptr, 0): it is implementation-defined before C23
+	 * and undefined behavior since C23, and libcs disagree on it anyway
+	 * (e.g. musl returns a non-NULL 1-byte allocation, while glibc/MSVC
+	 * free ptr and return NULL). Handle a zero size explicitly instead.
+	 */
+	if (size == 0) {
+		free(ptr);
+		return NULL;
+	}
+	ret = realloc(ptr, size);
+	if (!ret)
 		free(ptr);
 	return ret;
 }
