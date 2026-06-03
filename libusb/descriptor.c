@@ -179,49 +179,59 @@ static int parse_interface(libusb_context *ctx,
 	const uint8_t *begin;
 
 	while (size >= LIBUSB_DT_INTERFACE_SIZE) {
-		struct libusb_interface_descriptor *altsetting;
+		uint8_t bLength = buffer[0];
+		uint8_t bDescriptorType = buffer[1];
+		uint8_t bInterfaceNumber = buffer[2];
+		uint8_t bAlternateSetting = buffer[3];
+		uint8_t bNumEndpoints = buffer[4];
+		uint8_t bInterfaceClass = buffer[5];
+		uint8_t bInterfaceSubClass = buffer[6];
+		uint8_t bInterfaceProtocol = buffer[7];
+		uint8_t iInterface = buffer[8];
 
+		if (bDescriptorType != LIBUSB_DT_INTERFACE) {
+			usbi_err(ctx, "unexpected descriptor 0x%x (expected 0x%x)",
+				 bDescriptorType, LIBUSB_DT_INTERFACE);
+			return parsed;
+		} else if (bLength < LIBUSB_DT_INTERFACE_SIZE) {
+			usbi_err(ctx, "invalid interface bLength (%u)",
+				 bLength);
+			r = LIBUSB_ERROR_IO;
+			goto err;
+		} else if (bLength > size) {
+			usbi_warn(ctx, "short intf descriptor read %d/%u",
+				 size, bLength);
+			return parsed;
+		} else if (bNumEndpoints > USB_MAXENDPOINTS) {
+			usbi_err(ctx, "too many endpoints (%u)", bNumEndpoints);
+			r = LIBUSB_ERROR_IO;
+			goto err;
+		}
+
+		struct libusb_interface_descriptor *altsetting;
 		altsetting = realloc((void *)usb_interface->altsetting,
 			sizeof(*altsetting) * (size_t)(usb_interface->num_altsetting + 1));
 		if (!altsetting) {
 			r = LIBUSB_ERROR_NO_MEM;
 			goto err;
 		}
-		usb_interface->altsetting = altsetting;
 
 		ifp = altsetting + usb_interface->num_altsetting;
-		ifp->bLength = buffer[0];
-		ifp->bDescriptorType = buffer[1];
-		ifp->bInterfaceNumber = buffer[2];
-		ifp->bAlternateSetting = buffer[3];
-		ifp->bNumEndpoints = buffer[4];
-		ifp->bInterfaceClass = buffer[5];
-		ifp->bInterfaceSubClass = buffer[6];
-		ifp->bInterfaceProtocol = buffer[7];
-		ifp->iInterface = buffer[8];
-		if (ifp->bDescriptorType != LIBUSB_DT_INTERFACE) {
-			usbi_err(ctx, "unexpected descriptor 0x%x (expected 0x%x)",
-				 ifp->bDescriptorType, LIBUSB_DT_INTERFACE);
-			return parsed;
-		} else if (ifp->bLength < LIBUSB_DT_INTERFACE_SIZE) {
-			usbi_err(ctx, "invalid interface bLength (%u)",
-				 ifp->bLength);
-			r = LIBUSB_ERROR_IO;
-			goto err;
-		} else if (ifp->bLength > size) {
-			usbi_warn(ctx, "short intf descriptor read %d/%u",
-				 size, ifp->bLength);
-			return parsed;
-		} else if (ifp->bNumEndpoints > USB_MAXENDPOINTS) {
-			usbi_err(ctx, "too many endpoints (%u)", ifp->bNumEndpoints);
-			r = LIBUSB_ERROR_IO;
-			goto err;
-		}
-
-		usb_interface->num_altsetting++;
+		ifp->bLength = bLength;
+		ifp->bDescriptorType = bDescriptorType;
+		ifp->bInterfaceNumber = bInterfaceNumber;
+		ifp->bAlternateSetting = bAlternateSetting;
+		ifp->bNumEndpoints = bNumEndpoints;
+		ifp->bInterfaceClass = bInterfaceClass;
+		ifp->bInterfaceSubClass = bInterfaceSubClass;
+		ifp->bInterfaceProtocol = bInterfaceProtocol;
+		ifp->iInterface = iInterface;
 		ifp->extra = NULL;
 		ifp->extra_length = 0;
 		ifp->endpoint = NULL;
+
+		usb_interface->altsetting = altsetting;
+		usb_interface->num_altsetting++;
 
 		if (interface_number == -1)
 			interface_number = ifp->bInterfaceNumber;
