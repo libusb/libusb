@@ -160,7 +160,7 @@ enum windows_version {
 
 extern enum windows_version windows_version;
 
-#include <pshpack1.h>
+#pragma pack(push, 1)
 
 typedef struct USB_DEVICE_DESCRIPTOR {
 	UCHAR  bLength;
@@ -190,7 +190,7 @@ typedef struct USB_CONFIGURATION_DESCRIPTOR {
 	UCHAR  MaxPower;
 } USB_CONFIGURATION_DESCRIPTOR, *PUSB_CONFIGURATION_DESCRIPTOR;
 
-#include <poppack.h>
+#pragma pack(pop)
 
 #define MAX_DEVICE_ID_LEN	200
 
