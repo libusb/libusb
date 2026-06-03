@@ -97,7 +97,7 @@ static int LIBUSB_CALL hotplug_callback_detach(libusb_context *ctx, libusb_devic
 	return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 {
 	libusb_hotplug_callback_handle hp[2];
 	int product_id, vendor_id, class_id;

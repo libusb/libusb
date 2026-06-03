@@ -124,7 +124,7 @@ static const libusb_testlib_test tests[] = {
   LIBUSB_NULL_TEST
 };
 
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 {
   return libusb_testlib_run_tests(argc, argv, tests);
 }

@@ -76,7 +76,7 @@ static int usage(void) {
 	return 1;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 {
 	int verbose = 0;
 	libusb_device **devs;
