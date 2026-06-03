@@ -567,10 +567,10 @@ void usbi_get_real_time(struct timespec *tp);
  * 3. struct libusb_transfer (which includes iso packets) [variable size]
  *
  * You can convert between them with the functions:
- *  TRANSFER_PRIV_TO_USBI_TRANSFER
- *  USBI_TRANSFER_TO_TRANSFER_PRIV
- *  USBI_TRANSFER_TO_LIBUSB_TRANSFER
- *  LIBUSB_TRANSFER_TO_USBI_TRANSFER
+ *  transfer_priv_to_usbi_transfer
+ *  usbi_transfer_to_transfer_priv
+ *  usbi_transfer_to_libusb_transfer
+ *  libusb_transfer_to_usbi_transfer
  */
 
 struct usbi_transfer {
@@ -1519,64 +1519,64 @@ struct usbi_os_backend {
 
 extern const struct usbi_os_backend usbi_backend;
 
-static inline struct usbi_transfer * TRANSFER_PRIV_TO_USBI_TRANSFER(void * transfer_priv)
+static inline struct usbi_transfer * transfer_priv_to_usbi_transfer(void * transfer_priv)
 {
 	return (struct usbi_transfer *)((unsigned char *)(transfer_priv) + PTR_ALIGN(usbi_backend.transfer_priv_size));
 }
 
-static inline void * USBI_TRANSFER_TO_TRANSFER_PRIV (const struct usbi_transfer * itransfer)
+static inline void * usbi_transfer_to_transfer_priv (const struct usbi_transfer * itransfer)
 {
 	return (void *)((unsigned char *)(itransfer) - PTR_ALIGN(usbi_backend.transfer_priv_size));
 }
 
-static inline struct libusb_transfer * USBI_TRANSFER_TO_LIBUSB_TRANSFER (const struct usbi_transfer * itransfer)
+static inline struct libusb_transfer * usbi_transfer_to_libusb_transfer (const struct usbi_transfer * itransfer)
 {
 	return (struct libusb_transfer *)((unsigned char *)(itransfer) + PTR_ALIGN(sizeof(struct usbi_transfer)));
 }
 
-static inline struct usbi_transfer * LIBUSB_TRANSFER_TO_USBI_TRANSFER (const struct libusb_transfer * transfer)
+static inline struct usbi_transfer * libusb_transfer_to_usbi_transfer (const struct libusb_transfer * transfer)
 {
 	return (struct usbi_transfer *)((unsigned char *)(transfer) - PTR_ALIGN(sizeof(struct usbi_transfer)));
 }
 
-static inline struct libusb_context * DEVICE_CTX(const struct libusb_device *dev)
+static inline struct libusb_context * device_ctx(const struct libusb_device *dev)
 {
 	return dev->ctx;
 }
 
-static inline struct libusb_context * HANDLE_CTX(const struct libusb_device_handle *handle)
+static inline struct libusb_context * handle_ctx(const struct libusb_device_handle *handle)
 {
-	return handle ? DEVICE_CTX(handle->dev) : NULL;
+	return handle ? device_ctx(handle->dev) : NULL;
 }
 
-static inline struct libusb_context * ITRANSFER_CTX(const struct usbi_transfer *itransfer)
+static inline struct libusb_context * itransfer_ctx(const struct usbi_transfer *itransfer)
 {
-	return itransfer->dev ? DEVICE_CTX(itransfer->dev) : NULL;
+	return itransfer->dev ? device_ctx(itransfer->dev) : NULL;
 }
 
-static inline struct libusb_context * TRANSFER_CTX(const struct libusb_transfer *transfer)
+static inline struct libusb_context * transfer_ctx(const struct libusb_transfer *transfer)
 {
-	return ITRANSFER_CTX(LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer));
+	return itransfer_ctx(libusb_transfer_to_usbi_transfer(transfer));
 }
 
-static inline bool IS_EPIN (uint8_t ep)
+static inline bool is_ep_in (uint8_t ep)
 {
 	return (0 != (ep & LIBUSB_ENDPOINT_IN));
 }
 
-static inline bool IS_EPOUT (uint8_t ep)
+static inline bool is_ep_out (uint8_t ep)
 {
-	return !IS_EPIN(ep);
+	return !is_ep_in(ep);
 }
 
-static inline bool IS_XFERIN (const struct libusb_transfer * xfer)
+static inline bool is_xfer_in (const struct libusb_transfer * xfer)
 {
 	return (0 != (xfer->endpoint & LIBUSB_ENDPOINT_IN));
 }
 
-static inline bool IS_XFEROUT (const struct libusb_transfer * xfer)
+static inline bool is_xfer_out (const struct libusb_transfer * xfer)
 {
-	return !IS_XFERIN(xfer);
+	return !is_xfer_in(xfer);
 }
 
 #define for_each_context(c) \

@@ -255,7 +255,7 @@ static int usbi_hotplug_match_cb(struct libusb_device *dev,
 		return 0;
 	}
 
-	return hotplug_cb->cb(DEVICE_CTX(dev), dev, event, hotplug_cb->user_data);
+	return hotplug_cb->cb(device_ctx(dev), dev, event, hotplug_cb->user_data);
 }
 
 void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device *dev,

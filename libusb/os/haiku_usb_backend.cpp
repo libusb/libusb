@@ -34,7 +34,7 @@ static int _errno_to_libusb(int status)
 USBTransfer::USBTransfer(struct usbi_transfer *itransfer, USBDevice *device)
 {
 	fUsbiTransfer = itransfer;
-	fLibusbTransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	fLibusbTransfer = usbi_transfer_to_libusb_transfer(itransfer);
 	fUSBDevice = device;
 	fCancelled = false;
 }
@@ -80,7 +80,7 @@ USBTransfer::Do(int fRawFD)
 			if (ioctl(fRawFD, B_USB_RAW_COMMAND_CONTROL_TRANSFER, &command, sizeof(command)) ||
 					command.control.status != B_USB_RAW_STATUS_SUCCESS) {
 				fUsbiTransfer->transferred = -1;
-				usbi_err(TRANSFER_CTX(fLibusbTransfer), "failed control transfer");
+				usbi_err(transfer_ctx(fLibusbTransfer), "failed control transfer");
 				break;
 			}
 			fUsbiTransfer->transferred = command.control.length;
@@ -100,7 +100,7 @@ USBTransfer::Do(int fRawFD)
 				if (ioctl(fRawFD, B_USB_RAW_COMMAND_BULK_TRANSFER, &command, sizeof(command)) ||
 						command.transfer.status != B_USB_RAW_STATUS_SUCCESS) {
 					fUsbiTransfer->transferred = -1;
-					usbi_err(TRANSFER_CTX(fLibusbTransfer), "failed bulk transfer");
+					usbi_err(transfer_ctx(fLibusbTransfer), "failed bulk transfer");
 					break;
 				}
 			}
@@ -108,7 +108,7 @@ USBTransfer::Do(int fRawFD)
 				if (ioctl(fRawFD, B_USB_RAW_COMMAND_INTERRUPT_TRANSFER, &command, sizeof(command)) ||
 						command.transfer.status != B_USB_RAW_STATUS_SUCCESS) {
 					fUsbiTransfer->transferred = -1;
-					usbi_err(TRANSFER_CTX(fLibusbTransfer), "failed interrupt transfer");
+					usbi_err(transfer_ctx(fLibusbTransfer), "failed interrupt transfer");
 					break;
 				}
 			}
@@ -129,7 +129,7 @@ USBTransfer::Do(int fRawFD)
 			for (i = 0; i < fLibusbTransfer->num_iso_packets; i++) {
 				if ((fLibusbTransfer->iso_packet_desc[i]).length > (unsigned int)INT16_MAX) {
 					fUsbiTransfer->transferred = -1;
-					usbi_err(TRANSFER_CTX(fLibusbTransfer), "failed isochronous transfer");
+					usbi_err(transfer_ctx(fLibusbTransfer), "failed isochronous transfer");
 					break;
 				}
 				packetDescriptors[i].request_length = (int16)(fLibusbTransfer->iso_packet_desc[i]).length;
@@ -142,7 +142,7 @@ USBTransfer::Do(int fRawFD)
 			if (ioctl(fRawFD, B_USB_RAW_COMMAND_ISOCHRONOUS_TRANSFER, &command, sizeof(command)) ||
 					command.isochronous.status != B_USB_RAW_STATUS_SUCCESS) {
 				fUsbiTransfer->transferred = -1;
-				usbi_err(TRANSFER_CTX(fLibusbTransfer), "failed isochronous transfer");
+				usbi_err(transfer_ctx(fLibusbTransfer), "failed isochronous transfer");
 				break;
 			}
 			for (i = 0; i < fLibusbTransfer->num_iso_packets; i++) {
@@ -162,7 +162,7 @@ USBTransfer::Do(int fRawFD)
 		}
 		break;
 		default:
-			usbi_err(TRANSFER_CTX(fLibusbTransfer), "Unknown type of transfer");
+			usbi_err(transfer_ctx(fLibusbTransfer), "Unknown type of transfer");
 	}
 }
 

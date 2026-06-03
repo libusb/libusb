@@ -698,7 +698,7 @@ struct discovered_devs *discovered_devs_append(
 	}
 
 	/* exceeded capacity, need to grow */
-	usbi_dbg(DEVICE_CTX(dev), "need to increase capacity");
+	usbi_dbg(device_ctx(dev), "need to increase capacity");
 	capacity = discdevs->capacity + DISCOVERED_DEVICES_SIZE_STEP;
 	/* can't use usbi_reallocf here because in failure cases it would
 	 * free the existing discdevs without unreferencing its devices. */
@@ -745,7 +745,7 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 
 void usbi_attach_device(struct libusb_device *dev)
 {
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx = device_ctx(dev);
 
 	usbi_atomic_store(&dev->attached, 1);
 
@@ -757,12 +757,12 @@ void usbi_attach_device(struct libusb_device *dev)
 void usbi_connect_device(struct libusb_device *dev)
 {
 	usbi_attach_device(dev);
-	usbi_hotplug_notification(DEVICE_CTX(dev), dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
+	usbi_hotplug_notification(device_ctx(dev), dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
 }
 
 void usbi_detach_device(struct libusb_device *dev)
 {
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx = device_ctx(dev);
 
 	usbi_atomic_store(&dev->attached, 0);
 
@@ -774,7 +774,7 @@ void usbi_detach_device(struct libusb_device *dev)
 void usbi_disconnect_device(struct libusb_device *dev)
 {
 	usbi_detach_device(dev);
-	usbi_hotplug_notification(DEVICE_CTX(dev), dev, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT);
+	usbi_hotplug_notification(device_ctx(dev), dev, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT);
 }
 
 /* Perform some final sanity checks on a newly discovered device. If this
@@ -786,16 +786,16 @@ int usbi_sanitize_device(struct libusb_device *dev)
 
 	if (dev->device_descriptor.bLength != LIBUSB_DT_DEVICE_SIZE ||
 	    dev->device_descriptor.bDescriptorType != LIBUSB_DT_DEVICE) {
-		usbi_err(DEVICE_CTX(dev), "invalid device descriptor");
+		usbi_err(device_ctx(dev), "invalid device descriptor");
 		return LIBUSB_ERROR_IO;
 	}
 
 	num_configurations = dev->device_descriptor.bNumConfigurations;
 	if (num_configurations > USB_MAXCONFIG) {
-		usbi_err(DEVICE_CTX(dev), "too many configurations");
+		usbi_err(device_ctx(dev), "too many configurations");
 		return LIBUSB_ERROR_IO;
 	} else if (0 == num_configurations) {
-		usbi_dbg(DEVICE_CTX(dev), "zero configurations, maybe an unauthorized device");
+		usbi_dbg(device_ctx(dev), "zero configurations, maybe an unauthorized device");
 	}
 
 	return 0;
@@ -992,7 +992,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 	uint8_t *port_numbers, int port_numbers_len)
 {
 	int i = port_numbers_len;
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx = device_ctx(dev);
 
 	if (port_numbers_len <= 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -1110,7 +1110,7 @@ int API_EXPORTED libusb_get_max_packet_size(libusb_device *dev,
 
 	r = libusb_get_active_config_descriptor(dev, &config);
 	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev),
+		usbi_err(device_ctx(dev),
 			"could not retrieve active config descriptor");
 		return LIBUSB_ERROR_OTHER;
 	}
@@ -1229,7 +1229,7 @@ int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 
 	r = libusb_get_active_config_descriptor(dev, &config);
 	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev),
+		usbi_err(device_ctx(dev),
 			"could not retrieve active config descriptor");
 		return LIBUSB_ERROR_OTHER;
 	}
@@ -1288,7 +1288,7 @@ int API_EXPORTED libusb_get_max_alt_packet_size(libusb_device *dev,
 
 	r = libusb_get_active_config_descriptor(dev, &config);
 	if (r < 0) {
-		usbi_err(DEVICE_CTX(dev),
+		usbi_err(device_ctx(dev),
 			"could not retrieve active config descriptor");
 		return LIBUSB_ERROR_OTHER;
 	}
@@ -1343,7 +1343,7 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 		 * Without this, a concurrent search could find a device whose
 		 * refcnt has already reached zero and hit the assert in
 		 * libusb_ref_device(). */
-		struct libusb_context *ctx = DEVICE_CTX(dev);
+		struct libusb_context *ctx = device_ctx(dev);
 
 		usbi_mutex_lock(&ctx->usb_devs_lock);
 		refcnt = usbi_atomic_dec(&dev->refcnt);
@@ -1359,7 +1359,7 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 	}
 
 	if (refcnt == 0) {
-		usbi_dbg(DEVICE_CTX(dev), "destroy device %d.%d", dev->bus_number, dev->device_address);
+		usbi_dbg(device_ctx(dev), "destroy device %d.%d", dev->bus_number, dev->device_address);
 
 		libusb_unref_device(dev->parent_dev);
 
@@ -1467,12 +1467,12 @@ int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
 int API_EXPORTED libusb_open(libusb_device *dev,
 	libusb_device_handle **dev_handle)
 {
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx = device_ctx(dev);
 	struct libusb_device_handle *_dev_handle;
 	size_t priv_size = usbi_backend.device_handle_priv_size;
 	int r;
 
-	usbi_dbg(DEVICE_CTX(dev), "open %d.%d", dev->bus_number, dev->device_address);
+	usbi_dbg(device_ctx(dev), "open %d.%d", dev->bus_number, dev->device_address);
 
 	if (!usbi_atomic_load(&dev->attached))
 		return LIBUSB_ERROR_NO_DEVICE;
@@ -1487,7 +1487,7 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 
 	r = usbi_backend.open(_dev_handle);
 	if (r < 0) {
-		usbi_dbg(DEVICE_CTX(dev), "open %d.%d returns %d", dev->bus_number, dev->device_address, r);
+		usbi_dbg(device_ctx(dev), "open %d.%d returns %d", dev->bus_number, dev->device_address, r);
 		libusb_unref_device(dev);
 		usbi_mutex_destroy(&_dev_handle->lock);
 		free(_dev_handle);
@@ -1566,7 +1566,7 @@ static void do_close(struct libusb_context *ctx,
 	/* safe iteration because transfers may be being deleted */
 	for_each_transfer_safe(ctx, itransfer, tmp) {
 		struct libusb_transfer *transfer =
-			USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+			usbi_transfer_to_libusb_transfer(itransfer);
 		uint32_t state_flags;
 
 		if (transfer->dev_handle != dev_handle)
@@ -1629,7 +1629,7 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 
 	if (!dev_handle)
 		return;
-	ctx = HANDLE_CTX(dev_handle);
+	ctx = handle_ctx(dev_handle);
 	usbi_dbg(ctx, " ");
 
 	handling_events = usbi_handling_events(ctx);
@@ -1713,7 +1713,7 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev_handle,
 {
 	int r = LIBUSB_ERROR_NOT_SUPPORTED;
 	uint8_t tmp = 0;
-	struct libusb_context *ctx = HANDLE_CTX(dev_handle);
+	struct libusb_context *ctx = handle_ctx(dev_handle);
 
 	usbi_dbg(ctx, " ");
 	if (usbi_backend.get_configuration)
@@ -1798,7 +1798,7 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev_handle,
 int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
 	int configuration)
 {
-	usbi_dbg(HANDLE_CTX(dev_handle), "configuration %d", configuration);
+	usbi_dbg(handle_ctx(dev_handle), "configuration %d", configuration);
 	if (configuration < -1 || configuration > (int)UINT8_MAX)
 		return LIBUSB_ERROR_INVALID_PARAM;
 	return usbi_backend.set_configuration(dev_handle, configuration);
@@ -1837,7 +1837,7 @@ int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
 {
 	int r = 0;
 
-	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
+	usbi_dbg(handle_ctx(dev_handle), "interface %d", interface_number);
 	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -1881,7 +1881,7 @@ int API_EXPORTED libusb_release_interface(libusb_device_handle *dev_handle,
 {
 	int r;
 
-	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
+	usbi_dbg(handle_ctx(dev_handle), "interface %d", interface_number);
 	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
@@ -1924,7 +1924,7 @@ out:
 int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_handle,
 	int interface_number, int alternate_setting)
 {
-	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d altsetting %d",
+	usbi_dbg(handle_ctx(dev_handle), "interface %d altsetting %d",
 		interface_number, alternate_setting);
 	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -1965,7 +1965,7 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_hand
 int API_EXPORTED libusb_clear_halt(libusb_device_handle *dev_handle,
 	unsigned char endpoint)
 {
-	usbi_dbg(HANDLE_CTX(dev_handle), "endpoint 0x%x", endpoint);
+	usbi_dbg(handle_ctx(dev_handle), "endpoint 0x%x", endpoint);
 	if (!usbi_atomic_load(&dev_handle->dev->attached))
 		return LIBUSB_ERROR_NO_DEVICE;
 
@@ -1993,7 +1993,7 @@ int API_EXPORTED libusb_clear_halt(libusb_device_handle *dev_handle,
  */
 int API_EXPORTED libusb_reset_device(libusb_device_handle *dev_handle)
 {
-	usbi_dbg(HANDLE_CTX(dev_handle), " ");
+	usbi_dbg(handle_ctx(dev_handle), " ");
 	if (!usbi_atomic_load(&dev_handle->dev->attached))
 		return LIBUSB_ERROR_NO_DEVICE;
 
@@ -2027,7 +2027,7 @@ int API_EXPORTED libusb_reset_device(libusb_device_handle *dev_handle)
 int API_EXPORTED libusb_alloc_streams(libusb_device_handle *dev_handle,
 	uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
 {
-	usbi_dbg(HANDLE_CTX(dev_handle), "streams %u eps %d", (unsigned)num_streams, num_endpoints);
+	usbi_dbg(handle_ctx(dev_handle), "streams %u eps %d", (unsigned)num_streams, num_endpoints);
 
 	if (!num_streams || !endpoints || num_endpoints <= 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -2057,7 +2057,7 @@ int API_EXPORTED libusb_alloc_streams(libusb_device_handle *dev_handle,
 int API_EXPORTED libusb_free_streams(libusb_device_handle *dev_handle,
 	unsigned char *endpoints, int num_endpoints)
 {
-	usbi_dbg(HANDLE_CTX(dev_handle), "eps %d", num_endpoints);
+	usbi_dbg(handle_ctx(dev_handle), "eps %d", num_endpoints);
 
 	if (!endpoints || num_endpoints <= 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -2146,7 +2146,7 @@ int API_EXPORTED libusb_dev_mem_free(libusb_device_handle *dev_handle,
 int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev_handle,
 	int interface_number)
 {
-	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
+	usbi_dbg(handle_ctx(dev_handle), "interface %d", interface_number);
 
 	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -2184,7 +2184,7 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev_handle,
 int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
 	int interface_number)
 {
-	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
+	usbi_dbg(handle_ctx(dev_handle), "interface %d", interface_number);
 
 	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;
@@ -2220,7 +2220,7 @@ int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
 int API_EXPORTED libusb_attach_kernel_driver(libusb_device_handle *dev_handle,
 	int interface_number)
 {
-	usbi_dbg(HANDLE_CTX(dev_handle), "interface %d", interface_number);
+	usbi_dbg(handle_ctx(dev_handle), "interface %d", interface_number);
 
 	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
 		return LIBUSB_ERROR_INVALID_PARAM;

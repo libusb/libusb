@@ -1244,7 +1244,7 @@ void usbi_io_exit(struct libusb_context *ctx)
 
 static void calculate_timeout(struct usbi_transfer *itransfer)
 {
-	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct libusb_transfer *transfer = usbi_transfer_to_libusb_transfer(itransfer);
 	unsigned int timeout = transfer->timeout;
 
 	if (!timeout) {
@@ -1305,7 +1305,7 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	struct usbi_transfer *itransfer = (struct usbi_transfer *)(ptr + priv_size);
 	itransfer->priv = ptr;
 	usbi_mutex_init(&itransfer->lock);
-	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct libusb_transfer *transfer = usbi_transfer_to_libusb_transfer(itransfer);
 
 	return transfer;
 }
@@ -1332,16 +1332,16 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 	if (!transfer)
 		return;
 
-	usbi_dbg(TRANSFER_CTX(transfer), "transfer %p", (void *) transfer);
+	usbi_dbg(transfer_ctx(transfer), "transfer %p", (void *) transfer);
 	if (transfer->flags & LIBUSB_TRANSFER_FREE_BUFFER)
 		free(transfer->buffer);
 
-	struct usbi_transfer *itransfer = LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+	struct usbi_transfer *itransfer = libusb_transfer_to_usbi_transfer(transfer);
 	usbi_mutex_destroy(&itransfer->lock);
 	if (itransfer->dev)
 		libusb_unref_device(itransfer->dev);
 
-	unsigned char *ptr = USBI_TRANSFER_TO_TRANSFER_PRIV(itransfer);
+	unsigned char *ptr = usbi_transfer_to_transfer_priv(itransfer);
 	assert(ptr == itransfer->priv);
 	free(ptr);
 }
@@ -1370,7 +1370,7 @@ static int arm_timer_for_next_timeout(struct libusb_context *ctx)
 		/* act on first transfer that has not already been handled */
 		if (!(itransfer->timeout_flags & (USBI_TRANSFER_TIMEOUT_HANDLED | USBI_TRANSFER_OS_HANDLES_TIMEOUT))) {
 #ifdef ENABLE_LOGGING
-			struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+			struct libusb_transfer *transfer = usbi_transfer_to_libusb_transfer(itransfer);
 			usbi_dbg(ctx, "next timeout originally %ums", transfer->timeout);
 #endif
 			return usbi_arm_timer(&ctx->timer, cur_ts);
@@ -1396,7 +1396,7 @@ static int add_to_flying_list(struct usbi_transfer *itransfer)
 {
 	struct usbi_transfer *cur;
 	struct timespec *timeout = &itransfer->timeout;
-	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
+	struct libusb_context *ctx = itransfer_ctx(itransfer);
 	int r = 0;
 	int first = 1;
 
@@ -1436,7 +1436,7 @@ out:
 		/* if this transfer has the lowest timeout of all active transfers,
 		 * rearm the timer with this transfer's timeout */
 #ifdef ENABLE_LOGGING
-		struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		struct libusb_transfer *transfer = usbi_transfer_to_libusb_transfer(itransfer);
 		usbi_dbg(ctx, "arm timer for timeout in %ums (first in line)",
 			transfer->timeout);
 #endif
@@ -1459,7 +1459,7 @@ out:
  * NB: flying_transfers_lock MUST be held when calling this. */
 static int remove_from_flying_list(struct usbi_transfer *itransfer)
 {
-	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
+	struct libusb_context *ctx = itransfer_ctx(itransfer);
 	int rearm_timer;
 	int r = 0;
 
@@ -1489,7 +1489,7 @@ static int remove_from_flying_list(struct usbi_transfer *itransfer)
 int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 {
 	struct usbi_transfer *itransfer =
-		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+		libusb_transfer_to_usbi_transfer(transfer);
 	struct libusb_context *ctx;
 	int r;
 
@@ -1498,7 +1498,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		libusb_unref_device(itransfer->dev);
 	itransfer->dev = libusb_ref_device(transfer->dev_handle->dev);
 
-	ctx = HANDLE_CTX(transfer->dev_handle);
+	ctx = handle_ctx(transfer->dev_handle);
 	usbi_dbg(ctx, "transfer %p", (void *) transfer);
 
 	/*
@@ -1609,8 +1609,8 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 {
 	struct usbi_transfer *itransfer =
-		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
-	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
+		libusb_transfer_to_usbi_transfer(transfer);
+	struct libusb_context *ctx = itransfer_ctx(itransfer);
 	int r;
 
 	usbi_dbg(ctx, "transfer %p", (void *) transfer );
@@ -1654,7 +1654,7 @@ void API_EXPORTED libusb_transfer_set_stream_id(
 	struct libusb_transfer *transfer, uint32_t stream_id)
 {
 	struct usbi_transfer *itransfer =
-		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+		libusb_transfer_to_usbi_transfer(transfer);
 
 	itransfer->stream_id = stream_id;
 }
@@ -1671,7 +1671,7 @@ uint32_t API_EXPORTED libusb_transfer_get_stream_id(
 	struct libusb_transfer *transfer)
 {
 	struct usbi_transfer *itransfer =
-		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+		libusb_transfer_to_usbi_transfer(transfer);
 
 	return itransfer->stream_id;
 }
@@ -1688,8 +1688,8 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status)
 {
 	struct libusb_transfer *transfer =
-		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
+		usbi_transfer_to_libusb_transfer(itransfer);
+	struct libusb_context *ctx = itransfer_ctx(itransfer);
 	uint8_t flags;
 	int r;
 
@@ -1740,7 +1740,7 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
  * will attempt to take the lock. */
 int usbi_handle_transfer_cancellation(struct usbi_transfer *itransfer)
 {
-	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
+	struct libusb_context *ctx = itransfer_ctx(itransfer);
 	uint8_t timed_out;
 
 	usbi_mutex_lock(&ctx->flying_transfers_lock);
@@ -1765,7 +1765,7 @@ void usbi_signal_transfer_completion(struct usbi_transfer *itransfer)
 	struct libusb_device *dev = itransfer->dev;
 
 	if (dev) {
-		struct libusb_context *ctx = DEVICE_CTX(dev);
+		struct libusb_context *ctx = device_ctx(dev);
 		unsigned int event_flags;
 
 		usbi_mutex_lock(&ctx->event_data_lock);
@@ -2052,7 +2052,7 @@ int API_EXPORTED libusb_wait_for_event(libusb_context *ctx, struct timeval *tv)
 static void handle_timeout(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer =
-		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		usbi_transfer_to_libusb_transfer(itransfer);
 	int r;
 
 	itransfer->timeout_flags |= USBI_TRANSFER_TIMEOUT_HANDLED;
@@ -2060,7 +2060,7 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 	if (r == LIBUSB_SUCCESS)
 		itransfer->timeout_flags |= USBI_TRANSFER_TIMED_OUT;
 	else
-		usbi_warn(TRANSFER_CTX(transfer),
+		usbi_warn(transfer_ctx(transfer),
 			"async cancel failed %d", r);
 }
 
@@ -2839,7 +2839,7 @@ void usbi_handle_disconnect(struct libusb_context *ctx, struct libusb_device_han
 		to_cancel = NULL;
 		usbi_mutex_lock(&ctx->flying_transfers_lock);
 		for_each_transfer(ctx, cur) {
-			struct libusb_transfer *cur_transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(cur);
+			struct libusb_transfer *cur_transfer = usbi_transfer_to_libusb_transfer(cur);
 			if (cur_transfer->dev_handle == dev_handle) {
 				usbi_mutex_lock(&cur->lock);
 				if (cur->state_flags & USBI_TRANSFER_IN_FLIGHT)
@@ -2856,7 +2856,7 @@ void usbi_handle_disconnect(struct libusb_context *ctx, struct libusb_device_han
 			break;
 
 #ifdef ENABLE_LOGGING
-		struct libusb_transfer *transfer_to_cancel = USBI_TRANSFER_TO_LIBUSB_TRANSFER(to_cancel);
+		struct libusb_transfer *transfer_to_cancel = usbi_transfer_to_libusb_transfer(to_cancel);
 		usbi_dbg(ctx, "cancelling transfer %p from disconnect",
 			 (void *) transfer_to_cancel);
 #endif

@@ -763,7 +763,7 @@ void em_destroy_device(libusb_device* dev) {
 
 int em_submit_transfer(usbi_transfer* itransfer) {
 	return runOnMain([itransfer] {
-		auto transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		auto transfer = usbi_transfer_to_libusb_transfer(itransfer);
 		auto& web_usb_device = WebUsbDevicePtr(transfer->dev_handle)
 								   ->getDeviceAssumingMainThread();
 		val transfer_promise;
@@ -779,7 +779,7 @@ int em_submit_transfer(usbi_transfer* itransfer) {
 				auto endpoint =
 					transfer->endpoint & LIBUSB_ENDPOINT_ADDRESS_MASK;
 
-				if (IS_XFERIN(transfer)) {
+				if (is_xfer_in(transfer)) {
 					transfer_promise = web_usb_device.call<val>(
 						"transferIn", endpoint, transfer->length);
 				} else {
@@ -816,7 +816,7 @@ int em_cancel_transfer(usbi_transfer* itransfer) {
 
 int em_handle_transfer_completion(usbi_transfer* itransfer) {
 	libusb_transfer_status status = runOnMain([itransfer] {
-		auto transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		auto transfer = usbi_transfer_to_libusb_transfer(itransfer);
 
 		// Take ownership of the transfer result, as `em_clear_transfer_priv` is
 		// not called automatically for completed transfers and we must free it
