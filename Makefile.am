@@ -22,7 +22,15 @@ distdir = libusb-$(VERSION)
 # Ensure any generated docs are cleaned out
 # We need this here because make does not recurse into doc/
 clean-local:
-	rm -rf doc/$(DOXYGEN_HTMLDIR)
+	rm -rf doc/$(DOXYGEN_HTMLDIR) doc/man
+
+if BUILD_MAN_PAGES
+install-data-local:
+	$(MAKE) -C doc install-man DESTDIR=$(DESTDIR)
+
+uninstall-local:
+	$(MAKE) -C doc uninstall-man DESTDIR=$(DESTDIR)
+endif
 
 # Use dist-hook to accomplish the following things for the dist recipe:
 #   1) Remove the GitHub Markdown from the README file

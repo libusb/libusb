@@ -54,6 +54,7 @@ android/obj
 *.exe
 *.pc
 doc/api-1.0
+doc/man
 *.plg
 *.ncb
 *.opt
