@@ -70,7 +70,7 @@ typedef struct {
  * \param tests A NULL_TEST terminated array of tests
  * \return 0 on success, non-zero on failure
  */
-int libusb_testlib_run_tests(int argc, char *argv[],
+int libusb_testlib_run_tests(int argc, const char *argv[],
 	const libusb_testlib_test *tests);
 
 #endif //LIBUSB_TESTLIB_H

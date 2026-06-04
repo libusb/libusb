@@ -220,20 +220,19 @@ int usbi_disarm_timer(usbi_timer_t *timer)
 
 int usbi_alloc_event_data(struct libusb_context *ctx)
 {
-	struct usbi_event_source *ievent_source;
+	struct usbi_event_source * __single ievent_source;
 	struct pollfd *fds;
 	size_t i = 0;
 
-	if (ctx->event_data) {
-		free(ctx->event_data);
-		ctx->event_data = NULL;
-	}
-
+	free(ctx->event_data);
+	ctx->event_data = NULL;
 	ctx->event_data_cnt = 0;
-	for_each_event_source(ctx, ievent_source)
-		ctx->event_data_cnt++;
 
-	fds = calloc(ctx->event_data_cnt, sizeof(*fds));
+	unsigned int cnt = 0;
+	for_each_event_source(ctx, ievent_source)
+		cnt++;
+
+	fds = calloc(cnt, sizeof(*fds));
 	if (!fds)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -244,6 +243,8 @@ int usbi_alloc_event_data(struct libusb_context *ctx)
 	}
 
 	ctx->event_data = fds;
+	ctx->event_data_cnt = cnt;
+
 	return 0;
 }
 

@@ -1103,7 +1103,7 @@ static void display_help(const char *progname)
 	printf("If only the vid:pid is provided, xusb attempts to run the most appropriate test\n");
 }
 
-int main(int argc, char** argv)
+int main(int argc, const char* argv[])
 {
 	bool debug_mode = false;
 	const struct libusb_version* version;
