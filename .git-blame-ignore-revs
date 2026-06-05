@@ -1,3 +1,15 @@
+#
+# This file lists revisions that should be ignored when considering
+# attribution for the actual code written.  Code style changes should
+# not be considered as modifications with regards to attribution.
+#
+# To see clean and meaningful blame information.
+# $ git blame important.py --ignore-revs-file .git-blame-ignore-revs
+#
+# To configure git to automatically ignore revisions listed in a file on every call to git blame.
+# $ git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+
 # Add missing newlines at the end of files
 042d12470c70f7f04221c3821a2b8e6b55356a77
 
@@ -6,3 +18,6 @@ f60e73fa1e425f51565ee83930504406d37d9149
 
 # Convert tabs<->spaces, making files self-consistent
 c6dd91363112f4084c85e9cc2903983c286a79d0
+
+# Ignore changes introduced when doing global file format changes
+3e74ea52c05ed7806815aa0f4bc77ff99c088328
