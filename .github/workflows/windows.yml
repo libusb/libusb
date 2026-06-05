@@ -52,3 +52,23 @@ jobs:
             build/**/dll/libusb-1.0.exp
             build/**/dll/libusb-1.0.pdb
             build/**/lib/libusb-1.0.lib
+
+  # Compile the MSVC solution with /TP (treat all sources as C++) — configure +
+  # build only, no tests/runtime. Verifies the code stays valid C++ under MSVC.
+  build-cxx:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v3
+
+      - name: build as C++ (MSVC)
+        run: |
+          # Force the library sources to compile as C++. A Directory.Build.props in
+          # msvc/ applies to the projects there, which don't set CompileAs themselves.
+          '<Project><ItemDefinitionGroup><ClCompile><CompileAs>CompileAsCpp</CompileAs></ClCompile></ItemDefinitionGroup></Project>' | Set-Content msvc/Directory.Build.props
+          msbuild msvc/libusb_dll.vcxproj /m -property:Configuration=Release -property:Platform=x64
