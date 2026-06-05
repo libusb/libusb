@@ -84,3 +84,26 @@ jobs:
           ./fuzz_bos_descriptor tests/fuzz/corpus/bos \
             -seed=1 -runs=200 -max_total_time=15 -timeout=5 -rss_limit_mb=1536 -print_final_stats=1
       # --- end sanitizers + fuzzer smoke ---
+
+  # Compile the library sources with a C++ compiler (configure + build only,
+  # no tests/runtime). Verifies the code stays valid C++.
+  build-cxx:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup prerequisites
+        run: |
+          sudo apt update
+          sudo apt install -y autoconf automake libtool libudev-dev m4 pkg-config
+
+      - name: bootstrap
+        run: ./bootstrap.sh
+
+      - name: configure and build as C++
+        run: |
+          mkdir build-cxx && cd build-cxx
+          ../configure
+          make CC='g++' CFLAGS='-x c++' AM_CFLAGS='-std=c++20 -fvisibility=hidden -pthread'
