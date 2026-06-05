@@ -50,3 +50,30 @@ jobs:
             build*/config.log
             build*/tests/*.log
           if-no-files-found: ignore
+
+  # Compile the library sources with a C++ compiler (configure + build only,
+  # no tests/runtime). Verifies the code stays valid C++.
+  build-cxx:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup prerequisites
+        shell: bash
+        run: |
+          brew update
+          brew install autoconf automake libtool m4
+
+      - name: bootstrap
+        shell: bash
+        run: ./bootstrap.sh
+
+      - name: configure and build as C++
+        shell: bash
+        run: |
+          mkdir build-cxx && cd build-cxx
+          ../configure
+          make CC='clang++' CFLAGS='-x c++' AM_CFLAGS='-std=c++20 -fvisibility=hidden -pthread'
