@@ -1699,7 +1699,7 @@ enum libusb_device_string_type {
  *  => 126.5 codepoints
  *  => 127 * 3 + 1
  *  => 382 bytes
- * 
+ *
  * Stay with 256 * 3/2 = 384 to be safe.
  */
 #define LIBUSB_DEVICE_STRING_BYTES_MAX  (384U)

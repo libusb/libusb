@@ -1381,7 +1381,7 @@ static int linux_default_scan_devices(struct libusb_context *ctx)
 	if (sysfs_available && sysfs_get_device_list(ctx) == LIBUSB_SUCCESS)
 		return LIBUSB_SUCCESS;
 
-    return usbfs_get_device_list(ctx);
+	return usbfs_get_device_list(ctx);
 }
 #endif
 
