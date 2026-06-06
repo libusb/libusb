@@ -1950,7 +1950,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						libusb_unref_device(dev);
 						goto alloc_device;
 					}
-					if (memcmp(&priv->class_guid, &dev_info_data.ClassGuid, sizeof(GUID)) != 0) {
+					if (!usbi_guid_equal(&priv->class_guid, &dev_info_data.ClassGuid)) {
 						usbi_dbg(ctx, "device class GUID for session [%lX] changed", session_id);
 						usbi_detach_device(dev); // usbi_detach_device is equivalent do usbi_disconnect_device but for the firing of LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT
 						libusb_unref_device(dev);

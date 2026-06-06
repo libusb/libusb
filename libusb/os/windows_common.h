@@ -429,6 +429,17 @@ static inline struct winusb_transfer_priv *get_winusb_transfer_priv(struct usbi_
 	return &transfer_priv->winusb_priv;
 }
 
+/* IsEqualGUID() takes pointers in C but const GUID& references in C++; wrap it
+ * so callers can pass pointers regardless of the language being compiled. */
+static inline bool usbi_guid_equal(const GUID *guid1, const GUID *guid2)
+{
+#ifdef __cplusplus
+	return IsEqualGUID(*guid1, *guid2) != 0;
+#else
+	return IsEqualGUID(guid1, guid2) != 0;
+#endif
+}
+
 extern const struct windows_backend usbdk_backend;
 extern const struct windows_backend winusb_backend;
 
