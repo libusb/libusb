@@ -81,8 +81,7 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 		return LIBUSB_ERROR_OTHER;
 }
 
-/* C++ spells C11's _Thread_local as the keyword thread_local; map to whichever
- * the current compiler accepts so this file builds as both C and C++. */
+/* C uses _Thread_local; C++ uses the thread_local keyword. */
 #if defined(__cplusplus)
 #define USBI_THREAD_LOCAL thread_local
 #else

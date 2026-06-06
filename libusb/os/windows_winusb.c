@@ -3697,7 +3697,7 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 
 		// Initiate the transfers.
 		if (IS_XFERIN(transfer))
-			ret = WinUSBX[sub_api].ReadIsochPipeAsap((PWINUSB_ISOCH_BUFFER_HANDLE)buffer_handle, 0, transfer->length, !transfer_priv->iso_break_stream, transfer->num_iso_packets, (PUSBD_ISO_PACKET_DESCRIPTOR)transfer->iso_packet_desc, overlapped);
+			ret = WinUSBX[sub_api].ReadIsochPipeAsap(buffer_handle, 0, transfer->length, !transfer_priv->iso_break_stream, transfer->num_iso_packets, (PUSBD_ISO_PACKET_DESCRIPTOR)transfer->iso_packet_desc, overlapped);
 		else
 			ret = WinUSBX[sub_api].WriteIsochPipeAsap(buffer_handle, 0, out_transfer_length, !transfer_priv->iso_break_stream, overlapped);
 

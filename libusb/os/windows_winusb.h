@@ -499,7 +499,7 @@ typedef BOOL (WINAPI *WinUsb_QueryPipeEx_t)(
 	PWINUSB_PIPE_INFORMATION_EX PipeInformationEx
 );
 typedef BOOL (WINAPI *WinUsb_ReadIsochPipeAsap_t)(
-	PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
+	WINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
 	ULONG Offset,
 	ULONG Length,
 	BOOL ContinueStream,
