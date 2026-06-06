@@ -395,37 +395,37 @@ struct windows_transfer_priv {
 
 static inline struct usbdk_device_handle_priv *get_usbdk_device_handle_priv(struct libusb_device_handle *dev_handle)
 {
-	struct windows_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
 	return &handle_priv->usbdk_priv;
 }
 
 static inline struct winusb_device_handle_priv *get_winusb_device_handle_priv(struct libusb_device_handle *dev_handle)
 {
-	struct windows_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
 	return &handle_priv->winusb_priv;
 }
 
 static inline OVERLAPPED *get_transfer_priv_overlapped(struct usbi_transfer *itransfer)
 {
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	return &transfer_priv->overlapped;
 }
 
 static inline void set_transfer_priv_handle(struct usbi_transfer *itransfer, HANDLE handle)
 {
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	transfer_priv->handle = handle;
 }
 
 static inline struct usbdk_transfer_priv *get_usbdk_transfer_priv(struct usbi_transfer *itransfer)
 {
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	return &transfer_priv->usbdk_priv;
 }
 
 static inline struct winusb_transfer_priv *get_winusb_transfer_priv(struct usbi_transfer *itransfer)
 {
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	return &transfer_priv->winusb_priv;
 }
 

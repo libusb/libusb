@@ -104,11 +104,11 @@ typedef volatile LONG usbi_atomic_t;
 #define usbi_atomic_inc(a)	InterlockedIncrement((a))
 #define usbi_atomic_dec(a)	InterlockedDecrement((a))
 #else
-#if defined(__HAIKU__) && defined(__GNUC__) && !defined(__clang__)
-/* The Haiku port of libusb has some C++ files and GCC does not define
- * anything in stdatomic.h when compiled in C++11 (only in C++23).
- * This appears to be a bug in gcc's stdatomic.h, and should be fixed either
- * in gcc or in Haiku. Until then, use the gcc builtins. */
+#if defined(__GNUC__) && !defined(__clang__) && (defined(__cplusplus) || defined(__HAIKU__))
+/* GCC's <stdatomic.h> cannot be used when compiling as C++ before C++23:
+ * it relies on the C-only _Atomic keyword, so the header fails to parse.
+ * Fall back to the GCC __atomic builtins, which work in both C and C++.
+ * This also covers the Haiku port, which builds some files as C++ with GCC. */
 typedef long usbi_atomic_t;
 #define usbi_atomic_load(a)    __atomic_load_n((a), __ATOMIC_SEQ_CST)
 #define usbi_atomic_store(a, v)        __atomic_store_n((a), (v), __ATOMIC_SEQ_CST)
