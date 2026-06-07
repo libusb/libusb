@@ -362,40 +362,39 @@ static int parse_configuration(struct libusb_context *ctx,
 		return LIBUSB_ERROR_IO;
 	}
 
-	config->bLength = buffer[0];
-	config->bDescriptorType = buffer[1];
-	config->wTotalLength = ReadLittleEndian16(&buffer[2]);
-	config->bNumInterfaces = buffer[4];
-	config->bConfigurationValue = buffer[5];
-	config->iConfiguration = buffer[6];
-	config->bmAttributes = buffer[7];
-	config->MaxPower = buffer[8];
-	if (config->bDescriptorType != LIBUSB_DT_CONFIG) {
+	uint8_t bLength = buffer[0];
+	uint8_t bDescriptorType = buffer[1];
+	uint16_t wTotalLength = ReadLittleEndian16(&buffer[2]);
+	uint8_t bNumInterfaces = buffer[4];
+	uint8_t bConfigurationValue = buffer[5];
+	uint8_t iConfiguration = buffer[6];
+	uint8_t bmAttributes = buffer[7];
+	uint8_t MaxPower = buffer[8];
+
+	if (bDescriptorType != LIBUSB_DT_CONFIG) {
 		usbi_err(ctx, "unexpected descriptor 0x%x (expected 0x%x)",
-			 config->bDescriptorType, LIBUSB_DT_CONFIG);
+			 bDescriptorType, LIBUSB_DT_CONFIG);
 		return LIBUSB_ERROR_IO;
-	} else if (config->bLength < LIBUSB_DT_CONFIG_SIZE) {
-		usbi_err(ctx, "invalid config bLength (%u)", config->bLength);
+	} else if (bLength < LIBUSB_DT_CONFIG_SIZE) {
+		usbi_err(ctx, "invalid config bLength (%u)", bLength);
 		return LIBUSB_ERROR_IO;
-	} else if (config->bLength > size) {
+	} else if (bLength > size) {
 		usbi_err(ctx, "short config descriptor read %d/%u",
-			 size, config->bLength);
+			 size, bLength);
 		return LIBUSB_ERROR_IO;
-	} else if (config->bNumInterfaces > USB_MAXINTERFACES) {
-		usbi_err(ctx, "too many interfaces (%u)", config->bNumInterfaces);
+	} else if (bNumInterfaces > USB_MAXINTERFACES) {
+		usbi_err(ctx, "too many interfaces (%u)", bNumInterfaces);
 		return LIBUSB_ERROR_IO;
 	}
 
-	usb_interface = calloc(config->bNumInterfaces, sizeof(*usb_interface));
+	usb_interface = calloc(bNumInterfaces, sizeof(*usb_interface));
 	if (!usb_interface)
 		return LIBUSB_ERROR_NO_MEM;
 
-	config->interface = usb_interface;
+	buffer += bLength;
+	size -= bLength;
 
-	buffer += config->bLength;
-	size -= config->bLength;
-
-	for (i = 0; i < config->bNumInterfaces; i++) {
+	for (i = 0; i < bNumInterfaces; i++) {
 		const uint8_t *begin;
 
 		/* Skip over the rest of the Class Specific or Vendor */
@@ -413,8 +412,8 @@ static int parse_configuration(struct libusb_context *ctx,
 				usbi_warn(ctx,
 					  "short extra config desc read %d/%u",
 					  size, header->bLength);
-				config->bNumInterfaces = i;
-				return size;
+				bNumInterfaces = i;
+				goto finish;
 			}
 
 			/* If we find another "proper" descriptor then we're done */
@@ -433,30 +432,41 @@ static int parse_configuration(struct libusb_context *ctx,
 		/*  drivers to later parse */
 		ptrdiff_t len = buffer - begin;
 		if (len > 0) {
-			uint8_t *extra = realloc((void *)config->extra,
-						 (size_t)(config->extra_length) + (size_t)len);
+			size_t newExtraLen = (size_t)(config->extra_length) + (size_t)len;
+			uint8_t *newExtra = realloc((void *)config->extra, newExtraLen);
 
-			if (!extra) {
+			if (!newExtra) {
 				r = LIBUSB_ERROR_NO_MEM;
 				goto err;
 			}
 
-			memcpy(extra + config->extra_length, begin, (size_t)len);
-			config->extra = extra;
-			config->extra_length += (int)len;
+			memcpy(newExtra + config->extra_length, begin, (size_t)len);
+			config->extra = newExtra;
+			config->extra_length = (int)newExtraLen;
 		}
 
 		r = parse_interface(ctx, usb_interface + i, buffer, size);
 		if (r < 0)
 			goto err;
 		if (r == 0) {
-			config->bNumInterfaces = i;
+			bNumInterfaces = i;
 			break;
 		}
 
 		buffer += r;
 		size -= r;
 	}
+
+finish:
+	config->interface = usb_interface;
+	config->bNumInterfaces = bNumInterfaces;
+	config->bLength = bLength;
+	config->bDescriptorType = bDescriptorType;
+	config->wTotalLength = wTotalLength;
+	config->bConfigurationValue = bConfigurationValue;
+	config->iConfiguration = iConfiguration;
+	config->bmAttributes = bmAttributes;
+	config->MaxPower = MaxPower;
 
 	return size;
 
