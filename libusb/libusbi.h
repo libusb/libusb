@@ -1049,7 +1049,7 @@ struct usbi_os_backend {
 	 * including the null terminator.
 	 *
 	 * Return:
-	 * - The actual length in bytes including the null termintor on success.
+	 * - The actual length in bytes including the null terminator on success.
 	 * - LIBUSB_ERROR_NO_DEVICE if device not found.
 	 * - LIBUSB_ERROR_INVALID_PARAM if any parameter is invalid.
 	 * - another LIBUSB_ERROR code on other failure
