@@ -91,7 +91,7 @@ haiku_get_config_descriptor(struct libusb_device *device, uint8_t config_index, 
 	USBDevice *dev = *((USBDevice **)usbi_get_device_priv(device));
 	const usb_configuration_descriptor *config = dev->ConfigurationDescriptor(config_index);
 	if (config == NULL) {
-		usbi_err(DEVICE_CTX(device), "failed getting configuration descriptor");
+		usbi_err(device_ctx(device), "failed getting configuration descriptor");
 		return LIBUSB_ERROR_IO;
 	}
 	if (len > config->total_length) {
@@ -142,7 +142,7 @@ haiku_release_interface(struct libusb_device_handle *dev_handle, uint8_t interfa
 static int
 haiku_submit_transfer(struct usbi_transfer *itransfer)
 {
-	struct libusb_transfer *fLibusbTransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct libusb_transfer *fLibusbTransfer = usbi_transfer_to_libusb_transfer(itransfer);
 	USBDeviceHandle *fDeviceHandle = *((USBDeviceHandle **)usbi_get_device_handle_priv(fLibusbTransfer->dev_handle));
 	return fDeviceHandle->SubmitTransfer(itransfer);
 }
@@ -150,7 +150,7 @@ haiku_submit_transfer(struct usbi_transfer *itransfer)
 static int
 haiku_cancel_transfer(struct usbi_transfer *itransfer)
 {
-	struct libusb_transfer *fLibusbTransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct libusb_transfer *fLibusbTransfer = usbi_transfer_to_libusb_transfer(itransfer);
 	USBDeviceHandle *fDeviceHandle = *((USBDeviceHandle **)usbi_get_device_handle_priv(fLibusbTransfer->dev_handle));
 	return fDeviceHandle->CancelTransfer(*((USBTransfer **)usbi_get_transfer_priv(itransfer)));
 }
@@ -172,7 +172,7 @@ haiku_handle_transfer_completion(struct usbi_transfer *itransfer)
 	}
 	libusb_transfer_status status = LIBUSB_TRANSFER_COMPLETED;
 	if (itransfer->transferred < 0) {
-		usbi_err(ITRANSFER_CTX(itransfer), "error in transfer");
+		usbi_err(itransfer_ctx(itransfer), "error in transfer");
 		status = LIBUSB_TRANSFER_ERROR;
 		itransfer->transferred = 0;
 	}
