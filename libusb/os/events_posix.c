@@ -23,6 +23,7 @@
 
 #include "libusbi.h"
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #ifdef HAVE_EVENTFD
@@ -258,7 +259,6 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 {
 	struct pollfd *fds = (struct pollfd *)ctx->event_data;
 	usbi_nfds_t nfds = (usbi_nfds_t)ctx->event_data_cnt;
-	int internal_fds, num_ready;
 
 	usbi_dbg(ctx, "poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
 #ifdef __EMSCRIPTEN__
@@ -269,13 +269,13 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	 * in case they ever implement real poll. */
 	timeout_ms = 0;
 #endif
-	num_ready = poll(fds, nfds, timeout_ms);
+	int num_ready = poll(fds, nfds, timeout_ms);
 	usbi_dbg(ctx, "poll() returned %d", num_ready);
 	if (num_ready == 0) {
 		if (usbi_using_timer(ctx))
 			goto done;
 		return LIBUSB_ERROR_TIMEOUT;
-	} else if (num_ready == -1) {
+	} else if (num_ready < 0) {
 		if (errno == EINTR)
 			return LIBUSB_ERROR_INTERRUPTED;
 		usbi_err(ctx, "poll() failed, errno=%d", errno);
@@ -283,6 +283,7 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	}
 
 	/* fds[0] is always the internal signalling event */
+	assert(nfds >= 1);
 	if (fds[0].revents) {
 		reported_events->event_triggered = 1;
 		num_ready--;
@@ -292,6 +293,7 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 
 #ifdef HAVE_OS_TIMER
 	/* on timer configurations, fds[1] is the timer */
+	assert(nfds >= 2);
 	if (usbi_using_timer(ctx) && fds[1].revents) {
 		reported_events->timer_triggered = 1;
 		num_ready--;
@@ -307,7 +309,7 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	 * library's internal file descriptors, so we determine how many are
 	 * in use internally for this context and skip these when passing any
 	 * remaining pollfds to the backend. */
-	internal_fds = usbi_using_timer(ctx) ? 2 : 1;
+	unsigned int internal_fds = usbi_using_timer(ctx) ? 2 : 1;
 	fds += internal_fds;
 	nfds -= internal_fds;
 
@@ -334,13 +336,13 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	}
 	usbi_mutex_unlock(&ctx->event_data_lock);
 
+	assert(num_ready >= 0);
 	if (num_ready) {
-		assert(num_ready > 0);
 		reported_events->event_data = fds;
 		reported_events->event_data_count = (unsigned int)nfds;
 	}
 
 done:
-	reported_events->num_ready = num_ready;
+	reported_events->num_ready = (unsigned int)num_ready;
 	return LIBUSB_SUCCESS;
 }
