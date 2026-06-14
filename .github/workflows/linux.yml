@@ -2,11 +2,14 @@ name: linux
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           # Fetch full history + tags so build-aux/gen-describe.sh can
           # produce a tag-prefixed `git describe` string.
@@ -33,7 +36,7 @@ jobs:
       - name: disable-log
         run: .private/ci-build.sh --werror --build-dir build-nolog -- --disable-log
 
-      - uses: emscripten-core/setup-emsdk@v16
+      - uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
 
       - run: npm ci
         working-directory: tests/webusb-test-shim
