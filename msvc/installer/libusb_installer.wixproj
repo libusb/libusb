@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSBuild project that builds the libusb runtime MSI installer using the
+  WiX Toolset MSBuild SDK. Building this project *is* the installer build:
+
+      msbuild msvc\installer\libusb_installer.wixproj -restore -p:Platform=x64
+      msbuild msvc\installer\libusb_installer.wixproj -restore -p:Platform=x86
+      msbuild msvc\installer\libusb_installer.wixproj -restore -p:Platform=arm64
+
+  The project does the following:
+    * Reads the product version from libusb/version.h (pure MSBuild),
+    * Builds the libusb-1.0 DLL for the requested architecture,
+    * Discovers the freshly built DLL in the MSVC output tree,
+    * Feeds Version + DllPath to libusb.wxs as preprocessor constants.
+-->
+<Project Sdk="WixToolset.Sdk/6.0.2">
+
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+
+    <!-- Normalise the requested platform to a lowercase WiX arch. -->
+    <InstallerArch Condition="'$(Platform)' == 'Win32' or '$(Platform)' == 'x86' or '$(Platform)' == 'AnyCPU' or '$(Platform)' == 'Any CPU'">x86</InstallerArch>
+    <InstallerArch Condition="'$(Platform)' == 'x64'">x64</InstallerArch>
+    <InstallerArch Condition="'$(Platform)' == 'ARM64' or '$(Platform)' == 'arm64'">arm64</InstallerArch>
+    <InstallerArch Condition="'$(InstallerArch)' == ''">$(Platform)</InstallerArch>
+    <InstallerPlatform>$(InstallerArch)</InstallerPlatform>
+
+    <!-- MSVC platform name (matches libusb.sln output folders): Win32, not x86. -->
+    <LibusbMsvcPlatform Condition="'$(InstallerArch)' == 'x86'">Win32</LibusbMsvcPlatform>
+    <LibusbMsvcPlatform Condition="'$(InstallerArch)' == 'x64'">x64</LibusbMsvcPlatform>
+    <LibusbMsvcPlatform Condition="'$(InstallerArch)' == 'arm64'">ARM64</LibusbMsvcPlatform>
+    <LibusbMsvcPlatform Condition="'$(LibusbMsvcPlatform)' == ''">$(InstallerArch)</LibusbMsvcPlatform>
+
+    <!-- Configuration of the DLL to package. Defaults to Release-MT, which statically links the CRT so the shipped DLL needs no Visual C++ runtime redistributable. -->
+    <LibusbDllConfiguration Condition="'$(LibusbDllConfiguration)' == ''">Release-MT</LibusbDllConfiguration>
+
+    <!-- When false, skip compiling the DLL and just package an existing build output. -->
+    <BuildLibusbDll Condition="'$(BuildLibusbDll)' == ''">true</BuildLibusbDll>
+
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..'))\</RepoRoot>
+
+    <!-- Read the version straight out of the canonical header. -->
+    <_VersionHeader>$([System.IO.File]::ReadAllText('$(RepoRoot)libusb\version.h'))</_VersionHeader>
+    <_LibusbMajor>$([System.Text.RegularExpressions.Regex]::Match($(_VersionHeader), 'define\s+LIBUSB_MAJOR\s+(\d+)').Groups.get_Item(1).Value)</_LibusbMajor>
+    <_LibusbMinor>$([System.Text.RegularExpressions.Regex]::Match($(_VersionHeader), 'define\s+LIBUSB_MINOR\s+(\d+)').Groups.get_Item(1).Value)</_LibusbMinor>
+    <_LibusbMicro>$([System.Text.RegularExpressions.Regex]::Match($(_VersionHeader), 'define\s+LIBUSB_MICRO\s+(\d+)').Groups.get_Item(1).Value)</_LibusbMicro>
+    <LibusbVersion>$(_LibusbMajor).$(_LibusbMinor).$(_LibusbMicro).0</LibusbVersion>
+    <DefineConstants>Version=$(LibusbVersion)</DefineConstants>
+
+    <!-- build/installer/<arch>/libusb-<version>-<arch>.msi -->
+    <OutputName>libusb-$(LibusbVersion)-$(InstallerArch)</OutputName>
+    <OutputPath>$(RepoRoot)build\installer\$(InstallerArch)\</OutputPath>
+  </PropertyGroup>
+
+  <!--
+    Build the libusb DLL for this architecture and resolve its path, then
+    expose it to the WiX compiler as the DllPath preprocessor constant.
+    Runs before CoreCompile so $(DefineConstants) is updated before the
+    WixBuild task reads it.
+  -->
+  <Target Name="ResolveLibusbDll" BeforeTargets="CoreCompile">
+    <Message Condition="'$(BuildLibusbDll)' == 'true'" 
+             Importance="high" Text="Building libusb-1.0.dll ($(LibusbDllConfiguration) | $(LibusbMsvcPlatform))" />
+
+    <MSBuild Condition="'$(BuildLibusbDll)' == 'true'"
+             Projects="$(RepoRoot)msvc\libusb_dll.vcxproj"
+             Targets="Build"
+             Properties="Configuration=$(LibusbDllConfiguration);Platform=$(LibusbMsvcPlatform)" />
+
+    <!-- MSVC layout: build\<toolset>\<platform>\<configuration>\dll\libusb-1.0.dll.
+         A clean tree has exactly one toolset, hence one match. -->
+    <ItemGroup>
+      <_LibusbDll Include="$(RepoRoot)build\**\$(LibusbMsvcPlatform)\$(LibusbDllConfiguration)\dll\libusb-1.0.dll" />
+    </ItemGroup>
+
+    <Error Condition="'@(_LibusbDll)' == ''"
+           Text="libusb-1.0.dll not found for $(LibusbMsvcPlatform)/$(LibusbDllConfiguration) under $(RepoRoot)build." />
+
+    <PropertyGroup>
+      <DllPath>@(_LibusbDll)</DllPath>
+      <DefineConstants>$(DefineConstants);DllPath=$(DllPath)</DefineConstants>
+    </PropertyGroup>
+
+    <Message Importance="high" Text="Packaging DLL: $(DllPath)" />
+    <Message Importance="high" Text="Installer version: $(LibusbVersion)" />
+  </Target>
+
+</Project>
