@@ -1120,6 +1120,214 @@ test_hotplug_add_remove(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 #endif
 }
 
+static void
+test_prealloc_bulk_urbs(UMockdevTestbedFixture * fixture, UNUSED_DATA)
+{
+	unsigned char buf[4] = { 0x01, 0x02, 0x03, 0x04 };
+	int completed = 0;
+	libusb_device_handle *handle;
+	struct libusb_transfer *transfer;
+	UsbChat chat[] = {
+		{
+		  .submit = TRUE,
+		  .reaps = &chat[1],
+		  .type = USBDEVFS_URB_TYPE_BULK,
+		  .endpoint = LIBUSB_ENDPOINT_OUT,
+		  .buffer_length = 4,
+		}, {
+		  .reap = TRUE,
+		  .actual_length = 4,
+		}, {
+		  .submit = FALSE,
+		}
+	};
+
+	fixture->chat = chat;
+	handle = libusb_open_device_with_vid_pid(fixture->ctx, 0x04a9, 0x31c0);
+	g_assert_nonnull(handle);
+
+	transfer = libusb_alloc_transfer(0);
+	libusb_fill_bulk_transfer(transfer, handle, LIBUSB_ENDPOINT_OUT, buf, 4,
+				  transfer_cb_inc_user_data, &completed, 0);
+
+	g_assert_cmpint(libusb_prealloc_bulk_urbs(transfer), ==, LIBUSB_SUCCESS);
+
+	g_assert_cmpint(libusb_submit_transfer(transfer), ==, LIBUSB_SUCCESS);
+	while (!completed)
+		g_assert_cmpint(libusb_handle_events_completed(fixture->ctx, &completed), ==, 0);
+
+	g_assert_cmpint(transfer->status, ==, LIBUSB_TRANSFER_COMPLETED);
+	libusb_free_transfer(transfer);
+	libusb_close(handle);
+}
+
+static void
+test_prealloc_bulk_urbs_idempotent(UMockdevTestbedFixture * fixture, UNUSED_DATA)
+{
+	unsigned char buf[4] = { 0x01, 0x02, 0x03, 0x04 };
+	int completed = 0;
+	libusb_device_handle *handle;
+	struct libusb_transfer *transfer;
+	UsbChat chat[] = {
+		{
+		  .submit = TRUE,
+		  .reaps = &chat[1],
+		  .type = USBDEVFS_URB_TYPE_BULK,
+		  .endpoint = LIBUSB_ENDPOINT_OUT,
+		  .buffer_length = 4,
+		}, {
+		  .reap = TRUE,
+		  .actual_length = 4,
+		}, {
+		  .submit = FALSE,
+		}
+	};
+
+	fixture->chat = chat;
+	handle = libusb_open_device_with_vid_pid(fixture->ctx, 0x04a9, 0x31c0);
+	g_assert_nonnull(handle);
+
+	transfer = libusb_alloc_transfer(0);
+	libusb_fill_bulk_transfer(transfer, handle, LIBUSB_ENDPOINT_OUT, buf, 4,
+				  transfer_cb_inc_user_data, &completed, 0);
+
+	g_assert_cmpint(libusb_prealloc_bulk_urbs(transfer), ==, LIBUSB_SUCCESS);
+	g_assert_cmpint(libusb_prealloc_bulk_urbs(transfer), ==, LIBUSB_SUCCESS);
+
+	g_assert_cmpint(libusb_submit_transfer(transfer), ==, LIBUSB_SUCCESS);
+	while (!completed)
+		g_assert_cmpint(libusb_handle_events_completed(fixture->ctx, &completed), ==, 0);
+
+	g_assert_cmpint(transfer->status, ==, LIBUSB_TRANSFER_COMPLETED);
+	libusb_free_transfer(transfer);
+	libusb_close(handle);
+}
+
+static void
+test_prealloc_bulk_urbs_wrong_type(UMockdevTestbedFixture * fixture, UNUSED_DATA)
+{
+	unsigned char buf[4] = { 0 };
+	libusb_device_handle *handle;
+	struct libusb_transfer *transfer;
+
+	handle = libusb_open_device_with_vid_pid(fixture->ctx, 0x04a9, 0x31c0);
+	g_assert_nonnull(handle);
+
+	transfer = libusb_alloc_transfer(0);
+	libusb_fill_bulk_transfer(transfer, handle, LIBUSB_ENDPOINT_OUT, buf, 4,
+				  NULL, NULL, 0);
+	transfer->type = LIBUSB_TRANSFER_TYPE_CONTROL;
+
+	g_assert_cmpint(libusb_prealloc_bulk_urbs(transfer), ==, LIBUSB_ERROR_INVALID_PARAM);
+
+	libusb_free_transfer(transfer);
+	libusb_close(handle);
+}
+
+static void
+test_prealloc_iso_urbs(UMockdevTestbedFixture * fixture, UNUSED_DATA)
+{
+	unsigned char buf[64] = { 0 };
+	int completed = 0;
+	libusb_device_handle *handle;
+	struct libusb_transfer *transfer;
+	UsbChat chat[] = {
+		{
+		  .submit = TRUE,
+		  .reaps = &chat[1],
+		  .type = USBDEVFS_URB_TYPE_ISO,
+		  .endpoint = LIBUSB_ENDPOINT_OUT | 0x02,
+		  .buffer_length = 64,
+		}, {
+		  .reap = TRUE,
+		  .actual_length = 64,
+		}, {
+		  .submit = FALSE,
+		}
+	};
+
+	fixture->chat = chat;
+	handle = libusb_open_device_with_vid_pid(fixture->ctx, 0x04a9, 0x31c0);
+	g_assert_nonnull(handle);
+
+	transfer = libusb_alloc_transfer(1);
+	libusb_fill_iso_transfer(transfer, handle, LIBUSB_ENDPOINT_OUT | 0x02,
+				 buf, 64, 1, transfer_cb_inc_user_data, &completed, 0);
+	libusb_set_iso_packet_lengths(transfer, 64);
+
+	g_assert_cmpint(libusb_prealloc_iso_urbs(transfer), ==, LIBUSB_SUCCESS);
+
+	g_assert_cmpint(libusb_submit_transfer(transfer), ==, LIBUSB_SUCCESS);
+	while (!completed)
+		g_assert_cmpint(libusb_handle_events_completed(fixture->ctx, &completed), ==, 0);
+
+	g_assert_cmpint(transfer->status, ==, LIBUSB_TRANSFER_COMPLETED);
+	libusb_free_transfer(transfer);
+	libusb_close(handle);
+}
+
+static void
+test_prealloc_iso_urbs_idempotent(UMockdevTestbedFixture * fixture, UNUSED_DATA)
+{
+	unsigned char buf[64] = { 0 };
+	int completed = 0;
+	libusb_device_handle *handle;
+	struct libusb_transfer *transfer;
+	UsbChat chat[] = {
+		{
+		  .submit = TRUE,
+		  .reaps = &chat[1],
+		  .type = USBDEVFS_URB_TYPE_ISO,
+		  .endpoint = LIBUSB_ENDPOINT_OUT | 0x02,
+		  .buffer_length = 64,
+		}, {
+		  .reap = TRUE,
+		  .actual_length = 64,
+		}, {
+		  .submit = FALSE,
+		}
+	};
+
+	fixture->chat = chat;
+	handle = libusb_open_device_with_vid_pid(fixture->ctx, 0x04a9, 0x31c0);
+	g_assert_nonnull(handle);
+
+	transfer = libusb_alloc_transfer(1);
+	libusb_fill_iso_transfer(transfer, handle, LIBUSB_ENDPOINT_OUT | 0x02,
+				 buf, 64, 1, transfer_cb_inc_user_data, &completed, 0);
+	libusb_set_iso_packet_lengths(transfer, 64);
+
+	g_assert_cmpint(libusb_prealloc_iso_urbs(transfer), ==, LIBUSB_SUCCESS);
+	g_assert_cmpint(libusb_prealloc_iso_urbs(transfer), ==, LIBUSB_SUCCESS);
+
+	g_assert_cmpint(libusb_submit_transfer(transfer), ==, LIBUSB_SUCCESS);
+	while (!completed)
+		g_assert_cmpint(libusb_handle_events_completed(fixture->ctx, &completed), ==, 0);
+
+	g_assert_cmpint(transfer->status, ==, LIBUSB_TRANSFER_COMPLETED);
+	libusb_free_transfer(transfer);
+	libusb_close(handle);
+}
+
+static void
+test_prealloc_iso_urbs_no_packets(UMockdevTestbedFixture * fixture, UNUSED_DATA)
+{
+	libusb_device_handle *handle;
+	struct libusb_transfer *transfer;
+
+	handle = libusb_open_device_with_vid_pid(fixture->ctx, 0x04a9, 0x31c0);
+	g_assert_nonnull(handle);
+
+	transfer = libusb_alloc_transfer(0);
+	transfer->dev_handle = handle;
+	transfer->type = LIBUSB_TRANSFER_TYPE_ISOCHRONOUS;
+
+	g_assert_cmpint(libusb_prealloc_iso_urbs(transfer), ==, LIBUSB_ERROR_INVALID_PARAM);
+
+	libusb_free_transfer(transfer);
+	libusb_close(handle);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1172,6 +1380,36 @@ main(int argc, char **argv)
 	g_test_add("/libusb/hotplug/add-remove", UMockdevTestbedFixture, NULL,
 	           test_fixture_setup_empty,
 	           test_hotplug_add_remove,
+	           test_fixture_teardown);
+
+	g_test_add("/libusb/prealloc-bulk-urbs", UMockdevTestbedFixture, NULL,
+	           test_fixture_setup_with_canon,
+	           test_prealloc_bulk_urbs,
+	           test_fixture_teardown);
+
+	g_test_add("/libusb/prealloc-bulk-urbs-idempotent", UMockdevTestbedFixture, NULL,
+	           test_fixture_setup_with_canon,
+	           test_prealloc_bulk_urbs_idempotent,
+	           test_fixture_teardown);
+
+	g_test_add("/libusb/prealloc-bulk-urbs-wrong-type", UMockdevTestbedFixture, NULL,
+	           test_fixture_setup_with_canon,
+	           test_prealloc_bulk_urbs_wrong_type,
+	           test_fixture_teardown);
+
+	g_test_add("/libusb/prealloc-iso-urbs", UMockdevTestbedFixture, NULL,
+	           test_fixture_setup_with_canon,
+	           test_prealloc_iso_urbs,
+	           test_fixture_teardown);
+
+	g_test_add("/libusb/prealloc-iso-urbs-idempotent", UMockdevTestbedFixture, NULL,
+	           test_fixture_setup_with_canon,
+	           test_prealloc_iso_urbs_idempotent,
+	           test_fixture_teardown);
+
+	g_test_add("/libusb/prealloc-iso-urbs-no-packets", UMockdevTestbedFixture, NULL,
+	           test_fixture_setup_with_canon,
+	           test_prealloc_iso_urbs_no_packets,
 	           test_fixture_teardown);
 
 	return g_test_run();
