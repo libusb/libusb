@@ -3197,6 +3197,15 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 	if (((is_using_usbccgp) || (iface == 0)) &&
 	    (!is_associated_interface || (iface==priv->usb_interface[iface].first_associated_interface))) {
 		// composite device (independent interfaces) or interface 0
+
+		// This interface may already have been auto-claimed as the first
+		// interface while another interface was claimed before it. Calling
+		// Initialize() again on the same handle would overwrite and leak the
+		// existing api_handle (the one any associated interface was derived
+		// from), so treat an already-initialized interface as done.
+		if (HANDLE_VALID(handle_priv->interface_handle[iface].api_handle))
+			return LIBUSB_SUCCESS;
+
 		file_handle = handle_priv->interface_handle[iface].dev_handle;
 		if (!HANDLE_VALID(file_handle))
 			return LIBUSB_ERROR_NOT_FOUND;
