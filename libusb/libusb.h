@@ -1756,6 +1756,11 @@ void LIBUSB_CALL libusb_unref_device(libusb_device *dev);
 
 int LIBUSB_CALL libusb_get_device_string(libusb_device *dev,
 	enum libusb_device_string_type string_type, char *data, int length);
+int LIBUSB_CALL libusb_get_config_string(libusb_device *dev,
+	uint8_t config_value, char *data, int length);
+int LIBUSB_CALL libusb_get_interface_string(libusb_device *dev,
+	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+	char *data, int length);
 int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
 	int *config);
 int LIBUSB_CALL libusb_get_device_descriptor(libusb_device *dev,

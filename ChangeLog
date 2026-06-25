@@ -5,6 +5,7 @@ For detailed information about the changes below, please see the git log.
 * Add RAW_IO support in WinUSB backend
 * Work around a macOS 26 Tahoe compatibility breakage due to Apple changing kUSBHostPortPropertyPortNumber
 * Add new API libusb_get_device_string() to access device strings without opening the device
+* Add new APIs libusb_get_config_string() and libusb_get_interface_string() to access configuration and interface strings without opening the device
 * Add new API libusb_get_session_data() which returns the OS-specific handle
 * Fix device removal races on non-hotplug builds
 * Improve descriptor parsing memory safety

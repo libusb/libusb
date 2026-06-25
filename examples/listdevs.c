@@ -69,6 +69,29 @@ static void print_devs(libusb_device **devs, int verbose)
 			if (r >= 0) {
 				printf("\n    serial_number = %s", string_buffer);
 			}
+
+			r = libusb_get_config_string(dev, /*config_value=*/0,
+				string_buffer, sizeof(string_buffer));
+			if (r >= 0) {
+				printf("\n    configuration = %s", string_buffer);
+			}
+
+			struct libusb_config_descriptor *config;
+			if (libusb_get_active_config_descriptor(dev, &config) == 0) {
+				int ifc;
+				for (ifc = 0; ifc < config->bNumInterfaces; ifc++) {
+					const struct libusb_interface_descriptor *altsetting =
+						&config->interface[ifc].altsetting[0];
+					r = libusb_get_interface_string(dev, /*config_value=*/0,
+						altsetting->bInterfaceNumber, altsetting->bAlternateSetting,
+						string_buffer, sizeof(string_buffer));
+					if (r >= 0) {
+						printf("\n    interface %u = %s",
+							altsetting->bInterfaceNumber, string_buffer);
+					}
+				}
+				libusb_free_config_descriptor(config);
+			}
 		}
 		printf("\n");
 	}
