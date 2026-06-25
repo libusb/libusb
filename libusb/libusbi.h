@@ -1057,6 +1057,24 @@ struct usbi_os_backend {
 	int (*get_device_string)(libusb_device *dev,
 		enum libusb_device_string_type string_type, char *data, int length);
 
+	/* Retrieve a configuration string (iConfiguration) without opening the
+	 * device.  config_value is the bConfigurationValue, or 0 for the active
+	 * configuration.  The same constraints and return values as
+	 * get_device_string apply.  Optional.
+	 */
+	int (*get_config_string)(libusb_device *dev,
+		uint8_t config_value, char *data, int length);
+
+	/* Retrieve an interface string (iInterface) without opening the device.
+	 * config_value is the bConfigurationValue, or 0 for the active
+	 * configuration.  interface_number and alt_setting identify the
+	 * interface alternate setting.  The same constraints and return values
+	 * as get_device_string apply.  Optional.
+	 */
+	int (*get_interface_string)(libusb_device *dev,
+		uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+		char *data, int length);
+
 	/* Apps which were written before hotplug support, may listen for
 	 * hotplug events on their own and call libusb_get_device_list on
 	 * device addition. In this case libusb_get_device_list will likely
@@ -1552,6 +1570,16 @@ struct usbi_os_backend {
 };
 
 extern const struct usbi_os_backend usbi_backend;
+
+/* Resolve the string descriptor index (iConfiguration / iInterface) for a
+ * configuration or interface alternate setting, without opening the device.
+ * config_value is the bConfigurationValue, or 0 for the active configuration.
+ * Used by backends that fetch strings by descriptor index. */
+int usbi_get_config_string_index(libusb_device *dev,
+	uint8_t config_value, uint8_t *index_out);
+int usbi_get_interface_string_index(libusb_device *dev,
+	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+	uint8_t *index_out);
 
 #define for_each_context(c) \
 	for_each_helper(c, &active_contexts_list, struct libusb_context)

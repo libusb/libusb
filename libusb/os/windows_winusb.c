@@ -2282,8 +2282,14 @@ static int usbi_utf16le_to_utf8(uint8_t const *src, int src_length, char *dst, i
  * While we would rather not invoke USB IO, we currently lack a
  * better option.
  */
-static int winusb_get_device_string(libusb_device *dev,
-	enum libusb_device_string_type string_type, char *data, int length)
+/*
+ * Fetch the string descriptor at the given index from the parent USB hub,
+ * without opening the device.  Shared by winusb_get_device_string(),
+ * winusb_get_config_string() and winusb_get_interface_string() since USB
+ * string descriptors are device-global and addressed by index.
+ */
+static int winusb_fetch_string_descriptor(libusb_device *dev,
+	uint8_t string_descriptor_idx, char *data, int length)
 {
 	struct winusb_device_priv* priv = usbi_get_device_priv(dev);
 	struct libusb_context* ctx = DEVICE_CTX(dev);
@@ -2296,18 +2302,6 @@ static int winusb_get_device_string(libusb_device *dev,
 	}
 	if (NULL == dev->parent_dev) {
 		return LIBUSB_ERROR_NOT_SUPPORTED;
-	}
-
-	uint8_t string_descriptor_idx;
-	switch (string_type) {
-	case LIBUSB_DEVICE_STRING_MANUFACTURER: string_descriptor_idx = dev->device_descriptor.iManufacturer; break;
-	case LIBUSB_DEVICE_STRING_PRODUCT: string_descriptor_idx = dev->device_descriptor.iProduct; break;
-	case LIBUSB_DEVICE_STRING_SERIAL_NUMBER: string_descriptor_idx = dev->device_descriptor.iSerialNumber; break;
-	default: return LIBUSB_ERROR_INVALID_PARAM;
-	}
-
-	if (0 == string_descriptor_idx) {
-		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
 	struct winusb_device_priv* hub_priv = usbi_get_device_priv(dev->parent_dev);
@@ -2373,6 +2367,73 @@ static int winusb_get_device_string(libusb_device *dev,
 	}
 
 	return usbi_utf16le_to_utf8(sd.desc.bString, (int) (sd.desc.bLength - 2), data, length);
+}
+
+static int winusb_get_device_string(libusb_device *dev,
+	enum libusb_device_string_type string_type, char *data, int length)
+{
+	uint8_t string_descriptor_idx;
+
+	if ((NULL != data) && (length > 0)) {
+		*data = 0;
+	}
+
+	switch (string_type) {
+	case LIBUSB_DEVICE_STRING_MANUFACTURER: string_descriptor_idx = dev->device_descriptor.iManufacturer; break;
+	case LIBUSB_DEVICE_STRING_PRODUCT: string_descriptor_idx = dev->device_descriptor.iProduct; break;
+	case LIBUSB_DEVICE_STRING_SERIAL_NUMBER: string_descriptor_idx = dev->device_descriptor.iSerialNumber; break;
+	default: return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	if (0 == string_descriptor_idx) {
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	return winusb_fetch_string_descriptor(dev, string_descriptor_idx, data, length);
+}
+
+static int winusb_get_config_string(libusb_device *dev,
+	uint8_t config_value, char *data, int length)
+{
+	uint8_t string_descriptor_idx = 0;
+	int r;
+
+	if ((NULL != data) && (length > 0)) {
+		*data = 0;
+	}
+
+	r = usbi_get_config_string_index(dev, config_value, &string_descriptor_idx);
+	if (r < 0) {
+		return r;
+	}
+	if (0 == string_descriptor_idx) {
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	return winusb_fetch_string_descriptor(dev, string_descriptor_idx, data, length);
+}
+
+static int winusb_get_interface_string(libusb_device *dev,
+	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+	char *data, int length)
+{
+	uint8_t string_descriptor_idx = 0;
+	int r;
+
+	if ((NULL != data) && (length > 0)) {
+		*data = 0;
+	}
+
+	r = usbi_get_interface_string_index(dev, config_value, interface_number,
+		alt_setting, &string_descriptor_idx);
+	if (r < 0) {
+		return r;
+	}
+	if (0 == string_descriptor_idx) {
+		return LIBUSB_ERROR_NOT_FOUND;
+	}
+
+	return winusb_fetch_string_descriptor(dev, string_descriptor_idx, data, length);
 }
 
 static int winusb_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len)
@@ -2695,6 +2756,8 @@ const struct windows_backend winusb_backend = {
 	winusb_exit,
 	winusb_get_device_list,
 	winusb_get_device_string,
+	winusb_get_config_string,
+	winusb_get_interface_string,
 	winusb_open,
 	winusb_close,
 	winusb_get_active_config_descriptor,

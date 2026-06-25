@@ -1710,3 +1710,174 @@ int API_EXPORTED libusb_get_device_string(libusb_device *dev,
 
 	return usbi_utf8_copy(data, s, length);
 }
+
+/* Get the configuration descriptor for config_value, or the active
+ * configuration when config_value is 0. */
+static int get_config_descriptor_for_value(libusb_device *dev,
+	uint8_t config_value, struct libusb_config_descriptor **config)
+{
+	if (config_value == 0)
+		return libusb_get_active_config_descriptor(dev, config);
+	return libusb_get_config_descriptor_by_value(dev, config_value, config);
+}
+
+/* Resolve iConfiguration for config_value (0 = active config); *index_out is
+ * set to 0 when the configuration has no string descriptor. */
+int usbi_get_config_string_index(libusb_device *dev,
+	uint8_t config_value, uint8_t *index_out)
+{
+	struct libusb_config_descriptor *config = NULL;
+	int r;
+
+	r = get_config_descriptor_for_value(dev, config_value, &config);
+	if (r < 0)
+		return r;
+
+	*index_out = config->iConfiguration;
+	libusb_free_config_descriptor(config);
+	return LIBUSB_SUCCESS;
+}
+
+/* Resolve iInterface for the given interface/alt setting (config_value 0 =
+ * active config); *index_out is 0 when it has no string descriptor.  Returns
+ * LIBUSB_ERROR_NOT_FOUND if the interface/alt setting does not exist. */
+int usbi_get_interface_string_index(libusb_device *dev,
+	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+	uint8_t *index_out)
+{
+	struct libusb_config_descriptor *config = NULL;
+	int r, i, j;
+
+	r = get_config_descriptor_for_value(dev, config_value, &config);
+	if (r < 0)
+		return r;
+
+	r = LIBUSB_ERROR_NOT_FOUND;
+	for (i = 0; i < config->bNumInterfaces; i++) {
+		const struct libusb_interface *intf = &config->interface[i];
+		for (j = 0; j < intf->num_altsetting; j++) {
+			const struct libusb_interface_descriptor *as = &intf->altsetting[j];
+			if (as->bInterfaceNumber == interface_number &&
+			    as->bAlternateSetting == alt_setting) {
+				*index_out = as->iInterface;
+				r = LIBUSB_SUCCESS;
+				break;
+			}
+		}
+		if (r == LIBUSB_SUCCESS)
+			break;
+	}
+
+	libusb_free_config_descriptor(config);
+	return r;
+}
+
+/** \ingroup libusb_desc
+ * Retrieve the string descriptor describing a configuration (iConfiguration)
+ * without needing to open the device.
+ *
+ * Since version v1.0.30 \ref LIBUSB_API_VERSION >= 0x0100010C
+ *
+ * \param dev the target device
+ * \param config_value the bConfigurationValue of the configuration, or 0 to
+ *      select the device's currently active configuration.
+ * \param data the data buffer for the UTF-8 encoded string.
+ * \param length the size of the data buffer in bytes.
+ *      USB string descriptors cannot be longer than
+ *      LIBUSB_DEVICE_STRING_BYTES_MAX.
+ * \returns a negative error code or
+ *      the actual string length in bytes including the null terminator.
+ * \see libusb_get_device_string()
+ * \see libusb_get_interface_string()
+ *
+ * Like \ref libusb_get_device_string() this function works while the device is
+ * still closed, relying on the operating system's cached descriptors.
+ *
+ * Selecting a non-active configuration (a non-zero config_value that does not
+ * match the active configuration) is only possible on backends that can read
+ * arbitrary string descriptors without opening the device; other backends
+ * return \ref LIBUSB_ERROR_NOT_SUPPORTED in that case.
+ */
+int API_EXPORTED libusb_get_config_string(libusb_device *dev,
+	uint8_t config_value, char *data, int length)
+{
+	char buf[LIBUSB_DEVICE_STRING_BYTES_MAX];
+	int r;
+
+	if (NULL == dev)
+		return LIBUSB_ERROR_INVALID_PARAM;
+	if ((NULL == data) || (length <= 0))
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	*data = 0;  /* return an empty string on errors when possible */
+
+	if (NULL == usbi_backend.get_config_string)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	/* Fetch into a full-size buffer, then copy out via usbi_utf8_copy() for
+	 * UTF-8-safe truncation, as libusb_get_device_string() does. */
+	r = usbi_backend.get_config_string(dev, config_value, buf, sizeof(buf));
+	if (r < 0)
+		return r;
+
+	return usbi_utf8_copy(data, buf, length);
+}
+
+/** \ingroup libusb_desc
+ * Retrieve the string descriptor describing an interface (iInterface)
+ * without needing to open the device.
+ *
+ * Since version v1.0.30 \ref LIBUSB_API_VERSION >= 0x0100010C
+ *
+ * \param dev the target device
+ * \param config_value the bConfigurationValue of the configuration the
+ *      interface belongs to, or 0 to select the device's currently active
+ *      configuration.
+ * \param interface_number the bInterfaceNumber of the interface
+ * \param alt_setting the bAlternateSetting of the interface
+ * \param data the data buffer for the UTF-8 encoded string.
+ * \param length the size of the data buffer in bytes.
+ *      USB string descriptors cannot be longer than
+ *      LIBUSB_DEVICE_STRING_BYTES_MAX.
+ * \returns a negative error code or
+ *      the actual string length in bytes including the null terminator.
+ * \see libusb_get_device_string()
+ * \see libusb_get_config_string()
+ *
+ * Like \ref libusb_get_device_string() this function works while the device is
+ * still closed, relying on the operating system's cached descriptors.
+ *
+ * Selecting a non-active configuration or, on some backends, a non-current
+ * alternate setting is only possible where the operating system exposes the
+ * corresponding string descriptor without opening the device; otherwise
+ * \ref LIBUSB_ERROR_NOT_SUPPORTED is returned.  A return of
+ * \ref LIBUSB_ERROR_NOT_FOUND means the interface has no string descriptor
+ * (its iInterface is 0) or the requested interface/alternate setting does not
+ * exist.
+ */
+int API_EXPORTED libusb_get_interface_string(libusb_device *dev,
+	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+	char *data, int length)
+{
+	char buf[LIBUSB_DEVICE_STRING_BYTES_MAX];
+	int r;
+
+	if (NULL == dev)
+		return LIBUSB_ERROR_INVALID_PARAM;
+	if ((NULL == data) || (length <= 0))
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	*data = 0;  /* return an empty string on errors when possible */
+
+	if (NULL == usbi_backend.get_interface_string)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	/* Fetch into a full-size buffer, then copy out via usbi_utf8_copy() for
+	 * UTF-8-safe truncation, as libusb_get_device_string() does. */
+	r = usbi_backend.get_interface_string(dev, config_value,
+		interface_number, alt_setting, buf, sizeof(buf));
+	if (r < 0)
+		return r;
+
+	return usbi_utf8_copy(data, buf, length);
+}
