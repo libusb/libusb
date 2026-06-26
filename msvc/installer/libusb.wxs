@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WiX source for the libusb runtime MSI installer.
+
+  It installs the DLL under "Program Files\libusb\bin"
+  (or "Program Files (x86)\libusb\bin" for x86) and prepends
+  that directory to the system PATH.
+
+  Values supplied on the command line with `wix build -d NAME=VALUE`:
+    Version  - product version, e.g. "1.0.30.0" (must be numeric a.b.c.d)
+    DllPath  - absolute path to the built libusb-1.0.dll for this arch
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <!-- Stable, per-arch UpgradeCodes so each flavour installs side by side and upgrades independently. Do not change these. -->
+  <?if $(sys.BUILDARCH) = x64 ?>
+    <?define PlatformName = "x64" ?>
+    <?define ProgramFilesDir = "ProgramFiles64Folder" ?>
+    <?define ComponentBitness = "always64" ?>
+    <?define UpgradeCode = "5C9F3A2B-AD4E-4F7A-B2C3-8D9E0F1A2B3C" ?>
+  <?elseif $(sys.BUILDARCH) = arm64 ?>
+    <?define PlatformName = "arm64" ?>
+    <?define ProgramFilesDir = "ProgramFiles64Folder" ?>
+    <?define ComponentBitness = "always64" ?>
+    <?define UpgradeCode = "7E1D4C3B-2F5A-4B8C-9D0E-3A6B1C2D3E4F" ?>
+  <?else?>
+    <?define PlatformName = "x86" ?>
+    <?define ProgramFilesDir = "ProgramFilesFolder" ?>
+    <?define ComponentBitness = "always32" ?>
+    <?define UpgradeCode = "4B8E2F1A-9C3D-4E6F-A1B2-7C8D9E0F1A2B" ?>
+  <?endif?>
+
+  <Package
+      Name="libusb $(PlatformName) runtime"
+      Manufacturer="The libusb project"
+      Version="$(Version)"
+      UpgradeCode="$(UpgradeCode)"
+      Compressed="yes"
+      Scope="perMachine">
+
+    <SummaryInformation Description="libusb $(PlatformName) runtime library" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of the libusb $(PlatformName) runtime is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="$(ProgramFilesDir)">
+      <Directory Id="INSTALLFOLDER" Name="libusb">
+        <Directory Id="BINFOLDER" Name="bin" />
+      </Directory>
+    </StandardDirectory>
+
+    <ComponentGroup Id="ProductComponents" Directory="BINFOLDER">
+      <!-- The runtime DLL itself. -->
+      <Component Id="LibusbRuntimeDll" Bitness="$(ComponentBitness)">
+        <File Id="LibusbDll" Source="$(DllPath)" Name="libusb-1.0.dll" KeyPath="yes" />
+      </Component>
+
+      <!-- Prepend the install directory to the system PATH. The registry
+           value acts as the component key path; the PATH entry is removed
+           on uninstall (Permanent="no"). -->
+      <Component Id="LibusbPath" Bitness="$(ComponentBitness)">
+        <Environment Id="LibusbPathEnv" Name="PATH" Value="[BINFOLDER]"
+                     Action="set" Part="last" System="yes" Permanent="no" />
+        <RegistryValue Root="HKLM" Key="Software\libusb\$(PlatformName)"
+                       Name="InstallDir" Type="string" Value="[BINFOLDER]" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Package>
+</Wix>
