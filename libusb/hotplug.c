@@ -198,10 +198,12 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 		return;
 
 	/* free all registered hotplug callbacks */
+	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 	for_each_hotplug_cb_safe(ctx, hotplug_cb, next_cb) {
 		list_del(&hotplug_cb->list);
 		free(hotplug_cb);
 	}
+	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
 
 	/* free all pending hotplug messages */
 	while (!list_empty(&ctx->hotplug_msgs)) {
@@ -348,6 +350,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 	libusb_hotplug_callback_handle *callback_handle)
 {
 	struct usbi_hotplug_callback *hotplug_cb;
+	libusb_hotplug_callback_handle handle;
 
 	/* check for sane values */
 	if (!events || (~VALID_HOTPLUG_EVENTS & events) ||
@@ -389,6 +392,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 
 	/* protect the handle by the context hotplug lock */
 	hotplug_cb->handle = ctx->next_hotplug_cb_handle++;
+	handle = hotplug_cb->handle;
 
 	/* handle the unlikely case of overflow */
 	if (ctx->next_hotplug_cb_handle < 0)
@@ -399,7 +403,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
 
 	usbi_dbg(ctx, "new hotplug cb %p with handle %d",
-		 (void *) hotplug_cb, hotplug_cb->handle);
+		 (void *) hotplug_cb, handle);
 
 	if ((flags & LIBUSB_HOTPLUG_ENUMERATE) && (events & LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)) {
 		ssize_t i, len;
@@ -407,21 +411,39 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 
 		len = libusb_get_device_list(ctx, &devs);
 		if (len < 0) {
-			libusb_hotplug_deregister_callback(ctx, hotplug_cb->handle);
+			libusb_hotplug_deregister_callback(ctx, handle);
 			return (int)len;
 		}
 
 		for (i = 0; i < len; i++) {
+			struct usbi_hotplug_callback hotplug_cb_copy;
+			int found = 0;
+
+			usbi_mutex_lock(&ctx->hotplug_cbs_lock);
+			for_each_hotplug_cb(ctx, hotplug_cb) {
+				if (handle == hotplug_cb->handle) {
+					if (!(hotplug_cb->flags & USBI_HOTPLUG_NEEDS_FREE)) {
+						hotplug_cb_copy = *hotplug_cb;
+						found = 1;
+					}
+					break;
+				}
+			}
+			usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
+
+			if (!found)
+				break;
+
 			usbi_hotplug_match_cb(devs[i],
 					LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
-					hotplug_cb);
+					&hotplug_cb_copy);
 		}
 
 		libusb_free_device_list(devs, 1);
 	}
 
 	if (callback_handle)
-		*callback_handle = hotplug_cb->handle;
+		*callback_handle = handle;
 
 	return LIBUSB_SUCCESS;
 }
