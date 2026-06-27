@@ -53,7 +53,8 @@
  * libusb_hotplug_register_callback() because of the \ref LIBUSB_HOTPLUG_ENUMERATE
  * flag, the callback return value is ignored. In other words, you cannot cause a
  * callback to be deregistered by returning 1 when it is called from
- * libusb_hotplug_register_callback().
+ * libusb_hotplug_register_callback(). Deregistering the callback from within
+ * such a callback stops further enumeration.
  *
  * Callbacks for a particular context are automatically deregistered by libusb_exit().
  *
@@ -417,13 +418,14 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 
 		for (i = 0; i < len; i++) {
 			struct usbi_hotplug_callback hotplug_cb_copy;
+			struct usbi_hotplug_callback *matching_cb;
 			int found = 0;
 
 			usbi_mutex_lock(&ctx->hotplug_cbs_lock);
-			for_each_hotplug_cb(ctx, hotplug_cb) {
-				if (handle == hotplug_cb->handle) {
-					if (!(hotplug_cb->flags & USBI_HOTPLUG_NEEDS_FREE)) {
-						hotplug_cb_copy = *hotplug_cb;
+			for_each_hotplug_cb(ctx, matching_cb) {
+				if (handle == matching_cb->handle) {
+					if (!(matching_cb->flags & USBI_HOTPLUG_NEEDS_FREE)) {
+						hotplug_cb_copy = *matching_cb;
 						found = 1;
 					}
 					break;
