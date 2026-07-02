@@ -247,15 +247,53 @@ static void windows_refresh_device_list_for_all_ctx(void)
 
 #define WND_CLASS_NAME TEXT("libusb-1.0-windows-hotplug")
 
+// Window classes are keyed by the (name, hInstance) pair. Use this libusb
+// copy's own module handle rather than the executable's, so that independent
+// copies of libusb within one process (e.g. one linked statically into the
+// application and one bundled as a DLL by a plugin) each register their own
+// class instead of colliding on ERROR_CLASS_ALREADY_EXISTS.
+static HINSTANCE get_hotplug_instance(void)
+{
+	// Cached so that RegisterClass, CreateWindow and UnregisterClass are
+	// guaranteed to use the same handle. No synchronization needed: all
+	// callers run on the event thread, and successive event threads are
+	// serialized by the join in windows_stop_event_monitor.
+	static HINSTANCE hotplug_instance;
+
+	if (hotplug_instance == NULL)
+	{
+		// Resolve the module containing this libusb copy from the address of
+		// one of its statics (works for both the DLL and static-linked cases).
+		if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+			GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+			(LPCTSTR)&windows_event_hwnd, &hotplug_instance))
+		{
+			log_error("GetModuleHandleEx");
+		}
+	}
+
+	return hotplug_instance;
+}
+
 static bool init_wnd_class(void)
 {
 	WNDCLASS wndClass = { 0 };
 	wndClass.lpfnWndProc = windows_proc_callback;
-	wndClass.hInstance = GetModuleHandle(NULL);
+	wndClass.hInstance = get_hotplug_instance();
 	wndClass.lpszClassName = WND_CLASS_NAME;
 
 	if (!RegisterClass(&wndClass))
 	{
+		if (GetLastError() == ERROR_CLASS_ALREADY_EXISTS)
+		{
+			// A registration left behind by an abnormally terminated event
+			// thread of this same libusb copy (the class is keyed to this
+			// module, and orderly shutdowns unregister it). It is still
+			// backed by this module's windows_proc_callback, so reuse it.
+			usbi_warn(NULL, "hotplug window class was already registered");
+			return true;
+		}
+
 		log_error("event thread: RegisterClass");
 		return false;
 	}
@@ -280,13 +318,13 @@ static DWORD WINAPI windows_event_thread_main(LPVOID lpParam)
 		0,
 		0, 0, 0, 0,
 		NULL, NULL,
-		GetModuleHandle(NULL),
+		get_hotplug_instance(),
 		NULL);
 
 	if (windows_event_hwnd == NULL)
 	{
 		log_error("event thread: CreateWindow");
-		UnregisterClass(WND_CLASS_NAME, GetModuleHandle(NULL));
+		UnregisterClass(WND_CLASS_NAME, get_hotplug_instance());
 		return (DWORD)-1;
 	}
 
@@ -320,7 +358,7 @@ static DWORD WINAPI windows_event_thread_main(LPVOID lpParam)
 	// restarting the event monitor (libusb_exit followed by libusb_init)
 	// would fail RegisterClass with ERROR_CLASS_ALREADY_EXISTS and hotplug
 	// events would never be delivered again. See issue #1862.
-	if (!UnregisterClass(WND_CLASS_NAME, GetModuleHandle(NULL)))
+	if (!UnregisterClass(WND_CLASS_NAME, get_hotplug_instance()))
 	{
 		log_error("event thread: UnregisterClass");
 	}
