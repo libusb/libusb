@@ -474,6 +474,7 @@ static void darwin_deref_cached_device(struct darwin_cached_device *cached_dev) 
   }
 }
 
+/* this function must be called with the darwin_cached_devices_mutex held */
 static void darwin_ref_cached_device(struct darwin_cached_device *cached_dev) REQUIRES(darwin_cached_devices_mutex) {
   cached_dev->refcount++;
 }
@@ -1514,7 +1515,9 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
       priv = (struct darwin_device_priv *)usbi_get_device_priv(dev);
 
       priv->dev = cached_device;
+      usbi_mutex_lock(&darwin_cached_devices_mutex);
       darwin_ref_cached_device (priv->dev);
+      usbi_mutex_unlock(&darwin_cached_devices_mutex);
       dev->port_number    = cached_device->port;
       /* the location ID encodes the path to the device. the top byte of the location ID contains the bus number
          (numbered from 0). the remaining bytes can be used to construct the device tree for that bus. */
