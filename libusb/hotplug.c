@@ -386,11 +386,13 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 
 	/* protect the handle by the context hotplug lock */
-	hotplug_cb->handle = ctx->next_hotplug_cb_handle++;
+	hotplug_cb->handle = ctx->next_hotplug_cb_handle;
 
-	/* handle the unlikely case of overflow */
-	if (ctx->next_hotplug_cb_handle < 0)
+	/* handle the unlikely case of overflow manually (as signed overflow is UB) */
+	if (hotplug_cb->handle == INT_MAX)
 		ctx->next_hotplug_cb_handle = 1;
+	else
+		ctx->next_hotplug_cb_handle++;
 
 	list_add(&hotplug_cb->list, &ctx->hotplug_cbs);
 
