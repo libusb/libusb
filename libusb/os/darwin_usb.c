@@ -68,12 +68,16 @@ static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for eve
 /* Lock ordering: the per-device lock (struct darwin_cached_device, dpriv->lock)
    may be held when acquiring darwin_cached_devices_mutex (e.g. via
    darwin_reload_device), so never acquire dpriv->lock while holding
-   darwin_cached_devices_mutex. The core acquires dev_handle->lock before
-   calling into the backend (libusb_claim_interface/libusb_release_interface),
-   so dev_handle->lock always sits above dpriv->lock. Consequently, code
-   holding dpriv->lock must not call public libusb_* functions that take
-   locks (e.g. libusb_release_interface). Lock-free ones such as
-   libusb_get_active_config_descriptor are tolerated but discouraged. */
+   darwin_cached_devices_mutex. dev_handle->lock always sits above
+   dpriv->lock: the core acquires it around the claim/release backend calls,
+   and the backend entry points that mutate per-handle interface state
+   (darwin_reset_device, darwin_detach_kernel_driver,
+   darwin_attach_kernel_driver, darwin_set_configuration,
+   darwin_set_interface_altsetting, darwin_clear_halt) take it themselves
+   before dpriv->lock. Consequently, code holding dpriv->lock must not call
+   public libusb_* functions that take locks (e.g. libusb_release_interface).
+   Lock-free ones such as libusb_get_active_config_descriptor are tolerated
+   but discouraged. */
 static usbi_mutex_t darwin_cached_devices_mutex = USBI_MUTEX_INITIALIZER;
 static struct list_head darwin_cached_devices GUARDED_BY(darwin_cached_devices_mutex);
 static int init_count GUARDED_BY(darwin_cached_devices_mutex);
@@ -99,6 +103,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
 static int darwin_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
 static int darwin_reenumerate_device(struct libusb_device_handle *dev_handle, bool capture);
 static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint);
+static int darwin_clear_halt_locked(struct libusb_device_handle *dev_handle, unsigned char endpoint) REQUIRES(dev_handle->lock);
 static int darwin_reset_device(struct libusb_device_handle *dev_handle);
 static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface);
 static int darwin_detach_kernel_driver_locked (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock);
@@ -501,7 +506,8 @@ static usb_device_t darwin_active_device_interface (struct darwin_cached_device 
   return device;
 }
 
-static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, uint8_t *pipep, uint8_t *ifcp, struct darwin_interface **interface_out) {
+/* must be called while holding dev_handle->lock */
+static int ep_to_pipeRef_locked(struct libusb_device_handle *dev_handle, uint8_t ep, uint8_t *pipep, uint8_t *ifcp, struct darwin_interface **interface_out) REQUIRES(dev_handle->lock) {
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
 
   /* current interface */
@@ -513,7 +519,6 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
 
   usbi_dbg (ctx, "converting ep address 0x%02x to pipeRef and interface", ep);
 
-  usbi_mutex_lock(&dev_handle->lock);
   for (iface = 0 ; iface < USB_MAXINTERFACES ; iface++) {
     cInterface = &priv->interfaces[iface];
 
@@ -529,7 +534,6 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
             *interface_out = cInterface;
 
           usbi_dbg (ctx, "pipe %d on interface %d matches", *pipep, iface);
-          usbi_mutex_unlock(&dev_handle->lock);
           return LIBUSB_SUCCESS;
         }
       }
@@ -539,9 +543,17 @@ static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, ui
   /* No pipe found with the correct endpoint address */
   usbi_warn (HANDLE_CTX(dev_handle), "no pipeRef found with endpoint address 0x%02x.", ep);
 
+  return LIBUSB_ERROR_NOT_FOUND;
+}
+
+static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, uint8_t *pipep, uint8_t *ifcp, struct darwin_interface **interface_out) {
+  int ret;
+
+  usbi_mutex_lock(&dev_handle->lock);
+  ret = ep_to_pipeRef_locked (dev_handle, ep, pipep, ifcp, interface_out);
   usbi_mutex_unlock(&dev_handle->lock);
 
-  return LIBUSB_ERROR_NOT_FOUND;
+  return ret;
 }
 
 static IOReturn usb_setup_device_iterator (io_iterator_t *deviceIterator, UInt32 location) {
@@ -1784,7 +1796,10 @@ static int darwin_get_configuration(struct libusb_device_handle *dev_handle, uin
   return LIBUSB_SUCCESS;
 }
 
-static int darwin_set_configuration(struct libusb_device_handle *dev_handle, int config) REQUIRES(dev_handle->lock) {
+/* must be called while holding dev_handle->lock, which protects the
+   claimed_interfaces bits iterated here against a concurrent
+   libusb_claim_interface/libusb_release_interface */
+static int darwin_set_configuration_locked(struct libusb_device_handle *dev_handle, int config) REQUIRES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   IOReturn kresult;
   uint8_t i;
@@ -1810,6 +1825,16 @@ static int darwin_set_configuration(struct libusb_device_handle *dev_handle, int
   dpriv->active_config = (UInt8)config;
 
   return LIBUSB_SUCCESS;
+}
+
+static int darwin_set_configuration(struct libusb_device_handle *dev_handle, int config) EXCLUDES(dev_handle->lock) {
+  int ret;
+
+  usbi_mutex_lock(&dev_handle->lock);
+  ret = darwin_set_configuration_locked (dev_handle, config);
+  usbi_mutex_unlock(&dev_handle->lock);
+
+  return ret;
 }
 
 static IOReturn darwin_get_interface (usb_device_t darwin_device, uint8_t ifc, io_service_t *usbInterfacep) {
@@ -1928,6 +1953,10 @@ static int get_endpoints (struct libusb_device_handle *dev_handle, uint8_t iface
   return LIBUSB_SUCCESS;
 }
 
+/* must be called while holding dev_handle->lock: the core holds it around
+   the claim backend call, and the internal callers (darwin_restore_state,
+   darwin_set_configuration_locked, darwin_set_interface_altsetting_locked)
+   run under it via their entry points */
 static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface) REQUIRES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
@@ -1950,8 +1979,10 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
   if (!usbInterface && dpriv->first_config != 0) {
     usbi_info (ctx, "no interface found; setting configuration: %d", dpriv->first_config);
 
-    /* set the configuration */
-    ret = darwin_set_configuration (dev_handle, (int) dpriv->first_config);
+    /* set the configuration. the caller already holds dev_handle->lock, so
+       call the locked variant (the darwin_set_configuration entry point
+       would deadlock here). */
+    ret = darwin_set_configuration_locked (dev_handle, (int) dpriv->first_config);
     if (ret != LIBUSB_SUCCESS) {
       usbi_err (ctx, "could not set configuration");
       return ret;
@@ -2075,7 +2106,8 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, uin
   return darwin_to_libusb (kresult);
 }
 
-static int check_alt_setting_and_clear_halt(struct libusb_device_handle *dev_handle, uint8_t altsetting, struct darwin_interface *cInterface) {
+/* must be called while holding dev_handle->lock */
+static int check_alt_setting_and_clear_halt(struct libusb_device_handle *dev_handle, uint8_t altsetting, struct darwin_interface *cInterface) REQUIRES(dev_handle->lock) {
   int ret;
   IOReturn kresult;
   uint8_t current_alt_setting;
@@ -2086,7 +2118,7 @@ static int check_alt_setting_and_clear_halt(struct libusb_device_handle *dev_han
   }
 
   for (int i = 0 ; i < cInterface->num_endpoints ; i++) {
-    ret = darwin_clear_halt(dev_handle, cInterface->endpoint_addrs[i]);
+    ret = darwin_clear_halt_locked(dev_handle, cInterface->endpoint_addrs[i]);
     if (LIBUSB_SUCCESS != ret) {
       usbi_warn(HANDLE_CTX (dev_handle), "error clearing pipe halt for endpoint %d", i);
       if (LIBUSB_ERROR_NOT_FOUND == ret) {
@@ -2099,7 +2131,11 @@ static int check_alt_setting_and_clear_halt(struct libusb_device_handle *dev_han
   return LIBUSB_SUCCESS;
 }
 
-static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting) REQUIRES(dev_handle->lock) {
+/* must be called while holding dev_handle->lock: the interface state
+   manipulated here (the interface plug-in, its endpoint table and the
+   claimed_interfaces bits read by the helpers) is otherwise torn down by a
+   concurrent libusb_release_interface, which runs under dev_handle->lock */
+static int darwin_set_interface_altsetting_locked(struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting) REQUIRES(dev_handle->lock) {
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
   IOReturn kresult;
   int ret;
@@ -2149,14 +2185,25 @@ static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_hand
   return ret;
 }
 
-static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint) EXCLUDES(dev_handle->lock) {
+static int darwin_set_interface_altsetting(struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting) EXCLUDES(dev_handle->lock) {
+  int ret;
+
+  usbi_mutex_lock(&dev_handle->lock);
+  ret = darwin_set_interface_altsetting_locked (dev_handle, iface, altsetting);
+  usbi_mutex_unlock(&dev_handle->lock);
+
+  return ret;
+}
+
+/* must be called while holding dev_handle->lock */
+static int darwin_clear_halt_locked(struct libusb_device_handle *dev_handle, unsigned char endpoint) REQUIRES(dev_handle->lock) {
   /* current interface */
   struct darwin_interface *cInterface;
   IOReturn kresult;
   uint8_t pipeRef;
 
   /* determine the interface/endpoint to use */
-  if (ep_to_pipeRef (dev_handle, endpoint, &pipeRef, NULL, &cInterface) != 0) {
+  if (ep_to_pipeRef_locked (dev_handle, endpoint, &pipeRef, NULL, &cInterface) != 0) {
     usbi_err (HANDLE_CTX (dev_handle), "endpoint not found on any open interface");
 
     return LIBUSB_ERROR_NOT_FOUND;
@@ -2170,9 +2217,18 @@ static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
   return darwin_to_libusb (kresult);
 }
 
-/* must be called while holding dpriv->lock. the REQUIRES annotation carries
-   the dev_handle->lock contract of the claimed_interfaces accesses, as on
-   the pre-split code. */
+static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint) EXCLUDES(dev_handle->lock) {
+  int ret;
+
+  usbi_mutex_lock(&dev_handle->lock);
+  ret = darwin_clear_halt_locked (dev_handle, endpoint);
+  usbi_mutex_unlock(&dev_handle->lock);
+
+  return ret;
+}
+
+/* must be called while holding dev_handle->lock (protects the
+   claimed_interfaces bits cleared and rebuilt here) and dpriv->lock */
 static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_handle, uint8_t active_config,
                                                unsigned long claimed_interfaces) REQUIRES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
@@ -2203,7 +2259,7 @@ static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_
   if (dpriv->active_config != active_config) {
     usbi_dbg (ctx, "darwin/restore_state: restoring configuration %d...", active_config);
 
-    ret = darwin_set_configuration (dev_handle, active_config);
+    ret = darwin_set_configuration_locked (dev_handle, active_config);
     if (LIBUSB_SUCCESS != ret) {
       usbi_dbg (ctx, "darwin/restore_state: could not restore configuration");
       return LIBUSB_ERROR_NOT_FOUND;
@@ -2262,12 +2318,14 @@ static void darwin_adopt_pending_device (struct darwin_cached_device *dpriv) EXC
   usbi_mutex_unlock(&darwin_cached_devices_mutex);
 }
 
-/* must be called while holding dpriv->lock. the lock is held during the wait
-   for re-enumeration to complete, which serializes open/close/capture
-   operations on the device while it is being reset. the hotplug thread that
-   signals completion (via dpriv->in_reenumerate) does not take this lock.
-   the REQUIRES annotation carries the dev_handle->lock contract of the
-   claimed_interfaces accesses, as before this change. */
+/* must be called while holding dev_handle->lock and dpriv->lock. both locks
+   are held during the wait for re-enumeration to complete, which serializes
+   open/close/capture operations on the device while it is being reset. the
+   event thread that signals completion (via dpriv->in_reenumerate) must
+   never take either lock: the hotplug callbacks do not, and
+   darwin_async_io_callback uses the pipe cached at submission instead of
+   ep_to_pipeRef precisely so that a completing transfer cannot block the
+   event thread on dev_handle->lock while we wait here. */
 static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, bool capture) REQUIRES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   unsigned long claimed_interfaces = dev_handle->claimed_interfaces;
@@ -2387,9 +2445,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
   return darwin_restore_state (dev_handle, active_config, claimed_interfaces);
 }
 
-/* must be called while holding dpriv->lock. the REQUIRES annotation carries
-   the dev_handle->lock contract of the claimed_interfaces accesses further
-   down the re-enumeration path, as on the pre-split function. */
+/* must be called while holding dev_handle->lock and dpriv->lock */
 static int darwin_reset_device_locked (struct libusb_device_handle *dev_handle) REQUIRES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   IOReturn kresult;
@@ -2429,13 +2485,19 @@ static int darwin_reset_device_locked (struct libusb_device_handle *dev_handle) 
   return ret;
 }
 
-static int darwin_reset_device (struct libusb_device_handle *dev_handle) REQUIRES(dev_handle->lock) {
+static int darwin_reset_device (struct libusb_device_handle *dev_handle) EXCLUDES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   int ret;
 
+  /* dev_handle->lock protects the claimed_interfaces bits that
+     darwin_restore_state clears and rebuilds while restoring the device
+     state. it must be taken before dpriv->lock (same order as the core,
+     which holds it around the claim/release backend calls). */
+  usbi_mutex_lock(&dev_handle->lock);
   usbi_mutex_lock(&dpriv->lock);
   ret = darwin_reset_device_locked (dev_handle);
   usbi_mutex_unlock(&dpriv->lock);
+  usbi_mutex_unlock(&dev_handle->lock);
 
   return ret;
 }
@@ -2499,6 +2561,7 @@ static void darwin_destroy_device(struct libusb_device *dev) EXCLUDES(darwin_cac
 
 static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+  struct darwin_transfer_priv *tpriv = (struct darwin_transfer_priv *)usbi_get_transfer_priv(itransfer);
 
   IOReturn               ret;
   uint8_t                pipeRef;
@@ -2522,6 +2585,16 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
   if (0 != (transfer->length % pipe_properties.max_packet_size)) {
     /* do not need a zero packet */
     transfer->flags &= ~LIBUSB_TRANSFER_ADD_ZERO_PACKET;
+  }
+
+  if (IS_XFEROUT(transfer) && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)) {
+    /* cache the pipe for the zero-length packet write in
+       darwin_async_io_callback, which must not take dev_handle->lock to
+       look it up: it runs on the event thread, and blocking there would
+       stall all event and hotplug processing while another thread holds
+       the lock across a re-enumeration */
+    tpriv->zlp_interface = cInterface;
+    tpriv->zlp_pipeRef = pipeRef;
   }
 
   /* submit the request */
@@ -2733,6 +2806,11 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) REQUIRES(itr
 
 static int darwin_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+  struct darwin_transfer_priv *tpriv = (struct darwin_transfer_priv *)usbi_get_transfer_priv(itransfer);
+
+  /* transfers may be resubmitted; clear the cached zero-length-packet pipe
+     unless this submission sets it again */
+  tpriv->zlp_interface = NULL;
 
   switch (transfer->type) {
   case LIBUSB_TRANSFER_TYPE_CONTROL:
@@ -2836,14 +2914,14 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 
   usbi_dbg (TRANSFER_CTX(transfer), "an async io operation has completed");
 
-  /* if requested write a zero packet */
-  if (kIOReturnSuccess == result && IS_XFEROUT(transfer) && transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET) {
-    struct darwin_interface *cInterface;
-    uint8_t pipeRef;
-
-    (void) ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface);
-
-    (*IOINTERFACE(cInterface))->WritePipe (IOINTERFACE(cInterface), pipeRef, transfer->buffer, 0);
+  /* if requested write a zero packet. use the pipe cached at submission:
+     this callback runs on the event thread and must not take
+     dev_handle->lock (via ep_to_pipeRef), or it would stall all event and
+     hotplug processing whenever another thread holds the lock across a
+     re-enumeration. */
+  if (kIOReturnSuccess == result && IS_XFEROUT(transfer) && transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET &&
+      tpriv->zlp_interface && IOINTERFACE(tpriv->zlp_interface)) {
+    (*IOINTERFACE(tpriv->zlp_interface))->WritePipe (IOINTERFACE(tpriv->zlp_interface), tpriv->zlp_pipeRef, transfer->buffer, 0);
   }
 
   tpriv->result = result;
@@ -3061,9 +3139,7 @@ static int darwin_reload_device (struct libusb_device_handle *dev_handle) EXCLUD
 
 /* On macOS, we capture an entire device at once, not individual interfaces. */
 
-/* must be called while holding dpriv->lock. the REQUIRES annotation carries
-   the dev_handle->lock contract of the claimed_interfaces accesses further
-   down the re-enumeration path, as on the pre-split function. */
+/* must be called while holding dev_handle->lock and dpriv->lock */
 static int darwin_detach_kernel_driver_locked (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock) {
   UNUSED(interface);
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
@@ -3114,20 +3190,25 @@ static int darwin_detach_kernel_driver_locked (struct libusb_device_handle *dev_
   return LIBUSB_SUCCESS;
 }
 
-static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock) {
+static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) EXCLUDES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   int ret;
 
+  /* see darwin_reset_device for the dev_handle->lock rationale. this entry
+     point is only reached from libusb_detach_kernel_driver (no locks held);
+     the auto-detach path (darwin_capture_claim_interface) runs with
+     dev_handle->lock already held by the core and takes dpriv->lock
+     directly. */
+  usbi_mutex_lock(&dev_handle->lock);
   usbi_mutex_lock(&dpriv->lock);
   ret = darwin_detach_kernel_driver_locked (dev_handle, interface);
   usbi_mutex_unlock(&dpriv->lock);
+  usbi_mutex_unlock(&dev_handle->lock);
 
   return ret;
 }
 
-/* must be called while holding dpriv->lock. the REQUIRES annotation carries
-   the dev_handle->lock contract of the claimed_interfaces accesses further
-   down the re-enumeration path, as on the pre-split function. */
+/* must be called while holding dev_handle->lock and dpriv->lock */
 static int darwin_attach_kernel_driver_locked (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock) {
   UNUSED(interface);
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
@@ -3147,21 +3228,33 @@ static int darwin_attach_kernel_driver_locked (struct libusb_device_handle *dev_
   return darwin_reenumerate_device (dev_handle, false);
 }
 
-static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock) {
+static int darwin_attach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) EXCLUDES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   int ret;
 
+  /* see darwin_reset_device for the dev_handle->lock rationale. this entry
+     point is only reached from libusb_attach_kernel_driver (no locks held);
+     the auto-attach path (darwin_capture_release_interface) runs with
+     dev_handle->lock already held by the core. */
+  usbi_mutex_lock(&dev_handle->lock);
   usbi_mutex_lock(&dpriv->lock);
   ret = darwin_attach_kernel_driver_locked (dev_handle, interface);
   usbi_mutex_unlock(&dpriv->lock);
+  usbi_mutex_unlock(&dev_handle->lock);
 
   return ret;
 }
 
 static int darwin_capture_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface) REQUIRES(dev_handle->lock) {
+  struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   int ret;
   if (dev_handle->auto_detach_kernel_driver && darwin_kernel_driver_active(dev_handle, iface)) {
-    ret = darwin_detach_kernel_driver (dev_handle, iface);
+    /* the core holds dev_handle->lock around this backend call, so take only
+       dpriv->lock here (the darwin_detach_kernel_driver entry point would
+       take dev_handle->lock again and self-deadlock) */
+    usbi_mutex_lock(&dpriv->lock);
+    ret = darwin_detach_kernel_driver_locked (dev_handle, iface);
+    usbi_mutex_unlock(&dpriv->lock);
     if (ret != LIBUSB_SUCCESS) {
       usbi_info (HANDLE_CTX (dev_handle), "failed to auto-detach the kernel driver for this device, ret=%d", ret);
     }

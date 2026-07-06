@@ -160,6 +160,11 @@ struct darwin_transfer_priv {
   IOUSBDevRequestTO req;
 
   /* Bulk */
+  /* pipe cached at submission for the zero-length packet write in
+     darwin_async_io_callback: the event thread must not take
+     dev_handle->lock to look the pipe up */
+  struct darwin_interface *zlp_interface;
+  uint8_t zlp_pipeRef;
 
   /* Completion status */
   IOReturn result;
