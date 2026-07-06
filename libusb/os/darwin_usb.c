@@ -468,7 +468,14 @@ static void darwin_deref_cached_device(struct darwin_cached_device *cached_dev) 
       (*cached_dev->device)->Release(cached_dev->device);
       cached_dev->device = NULL;
     }
+    if (cached_dev->pending_device) {
+      (*cached_dev->pending_device)->Release(cached_dev->pending_device);
+      cached_dev->pending_device = NULL;
+    }
     IOObjectRelease (cached_dev->service);
+    if (cached_dev->pending_service != IO_OBJECT_NULL) {
+      IOObjectRelease (cached_dev->pending_service);
+    }
     usbi_mutex_destroy(&cached_dev->lock);
     free (cached_dev);
   }
@@ -476,6 +483,21 @@ static void darwin_deref_cached_device(struct darwin_cached_device *cached_dev) 
 
 static void darwin_ref_cached_device(struct darwin_cached_device *cached_dev) REQUIRES(darwin_cached_devices_mutex) {
   cached_dev->refcount++;
+}
+
+/* returns the live device interface for enumeration purposes: while the
+   device is re-enumerating, the replacement discovered by the hotplug thread
+   (pending_device) is the interface that works; the one in device is the old,
+   no longer functional one that the re-enumerating thread still owns. must
+   NOT be called with darwin_cached_devices_mutex held. */
+static usb_device_t darwin_active_device_interface (struct darwin_cached_device *cached_dev) {
+  usb_device_t device;
+
+  usbi_mutex_lock(&darwin_cached_devices_mutex);
+  device = cached_dev->pending_device ? cached_dev->pending_device : cached_dev->device;
+  usbi_mutex_unlock(&darwin_cached_devices_mutex);
+
+  return device;
 }
 
 static int ep_to_pipeRef(struct libusb_device_handle *dev_handle, uint8_t ep, uint8_t *pipep, uint8_t *ifcp, struct darwin_interface **interface_out) {
@@ -1101,7 +1123,7 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
 
 /* check whether the os has configured the device */
 static enum libusb_error darwin_check_configuration (struct libusb_context *ctx, struct darwin_cached_device *dev) {
-  usb_device_t darwin_device = dev->device;
+  usb_device_t darwin_device = darwin_active_device_interface (dev);
 
   IOUSBConfigurationDescriptorPtr configDesc;
   IOUSBFindInterfaceRequest request;
@@ -1186,8 +1208,10 @@ static IOReturn darwin_request_descriptor (usb_device_t device, UInt8 desc, UInt
   return (*device)->DeviceRequestTO (device, &req);
 }
 
-static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *ctx, struct darwin_cached_device *dev) {
-  usb_device_t device = dev->device;
+/* device is passed explicitly because this is called from
+   darwin_get_cached_device with darwin_cached_devices_mutex held, before the
+   pending replacement (if any) has been adopted into dev->device */
+static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *ctx, struct darwin_cached_device *dev, usb_device_t device) {
   int retries = 1;
   long delay = 30000; /* microseconds */
   int unsuspended = 0, try_unsuspend = 1, try_reconfigure = 1;
@@ -1371,8 +1395,7 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
   UInt64 sessionID = 0, parent_sessionID = 0;
   UInt32 locationID = 0;
   enum libusb_error ret = LIBUSB_SUCCESS;
-  usb_device_t device, old_device = NULL;
-  io_service_t old_service = IO_OBJECT_NULL;
+  usb_device_t device;
   UInt8 port = 0;
 
   /* assuming sessionID != 0 normally (never seen it be 0) */
@@ -1400,8 +1423,6 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
       if (new_device->location == locationID && atomic_load(&new_device->in_reenumerate)) {
         usbi_dbg (ctx, "found cached device with matching location that is being re-enumerated");
         *old_session_id = new_device->session;
-        old_device = new_device->device;
-        old_service = new_device->service;
         break;
       }
 
@@ -1449,25 +1470,29 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
     *cached_out = new_device;
 
     new_device->session = sessionID;
-    new_device->device = device;
-    new_device->service = service;
+    if (*old_session_id) {
+      /* the device is being re-enumerated: the re-enumerating thread may
+         still be using device and service, so do not touch them here. stash
+         the replacements instead; darwin_reenumerate_device adopts them (and
+         releases the old ones) once the re-enumeration completes. */
+      if (new_device->pending_device) {
+        (*new_device->pending_device)->Release (new_device->pending_device);
+      }
+      if (new_device->pending_service != IO_OBJECT_NULL) {
+        IOObjectRelease (new_device->pending_service);
+      }
+      new_device->pending_device = device;
+      new_device->pending_service = service;
+    } else {
+      new_device->device = device;
+      new_device->service = service;
+    }
 
     /* retain the service */
     IOObjectRetain (service);
 
-    /* release the old device */
-    if (old_device) {
-      (*old_device)->Release (old_device);
-      old_device = NULL;
-    }
-
-    /* release the ref to old device's service */
-    if (old_service) {
-      IOObjectRelease (old_service);
-    }
-
     /* cache the device descriptor */
-    ret = darwin_cache_device_descriptor(ctx, new_device);
+    ret = darwin_cache_device_descriptor(ctx, new_device, device);
     if (ret)
       break;
 
@@ -1545,7 +1570,8 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
       dev->parent_dev = usbi_get_device_by_session_id (ctx, (unsigned long) cached_device->parent_session);
     }
 
-    (*priv->dev->device)->GetDeviceSpeed (priv->dev->device, &devSpeed);
+    usb_device_t darwin_device = darwin_active_device_interface (priv->dev);
+    (*darwin_device)->GetDeviceSpeed (darwin_device, &devSpeed);
 
     switch (devSpeed) {
     case kUSBDeviceSpeedLow: dev->speed = LIBUSB_SPEED_LOW; break;
@@ -2206,6 +2232,33 @@ static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_
   return LIBUSB_SUCCESS;
 }
 
+/* adopt the replacement device interface and service discovered by the
+   hotplug thread during re-enumeration (see darwin_get_cached_device), and
+   release the old ones. after this, device and service have only ever been
+   written by threads holding dpriv->lock. must be called while holding
+   dpriv->lock. */
+static void darwin_adopt_pending_device (struct darwin_cached_device *dpriv) {
+  usbi_mutex_lock(&darwin_cached_devices_mutex);
+
+  if (dpriv->pending_device) {
+    if (dpriv->device) {
+      (*dpriv->device)->Release (dpriv->device);
+    }
+    dpriv->device = dpriv->pending_device;
+    dpriv->pending_device = NULL;
+  }
+
+  if (dpriv->pending_service != IO_OBJECT_NULL) {
+    if (dpriv->service != IO_OBJECT_NULL) {
+      IOObjectRelease (dpriv->service);
+    }
+    dpriv->service = dpriv->pending_service;
+    dpriv->pending_service = IO_OBJECT_NULL;
+  }
+
+  usbi_mutex_unlock(&darwin_cached_devices_mutex);
+}
+
 /* must be called while holding dpriv->lock. the lock is held during the wait
    for re-enumeration to complete, which serializes open/close/capture
    operations on the device while it is being reset. the hotplug thread that
@@ -2225,6 +2278,10 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
 
   struct libusb_context *ctx = HANDLE_CTX (dev_handle);
 
+  /* adopt any replacement left over from a previous re-enumeration that
+     returned (e.g. on timeout) before the device came back */
+  darwin_adopt_pending_device (dpriv);
+
   if (!dpriv->device) {
     usbi_warn(ctx, "darwin_reenumerate_device: device interface is NULL");
     return LIBUSB_ERROR_NO_DEVICE;
@@ -2235,8 +2292,13 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
-  /* store copies of descriptors so they can be compared after the reset */
+  /* store copies of descriptors so they can be compared after the reset.
+     the mutex orders this read against the hotplug thread refreshing
+     dev_descriptor (under the same mutex) while an earlier re-enumeration
+     completes. */
+  usbi_mutex_lock(&darwin_cached_devices_mutex);
   memcpy (&descriptor, &dpriv->dev_descriptor, sizeof (descriptor));
+  usbi_mutex_unlock(&darwin_cached_devices_mutex);
   cached_configurations = (IOUSBConfigurationDescriptor *)alloca (sizeof (*cached_configurations) * descriptor.bNumConfigurations);
 
   for (i = 0 ; i < descriptor.bNumConfigurations ; ++i) {
@@ -2295,6 +2357,10 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
       return LIBUSB_ERROR_TIMEOUT;
     }
   }
+
+  /* the hotplug thread has processed the re-attach: adopt the replacement
+     device interface and service it discovered */
+  darwin_adopt_pending_device (dpriv);
 
   /* compare descriptors */
   usbi_dbg (ctx, "darwin/reenumerate_device: checking whether descriptors changed");
@@ -3005,6 +3071,11 @@ static int darwin_detach_kernel_driver_locked (struct libusb_device_handle *dev_
   if (get_interface_interface_version() < 700) {
     return LIBUSB_ERROR_NOT_SUPPORTED;
   }
+
+  /* adopt any replacement left over from a re-enumeration that timed out:
+     IOServiceAuthorize and darwin_reload_device below must operate on the
+     live service */
+  darwin_adopt_pending_device (dpriv);
 
   if (dpriv->capture_count == 0) {
     usbi_dbg (ctx, "attempting to detach kernel driver from device");

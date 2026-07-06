@@ -116,6 +116,13 @@ struct darwin_cached_device {
   char                  sys_path[21];
   usb_device_t          device;
   io_service_t          service;
+  /* replacement interface and service discovered by the hotplug thread while
+     the device is re-enumerating. adopted (and the old ones released) by the
+     re-enumerating thread once the re-enumeration completes, so device and
+     service themselves are never written by the hotplug thread.
+     GUARDED_BY(darwin_cached_devices_mutex) */
+  usb_device_t          pending_device;
+  io_service_t          pending_service;
   usbi_mutex_t          lock;          /* protects open_count and capture_count */
   int                   open_count;    /* GUARDED_BY(lock) */
   int                   capture_count; /* GUARDED_BY(lock) */
