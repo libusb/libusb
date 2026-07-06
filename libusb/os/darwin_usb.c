@@ -1712,18 +1712,29 @@ static void darwin_close_locked (struct libusb_device_handle *dev_handle) {
   }
 }
 
-static void darwin_close (struct libusb_device_handle *dev_handle) REQUIRES(dev_handle->lock) {
+static void darwin_close (struct libusb_device_handle *dev_handle) EXCLUDES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
+  unsigned long claimed_interfaces;
   int i;
 
-  /* make sure all interfaces are released before taking the device lock.
-     releasing an interface may reattach the kernel driver
-     (auto_detach_kernel_driver) via darwin_capture_release_interface, which
-     acquires dpriv->lock itself. this is safe even if the device is gone:
-     the interface plug-ins are per-handle objects and every path below
-     checks dpriv->device before using it. */
+  /* snapshot the claimed interfaces under dev_handle->lock, which guards
+     claimed_interfaces. the interfaces must be released before taking the
+     device lock and without holding dev_handle->lock:
+     libusb_release_interface takes dev_handle->lock itself, and releasing
+     an interface may reattach the kernel driver
+     (auto_detach_kernel_driver) via darwin_capture_release_interface,
+     which acquires dpriv->lock. a stale snapshot is harmless because
+     libusb_release_interface rechecks the bit under the lock, and using
+     the handle concurrently with libusb_close is undefined anyway.
+     releasing is safe even if the device is gone: the interface plug-ins
+     are per-handle objects and every path below checks dpriv->device
+     before using it. */
+  usbi_mutex_lock(&dev_handle->lock);
+  claimed_interfaces = dev_handle->claimed_interfaces;
+  usbi_mutex_unlock(&dev_handle->lock);
+
   for (i = 0 ; i < USB_MAXINTERFACES ; i++)
-    if (dev_handle->claimed_interfaces & (1U << i))
+    if (claimed_interfaces & (1U << i))
       libusb_release_interface (dev_handle, i);
 
   usbi_mutex_lock(&dpriv->lock);
