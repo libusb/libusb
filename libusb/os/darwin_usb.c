@@ -1186,12 +1186,18 @@ static enum libusb_error darwin_check_configuration (struct libusb_context *ctx,
     IOObjectRelease (firstInterface);
 
     /* device is configured */
-    if (dev->dev_descriptor.bNumConfigurations == 1)
+    if (dev->dev_descriptor.bNumConfigurations == 1) {
       /* to avoid problems with some devices get the configurations value from the configuration descriptor */
       dev->active_config = dev->first_config;
-    else
-      /* devices with more than one configuration should work with GetConfiguration */
-      (*darwin_device)->GetConfiguration (darwin_device, &dev->active_config);
+    } else {
+      /* devices with more than one configuration should work with GetConfiguration.
+         active_config is atomic, so read into a local and store only on
+         success */
+      UInt8 active_config;
+      if (kIOReturnSuccess == (*darwin_device)->GetConfiguration (darwin_device, &active_config)) {
+        dev->active_config = active_config;
+      }
+    }
   } else
     /* not configured */
     dev->active_config = 0;
