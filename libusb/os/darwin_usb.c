@@ -660,10 +660,21 @@ static enum libusb_error darwin_device_from_service (struct libusb_context *ctx,
     return LIBUSB_ERROR_OTHER;
   }
 
-  (void)(*plugInInterface)->QueryInterface(plugInInterface, CFUUIDGetUUIDBytes(get_device_interface_id()),
-                                           (LPVOID *)device);
+  /* do not trust QueryInterface to set the out parameter on failure */
+  *device = NULL;
+
+  kresult = (*plugInInterface)->QueryInterface(plugInInterface, CFUUIDGetUUIDBytes(get_device_interface_id()),
+                                               (LPVOID *)device);
   /* Use release instead of IODestroyPlugInInterface to avoid stopping IOServices associated with this device */
   (*plugInInterface)->Release (plugInInterface);
+  if (kresult != kIOReturnSuccess) {
+    usbi_dbg (ctx, "QueryInterface: %s", darwin_error_str(kresult));
+    return darwin_to_libusb (kresult);
+  }
+  if (!(*device)) {
+    usbi_dbg (ctx, "QueryInterface: returned null device interface");
+    return LIBUSB_ERROR_OTHER;
+  }
 
   return LIBUSB_SUCCESS;
 }
