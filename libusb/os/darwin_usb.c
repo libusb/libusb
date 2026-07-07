@@ -1559,6 +1559,7 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
   struct libusb_device *dev = NULL;
   UInt8 devSpeed;
   enum libusb_error ret = LIBUSB_SUCCESS;
+  bool reused = false;
 
   do {
     /* check current active configuration (and cache the first configuration value--
@@ -1596,6 +1597,7 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
       assert(cached_device->address <= UINT8_MAX);
       dev->device_address = (uint8_t)cached_device->address;
     } else {
+      reused = true;
       priv = (struct darwin_device_priv *)usbi_get_device_priv(dev);
     }
 
@@ -1643,7 +1645,11 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
 
   } while (0);
 
-  if (!atomic_load(&cached_device->in_reenumerate) && 0 == ret) {
+  /* a device found by its old session id is already in this context's device
+     list; connecting it again would corrupt the list (list_add of an
+     already-listed node). New devices (including a re-enumerated device
+     this context has never seen) are connected.*/
+  if (!reused && 0 == ret) {
     usbi_connect_device (dev);
   } else {
     libusb_unref_device (dev);
