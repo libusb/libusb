@@ -274,6 +274,11 @@
 		1443EE8916417EA6007E0579 /* libusb_release.xcconfig */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = text.xcconfig; path = libusb_release.xcconfig; sourceTree = SOURCE_ROOT; tabWidth = 4; usesTabs = 1; };
 		145F5D8D2E60B46B004ABA5D /* windows_hotplug.h */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = windows_hotplug.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		145F5D8E2E60B46B004ABA5D /* windows_hotplug.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = windows_hotplug.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
+		1472E1592B43D66B00850BA3 /* init_context.c */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.c; path = init_context.c; sourceTree = "<group>"; tabWidth = 2; usesTabs = 0; };
+		1472E15A2B43D68600850BA3 /* stress_mt.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = stress_mt.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
+		1472E15D2B43D68600850BA3 /* macos.c */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.c; path = macos.c; sourceTree = "<group>"; tabWidth = 2; usesTabs = 0; };
+		1472E15F2B43D68600850BA3 /* set_option.c */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.c; path = set_option.c; sourceTree = "<group>"; tabWidth = 2; usesTabs = 0; };
+		1472E1602B43D69800850BA3 /* umockdev.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = umockdev.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		14EC13E12B3D5BA600CF9AD0 /* emscripten_webusb.cpp */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.cpp.cpp; path = emscripten_webusb.cpp; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		14EC13E22B3D5BBE00CF9AD0 /* sunos_usb.h */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = sunos_usb.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		14EC13E32B3D5BBE00CF9AD0 /* openbsd_usb.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = openbsd_usb.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
@@ -299,11 +304,6 @@
 		14EC13F72B3D5BC800CF9AD0 /* threads_windows.h */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = threads_windows.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		14EC13F82B3D5BC800CF9AD0 /* windows_usbdk.h */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = windows_usbdk.h; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		14EC13F92B3D5BC800CF9AD0 /* windows_usbdk.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = windows_usbdk.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
-		1472E1592B43D66B00850BA3 /* init_context.c */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.c; path = init_context.c; sourceTree = "<group>"; tabWidth = 2; usesTabs = 0; };
-		1472E15A2B43D68600850BA3 /* stress_mt.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = stress_mt.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
-		1472E15D2B43D68600850BA3 /* macos.c */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.c; path = macos.c; sourceTree = "<group>"; tabWidth = 2; usesTabs = 0; };
-		1472E15F2B43D68600850BA3 /* set_option.c */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.c.c; path = set_option.c; sourceTree = "<group>"; tabWidth = 2; usesTabs = 0; };
-		1472E1602B43D69800850BA3 /* umockdev.c */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.c.c; path = umockdev.c; sourceTree = "<group>"; tabWidth = 4; usesTabs = 1; };
 		2018D95E24E453BA001589B2 /* events_posix.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = events_posix.c; sourceTree = "<group>"; };
 		2018D96024E453D0001589B2 /* events_posix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = events_posix.h; sourceTree = "<group>"; };
 		20468D67243298AE00650534 /* sam3u_benchmark */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = sam3u_benchmark; sourceTree = BUILT_PRODUCTS_DIR; };
