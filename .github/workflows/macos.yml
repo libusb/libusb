@@ -10,6 +10,9 @@ jobs:
   # This workflow contains a single job called "build"
   build:
     runs-on: macos-latest
+    # Fail fast instead of burning the default 6-hour limit when a test
+    # hangs (see the stress_mt hang, issue #1869).
+    timeout-minutes: 60
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -32,7 +35,33 @@ jobs:
 
       - name: compile
         shell: bash
-        run: .private/ci-build.sh --build-dir build
+        # stress_mt sometimes hangs forever on the macOS runners (issue
+        # #1869). Without a watchdog the job dies at the GitHub timeout
+        # and every trace of the hang is lost with it (automake buffers
+        # the test output). A normal run of this step takes well under
+        # 15 minutes, so after 40 minutes assume a hang: capture stack
+        # samples of the hung test, then kill it so the job fails
+        # quickly with the evidence attached (ci-build.sh already dumps
+        # test-suite.log when make check fails).
+        run: |
+          (
+            sleep 2400
+            pid=$(pgrep -nx stress_mt || true)
+            if [ -n "${pid}" ]; then
+              sample "${pid}" 5 -file stress_mt_sample.txt || true
+              kill -ABRT "${pid}" || true
+            fi
+          ) >/dev/null 2>&1 &
+          watchdog_pid=$!
+          status=0
+          .private/ci-build.sh --build-dir build || status=$?
+          kill "${watchdog_pid}" 2>/dev/null || true
+          if [ -f stress_mt_sample.txt ]; then
+            echo '::group::stress_mt watchdog: hung process stack samples'
+            cat stress_mt_sample.txt
+            echo '::endgroup::'
+          fi
+          exit "${status}"
 
       - name: Xcode
         shell: bash
