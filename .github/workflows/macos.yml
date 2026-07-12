@@ -61,6 +61,17 @@ jobs:
             cat stress_mt_sample.txt
             echo '::endgroup::'
           fi
+          # automake's parallel-tests driver only prints PASS/FAIL to this
+          # log; the test's own stdout/stderr goes to its .log file, which
+          # otherwise only surfaces via ci-build.sh's test-suite.log dump on
+          # overall failure. Show it unconditionally so a pass doesn't hide
+          # non-fatal warnings (e.g. transient device-access skips) that are
+          # still worth auditing.
+          if [ -f build/tests/stress_mt.log ]; then
+            echo '::group::stress_mt.log (full test output, pass or fail)'
+            cat build/tests/stress_mt.log
+            echo '::endgroup::'
+          fi
           exit "${status}"
 
       - name: Xcode
