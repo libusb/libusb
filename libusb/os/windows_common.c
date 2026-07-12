@@ -568,7 +568,6 @@ static int windows_init(struct libusb_context *ctx)
 	priv->completion_port_thread = (HANDLE)_beginthreadex(NULL, 0, windows_iocp_thread, ctx, 0, NULL);
 	if (priv->completion_port_thread == NULL) {
 		usbi_err(ctx, "failed to create I/O completion port thread");
-		CloseHandle(priv->completion_port);
 		goto init_exit;
 	}
 
@@ -587,6 +586,27 @@ static int windows_init(struct libusb_context *ctx)
 #endif
 
 init_exit: // Holds semaphore here
+	if (r != LIBUSB_SUCCESS) {
+		// Halt the I/O completion port thread and close the I/O completion
+		// port if they were brought up, mirroring windows_exit()
+		if (priv->completion_port_thread != NULL) {
+			// A NULL completion status will indicate to the thread that it is time to exit
+			if (!PostQueuedCompletionStatus(priv->completion_port, 0, (ULONG_PTR)ctx, NULL))
+				usbi_err(ctx, "failed to post I/O completion: %s", windows_error_str(0));
+
+			if (WaitForSingleObject(priv->completion_port_thread, INFINITE) == WAIT_FAILED)
+				usbi_err(ctx, "failed to wait for I/O completion port thread: %s", windows_error_str(0));
+
+			CloseHandle(priv->completion_port_thread);
+			priv->completion_port_thread = NULL;
+		}
+
+		if (priv->completion_port != NULL) {
+			CloseHandle(priv->completion_port);
+			priv->completion_port = NULL;
+		}
+	}
+
 	if ((init_count == 1) && (r != LIBUSB_SUCCESS)) { // First init failed?
 		if (usbdk_available) {
 			usbdk_backend.exit(ctx);
