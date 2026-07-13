@@ -368,7 +368,7 @@ struct windows_backend {
 
 // Lifecycle of the I/O completion port thread, tracked in
 // windows_context_priv::completion_port_state. Written and read with the
-// Interlocked functions, see windows_iocp_thread().
+// usbi_atomic helpers, see windows_iocp_thread().
 enum windows_iocp_state {
 	WINDOWS_IOCP_INITIALIZING = 0, // windows_init() in progress, the thread uses timed waits
 	WINDOWS_IOCP_RUNNING,          // windows_init() succeeded, the thread blocks indefinitely
@@ -379,7 +379,7 @@ struct windows_context_priv {
 	const struct windows_backend *backend;
 	HANDLE completion_port;
 	HANDLE completion_port_thread;
-	volatile LONG completion_port_state; // enum windows_iocp_state
+	usbi_atomic_t completion_port_state; // enum windows_iocp_state
 };
 
 union windows_device_priv {

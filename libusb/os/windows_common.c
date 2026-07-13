@@ -437,12 +437,6 @@ static enum windows_version get_windows_version(void)
 // the exit completion packet failed, see windows_iocp_teardown()
 #define IOCP_INIT_WAIT_TIMEOUT_MS 100
 
-static enum windows_iocp_state windows_iocp_state_get(struct windows_context_priv *priv)
-{
-	// Atomic read of the state, with a full memory barrier
-	return (enum windows_iocp_state)InterlockedCompareExchange(&priv->completion_port_state, 0, 0);
-}
-
 static unsigned __stdcall windows_iocp_thread(void *arg)
 {
 	struct libusb_context *ctx = arg;
@@ -467,13 +461,13 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 		// noticed even if no exit completion packet could be posted. Once
 		// running, block indefinitely; exit is signaled by a NULL
 		// completion status.
-		state = windows_iocp_state_get(priv);
+		state = (enum windows_iocp_state)usbi_atomic_load(&priv->completion_port_state);
 		overlapped = NULL;
 		if (!GetQueuedCompletionStatus(iocp, &num_bytes, &completion_key, &overlapped,
 					       (state == WINDOWS_IOCP_RUNNING) ? INFINITE : IOCP_INIT_WAIT_TIMEOUT_MS)
 		    && (overlapped == NULL)) {
 			if (GetLastError() == WAIT_TIMEOUT) {
-				if (windows_iocp_state_get(priv) == WINDOWS_IOCP_EXIT_REQUESTED)
+				if (usbi_atomic_load(&priv->completion_port_state) == WINDOWS_IOCP_EXIT_REQUESTED)
 					break;
 				continue;
 			}
@@ -546,7 +540,7 @@ static void windows_iocp_teardown(struct libusb_context *ctx)
 		// initializing the thread waits with a finite timeout and checks
 		// this state, so it exits even if posting the exit completion
 		// packet below fails.
-		InterlockedExchange(&priv->completion_port_state, WINDOWS_IOCP_EXIT_REQUESTED);
+		usbi_atomic_store(&priv->completion_port_state, WINDOWS_IOCP_EXIT_REQUESTED);
 
 		// A NULL completion status will indicate to the thread that it is time to exit
 		if (!PostQueuedCompletionStatus(priv->completion_port, 0, (ULONG_PTR)ctx, NULL))
@@ -623,7 +617,7 @@ static int windows_init(struct libusb_context *ctx)
 	// in the initializing state and uses timed waits until initialization
 	// has fully succeeded; thread creation orders this store before any
 	// read the thread performs.
-	priv->completion_port_state = WINDOWS_IOCP_INITIALIZING;
+	usbi_atomic_store(&priv->completion_port_state, WINDOWS_IOCP_INITIALIZING);
 	priv->completion_port_thread = (HANDLE)_beginthreadex(NULL, 0, windows_iocp_thread, ctx, 0, NULL);
 	if (priv->completion_port_thread == NULL) {
 		usbi_err(ctx, "failed to create I/O completion port thread");
@@ -646,7 +640,7 @@ static int windows_init(struct libusb_context *ctx)
 
 	// Initialization has fully succeeded, switch the I/O completion port
 	// thread to indefinite blocking waits
-	InterlockedExchange(&priv->completion_port_state, WINDOWS_IOCP_RUNNING);
+	usbi_atomic_store(&priv->completion_port_state, WINDOWS_IOCP_RUNNING);
 
 init_exit: // Holds semaphore here
 	if (r != LIBUSB_SUCCESS) {
