@@ -103,8 +103,8 @@
  */
 #ifdef _MSC_VER
 typedef volatile LONG usbi_atomic_t;
-#define usbi_atomic_load(a)	(*(a))
-#define usbi_atomic_store(a, v)	(*(a)) = (v)
+#define usbi_atomic_load(a)	InterlockedCompareExchange((a), 0, 0)
+#define usbi_atomic_store(a, v)	((void)InterlockedExchange((a), (v)))
 #define usbi_atomic_inc(a)	InterlockedIncrement((a))
 #define usbi_atomic_dec(a)	InterlockedDecrement((a))
 #else
