@@ -99,8 +99,8 @@ static bool libusb_darwin_at_started GUARDED_BY(libusb_darwin_at_mutex);
 
 static void darwin_exit(struct libusb_context *ctx);
 static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len);
-static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
-static int darwin_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
+static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface) REQUIRES(dev_handle->lock);
+static int darwin_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface) REQUIRES(dev_handle->lock);
 static int darwin_reenumerate_device(struct libusb_device_handle *dev_handle, bool capture);
 static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint);
 static int darwin_clear_halt_locked(struct libusb_device_handle *dev_handle, unsigned char endpoint) REQUIRES(dev_handle->lock);
@@ -2143,6 +2143,15 @@ static int darwin_set_interface_altsetting_locked(struct libusb_device_handle *d
   /* current interface */
   struct darwin_interface *cInterface = &priv->interfaces[iface];
 
+  /* the core checked the claimed bit before dropping dev_handle->lock, and a
+     concurrent libusb_release_interface may have won the race to re-acquire
+     it. recheck under the lock so an unclaimed interface returns the
+     documented LIBUSB_ERROR_NOT_FOUND; LIBUSB_ERROR_NO_DEVICE is reserved
+     for actual disconnection. */
+  if (!(dev_handle->claimed_interfaces & (1U << iface))) {
+    return LIBUSB_ERROR_NOT_FOUND;
+  }
+
   if (!IOINTERFACE(cInterface)) {
     return LIBUSB_ERROR_NO_DEVICE;
   }
@@ -2569,7 +2578,10 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
   struct darwin_interface *cInterface;
   darwin_pipe_properties_t pipe_properties;
 
-  if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface) != 0) {
+  usbi_mutex_lock(&transfer->dev_handle->lock);
+
+  if (ep_to_pipeRef_locked (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface) != 0) {
+    usbi_mutex_unlock(&transfer->dev_handle->lock);
     usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
 
     return LIBUSB_ERROR_NOT_FOUND;
@@ -2577,6 +2589,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
 
   ret = darwin_get_pipe_properties(cInterface, pipeRef, &pipe_properties);
   if (kIOReturnSuccess != ret) {
+    usbi_mutex_unlock(&transfer->dev_handle->lock);
     usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
               darwin_error_str(ret), ret);
     return darwin_to_libusb (ret);
@@ -2588,14 +2601,20 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
   }
 
   if (IS_XFEROUT(transfer) && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)) {
-    /* cache the pipe for the zero-length packet write in
+    /* pin the interface plug-in for the zero-length packet write in
        darwin_async_io_callback, which must not take dev_handle->lock to
-       look it up: it runs on the event thread, and blocking there would
-       stall all event and hotplug processing while another thread holds
-       the lock across a re-enumeration */
-    tpriv->zlp_interface = cInterface;
+       look the pipe up: it runs on the event thread, and blocking there
+       would stall all event and hotplug processing while another thread
+       holds the lock across a re-enumeration. the reference is taken here,
+       under the same lock hold as the lookup, so a concurrent interface
+       release cannot free the plug-in while the transfer is in flight; the
+       callback (or the submission failure path below) drops it. */
+    tpriv->zlp_interface = IOINTERFACE(cInterface);
+    (*tpriv->zlp_interface)->AddRef (tpriv->zlp_interface);
     tpriv->zlp_pipeRef = pipeRef;
   }
+
+  usbi_mutex_unlock(&transfer->dev_handle->lock);
 
   /* submit the request */
   /* timeouts are unavailable on interrupt endpoints */
@@ -2619,9 +2638,15 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
                                                                  darwin_async_io_callback, itransfer);
   }
 
-  if (ret)
+  if (ret) {
+    /* the callback will not run: drop the zero-length-packet pin */
+    if (tpriv->zlp_interface) {
+      (*tpriv->zlp_interface)->Release (tpriv->zlp_interface);
+      tpriv->zlp_interface = NULL;
+    }
     usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
                darwin_error_str(ret), ret);
+  }
 
   return darwin_to_libusb (ret);
 }
@@ -2632,6 +2657,16 @@ static int submit_stream_transfer(struct usbi_transfer *itransfer) REQUIRES(itra
   struct darwin_interface *cInterface;
   uint8_t pipeRef;
   IOReturn ret;
+
+  if (IS_XFEROUT(transfer) && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)) {
+    /* the previous code terminated stream transfers with a plain WritePipe
+       on the streams-configured pipe, which is not a valid operation for a
+       stream endpoint. there is no synchronous streams write to terminate
+       with, so the flag is not supported here; warn instead of silently
+       dropping the requested terminator. */
+    usbi_warn (TRANSFER_CTX (transfer), "LIBUSB_TRANSFER_ADD_ZERO_PACKET is not supported for bulk stream transfers, ignoring");
+    transfer->flags &= ~LIBUSB_TRANSFER_ADD_ZERO_PACKET;
+  }
 
   if (ep_to_pipeRef (transfer->dev_handle, transfer->endpoint, &pipeRef, NULL, &cInterface) != 0) {
     usbi_err (TRANSFER_CTX (transfer), "endpoint not found on any open interface");
@@ -2914,14 +2949,20 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 
   usbi_dbg (TRANSFER_CTX(transfer), "an async io operation has completed");
 
-  /* if requested write a zero packet. use the pipe cached at submission:
-     this callback runs on the event thread and must not take
+  /* if requested write a zero packet. use the interface plug-in pinned at
+     submission: this callback runs on the event thread and must not take
      dev_handle->lock (via ep_to_pipeRef), or it would stall all event and
      hotplug processing whenever another thread holds the lock across a
-     re-enumeration. */
-  if (kIOReturnSuccess == result && IS_XFEROUT(transfer) && transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET &&
-      tpriv->zlp_interface && IOINTERFACE(tpriv->zlp_interface)) {
-    (*IOINTERFACE(tpriv->zlp_interface))->WritePipe (IOINTERFACE(tpriv->zlp_interface), tpriv->zlp_pipeRef, transfer->buffer, 0);
+     re-enumeration. the pin keeps the plug-in valid even if the interface
+     was released or reclaimed while the transfer was in flight (a write on
+     a closed interface just returns an error, which is ignored as before).
+     the reference is always dropped here, whatever the completion result. */
+  if (tpriv->zlp_interface) {
+    if (kIOReturnSuccess == result && IS_XFEROUT(transfer) && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)) {
+      (*tpriv->zlp_interface)->WritePipe (tpriv->zlp_interface, tpriv->zlp_pipeRef, transfer->buffer, 0);
+    }
+    (*tpriv->zlp_interface)->Release (tpriv->zlp_interface);
+    tpriv->zlp_interface = NULL;
   }
 
   tpriv->result = result;

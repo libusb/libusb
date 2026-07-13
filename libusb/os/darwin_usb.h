@@ -160,10 +160,13 @@ struct darwin_transfer_priv {
   IOUSBDevRequestTO req;
 
   /* Bulk */
-  /* pipe cached at submission for the zero-length packet write in
-     darwin_async_io_callback: the event thread must not take
-     dev_handle->lock to look the pipe up */
-  struct darwin_interface *zlp_interface;
+  /* interface plug-in pinned (retained) at submission for the zero-length
+     packet write in darwin_async_io_callback: the event thread must not
+     take dev_handle->lock to look the pipe up, and the reference keeps the
+     plug-in valid if the interface is released or reclaimed while the
+     transfer is in flight. released by the callback, or by the submission
+     failure path if the callback will never run. */
+  usb_interface_t zlp_interface;
   uint8_t zlp_pipeRef;
 
   /* Completion status */
