@@ -432,11 +432,23 @@ static enum windows_version get_windows_version(void)
 	return winver;
 }
 
+// While the context is still initializing, the I/O completion port thread
+// waits with this timeout so that it notices an exit request even if posting
+// the exit completion packet failed, see windows_iocp_teardown()
+#define IOCP_INIT_WAIT_TIMEOUT_MS 100
+
+static enum windows_iocp_state windows_iocp_state_get(struct windows_context_priv *priv)
+{
+	// Atomic read of the state, with a full memory barrier
+	return (enum windows_iocp_state)InterlockedCompareExchange(&priv->completion_port_state, 0, 0);
+}
+
 static unsigned __stdcall windows_iocp_thread(void *arg)
 {
 	struct libusb_context *ctx = arg;
 	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
 	HANDLE iocp = priv->completion_port;
+	enum windows_iocp_state state;
 	DWORD num_bytes;
 	ULONG_PTR completion_key;
 	OVERLAPPED *overlapped;
@@ -450,8 +462,21 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 	usbi_dbg(ctx, "I/O completion thread started");
 
 	while (true) {
+		// Until windows_init() has fully succeeded, wait with a finite
+		// timeout so that an exit request from a failed initialization is
+		// noticed even if no exit completion packet could be posted. Once
+		// running, block indefinitely; exit is signaled by a NULL
+		// completion status.
+		state = windows_iocp_state_get(priv);
 		overlapped = NULL;
-		if (!GetQueuedCompletionStatus(iocp, &num_bytes, &completion_key, &overlapped, INFINITE) && (overlapped == NULL)) {
+		if (!GetQueuedCompletionStatus(iocp, &num_bytes, &completion_key, &overlapped,
+					       (state == WINDOWS_IOCP_RUNNING) ? INFINITE : IOCP_INIT_WAIT_TIMEOUT_MS)
+		    && (overlapped == NULL)) {
+			if (GetLastError() == WAIT_TIMEOUT) {
+				if (windows_iocp_state_get(priv) == WINDOWS_IOCP_EXIT_REQUESTED)
+					break;
+				continue;
+			}
 			usbi_err(ctx, "GetQueuedCompletionStatus failed: %s", windows_error_str(0));
 			break;
 		}
@@ -512,6 +537,36 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 	return 0;
 }
 
+static void windows_iocp_teardown(struct libusb_context *ctx)
+{
+	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
+
+	if (priv->completion_port_thread != NULL) {
+		// Request the thread to exit. While the context is still
+		// initializing the thread waits with a finite timeout and checks
+		// this state, so it exits even if posting the exit completion
+		// packet below fails.
+		InterlockedExchange(&priv->completion_port_state, WINDOWS_IOCP_EXIT_REQUESTED);
+
+		// A NULL completion status will indicate to the thread that it is time to exit
+		if (!PostQueuedCompletionStatus(priv->completion_port, 0, (ULONG_PTR)ctx, NULL))
+			usbi_err(ctx, "failed to post I/O completion: %s", windows_error_str(0));
+
+		if (WaitForSingleObject(priv->completion_port_thread, INFINITE) == WAIT_FAILED)
+			usbi_err(ctx, "failed to wait for I/O completion port thread: %s", windows_error_str(0));
+
+		CloseHandle(priv->completion_port_thread);
+		priv->completion_port_thread = NULL;
+	}
+
+	// The I/O completion port must stay open until the thread has been
+	// joined, so that the thread never waits on a closed or recycled handle
+	if (priv->completion_port != NULL) {
+		CloseHandle(priv->completion_port);
+		priv->completion_port = NULL;
+	}
+}
+
 static int windows_init(struct libusb_context *ctx)
 {
 	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
@@ -564,7 +619,11 @@ static int windows_init(struct libusb_context *ctx)
 		goto init_exit;
 	}
 
-	// And a dedicated thread to wait for I/O completions
+	// And a dedicated thread to wait for I/O completions. The thread starts
+	// in the initializing state and uses timed waits until initialization
+	// has fully succeeded; thread creation orders this store before any
+	// read the thread performs.
+	priv->completion_port_state = WINDOWS_IOCP_INITIALIZING;
 	priv->completion_port_thread = (HANDLE)_beginthreadex(NULL, 0, windows_iocp_thread, ctx, 0, NULL);
 	if (priv->completion_port_thread == NULL) {
 		usbi_err(ctx, "failed to create I/O completion port thread");
@@ -585,36 +644,25 @@ static int windows_init(struct libusb_context *ctx)
 	windows_initial_scan_devices(ctx);
 #endif
 
+	// Initialization has fully succeeded, switch the I/O completion port
+	// thread to indefinite blocking waits
+	InterlockedExchange(&priv->completion_port_state, WINDOWS_IOCP_RUNNING);
+
 init_exit: // Holds semaphore here
 	if (r != LIBUSB_SUCCESS) {
 		// Halt the I/O completion port thread and close the I/O completion
 		// port if they were brought up, mirroring windows_exit()
-		if (priv->completion_port_thread != NULL) {
-			// A NULL completion status will indicate to the thread that it is time to exit
-			if (!PostQueuedCompletionStatus(priv->completion_port, 0, (ULONG_PTR)ctx, NULL))
-				usbi_err(ctx, "failed to post I/O completion: %s", windows_error_str(0));
+		windows_iocp_teardown(ctx);
 
-			if (WaitForSingleObject(priv->completion_port_thread, INFINITE) == WAIT_FAILED)
-				usbi_err(ctx, "failed to wait for I/O completion port thread: %s", windows_error_str(0));
-
-			CloseHandle(priv->completion_port_thread);
-			priv->completion_port_thread = NULL;
+		if (init_count == 1) { // First init failed?
+			if (usbdk_available) {
+				usbdk_backend.exit(ctx);
+				usbdk_available = false;
+			}
+			if (winusb_backend_init)
+				winusb_backend.exit(ctx);
+			htab_destroy();
 		}
-
-		if (priv->completion_port != NULL) {
-			CloseHandle(priv->completion_port);
-			priv->completion_port = NULL;
-		}
-	}
-
-	if ((init_count == 1) && (r != LIBUSB_SUCCESS)) { // First init failed?
-		if (usbdk_available) {
-			usbdk_backend.exit(ctx);
-			usbdk_available = false;
-		}
-		if (winusb_backend_init)
-			winusb_backend.exit(ctx);
-		htab_destroy();
 		--init_count;
 	}
 
@@ -623,17 +671,7 @@ init_exit: // Holds semaphore here
 
 static void windows_exit(struct libusb_context *ctx)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
-
-	// A NULL completion status will indicate to the thread that it is time to exit
-	if (!PostQueuedCompletionStatus(priv->completion_port, 0, (ULONG_PTR)ctx, NULL))
-		usbi_err(ctx, "failed to post I/O completion: %s", windows_error_str(0));
-
-	if (WaitForSingleObject(priv->completion_port_thread, INFINITE) == WAIT_FAILED)
-		usbi_err(ctx, "failed to wait for I/O completion port thread: %s", windows_error_str(0));
-
-	CloseHandle(priv->completion_port_thread);
-	CloseHandle(priv->completion_port);
+	windows_iocp_teardown(ctx);
 
 	// Only works if exits and inits are balanced exactly
 	if (--init_count == 0) { // Last exit
