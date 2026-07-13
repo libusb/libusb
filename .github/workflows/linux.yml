@@ -5,6 +5,7 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -84,3 +85,15 @@ jobs:
           ./fuzz_bos_descriptor tests/fuzz/corpus/bos \
             -seed=1 -runs=200 -max_total_time=15 -timeout=5 -rss_limit_mb=1536 -print_final_stats=1
       # --- end sanitizers + fuzzer smoke ---
+
+      # The autotools test driver buffers each test's output into its own
+      # tests/<test>.log; keep them (and config.log) when something goes wrong.
+      - name: Upload test logs
+        uses: actions/upload-artifact@v7
+        if: failure() || cancelled()
+        with:
+          name: test-logs-linux
+          path: |
+            build*/config.log
+            build*/tests/*.log
+          if-no-files-found: ignore

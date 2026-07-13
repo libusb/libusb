@@ -4,6 +4,7 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: windows-11-arm
+    timeout-minutes: 60
     defaults:
       run:
         shell: msys2 {0}
@@ -30,3 +31,15 @@ jobs:
             build-msys2-clang64-aarch64/libusb/.libs/libusb-1.0.dll.a
             build-msys2-clang64-aarch64/libusb/.libs/libusb-1.0.a
             build-msys2-clang64-aarch64/libusb/.libs/libusb-1.0.dll
+
+      # The autotools test driver buffers each test's output into its own
+      # tests/<test>.log; keep them (and config.log) when something goes wrong.
+      - name: Upload test logs
+        uses: actions/upload-artifact@v7
+        if: failure() || cancelled()
+        with:
+          name: test-logs-msys2-clang64-aarch64
+          path: |
+            build*/config.log
+            build*/tests/*.log
+          if-no-files-found: ignore
