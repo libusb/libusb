@@ -2061,6 +2061,9 @@ static void handle_timeout(struct usbi_transfer *itransfer)
 	r = libusb_cancel_transfer(transfer);
 	if (r == LIBUSB_SUCCESS)
 		itransfer->timeout_flags |= USBI_TRANSFER_TIMED_OUT;
+	else if (r == LIBUSB_ERROR_NOT_FOUND)
+		usbi_dbg(TRANSFER_CTX(transfer),
+			"transfer already complete");
 	else
 		usbi_warn(TRANSFER_CTX(transfer),
 			"async cancel failed %d", r);
