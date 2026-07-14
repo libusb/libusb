@@ -1,7 +1,5 @@
 version: 1.0.{build}
 image:
-  - Visual Studio 2013
-  - Visual Studio 2015
   - Visual Studio 2017
   - Visual Studio 2019
   - Visual Studio 2022
@@ -20,30 +18,11 @@ for:
   -
     matrix:
       only:
-        - image: Visual Studio 2013
-    environment:
-      toolset: v120
-    build:
-      project: msvc\libusb.sln
-
-  -
-    matrix:
-      only:
-        - image: Visual Studio 2015
-          configuration: Debug
-    environment:
-      toolset: v140
-    build:
-      project: msvc\libusb.sln
-
-  -
-    matrix:
-      only:
-        - image: Visual Studio 2015
+        - image: Visual Studio 2017
           platform: Win32
           configuration: Release
     environment:
-      toolset: v140
+      toolset: v141
     install:
       - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\msys64\home\appveyor\libusb
       - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\cygwin\home\appveyor\libusb
@@ -57,11 +36,11 @@ for:
   -
     matrix:
       only:
-        - image: Visual Studio 2015
+        - image: Visual Studio 2017
           platform: x64
           configuration: Release
     environment:
-      toolset: v140
+      toolset: v141
     install:
       - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\msys64\home\appveyor\libusb
       - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\cygwin64\home\appveyor\libusb
@@ -76,6 +55,7 @@ for:
     matrix:
       only:
         - image: Visual Studio 2017
+          configuration: Debug
     environment:
       toolset: v141
     build:

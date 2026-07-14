@@ -578,6 +578,9 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 	// Extra init may be required to configure endpoints
 	if (priv->apib->configure_endpoints)
 		r = priv->apib->configure_endpoints(SUB_API_NOTSET, dev_handle, iface);
+	else if (priv->usb_interface[iface].apib->configure_endpoints)
+		priv->usb_interface[iface].apib->configure_endpoints(
+			priv->usb_interface[iface].sub_api, dev_handle, iface);
 
 	if (r == LIBUSB_SUCCESS)
 		priv->usb_interface[iface].current_altsetting = altsetting;

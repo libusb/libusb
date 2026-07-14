@@ -58,50 +58,105 @@ static LRESULT CALLBACK windows_proc_callback(HWND hwnd, UINT message, WPARAM wP
 
 int windows_start_event_monitor(void)
 {
+	// Signaled by the event thread once its notification window exists, so
+	// that a failure to bring up the monitor is reported to the caller.
+	// Owned by this function; the thread only receives it to signal it,
+	// and must not use it after this function returns.
+	HANDLE window_ready = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (window_ready == NULL)
+	{
+		log_error("CreateEvent");
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	DWORD thread_id;
+
 	windows_event_thread_handle = CreateThread(
 		NULL, // Default security descriptor
 		0, // Default stack size
 		windows_event_thread_main,
-		NULL, // No parameters to pass to the thread
+		window_ready, // The event the thread signals once its window exists
 		0, // Start immediately
-		NULL // No need to keep track of thread ID
+		&thread_id // Used to reap the thread if waiting for readiness fails
 	);
 
 	if (windows_event_thread_handle == NULL)
 	{
 		log_error("CreateThread");
+		CloseHandle(window_ready);
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	return LIBUSB_SUCCESS;
+	// Wait until the notification window exists or the thread failed and exited
+	HANDLE handles[2] = { window_ready, windows_event_thread_handle };
+	int r = LIBUSB_ERROR_OTHER;
+
+	switch (WaitForMultipleObjects(2, handles, FALSE, INFINITE))
+	{
+	case WAIT_OBJECT_0:
+		r = LIBUSB_SUCCESS;
+		break;
+	case WAIT_OBJECT_0 + 1:
+		usbi_err(NULL, "event thread exited before its notification window was created");
+		break;
+	default:
+		log_error("WaitForMultipleObjects");
+		// Should not happen with two valid handles, but do not abandon a
+		// live thread: a queued WM_QUIT ends its message loop even if it
+		// is posted before the loop starts. PostThreadMessage fails until
+		// the thread has a message queue, so retry while it is running.
+		while (!PostThreadMessage(thread_id, WM_QUIT, 0, 0))
+		{
+			if (WaitForSingleObject(windows_event_thread_handle, 10) != WAIT_TIMEOUT)
+			{
+				break; // The thread exited on its own
+			}
+		}
+		WaitForSingleObject(windows_event_thread_handle, INFINITE);
+		break;
+	}
+
+	if (r != LIBUSB_SUCCESS)
+	{
+		CloseHandle(windows_event_thread_handle);
+		windows_event_thread_handle = NULL;
+		windows_event_hwnd = NULL; // May have been set before the thread was reaped
+	}
+
+	CloseHandle(window_ready);
+
+	return r;
 }
 
 int windows_stop_event_monitor(void)
 {
-	if (windows_event_hwnd == NULL)
+	if (windows_event_thread_handle == NULL)
 	{
+		// The event monitor is not running, there is nothing to stop
 		return LIBUSB_SUCCESS;
 	}
 
-	if (!SUCCEEDED(SendMessage(windows_event_hwnd, WM_CLOSE, 0, 0)))
-	{
-		log_error("SendMessage");
-		return LIBUSB_ERROR_OTHER;
-	}
+	// The WM_CLOSE handler destroys the notification window, which in turn
+	// posts WM_QUIT and thereby ends the event thread's message loop.
+	SendMessage(windows_event_hwnd, WM_CLOSE, 0, 0);
 
+	int r = LIBUSB_SUCCESS;
 	if (WaitForSingleObject(windows_event_thread_handle, INFINITE) != WAIT_OBJECT_0)
 	{
 		log_error("WaitForSingleObject");
-		return LIBUSB_ERROR_OTHER;
+		r = LIBUSB_ERROR_OTHER;
 	}
 
 	if (!CloseHandle(windows_event_thread_handle))
 	{
 		log_error("CloseHandle");
-		return LIBUSB_ERROR_OTHER;
+		r = LIBUSB_ERROR_OTHER;
 	}
 
-	return LIBUSB_SUCCESS;
+	windows_event_thread_handle = NULL;
+	windows_event_hwnd = NULL;
+
+	return r;
 }
 
 static int windows_get_device_list(struct libusb_context *ctx)
@@ -192,15 +247,53 @@ static void windows_refresh_device_list_for_all_ctx(void)
 
 #define WND_CLASS_NAME TEXT("libusb-1.0-windows-hotplug")
 
+// Window classes are keyed by the (name, hInstance) pair. Use this libusb
+// copy's own module handle rather than the executable's, so that independent
+// copies of libusb within one process (e.g. one linked statically into the
+// application and one bundled as a DLL by a plugin) each register their own
+// class instead of colliding on ERROR_CLASS_ALREADY_EXISTS.
+static HINSTANCE get_hotplug_instance(void)
+{
+	// Cached so that RegisterClass, CreateWindow and UnregisterClass are
+	// guaranteed to use the same handle. No synchronization needed: all
+	// callers run on the event thread, and successive event threads are
+	// serialized by the join in windows_stop_event_monitor.
+	static HINSTANCE hotplug_instance;
+
+	if (hotplug_instance == NULL)
+	{
+		// Resolve the module containing this libusb copy from the address of
+		// one of its statics (works for both the DLL and static-linked cases).
+		if (!GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+			GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+			(LPCTSTR)&windows_event_hwnd, &hotplug_instance))
+		{
+			log_error("GetModuleHandleEx");
+		}
+	}
+
+	return hotplug_instance;
+}
+
 static bool init_wnd_class(void)
 {
 	WNDCLASS wndClass = { 0 };
 	wndClass.lpfnWndProc = windows_proc_callback;
-	wndClass.hInstance = GetModuleHandle(NULL);
+	wndClass.hInstance = get_hotplug_instance();
 	wndClass.lpszClassName = WND_CLASS_NAME;
 
 	if (!RegisterClass(&wndClass))
 	{
+		if (GetLastError() == ERROR_CLASS_ALREADY_EXISTS)
+		{
+			// A registration left behind by an abnormally terminated event
+			// thread of this same libusb copy (the class is keyed to this
+			// module, and orderly shutdowns unregister it). It is still
+			// backed by this module's windows_proc_callback, so reuse it.
+			usbi_warn(NULL, "hotplug window class was already registered");
+			return true;
+		}
+
 		log_error("event thread: RegisterClass");
 		return false;
 	}
@@ -210,7 +303,7 @@ static bool init_wnd_class(void)
 
 static DWORD WINAPI windows_event_thread_main(LPVOID lpParam)
 {
-	UNUSED(lpParam);
+	HANDLE window_ready = (HANDLE)lpParam;
 
 	usbi_dbg(NULL, "windows event thread entering");
 
@@ -225,19 +318,30 @@ static DWORD WINAPI windows_event_thread_main(LPVOID lpParam)
 		0,
 		0, 0, 0, 0,
 		NULL, NULL,
-		GetModuleHandle(NULL),
+		get_hotplug_instance(),
 		NULL);
 
 	if (windows_event_hwnd == NULL)
 	{
 		log_error("event thread: CreateWindow");
+		UnregisterClass(WND_CLASS_NAME, get_hotplug_instance());
 		return (DWORD)-1;
 	}
+
+	// Unblock windows_start_event_monitor: the monitor is now operational.
+	// The event handle is owned by windows_start_event_monitor and must not
+	// be used after this point.
+	SetEvent(window_ready);
 
 	MSG msg;
 	BOOL ret_val;
 
-	while ((ret_val = GetMessage(&msg, windows_event_hwnd, 0, 0)) != 0)
+	// Note: no window handle filter here. The documentation only guarantees
+	// that WM_QUIT is retrieved regardless of the message-range filter; with
+	// a window handle filter, clean termination would instead depend on
+	// GetMessage failing with -1 once the notification window (the filter)
+	// has been destroyed. With a NULL filter the loop simply ends on WM_QUIT.
+	while ((ret_val = GetMessage(&msg, NULL, 0, 0)) != 0)
 	{
 		if (ret_val == -1)
 		{
@@ -245,15 +349,18 @@ static DWORD WINAPI windows_event_thread_main(LPVOID lpParam)
 			break;
 		}
 
-		if (!SUCCEEDED(TranslateMessage(&msg)))
-		{
-			log_error("event thread: TranslateMessage");
-		}
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
 
-		if (!SUCCEEDED(DispatchMessage(&msg)))
-		{
-			log_error("event thread: DispatchMessage");
-		}
+	// Window classes are process-global and survive both the destruction of
+	// the window and the end of this thread. If the class were left behind,
+	// restarting the event monitor (libusb_exit followed by libusb_init)
+	// would fail RegisterClass with ERROR_CLASS_ALREADY_EXISTS and hotplug
+	// events would never be delivered again. See issue #1862.
+	if (!UnregisterClass(WND_CLASS_NAME, get_hotplug_instance()))
+	{
+		log_error("event thread: UnregisterClass");
 	}
 
 	usbi_dbg(NULL, "windows event thread exiting");
