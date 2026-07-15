@@ -546,6 +546,9 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 	const struct libusb_interface_descriptor *if_desc;
 	int i, r;
 
+	safe_free(priv->usb_interface[iface].endpoint);
+	priv->usb_interface[iface].nb_endpoints = 0;
+
 	r = libusb_get_active_config_descriptor(dev_handle->dev, &conf_desc);
 	if (r != LIBUSB_SUCCESS) {
 		usbi_warn(HANDLE_CTX(dev_handle), "could not read config descriptor: error %d", r);
@@ -557,8 +560,6 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 		r = LIBUSB_ERROR_NOT_FOUND;
 		goto end;
 	}
-
-	safe_free(priv->usb_interface[iface].endpoint);
 
 	if (if_desc->bNumEndpoints == 0) {
 		usbi_dbg(HANDLE_CTX(dev_handle), "no endpoints found for interface %u", iface);
@@ -2492,9 +2493,6 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, uint8
 
 	usbi_mutex_lock(&priv->interface_lock);
 
-	safe_free(priv->usb_interface[iface].endpoint);
-	priv->usb_interface[iface].nb_endpoints = 0;
-
 	r = priv->apib->claim_interface(SUB_API_NOTSET, dev_handle, iface);
 
 	if (r == LIBUSB_SUCCESS)
@@ -2513,9 +2511,6 @@ static int winusb_set_interface_altsetting(struct libusb_device_handle *dev_hand
 	CHECK_SUPPORTED_API(priv->apib, set_interface_altsetting);
 
 	usbi_mutex_lock(&priv->interface_lock);
-
-	safe_free(priv->usb_interface[iface].endpoint);
-	priv->usb_interface[iface].nb_endpoints = 0;
 
 	r = priv->apib->set_interface_altsetting(SUB_API_NOTSET, dev_handle, iface, altsetting);
 
