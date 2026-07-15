@@ -4,6 +4,8 @@
  * Copyright © 2012-2021 Nathan Hjelm <hjelmn@mac.com>
  * Copyright © 2012-2013 Peter Stuge <peter@stuge.se>
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -149,7 +151,7 @@ int main (void) {
 #define VALID_HOTPLUG_FLAGS			\
 	(LIBUSB_HOTPLUG_ENUMERATE)
 
-void usbi_hotplug_init(struct libusb_context *ctx)
+void usbi_hotplug_init(struct libusb_context *ctx) NO_THREAD_SAFETY_ANALYSIS
 {
 	/* check for hotplug support */
 	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
@@ -270,7 +272,7 @@ void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device 
 	if (!usbi_atomic_load(&ctx->hotplug_ready))
 		return;
 
-	msg = calloc(1, sizeof(*msg));
+	msg = (struct usbi_hotplug_message *)calloc(1, sizeof(*msg));
 	if (!msg) {
 		usbi_err(ctx, "error allocating hotplug message");
 		return;
@@ -290,7 +292,7 @@ void usbi_hotplug_notification(struct libusb_context *ctx, struct libusb_device 
 	usbi_mutex_unlock(&ctx->event_data_lock);
 }
 
-void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_msgs)
+void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_msgs) EXCLUDES(ctx->hotplug_cbs_lock)
 {
 	struct usbi_hotplug_callback *hotplug_cb, *next_cb;
 	struct usbi_hotplug_message *msg;
@@ -343,7 +345,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 	int events, int flags,
 	int vendor_id, int product_id, int dev_class,
 	libusb_hotplug_callback_fn cb_fn, void *user_data,
-	libusb_hotplug_callback_handle *callback_handle)
+	libusb_hotplug_callback_handle *callback_handle) EXCLUDES(ctx->hotplug_cbs_lock)
 {
 	struct usbi_hotplug_callback *hotplug_cb;
 
@@ -363,7 +365,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 
 	ctx = usbi_get_context(ctx);
 
-	hotplug_cb = calloc(1, sizeof(*hotplug_cb));
+	hotplug_cb = (struct usbi_hotplug_callback *)calloc(1, sizeof(*hotplug_cb));
 	if (!hotplug_cb)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -386,11 +388,13 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 
 	/* protect the handle by the context hotplug lock */
-	hotplug_cb->handle = ctx->next_hotplug_cb_handle++;
+	hotplug_cb->handle = ctx->next_hotplug_cb_handle;
 
-	/* handle the unlikely case of overflow */
-	if (ctx->next_hotplug_cb_handle < 0)
+	/* handle the unlikely case of overflow manually (as signed overflow is UB) */
+	if (hotplug_cb->handle == INT_MAX)
 		ctx->next_hotplug_cb_handle = 1;
+	else
+		ctx->next_hotplug_cb_handle++;
 
 	list_add(&hotplug_cb->list, &ctx->hotplug_cbs);
 
@@ -425,7 +429,7 @@ int API_EXPORTED libusb_hotplug_register_callback(libusb_context *ctx,
 }
 
 void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
-	libusb_hotplug_callback_handle callback_handle)
+	libusb_hotplug_callback_handle callback_handle) EXCLUDES(ctx->hotplug_cbs_lock)
 {
 	struct usbi_hotplug_callback *hotplug_cb;
 	int deregistered = 0;
@@ -463,7 +467,7 @@ void API_EXPORTED libusb_hotplug_deregister_callback(libusb_context *ctx,
 
 DEFAULT_VISIBILITY
 void * LIBUSB_CALL libusb_hotplug_get_user_data(libusb_context *ctx,
-	libusb_hotplug_callback_handle callback_handle)
+	libusb_hotplug_callback_handle callback_handle) EXCLUDES(ctx->hotplug_cbs_lock)
 {
 	struct usbi_hotplug_callback *hotplug_cb;
 	void *user_data = NULL;

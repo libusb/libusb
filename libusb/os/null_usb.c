@@ -2,6 +2,8 @@
 /*
  * Copyright © 2019 Pino Toscano <toscano.pino@tiscali.it>
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -83,7 +85,7 @@ null_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 }
 
 static int
-null_submit_transfer(struct usbi_transfer *itransfer)
+null_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }

@@ -3,6 +3,8 @@
  * Copyright © 2021 Google LLC
  * Copyright © 2023 Ingvar Stepanyan <me@rreverser.com>
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -762,7 +764,7 @@ void em_destroy_device(libusb_device* dev) {
 	WebUsbDevicePtr(dev).free();
 }
 
-int em_submit_transfer(usbi_transfer* itransfer) {
+int em_submit_transfer(usbi_transfer* itransfer) REQUIRES(itransfer->lock) {
 	return runOnMain([itransfer] {
 		auto transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 		auto& web_usb_device = WebUsbDevicePtr(transfer->dev_handle)

@@ -9,6 +9,8 @@
  * Hash table functions adapted from glibc, by Ulrich Drepper et al.
  * Major code testing contribution by Xiaofan Chen
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -576,6 +578,9 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 	// Extra init may be required to configure endpoints
 	if (priv->apib->configure_endpoints)
 		r = priv->apib->configure_endpoints(SUB_API_NOTSET, dev_handle, iface);
+	else if (priv->usb_interface[iface].apib->configure_endpoints)
+		priv->usb_interface[iface].apib->configure_endpoints(
+			priv->usb_interface[iface].sub_api, dev_handle, iface);
 
 	if (r == LIBUSB_SUCCESS)
 		priv->usb_interface[iface].current_altsetting = altsetting;
@@ -3195,6 +3200,15 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 	if (((is_using_usbccgp) || (iface == 0)) &&
 	    (!is_associated_interface || (iface==priv->usb_interface[iface].first_associated_interface))) {
 		// composite device (independent interfaces) or interface 0
+
+		// This interface may already have been auto-claimed as the first
+		// interface while another interface was claimed before it. Calling
+		// Initialize() again on the same handle would overwrite and leak the
+		// existing api_handle (the one any associated interface was derived
+		// from), so treat an already-initialized interface as done.
+		if (HANDLE_VALID(handle_priv->interface_handle[iface].api_handle))
+			return LIBUSB_SUCCESS;
+
 		file_handle = handle_priv->interface_handle[iface].dev_handle;
 		if (!HANDLE_VALID(file_handle))
 			return LIBUSB_ERROR_NOT_FOUND;

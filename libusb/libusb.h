@@ -6,6 +6,9 @@
  * Copyright © 2012 Pete Batard <pete@akeo.ie>
  * Copyright © 2012-2023 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2014-2020 Chris Dickens <christopher.a.dickens@gmail.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * For more information, please visit: https://libusb.info
  *
  * This library is free software; you can redistribute it and/or
@@ -1699,7 +1702,7 @@ enum libusb_device_string_type {
  *  => 126.5 codepoints
  *  => 127 * 3 + 1
  *  => 382 bytes
- * 
+ *
  * Stay with 256 * 3/2 = 384 to be safe.
  */
 #define LIBUSB_DEVICE_STRING_BYTES_MAX  (384U)

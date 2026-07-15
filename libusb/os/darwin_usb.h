@@ -4,6 +4,8 @@
  * Copyright © 2008-2023 Nathan Hjelm <hjelmn@users.sourceforge.net>
  * Copyright © 2019-2023 Google LLC. All rights reserved.
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -114,12 +116,20 @@ struct darwin_cached_device {
   char                  sys_path[21];
   usb_device_t          device;
   io_service_t          service;
-  int                   open_count;
+  /* replacement interface and service discovered by the hotplug thread while
+     the device is re-enumerating. adopted (and the old ones released) by the
+     re-enumerating thread once the re-enumeration completes, so device and
+     service themselves are never written by the hotplug thread.
+     GUARDED_BY(darwin_cached_devices_mutex) */
+  usb_device_t          pending_device;
+  io_service_t          pending_service;
+  usbi_mutex_t          lock;          /* protects open_count and capture_count */
+  int                   open_count;    /* GUARDED_BY(lock) */
+  int                   capture_count; /* GUARDED_BY(lock) */
   UInt8                 first_config, active_config, port;
   int                   can_enumerate;
   int                   refcount;
   atomic_bool           in_reenumerate;
-  int                   capture_count;
 };
 
 struct darwin_device_priv {

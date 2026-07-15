@@ -3,6 +3,8 @@
  * Copyright (c) 2016, Oracle and/or its affiliates.
  * Copyright 2023 Oxide Computer Company
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -1382,7 +1384,7 @@ sunos_destroy_device(struct libusb_device *dev)
 }
 
 int
-sunos_submit_transfer(struct usbi_transfer *itransfer)
+sunos_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct	libusb_transfer *transfer;
 	struct	libusb_device_handle *hdl;

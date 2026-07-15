@@ -7,6 +7,8 @@
  * Copyright © 2012-2013 Hans de Goede <hdegoede@redhat.com>
  * Copyright © 2020 Chris Dickens <christopher.a.dickens@gmail.com>
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -1381,7 +1383,7 @@ static int linux_default_scan_devices(struct libusb_context *ctx)
 	if (sysfs_available && sysfs_get_device_list(ctx) == LIBUSB_SUCCESS)
 		return LIBUSB_SUCCESS;
 
-    return usbfs_get_device_list(ctx);
+	return usbfs_get_device_list(ctx);
 }
 #endif
 
@@ -1856,7 +1858,7 @@ static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
 	int r, fd = hpriv->fd;
 
 	dc.interface = interface;
-	strcpy(dc.driver, "usbfs");
+	snprintf(dc.driver, sizeof(dc.driver), "%s", "usbfs");
 	dc.flags = USBFS_DISCONNECT_CLAIM_EXCEPT_DRIVER;
 	r = ioctl(fd, IOCTL_USBFS_DISCONNECT_CLAIM, &dc);
 	if (r == 0)
@@ -2324,7 +2326,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 	return 0;
 }
 
-static int op_submit_transfer(struct usbi_transfer *itransfer)
+static int op_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct libusb_transfer *transfer =
 		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);

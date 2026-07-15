@@ -3,6 +3,8 @@
 // Copyright © 2012 Pete Batard <pete@akeo.ie>
 // For more information, please visit: <https://libusb.info>
 //
+// SPDX-License-Identifier: LGPL-2.1-or-later
+//
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
 // License as published by the Free Software Foundation; either
@@ -85,6 +87,9 @@ CLANG_WARN_SUSPICIOUS_MOVE = YES
 CLANG_WARN__DUPLICATE_METHOD_MATCH = YES
 CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES
 GCC_WARN_UNDECLARED_SELECTOR = YES
+
+// Optionally enable thread safety warnings, which requires building as C++.
+//OTHER_CFLAGS = -Wthread-safety -x c++
 
 // Static analyzer warnings.
 CLANG_ANALYZER_NONNULL = YES

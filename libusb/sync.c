@@ -5,6 +5,8 @@
  * Copyright © 2019 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2019 Google LLC. All rights reserved.
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -37,7 +39,7 @@ static void LIBUSB_CALL sync_transfer_cb(struct libusb_transfer *transfer)
 {
 	usbi_dbg(TRANSFER_CTX(transfer), "actual_length=%d", transfer->actual_length);
 
-	int *completed = transfer->user_data;
+	int *completed = (int *)transfer->user_data;
 	*completed = 1;
 	/*
 	 * Right after setting 'completed', another thread might free the transfer, so don't
@@ -48,7 +50,7 @@ static void LIBUSB_CALL sync_transfer_cb(struct libusb_transfer *transfer)
 
 static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
 {
-	int r, *completed = transfer->user_data;
+	int r, *completed = (int *)transfer->user_data;
 	struct libusb_context *ctx = HANDLE_CTX(transfer->dev_handle);
 
 	while (!*completed) {
@@ -116,7 +118,7 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 	if (!transfer)
 		return LIBUSB_ERROR_NO_MEM;
 
-	buffer = malloc(LIBUSB_CONTROL_SETUP_SIZE + wLength);
+	buffer = (unsigned char *)malloc(LIBUSB_CONTROL_SETUP_SIZE + wLength);
 	if (!buffer) {
 		libusb_free_transfer(transfer);
 		return LIBUSB_ERROR_NO_MEM;

@@ -5,6 +5,8 @@
  * Copyright © 2011 Vitali Lovich <vlovich@aliph.com>
  * Copyright © 2011 Peter Stuge <peter@stuge.se>
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -54,7 +56,7 @@ void usbi_cond_init(usbi_cond_t *cond)
 }
 
 int usbi_cond_timedwait(usbi_cond_t *cond,
-	usbi_mutex_t *mutex, const struct timeval *tv)
+	usbi_mutex_t *mutex, const struct timeval *tv) REQUIRES(*mutex)
 {
 	struct timespec timeout;
 	int r;

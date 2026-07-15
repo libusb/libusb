@@ -4,6 +4,8 @@
  *
  * Copyright © 2020 Chris Dickens <christopher.a.dickens@gmail.com>
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -234,7 +236,7 @@ int usbi_alloc_event_data(struct libusb_context *ctx)
 		return 0;
 	}
 
-	struct pollfd *fds = calloc(cnt, sizeof(*fds));
+	struct pollfd *fds = (struct pollfd *)calloc(cnt, sizeof(*fds));
 	if (!fds)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -254,7 +256,7 @@ int usbi_alloc_event_data(struct libusb_context *ctx)
 int usbi_wait_for_events(struct libusb_context *ctx,
 	struct usbi_reported_events *reported_events, int timeout_ms)
 {
-	struct pollfd *fds = ctx->event_data;
+	struct pollfd *fds = (struct pollfd *)ctx->event_data;
 	usbi_nfds_t nfds = (usbi_nfds_t)ctx->event_data_cnt;
 	int internal_fds, num_ready;
 
