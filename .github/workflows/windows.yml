@@ -53,3 +53,46 @@ jobs:
             build/**/dll/libusb-1.0.exp
             build/**/dll/libusb-1.0.pdb
             build/**/lib/libusb-1.0.lib
+
+  build-v142:
+    name: MSVC v142 (${{ matrix.configuration }}, ${{ matrix.architecture }})
+    strategy:
+      matrix:
+        configuration:
+          - 'Debug'
+          - 'Release'
+        architecture:
+          - 'Win32'
+          - 'x64'
+
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          # Full history + tags so the MSVC PreBuildEvent's call to
+          # build-aux/gen-describe.ps1 can produce a tag-prefixed
+          # `git describe` string.
+          fetch-depth: 0
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v3
+
+      - name: Build solution
+        run: |
+          msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }} -property:Platform=${{ matrix.architecture }} -property:PlatformToolset=v142
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-windows-2022-v142-${{ matrix.configuration }}-${{ matrix.architecture }}
+          path: |
+            build/**/*.exe
+            build/**/dll/libusb-1.0.dll
+            build/**/dll/libusb-1.0.lib
+            build/**/dll/libusb-1.0.exp
+            build/**/dll/libusb-1.0.pdb
+            build/**/lib/libusb-1.0.lib
+            build/**/lib/libusb-1.0.pdb
