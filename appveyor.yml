@@ -21,6 +21,7 @@ matrix:
 environment:
   toolset: UNK
 clone_depth: 1
+skip_branch_with_pr: true
 build:
   parallel: true
 for:
