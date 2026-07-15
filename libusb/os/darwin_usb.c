@@ -97,15 +97,15 @@ static pthread_t libusb_darwin_at;
 /* protected by libusb_darwin_at_mutex */
 static bool libusb_darwin_at_started GUARDED_BY(libusb_darwin_at_mutex);
 
-static void darwin_exit(struct libusb_context *ctx);
+static void darwin_exit(struct libusb_context *ctx) EXCLUDES(darwin_cached_devices_mutex);
 static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len);
 static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface) REQUIRES(dev_handle->lock);
 static int darwin_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface) REQUIRES(dev_handle->lock);
-static int darwin_reenumerate_device(struct libusb_device_handle *dev_handle, bool capture);
-static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint);
+static int darwin_reenumerate_device(struct libusb_device_handle *dev_handle, bool capture) REQUIRES(dev_handle->lock);
+static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint) EXCLUDES(dev_handle->lock);
 static int darwin_clear_halt_locked(struct libusb_device_handle *dev_handle, unsigned char endpoint) REQUIRES(dev_handle->lock);
-static int darwin_reset_device(struct libusb_device_handle *dev_handle);
-static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface);
+static int darwin_reset_device(struct libusb_device_handle *dev_handle) REQUIRES(dev_handle->lock);
+static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock);
 static int darwin_detach_kernel_driver_locked (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock);
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0);
 
@@ -114,7 +114,7 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
                                              UInt64 old_session_id);
 
 static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io_service_t service, struct darwin_cached_device **cached_out,
-                                                  UInt64 *old_session_id);
+                                                  UInt64 *old_session_id) EXCLUDES(darwin_cached_devices_mutex);
 
 struct darwin_iokit_interface {
   uint32_t min_os_version;
