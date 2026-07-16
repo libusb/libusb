@@ -172,9 +172,10 @@ typedef SSIZE_T ssize_t;
  * <li>libusb version 1.0.28: LIBUSB_API_VERSION = 0x0100010A
  * <li>libusb version 1.0.29: LIBUSB_API_VERSION = 0x0100010B
  * <li>libusb version 1.0.30: LIBUSB_API_VERSION = 0x0100010C
+ * <li>libusb version 1.0.31: LIBUSB_API_VERSION = 0x0100010D
  * </ul>
  */
-#define LIBUSB_API_VERSION 0x0100010C
+#define LIBUSB_API_VERSION 0x0100010D
 
 /** \def LIBUSBX_API_VERSION
  * \ingroup libusb_misc
@@ -1758,6 +1759,11 @@ void LIBUSB_CALL libusb_unref_device(libusb_device *dev);
 
 int LIBUSB_CALL libusb_get_device_string(libusb_device *dev,
 	enum libusb_device_string_type string_type, char *data, int length);
+int LIBUSB_CALL libusb_get_config_string(libusb_device *dev,
+	uint8_t config_value, char *data, int length);
+int LIBUSB_CALL libusb_get_interface_string(libusb_device *dev,
+	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+	char *data, int length);
 int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
 	int *config);
 int LIBUSB_CALL libusb_get_device_descriptor(libusb_device *dev,

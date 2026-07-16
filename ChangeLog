@@ -1,5 +1,9 @@
 For detailed information about the changes below, please see the git log.
 
+202?-??-??: v1.0.31
+* Add new APIs libusb_get_config_string() and libusb_get_interface_string() to access configuration and interface strings without opening the device
+* LIBUSB_API_VERSION bump to 0x0100010D
+
 2026-05-17: v1.0.30
 * Add hotplug support on Microsoft Windows
 * Add RAW_IO support in WinUSB backend
