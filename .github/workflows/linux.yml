@@ -55,7 +55,7 @@ jobs:
       - name: emscripten
         run: emconfigure .private/ci-build.sh --build-dir build-emscripten -- --host=wasm32-unknown-emscripten
 
-      - name: umockdev test
+      - name: Ubuntu rolling / GCC C23 / umockdev
         run: .private/ci-container-build.sh docker.io/amd64/ubuntu:rolling
 
       # --- Sanitizers + BOS fuzzer smoke, inside linux job (PRs only) ---

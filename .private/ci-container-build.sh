@@ -38,7 +38,7 @@ eatmydata apt-get install -y make libtool libudev-dev pkg-config umockdev libumo
 
 # run build as user
 useradd build
-su -s /bin/bash - build << EOG
+su -s /bin/bash - build << 'EOG'
 set -ex
 
 mkdir "/tmp/builddir"
@@ -53,13 +53,33 @@ CFLAGS+=" -Wnested-externs"
 CFLAGS+=" -Wpointer-arith"
 CFLAGS+=" -Wredundant-decls"
 CFLAGS+=" -Wswitch-enum"
-export CFLAGS
 
 export CXXFLAGS="\${CFLAGS}"
+CFLAGS+=" -std=c23"
+export CFLAGS
 
 echo ""
 echo "Configuring ..."
 /source/configure --enable-examples-build --enable-tests-build
+
+echo ""
+echo "Checking C23 headers ..."
+printf '%s\n' \
+	'#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L' \
+	'#error compiler does not report final C23 mode' \
+	'#endif' \
+	'#include <assert.h>' \
+	'#ifdef static_assert' \
+	'#define SYSTEM_STATIC_ASSERT_IS_MACRO 1' \
+	'#endif' \
+	'#include "libusbi.h"' \
+	'#if !defined(SYSTEM_STATIC_ASSERT_IS_MACRO) && defined(static_assert)' \
+	'#error libusbi.h must not define static_assert in C23' \
+	'#endif' | \
+	gcc -std=c23 -I. -I/source/libusb -E -x c -o /dev/null -
+
+gcc -std=c23 -I/source/libusb -dM -E -include libusb.h -x c /dev/null | \
+	grep -F '#define LIBUSB_DEPRECATED_FOR(f) [[deprecated("Use " #f " instead")]]'
 
 echo ""
 echo "Building ..."
