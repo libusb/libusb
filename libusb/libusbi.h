@@ -42,8 +42,10 @@
 
 /* Not all C standard library headers define static_assert in assert.h
  * Additionally, Visual Studio treats static_assert as a keyword.
+ * Additionally, starting with C23, static_assert must always be present.
  */
-#if !defined(__cplusplus) && !defined(static_assert) && !defined(_MSC_VER)
+#if !(defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)) && \
+    !defined(__cplusplus) && !defined(static_assert) && !defined(_MSC_VER)
 #define static_assert(cond, msg) _Static_assert(cond, msg)
 #endif
 
