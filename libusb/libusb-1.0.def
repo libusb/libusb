@@ -74,6 +74,8 @@ EXPORTS
   libusb_get_config_descriptor@12 = libusb_get_config_descriptor
   libusb_get_config_descriptor_by_value
   libusb_get_config_descriptor_by_value@12 = libusb_get_config_descriptor_by_value
+  libusb_get_config_string
+  libusb_get_config_string@16 = libusb_get_config_string
   libusb_get_configuration
   libusb_get_configuration@8 = libusb_get_configuration
   libusb_get_container_id_descriptor
@@ -92,6 +94,8 @@ EXPORTS
   libusb_get_device_string@16 = libusb_get_device_string
   libusb_get_interface_association_descriptors
   libusb_get_interface_association_descriptors@12 = libusb_get_interface_association_descriptors
+  libusb_get_interface_string
+  libusb_get_interface_string@24 = libusb_get_interface_string
   libusb_get_max_alt_packet_size
   libusb_get_max_alt_packet_size@16 = libusb_get_max_alt_packet_size
   libusb_get_max_iso_packet_size

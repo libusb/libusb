@@ -1072,6 +1072,144 @@ static int darwin_get_device_string(struct libusb_device *dev,
   return (int) cfUsedIndex + 1;
 }
 
+/* Fetch the string descriptor at string_index and convert it to UTF-8.
+ * IOKit does not cache interface/configuration strings as IORegistry
+ * properties (unlike manufacturer/product/serial), so a GET_DESCRIPTOR
+ * control request is used; string descriptors are indexed device-globally. */
+static int darwin_fetch_string_descriptor (struct libusb_context *ctx,
+    struct darwin_cached_device *dpriv, uint8_t string_index, char *buffer, int length) {
+  usb_device_t device;
+  IOUSBDevRequestTO req;
+  IOReturn kresult;
+  int is_open = 0;
+  UInt16 langid;
+  uint8_t desc[256];
+  CFStringRef cf;
+  long used = 0;
+  int desc_len;
+
+  /* Hold the device lock for the whole open/request/close sequence: it keeps
+   * the open_count check below stable, so a concurrent libusb_open() or
+   * libusb_close() cannot interleave with the temporary open.  Since
+   * re-enumeration also runs with this lock held, the device interface read
+   * below cannot be swapped or released underneath the requests. */
+  usbi_mutex_lock(&dpriv->lock);
+
+  device = dpriv->device;
+  if (NULL == device) {
+    usbi_mutex_unlock(&dpriv->lock);
+    return LIBUSB_ERROR_NO_DEVICE;
+  }
+
+  /* According to Apple's documentation the device must be open to issue a
+   * control request, but (as in darwin_cache_device_descriptor) we may not be
+   * able to open every device, so the request is attempted regardless.  Never
+   * open (or later close) the device here when the application already has it
+   * open via libusb_open(): dpriv->device is shared, and USBDeviceClose()
+   * would tear down that open state under the active handle. */
+  if (0 == dpriv->open_count)
+    is_open = ((*device)->USBDeviceOpen (device) == kIOReturnSuccess);
+
+  /* Fetch the supported language IDs (string descriptor 0) and cache the
+   * first (primary) one for this and subsequent requests. */
+  langid = dpriv->langid;
+  if (0 == langid) {
+    memset (desc, 0, sizeof(desc));
+    req.bmRequestType = USBmakebmRequestType (kUSBIn, kUSBStandard, kUSBDevice);
+    req.bRequest      = kUSBRqGetDescriptor;
+    req.wValue        = (UInt16)(LIBUSB_DT_STRING << 8);
+    req.wIndex        = 0;
+    req.wLength       = (UInt16)sizeof(desc);
+    req.pData         = desc;
+    req.noDataTimeout = 20;
+    req.completionTimeout = 100;
+    kresult = (*device)->DeviceRequestTO (device, &req);
+    if (kIOReturnSuccess == kresult && req.wLenDone >= 4) {
+      langid = (UInt16)desc[2] | ((UInt16)desc[3] << 8);
+      dpriv->langid = langid;
+    }
+  }
+
+  /* Fetch the requested string descriptor. */
+  memset (desc, 0, sizeof(desc));
+  req.bmRequestType = USBmakebmRequestType (kUSBIn, kUSBStandard, kUSBDevice);
+  req.bRequest      = kUSBRqGetDescriptor;
+  req.wValue        = (UInt16)((LIBUSB_DT_STRING << 8) | string_index);
+  req.wIndex        = langid;
+  req.wLength       = (UInt16)sizeof(desc);
+  req.pData         = desc;
+  req.noDataTimeout = 20;
+  req.completionTimeout = 100;
+  kresult = (*device)->DeviceRequestTO (device, &req);
+
+  if (is_open)
+    (void)(*device)->USBDeviceClose (device);
+
+  usbi_mutex_unlock(&dpriv->lock);
+
+  if (kIOReturnSuccess != kresult) {
+    usbi_warn (ctx, "could not retrieve string descriptor %u: %s", string_index, darwin_error_str (kresult));
+    return darwin_to_libusb (kresult);
+  }
+
+  if (req.wLenDone < 2 || desc[1] != LIBUSB_DT_STRING)
+    return LIBUSB_ERROR_IO;
+
+  desc_len = desc[0];  /* bLength */
+  if (desc_len > (int)req.wLenDone)
+    desc_len = (int)req.wLenDone;
+  if (desc_len < 2)
+    return LIBUSB_ERROR_IO;
+
+  cf = CFStringCreateWithBytes (kCFAllocatorDefault, desc + 2, desc_len - 2,
+    kCFStringEncodingUTF16LE, false);
+  if (NULL == cf)
+    return LIBUSB_ERROR_OTHER;
+
+  CFStringGetBytes (cf, CFRangeMake(0, CFStringGetLength(cf)), kCFStringEncodingUTF8,
+    '?', false, (uint8_t *) buffer, length - 1, &used);
+  CFRelease (cf);
+
+  buffer[used] = '\0';
+  return (int) used + 1;
+}
+
+static int darwin_get_config_string (struct libusb_device *dev,
+    uint8_t config_value, char *buffer, int length) {
+  struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev);
+  uint8_t string_index = 0;
+  int r;
+
+  assert (NULL != buffer && length > 0);  /* guaranteed by the core */
+
+  r = usbi_get_config_string_index (dev, config_value, &string_index);
+  if (r < 0)
+    return r;
+  if (0 == string_index)
+    return LIBUSB_ERROR_NOT_FOUND;
+
+  return darwin_fetch_string_descriptor (DEVICE_CTX(dev), dpriv, string_index, buffer, length);
+}
+
+static int darwin_get_interface_string (struct libusb_device *dev,
+    uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+    char *buffer, int length) {
+  struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev);
+  uint8_t string_index = 0;
+  int r;
+
+  assert (NULL != buffer && length > 0);  /* guaranteed by the core */
+
+  r = usbi_get_interface_string_index (dev, config_value, interface_number,
+    alt_setting, &string_index);
+  if (r < 0)
+    return r;
+  if (0 == string_index)
+    return LIBUSB_ERROR_NOT_FOUND;
+
+  return darwin_fetch_string_descriptor (DEVICE_CTX(dev), dpriv, string_index, buffer, length);
+}
+
 static int get_configuration_index (struct libusb_device *dev, UInt8 config_value) {
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   UInt8 i, numConfig;
@@ -3350,6 +3488,8 @@ const struct usbi_os_backend usbi_backend = {
         .set_option = NULL,
         .get_device_list = NULL,
         .get_device_string = darwin_get_device_string,
+        .get_config_string = darwin_get_config_string,
+        .get_interface_string = darwin_get_interface_string,
         .hotplug_poll = darwin_hotplug_poll,
         .wrap_sys_device = NULL,
         .open = darwin_open,

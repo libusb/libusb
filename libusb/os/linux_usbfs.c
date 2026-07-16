@@ -102,6 +102,8 @@ usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 
 static int open_sysfs_attr(struct libusb_context *ctx,
 	const char *sysfs_dir, const char *attr);
+static int read_sysfs_attr(struct libusb_context *ctx,
+	const char *sysfs_dir, const char *attr, int max_value, int *value_p);
 static int linux_scan_devices(struct libusb_context *ctx);
 static int detach_kernel_driver_and_claim(struct libusb_device_handle *, uint8_t);
 
@@ -457,10 +459,43 @@ static int op_set_option(struct libusb_context *ctx, enum libusb_option option, 
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+/* Read an already-open sysfs attribute fd into buffer as a NUL-terminated
+ * string, strip the trailing newline and close fd.  Returns the length of
+ * the string in buffer, including the terminating NUL, or a negative
+ * LIBUSB_ERROR code. */
+static int read_sysfs_attr_fd(struct libusb_context *ctx, int fd,
+	const char *attr, char *buffer, int length)
+{
+	ssize_t r;
+	int e;
+
+	UNUSED(attr);  /* only referenced by usbi_err(), a no-op without logging */
+
+	if (length <= 0) {
+		close(fd);
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	r = read(fd, buffer, length - 1);  // leave space for null terminator
+	if (r < 0) {
+		e = errno;
+		close(fd);
+		if (e == ENODEV)
+			return LIBUSB_ERROR_NO_DEVICE;
+		usbi_err(ctx, "attribute %s read failed, errno=%d", attr, e);
+		return LIBUSB_ERROR_IO;
+	}
+	close(fd);
+	buffer[r] = 0;  // add null terminator
+	while (r && ((buffer[r] == 0) || (buffer[r] == '\n'))) {
+		buffer[r--] = 0;
+	}
+	return (int)strlen(buffer) + 1;
+}
+
 static int op_get_device_string(struct libusb_device *dev,
 		enum libusb_device_string_type string_type, char *buffer, int length)
 {
-	ssize_t r;
 	int fd;
 	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
 	struct libusb_context* ctx = DEVICE_CTX(dev);
@@ -479,22 +514,133 @@ static int op_get_device_string(struct libusb_device *dev,
 	if (fd < 0)
 		return LIBUSB_ERROR_IO;
 
-	r = read(fd, buffer, length - 1);  // leave space for null terminator
-	if (r < 0) {
-		r = errno;
-		close(fd);
-		if (r == ENODEV)
-			return LIBUSB_ERROR_NO_DEVICE;
-		usbi_err(ctx, "attribute %s read failed, errno=%zd", attr, r);
+	return read_sysfs_attr_fd(ctx, fd, attr, buffer, length);
+}
+
+/* Read a textual sysfs attribute into buffer as a UTF-8 string.  A missing
+ * file maps to LIBUSB_ERROR_NOT_FOUND (no such string), not a disconnect. */
+static int read_sysfs_string_attr(struct libusb_context *ctx,
+	const char *sysfs_dir, const char *attr, char *buffer, int length)
+{
+	char filename[256];
+	int fd, e, r;
+
+	if (length <= 0)
+		return LIBUSB_ERROR_INVALID_PARAM;
+	if (sysfs_dir == NULL)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	r = snprintf(filename, sizeof(filename), SYSFS_DEVICE_PATH "/%s/%s", sysfs_dir, attr);
+	if (r < 0 || r >= (int)sizeof(filename)) {
+		usbi_err(ctx, "sysfs attribute path %s/%s too long", sysfs_dir, attr);
+		return LIBUSB_ERROR_OTHER;
+	}
+	fd = open(filename, O_RDONLY | O_CLOEXEC);
+	if (fd < 0) {
+		e = errno;
+		if (e == ENOENT)
+			return LIBUSB_ERROR_NOT_FOUND;
+		usbi_err(ctx, "open %s failed, errno=%d", filename, e);
 		return LIBUSB_ERROR_IO;
 	}
-	close(fd);
-	buffer[r] = 0;  // add null terminator
-	while (r && ((buffer[r] == 0) || (buffer[r] == '\n'))) {
-		buffer[r--] = 0;
+
+	return read_sysfs_attr_fd(ctx, fd, attr, buffer, length);
+}
+
+static int op_get_config_string(struct libusb_device *dev,
+		uint8_t config_value, char *buffer, int length)
+{
+	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
+	struct libusb_context* ctx = DEVICE_CTX(dev);
+	uint8_t string_index = 0;
+	int r;
+
+	assert(NULL != buffer && length > 0);  /* guaranteed by the core */
+
+	if (priv->sysfs_dir == NULL)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	/* Resolve iConfiguration from the cached descriptors first, so that a
+	 * missing string (index 0), a nonexistent configuration or an
+	 * unconfigured device fails the same way as on other backends. */
+	r = usbi_get_config_string_index(dev, config_value, &string_index);
+	if (r < 0)
+		return r;
+	if (0 == string_index)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	/* sysfs only exposes the iConfiguration string of the active
+	 * configuration; a non-active configuration cannot be read without
+	 * opening the device. */
+	if (config_value != 0) {
+		int active = 0;
+		r = read_sysfs_attr(ctx, priv->sysfs_dir, "bConfigurationValue",
+			UINT8_MAX, &active);
+		if (r < 0)
+			return r;
+		if (active != (int)config_value)
+			return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
-	++r;
-	return r;
+
+	return read_sysfs_string_attr(ctx, priv->sysfs_dir, "configuration", buffer, length);
+}
+
+static int op_get_interface_string(struct libusb_device *dev,
+		uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+		char *buffer, int length)
+{
+	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
+	struct libusb_context* ctx = DEVICE_CTX(dev);
+	char intf_dir[256];
+	uint8_t string_index = 0;
+	int active = 0;
+	int cur_alt = 0;
+	int r;
+
+	assert(NULL != buffer && length > 0);  /* guaranteed by the core */
+
+	if (priv->sysfs_dir == NULL)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	/* Resolve iInterface from the cached descriptors first, so that a
+	 * nonexistent interface/alternate setting or a missing string (index 0)
+	 * returns NOT_FOUND, the same way as on other backends. */
+	r = usbi_get_interface_string_index(dev, config_value, interface_number,
+		alt_setting, &string_index);
+	if (r < 0)
+		return r;
+	if (0 == string_index)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	/* sysfs exposes interfaces only for the active configuration */
+	r = read_sysfs_attr(ctx, priv->sysfs_dir, "bConfigurationValue", UINT8_MAX, &active);
+	if (r < 0)
+		return r;
+	if (active <= 0)
+		return LIBUSB_ERROR_NOT_FOUND;  /* device not configured */
+	if (config_value != 0 && (int)config_value != active)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	/* The interface's sysfs directory is a sibling of the device directory,
+	 * named "<device>:<bConfigurationValue>.<bInterfaceNumber>". */
+	r = snprintf(intf_dir, sizeof(intf_dir), "%s:%d.%u", priv->sysfs_dir, active,
+		(unsigned)interface_number);
+	if (r < 0 || r >= (int)sizeof(intf_dir)) {
+		usbi_err(ctx, "interface sysfs directory name %s:%d.%u too long",
+			priv->sysfs_dir, active, (unsigned)interface_number);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	r = read_sysfs_attr(ctx, intf_dir, "bAlternateSetting", UINT8_MAX, &cur_alt);
+	if (r < 0)
+		return (r == LIBUSB_ERROR_NO_DEVICE) ? LIBUSB_ERROR_NOT_FOUND : r;
+
+	/* sysfs only reflects the currently selected alternate setting; another
+	 * alternate setting cannot be read without opening the device. */
+	if (cur_alt != (int)alt_setting)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	return read_sysfs_string_attr(ctx, intf_dir, "interface", buffer, length);
 }
 
 static int linux_scan_devices(struct libusb_context *ctx)
@@ -2839,6 +2985,8 @@ const struct usbi_os_backend usbi_backend = {
 	.exit = op_exit,
 	.set_option = op_set_option,
 	.get_device_string = op_get_device_string,
+	.get_config_string = op_get_config_string,
+	.get_interface_string = op_get_interface_string,
 	.hotplug_poll = op_hotplug_poll,
 	.wrap_sys_device = op_wrap_sys_device,
 	.open = op_open,
