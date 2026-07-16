@@ -1824,9 +1824,11 @@ int usbi_get_interface_string_index(libusb_device *dev,
  * - Windows and macOS fetch the string by its descriptor index and can serve
  *   any configuration, active or not.
  * - Linux reads the string from sysfs, which only exposes the string of the
- *   active configuration.  Requesting a non-active configuration returns
- *   \ref LIBUSB_ERROR_NOT_SUPPORTED even though it is valid.  In that case
- *   the string can still be read by opening the device and calling
+ *   active configuration.  A non-active configuration can only be served
+ *   when it shares its string descriptor (iConfiguration index) with the
+ *   active one; otherwise \ref LIBUSB_ERROR_NOT_SUPPORTED is returned even
+ *   though the requested configuration is valid.  In that case the string
+ *   can still be read by opening the device and calling
  *   \ref libusb_get_string_descriptor() with the iConfiguration index.
  * - Backends that do not implement this function always return
  *   \ref LIBUSB_ERROR_NOT_SUPPORTED.
@@ -1894,10 +1896,12 @@ int API_EXPORTED libusb_get_config_string(libusb_device *dev,
  * - Windows and macOS fetch the string by its descriptor index and can serve
  *   any configuration and alternate setting, current or not.
  * - Linux reads the string from sysfs, which only exposes the string of the
- *   currently selected alternate setting in the active configuration.
- *   Requesting any other alternate setting or configuration returns
- *   \ref LIBUSB_ERROR_NOT_SUPPORTED even though it is valid.  In that case
- *   the string can still be read by opening the device and calling
+ *   currently selected alternate setting in the active configuration.  A
+ *   valid but non-current alternate setting (or non-active configuration)
+ *   can only be served when it shares its string descriptor (iInterface
+ *   index) with the current one; otherwise \ref LIBUSB_ERROR_NOT_SUPPORTED
+ *   is returned even though the requested combination is valid.  In that
+ *   case the string can still be read by opening the device and calling
  *   \ref libusb_get_string_descriptor() with the iInterface index.
  * - Backends that do not implement this function always return
  *   \ref LIBUSB_ERROR_NOT_SUPPORTED.
