@@ -719,16 +719,17 @@ static int winusb_init(struct libusb_context *ctx)
 }
 
 /*
- * Hub IOCTLs that translate into control transfers on the bus - most notably
- * IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION - are not given a timeout by the
- * hub driver. A device that stops responding on its control pipe therefore hangs
- * the calling thread forever, which during enumeration means hanging the whole
- * library (observed in the wild, e.g. with the Nacon PS4 Compact Controller, #1127).
- * Such calls are bounded by issuing them asynchronously and giving up after this
- * many milliseconds. Well-behaved requests complete in milliseconds; 5 seconds
- * matches the timeout other USB stacks apply to control transfers (e.g. Linux's
- * USB_CTRL_GET_TIMEOUT) and is generous enough for hubs waking from selective
- * suspend.
+ * Hub IOCTLs used during enumeration can block indefinitely when a device
+ * stops responding. The Nacon controller report (#1136) stalled in
+ * IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, while descriptor requests
+ * translate into control transfers for which the hub driver applies no
+ * timeout. A blocked call hangs the calling thread forever, which during
+ * enumeration means hanging the whole library. Such calls are bounded by
+ * issuing them asynchronously and giving up after this many milliseconds.
+ * Well-behaved requests complete in milliseconds; 5 seconds matches the
+ * timeout other USB stacks apply to control transfers (e.g. Linux's
+ * USB_CTRL_GET_TIMEOUT) and is generous enough for hubs waking from
+ * selective suspend.
  */
 #define HUB_IOCTL_TIMEOUT_MS	5000
 
@@ -1076,6 +1077,7 @@ static int init_root_hub(struct libusb_device *dev)
 	HANDLE handle;
 	ULONG port_number, num_ports;
 	DWORD size;
+	bool ioctl_timed_out = false;
 	int r;
 
 	// Determining the speed of a root hub is painful. Microsoft does not directly report the speed
@@ -1083,16 +1085,20 @@ static int init_root_hub(struct libusb_device *dev)
 	// are forced to query each individual port of the root hub to try and infer the root hub's
 	// speed. Note that we have to query all ports because the presence of a device on that port
 	// changes if/how Windows returns any useful speed information.
-	handle = CreateFileA(priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	// Opened with FILE_FLAG_OVERLAPPED because a wedged device on one of the ports can block
+	// even the connection-info queries (#1136); consequently every DeviceIoControl() on this
+	// handle must go through hub_device_io_control()
+	handle = CreateFileA(priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 	if (handle == INVALID_HANDLE_VALUE) {
 		usbi_err(ctx, "could not open root hub %s: %s", priv->path, windows_error_str(0));
 		return LIBUSB_ERROR_ACCESS;
 	}
 
-	if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_INFORMATION, NULL, 0, &hub_info, sizeof(hub_info), &size, NULL)) {
-		usbi_warn(ctx, "could not get root hub info for '%s': %s", priv->dev_id, windows_error_str(0));
+	if (!hub_device_io_control(ctx, handle, IOCTL_USB_GET_NODE_INFORMATION, NULL, 0, &hub_info, sizeof(hub_info), &size)) {
+		DWORD error = GetLastError();
+		usbi_warn(ctx, "could not get root hub info for '%s': %s", priv->dev_id, windows_error_str(error));
 		CloseHandle(handle);
-		return LIBUSB_ERROR_ACCESS;
+		return (error == ERROR_SEM_TIMEOUT) ? LIBUSB_ERROR_TIMEOUT : LIBUSB_ERROR_ACCESS;
 	}
 
 	num_ports = hub_info.u.HubInformation.HubDescriptor.bNumberOfPorts;
@@ -1107,8 +1113,9 @@ static int init_root_hub(struct libusb_device *dev)
 			conn_info_v2.ConnectionIndex = port_number;
 			conn_info_v2.Length = sizeof(conn_info_v2);
 			conn_info_v2.SupportedUsbProtocols.Usb300 = 1;
-			if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
-				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size, NULL)) {
+			if (!hub_device_io_control(ctx, handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
+				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size)) {
+				ioctl_timed_out = (GetLastError() == ERROR_SEM_TIMEOUT);
 				usbi_warn(ctx, "could not get node connection information (V2) for root hub '%s' port %lu: %s",
 					priv->dev_id, ULONG_CAST(port_number), windows_error_str(0));
 				break;
@@ -1145,12 +1152,17 @@ static int init_root_hub(struct libusb_device *dev)
 	// Windows only reports speed information about a connected device. This means that a root
 	// hub with no connected devices or devices that are all operating at a speed less than the
 	// highest speed that the root hub supports will not give us the correct speed.
-	for (port_number = 1; port_number <= num_ports; port_number++) {
+	// If a request already timed out, most likely every request on this handle would pay the
+	// full timeout as well, so don't even start the loop and settle for a pessimistic default.
+	for (port_number = 1; !ioctl_timed_out && port_number <= num_ports; port_number++) {
 		conn_info.ConnectionIndex = port_number;
-		if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
-			&conn_info, sizeof(conn_info), &size, NULL)) {
+		if (!hub_device_io_control(ctx, handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
+			&conn_info, sizeof(conn_info), &size)) {
+			DWORD error = GetLastError();
 			usbi_warn(ctx, "could not get node connection information for root hub '%s' port %lu: %s",
-				priv->dev_id, ULONG_CAST(port_number), windows_error_str(0));
+				priv->dev_id, ULONG_CAST(port_number), windows_error_str(error));
+			if (error == ERROR_SEM_TIMEOUT)
+				break;
 			continue;
 		}
 
