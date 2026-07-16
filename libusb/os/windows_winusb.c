@@ -766,6 +766,97 @@ static void reap_orphaned_requests(struct libusb_context *ctx)
 }
 
 /*
+ * When a hub IOCTL times out during device initialization, the device is left
+ * uninitialized and enumeration would try again - and pay the full timeout
+ * again - on every subsequent libusb_get_device_list(). To keep a polling
+ * application usable next to a wedged device, and to bound the accumulation of
+ * orphaned requests such retries can produce, re-initialization of a device
+ * that recently caused a timeout is skipped until its backoff expires. The
+ * backoff is deliberately not cleared on reconnection: a replug cannot cheaply
+ * be told apart from a still-wedged device, so a replugged (now healthy)
+ * device may stay invisible for up to this many milliseconds - a self-healing
+ * delay, much cheaper than stalling every scan by the full timeout.
+ */
+#define HUB_IOCTL_RETRY_BACKOFF_MS	30000
+
+struct hub_timeout_backoff {
+	struct list_head list;	// linkage in hub_timeout_backoffs
+	ULONGLONG expiry;	// GetTickCount64() time after which init may be retried
+	// the NUL-terminated device instance ID immediately follows the struct
+};
+
+static usbi_mutex_static_t hub_timeout_backoffs_lock = USBI_MUTEX_INITIALIZER;
+static struct list_head hub_timeout_backoffs = { &hub_timeout_backoffs, &hub_timeout_backoffs };
+
+// call only with hub_timeout_backoffs_lock held
+static struct hub_timeout_backoff *hub_timeout_backoff_find(const char *dev_id)
+{
+	struct hub_timeout_backoff *backoff;
+
+	list_for_each_entry(backoff, &hub_timeout_backoffs, list, struct hub_timeout_backoff) {
+		if (strcmp((const char *)(backoff + 1), dev_id) == 0)
+			return backoff;
+	}
+	return NULL;
+}
+
+// Whether initialization of this device should be skipped because a recent
+// hub IOCTL timeout put it into its backoff window. Expired entries are
+// dropped, so the next attempt after the window goes through again.
+static bool hub_timeout_backoff_active(const char *dev_id)
+{
+	struct hub_timeout_backoff *backoff;
+	bool active = false;
+
+	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
+	backoff = hub_timeout_backoff_find(dev_id);
+	if (backoff != NULL) {
+		if (GetTickCount64() < backoff->expiry) {
+			active = true;
+		} else {
+			list_del(&backoff->list);
+			free(backoff);
+		}
+	}
+	usbi_mutex_static_unlock(&hub_timeout_backoffs_lock);
+
+	return active;
+}
+
+static void hub_timeout_backoff_arm(struct libusb_context *ctx, const char *dev_id)
+{
+	struct hub_timeout_backoff *backoff;
+
+	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
+	backoff = hub_timeout_backoff_find(dev_id);
+	if (backoff == NULL) {
+		backoff = (struct hub_timeout_backoff *)calloc(1, sizeof(*backoff) + strlen(dev_id) + 1);
+		if (backoff != NULL) {
+			strcpy((char *)(backoff + 1), dev_id);
+			list_add_tail(&backoff->list, &hub_timeout_backoffs);
+		}
+	}
+	if (backoff != NULL)
+		backoff->expiry = GetTickCount64() + HUB_IOCTL_RETRY_BACKOFF_MS;
+	usbi_mutex_static_unlock(&hub_timeout_backoffs_lock);
+
+	usbi_warn(ctx, "not retrying initialization of '%s' for the next %d ms", dev_id, HUB_IOCTL_RETRY_BACKOFF_MS);
+}
+
+static void hub_timeout_backoff_clear(const char *dev_id)
+{
+	struct hub_timeout_backoff *backoff;
+
+	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
+	backoff = hub_timeout_backoff_find(dev_id);
+	if (backoff != NULL) {
+		list_del(&backoff->list);
+		free(backoff);
+	}
+	usbi_mutex_static_unlock(&hub_timeout_backoffs_lock);
+}
+
+/*
  * Synchronous DeviceIoControl() with a timeout, for hub requests issued outside the
  * regular transfer path. The handle must have been opened with FILE_FLAG_OVERLAPPED,
  * which in turn means every DeviceIoControl() on that handle must go through here
@@ -889,6 +980,15 @@ static void winusb_exit(struct libusb_context *ctx)
 	if (!list_empty(&orphaned_requests))
 		usbi_warn(ctx, "keeping timed-out hub request(s) never released by the kernel");
 	usbi_mutex_static_unlock(&orphaned_requests_lock);
+
+	// Recorded re-initialization backoffs, however, can simply be dropped
+	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
+	while (!list_empty(&hub_timeout_backoffs)) {
+		struct hub_timeout_backoff *backoff = list_first_entry(&hub_timeout_backoffs, struct hub_timeout_backoff, list);
+		list_del(&backoff->list);
+		free(backoff);
+	}
+	usbi_mutex_static_unlock(&hub_timeout_backoffs_lock);
 }
 
 /*
@@ -1276,6 +1376,14 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	if (priv->initialized)
 		return LIBUSB_SUCCESS;
 
+	// Skip devices whose recent hub IOCTL timeout put them into their backoff
+	// window: retrying immediately would stall every device list scan by the
+	// full timeout all over again
+	if (hub_timeout_backoff_active(priv->dev_id)) {
+		usbi_dbg(DEVICE_CTX(dev), "skipping initialization of '%s' until its timeout backoff expires", priv->dev_id);
+		return LIBUSB_ERROR_NO_DEVICE;
+	}
+
 	if (parent_dev != NULL) { // Not a HCD root hub
 		ctx = DEVICE_CTX(dev);
 		parent_priv = (struct winusb_device_priv *)usbi_get_device_priv(parent_dev);
@@ -1335,9 +1443,14 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 
 		if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
 			&conn_info, sizeof(conn_info), &size)) {
+			DWORD error = GetLastError();
 			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
-				priv->dev_id, windows_error_str(0));
+				priv->dev_id, windows_error_str(error));
 			CloseHandle(hub_handle);
+			// This is the request implicated by the Nacon report (#1136): throttle
+			// re-initialization so later scans do not stall on it again right away
+			if (error == ERROR_SEM_TIMEOUT)
+				hub_timeout_backoff_arm(ctx, priv->dev_id);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
 
@@ -1411,8 +1524,11 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		}
 	} else {
 		r = init_root_hub(dev);
-		if (r)
+		if (r) {
+			if (r == LIBUSB_ERROR_TIMEOUT)
+				hub_timeout_backoff_arm(DEVICE_CTX(dev), priv->dev_id);
 			return r;
+		}
 	}
 
 	r = usbi_sanitize_device(dev);
@@ -1420,6 +1536,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		return r;
 
 	priv->initialized = true;
+	hub_timeout_backoff_clear(priv->dev_id);
 
 	usbi_dbg(ctx, "(bus: %u, addr: %u, depth: %u, port: %u): '%s'",
 		dev->bus_number, dev->device_address, priv->depth, dev->port_number, priv->dev_id);
