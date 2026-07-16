@@ -570,16 +570,23 @@ static int op_get_config_string(struct libusb_device *dev,
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	/* sysfs only exposes the iConfiguration string of the active
-	 * configuration; a non-active configuration cannot be read without
-	 * opening the device. */
+	 * configuration.  String descriptors are device-global, however, so
+	 * that string is also the requested one whenever the requested
+	 * configuration shares its iConfiguration index with the active one;
+	 * anything else cannot be read without opening the device. */
 	if (config_value != 0) {
 		int active = 0;
 		r = read_sysfs_attr(ctx, priv->sysfs_dir, "bConfigurationValue",
 			UINT8_MAX, &active);
 		if (r < 0)
 			return r;
-		if (active != (int)config_value)
-			return LIBUSB_ERROR_NOT_SUPPORTED;
+		if (active != (int)config_value) {
+			uint8_t active_index = 0;
+			if (active <= 0 ||
+			    usbi_get_config_string_index(dev, (uint8_t)active, &active_index) < 0 ||
+			    active_index != string_index)
+				return LIBUSB_ERROR_NOT_SUPPORTED;
+		}
 	}
 
 	return read_sysfs_string_attr(ctx, priv->sysfs_dir, "configuration", buffer, length);
@@ -618,8 +625,6 @@ static int op_get_interface_string(struct libusb_device *dev,
 		return r;
 	if (active <= 0)
 		return LIBUSB_ERROR_NOT_FOUND;  /* device not configured */
-	if (config_value != 0 && (int)config_value != active)
-		return LIBUSB_ERROR_NOT_SUPPORTED;
 
 	/* The interface's sysfs directory is a sibling of the device directory,
 	 * named "<device>:<bConfigurationValue>.<bInterfaceNumber>". */
@@ -632,13 +637,30 @@ static int op_get_interface_string(struct libusb_device *dev,
 	}
 
 	r = read_sysfs_attr(ctx, intf_dir, "bAlternateSetting", UINT8_MAX, &cur_alt);
-	if (r < 0)
+	if (r < 0) {
+		/* When a non-active configuration was requested the interface may
+		 * legitimately not exist in the active one: that is a limit of
+		 * sysfs, not a nonexistent interface (already ruled out above). */
+		if (config_value != 0 && (int)config_value != active)
+			return LIBUSB_ERROR_NOT_SUPPORTED;
 		return (r == LIBUSB_ERROR_NO_DEVICE) ? LIBUSB_ERROR_NOT_FOUND : r;
+	}
 
-	/* sysfs only reflects the currently selected alternate setting; another
-	 * alternate setting cannot be read without opening the device. */
-	if (cur_alt != (int)alt_setting)
-		return LIBUSB_ERROR_NOT_SUPPORTED;
+	/* sysfs only exposes the string of the currently selected alternate
+	 * setting in the active configuration.  String descriptors are
+	 * device-global, however, so that string is also the requested one
+	 * whenever the requested interface/alternate setting shares its
+	 * iInterface index with the current one; anything else cannot be read
+	 * without opening the device. */
+	if ((config_value != 0 && (int)config_value != active) ||
+	    cur_alt != (int)alt_setting) {
+		uint8_t cur_index = 0;
+		if (cur_alt < 0 ||
+		    usbi_get_interface_string_index(dev, (uint8_t)active, interface_number,
+						    (uint8_t)cur_alt, &cur_index) < 0 ||
+		    cur_index != string_index)
+			return LIBUSB_ERROR_NOT_SUPPORTED;
+	}
 
 	return read_sysfs_string_attr(ctx, intf_dir, "interface", buffer, length);
 }
