@@ -893,8 +893,15 @@ static void winusb_exit(struct libusb_context *ctx)
 
 /*
  * fetch and cache all the config descriptors through I/O
+ *
+ * Returns LIBUSB_ERROR_TIMEOUT if a descriptor request timed out, in which case
+ * probing was abandoned: the control pipe is most likely wedged, every further
+ * request would pay the full timeout, and bNumConfigurations is device-supplied
+ * (not sanitized until usbi_sanitize_device()) so the multiplied stall could
+ * otherwise last for minutes. Ordinary per-descriptor failures are skipped as
+ * before and do not affect the return value.
  */
-static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle)
+static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
@@ -907,14 +914,14 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 
 	num_configurations = dev->device_descriptor.bNumConfigurations;
 	if (num_configurations == 0)
-		return;
+		return LIBUSB_SUCCESS;
 
 	assert(sizeof(USB_DESCRIPTOR_REQUEST) == USB_DESCRIPTOR_REQUEST_SIZE);
 
 	priv->config_descriptor = (PUSB_CONFIGURATION_DESCRIPTOR *)calloc(num_configurations, sizeof(PUSB_CONFIGURATION_DESCRIPTOR));
 	if (priv->config_descriptor == NULL) {
 		usbi_err(ctx, "could not allocate configuration descriptor array for '%s'", priv->dev_id);
-		return;
+		return LIBUSB_ERROR_NO_MEM;
 	}
 
 	for (i = 0; i <= num_configurations; i++) {
@@ -938,7 +945,10 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 		// coverity[tainted_data_argument]
 		if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
 			&cd_buf_short, size, &ret_size)) {
-			usbi_info(ctx, "could not access configuration descriptor %u (dummy) for '%s': %s", i, priv->dev_id, windows_error_str(0));
+			DWORD error = GetLastError();
+			usbi_info(ctx, "could not access configuration descriptor %u (dummy) for '%s': %s", i, priv->dev_id, windows_error_str(error));
+			if (error == ERROR_SEM_TIMEOUT)
+				return LIBUSB_ERROR_TIMEOUT;
 			continue;
 		}
 
@@ -964,7 +974,12 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 
 		if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
 			cd_buf_actual, size, &ret_size)) {
-			usbi_err(ctx, "could not access configuration descriptor %u (actual) for '%s': %s", i, priv->dev_id, windows_error_str(0));
+			DWORD error = GetLastError();
+			usbi_err(ctx, "could not access configuration descriptor %u (actual) for '%s': %s", i, priv->dev_id, windows_error_str(error));
+			if (error == ERROR_SEM_TIMEOUT) {
+				safe_free(cd_buf_actual);
+				return LIBUSB_ERROR_TIMEOUT;
+			}
 			continue;
 		}
 
@@ -987,6 +1002,8 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 		priv->config_descriptor[i] = cd_data;
 		cd_buf_actual = NULL;
 	}
+
+	return LIBUSB_SUCCESS;
 }
 
 #define ROOT_HUB_FS_CONFIG_DESC_LENGTH		0x19
@@ -1355,10 +1372,12 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			dev->device_descriptor.bNumConfigurations, priv->active_config,	priv->dev_id);
 
 		// Cache as many config descriptors as we can
-		cache_config_descriptors(dev, hub_handle);
+		r = cache_config_descriptors(dev, hub_handle);
 
-		// In their great wisdom, Microsoft decided to BREAK the USB speed report between Windows 7 and Windows 8
-		if (windows_version >= WINDOWS_8) {
+		// In their great wisdom, Microsoft decided to BREAK the USB speed report between Windows 7 and Windows 8.
+		// Skip the query when descriptor caching hit a timeout: the same handle serves this request,
+		// so it would most likely just pay another full timeout for nothing.
+		if ((windows_version >= WINDOWS_8) && (r != LIBUSB_ERROR_TIMEOUT)) {
 			conn_info_v2.ConnectionIndex = (ULONG)port_number;
 			conn_info_v2.Length = sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2);
 			conn_info_v2.SupportedUsbProtocols.Usb300 = 1;
