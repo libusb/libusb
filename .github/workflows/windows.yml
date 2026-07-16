@@ -4,26 +4,74 @@ on: [push, pull_request]
 
 jobs:
   build:
+    name: >-
+      ${{ matrix.compiler.runner }} |
+      ${{ matrix.compiler.host }} |
+      MSVC ${{ matrix.compiler.toolset }} (${{ matrix.compiler.toolset_visual_studio }} toolset) |
+      ${{ matrix.architecture }} |
+      ${{ matrix.configuration_family.label }}
     strategy:
+      fail-fast: false
+      # Leave runner capacity for the Linux, macOS, and MSYS2 workflows.
+      max-parallel: 12
       matrix:
-        os:
-          - 'windows-2022'
-          - 'windows-2025'
-        configuration:
-          - 'Debug'
-          - 'Release'
-          - 'Debug-MT'
-          - 'Release-MT'
-          - 'Debug-Hotplug'
-          - 'Release-Hotplug'
-          - 'Debug-Hotplug-MT'
-          - 'Release-Hotplug-MT'
+        compiler:
+          - runner: windows-2022
+            host: Visual Studio 2022/MSBuild 17 host
+            toolset: v143
+            toolset_visual_studio: Visual Studio 2022
+            artifact_prefix: build-windows-2022
+          - runner: windows-2025-vs2026
+            host: Visual Studio 2026/MSBuild 18 host
+            toolset: v145
+            toolset_visual_studio: Visual Studio 2026
+            # Retain the established artifact names despite using the explicit
+            # VS 2026 runner label.
+            artifact_prefix: build-windows-2025
+        configuration_family:
+          - label: Debug + Release
+            first: Debug
+            second: Release
+          - label: Debug-MT + Release-MT
+            first: Debug-MT
+            second: Release-MT
+          - label: Debug-Hotplug + Release-Hotplug
+            first: Debug-Hotplug
+            second: Release-Hotplug
+          - label: Debug-Hotplug-MT + Release-Hotplug-MT
+            first: Debug-Hotplug-MT
+            second: Release-Hotplug-MT
         architecture:
-          - 'Win32'
-          - 'x64'
-          - 'ARM64'
+          - Win32
+          - x64
+          - ARM64
+        include:
+          # VS 2022 hosts the VS 2019-era v142 toolset. Pairing Debug and
+          # Release keeps the four v142 builds in two clearly named jobs.
+          - compiler:
+              runner: windows-2022
+              host: Visual Studio 2022/MSBuild 17 host
+              toolset: v142
+              toolset_visual_studio: Visual Studio 2019
+              artifact_prefix: build-windows-2022-v142
+            configuration_family:
+              label: Debug + Release
+              first: Debug
+              second: Release
+            architecture: Win32
+          - compiler:
+              runner: windows-2022
+              host: Visual Studio 2022/MSBuild 17 host
+              toolset: v142
+              toolset_visual_studio: Visual Studio 2019
+              artifact_prefix: build-windows-2022-v142
+            configuration_family:
+              label: Debug + Release
+              first: Debug
+              second: Release
+            architecture: x64
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.compiler.runner }}
     timeout-minutes: 60
 
     steps:
@@ -38,61 +86,64 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v3
 
-      - name: Build solution
-        run: |
-          msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }} -property:Platform=${{ matrix.architecture }}
+      - name: Build ${{ matrix.configuration_family.first }}
+        id: first_build
+        continue-on-error: true
+        run: >-
+          msbuild msvc/libusb.sln /m
+          -property:Configuration=${{ matrix.configuration_family.first }}
+          -property:Platform=${{ matrix.architecture }}
+          -property:PlatformToolset=${{ matrix.compiler.toolset }}
 
-      - name: Upload artifacts
+      - name: Build ${{ matrix.configuration_family.second }}
+        id: second_build
+        if: ${{ !cancelled() && steps.first_build.outcome != 'skipped' }}
+        continue-on-error: true
+        run: >-
+          msbuild msvc/libusb.sln /m
+          -property:Configuration=${{ matrix.configuration_family.second }}
+          -property:Platform=${{ matrix.architecture }}
+          -property:PlatformToolset=${{ matrix.compiler.toolset }}
+
+      - name: Upload ${{ matrix.configuration_family.first }} artifacts
+        if: ${{ !cancelled() && steps.first_build.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
-          name: build-${{ matrix.os }}-${{ matrix.configuration }}-${{ matrix.architecture }}
+          name: ${{ matrix.compiler.artifact_prefix }}-${{ matrix.configuration_family.first }}-${{ matrix.architecture }}
+          if-no-files-found: error
           path: |
-            build/**/*.exe
-            build/**/dll/libusb-1.0.dll
-            build/**/dll/libusb-1.0.lib
-            build/**/dll/libusb-1.0.exp
-            build/**/dll/libusb-1.0.pdb
-            build/**/lib/libusb-1.0.lib
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.first }}/**/*.exe
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.first }}/dll/libusb-1.0.dll
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.first }}/dll/libusb-1.0.lib
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.first }}/dll/libusb-1.0.exp
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.first }}/dll/libusb-1.0.pdb
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.first }}/lib/libusb-1.0.lib
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.first }}/lib/libusb-1.0.pdb
 
-  build-v142:
-    name: MSVC v142 (${{ matrix.configuration }}, ${{ matrix.architecture }})
-    strategy:
-      matrix:
-        configuration:
-          - 'Debug'
-          - 'Release'
-        architecture:
-          - 'Win32'
-          - 'x64'
-
-    runs-on: windows-2022
-    timeout-minutes: 60
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          # Full history + tags so the MSVC PreBuildEvent's call to
-          # build-aux/gen-describe.ps1 can produce a tag-prefixed
-          # `git describe` string.
-          fetch-depth: 0
-
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v3
-
-      - name: Build solution
-        run: |
-          msbuild msvc/libusb.sln /m -property:Configuration=${{ matrix.configuration }} -property:Platform=${{ matrix.architecture }} -property:PlatformToolset=v142
-
-      - name: Upload artifacts
+      - name: Upload ${{ matrix.configuration_family.second }} artifacts
+        if: ${{ !cancelled() && steps.second_build.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
-          name: build-windows-2022-v142-${{ matrix.configuration }}-${{ matrix.architecture }}
+          name: ${{ matrix.compiler.artifact_prefix }}-${{ matrix.configuration_family.second }}-${{ matrix.architecture }}
+          if-no-files-found: error
           path: |
-            build/**/*.exe
-            build/**/dll/libusb-1.0.dll
-            build/**/dll/libusb-1.0.lib
-            build/**/dll/libusb-1.0.exp
-            build/**/dll/libusb-1.0.pdb
-            build/**/lib/libusb-1.0.lib
-            build/**/lib/libusb-1.0.pdb
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.second }}/**/*.exe
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.second }}/dll/libusb-1.0.dll
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.second }}/dll/libusb-1.0.lib
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.second }}/dll/libusb-1.0.exp
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.second }}/dll/libusb-1.0.pdb
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.second }}/lib/libusb-1.0.lib
+            build/${{ matrix.compiler.toolset }}/${{ matrix.architecture }}/${{ matrix.configuration_family.second }}/lib/libusb-1.0.pdb
+
+      - name: Check build results
+        if: ${{ always() }}
+        shell: pwsh
+        env:
+          FIRST_CONFIGURATION: ${{ matrix.configuration_family.first }}
+          FIRST_OUTCOME: ${{ steps.first_build.outcome }}
+          SECOND_CONFIGURATION: ${{ matrix.configuration_family.second }}
+          SECOND_OUTCOME: ${{ steps.second_build.outcome }}
+        run: |
+          if ($env:FIRST_OUTCOME -ne 'success' -or $env:SECOND_OUTCOME -ne 'success') {
+            throw "Build results: $env:FIRST_CONFIGURATION=$env:FIRST_OUTCOME, $env:SECOND_CONFIGURATION=$env:SECOND_OUTCOME"
+          }
