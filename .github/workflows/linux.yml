@@ -4,9 +4,9 @@ on: [push, pull_request]
 
 jobs:
   c23:
-    name: GCC 15 / C23
+    name: GCC 16 / C23
     runs-on: ubuntu-latest
-    container: gcc:15
+    container: gcc:16
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
