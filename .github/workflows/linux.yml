@@ -3,6 +3,36 @@ name: linux
 on: [push, pull_request]
 
 jobs:
+  c23:
+    name: GCC 15 / C23
+    runs-on: ubuntu-latest
+    container: gcc:15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history + tags for build-aux/gen-describe.sh.
+          fetch-depth: 0
+
+      - name: setup prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends autoconf automake libtool pkg-config
+
+      - name: bootstrap
+        run: ./bootstrap.sh
+
+      - name: build libusb with C23
+        env:
+          CC: gcc
+          CFLAGS: -std=c23
+        run: |
+          gcc --version
+          mkdir build-c23
+          cd build-c23 || exit 1
+          ../configure --disable-udev
+          make -j"$(nproc)"
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -55,7 +85,7 @@ jobs:
       - name: emscripten
         run: emconfigure .private/ci-build.sh --build-dir build-emscripten -- --host=wasm32-unknown-emscripten
 
-      - name: Ubuntu rolling / GCC C23 / umockdev
+      - name: umockdev test
         run: .private/ci-container-build.sh docker.io/amd64/ubuntu:rolling
 
       # --- Sanitizers + BOS fuzzer smoke, inside linux job (PRs only) ---
