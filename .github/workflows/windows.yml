@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       # Leave runner capacity for the Linux, macOS, and MSYS2 workflows.
-      max-parallel: 16
+      max-parallel: 18
       matrix:
         compiler:
           - runner: windows-2022
