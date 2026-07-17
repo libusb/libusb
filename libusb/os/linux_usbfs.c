@@ -2571,9 +2571,11 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		struct usbfs_iso_packet_desc *urb_desc = &urb->iso_frame_desc[i];
 		struct libusb_iso_packet_descriptor *lib_desc =
 			&transfer->iso_packet_desc[tpriv->iso_packet_offset++];
+		/* usbfs writes negative errno values to this unsigned UAPI field. */
+		int packet_status = (int)urb_desc->status;
 
 		lib_desc->status = LIBUSB_TRANSFER_COMPLETED;
-		switch (urb_desc->status) {
+		switch (packet_status) {
 		case 0:
 			break;
 		case -ENOENT: /* cancelled */
@@ -2598,12 +2600,12 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		case -ECOMM:
 		case -ENOSR:
 		case -EXDEV:
-			usbi_dbg(TRANSFER_CTX(transfer), "packet %d - low-level USB error %d", i, urb_desc->status);
+			usbi_dbg(TRANSFER_CTX(transfer), "packet %d - low-level USB error %d", i, packet_status);
 			lib_desc->status = LIBUSB_TRANSFER_ERROR;
 			break;
 		default:
 			usbi_warn(TRANSFER_CTX(transfer), "packet %d - unrecognised urb status %d",
-				  i, urb_desc->status);
+				  i, packet_status);
 			lib_desc->status = LIBUSB_TRANSFER_ERROR;
 			break;
 		}
