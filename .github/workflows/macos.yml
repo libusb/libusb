@@ -1,8 +1,18 @@
 name: macOS
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
-on: [push, pull_request]
+# Run branch pushes only on master; pull requests continue to run against all
+# branches.
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '**'
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # A workflow run is made up of one or more jobs that can run
 # sequentially or in parallel
