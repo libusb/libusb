@@ -71,7 +71,9 @@ typedef SSIZE_T ssize_t;
 #endif
 #endif /* _WIN32 || __CYGWIN__ */
 
-#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)
+#define LIBUSB_DEPRECATED_FOR(f) [[deprecated("Use " #f " instead")]]
+#elif defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
 #define LIBUSB_DEPRECATED_FOR(f) __attribute__ ((deprecated ("Use " #f " instead")))
 #elif defined(__GNUC__) && (__GNUC__ >= 3)
 #define LIBUSB_DEPRECATED_FOR(f) __attribute__ ((deprecated))

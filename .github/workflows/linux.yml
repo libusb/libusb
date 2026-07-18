@@ -1,8 +1,48 @@
 name: linux
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '**'
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  c23:
+    name: GCC 16 / C23
+    runs-on: ubuntu-latest
+    container: gcc:16
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history + tags for build-aux/gen-describe.sh.
+          fetch-depth: 0
+
+      - name: setup prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends autoconf automake libtool pkg-config
+
+      - name: bootstrap
+        run: ./bootstrap.sh
+
+      - name: build libusb with C23
+        env:
+          CC: gcc
+          CFLAGS: -std=c23
+        run: |
+          gcc --version
+          mkdir build-c23
+          cd build-c23 || exit 1
+          ../configure --disable-udev
+          make -j"$(nproc)"
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -16,7 +56,7 @@ jobs:
       - name: setup prerequisites
         run: |
           sudo apt update
-          sudo apt install -y autoconf automake libtool libudev-dev m4 pkg-config clang llvm
+          sudo apt install -y autoconf automake libtool libudev-dev m4 pkg-config clang llvm doxygen
 
       - name: bootstrap
         run: ./bootstrap.sh
@@ -27,6 +67,19 @@ jobs:
 
       - name: udev
         run: .private/ci-build.sh --werror --build-dir build-udev -- --enable-udev
+
+      - name: Release build
+        run: |
+          mkdir build-release && cd build-release
+          ../configure --enable-udev --enable-man-pages
+          make -j$(nproc)
+          make install DESTDIR="$PWD/staging"
+
+      - name: Upload Release build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-release
+          path: build-release/staging/
 
       - name: debug-log
         run: .private/ci-build.sh --werror --build-dir build-debug -- --enable-debug-log

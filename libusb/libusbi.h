@@ -42,8 +42,10 @@
 
 /* Not all C standard library headers define static_assert in assert.h
  * Additionally, Visual Studio treats static_assert as a keyword.
+ * Additionally, starting with C23, static_assert must always be present.
  */
-#if !defined(__cplusplus) && !defined(static_assert) && !defined(_MSC_VER)
+#if !(defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)) && \
+    !defined(__cplusplus) && !defined(static_assert) && !defined(_MSC_VER)
 #define static_assert(cond, msg) _Static_assert(cond, msg)
 #endif
 
@@ -108,11 +110,12 @@ typedef volatile LONG usbi_atomic_t;
 #define usbi_atomic_inc(a)	InterlockedIncrement((a))
 #define usbi_atomic_dec(a)	InterlockedDecrement((a))
 #else
-#if defined(__HAIKU__) && defined(__GNUC__) && !defined(__clang__)
-/* The Haiku port of libusb has some C++ files and GCC does not define
- * anything in stdatomic.h when compiled in C++11 (only in C++23).
- * This appears to be a bug in gcc's stdatomic.h, and should be fixed either
- * in gcc or in Haiku. Until then, use the gcc builtins. */
+#if defined(__GNUC__) && !defined(__clang__) && (defined(__cplusplus) || defined(__HAIKU__))
+/* GCC's <stdatomic.h> relies on the C-only _Atomic keyword and so fails to
+ * compile as C++ (GCC only added C++ support for it in C++23). This was first
+ * hit by the Haiku port, which builds some libusb files as C++ with GCC. The
+ * GCC __atomic builtins work in both C and every C++ version, so use them for
+ * any GCC C++ build rather than maintaining a separate C++23 path. */
 typedef long usbi_atomic_t;
 #define usbi_atomic_load(a)    __atomic_load_n((a), __ATOMIC_SEQ_CST)
 #define usbi_atomic_store(a, v)        __atomic_store_n((a), (v), __ATOMIC_SEQ_CST)

@@ -154,7 +154,7 @@ int usbi_alloc_event_data(struct libusb_context *ctx)
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	handles = calloc(ctx->event_data_cnt, sizeof(HANDLE));
+	handles = (HANDLE *)calloc(ctx->event_data_cnt, sizeof(HANDLE));
 	if (!handles)
 		return LIBUSB_ERROR_NO_MEM;
 
@@ -170,7 +170,7 @@ int usbi_alloc_event_data(struct libusb_context *ctx)
 int usbi_wait_for_events(struct libusb_context *ctx,
 	struct usbi_reported_events *reported_events, int timeout_ms)
 {
-	HANDLE *handles = ctx->event_data;
+	HANDLE *handles = (HANDLE *)ctx->event_data;
 	DWORD num_handles = (DWORD)ctx->event_data_cnt;
 	DWORD result;
 
