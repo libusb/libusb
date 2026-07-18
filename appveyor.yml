@@ -1,7 +1,6 @@
 version: 1.0.{build}
 image:
   - Visual Studio 2017
-  - Visual Studio 2019
   - Visual Studio 2022
 platform:
   - Win32
@@ -9,9 +8,20 @@ platform:
 configuration:
   - Debug
   - Release
+matrix:
+  exclude:
+    # GitHub Actions already checks these v143 configurations. Keep only the
+    # AppVeyor Release jobs whose artifacts are used to assemble releases.
+    - image: Visual Studio 2022
+      platform: Win32
+      configuration: Debug
+    - image: Visual Studio 2022
+      platform: x64
+      configuration: Debug
 environment:
   toolset: UNK
 clone_depth: 1
+skip_branch_with_pr: true
 build:
   parallel: true
 for:
@@ -64,16 +74,8 @@ for:
   -
     matrix:
       only:
-        - image: Visual Studio 2019
-    environment:
-      toolset: v142
-    build:
-      project: msvc\libusb.sln
-
-  -
-    matrix:
-      only:
         - image: Visual Studio 2022
+          configuration: Release
     environment:
       toolset: v143
     build:
