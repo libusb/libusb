@@ -1235,11 +1235,11 @@ static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *
 
     if (!get_ioregistry_value_number (dev->service, CFSTR("bcdUSB"), kCFNumberSInt16Type, &bcdUSB))
       break;
-    desc->bcdUSB = libusb_cpu_to_le16(bcdUSB);
 
     if (!get_ioregistry_value_number (dev->service, CFSTR("bMaxPacketSize0"), kCFNumberSInt8Type, &desc->bMaxPacketSize0))
       break;
 
+    desc->bcdUSB = libusb_cpu_to_le16(bcdUSB);
     desc->bDeviceClass = bDeviceClass;
     (*device)->GetDeviceSubClass (device, &desc->bDeviceSubClass);
     (*device)->GetDeviceProtocol (device, &desc->bDeviceProtocol);
