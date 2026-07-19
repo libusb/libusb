@@ -169,6 +169,10 @@ struct linux_transfer_priv {
 
 	/* next iso packet in user-supplied transfer to be populated */
 	int iso_packet_offset;
+
+	/* set by libusb_prealloc_{bulk,iso}_urbs() to skip calloc/free on hot resubmit */
+	int bulk_urbs_preallocated;
+	int iso_urbs_preallocated;
 };
 
 static int dev_has_config0(struct libusb_device *dev)
@@ -2002,6 +2006,39 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 	 * short split-transfers to work reliable USBFS_CAP_BULK_CONTINUATION
 	 * is needed, but this is not always available.
 	 */
+	/* Fast resubmit path: URBs were pre-allocated once; just reset bookkeeping
+	 * and reissue the ioctls with zero heap allocation. */
+	if (tpriv->bulk_urbs_preallocated) {
+		tpriv->num_retired = 0;
+		tpriv->reap_action = NORMAL;
+		tpriv->reap_status = LIBUSB_TRANSFER_COMPLETED;
+		for (i = 0; i < tpriv->num_urbs; i++) {
+			struct usbfs_urb *urb = &tpriv->urbs[i];
+			urb->status = 0;
+			urb->actual_length = 0;
+			urb->error_count = 0;
+			r = ioctl(hpriv->fd, IOCTL_USBFS_SUBMITURB, urb);
+			if (r == 0)
+				continue;
+			if (errno == ENODEV)
+				r = LIBUSB_ERROR_NO_DEVICE;
+			else {
+				usbi_err(TRANSFER_CTX(transfer),
+					 "prealloc bulk submiturb failed, errno=%d", errno);
+				r = LIBUSB_ERROR_IO;
+			}
+			if (i == 0)
+				return r;
+			tpriv->reap_action = errno == EREMOTEIO ? COMPLETED_EARLY : SUBMIT_FAILED;
+			tpriv->num_retired += tpriv->num_urbs - i;
+			if (tpriv->reap_action == COMPLETED_EARLY)
+				return 0;
+			discard_urbs(itransfer, 0, i);
+			return 0;
+		}
+		return 0;
+	}
+
 	if (hpriv->caps & USBFS_CAP_BULK_SCATTER_GATHER) {
 		/* Good! Just submit everything in one go */
 		bulk_buffer_len = transfer->length ? transfer->length : 1;
@@ -2179,6 +2216,44 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 
 	if (transfer->length < (int)total_len)
 		return LIBUSB_ERROR_INVALID_PARAM;
+
+	/* Fast resubmit path: URBs were pre-allocated once; reset bookkeeping and
+	 * per-packet status fields, then reissue ioctls with zero heap allocation. */
+	if (tpriv->iso_urbs_preallocated) {
+		int k;
+		tpriv->num_retired = 0;
+		tpriv->reap_action = NORMAL;
+		tpriv->iso_packet_offset = 0;
+		for (i = 0; i < tpriv->num_urbs; i++) {
+			struct usbfs_urb *urb = tpriv->iso_urbs[i];
+			urb->status = 0;
+			urb->actual_length = 0;
+			urb->error_count = 0;
+			for (k = 0; k < urb->number_of_packets; k++) {
+				urb->iso_frame_desc[k].actual_length = 0;
+				urb->iso_frame_desc[k].status = 0;
+			}
+		}
+		for (i = 0; i < tpriv->num_urbs; i++) {
+			int r = ioctl(hpriv->fd, IOCTL_USBFS_SUBMITURB, tpriv->iso_urbs[i]);
+			if (r == 0)
+				continue;
+			if (errno == ENODEV)
+				r = LIBUSB_ERROR_NO_DEVICE;
+			else {
+				usbi_err(TRANSFER_CTX(transfer),
+					 "prealloc iso submiturb failed, errno=%d", errno);
+				r = LIBUSB_ERROR_IO;
+			}
+			if (i == 0)
+				return r;
+			tpriv->reap_action = SUBMIT_FAILED;
+			tpriv->num_retired = tpriv->num_urbs - i;
+			discard_urbs(itransfer, 0, i);
+			return 0;
+		}
+		return 0;
+	}
 
 	/* usbfs limits the number of iso packets per URB */
 	num_urbs = (num_packets + (MAX_ISO_PACKETS_PER_URB - 1)) / MAX_ISO_PACKETS_PER_URB;
@@ -2530,8 +2605,10 @@ out_unlock:
 	return 0;
 
 completed:
-	free(tpriv->urbs);
-	tpriv->urbs = NULL;
+	if (!tpriv->bulk_urbs_preallocated) {
+		free(tpriv->urbs);
+		tpriv->urbs = NULL;
+	}
 	usbi_mutex_unlock(&itransfer->lock);
 	return tpriv->reap_action == CANCELLED ?
 		usbi_handle_transfer_cancellation(itransfer) :
@@ -2619,7 +2696,8 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 
 		if (tpriv->num_retired == num_urbs) {
 			usbi_dbg(TRANSFER_CTX(transfer), "CANCEL: last URB handled, reporting");
-			free_iso_urbs(tpriv);
+			if (!tpriv->iso_urbs_preallocated)
+				free_iso_urbs(tpriv);
 			if (tpriv->reap_action == CANCELLED) {
 				usbi_mutex_unlock(&itransfer->lock);
 				return usbi_handle_transfer_cancellation(itransfer);
@@ -2650,7 +2728,8 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	/* if we've reaped all urbs then we're done */
 	if (tpriv->num_retired == num_urbs) {
 		usbi_dbg(TRANSFER_CTX(transfer), "all URBs in transfer reaped --> complete!");
-		free_iso_urbs(tpriv);
+		if (!tpriv->iso_urbs_preallocated)
+			free_iso_urbs(tpriv);
 		usbi_mutex_unlock(&itransfer->lock);
 		return usbi_handle_transfer_completion(itransfer, status);
 	}
@@ -2830,6 +2909,213 @@ static int op_handle_events(struct libusb_context *ctx,
 out:
 	usbi_mutex_unlock(&ctx->open_devs_lock);
 	return r;
+}
+
+/** \ingroup libusb_asyncio
+ * Pre-allocate kernel URBs for a bulk or interrupt transfer.
+ *
+ * Call once before the first libusb_submit_transfer().  Subsequent submits
+ * skip the per-submit calloc()/free() and reissue the SUBMITURB ioctls
+ * directly, with zero heap allocation on the hot resubmit path.
+ *
+ * This is valuable for high-throughput streaming where the transfer buffer
+ * never changes between submits and the fixed overhead of calloc()/free()
+ * is measurable at high fps.
+ *
+ * Idempotent — safe to call multiple times on the same transfer.
+ * The URBs are freed automatically by libusb_free_transfer().
+ *
+ * \param transfer A fully configured bulk or interrupt transfer.
+ * \returns LIBUSB_SUCCESS, or a \ref libusb_error "LIBUSB_ERROR" code on
+ * failure.
+ */
+int API_EXPORTED libusb_prealloc_bulk_urbs(struct libusb_transfer *transfer)
+{
+	struct usbi_transfer *itransfer = LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+	struct linux_transfer_priv *tpriv = usbi_get_transfer_priv(itransfer);
+	struct linux_device_handle_priv *hpriv =
+		usbi_get_device_handle_priv(transfer->dev_handle);
+	struct usbfs_urb *urbs;
+	int is_out = IS_XFEROUT(transfer);
+	int bulk_buffer_len, use_bulk_continuation;
+	int num_urbs;
+	int last_urb_partial = 0;
+	int i;
+
+	if (tpriv->bulk_urbs_preallocated)
+		return LIBUSB_SUCCESS;
+
+	if (transfer->type != LIBUSB_TRANSFER_TYPE_BULK &&
+	    transfer->type != LIBUSB_TRANSFER_TYPE_BULK_STREAM &&
+	    transfer->type != LIBUSB_TRANSFER_TYPE_INTERRUPT)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	/* Mirror submit_bulk_transfer()'s buffer-length selection exactly so
+	 * the pre-allocated URBs match what the submit path would have built. */
+	if (hpriv->caps & USBFS_CAP_BULK_SCATTER_GATHER) {
+		bulk_buffer_len = transfer->length ? transfer->length : 1;
+		use_bulk_continuation = 0;
+	} else if (hpriv->caps & USBFS_CAP_BULK_CONTINUATION) {
+		bulk_buffer_len = MAX_BULK_BUFFER_LENGTH;
+		use_bulk_continuation = 1;
+	} else if (hpriv->caps & USBFS_CAP_NO_PACKET_SIZE_LIM) {
+		bulk_buffer_len = transfer->length ? transfer->length : 1;
+		use_bulk_continuation = 0;
+	} else {
+		bulk_buffer_len = MAX_BULK_BUFFER_LENGTH;
+		use_bulk_continuation = 0;
+	}
+
+	num_urbs = transfer->length / bulk_buffer_len;
+	if (transfer->length == 0) {
+		num_urbs = 1;
+	} else if ((transfer->length % bulk_buffer_len) > 0) {
+		last_urb_partial = 1;
+		num_urbs++;
+	}
+
+	urbs = calloc(num_urbs, sizeof(*urbs));
+	if (!urbs)
+		return LIBUSB_ERROR_NO_MEM;
+
+	for (i = 0; i < num_urbs; i++) {
+		struct usbfs_urb *urb = &urbs[i];
+		urb->usercontext = itransfer;
+		switch (transfer->type) {
+		case LIBUSB_TRANSFER_TYPE_BULK:
+			urb->type = USBFS_URB_TYPE_BULK;
+			urb->stream_id = 0;
+			break;
+		case LIBUSB_TRANSFER_TYPE_BULK_STREAM:
+			urb->type = USBFS_URB_TYPE_BULK;
+			urb->stream_id = itransfer->stream_id;
+			break;
+		case LIBUSB_TRANSFER_TYPE_INTERRUPT:
+			urb->type = USBFS_URB_TYPE_INTERRUPT;
+			break;
+		default:
+			break;
+		}
+		urb->endpoint = transfer->endpoint;
+		urb->buffer = transfer->buffer + (i * bulk_buffer_len);
+		if (use_bulk_continuation && !is_out && (i < num_urbs - 1))
+			urb->flags = USBFS_URB_SHORT_NOT_OK;
+		if (i == num_urbs - 1 && last_urb_partial)
+			urb->buffer_length = transfer->length % bulk_buffer_len;
+		else if (transfer->length == 0)
+			urb->buffer_length = 0;
+		else
+			urb->buffer_length = bulk_buffer_len;
+		if (i > 0 && use_bulk_continuation)
+			urb->flags |= USBFS_URB_BULK_CONTINUATION;
+		if (is_out && i == num_urbs - 1 &&
+		    (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET))
+			urb->flags |= USBFS_URB_ZERO_PACKET;
+	}
+
+	tpriv->urbs = urbs;
+	tpriv->num_urbs = num_urbs;
+	tpriv->bulk_urbs_preallocated = 1;
+	usbi_dbg(TRANSFER_CTX(transfer), "preallocated %d bulk URBs for transfer", num_urbs);
+	return LIBUSB_SUCCESS;
+}
+
+/** \ingroup libusb_asyncio
+ * Pre-allocate kernel URBs for an isochronous transfer.
+ *
+ * Call once after the transfer's iso_packet_desc[] array is fully populated
+ * and before the first libusb_submit_transfer().  Subsequent submits reset
+ * per-packet status/actual_length fields in-place and reissue the SUBMITURB
+ * ioctls directly, with zero heap allocation on the hot resubmit path.
+ *
+ * This is valuable for high-throughput streaming where the ISO packet layout 
+ * never changes between submits
+ *
+ * Idempotent — safe to call multiple times on the same transfer.
+ * The URBs are freed automatically by libusb_free_transfer().
+ *
+ * \param transfer A fully configured isochronous transfer with all
+ * iso_packet_desc[] entries populated.
+ * \returns LIBUSB_SUCCESS, or a \ref libusb_error "LIBUSB_ERROR" code on
+ * failure.
+ */
+int API_EXPORTED libusb_prealloc_iso_urbs(struct libusb_transfer *transfer)
+{
+	struct usbi_transfer *itransfer = LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
+	struct linux_transfer_priv *tpriv = usbi_get_transfer_priv(itransfer);
+	struct usbfs_urb **urbs;
+	int num_packets = transfer->num_iso_packets;
+	int num_packets_remaining;
+	int i, j;
+	int num_urbs;
+	unsigned int packet_len;
+	unsigned int total_len = 0;
+	unsigned char *urb_buffer = transfer->buffer;
+
+	if (tpriv->iso_urbs_preallocated)
+		return LIBUSB_SUCCESS;
+
+	if (num_packets < 1)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	/* Mirror submit_iso_transfer()'s validation exactly. */
+	for (i = 0; i < num_packets; i++) {
+		packet_len = transfer->iso_packet_desc[i].length;
+		if (packet_len > max_iso_packet_len)
+			return LIBUSB_ERROR_INVALID_PARAM;
+		total_len += packet_len;
+	}
+
+	if (transfer->length < (int)total_len)
+		return LIBUSB_ERROR_INVALID_PARAM;
+
+	num_urbs = (num_packets + (MAX_ISO_PACKETS_PER_URB - 1)) / MAX_ISO_PACKETS_PER_URB;
+
+	urbs = calloc(num_urbs, sizeof(*urbs));
+	if (!urbs)
+		return LIBUSB_ERROR_NO_MEM;
+
+	num_packets_remaining = num_packets;
+	for (i = 0, j = 0; i < num_urbs; i++) {
+		int num_packets_in_urb = MIN(num_packets_remaining, MAX_ISO_PACKETS_PER_URB);
+		struct usbfs_urb *urb;
+		size_t alloc_size;
+		int k;
+
+		alloc_size = sizeof(*urb)
+			+ (num_packets_in_urb * sizeof(struct usbfs_iso_packet_desc));
+		urb = calloc(1, alloc_size);
+		if (!urb) {
+			int m;
+			for (m = 0; m < i; m++)
+				free(urbs[m]);
+			free(urbs);
+			return LIBUSB_ERROR_NO_MEM;
+		}
+		urbs[i] = urb;
+
+		for (k = 0; k < num_packets_in_urb; j++, k++) {
+			packet_len = transfer->iso_packet_desc[j].length;
+			urb->buffer_length += packet_len;
+			urb->iso_frame_desc[k].length = packet_len;
+		}
+
+		urb->usercontext = itransfer;
+		urb->type = USBFS_URB_TYPE_ISO;
+		urb->flags = USBFS_URB_ISO_ASAP;
+		urb->endpoint = transfer->endpoint;
+		urb->number_of_packets = num_packets_in_urb;
+		urb->buffer = urb_buffer;
+
+		urb_buffer += urb->buffer_length;
+		num_packets_remaining -= num_packets_in_urb;
+	}
+
+	tpriv->iso_urbs = urbs;
+	tpriv->num_urbs = num_urbs;
+	tpriv->iso_urbs_preallocated = 1;
+	usbi_dbg(TRANSFER_CTX(transfer), "preallocated %d ISO URBs for transfer", num_urbs);
+	return LIBUSB_SUCCESS;
 }
 
 const struct usbi_os_backend usbi_backend = {
