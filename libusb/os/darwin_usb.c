@@ -1209,10 +1209,10 @@ static IOReturn darwin_request_descriptor (usb_device_t device, UInt8 desc, UInt
   return (*device)->DeviceRequestTO (device, &req);
 }
 
-/* device is passed explicitly because this is called from
+/* device and service are passed explicitly because this is called from
    darwin_get_cached_device with darwin_cached_devices_mutex held, before the
-   pending replacement (if any) has been adopted into dev->device */
-static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *ctx, struct darwin_cached_device *dev, usb_device_t device) {
+   pending replacement (if any) has been adopted into dev->device and dev->service */
+static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *ctx, struct darwin_cached_device *dev, usb_device_t device, io_service_t service) {
   int retries = 1;
   long delay = 30000; /* microseconds */
   int unsuspended = 0, try_unsuspend = 1, try_reconfigure = 1;
@@ -1233,10 +1233,10 @@ static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *
     IOUSBDeviceDescriptor *desc = &dev->dev_descriptor;
     UInt16 bcdDevice, bcdUSB;
 
-    if (!get_ioregistry_value_number (dev->service, CFSTR("bcdUSB"), kCFNumberSInt16Type, &bcdUSB))
+    if (!get_ioregistry_value_number (service, CFSTR("bcdUSB"), kCFNumberSInt16Type, &bcdUSB))
       break;
 
-    if (!get_ioregistry_value_number (dev->service, CFSTR("bMaxPacketSize0"), kCFNumberSInt8Type, &desc->bMaxPacketSize0))
+    if (!get_ioregistry_value_number (service, CFSTR("bMaxPacketSize0"), kCFNumberSInt8Type, &desc->bMaxPacketSize0))
       break;
 
     usbi_dbg (ctx, "synthesizing device descriptor from cached OS values");
@@ -1529,7 +1529,7 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
     IOObjectRetain (service);
 
     /* cache the device descriptor */
-    ret = darwin_cache_device_descriptor(ctx, new_device, device);
+    ret = darwin_cache_device_descriptor(ctx, new_device, device, service);
     if (ret)
       break;
 
