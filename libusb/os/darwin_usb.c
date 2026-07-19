@@ -1239,6 +1239,8 @@ static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *
     if (!get_ioregistry_value_number (dev->service, CFSTR("bMaxPacketSize0"), kCFNumberSInt8Type, &desc->bMaxPacketSize0))
       break;
 
+    usbi_dbg (ctx, "synthesizing device descriptor from cached OS values");
+
     desc->bcdUSB = libusb_cpu_to_le16(bcdUSB);
     desc->bDeviceClass = bDeviceClass;
     (*device)->GetDeviceSubClass (device, &desc->bDeviceSubClass);
@@ -1254,8 +1256,6 @@ static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *
     (*device)->USBGetSerialNumberStringIndex (device, &desc->iSerialNumber);
     (*device)->GetNumberOfConfigurations (device, &desc->bNumConfigurations);
 
-    // if needed do validity checks here (and reset descriptor on failure?)
-
     desc->bDescriptorType = LIBUSB_DT_DEVICE;
     desc->bLength = LIBUSB_DT_DEVICE_SIZE;
     goto done_desc;
@@ -1267,7 +1267,7 @@ static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *
   is_open = ((*device)->USBDeviceOpenSeize(device) == kIOReturnSuccess);
 
   do {
-    usbi_dbg (ctx, "requesting device descriptor from device");
+    usbi_info (ctx, "requesting device descriptor from device");
     /**** retrieve device descriptor ****/
     ret = darwin_request_descriptor (device, kUSBDeviceDesc, 0, &dev->dev_descriptor, sizeof(dev->dev_descriptor));
 
