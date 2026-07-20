@@ -1098,10 +1098,10 @@ static int darwin_get_active_config_descriptor(struct libusb_device *dev, void *
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   int config_index;
 
-  if (0 == priv->active_config)
+  if (0 == atomic_load_explicit(&priv->active_config, memory_order_relaxed))
     return LIBUSB_ERROR_NOT_FOUND;
 
-  config_index = get_configuration_index (dev, priv->active_config);
+  config_index = get_configuration_index (dev, atomic_load_explicit(&priv->active_config, memory_order_relaxed));
   if (config_index < 0)
     return config_index;
 
@@ -1154,13 +1154,13 @@ static enum libusb_error darwin_check_configuration (struct libusb_context *ctx,
   if (0x05ac == libusb_le16_to_cpu (dev->dev_descriptor.idVendor) &&
       0x8005 == libusb_le16_to_cpu (dev->dev_descriptor.idProduct)) {
     usbi_dbg (ctx, "ignoring configuration on root hub simulation");
-    dev->active_config = 0;
+    atomic_store_explicit(&dev->active_config, 0, memory_order_relaxed);
     return LIBUSB_SUCCESS;
   }
 
   /* find the first configuration */
   kresult = (*darwin_device)->GetConfigurationDescriptorPtr (darwin_device, 0, &configDesc);
-  dev->first_config = (kIOReturnSuccess == kresult) ? configDesc->bConfigurationValue : 1;
+  atomic_store_explicit(&dev->first_config, (kIOReturnSuccess == kresult) ? configDesc->bConfigurationValue : 1, memory_order_relaxed);
 
   /* check if the device is already configured. there is probably a better way than iterating over the
      to accomplish this (the trick is we need to avoid a call to GetConfigurations since buggy devices
@@ -1188,21 +1188,22 @@ static enum libusb_error darwin_check_configuration (struct libusb_context *ctx,
     /* device is configured */
     if (dev->dev_descriptor.bNumConfigurations == 1) {
       /* to avoid problems with some devices get the configurations value from the configuration descriptor */
-      dev->active_config = dev->first_config;
+      atomic_store_explicit(&dev->active_config, atomic_load_explicit(&dev->first_config, memory_order_relaxed), memory_order_relaxed);
     } else {
       /* devices with more than one configuration should work with GetConfiguration.
          active_config is atomic, so read into a local and store only on
          success */
       UInt8 active_config;
       if (kIOReturnSuccess == (*darwin_device)->GetConfiguration (darwin_device, &active_config)) {
-        dev->active_config = active_config;
+        atomic_store_explicit(&dev->active_config, active_config, memory_order_relaxed);
       }
     }
   } else
     /* not configured */
-    dev->active_config = 0;
+    atomic_store_explicit(&dev->active_config, 0, memory_order_relaxed);
 
-  usbi_dbg (ctx, "active config: %u, first config: %u", dev->active_config, dev->first_config);
+  usbi_dbg (ctx, "active config: %u, first config: %u", atomic_load_explicit(&dev->active_config, memory_order_relaxed),
+            atomic_load_explicit(&dev->first_config, memory_order_relaxed));
 
   return LIBUSB_SUCCESS;
 }
@@ -1468,6 +1469,13 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
         ret = LIBUSB_ERROR_NO_MEM;
         break;
       }
+
+      /* calloc zero-fills the storage but does not give the atomic members a
+         specified initialized state in C11; initialize them explicitly before
+         list_add publishes the object */
+      atomic_init(&new_device->first_config, 0);
+      atomic_init(&new_device->active_config, 0);
+      atomic_init(&new_device->in_reenumerate, false);
 
       /* add this device to the cached device list */
       list_add(&new_device->list, &darwin_cached_devices);
@@ -1797,7 +1805,7 @@ static void darwin_close (struct libusb_device_handle *dev_handle) EXCLUDES(dev_
 static int darwin_get_configuration(struct libusb_device_handle *dev_handle, uint8_t *config) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
 
-  *config = dpriv->active_config;
+  *config = atomic_load_explicit(&dpriv->active_config, memory_order_relaxed);
 
   return LIBUSB_SUCCESS;
 }
@@ -1828,7 +1836,7 @@ static int darwin_set_configuration_locked(struct libusb_device_handle *dev_hand
     if (dev_handle->claimed_interfaces & (1U << i))
       darwin_claim_interface (dev_handle, i);
 
-  dpriv->active_config = (UInt8)config;
+  atomic_store_explicit(&dpriv->active_config, (UInt8)config, memory_order_relaxed);
 
   return LIBUSB_SUCCESS;
 }
@@ -1982,13 +1990,13 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
     return darwin_to_libusb (kresult);
 
   /* make sure we have an interface */
-  if (!usbInterface && dpriv->first_config != 0) {
-    usbi_info (ctx, "no interface found; setting configuration: %d", dpriv->first_config);
+  if (!usbInterface && 0 != atomic_load_explicit(&dpriv->first_config, memory_order_relaxed)) {
+    usbi_info (ctx, "no interface found; setting configuration: %d", atomic_load_explicit(&dpriv->first_config, memory_order_relaxed));
 
     /* set the configuration. the caller already holds dev_handle->lock, so
        call the locked variant (the darwin_set_configuration entry point
        would deadlock here). */
-    ret = darwin_set_configuration_locked (dev_handle, (int) dpriv->first_config);
+    ret = darwin_set_configuration_locked (dev_handle, (int) atomic_load_explicit(&dpriv->first_config, memory_order_relaxed));
     if (ret != LIBUSB_SUCCESS) {
       usbi_err (ctx, "could not set configuration");
       return ret;
@@ -2271,7 +2279,7 @@ static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
-  if (dpriv->active_config != active_config) {
+  if (atomic_load_explicit(&dpriv->active_config, memory_order_relaxed) != active_config) {
     usbi_dbg (ctx, "darwin/restore_state: restoring configuration %d...", active_config);
 
     ret = darwin_set_configuration_locked (dev_handle, active_config);
@@ -2344,7 +2352,7 @@ static void darwin_adopt_pending_device (struct darwin_cached_device *dpriv) EXC
 static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, bool capture) REQUIRES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   unsigned long claimed_interfaces = dev_handle->claimed_interfaces;
-  uint8_t active_config = dpriv->active_config;
+  uint8_t active_config = atomic_load_explicit(&dpriv->active_config, memory_order_relaxed);
   UInt32 options = 0;
   IOUSBDeviceDescriptor descriptor;
   IOUSBConfigurationDescriptorPtr cached_configuration;
@@ -2479,7 +2487,7 @@ static int darwin_reset_device_locked (struct libusb_device_handle *dev_handle) 
   ret = darwin_reenumerate_device (dev_handle, false);
   if ((ret == LIBUSB_SUCCESS || ret == LIBUSB_ERROR_NOT_FOUND) && dpriv->capture_count > 0) {
     int capture_count;
-    uint8_t active_config = dpriv->active_config;
+    uint8_t active_config = atomic_load_explicit(&dpriv->active_config, memory_order_relaxed);
     unsigned long claimed_interfaces = dev_handle->claimed_interfaces;
 
     /* save old capture_count */

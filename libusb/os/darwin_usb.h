@@ -129,7 +129,9 @@ struct darwin_cached_device {
   UInt8                 port;
   /* first_config and active_config are written by darwin_check_configuration
      on the enumeration/hotplug paths and read from user threads with no
-     common lock. Using atomic remove the data race. */
+     common lock. Using atomics removes the data race. accesses use explicit
+     memory_order_relaxed operations: no ordering is required, and the Xcode
+     build enables -Watomic-implicit-seq-cst. */
   _Atomic UInt8         first_config;
   _Atomic UInt8         active_config;
   int                   can_enumerate;
