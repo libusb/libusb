@@ -41,8 +41,11 @@ jobs:
           name: linux-release
           path: build-release/staging/
 
-      - name: debug-log
-        run: .private/ci-build.sh --werror --build-dir build-debug -- --enable-debug-log
+      - name: debug-log + fixed enum sizes
+        env:
+          CC: clang
+          CXX: clang++
+        run: .private/ci-build.sh --werror --build-dir build-debug -- --enable-debug-log --enable-enum-size
 
       - name: disable-log
         run: .private/ci-build.sh --werror --build-dir build-nolog -- --disable-log
