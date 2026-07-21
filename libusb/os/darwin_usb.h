@@ -126,7 +126,14 @@ struct darwin_cached_device {
   usbi_mutex_t          lock;          /* protects open_count and capture_count */
   int                   open_count;    /* GUARDED_BY(lock) */
   int                   capture_count; /* GUARDED_BY(lock) */
-  UInt8                 first_config, active_config, port;
+  UInt8                 port;
+  /* first_config and active_config are written by darwin_check_configuration
+     on the enumeration/hotplug paths and read from user threads with no
+     common lock. Using atomics removes the data race. accesses use explicit
+     memory_order_relaxed operations: no ordering is required, and the Xcode
+     build enables -Watomic-implicit-seq-cst. */
+  _Atomic UInt8         first_config;
+  _Atomic UInt8         active_config;
   int                   can_enumerate;
   int                   refcount;
   atomic_bool           in_reenumerate;
@@ -160,6 +167,14 @@ struct darwin_transfer_priv {
   IOUSBDevRequestTO req;
 
   /* Bulk */
+  /* interface plug-in pinned (retained) at submission for the zero-length
+     packet write in darwin_async_io_callback: the event thread must not
+     take dev_handle->lock to look the pipe up, and the reference keeps the
+     plug-in valid if the interface is released or reclaimed while the
+     transfer is in flight. released by the callback, or by the submission
+     failure path if the callback will never run. */
+  usb_interface_t zlp_interface;
+  uint8_t zlp_pipeRef;
 
   /* Completion status */
   IOReturn result;

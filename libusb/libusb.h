@@ -83,7 +83,9 @@ typedef SSIZE_T ssize_t;
 #endif
 #endif /* _WIN32 || __CYGWIN__ */
 
-#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)
+#define LIBUSB_DEPRECATED_FOR(f) [[deprecated("Use " #f " instead")]]
+#elif defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
 #define LIBUSB_DEPRECATED_FOR(f) __attribute__ ((deprecated ("Use " #f " instead")))
 #elif defined(__GNUC__) && (__GNUC__ >= 3)
 #define LIBUSB_DEPRECATED_FOR(f) __attribute__ ((deprecated))
@@ -1535,7 +1537,7 @@ struct libusb_transfer {
 
 	/** Actual length of data that was transferred. Read-only, and only for
 	 * use within transfer callback function. Not valid for isochronous
-	 * endpoint transfers. */
+	 * endpoint transfers. Never negative. */
 	int actual_length;
 
 	/** Callback function. This will be invoked when the transfer completes,

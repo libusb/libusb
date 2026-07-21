@@ -179,7 +179,7 @@ struct hid_device_priv {
 
 static inline struct winusb_device_priv *winusb_device_priv_init(struct libusb_device *dev)
 {
-	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
 	int i;
 
 	usbi_mutex_init(&priv->interface_lock);
@@ -195,7 +195,7 @@ static inline struct winusb_device_priv *winusb_device_priv_init(struct libusb_d
 
 static inline void winusb_device_priv_release(struct libusb_device *dev)
 {
-	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
 	int i;
 
 	free(priv->dev_id);
@@ -501,7 +501,7 @@ typedef BOOL (WINAPI *WinUsb_QueryPipeEx_t)(
 	PWINUSB_PIPE_INFORMATION_EX PipeInformationEx
 );
 typedef BOOL (WINAPI *WinUsb_ReadIsochPipeAsap_t)(
-	PWINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
+	WINUSB_ISOCH_BUFFER_HANDLE BufferHandle,
 	ULONG Offset,
 	ULONG Length,
 	BOOL ContinueStream,

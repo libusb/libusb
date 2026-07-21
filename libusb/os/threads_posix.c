@@ -83,9 +83,16 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 		return LIBUSB_ERROR_OTHER;
 }
 
+/* C uses _Thread_local; C++ uses the thread_local keyword. */
+#if defined(__cplusplus)
+#define USBI_THREAD_LOCAL thread_local
+#else
+#define USBI_THREAD_LOCAL _Thread_local
+#endif
+
 unsigned long usbi_get_tid(void)
 {
-	static _Thread_local unsigned long tl_tid;
+	static USBI_THREAD_LOCAL unsigned long tl_tid;
 	unsigned long tid;
 
 	if (tl_tid)
