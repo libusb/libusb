@@ -84,6 +84,14 @@ AC_DEFINE([_GNU_SOURCE], [1], [Enable GNU extensions.])
 AC_DEFINE([DEFAULT_VISIBILITY], [__attribute__ ((visibility ("default")))], [Define to the attribute for default visibility.])
 AC_DEFINE([PRINTF_FORMAT(a, b)], [__attribute__ ((__format__ (__printf__, a, b)))], [Define to the attribute for enabling parameter checks on printf-like functions.])
 
+AC_ARG_ENABLE([enum-size],
+	[AS_HELP_STRING([--enable-enum-size], [enable fixed enum underlying types when supported [default=no]])],
+	[enum_size_enabled=$enableval],
+	[enum_size_enabled=no])
+if test "x$enum_size_enabled" != xno; then
+	AC_DEFINE([LIBUSB_ENABLE_ENUM_SIZE], [1], [Define to 1 to enable fixed enum underlying types when supported.])
+fi
+
 create_import_lib=
 is_android_linux=
 AC_MSG_CHECKING([operating system])
