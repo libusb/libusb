@@ -1381,6 +1381,9 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	// full timeout all over again
 	if (hub_timeout_backoff_active(priv->dev_id)) {
 		usbi_dbg(DEVICE_CTX(dev), "skipping initialization of '%s' until its timeout backoff expires", priv->dev_id);
+		// the caller's retained parent reference is only transferred to the
+		// device further down, so it must be released on this early exit
+		libusb_unref_device(parent_dev);
 		return LIBUSB_ERROR_NO_DEVICE;
 	}
 
