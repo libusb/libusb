@@ -59,15 +59,17 @@ typedef SSIZE_T ssize_t;
 #define LIBUSB_FLEXIBLE_ARRAY	0	/* [0] - non-standard, but usually working code */
 #endif /* __STDC_VERSION__ */
 
-/* In C23 and later we can specify the underlying type of an enum. This is also
- * supported by C++ and by clang in earlier versions of C as an extension. */
-#if (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)) || \
-     defined(__cplusplus) || \
-     defined(__clang__)
+/* Fixed underlying enum types can alter the ABI, so only enable them when
+ * explicitly requested by the build configuration and supported by the
+ * compiler. C23 and C++ provide this syntax, and clang supports it as an
+ * extension in earlier versions of C. */
+#if defined(LIBUSB_ENABLE_ENUM_SIZE) && \
+    ((defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)) || \
+     defined(__cplusplus) || defined(__clang__))
 #define LIBUSB_ENUM_SIZE(x) : x
 #else
 #define LIBUSB_ENUM_SIZE(x)
-#endif /* __STDC_VERSION__ */
+#endif
 
 /* 'interface' might be defined as a macro on Windows, so we need to
  * undefine it so as not to break the current libusb API, because
