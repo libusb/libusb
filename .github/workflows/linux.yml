@@ -150,3 +150,27 @@ jobs:
             build*/config.log
             build*/tests/*.log
           if-no-files-found: ignore
+
+  # Compile the library sources with a C++ compiler (configure + build only,
+  # no tests/runtime). Verifies the code stays valid C++.
+  build-cxx:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup prerequisites
+        run: |
+          sudo apt update
+          sudo apt install -y autoconf automake libtool libudev-dev m4 pkg-config
+
+      - name: bootstrap
+        run: ./bootstrap.sh
+
+      - name: configure and build as C++
+        run: |
+          mkdir build-cxx && cd build-cxx
+          ../configure
+          make CC='g++' CFLAGS='-x c++' AM_CFLAGS='-std=c++20 -fvisibility=hidden -pthread'
