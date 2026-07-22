@@ -721,13 +721,249 @@ static int winusb_init(struct libusb_context *ctx)
 }
 
 /*
+ * Hub IOCTLs used during enumeration can block indefinitely when a device
+ * stops responding. The Nacon controller report (#1136) stalled in
+ * IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, while descriptor requests
+ * translate into control transfers for which the hub driver applies no
+ * timeout. A blocked call hangs the calling thread forever, which during
+ * enumeration means hanging the whole library. Such calls are bounded by
+ * issuing them asynchronously and giving up after this many milliseconds.
+ * Well-behaved requests complete in milliseconds; 5 seconds matches the
+ * timeout other USB stacks apply to control transfers (e.g. Linux's
+ * USB_CTRL_GET_TIMEOUT) and is generous enough for hubs waking from
+ * selective suspend.
+ */
+#define HUB_IOCTL_TIMEOUT_MS	5000
+
+// After CancelIoEx(), how long to wait for a timed-out request to reach a terminal
+// state before parking it on the orphan list instead of freeing it
+#define HUB_IOCTL_CANCEL_GRACE_MS	250
+
+struct hub_ioctl_request {
+	OVERLAPPED overlapped;	// hEvent holds a per-request manual-reset event
+	struct list_head list;	// linkage in orphaned_requests
+	// the request's in/out data buffer immediately follows the struct
+};
+
+static usbi_mutex_static_t orphaned_requests_lock = USBI_MUTEX_INITIALIZER;
+static struct list_head orphaned_requests = { &orphaned_requests, &orphaned_requests };
+
+// Free timed-out requests whose I/O has since reached a terminal state. Requests
+// still owned by the kernel are left alone - their OVERLAPPED, event and buffer
+// must stay valid until the kernel is done with them.
+static void reap_orphaned_requests(struct libusb_context *ctx)
+{
+	struct hub_ioctl_request *req, *next_req;
+
+	usbi_mutex_static_lock(&orphaned_requests_lock);
+	list_for_each_entry_safe(req, next_req, &orphaned_requests, list, struct hub_ioctl_request) {
+		if (HasOverlappedIoCompleted(&req->overlapped)) {
+			usbi_dbg(ctx, "orphaned hub request %p has completed, freeing it", (void *)req);
+			list_del(&req->list);
+			CloseHandle(req->overlapped.hEvent);
+			free(req);
+		}
+	}
+	usbi_mutex_static_unlock(&orphaned_requests_lock);
+}
+
+/*
+ * When a hub IOCTL times out during device initialization, the device is left
+ * uninitialized and enumeration would try again - and pay the full timeout
+ * again - on every subsequent libusb_get_device_list(). To keep a polling
+ * application usable next to a wedged device, and to bound the accumulation of
+ * orphaned requests such retries can produce, re-initialization of a device
+ * that recently caused a timeout is skipped until its backoff expires. The
+ * backoff is deliberately not cleared on reconnection: a replug cannot cheaply
+ * be told apart from a still-wedged device, so a replugged (now healthy)
+ * device may stay invisible for up to this many milliseconds - a self-healing
+ * delay, much cheaper than stalling every scan by the full timeout.
+ */
+#define HUB_IOCTL_RETRY_BACKOFF_MS	30000
+
+struct hub_timeout_backoff {
+	struct list_head list;	// linkage in hub_timeout_backoffs
+	ULONGLONG expiry;	// GetTickCount64() time after which init may be retried
+	// the NUL-terminated device instance ID immediately follows the struct
+};
+
+static usbi_mutex_static_t hub_timeout_backoffs_lock = USBI_MUTEX_INITIALIZER;
+static struct list_head hub_timeout_backoffs = { &hub_timeout_backoffs, &hub_timeout_backoffs };
+
+// call only with hub_timeout_backoffs_lock held
+static struct hub_timeout_backoff *hub_timeout_backoff_find(const char *dev_id)
+{
+	struct hub_timeout_backoff *backoff;
+
+	list_for_each_entry(backoff, &hub_timeout_backoffs, list, struct hub_timeout_backoff) {
+		if (strcmp((const char *)(backoff + 1), dev_id) == 0)
+			return backoff;
+	}
+	return NULL;
+}
+
+// Whether initialization of this device should be skipped because a recent
+// hub IOCTL timeout put it into its backoff window. Expired entries are
+// dropped, so the next attempt after the window goes through again.
+static bool hub_timeout_backoff_active(const char *dev_id)
+{
+	struct hub_timeout_backoff *backoff;
+	bool active = false;
+
+	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
+	backoff = hub_timeout_backoff_find(dev_id);
+	if (backoff != NULL) {
+		if (GetTickCount64() < backoff->expiry) {
+			active = true;
+		} else {
+			list_del(&backoff->list);
+			free(backoff);
+		}
+	}
+	usbi_mutex_static_unlock(&hub_timeout_backoffs_lock);
+
+	return active;
+}
+
+static void hub_timeout_backoff_arm(struct libusb_context *ctx, const char *dev_id)
+{
+	struct hub_timeout_backoff *backoff;
+
+	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
+	backoff = hub_timeout_backoff_find(dev_id);
+	if (backoff == NULL) {
+		backoff = (struct hub_timeout_backoff *)calloc(1, sizeof(*backoff) + strlen(dev_id) + 1);
+		if (backoff != NULL) {
+			strcpy((char *)(backoff + 1), dev_id);
+			list_add_tail(&backoff->list, &hub_timeout_backoffs);
+		}
+	}
+	if (backoff != NULL)
+		backoff->expiry = GetTickCount64() + HUB_IOCTL_RETRY_BACKOFF_MS;
+	usbi_mutex_static_unlock(&hub_timeout_backoffs_lock);
+
+	usbi_warn(ctx, "not retrying initialization of '%s' for the next %d ms", dev_id, HUB_IOCTL_RETRY_BACKOFF_MS);
+}
+
+static void hub_timeout_backoff_clear(const char *dev_id)
+{
+	struct hub_timeout_backoff *backoff;
+
+	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
+	backoff = hub_timeout_backoff_find(dev_id);
+	if (backoff != NULL) {
+		list_del(&backoff->list);
+		free(backoff);
+	}
+	usbi_mutex_static_unlock(&hub_timeout_backoffs_lock);
+}
+
+/*
+ * Synchronous DeviceIoControl() with a timeout, for hub requests issued outside the
+ * regular transfer path. The handle must have been opened with FILE_FLAG_OVERLAPPED,
+ * which in turn means every DeviceIoControl() on that handle must go through here
+ * (calling it without an OVERLAPPED on an overlapped handle is not allowed).
+ *
+ * The request state (OVERLAPPED, event and data buffer) is heap-allocated and owned
+ * by the request itself: CancelIoEx() only *requests* cancellation, and the
+ * completion of a METHOD_BUFFERED request still writes into the output buffer and
+ * the OVERLAPPED afterwards. On timeout the state is therefore either freed once the
+ * cancellation is observed to complete, or handed over to the orphan list to be
+ * freed later - never released while the kernel may still reference it. This is
+ * also why the caller's buffers are never handed to the kernel directly.
+ *
+ * Returns TRUE on success, with the output copied to out_buf and *bytes_returned
+ * set. Returns FALSE on failure, with *bytes_returned zeroed and the cause
+ * available via GetLastError() (ERROR_SEM_TIMEOUT for a timeout).
+ */
+static BOOL hub_device_io_control(struct libusb_context *ctx, HANDLE handle, DWORD ioctl_code,
+	const void *in_buf, DWORD in_size, void *out_buf, DWORD out_size, DWORD *bytes_returned)
+{
+	struct hub_ioctl_request *req;
+	unsigned char *req_buf;
+	DWORD error, bytes;
+	BOOL ret;
+
+	*bytes_returned = 0;
+
+	reap_orphaned_requests(ctx);
+
+	// All hub IOCTLs are METHOD_BUFFERED: the kernel uses a single intermediate
+	// buffer for input and output, so one request buffer can stand in for both
+	// of the caller's (possibly aliased) buffers
+	assert((ioctl_code & 0x3) == METHOD_BUFFERED);
+
+	req = (struct hub_ioctl_request *)calloc(1, sizeof(*req) + MAX(in_size, out_size));
+	if (req == NULL) {
+		SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+		return FALSE;
+	}
+	req_buf = (unsigned char *)(req + 1);
+
+	// Manual-reset, so that waiting on it does not consume the completion state
+	req->overlapped.hEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
+	if (req->overlapped.hEvent == NULL) {
+		error = GetLastError();
+		free(req);
+		SetLastError(error);
+		return FALSE;
+	}
+
+	if (in_size != 0)
+		memcpy(req_buf, in_buf, in_size);
+
+	if (!DeviceIoControl(handle, ioctl_code, (in_size != 0) ? req_buf : NULL, in_size,
+			req_buf, out_size, NULL, &req->overlapped)) {
+		error = GetLastError();
+		if (error != ERROR_IO_PENDING) {
+			// Failed synchronously - no I/O was ever queued
+			CloseHandle(req->overlapped.hEvent);
+			free(req);
+			SetLastError(error);
+			return FALSE;
+		}
+	}
+	// Even on synchronous success the completion state and event are set,
+	// so a single wait-and-collect path handles both cases
+
+	if (WaitForSingleObject(req->overlapped.hEvent, HUB_IOCTL_TIMEOUT_MS) == WAIT_OBJECT_0) {
+		ret = GetOverlappedResult(handle, &req->overlapped, &bytes, FALSE);
+		error = ret ? ERROR_SUCCESS : GetLastError();
+		if (ret) {
+			if (bytes > out_size)	// should not happen for METHOD_BUFFERED
+				bytes = out_size;
+			memcpy(out_buf, req_buf, bytes);
+			*bytes_returned = bytes;
+		}
+		CloseHandle(req->overlapped.hEvent);
+		free(req);
+		SetLastError(error);
+		return ret;
+	}
+
+	usbi_warn(ctx, "IOCTL 0x%08lX timed out after %d ms, cancelling it",
+		ULONG_CAST(ioctl_code), HUB_IOCTL_TIMEOUT_MS);
+	CancelIoEx(handle, &req->overlapped);
+	if (WaitForSingleObject(req->overlapped.hEvent, HUB_IOCTL_CANCEL_GRACE_MS) == WAIT_OBJECT_0) {
+		CloseHandle(req->overlapped.hEvent);
+		free(req);
+	} else {
+		// The kernel still owns the request state: park it and free it once a
+		// later call (or winusb_exit()) observes it reached a terminal state
+		usbi_mutex_static_lock(&orphaned_requests_lock);
+		list_add_tail(&req->list, &orphaned_requests);
+		usbi_mutex_static_unlock(&orphaned_requests_lock);
+	}
+	SetLastError(ERROR_SEM_TIMEOUT);
+	return FALSE;
+}
+
+/*
 * exit: libusb backend deinitialization function
 */
 static void winusb_exit(struct libusb_context *ctx)
 {
 	int i;
-
-	UNUSED(ctx);
 
 	usbi_mutex_destroy(&autoclaim_lock);
 
@@ -737,12 +973,37 @@ static void winusb_exit(struct libusb_context *ctx)
 	}
 
 	exit_dlls();
+
+	// Last chance to release requests that timed out and were never observed to
+	// complete. Anything still pending is deliberately kept allocated: freeing it
+	// would let the kernel scribble over reused memory when it finally completes.
+	reap_orphaned_requests(ctx);
+	usbi_mutex_static_lock(&orphaned_requests_lock);
+	if (!list_empty(&orphaned_requests))
+		usbi_warn(ctx, "keeping timed-out hub request(s) never released by the kernel");
+	usbi_mutex_static_unlock(&orphaned_requests_lock);
+
+	// Recorded re-initialization backoffs, however, can simply be dropped
+	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
+	while (!list_empty(&hub_timeout_backoffs)) {
+		struct hub_timeout_backoff *backoff = list_first_entry(&hub_timeout_backoffs, struct hub_timeout_backoff, list);
+		list_del(&backoff->list);
+		free(backoff);
+	}
+	usbi_mutex_static_unlock(&hub_timeout_backoffs_lock);
 }
 
 /*
  * fetch and cache all the config descriptors through I/O
+ *
+ * Returns LIBUSB_ERROR_TIMEOUT if a descriptor request timed out, in which case
+ * probing was abandoned: the control pipe is most likely wedged, every further
+ * request would pay the full timeout, and bNumConfigurations is device-supplied
+ * (not sanitized until usbi_sanitize_device()) so the multiplied stall could
+ * otherwise last for minutes. Ordinary per-descriptor failures are skipped as
+ * before and do not affect the return value.
  */
-static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle)
+static int cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handle)
 {
 	struct libusb_context *ctx = DEVICE_CTX(dev);
 	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
@@ -755,14 +1016,14 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 
 	num_configurations = dev->device_descriptor.bNumConfigurations;
 	if (num_configurations == 0)
-		return;
+		return LIBUSB_SUCCESS;
 
 	assert(sizeof(USB_DESCRIPTOR_REQUEST) == USB_DESCRIPTOR_REQUEST_SIZE);
 
 	priv->config_descriptor = (PUSB_CONFIGURATION_DESCRIPTOR *)calloc(num_configurations, sizeof(PUSB_CONFIGURATION_DESCRIPTOR));
 	if (priv->config_descriptor == NULL) {
 		usbi_err(ctx, "could not allocate configuration descriptor array for '%s'", priv->dev_id);
-		return;
+		return LIBUSB_ERROR_NO_MEM;
 	}
 
 	for (i = 0; i <= num_configurations; i++) {
@@ -784,9 +1045,12 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 		// Dummy call to get the required data size. Initial failures are reported as info rather
 		// than error as they can occur for non-penalizing situations, such as with some hubs.
 		// coverity[tainted_data_argument]
-		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
-			&cd_buf_short, size, &ret_size, NULL)) {
-			usbi_info(ctx, "could not access configuration descriptor %u (dummy) for '%s': %s", i, priv->dev_id, windows_error_str(0));
+		if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &cd_buf_short, size,
+			&cd_buf_short, size, &ret_size)) {
+			DWORD error = GetLastError();
+			usbi_info(ctx, "could not access configuration descriptor %u (dummy) for '%s': %s", i, priv->dev_id, windows_error_str(error));
+			if (error == ERROR_SEM_TIMEOUT)
+				return LIBUSB_ERROR_TIMEOUT;
 			continue;
 		}
 
@@ -810,9 +1074,14 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 		cd_buf_actual->SetupPacket.wIndex = 0;
 		cd_buf_actual->SetupPacket.wLength = cd_buf_short.desc.wTotalLength;
 
-		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
-			cd_buf_actual, size, &ret_size, NULL)) {
-			usbi_err(ctx, "could not access configuration descriptor %u (actual) for '%s': %s", i, priv->dev_id, windows_error_str(0));
+		if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, cd_buf_actual, size,
+			cd_buf_actual, size, &ret_size)) {
+			DWORD error = GetLastError();
+			usbi_err(ctx, "could not access configuration descriptor %u (actual) for '%s': %s", i, priv->dev_id, windows_error_str(error));
+			if (error == ERROR_SEM_TIMEOUT) {
+				safe_free(cd_buf_actual);
+				return LIBUSB_ERROR_TIMEOUT;
+			}
 			continue;
 		}
 
@@ -835,6 +1104,8 @@ static void cache_config_descriptors(struct libusb_device *dev, HANDLE hub_handl
 		priv->config_descriptor[i] = cd_data;
 		cd_buf_actual = NULL;
 	}
+
+	return LIBUSB_SUCCESS;
 }
 
 #define ROOT_HUB_FS_CONFIG_DESC_LENGTH		0x19
@@ -925,6 +1196,7 @@ static int init_root_hub(struct libusb_device *dev)
 	HANDLE handle;
 	ULONG port_number, num_ports;
 	DWORD size;
+	bool ioctl_timed_out = false;
 	int r;
 
 	// Determining the speed of a root hub is painful. Microsoft does not directly report the speed
@@ -932,16 +1204,20 @@ static int init_root_hub(struct libusb_device *dev)
 	// are forced to query each individual port of the root hub to try and infer the root hub's
 	// speed. Note that we have to query all ports because the presence of a device on that port
 	// changes if/how Windows returns any useful speed information.
-	handle = CreateFileA(priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	// Opened with FILE_FLAG_OVERLAPPED because a wedged device on one of the ports can block
+	// even the connection-info queries (#1136); consequently every DeviceIoControl() on this
+	// handle must go through hub_device_io_control()
+	handle = CreateFileA(priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 	if (handle == INVALID_HANDLE_VALUE) {
 		usbi_err(ctx, "could not open root hub %s: %s", priv->path, windows_error_str(0));
 		return LIBUSB_ERROR_ACCESS;
 	}
 
-	if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_INFORMATION, NULL, 0, &hub_info, sizeof(hub_info), &size, NULL)) {
-		usbi_warn(ctx, "could not get root hub info for '%s': %s", priv->dev_id, windows_error_str(0));
+	if (!hub_device_io_control(ctx, handle, IOCTL_USB_GET_NODE_INFORMATION, NULL, 0, &hub_info, sizeof(hub_info), &size)) {
+		DWORD error = GetLastError();
+		usbi_warn(ctx, "could not get root hub info for '%s': %s", priv->dev_id, windows_error_str(error));
 		CloseHandle(handle);
-		return LIBUSB_ERROR_ACCESS;
+		return (error == ERROR_SEM_TIMEOUT) ? LIBUSB_ERROR_TIMEOUT : LIBUSB_ERROR_ACCESS;
 	}
 
 	num_ports = hub_info.u.HubInformation.HubDescriptor.bNumberOfPorts;
@@ -956,8 +1232,9 @@ static int init_root_hub(struct libusb_device *dev)
 			conn_info_v2.ConnectionIndex = port_number;
 			conn_info_v2.Length = sizeof(conn_info_v2);
 			conn_info_v2.SupportedUsbProtocols.Usb300 = 1;
-			if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
-				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size, NULL)) {
+			if (!hub_device_io_control(ctx, handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
+				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size)) {
+				ioctl_timed_out = (GetLastError() == ERROR_SEM_TIMEOUT);
 				usbi_warn(ctx, "could not get node connection information (V2) for root hub '%s' port %lu: %s",
 					priv->dev_id, ULONG_CAST(port_number), windows_error_str(0));
 				break;
@@ -994,12 +1271,17 @@ static int init_root_hub(struct libusb_device *dev)
 	// Windows only reports speed information about a connected device. This means that a root
 	// hub with no connected devices or devices that are all operating at a speed less than the
 	// highest speed that the root hub supports will not give us the correct speed.
-	for (port_number = 1; port_number <= num_ports; port_number++) {
+	// If a request already timed out, most likely every request on this handle would pay the
+	// full timeout as well, so don't even start the loop and settle for a pessimistic default.
+	for (port_number = 1; !ioctl_timed_out && port_number <= num_ports; port_number++) {
 		conn_info.ConnectionIndex = port_number;
-		if (!DeviceIoControl(handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
-			&conn_info, sizeof(conn_info), &size, NULL)) {
+		if (!hub_device_io_control(ctx, handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
+			&conn_info, sizeof(conn_info), &size)) {
+			DWORD error = GetLastError();
 			usbi_warn(ctx, "could not get node connection information for root hub '%s' port %lu: %s",
-				priv->dev_id, ULONG_CAST(port_number), windows_error_str(0));
+				priv->dev_id, ULONG_CAST(port_number), windows_error_str(error));
+			if (error == ERROR_SEM_TIMEOUT)
+				break;
 			continue;
 		}
 
@@ -1096,6 +1378,14 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	if (priv->initialized)
 		return LIBUSB_SUCCESS;
 
+	// Skip devices whose recent hub IOCTL timeout put them into their backoff
+	// window: retrying immediately would stall every device list scan by the
+	// full timeout all over again
+	if (hub_timeout_backoff_active(priv->dev_id)) {
+		usbi_dbg(DEVICE_CTX(dev), "skipping initialization of '%s' until its timeout backoff expires", priv->dev_id);
+		return LIBUSB_ERROR_NO_DEVICE;
+	}
+
 	if (parent_dev != NULL) { // Not a HCD root hub
 		ctx = DEVICE_CTX(dev);
 		parent_priv = (struct winusb_device_priv *)usbi_get_device_priv(parent_dev);
@@ -1141,7 +1431,10 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		dev->parent_dev = parent_dev;
 		priv->depth = depth;
 
-		hub_handle = CreateFileA(parent_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+		// Opened with FILE_FLAG_OVERLAPPED so the descriptor requests issued on this
+		// handle can be bounded by a timeout; consequently every DeviceIoControl()
+		// on it must go through hub_device_io_control()
+		hub_handle = CreateFileA(parent_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 		if (hub_handle == INVALID_HANDLE_VALUE) {
 			usbi_warn(ctx, "could not open hub %s: %s", parent_priv->path, windows_error_str(0));
 			return LIBUSB_ERROR_ACCESS;
@@ -1150,11 +1443,16 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		conn_info.ConnectionIndex = (ULONG)port_number;
 		// coverity[tainted_data_argument]
 
-		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
-			&conn_info, sizeof(conn_info), &size, NULL)) {
+		if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
+			&conn_info, sizeof(conn_info), &size)) {
+			DWORD error = GetLastError();
 			usbi_warn(ctx, "could not get node connection information for device '%s': %s",
-				priv->dev_id, windows_error_str(0));
+				priv->dev_id, windows_error_str(error));
 			CloseHandle(hub_handle);
+			// This is the request implicated by the Nacon report (#1136): throttle
+			// re-initialization so later scans do not stall on it again right away
+			if (error == ERROR_SEM_TIMEOUT)
+				hub_timeout_backoff_arm(ctx, priv->dev_id);
 			return LIBUSB_ERROR_NO_DEVICE;
 		}
 
@@ -1189,15 +1487,17 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			dev->device_descriptor.bNumConfigurations, priv->active_config,	priv->dev_id);
 
 		// Cache as many config descriptors as we can
-		cache_config_descriptors(dev, hub_handle);
+		r = cache_config_descriptors(dev, hub_handle);
 
-		// In their great wisdom, Microsoft decided to BREAK the USB speed report between Windows 7 and Windows 8
-		if (windows_version >= WINDOWS_8) {
+		// In their great wisdom, Microsoft decided to BREAK the USB speed report between Windows 7 and Windows 8.
+		// Skip the query when descriptor caching hit a timeout: the same handle serves this request,
+		// so it would most likely just pay another full timeout for nothing.
+		if ((windows_version >= WINDOWS_8) && (r != LIBUSB_ERROR_TIMEOUT)) {
 			conn_info_v2.ConnectionIndex = (ULONG)port_number;
 			conn_info_v2.Length = sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2);
 			conn_info_v2.SupportedUsbProtocols.Usb300 = 1;
-			if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
-				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size, NULL)) {
+			if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
+				&conn_info_v2, sizeof(conn_info_v2), &conn_info_v2, sizeof(conn_info_v2), &size)) {
 				usbi_warn(ctx, "could not get node connection information (V2) for device '%s': %s",
 					priv->dev_id,  windows_error_str(0));
 			} else if (conn_info_v2.Flags.DeviceIsOperatingAtSuperSpeedPlusOrHigher) {
@@ -1226,8 +1526,11 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		}
 	} else {
 		r = init_root_hub(dev);
-		if (r)
+		if (r) {
+			if (r == LIBUSB_ERROR_TIMEOUT)
+				hub_timeout_backoff_arm(DEVICE_CTX(dev), priv->dev_id);
 			return r;
+		}
 	}
 
 	r = usbi_sanitize_device(dev);
@@ -1235,6 +1538,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		return r;
 
 	priv->initialized = true;
+	hub_timeout_backoff_clear(priv->dev_id);
 
 	usbi_dbg(ctx, "(bus: %u, addr: %u, depth: %u, port: %u): '%s'",
 		dev->bus_number, dev->device_address, priv->depth, dev->port_number, priv->dev_id);
@@ -2370,7 +2674,9 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 	}
 
 	struct winusb_device_priv* hub_priv = (struct winusb_device_priv *)usbi_get_device_priv(dev->parent_dev);
-	HANDLE hub_handle = CreateFileA(hub_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	// Opened with FILE_FLAG_OVERLAPPED so the descriptor requests issued on this
+	// handle can be bounded by a timeout (see hub_device_io_control())
+	HANDLE hub_handle = CreateFileA(hub_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 	if (hub_handle == INVALID_HANDLE_VALUE) {
 		usbi_warn(ctx, "could not open hub %s: %s", hub_priv->path, windows_error_str(0));
 		return LIBUSB_ERROR_ACCESS;
@@ -2390,8 +2696,8 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 		sd.req.SetupPacket.wIndex = 0;
 		sd.req.SetupPacket.wLength = (USHORT)sizeof(sd.desc);
 
-		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
-			&sd, size, &ret_size, NULL)) {
+		if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
+			&sd, size, &ret_size)) {
 			usbi_warn(ctx, "could not retrieve language IDs for '%s': %s",
 				priv->dev_id, windows_error_str(0));
 			CloseHandle(hub_handle);
@@ -2417,8 +2723,8 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 	sd.req.SetupPacket.wIndex = priv->langid;
 	sd.req.SetupPacket.wLength = (USHORT)sizeof(sd.desc);
 
-	BOOL rv = DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
-		&sd, size, &ret_size, NULL);
+	BOOL rv = hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
+		&sd, size, &ret_size);
 	CloseHandle(hub_handle);
 	if (!rv) {
 		usbi_err(ctx, "could not access string descriptor %u for '%s': %s", string_descriptor_idx,
