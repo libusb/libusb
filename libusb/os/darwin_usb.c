@@ -691,16 +691,20 @@ static void darwin_devices_attached (void *ptr, io_iterator_t add_devices) EXCLU
 
   while ((service = IOIteratorNext(add_devices))) {
     ret = darwin_get_cached_device (NULL, service, &cached_device, &old_session_id);
-    if (ret < 0 || !cached_device->can_enumerate) {
-      continue;
+
+    if (ret >= 0 && cached_device->can_enumerate) {
+      /* add this device to each active context's device list */
+      for_each_context(ctx) {
+        process_new_device (ctx, cached_device, old_session_id);
+      }
     }
 
-    /* add this device to each active context's device list */
-    for_each_context(ctx) {
-      process_new_device (ctx, cached_device, old_session_id);
-    }
-
-    if (atomic_exchange(&cached_device->in_reenumerate, false)) {
+    /* clear the re-enumeration flag even if the device could not be
+       enumerated: the device did come back, and the thread waiting in
+       darwin_reenumerate_device must not sit out the full timeout. if
+       enumeration failed before a cached device was matched the flag
+       cannot be cleared here and the waiter will still time out. */
+    if (cached_device && atomic_exchange(&cached_device->in_reenumerate, false)) {
       usbi_dbg (NULL, "cached device in reset state. reset complete...");
     }
 
@@ -1693,6 +1697,7 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
   struct libusb_device *dev = NULL;
   UInt8 devSpeed;
   enum libusb_error ret = LIBUSB_SUCCESS;
+  bool reused = false;
 
   do {
     /* check current active configuration (and cache the first configuration value--
@@ -1730,6 +1735,7 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
       assert(cached_device->address <= UINT8_MAX);
       dev->device_address = (uint8_t)cached_device->address;
     } else {
+      reused = true;
       priv = (struct darwin_device_priv *)usbi_get_device_priv(dev);
     }
 
@@ -1777,7 +1783,11 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
 
   } while (0);
 
-  if (!atomic_load(&cached_device->in_reenumerate) && 0 == ret) {
+  /* a device found by its old session id is already in this context's device
+     list; connecting it again would corrupt the list (list_add of an
+     already-listed node). New devices (including a re-enumerated device
+     this context has never seen) are connected.*/
+  if (!reused && 0 == ret) {
     usbi_connect_device (dev);
   } else {
     libusb_unref_device (dev);
@@ -1801,11 +1811,9 @@ static enum libusb_error darwin_scan_devices(struct libusb_context *ctx) {
   while ((service = IOIteratorNext (deviceIterator))) {
     ret = darwin_get_cached_device (ctx, service, &cached_device, &old_session_id);
     assert((ret >= 0) ? (cached_device != NULL) : true);
-    if (ret < 0 || !cached_device->can_enumerate) {
-      continue;
+    if (ret >= 0 && cached_device->can_enumerate) {
+      (void) process_new_device (ctx, cached_device, old_session_id);
     }
-
-    (void) process_new_device (ctx, cached_device, old_session_id);
 
     IOObjectRelease(service);
   }
