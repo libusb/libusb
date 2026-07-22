@@ -74,7 +74,7 @@ void libusb_testlib_logf(const char *fmt, ...)
 	fflush(stdout);
 }
 
-int libusb_testlib_run_tests(int argc, char *argv[],
+int libusb_testlib_run_tests(int argc, const char *argv[],
 	const libusb_testlib_test *tests)
 {
 	int run_count = 0;
@@ -85,7 +85,7 @@ int libusb_testlib_run_tests(int argc, char *argv[],
 	int skip_count = 0;
 
 	/* Setup default mode of operation */
-	char **test_names = NULL;
+	const char **test_names = NULL;
 	int test_count = 0;
 	bool list_tests = false;
 	bool verbose = false;
