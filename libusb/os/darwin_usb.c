@@ -2787,8 +2787,15 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
 
   usbi_mutex_unlock(&transfer->dev_handle->lock);
 
-  /* submit the request */
   /* timeouts are unavailable on interrupt endpoints */
+  if (pipe_properties.transfer_type != kUSBInterrupt)
+    itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
+  /* publish the submit-side transfer state to darwin_async_io_callback
+     (see submit_fence in struct usbi_transfer) */
+  usbi_atomic_store(&itransfer->submit_fence, 1);
+
+  /* submit the request */
   if (pipe_properties.transfer_type == kUSBInterrupt) {
     if (IS_XFERIN(transfer))
       ret = (*IOINTERFACE(cInterface))->ReadPipeAsync(IOINTERFACE(cInterface), pipeRef, transfer->buffer,
@@ -2797,8 +2804,6 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
       ret = (*IOINTERFACE(cInterface))->WritePipeAsync(IOINTERFACE(cInterface), pipeRef, transfer->buffer,
                                                                (UInt32)transfer->length, darwin_async_io_callback, itransfer);
   } else {
-    itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
-
     if (IS_XFERIN(transfer))
       ret = (*IOINTERFACE(cInterface))->ReadPipeAsyncTO(IOINTERFACE(cInterface), pipeRef, transfer->buffer,
                                                                 (UInt32)transfer->length, transfer->timeout, transfer->timeout,
@@ -2852,6 +2857,10 @@ static int submit_stream_transfer(struct usbi_transfer *itransfer) REQUIRES(itra
   }
 
   itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
+  /* publish the submit-side transfer state to darwin_async_io_callback
+     (see submit_fence in struct usbi_transfer) */
+  usbi_atomic_store(&itransfer->submit_fence, 1);
 
   if (IS_XFERIN(transfer))
     ret = (*IOINTERFACE_V(cInterface, 550))->ReadStreamsPipeAsyncTO(IOINTERFACE(cInterface), pipeRef, itransfer->stream_id,
@@ -2935,6 +2944,10 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) REQUIRES(itransf
   if (cInterface->frames[transfer->endpoint] && frame < cInterface->frames[transfer->endpoint])
     frame = cInterface->frames[transfer->endpoint];
 
+  /* publish the submit-side transfer state to darwin_async_io_callback
+     (see submit_fence in struct usbi_transfer) */
+  usbi_atomic_store(&itransfer->submit_fence, 1);
+
   /* submit the request */
   if (IS_XFERIN(transfer))
     kresult = (*IOINTERFACE(cInterface))->ReadIsochPipeAsync(IOINTERFACE(cInterface), pipeRef, transfer->buffer, frame,
@@ -2985,6 +2998,10 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) REQUIRES(itr
   tpriv->req.noDataTimeout     = transfer->timeout;
 
   itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
+  /* publish the submit-side transfer state to darwin_async_io_callback
+     (see submit_fence in struct usbi_transfer) */
+  usbi_atomic_store(&itransfer->submit_fence, 1);
 
   /* all transfers in libusb-1.0 are async */
 
@@ -3115,6 +3132,13 @@ static int darwin_cancel_transfer(struct usbi_transfer *itransfer) REQUIRES(itra
 
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0) {
   struct usbi_transfer *itransfer = (struct usbi_transfer *)refcon;
+
+  /* acquire the submitting thread's writes to the transfer before reading
+     any of its state, including itransfer->priv below. pairs with the
+     usbi_atomic_store in the submit paths; see submit_fence in
+     struct usbi_transfer. */
+  (void)usbi_atomic_load(&itransfer->submit_fence);
+
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_transfer_priv *tpriv = (struct darwin_transfer_priv *)usbi_get_transfer_priv(itransfer);
 
