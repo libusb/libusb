@@ -106,6 +106,7 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 	const char *sysfs_dir, const char *attr, int max_value, int *value_p);
 static int linux_scan_devices(struct libusb_context *ctx);
 static int detach_kernel_driver_and_claim(struct libusb_device_handle *, uint8_t);
+static int sysfs_get_active_config(struct libusb_device *dev, int *config);
 
 #if !defined(HAVE_LIBUDEV)
 static int linux_default_scan_devices(struct libusb_context *ctx);
@@ -576,8 +577,7 @@ static int op_get_config_string(struct libusb_device *dev,
 	 * anything else cannot be read without opening the device. */
 	if (config_value != 0) {
 		int active = 0;
-		r = read_sysfs_attr(ctx, priv->sysfs_dir, "bConfigurationValue",
-			UINT8_MAX, &active);
+		r = sysfs_get_active_config(dev, &active);
 		if (r < 0)
 			return r;
 		if (active != (int)config_value) {
@@ -620,7 +620,7 @@ static int op_get_interface_string(struct libusb_device *dev,
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	/* sysfs exposes interfaces only for the active configuration */
-	r = read_sysfs_attr(ctx, priv->sysfs_dir, "bConfigurationValue", UINT8_MAX, &active);
+	r = sysfs_get_active_config(dev, &active);
 	if (r < 0)
 		return r;
 	if (active <= 0)
