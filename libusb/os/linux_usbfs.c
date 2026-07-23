@@ -106,6 +106,7 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 	const char *sysfs_dir, const char *attr, int max_value, int *value_p);
 static int linux_scan_devices(struct libusb_context *ctx);
 static int detach_kernel_driver_and_claim(struct libusb_device_handle *, uint8_t);
+static int sysfs_get_active_config(struct libusb_device *dev, int *config);
 
 #if !defined(HAVE_LIBUDEV)
 static int linux_default_scan_devices(struct libusb_context *ctx);
@@ -576,8 +577,7 @@ static int op_get_config_string(struct libusb_device *dev,
 	 * anything else cannot be read without opening the device. */
 	if (config_value != 0) {
 		int active = 0;
-		r = read_sysfs_attr(ctx, priv->sysfs_dir, "bConfigurationValue",
-			UINT8_MAX, &active);
+		r = sysfs_get_active_config(dev, &active);
 		if (r < 0)
 			return r;
 		if (active != (int)config_value) {
@@ -620,7 +620,7 @@ static int op_get_interface_string(struct libusb_device *dev,
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	/* sysfs exposes interfaces only for the active configuration */
-	r = read_sysfs_attr(ctx, priv->sysfs_dir, "bConfigurationValue", UINT8_MAX, &active);
+	r = sysfs_get_active_config(dev, &active);
 	if (r < 0)
 		return r;
 	if (active <= 0)
@@ -741,10 +741,7 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 
 	/* The kernel does *not* NUL-terminate the string, but every attribute
 	 * should be terminated with a newline character. */
-	if (!isdigit(buf[0])) {
-		usbi_err(ctx, "attribute %s doesn't have numeric value?", attr);
-		return LIBUSB_ERROR_IO;
-	} else if (buf[r - 1] != '\n') {
+	if (buf[r - 1] != '\n') {
 		usbi_warn(ctx, "attribute %s doesn't end with newline?", attr);
 	} else {
 		/* Remove the terminating newline character */
@@ -754,7 +751,14 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 
 	errno = 0;
 	value = strtol(buf, &endptr, 10);
-	if (buf == endptr || value < 0 || value > (long)max_value || errno) {
+	if (buf == endptr && value == 0) {
+		/* strtol() returns buf == endptr when a error occurs and
+		 * value == 0 for a non-numeric value, first check if the
+		 * error was because of a non-numeric value,
+		 * before general errors */
+		usbi_err(ctx, "attribute %s doesn't have numeric value?", attr);
+		return LIBUSB_ERROR_IO;
+	} else if (buf == endptr || value < 0 || value > (long)max_value || errno) {
 		usbi_err(ctx, "attribute %s contains an invalid value: '%s'", attr, buf);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	} else if (*endptr != '\0') {
