@@ -2369,6 +2369,14 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 	}
 
+	// A previous request already failed to obtain this device's language IDs.
+	// Without them no string descriptor can be fetched, so fail fast rather
+	// than re-opening the hub and re-issuing a request that fails again (and
+	// logs again) for every string queried.
+	if (priv->langid_unavailable) {
+		return LIBUSB_ERROR_IO;
+	}
+
 	struct winusb_device_priv* hub_priv = (struct winusb_device_priv *)usbi_get_device_priv(dev->parent_dev);
 	HANDLE hub_handle = CreateFileA(hub_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
 	if (hub_handle == INVALID_HANDLE_VALUE) {
@@ -2392,14 +2400,18 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 
 		if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
 			&sd, size, &ret_size, NULL)) {
-			usbi_warn(ctx, "could not retrieve language IDs for '%s': %s",
+			// Some devices never answer this request; remember that so it is
+			// tried (and logged) only once, not for every string queried.
+			usbi_info(ctx, "could not retrieve language IDs for '%s': %s",
 				priv->dev_id, windows_error_str(0));
+			priv->langid_unavailable = true;
 			CloseHandle(hub_handle);
 			return LIBUSB_ERROR_IO;
 		}
 
 		if (sd.desc.bDescriptorType != LIBUSB_DT_STRING || sd.desc.bLength < 4) {
-			usbi_warn(ctx, "invalid language ID descriptor for '%s'", priv->dev_id);
+			usbi_info(ctx, "invalid language ID descriptor for '%s'", priv->dev_id);
+			priv->langid_unavailable = true;
 			CloseHandle(hub_handle);
 			return LIBUSB_ERROR_IO;
 		}
