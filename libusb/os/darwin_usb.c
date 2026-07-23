@@ -937,7 +937,7 @@ static void *darwin_event_thread_main (void *arg0) EXCLUDES(libusb_darwin_at_mut
 static void darwin_cleanup_devices(void) REQUIRES(darwin_cached_devices_mutex) {
   struct darwin_cached_device *dev, *next;
 
-  list_for_each_entry_safe(dev, next, &darwin_cached_devices, list, struct darwin_cached_device) {
+  list_for_each_entry_safe(dev, next, darwin_cached_devices, list, struct darwin_cached_device) {
     if (dev->refcount > 1) {
       usbi_err(NULL, "device still referenced at libusb_exit");
     }

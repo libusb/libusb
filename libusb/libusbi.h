@@ -181,10 +181,10 @@ struct list_head {
 	container_of(ptr, type, member)
 
 #define list_first_entry(ptr, type, member) \
-	list_entry((ptr)->next, type, member)
+	list_entry((ptr).next, type, member)
 
 #define list_next_entry(ptr, type, member) \
-	list_entry((ptr)->member.next, type, member)
+	list_entry((ptr).member.next, type, member)
 
 /* Get each entry from a list
  *  pos - A structure pointer has a "member" element
@@ -193,15 +193,15 @@ struct list_head {
  *  type - the type of the first parameter
  */
 #define list_for_each_entry(pos, head, member, type)			\
-	for (pos = list_first_entry(head, type, member);		\
+	for (pos = list_first_entry(*(head), type, member);		\
 		 &pos->member != (head);				\
-		 pos = list_next_entry(pos, type, member))
+		 pos = list_next_entry(*pos, type, member))
 
 #define list_for_each_entry_safe(pos, n, head, member, type)		\
 	for (pos = list_first_entry(head, type, member),		\
-		 n = list_next_entry(pos, type, member);		\
-		 &pos->member != (head);				\
-		 pos = n, n = list_next_entry(n, type, member))
+		 n = list_next_entry(*pos, type, member);		\
+		 &pos->member != &(head);				\
+		 pos = n, n = list_next_entry(*n, type, member))
 
 /* Helper macros to iterate over a list. The structure pointed
  * to by "pos" must have a list_head member named "list".
@@ -1673,7 +1673,7 @@ static inline bool usbi_is_xferout(const struct libusb_transfer *xfer)
 	for_each_helper(d, &(ctx)->usb_devs, struct libusb_device)
 
 #define for_each_device_safe(ctx, d, n) \
-	for_each_safe_helper(d, n, &(ctx)->usb_devs, struct libusb_device)
+	for_each_safe_helper(d, n, (ctx)->usb_devs, struct libusb_device)
 
 #define for_each_open_device(ctx, h) \
 	for_each_helper(h, &(ctx)->open_devs, struct libusb_device_handle)
@@ -1688,7 +1688,7 @@ static inline bool usbi_is_xferout(const struct libusb_transfer *xfer)
 	for_each_safe_helper(t, n, (list), struct usbi_transfer)
 
 #define for_each_transfer_safe(ctx, t, n) \
-	__for_each_transfer_safe(&(ctx)->flying_transfers, t, n)
+	__for_each_transfer_safe((ctx)->flying_transfers, t, n)
 
 #define __for_each_completed_transfer_safe(list, t, n) \
 	list_for_each_entry_safe(t, n, (list), completed_list, struct usbi_transfer)
@@ -1700,13 +1700,13 @@ static inline bool usbi_is_xferout(const struct libusb_transfer *xfer)
 	for_each_helper(e, &(ctx)->removed_event_sources, struct usbi_event_source)
 
 #define for_each_removed_event_source_safe(ctx, e, n) \
-	for_each_safe_helper(e, n, &(ctx)->removed_event_sources, struct usbi_event_source)
+	for_each_safe_helper(e, n, (ctx)->removed_event_sources, struct usbi_event_source)
 
 #define for_each_hotplug_cb(ctx, c) \
 	for_each_helper(c, &(ctx)->hotplug_cbs, struct usbi_hotplug_callback)
 
 #define for_each_hotplug_cb_safe(ctx, c, n) \
-	for_each_safe_helper(c, n, &(ctx)->hotplug_cbs, struct usbi_hotplug_callback)
+	for_each_safe_helper(c, n, (ctx)->hotplug_cbs, struct usbi_hotplug_callback)
 
 #ifdef __cplusplus
 }
