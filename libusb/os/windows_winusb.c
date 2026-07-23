@@ -1299,6 +1299,46 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 			NULL, (PBYTE)port_nr, sizeof(*port_nr), &size) && (size == sizeof(*port_nr));
 }
 
+static bool get_dev_addr(struct libusb_device *parent_dev, uint8_t port_number, uint8_t *dev_addr)
+{
+	struct libusb_context *ctx = NULL;
+	struct winusb_device_priv *parent_priv;
+	USB_NODE_CONNECTION_INFORMATION_EX conn_info;
+	HANDLE hub_handle;
+	DWORD size;
+	if (parent_dev == NULL) {	// Root hub has no device address
+		return false;
+	}
+	ctx = DEVICE_CTX(parent_dev);
+	parent_priv = usbi_get_device_priv(parent_dev);
+	if (parent_priv->apib->id != USB_API_HUB) {
+		usbi_warn(ctx, "device '%s' is not a hub", parent_priv->dev_id);
+		return false;
+	}
+	// Even when the hub device is unplugged, it can still be opened and a handle can be obtained
+	// normally (tested on Win11 25H2).
+	hub_handle = CreateFileA(parent_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE,
+							NULL, OPEN_EXISTING, 0, NULL);
+	if (hub_handle == INVALID_HANDLE_VALUE) {
+		usbi_warn(ctx, "could not open hub %s: %s", parent_priv->dev_id,
+				windows_error_str(0));
+		return false;
+	}
+	conn_info.ConnectionIndex = (ULONG)port_number;
+	// If no device is connected to the corresponding port (or the hub device does not exist), it
+	// will still return success, and DeviceAddress will be 0 (tested on Win11 25H2).
+	if (!DeviceIoControl(hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX, &conn_info, sizeof(conn_info),
+		&conn_info, sizeof(conn_info), &size, NULL)) {
+		usbi_warn(ctx, "could not get node connection information for hub '%s' port %lu: %s",
+			parent_priv->dev_id, ULONG_CAST(port_number), windows_error_str(0));
+		CloseHandle(hub_handle);
+		return false;
+	}
+	*dev_addr = (uint8_t)conn_info.DeviceAddress;
+	CloseHandle(hub_handle);
+	return true;
+}
+
 static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id,
 	DEVINST devinst)
 {
@@ -1657,7 +1697,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	char *dev_interface_path = NULL;
 	unsigned long session_id;
 	DWORD size, port_nr, install_state;
-	uint8_t bus_number = 0;
+	uint8_t bus_number = 0, device_address;
 #if defined(ENABLE_LOGGING)
 	char guid_string[MAX_GUID_STRING_LENGTH];
 #endif
@@ -1953,15 +1993,24 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 
 					if (strcmp(priv->dev_id, dev_id) != 0) {
 						usbi_dbg(ctx, "device instance ID for session [%lX] changed", session_id);
-						usbi_detach_device(dev); // usbi_detach_device is equivalent do usbi_disconnect_device but for the firing of LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT
+						usbi_detach_device(dev); // usbi_detach_device is equivalent to usbi_disconnect_device but for the firing of LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT
 						libusb_unref_device(dev);
 						goto alloc_device;
 					}
 					if (!usbi_guid_equal(&priv->class_guid, &dev_info_data.ClassGuid)) {
 						usbi_dbg(ctx, "device class GUID for session [%lX] changed", session_id);
-						usbi_detach_device(dev); // usbi_detach_device is equivalent do usbi_disconnect_device but for the firing of LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT
+						usbi_detach_device(dev); // usbi_detach_device is equivalent to usbi_disconnect_device but for the firing of LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT
 						libusb_unref_device(dev);
 						goto alloc_device;
+					}
+					if (priv->initialized && parent_dev) {
+						device_address = 0;
+						if (get_dev_addr(parent_dev, dev->port_number, &device_address) && device_address != dev->device_address) {
+							usbi_dbg(ctx, "device address for session [%lX] changed", session_id);
+							usbi_detach_device(dev); // usbi_detach_device is equivalent to usbi_disconnect_device but for the firing of LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT
+							libusb_unref_device(dev);
+							goto alloc_device;
+						}
 					}
 #if defined(LIBUSB_WINDOWS_HOTPLUG)
 					priv->seen_during_scan = true;
