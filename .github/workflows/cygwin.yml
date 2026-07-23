@@ -1,4 +1,5 @@
-name: MSYS2 build
+name: Cygwin
+
 on:
   push:
     branches:
@@ -13,51 +14,47 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ matrix.msystem }} | ${{ matrix.architecture }}
-    runs-on: windows-latest
+    name: ${{ matrix.architecture }}
+    runs-on: windows-2022
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          - msystem: MINGW32
+          - platform: x86
             architecture: Win32
-            packages: git mingw-w64-i686-cc mingw-w64-i686-autotools
-            build_dir: build-MinGW-Win32
-            install_dir: libusb-MinGW-Win32
-          - msystem: MINGW64
+            build_dir: build-cygwin-Win32
+            install_dir: libusb-cygwin-Win32
+          - platform: x86_64
             architecture: x64
-            packages: git mingw-w64-x86_64-cc mingw-w64-x86_64-autotools
-            build_dir: build-MinGW-x64
-            install_dir: libusb-MinGW-x64
-    defaults:
-      run:
-        shell: msys2 {0}
+            build_dir: build-cygwin-x64
+            install_dir: libusb-cygwin-x64
+
     steps:
+      # Keep shell scripts usable by Cygwin after checkout.
+      - name: Configure Git line endings
+        run: git config --global core.autocrlf input
       - uses: actions/checkout@v6
         with:
           # Full history + tags for build-aux/gen-describe.sh.
           fetch-depth: 0
-      - uses: msys2/setup-msys2@v2
+      - uses: cygwin/cygwin-install-action@v6
         with:
-          msystem: ${{ matrix.msystem }}
-          update: true
-          install: ${{ matrix.packages }}
+          platform: ${{ matrix.platform }}
+          packages: >-
+            autoconf automake gcc-core gcc-g++ git libtool make pkg-config
       - name: bootstrap
-        run: ./bootstrap.sh
+        run: bash -eo pipefail ./bootstrap.sh
       - name: Build, test and install
-        # GCC on MSYS2 doesn't have ASAN support (but Clang does).
         run: >-
-          workspace=$(cygpath -u "$GITHUB_WORKSPACE") &&
+          bash -eo pipefail -c
+          'workspace=$(cygpath -u "$GITHUB_WORKSPACE") &&
           ./.private/ci-build.sh
           --build-dir ${{ matrix.build_dir }}
           --install
           --no-asan
           --
-          "--prefix=$workspace/${{ matrix.install_dir }}"
-      - name: Build with logging disabled
-        if: ${{ matrix.msystem == 'MINGW64' }}
-        run: ./.private/ci-build.sh --build-dir ${{ matrix.build_dir }}-nolog --no-asan -- --disable-log
+          "--prefix=$workspace/${{ matrix.install_dir }}"'
       - name: Upload installed tree
         uses: actions/upload-artifact@v7
         with:
@@ -70,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: failure() || cancelled()
         with:
-          name: test-logs-${{ matrix.msystem }}
+          name: test-logs-cygwin-${{ matrix.architecture }}
           path: |
             build*/config.log
             build*/tests/*.log
