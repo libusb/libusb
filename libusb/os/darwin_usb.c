@@ -762,7 +762,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) EXCLU
     /* we need to match darwin_ref_cached_device_locked call made in darwin_get_cached_device function
        otherwise no cached device will ever get freed */
     usbi_mutex_lock(&darwin_cached_devices_mutex);
-    list_for_each_entry(old_device, &darwin_cached_devices, list, struct darwin_cached_device) {
+    list_for_each_entry(old_device, darwin_cached_devices, list, struct darwin_cached_device) {
       if (old_device->session == session) {
         if (atomic_load(&old_device->in_reenumerate)) {
           /* device is re-enumerating. do not dereference the device at this time. libusb_reset_device()
@@ -947,7 +947,7 @@ static void *darwin_event_thread_main (void *arg0) EXCLUDES(libusb_darwin_at_mut
 static void darwin_cleanup_devices(void) REQUIRES(darwin_cached_devices_mutex) {
   struct darwin_cached_device *dev, *next;
 
-  list_for_each_entry_safe(dev, next, &darwin_cached_devices, list, struct darwin_cached_device) {
+  list_for_each_entry_safe(dev, next, darwin_cached_devices, list, struct darwin_cached_device) {
     if (dev->refcount > 1) {
       usbi_err(NULL, "device still referenced at libusb_exit");
     }
@@ -1628,7 +1628,7 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
 
   usbi_mutex_lock(&darwin_cached_devices_mutex);
   do {
-    list_for_each_entry(new_device, &darwin_cached_devices, list, struct darwin_cached_device) {
+    list_for_each_entry(new_device, darwin_cached_devices, list, struct darwin_cached_device) {
       usbi_dbg(ctx, "matching sessionID/locationID 0x%" PRIx64 "/0x%" PRIx32 " against cached device with sessionID/locationID 0x%" PRIx64 "/0x%" PRIx32,
                sessionID, locationID, new_device->session, new_device->location);
       if (new_device->location == locationID && atomic_load(&new_device->in_reenumerate)) {

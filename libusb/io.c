@@ -1466,7 +1466,7 @@ static int remove_from_flying_list(struct usbi_transfer *itransfer)
 	int r = 0;
 
 	rearm_timer = (TIMESPEC_IS_SET(&itransfer->timeout) &&
-		list_first_entry(&ctx->flying_transfers, struct usbi_transfer, list) == itransfer);
+		list_first_entry(ctx->flying_transfers, struct usbi_transfer, list) == itransfer);
 	list_del(&itransfer->list);
 	if (rearm_timer)
 		r = arm_timer_for_next_timeout(ctx);
@@ -2161,7 +2161,7 @@ static int handle_event_trigger(struct libusb_context *ctx)
 		list_cut(&completed_transfers, &ctx->completed_transfers);
 		usbi_mutex_unlock(&ctx->event_data_lock);
 
-		__for_each_completed_transfer_safe(&completed_transfers, itransfer, tmp) {
+		__for_each_completed_transfer_safe(completed_transfers, itransfer, tmp) {
 			list_del(&itransfer->completed_list);
 			r = usbi_backend.handle_transfer_completion(itransfer);
 			if (r) {
