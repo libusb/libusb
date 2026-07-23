@@ -1949,7 +1949,7 @@ static inline struct libusb_control_setup *libusb_control_transfer_get_setup(
  * \ref libusb_control_setup::wLength "wLength" field of
  * \ref libusb_control_setup
  */
-static inline void libusb_fill_control_setup(unsigned char *buffer,
+static inline void libusb_fill_control_setup(unsigned char * __sized_by(LIBUSB_CONTROL_SETUP_SIZE) buffer,
 	uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
 	uint16_t wLength)
 {
@@ -2000,7 +2000,7 @@ uint32_t LIBUSB_CALL libusb_transfer_get_stream_id(
  */
 static inline void libusb_fill_control_transfer(
 	struct libusb_transfer *transfer, libusb_device_handle *dev_handle,
-	unsigned char *buffer, libusb_transfer_cb_fn callback, void *user_data,
+	unsigned char * __sized_by_or_null(LIBUSB_CONTROL_SETUP_SIZE) buffer, libusb_transfer_cb_fn callback, void *user_data,
 	unsigned int timeout)
 {
 	struct libusb_control_setup *setup = (struct libusb_control_setup *)(void *)buffer;
