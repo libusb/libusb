@@ -180,10 +180,10 @@ struct list_head {
 	container_of(ptr, type, member)
 
 #define list_first_entry(ptr, type, member) \
-	list_entry((ptr)->next, type, member)
+	list_entry((ptr).next, type, member)
 
 #define list_next_entry(ptr, type, member) \
-	list_entry((ptr)->member.next, type, member)
+	list_entry((ptr).member.next, type, member)
 
 /* Get each entry from a list
  *  pos - A structure pointer has a "member" element
@@ -192,15 +192,15 @@ struct list_head {
  *  type - the type of the first parameter
  */
 #define list_for_each_entry(pos, head, member, type)			\
-	for (pos = list_first_entry(head, type, member);		\
+	for (pos = list_first_entry(*head, type, member);		\
 		 &pos->member != (head);				\
-		 pos = list_next_entry(pos, type, member))
+		 pos = list_next_entry(*pos, type, member))
 
 #define list_for_each_entry_safe(pos, n, head, member, type)		\
-	for (pos = list_first_entry(head, type, member),		\
-		 n = list_next_entry(pos, type, member);		\
+	for (pos = list_first_entry(*head, type, member),		\
+		 n = list_next_entry(*pos, type, member);		\
 		 &pos->member != (head);				\
-		 pos = n, n = list_next_entry(n, type, member))
+		 pos = n, n = list_next_entry(*n, type, member))
 
 /* Helper macros to iterate over a list. The structure pointed
  * to by "pos" must have a list_head member named "list".
