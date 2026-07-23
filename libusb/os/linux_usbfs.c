@@ -741,10 +741,7 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 
 	/* The kernel does *not* NUL-terminate the string, but every attribute
 	 * should be terminated with a newline character. */
-	if (!isdigit(buf[0])) {
-		usbi_err(ctx, "attribute %s doesn't have numeric value?", attr);
-		return LIBUSB_ERROR_IO;
-	} else if (buf[r - 1] != '\n') {
+	if (buf[r - 1] != '\n') {
 		usbi_warn(ctx, "attribute %s doesn't end with newline?", attr);
 	} else {
 		/* Remove the terminating newline character */
@@ -754,7 +751,14 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 
 	errno = 0;
 	value = strtol(buf, &endptr, 10);
-	if (buf == endptr || value < 0 || value > (long)max_value || errno) {
+	if (buf == endptr && value == 0) {
+		/* strtol() returns buf == endptr when a error occurs and
+		 * value == 0 for a non-numeric value, first check if the
+		 * error was because of a non-numeric value,
+		 * before general errors */
+		usbi_err(ctx, "attribute %s doesn't have numeric value?", attr);
+		return LIBUSB_ERROR_IO;
+	} else if (buf == endptr || value < 0 || value > (long)max_value || errno) {
 		usbi_err(ctx, "attribute %s contains an invalid value: '%s'", attr, buf);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	} else if (*endptr != '\0') {
