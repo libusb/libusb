@@ -618,6 +618,22 @@ struct usbi_transfer {
 	struct libusb_device *dev;
 
 	void *priv;
+
+	/* Publication fence for backends whose completion callback is invoked
+	 * directly by the OS on another thread (e.g. the darwin CFRunLoop event
+	 * thread). The kernel guarantees the callback only runs after the async
+	 * submission call that registered it, but that ordering is invisible to
+	 * the C11 memory model and to ThreadSanitizer. The backend stores 1 here
+	 * (usbi_atomic_store) after the last submit-side write to any transfer
+	 * state the callback reads and immediately before the async
+	 * registration; the callback loads it (usbi_atomic_load) before
+	 * touching any transfer state. Allocation-time state (priv above, the
+	 * lock) is covered transitively: handing the transfer from the
+	 * allocating thread to the submitting thread already requires
+	 * synchronization under the documented threading rules, so those writes
+	 * happen-before the store. Zeroed by the transfer allocation; the
+	 * loaded value is unused, only the ordering matters. */
+	usbi_atomic_t submit_fence;
 };
 
 enum usbi_transfer_state_flags {
