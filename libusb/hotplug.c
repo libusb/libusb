@@ -205,7 +205,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 
 	/* free all pending hotplug messages */
 	while (!list_empty(&ctx->hotplug_msgs)) {
-		msg = list_first_entry(&ctx->hotplug_msgs, struct usbi_hotplug_message, list);
+		msg = list_first_entry(ctx->hotplug_msgs, struct usbi_hotplug_message, list);
 
 		/* if the device left, the message holds a reference
 		 * and we must drop it */
@@ -302,7 +302,7 @@ void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_
 
 	/* dispatch all pending hotplug messages */
 	while (!list_empty(hotplug_msgs)) {
-		msg = list_first_entry(hotplug_msgs, struct usbi_hotplug_message, list);
+		msg = list_first_entry(*hotplug_msgs, struct usbi_hotplug_message, list);
 
 		for_each_hotplug_cb_safe(ctx, hotplug_cb, next_cb) {
 			/* skip callbacks that have unregistered */

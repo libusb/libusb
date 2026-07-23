@@ -1466,7 +1466,7 @@ static int remove_from_flying_list(struct usbi_transfer *itransfer)
 	int r = 0;
 
 	rearm_timer = (TIMESPEC_IS_SET(&itransfer->timeout) &&
-		list_first_entry(&ctx->flying_transfers, struct usbi_transfer, list) == itransfer);
+		list_first_entry(ctx->flying_transfers, struct usbi_transfer, list) == itransfer);
 	list_del(&itransfer->list);
 	if (rearm_timer)
 		r = arm_timer_for_next_timeout(ctx);
