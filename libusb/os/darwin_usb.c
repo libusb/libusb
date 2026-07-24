@@ -108,6 +108,7 @@ static int darwin_reset_device(struct libusb_device_handle *dev_handle) REQUIRES
 static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock);
 static int darwin_detach_kernel_driver_locked (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock);
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0);
+static void darwin_zlp_io_callback (void *refcon, IOReturn result, void *arg0);
 
 static enum libusb_error darwin_scan_devices(struct libusb_context *ctx);
 static enum libusb_error process_new_device (struct libusb_context *ctx, struct darwin_cached_device *cached_device,
@@ -2731,6 +2732,15 @@ static void darwin_destroy_device(struct libusb_device *dev) EXCLUDES(darwin_cac
   }
 }
 
+/* drop the interface plug-in pinned for the zero-length packet terminator, if
+   one is held. safe to call whether or not a terminator was ever requested. */
+static void darwin_release_zlp_interface (struct darwin_transfer_priv *tpriv) {
+  if (tpriv->zlp_interface) {
+    (*tpriv->zlp_interface)->Release (tpriv->zlp_interface);
+    tpriv->zlp_interface = NULL;
+  }
+}
+
 static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock) {
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_transfer_priv *tpriv = (struct darwin_transfer_priv *)usbi_get_transfer_priv(itransfer);
@@ -2764,14 +2774,14 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
   }
 
   if (IS_XFEROUT(transfer) && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)) {
-    /* pin the interface plug-in for the zero-length packet write in
-       darwin_async_io_callback, which must not take dev_handle->lock to
+    /* pin the interface plug-in for the zero-length packet write queued by
+       darwin_submit_zero_packet, which must not take dev_handle->lock to
        look the pipe up: it runs on the event thread, and blocking there
        would stall all event and hotplug processing while another thread
        holds the lock across a re-enumeration. the reference is taken here,
        under the same lock hold as the lookup, so a concurrent interface
        release cannot free the plug-in while the transfer is in flight; the
-       callback (or the submission failure path below) drops it. */
+       callbacks (or the submission failure path below) drop it. */
     tpriv->zlp_interface = IOINTERFACE(cInterface);
     (*tpriv->zlp_interface)->AddRef (tpriv->zlp_interface);
     tpriv->zlp_pipeRef = pipeRef;
@@ -2803,10 +2813,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
 
   if (ret) {
     /* the callback will not run: drop the zero-length-packet pin */
-    if (tpriv->zlp_interface) {
-      (*tpriv->zlp_interface)->Release (tpriv->zlp_interface);
-      tpriv->zlp_interface = NULL;
-    }
+    darwin_release_zlp_interface (tpriv);
     usbi_err (TRANSFER_CTX (transfer), "bulk transfer failed (dir = %s): %s (code = 0x%08x)", IS_XFERIN(transfer) ? "In" : "Out",
                darwin_error_str(ret), ret);
   }
@@ -3105,6 +3112,47 @@ static int darwin_cancel_transfer(struct usbi_transfer *itransfer) REQUIRES(itra
   }
 }
 
+/* queue the terminating zero-length packet as a second asynchronous write on
+   the interface plug-in pinned at submission (see submit_bulk_transfer). a
+   synchronous WritePipe(..., 0) is accepted by IOKit and returns success but
+   never reaches the bus, so a device that relies on the terminator would
+   stall; the async path does emit it. the pin lets this run on the event
+   thread without taking dev_handle->lock via ep_to_pipeRef, which would stall
+   event and hotplug processing. the pin is held until darwin_zlp_io_callback
+   runs. */
+static IOReturn darwin_submit_zero_packet (struct usbi_transfer *itransfer) {
+  struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+  struct darwin_transfer_priv *tpriv = (struct darwin_transfer_priv *)usbi_get_transfer_priv(itransfer);
+
+  /* timeouts are unavailable on interrupt endpoints */
+  if (LIBUSB_TRANSFER_TYPE_INTERRUPT == transfer->type)
+    return (*tpriv->zlp_interface)->WritePipeAsync (tpriv->zlp_interface, tpriv->zlp_pipeRef,
+                                                    transfer->buffer, 0, darwin_zlp_io_callback, itransfer);
+
+  return (*tpriv->zlp_interface)->WritePipeAsyncTO (tpriv->zlp_interface, tpriv->zlp_pipeRef,
+                                                    transfer->buffer, 0, transfer->timeout, transfer->timeout,
+                                                    darwin_zlp_io_callback, itransfer);
+}
+
+/* completion of the terminating zero-length packet. the terminator transfers
+   no data, so the result and size recorded for the data phase are kept as-is
+   and only the pin taken at submission is dropped here. */
+static void darwin_zlp_io_callback (void *refcon, IOReturn result, void *arg0) {
+  struct usbi_transfer *itransfer = (struct usbi_transfer *)refcon;
+  struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+  struct darwin_transfer_priv *tpriv = (struct darwin_transfer_priv *)usbi_get_transfer_priv(itransfer);
+
+  UNUSED(result);
+  UNUSED(arg0);
+
+  usbi_dbg (TRANSFER_CTX(transfer), "the zero-length packet terminator has completed");
+
+  darwin_release_zlp_interface (tpriv);
+
+  /* signal the core that this transfer is complete */
+  usbi_signal_transfer_completion(itransfer);
+}
+
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0) {
   struct usbi_transfer *itransfer = (struct usbi_transfer *)refcon;
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
@@ -3112,24 +3160,23 @@ static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0)
 
   usbi_dbg (TRANSFER_CTX(transfer), "an async io operation has completed");
 
-  /* if requested write a zero packet. use the interface plug-in pinned at
-     submission: this callback runs on the event thread and must not take
-     dev_handle->lock (via ep_to_pipeRef), or it would stall all event and
-     hotplug processing whenever another thread holds the lock across a
-     re-enumeration. the pin keeps the plug-in valid even if the interface
-     was released or reclaimed while the transfer was in flight (a write on
-     a closed interface just returns an error, which is ignored as before).
-     the reference is always dropped here, whatever the completion result. */
-  if (tpriv->zlp_interface) {
-    if (kIOReturnSuccess == result && IS_XFEROUT(transfer) && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)) {
-      (*tpriv->zlp_interface)->WritePipe (tpriv->zlp_interface, tpriv->zlp_pipeRef, transfer->buffer, 0);
-    }
-    (*tpriv->zlp_interface)->Release (tpriv->zlp_interface);
-    tpriv->zlp_interface = NULL;
-  }
-
   tpriv->result = result;
   tpriv->size = (UInt32) (uintptr_t) arg0;
+
+  if (tpriv->zlp_interface && kIOReturnSuccess == result && IS_XFEROUT(transfer)
+      && (transfer->flags & LIBUSB_TRANSFER_ADD_ZERO_PACKET)) {
+    IOReturn kresult = darwin_submit_zero_packet (itransfer);
+
+    if (kIOReturnSuccess == kresult)
+      return; /* darwin_zlp_io_callback completes the transfer */
+
+    usbi_warn (TRANSFER_CTX(transfer), "failed to submit zero-length packet: %s", darwin_error_str (kresult));
+  }
+
+  /* no terminator queued (not requested, the data phase failed, or the
+     submission above failed): drop the pin if held and complete with the
+     data-phase result. */
+  darwin_release_zlp_interface (tpriv);
 
   /* signal the core that this transfer is complete */
   usbi_signal_transfer_completion(itransfer);

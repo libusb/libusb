@@ -169,11 +169,12 @@ struct darwin_transfer_priv {
 
   /* Bulk */
   /* interface plug-in pinned (retained) at submission for the zero-length
-     packet write in darwin_async_io_callback: the event thread must not
-     take dev_handle->lock to look the pipe up, and the reference keeps the
-     plug-in valid if the interface is released or reclaimed while the
-     transfer is in flight. released by the callback, or by the submission
-     failure path if the callback will never run. */
+     packet write queued by darwin_submit_zero_packet: the event thread must
+     not take dev_handle->lock to look the pipe up, and the reference keeps
+     the plug-in valid if the interface is released or reclaimed while the
+     transfer is in flight. released by darwin_zlp_io_callback once the
+     terminator completes, by darwin_async_io_callback when no terminator is
+     queued, or by the submission failure path if neither callback will run. */
   usb_interface_t zlp_interface;
   uint8_t zlp_pipeRef;
 
