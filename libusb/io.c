@@ -1214,7 +1214,7 @@ err:
 	return r;
 }
 
-static void cleanup_removed_event_sources(struct libusb_context *ctx)
+static void cleanup_removed_event_sources(struct libusb_context *ctx) REQUIRES(ctx->event_data_lock)
 {
 	struct usbi_event_source *ievent_source, *tmp;
 
@@ -1234,13 +1234,17 @@ void usbi_io_exit(struct libusb_context *ctx)
 #endif
 	usbi_remove_event_source(ctx, USBI_EVENT_OS_HANDLE(&ctx->event));
 	usbi_destroy_event(&ctx->event);
+
+	usbi_mutex_lock(&ctx->event_data_lock);
+	cleanup_removed_event_sources(ctx);
+	usbi_mutex_unlock(&ctx->event_data_lock);
+
 	usbi_mutex_destroy(&ctx->flying_transfers_lock);
 	usbi_mutex_destroy(&ctx->events_lock);
 	usbi_mutex_destroy(&ctx->event_waiters_lock);
 	usbi_cond_destroy(&ctx->event_waiters_cond);
 	usbi_mutex_destroy(&ctx->event_data_lock);
 	usbi_tls_key_delete(ctx->event_handling_key);
-	cleanup_removed_event_sources(ctx);
 	free(ctx->event_data);
 }
 
