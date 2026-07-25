@@ -214,10 +214,12 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 		return;
 
 	/* free all registered hotplug callbacks */
+	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 	for_each_hotplug_cb_safe(ctx, hotplug_cb, next_cb) {
 		list_del(&hotplug_cb->list);
 		free(hotplug_cb);
 	}
+	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
 
 	/* free all pending hotplug messages */
 	while (!list_empty(&ctx->hotplug_msgs)) {
