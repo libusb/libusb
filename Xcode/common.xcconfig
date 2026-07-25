@@ -22,6 +22,10 @@
 // Use C11 dialect.
 GCC_C_LANGUAGE_STANDARD = c11
 
+// Use C++17 dialect, because:
+// - in C++23 there are various compiler errors with _Atomic usage
+CLANG_CXX_LANGUAGE_STANDARD = c++17
+
 // Don't search user paths with <> style #includes.
 ALWAYS_SEARCH_USER_PATHS = NO
 
