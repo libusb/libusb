@@ -252,6 +252,8 @@ struct winusb_device_priv {
 	bool root_hub;
 	uint8_t active_config;
 	uint16_t langid; // cached USB language ID for string descriptor requests
+	bool langid_unavailable; // set once the language ID request has failed, so
+	                         // it is not retried for every string descriptor
 	uint8_t depth; // distance to HCD
 	const struct windows_usb_api_backend *apib;
 	char *dev_id;
@@ -335,6 +337,11 @@ struct windows_backend {
 		struct discovered_devs **discdevs);
 	int (*get_device_string)(libusb_device *dev,
 		enum libusb_device_string_type string_type, char *data, int length);
+	int (*get_config_string)(libusb_device *dev,
+		uint8_t config_value, char *data, int length);
+	int (*get_interface_string)(libusb_device *dev,
+		uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+		char *data, int length);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
 	int (*get_active_config_descriptor)(struct libusb_device *device,
