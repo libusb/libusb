@@ -1,7 +1,10 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * xusb: Generic USB test program
  * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
  * Contributions to Mass Storage by Alan Stern.
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -75,8 +78,7 @@ static void perr(char const *format, ...)
 #define CALL_CHECK(fcall) do { int _r=fcall; if (_r < 0) ERR_EXIT(_r); } while (0)
 #define CALL_CHECK_CLOSE(fcall, hdl) do { int _r=fcall; if (_r < 0) { libusb_close(hdl); ERR_EXIT(_r); } } while (0)
 #define B(x) (((x)!=0)?1:0)
-#define be_to_int32(buf) (((buf)[0]<<24)|((buf)[1]<<16)|((buf)[2]<<8)|(buf)[3])
-
+#define be_to_int32(buf) ((uint32_t)((((uint32_t)(buf)[0])<<24) | (((uint32_t)(buf)[1])<<16) | (((uint32_t)(buf)[2])<<8) | ((uint32_t)(buf)[3])))
 #define RETRY_MAX                     5
 #define REQUEST_SENSE_LENGTH          0x12
 #define INQUIRY_LENGTH                0x24
@@ -323,7 +325,7 @@ static int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_
 }
 
 static int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, uint8_t lun,
-	uint8_t *cdb, uint8_t direction, int data_length, uint32_t *ret_tag)
+	uint8_t *cdb, uint8_t direction, uint32_t data_length, uint32_t *ret_tag)
 {
 	static uint32_t tag = 1;
 	uint8_t cdb_len;
@@ -545,12 +547,12 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	cdb[8] = 0x01;	// 1 block
 
 	send_mass_storage_command(handle, endpoint_out, lun, cdb, LIBUSB_ENDPOINT_IN, block_size, &expected_tag);
-	libusb_bulk_transfer(handle, endpoint_in, data, block_size, &size, 5000);
+	libusb_bulk_transfer(handle, endpoint_in, data, (int)block_size, &size, 5000);
 	printf("   READ: received %d bytes\n", size);
 	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
 		get_sense(handle, endpoint_in, endpoint_out);
 	} else {
-		display_buffer_hex(data, size);
+		display_buffer_hex(data, (unsigned int)size);
 		if (binary_dump) {
 			fd = fopen(binary_name, "w");
 			if (fd != NULL) {
@@ -1103,7 +1105,7 @@ static void display_help(const char *progname)
 	printf("If only the vid:pid is provided, xusb attempts to run the most appropriate test\n");
 }
 
-int main(int argc, char** argv)
+int main(int argc, const char* argv[])
 {
 	bool debug_mode = false;
 	const struct libusb_version* version;
@@ -1111,7 +1113,8 @@ int main(int argc, char** argv)
 	size_t i, arglen;
 	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
-	char *error_lang = NULL, *old_dbg_str = NULL, str[256];
+	const char *error_lang = NULL;
+	char *old_dbg_str = NULL, str[256];
 
 	// Default to generic, expecting VID:PID
 	VID = 0;

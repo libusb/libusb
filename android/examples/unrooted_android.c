@@ -1,8 +1,11 @@
+/* -*- Mode: C; indent-tabs-mode:nil -*- */
 /*
  *  libusb example program for reading out USB descriptors on unrooted Android
  *  (based on testlibusb.c)
  *
  *  Copyright 2020-2021 Peter Stoiber
+ *
+ *  SPDX-License-Identifier: LGPL-2.1-or-later
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public

@@ -1,7 +1,10 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb umockdev based tests
  *
  * Copyright (C) 2022 Benjamin Berg <bberg@redhat.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -957,9 +960,9 @@ test_threaded_submit(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 
 static int LIBUSB_CALL
 hotplug_count_arrival_cb(libusb_context *ctx,
-                         libusb_device  *device,
-                         libusb_hotplug_event event,
-                         void *user_data)
+						 libusb_device  *device,
+						 libusb_hotplug_event event,
+						 void *user_data)
 {
 	g_assert_cmpint(event, ==, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
 
@@ -974,9 +977,9 @@ hotplug_count_arrival_cb(libusb_context *ctx,
 #ifdef UMOCKDEV_HOTPLUG
 static int LIBUSB_CALL
 hotplug_count_removal_cb(libusb_context *ctx,
-                         libusb_device  *device,
-                         libusb_hotplug_event event,
-                         void *user_data)
+						 libusb_device  *device,
+						 libusb_hotplug_event event,
+						 void *user_data)
 {
 	g_assert_cmpint(event, ==, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT);
 
@@ -1118,7 +1121,7 @@ test_hotplug_add_remove(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 }
 
 int
-main(int argc, char **argv)
+main(int argc, char *argv[])
 {
 	g_test_init(&argc, &argv, NULL);
 

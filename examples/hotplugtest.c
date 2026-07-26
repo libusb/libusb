@@ -3,6 +3,8 @@
  * libusb example program for hotplug API
  * Copyright © 2012-2013 Nathan Hjelm <hjelmn@mac.com>
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -97,7 +99,7 @@ static int LIBUSB_CALL hotplug_callback_detach(libusb_context *ctx, libusb_devic
 	return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 {
 	libusb_hotplug_callback_handle hp[2];
 	int product_id, vendor_id, class_id;

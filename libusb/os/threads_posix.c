@@ -1,8 +1,11 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb synchronization using POSIX Threads
  *
  * Copyright © 2011 Vitali Lovich <vlovich@aliph.com>
  * Copyright © 2011 Peter Stuge <peter@stuge.se>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -53,7 +56,7 @@ void usbi_cond_init(usbi_cond_t *cond)
 }
 
 int usbi_cond_timedwait(usbi_cond_t *cond,
-	usbi_mutex_t *mutex, const struct timeval *tv)
+	usbi_mutex_t *mutex, const struct timeval *tv) REQUIRES(*mutex)
 {
 	struct timespec timeout;
 	int r;
@@ -80,9 +83,16 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 		return LIBUSB_ERROR_OTHER;
 }
 
+/* C uses _Thread_local; C++ uses the thread_local keyword. */
+#if defined(__cplusplus)
+#define USBI_THREAD_LOCAL thread_local
+#else
+#define USBI_THREAD_LOCAL _Thread_local
+#endif
+
 unsigned long usbi_get_tid(void)
 {
-	static _Thread_local unsigned long tl_tid;
+	static USBI_THREAD_LOCAL unsigned long tl_tid;
 	unsigned long tid;
 
 	if (tl_tid)

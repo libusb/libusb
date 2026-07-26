@@ -1,3 +1,10 @@
+/*
+ * libusb version.h
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
+ */
+
 /* This file is parsed by m4 and windres and RC.EXE so please keep it simple. */
 #include "version_nano.h"
 #ifndef LIBUSB_MAJOR
@@ -14,5 +21,5 @@
 #endif
 /* LIBUSB_RC is the release candidate suffix. Should normally be empty. */
 #ifndef LIBUSB_RC
-#define LIBUSB_RC "-rc1"
+#define LIBUSB_RC ""
 #endif

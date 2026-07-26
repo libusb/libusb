@@ -1,3 +1,5 @@
+/* -*- Mode: C; indent-tabs-mode:nil -*- */
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>

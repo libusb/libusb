@@ -1,10 +1,21 @@
 name: Android
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '**'
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -18,7 +29,11 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          # Full history + tags so build-aux/gen-describe.sh can produce a
+          # tag-prefixed describe string.
+          fetch-depth: 0
 
       - name: Show ANDROID_NDK_ROOT
         run: |
@@ -47,7 +62,7 @@ jobs:
           file "${NDK_LIBS_DIR}/"* || true
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: libusb-android-${{ matrix.abi }}-api${{ matrix.api }}
           path: |

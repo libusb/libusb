@@ -1,6 +1,9 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb example program to list devices on the bus
  * Copyright © 2007 Daniel Drake <dsd@gentoo.org>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,7 +29,7 @@ static void print_devs(libusb_device **devs, int verbose)
 {
 	libusb_device *dev;
 	int i = 0, j = 0;
-	uint8_t path[8]; 
+	uint8_t path[8];
 	char string_buffer[LIBUSB_DEVICE_STRING_BYTES_MAX];
 
 	while ((dev = devs[i++]) != NULL) {
@@ -66,6 +69,29 @@ static void print_devs(libusb_device **devs, int verbose)
 			if (r >= 0) {
 				printf("\n    serial_number = %s", string_buffer);
 			}
+
+			r = libusb_get_config_string(dev, /*config_value=*/0,
+				string_buffer, sizeof(string_buffer));
+			if (r >= 0) {
+				printf("\n    configuration = %s", string_buffer);
+			}
+
+			struct libusb_config_descriptor *config;
+			if (libusb_get_active_config_descriptor(dev, &config) == 0) {
+				int ifc;
+				for (ifc = 0; ifc < config->bNumInterfaces; ifc++) {
+					const struct libusb_interface_descriptor *altsetting =
+						&config->interface[ifc].altsetting[0];
+					r = libusb_get_interface_string(dev, /*config_value=*/0,
+						altsetting->bInterfaceNumber, altsetting->bAlternateSetting,
+						string_buffer, sizeof(string_buffer));
+					if (r >= 0) {
+						printf("\n    interface %u = %s",
+							altsetting->bInterfaceNumber, string_buffer);
+					}
+				}
+				libusb_free_config_descriptor(config);
+			}
 		}
 		printf("\n");
 	}
@@ -76,7 +102,7 @@ static int usage(void) {
 	return 1;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 {
 	int verbose = 0;
 	libusb_device **devs;

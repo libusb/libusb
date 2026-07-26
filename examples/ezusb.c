@@ -1,9 +1,12 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Copyright © 2001 Stephen Williams (steve@icarus.com)
  * Copyright © 2001-2002 David Brownell (dbrownell@users.sourceforge.net)
  * Copyright © 2008 Roger Williams (rawqux@users.sourceforge.net)
  * Copyright © 2012 Pete Batard (pete@akeo.ie)
  * Copyright © 2013 Federico Manzan (f.manzan@gmail.com)
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  *    This source code is free software; you can redistribute it
  *    and/or modify it in source code form under the terms of the GNU
@@ -439,8 +442,6 @@ static int parse_iic(FILE *image, void *context,
 	int (*poke)(void *context, uint32_t addr, bool external, const unsigned char *data, size_t len))
 {
 	unsigned char data[4096];
-	uint32_t data_addr = 0;
-	size_t data_len = 0, read_len;
 	uint8_t block_header[4];
 	int rc;
 	bool external = false;
@@ -463,14 +464,14 @@ static int parse_iic(FILE *image, void *context,
 			logerror("unable to read IIC block header\n");
 			return -1;
 		}
-		data_len = (block_header[0] << 8) + block_header[1];
-		data_addr = (block_header[2] << 8) + block_header[3];
+		size_t data_len = (size_t)((block_header[0] << 8) + block_header[1]);
+		uint32_t data_addr = (uint32_t)((block_header[2] << 8) + block_header[3]);
 		if (data_len > sizeof(data)) {
 			/* If this is ever reported as an error, switch to using malloc/realloc */
 			logerror("IIC data block too small - please report this error to libusb.info\n");
 			return -1;
 		}
-		read_len = fread(data, 1, data_len, image);
+		size_t read_len = fread(data, 1, data_len, image);
 		if (read_len != data_len) {
 			logerror("read error\n");
 			return -1;
@@ -486,8 +487,8 @@ static int parse_iic(FILE *image, void *context,
 
 /* the parse call will be selected according to the image type */
 static int (*parse[IMG_TYPE_MAX])(FILE *image, void *context, bool (*is_external)(uint32_t addr, size_t len),
-           int (*poke)(void *context, uint32_t addr, bool external, const unsigned char *data, size_t len))
-           = { parse_ihex, parse_iic, parse_bin };
+	int (*poke)(void *context, uint32_t addr, bool external, const unsigned char *data, size_t len))
+	= { parse_ihex, parse_iic, parse_bin };
 
 /*****************************************************************************/
 

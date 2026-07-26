@@ -14,12 +14,6 @@
     <Import Project="Base.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <ItemDefinitionGroup>
-    <ClCompile>
-      <!--VS2013 complains about while(0)-->
-      <DisableSpecificWarnings Condition="'$(LibusbPlatformToolsetVersion)'&lt;='120'">4127;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-    </ClCompile>
-  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\examples\xusb.c" />
   </ItemGroup>
