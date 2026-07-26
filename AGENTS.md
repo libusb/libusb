@@ -24,6 +24,13 @@ Assisted-by: AGENT_NAME:MODEL_VERSION
 For example: `Assisted-by: claude-code:claude-opus-4-7` or
 `Assisted-by: github-copilot:MODEL_VERSION`.
 
+Always use the most specific model variant available, not a shorter model-family name.
+When combining or preserving trailers, including during squash merges, deduplicate
+attributions for the same agent and keep only its most specific model variant. For
+example, if `Assisted-by: Codex:GPT-5.6 Sol` applies, do not also add the less-specific
+`Assisted-by: Codex:GPT-5` trailer. Multiple `Assisted-by` trailers are appropriate for
+different agents, but not merely for different specificity levels of the same agent.
+
 This applies to all commits, including those created via automation or agent workflows.
 
 ## Commit generation
