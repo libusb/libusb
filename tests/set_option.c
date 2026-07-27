@@ -112,6 +112,16 @@ static libusb_testlib_result test_set_log_level_basic(void) {
 #endif
 }
 
+static libusb_testlib_result test_invalid_option(void)
+{
+  libusb_context *test_ctx = NULL;
+
+  LIBUSB_EXPECT(==, libusb_set_option(NULL, -1), LIBUSB_ERROR_INVALID_PARAM);
+  LIBUSB_EXPECT(==, libusb_set_option(NULL, LIBUSB_OPTION_MAX),
+                LIBUSB_ERROR_INVALID_PARAM);
+  LIBUSB_TEST_CLEAN_EXIT(TEST_STATUS_SUCCESS);
+}
+
 static libusb_testlib_result test_set_log_level_default(void) {
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
   libusb_context *test_ctx = NULL;
@@ -240,6 +250,7 @@ static libusb_testlib_result test_set_log_cb(void)
 }
 
 static const libusb_testlib_test tests[] = {
+  { "test_invalid_option", &test_invalid_option },
   { "test_set_log_level_basic", &test_set_log_level_basic },
   { "test_set_log_level_env", &test_set_log_level_env },
   { "test_no_discovery", &test_no_discovery },
