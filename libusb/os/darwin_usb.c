@@ -1070,7 +1070,7 @@ static int darwin_get_device_string(struct libusb_device *dev,
       #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
         cf = (CFStringRef)IORegistryEntryCreateCFProperty(service, CFSTR(kUSBSerialNumberString), kCFAllocatorDefault, 0);
       #else
-        cf = "";
+        cf = NULL;
       #endif
       break;
     case LIBUSB_DEVICE_STRING_COUNT: /* intentional fall-through, avoid -Wswitch-enum */
