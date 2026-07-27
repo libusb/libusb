@@ -1140,7 +1140,7 @@ static int darwin_fetch_string_descriptor (struct libusb_context *ctx,
     req.completionTimeout = 100;
     kresult = (*device)->DeviceRequestTO (device, &req);
     if (kIOReturnSuccess == kresult && req.wLenDone >= 4) {
-      langid = (UInt16)desc[2] | ((UInt16)desc[3] << 8);
+      langid = (UInt16)((UInt16)desc[2] | ((UInt16)desc[3] << 8));
       dpriv->langid = langid;
     }
   }
