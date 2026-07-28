@@ -576,10 +576,10 @@ void usbi_get_real_time(struct timespec *tp);
  * 3. struct libusb_transfer (which includes iso packets) [variable size]
  *
  * You can convert between them with the functions:
- *  TRANSFER_PRIV_TO_USBI_TRANSFER
- *  USBI_TRANSFER_TO_TRANSFER_PRIV
- *  USBI_TRANSFER_TO_LIBUSB_TRANSFER
- *  LIBUSB_TRANSFER_TO_USBI_TRANSFER
+ *  usbi_transfer_priv_to_usbi_transfer
+ *  usbi_transfer_to_transfer_priv
+ *  usbi_transfer_to_libusb_transfer
+ *  usbi_libusb_transfer_to_usbi_transfer
  */
 
 struct usbi_transfer {
@@ -1575,65 +1575,96 @@ int usbi_get_interface_string_index(libusb_device *dev,
 	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
 	uint8_t *index_out);
 
-static inline struct usbi_transfer *TRANSFER_PRIV_TO_USBI_TRANSFER(void *transfer_priv)
+static inline struct usbi_transfer *usbi_transfer_priv_to_usbi_transfer(void *transfer_priv)
 {
 	return (struct usbi_transfer *)((unsigned char *)(transfer_priv) + PTR_ALIGN(usbi_backend.transfer_priv_size));
 }
 
-static inline void *USBI_TRANSFER_TO_TRANSFER_PRIV(const struct usbi_transfer *itransfer)
+static inline void *usbi_transfer_to_transfer_priv(const struct usbi_transfer *itransfer)
 {
 	return (void *)((unsigned char *)(itransfer) - PTR_ALIGN(usbi_backend.transfer_priv_size));
 }
 
-static inline struct libusb_transfer *USBI_TRANSFER_TO_LIBUSB_TRANSFER(const struct usbi_transfer *itransfer)
+static inline struct libusb_transfer *usbi_transfer_to_libusb_transfer(const struct usbi_transfer *itransfer)
 {
 	return (struct libusb_transfer *)((unsigned char *)(itransfer) + PTR_ALIGN(sizeof(struct usbi_transfer)));
 }
 
-static inline struct usbi_transfer *LIBUSB_TRANSFER_TO_USBI_TRANSFER(const struct libusb_transfer *transfer)
+static inline struct usbi_transfer *usbi_libusb_transfer_to_usbi_transfer(const struct libusb_transfer *transfer)
 {
 	return (struct usbi_transfer *)((unsigned char *)(transfer) - PTR_ALIGN(sizeof(struct usbi_transfer)));
 }
 
-static inline struct libusb_context *DEVICE_CTX(const struct libusb_device *dev)
+static inline struct libusb_context *usbi_device_ctx(const struct libusb_device *dev)
 {
 	return dev->ctx;
 }
 
-static inline struct libusb_context *HANDLE_CTX(const struct libusb_device_handle *handle)
+static inline struct libusb_context *usbi_handle_ctx(const struct libusb_device_handle *handle)
 {
-	return handle ? DEVICE_CTX(handle->dev) : NULL;
+	return handle ? usbi_device_ctx(handle->dev) : NULL;
 }
 
-static inline struct libusb_context *ITRANSFER_CTX(const struct usbi_transfer *itransfer)
+static inline struct libusb_context *usbi_itransfer_ctx(const struct usbi_transfer *itransfer)
 {
-	return itransfer->dev ? DEVICE_CTX(itransfer->dev) : NULL;
+	return itransfer->dev ? usbi_device_ctx(itransfer->dev) : NULL;
 }
 
-static inline struct libusb_context *TRANSFER_CTX(const struct libusb_transfer *transfer)
+static inline struct libusb_context *usbi_transfer_ctx(const struct libusb_transfer *transfer)
 {
-	return ITRANSFER_CTX(LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer));
+	return usbi_itransfer_ctx(usbi_libusb_transfer_to_usbi_transfer(transfer));
 }
 
-static inline bool IS_EPIN(uint8_t ep)
+static inline bool usbi_is_epin(uint8_t ep)
 {
 	return (0 != (ep & LIBUSB_ENDPOINT_IN));
 }
 
-static inline bool IS_EPOUT(uint8_t ep)
+static inline bool usbi_is_epout(uint8_t ep)
 {
-	return !IS_EPIN(ep);
+	return !usbi_is_epin(ep);
 }
 
-static inline bool IS_XFERIN(const struct libusb_transfer *xfer)
+static inline bool usbi_is_xferin(const struct libusb_transfer *xfer)
 {
 	return (0 != (xfer->endpoint & LIBUSB_ENDPOINT_IN));
 }
 
-static inline bool IS_XFEROUT(const struct libusb_transfer *xfer)
+static inline bool usbi_is_xferout(const struct libusb_transfer *xfer)
 {
-	return !IS_XFERIN(xfer);
+	return !usbi_is_xferin(xfer);
 }
+
+/* DEPRECATED: backwards compatible macros.
+ * Starting with libusb 1.0.31 several macros where changes to proper
+ * functions and renamed to be lowercase. These macros provide the old
+ * spelling for backwards compatibility.
+ */
+#define TRANSFER_PRIV_TO_USBI_TRANSFER(transfer_priv) \
+	usbi_transfer_priv_to_usbi_transfer(transfer_priv)
+#define USBI_TRANSFER_TO_TRANSFER_PRIV(itransfer) \
+	usbi_transfer_to_transfer_priv(itransfer)
+#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer) \
+	usbi_transfer_to_libusb_transfer(itransfer)
+#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer) \
+	usbi_libusb_transfer_to_usbi_transfer(transfer)
+#define DEVICE_CTX(dev) \
+	usbi_device_ctx(dev)
+#define HANDLE_CTX(handle) \
+	usbi_handle_ctx(handle)
+#define ITRANSFER_CTX(itransfer) \
+	usbi_itransfer_ctx(itransfer)
+#define TRANSFER_CTX(transfer) \
+	usbi_transfer_ctx(transfer)
+#define IS_EPIN(ep) \
+	usbi_is_ep_in(ep)
+#define IS_EPOUT(ep) \
+	usbi_is_ep_out(ep)
+#define IS_XFERIN(xfer) \
+	usbi_is_xfer_in(xfer)
+#define IS_XFEROUT(xfer) \
+	usbi_is_xfer_out(xfer)
+
 
 #define for_each_context(c) \
 	for_each_helper(c, &active_contexts_list, struct libusb_context)

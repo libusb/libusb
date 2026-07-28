@@ -782,7 +782,7 @@ int em_submit_transfer(usbi_transfer* itransfer) REQUIRES(itransfer->lock) {
 				auto endpoint =
 					transfer->endpoint & LIBUSB_ENDPOINT_ADDRESS_MASK;
 
-				if (IS_XFERIN(transfer)) {
+				if (usbi_is_xfer_in(transfer)) {
 					transfer_promise = web_usb_device.call<val>(
 						"transferIn", endpoint, transfer->length);
 				} else {
