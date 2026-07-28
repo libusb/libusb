@@ -2468,7 +2468,7 @@ void API_EXPORTED libusb_set_log_cb(libusb_context *ctx, libusb_log_cb cb,
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if LIBUSB_OPTION_USE_USBDK is valid on this platform but UsbDk is not available
  */
 int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
-	int option, ...)
+	enum libusb_option option, ...)
 {
 	int arg = 0, r = LIBUSB_SUCCESS;
 	libusb_log_cb log_cb = NULL;
@@ -2477,7 +2477,19 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	int is_default_context = (NULL == ctx);
 #endif
 
+	/*
+	 * The public API requires option to remain an enum. Clang warns that an
+	 * enum is subject to default argument promotion when passed to va_start,
+	 * but changing this parameter type would break source compatibility.
+	 */
+#if defined(__clang__) && defined(__cplusplus)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wvarargs"
+#endif
 	va_start(ap, option);
+#if defined(__clang__) && defined(__cplusplus)
+#pragma clang diagnostic pop
+#endif
 
 	if (LIBUSB_OPTION_LOG_LEVEL == option) {
 		arg = va_arg(ap, int);
@@ -2494,7 +2506,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 			break;
 		}
 
-		if (option < 0 || option >= (int)LIBUSB_OPTION_MAX) {
+		if (option >= LIBUSB_OPTION_MAX) {
 			r = LIBUSB_ERROR_INVALID_PARAM;
 			break;
 		}
@@ -2530,7 +2542,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		case LIBUSB_OPTION_USE_USBDK:
 		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
 			if (usbi_backend.set_option) {
-				r = usbi_backend.set_option(ctx, (enum libusb_option)option, ap);
+				r = usbi_backend.set_option(ctx, option, ap);
 				break;
 			}
 
