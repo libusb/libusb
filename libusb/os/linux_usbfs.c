@@ -190,7 +190,7 @@ static int dev_has_config0(struct libusb_device *dev)
 
 static int get_usbfs_fd(struct libusb_device *dev, int access_mode, int silent)
 {
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx = usbi_device_ctx(dev);
 	char path[24];
 	int fd;
 
@@ -498,7 +498,7 @@ static int op_get_device_string(struct libusb_device *dev,
 {
 	int fd;
 	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
-	struct libusb_context* ctx = DEVICE_CTX(dev);
+	struct libusb_context* ctx = usbi_device_ctx(dev);
 	const char * attr;
 
 	switch (string_type) {
@@ -551,7 +551,7 @@ static int op_get_config_string(struct libusb_device *dev,
 		uint8_t config_value, char *buffer, int length)
 {
 	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
-	struct libusb_context* ctx = DEVICE_CTX(dev);
+	struct libusb_context* ctx = usbi_device_ctx(dev);
 	uint8_t string_index = 0;
 	int r;
 
@@ -597,7 +597,7 @@ static int op_get_interface_string(struct libusb_device *dev,
 		char *buffer, int length)
 {
 	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
-	struct libusb_context* ctx = DEVICE_CTX(dev);
+	struct libusb_context* ctx = usbi_device_ctx(dev);
 	char intf_dir[256];
 	uint8_t string_index = 0;
 	int active = 0;
@@ -794,7 +794,7 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 {
 	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
 
-	return read_sysfs_attr(DEVICE_CTX(dev), priv->sysfs_dir, "bConfigurationValue",
+	return read_sysfs_attr(usbi_device_ctx(dev), priv->sysfs_dir, "bConfigurationValue",
 			UINT8_MAX, config);
 }
 
@@ -895,7 +895,7 @@ static int seek_to_next_config(struct libusb_context *ctx,
 
 static int parse_config_descriptors(struct libusb_device *dev)
 {
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx = usbi_device_ctx(dev);
 	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
 	struct usbi_device_descriptor *device_desc;
 	uint8_t idx, num_configs;
@@ -1025,7 +1025,7 @@ static int op_get_active_config_descriptor(struct libusb_device *dev,
 	}
 
 	if (active_config == -1) {
-		usbi_err(DEVICE_CTX(dev), "device unconfigured");
+		usbi_err(usbi_device_ctx(dev), "device unconfigured");
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
@@ -1076,7 +1076,7 @@ static int usbfs_get_active_config(struct libusb_device *dev, int fd)
 			return LIBUSB_ERROR_NO_DEVICE;
 
 		/* we hit this error path frequently with buggy devices :( */
-		usbi_warn(DEVICE_CTX(dev), "get configuration failed, errno=%d", errno);
+		usbi_warn(usbi_device_ctx(dev), "get configuration failed, errno=%d", errno);
 
 		/* assume the current configuration is the first one if we have
 		 * the configuration descriptors, otherwise treat the device
@@ -1124,7 +1124,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	uint8_t devaddr, const char *sysfs_dir, int wrapped_fd)
 {
 	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx = usbi_device_ctx(dev);
 	size_t alloc_len;
 	int fd, speed, r;
 	ssize_t nb;
@@ -1244,7 +1244,7 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 
 static int linux_get_parent_info(struct libusb_device *dev, const char *sysfs_dir)
 {
-	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct libusb_context *ctx = usbi_device_ctx(dev);
 	struct libusb_device *it;
 	char *parent_sysfs_dir, *tmp, *end;
 	int ret, add_parent = 1;
@@ -1565,13 +1565,13 @@ static int initialize_handle(struct libusb_device_handle *handle, int fd)
 	r = ioctl(fd, IOCTL_USBFS_GET_CAPABILITIES, &hpriv->caps);
 	if (r < 0) {
 		if (errno == ENOTTY)
-			usbi_dbg(HANDLE_CTX(handle), "getcap not available");
+			usbi_dbg(usbi_handle_ctx(handle), "getcap not available");
 		else
-			usbi_err(HANDLE_CTX(handle), "getcap failed, errno=%d", errno);
+			usbi_err(usbi_handle_ctx(handle), "getcap failed, errno=%d", errno);
 		hpriv->caps = USBFS_CAP_BULK_CONTINUATION;
 	}
 
-	return usbi_add_event_source(HANDLE_CTX(handle), hpriv->fd, POLLOUT);
+	return usbi_add_event_source(usbi_handle_ctx(handle), hpriv->fd, POLLOUT);
 }
 
 static int op_wrap_sys_device(struct libusb_context *ctx,
@@ -1635,7 +1635,7 @@ static int op_open(struct libusb_device_handle *handle)
 			 * hasn't processed remove event yet */
 			usbi_mutex_static_lock(&linux_hotplug_lock);
 			if (usbi_atomic_load(&handle->dev->attached)) {
-				usbi_dbg(HANDLE_CTX(handle), "open failed with no device, but device still attached");
+				usbi_dbg(usbi_handle_ctx(handle), "open failed with no device, but device still attached");
 				linux_device_disconnected(handle->dev->bus_number,
 							  handle->dev->device_address);
 			}
@@ -1657,7 +1657,7 @@ static void op_close(struct libusb_device_handle *dev_handle)
 
 	/* fd may have already been removed by POLLERR condition in op_handle_events() */
 	if (!hpriv->fd_removed)
-		usbi_remove_event_source(HANDLE_CTX(dev_handle), hpriv->fd);
+		usbi_remove_event_source(usbi_handle_ctx(dev_handle), hpriv->fd);
 	if (!hpriv->fd_keep)
 		close(hpriv->fd);
 }
@@ -1682,7 +1682,7 @@ static int op_get_configuration(struct libusb_device_handle *handle,
 		return r;
 
 	if (active_config == -1) {
-		usbi_warn(HANDLE_CTX(handle), "device unconfigured");
+		usbi_warn(usbi_handle_ctx(handle), "device unconfigured");
 		active_config = 0;
 	}
 
@@ -1706,7 +1706,7 @@ static int op_set_configuration(struct libusb_device_handle *handle, int config)
 		else if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(HANDLE_CTX(handle), "set configuration failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "set configuration failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 
@@ -1735,7 +1735,7 @@ static int claim_interface(struct libusb_device_handle *handle, unsigned int ifa
 		else if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(HANDLE_CTX(handle), "claim interface failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "claim interface failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 	return 0;
@@ -1751,7 +1751,7 @@ static int release_interface(struct libusb_device_handle *handle, unsigned int i
 		if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(HANDLE_CTX(handle), "release interface failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "release interface failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 	return 0;
@@ -1774,7 +1774,7 @@ static int op_set_interface(struct libusb_device_handle *handle, uint8_t interfa
 		else if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(HANDLE_CTX(handle), "set interface failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "set interface failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 
@@ -1795,7 +1795,7 @@ static int op_clear_halt(struct libusb_device_handle *handle,
 		else if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(HANDLE_CTX(handle), "clear halt failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "clear halt failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 
@@ -1827,7 +1827,7 @@ static int op_reset_device(struct libusb_device_handle *handle)
 			goto out;
 		}
 
-		usbi_err(HANDLE_CTX(handle), "reset failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "reset failed, errno=%d", errno);
 		ret = LIBUSB_ERROR_OTHER;
 		goto out;
 	}
@@ -1843,7 +1843,7 @@ static int op_reset_device(struct libusb_device_handle *handle)
 		 */
 		r = detach_kernel_driver_and_claim(handle, i);
 		if (r) {
-			usbi_warn(HANDLE_CTX(handle), "failed to re-claim interface %u after reset: %s",
+			usbi_warn(usbi_handle_ctx(handle), "failed to re-claim interface %u after reset: %s",
 				  i, libusb_error_name(r));
 			handle->claimed_interfaces &= ~(1UL << i);
 			ret = LIBUSB_ERROR_NOT_FOUND;
@@ -1885,7 +1885,7 @@ static int do_streams_ioctl(struct libusb_device_handle *handle,
 		else if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(HANDLE_CTX(handle), "streams-ioctl failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "streams-ioctl failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 	return r;
@@ -1912,7 +1912,7 @@ static void *op_dev_mem_alloc(struct libusb_device_handle *handle, size_t len)
 
 	buffer = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, hpriv->fd, 0);
 	if (buffer == MAP_FAILED) {
-		usbi_err(HANDLE_CTX(handle), "alloc dev mem failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "alloc dev mem failed, errno=%d", errno);
 		return NULL;
 	}
 	return buffer;
@@ -1922,7 +1922,7 @@ static int op_dev_mem_free(struct libusb_device_handle *handle, void *buffer,
 	size_t len)
 {
 	if (munmap(buffer, len) != 0) {
-		usbi_err(HANDLE_CTX(handle), "free dev mem failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "free dev mem failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	} else {
 		return LIBUSB_SUCCESS;
@@ -1945,7 +1945,7 @@ static int op_kernel_driver_active(struct libusb_device_handle *handle,
 		else if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(HANDLE_CTX(handle), "get driver failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "get driver failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 
@@ -1979,7 +1979,7 @@ static int op_detach_kernel_driver(struct libusb_device_handle *handle,
 		else if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(HANDLE_CTX(handle), "detach failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "detach failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 
@@ -2009,7 +2009,7 @@ static int op_attach_kernel_driver(struct libusb_device_handle *handle,
 		else if (errno == EBUSY)
 			return LIBUSB_ERROR_BUSY;
 
-		usbi_err(HANDLE_CTX(handle), "attach failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "attach failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	} else if (r == 0) {
 		return LIBUSB_ERROR_NOT_FOUND;
@@ -2041,7 +2041,7 @@ static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
 	case ENODEV:
 		return LIBUSB_ERROR_NO_DEVICE;
 	default:
-		usbi_err(HANDLE_CTX(handle), "disconnect-and-claim failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "disconnect-and-claim failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
 
@@ -2089,7 +2089,7 @@ static void op_destroy_device(struct libusb_device *dev)
 static int discard_urbs(struct usbi_transfer *itransfer, int first, int last_plus_one)
 {
 	struct libusb_transfer *transfer =
-		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		usbi_transfer_to_libusb_transfer(itransfer);
 	struct linux_transfer_priv *tpriv = (struct linux_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	struct linux_device_handle_priv *hpriv =
 		(struct linux_device_handle_priv *)usbi_get_device_handle_priv(transfer->dev_handle);
@@ -2106,14 +2106,14 @@ static int discard_urbs(struct usbi_transfer *itransfer, int first, int last_plu
 			continue;
 
 		if (errno == EINVAL) {
-			usbi_dbg(TRANSFER_CTX(transfer), "URB not found --> assuming ready to be reaped");
+			usbi_dbg(usbi_transfer_ctx(transfer), "URB not found --> assuming ready to be reaped");
 			if (i == (last_plus_one - 1))
 				ret = LIBUSB_ERROR_NOT_FOUND;
 		} else if (errno == ENODEV) {
-			usbi_dbg(TRANSFER_CTX(transfer), "Device not found for URB --> assuming ready to be reaped");
+			usbi_dbg(usbi_transfer_ctx(transfer), "Device not found for URB --> assuming ready to be reaped");
 			ret = LIBUSB_ERROR_NO_DEVICE;
 		} else {
-			usbi_warn(TRANSFER_CTX(transfer), "unrecognised discard errno %d", errno);
+			usbi_warn(usbi_transfer_ctx(transfer), "unrecognised discard errno %d", errno);
 			ret = LIBUSB_ERROR_OTHER;
 		}
 	}
@@ -2139,12 +2139,12 @@ static void free_iso_urbs(struct linux_transfer_priv *tpriv)
 static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer =
-		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		usbi_transfer_to_libusb_transfer(itransfer);
 	struct linux_transfer_priv *tpriv = (struct linux_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	struct linux_device_handle_priv *hpriv =
 		(struct linux_device_handle_priv *)usbi_get_device_handle_priv(transfer->dev_handle);
 	struct usbfs_urb *urbs;
-	int is_out = IS_XFEROUT(transfer);
+	int is_out = usbi_is_xferout(transfer);
 	int bulk_buffer_len, use_bulk_continuation;
 	int num_urbs;
 	int last_urb_partial = 0;
@@ -2201,7 +2201,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 		last_urb_partial = 1;
 		num_urbs++;
 	}
-	usbi_dbg(TRANSFER_CTX(transfer), "need %d urbs for new transfer with length %d", num_urbs, transfer->length);
+	usbi_dbg(usbi_transfer_ctx(transfer), "need %d urbs for new transfer with length %d", num_urbs, transfer->length);
 	urbs = (struct usbfs_urb *)calloc(num_urbs, sizeof(*urbs));
 	if (!urbs)
 		return LIBUSB_ERROR_NO_MEM;
@@ -2259,14 +2259,14 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 		} else if (errno == ENOMEM) {
 			r = LIBUSB_ERROR_NO_MEM;
 		} else {
-			usbi_err(TRANSFER_CTX(transfer), "submiturb failed, errno=%d", errno);
+			usbi_err(usbi_transfer_ctx(transfer), "submiturb failed, errno=%d", errno);
 			r = LIBUSB_ERROR_IO;
 		}
 
 		/* if the first URB submission fails, we can simply free up and
 		 * return failure immediately. */
 		if (i == 0) {
-			usbi_dbg(TRANSFER_CTX(transfer), "first URB failed, easy peasy");
+			usbi_dbg(usbi_transfer_ctx(transfer), "first URB failed, easy peasy");
 			free(urbs);
 			tpriv->urbs = NULL;
 			return r;
@@ -2300,7 +2300,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 
 		discard_urbs(itransfer, 0, i);
 
-		usbi_dbg(TRANSFER_CTX(transfer), "reporting successful submission but waiting for %d "
+		usbi_dbg(usbi_transfer_ctx(transfer), "reporting successful submission but waiting for %d "
 			 "discards before reporting error", i);
 		return 0;
 	}
@@ -2311,7 +2311,7 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer)
 static int submit_iso_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer =
-		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		usbi_transfer_to_libusb_transfer(itransfer);
 	struct linux_transfer_priv *tpriv = (struct linux_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	struct linux_device_handle_priv *hpriv =
 		(struct linux_device_handle_priv *)usbi_get_device_handle_priv(transfer->dev_handle);
@@ -2336,7 +2336,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		packet_len = transfer->iso_packet_desc[i].length;
 
 		if (packet_len > max_iso_packet_len) {
-			usbi_warn(TRANSFER_CTX(transfer),
+			usbi_warn(usbi_transfer_ctx(transfer),
 				  "iso packet length of %u bytes exceeds maximum of %u bytes",
 				  packet_len, max_iso_packet_len);
 			return LIBUSB_ERROR_INVALID_PARAM;
@@ -2351,7 +2351,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 	/* usbfs limits the number of iso packets per URB */
 	num_urbs = (num_packets + (MAX_ISO_PACKETS_PER_URB - 1)) / MAX_ISO_PACKETS_PER_URB;
 
-	usbi_dbg(TRANSFER_CTX(transfer), "need %d urbs for new transfer with length %d", num_urbs, transfer->length);
+	usbi_dbg(usbi_transfer_ctx(transfer), "need %d urbs for new transfer with length %d", num_urbs, transfer->length);
 
 	urbs = (struct usbfs_urb **)calloc(num_urbs, sizeof(*urbs));
 	if (!urbs)
@@ -2409,20 +2409,20 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		if (errno == ENODEV) {
 			r = LIBUSB_ERROR_NO_DEVICE;
 		} else if (errno == EINVAL) {
-			usbi_warn(TRANSFER_CTX(transfer), "submiturb failed, transfer too large");
+			usbi_warn(usbi_transfer_ctx(transfer), "submiturb failed, transfer too large");
 			r = LIBUSB_ERROR_INVALID_PARAM;
 		} else if (errno == EMSGSIZE) {
-			usbi_warn(TRANSFER_CTX(transfer), "submiturb failed, iso packet length too large");
+			usbi_warn(usbi_transfer_ctx(transfer), "submiturb failed, iso packet length too large");
 			r = LIBUSB_ERROR_INVALID_PARAM;
 		} else {
-			usbi_err(TRANSFER_CTX(transfer), "submiturb failed, errno=%d", errno);
+			usbi_err(usbi_transfer_ctx(transfer), "submiturb failed, errno=%d", errno);
 			r = LIBUSB_ERROR_IO;
 		}
 
 		/* if the first URB submission fails, we can simply free up and
 		 * return failure immediately. */
 		if (i == 0) {
-			usbi_dbg(TRANSFER_CTX(transfer), "first URB failed, easy peasy");
+			usbi_dbg(usbi_transfer_ctx(transfer), "first URB failed, easy peasy");
 			free_iso_urbs(tpriv);
 			return r;
 		}
@@ -2447,7 +2447,7 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer)
 		tpriv->num_retired = num_urbs - i;
 		discard_urbs(itransfer, 0, i);
 
-		usbi_dbg(TRANSFER_CTX(transfer), "reporting successful submission but waiting for %d "
+		usbi_dbg(usbi_transfer_ctx(transfer), "reporting successful submission but waiting for %d "
 			 "discards before reporting error", i);
 		return 0;
 	}
@@ -2459,7 +2459,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 {
 	struct linux_transfer_priv *tpriv = (struct linux_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	struct libusb_transfer *transfer =
-		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		usbi_transfer_to_libusb_transfer(itransfer);
 	struct linux_device_handle_priv *hpriv =
 		(struct linux_device_handle_priv *)usbi_get_device_handle_priv(transfer->dev_handle);
 	struct usbfs_urb *urb;
@@ -2488,7 +2488,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 		if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(TRANSFER_CTX(transfer), "submiturb failed, errno=%d", errno);
+		usbi_err(usbi_transfer_ctx(transfer), "submiturb failed, errno=%d", errno);
 		return LIBUSB_ERROR_IO;
 	}
 	return 0;
@@ -2497,7 +2497,7 @@ static int submit_control_transfer(struct usbi_transfer *itransfer)
 static int op_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct libusb_transfer *transfer =
-		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		usbi_transfer_to_libusb_transfer(itransfer);
 
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
@@ -2510,7 +2510,7 @@ static int op_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfe
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
 		return submit_iso_transfer(itransfer);
 	default:
-		usbi_err(TRANSFER_CTX(transfer), "unknown transfer type %u", transfer->type);
+		usbi_err(usbi_transfer_ctx(transfer), "unknown transfer type %u", transfer->type);
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 }
@@ -2519,7 +2519,7 @@ static int op_cancel_transfer(struct usbi_transfer *itransfer)
 {
 	struct linux_transfer_priv *tpriv = (struct linux_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	struct libusb_transfer *transfer =
-		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		usbi_transfer_to_libusb_transfer(itransfer);
 	int r;
 
 	if (!tpriv->urbs)
@@ -2545,7 +2545,7 @@ static int op_cancel_transfer(struct usbi_transfer *itransfer)
 static void op_clear_transfer_priv(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer =
-		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		usbi_transfer_to_libusb_transfer(itransfer);
 	struct linux_transfer_priv *tpriv = (struct linux_transfer_priv *)usbi_get_transfer_priv(itransfer);
 
 	switch (transfer->type) {
@@ -2565,7 +2565,7 @@ static void op_clear_transfer_priv(struct usbi_transfer *itransfer)
 		}
 		break;
 	default:
-		usbi_err(TRANSFER_CTX(transfer), "unknown transfer type %u", transfer->type);
+		usbi_err(usbi_transfer_ctx(transfer), "unknown transfer type %u", transfer->type);
 	}
 }
 
@@ -2573,18 +2573,18 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	struct usbfs_urb *urb)
 {
 	struct linux_transfer_priv *tpriv = (struct linux_transfer_priv *)usbi_get_transfer_priv(itransfer);
-	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	struct libusb_transfer *transfer = usbi_transfer_to_libusb_transfer(itransfer);
 	int urb_idx = urb - tpriv->urbs;
 
 	usbi_mutex_lock(&itransfer->lock);
-	usbi_dbg(TRANSFER_CTX(transfer), "handling completion status %d of bulk urb %d/%d", urb->status,
+	usbi_dbg(usbi_transfer_ctx(transfer), "handling completion status %d of bulk urb %d/%d", urb->status,
 		 urb_idx + 1, tpriv->num_urbs);
 
 	tpriv->num_retired++;
 
 	if (tpriv->reap_action != NORMAL) {
 		/* cancelled, submit_fail, or completed early */
-		usbi_dbg(TRANSFER_CTX(transfer), "abnormal reap: urb status %d", urb->status);
+		usbi_dbg(usbi_transfer_ctx(transfer), "abnormal reap: urb status %d", urb->status);
 
 		/* even though we're in the process of cancelling, it's possible that
 		 * we may receive some data in these URBs that we don't want to lose.
@@ -2605,9 +2605,9 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		if (urb->actual_length > 0) {
 			unsigned char *target = transfer->buffer + itransfer->transferred;
 
-			usbi_dbg(TRANSFER_CTX(transfer), "received %d bytes of surplus data", urb->actual_length);
+			usbi_dbg(usbi_transfer_ctx(transfer), "received %d bytes of surplus data", urb->actual_length);
 			if (urb->buffer != target) {
-				usbi_dbg(TRANSFER_CTX(transfer), "moving surplus data from offset %zu to offset %zu",
+				usbi_dbg(usbi_transfer_ctx(transfer), "moving surplus data from offset %zu to offset %zu",
 					 (unsigned char *)urb->buffer - transfer->buffer,
 					 target - transfer->buffer);
 				memmove(target, urb->buffer, urb->actual_length);
@@ -2616,7 +2616,7 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		}
 
 		if (tpriv->num_retired == tpriv->num_urbs) {
-			usbi_dbg(TRANSFER_CTX(transfer), "abnormal reap: last URB handled, reporting");
+			usbi_dbg(usbi_transfer_ctx(transfer), "abnormal reap: last URB handled, reporting");
 			if (tpriv->reap_action != COMPLETED_EARLY &&
 			    tpriv->reap_status == LIBUSB_TRANSFER_COMPLETED)
 				tpriv->reap_status = LIBUSB_TRANSFER_ERROR;
@@ -2640,17 +2640,17 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 		break;
 	case -ENODEV:
 	case -ESHUTDOWN:
-		usbi_dbg(TRANSFER_CTX(transfer), "device removed");
+		usbi_dbg(usbi_transfer_ctx(transfer), "device removed");
 		tpriv->reap_status = LIBUSB_TRANSFER_NO_DEVICE;
 		goto cancel_remaining;
 	case -EPIPE:
-		usbi_dbg(TRANSFER_CTX(transfer), "detected endpoint stall");
+		usbi_dbg(usbi_transfer_ctx(transfer), "detected endpoint stall");
 		if (tpriv->reap_status == LIBUSB_TRANSFER_COMPLETED)
 			tpriv->reap_status = LIBUSB_TRANSFER_STALL;
 		goto cancel_remaining;
 	case -EOVERFLOW:
 		/* overflow can only ever occur in the last urb */
-		usbi_dbg(TRANSFER_CTX(transfer), "overflow, actual_length=%d", urb->actual_length);
+		usbi_dbg(usbi_transfer_ctx(transfer), "overflow, actual_length=%d", urb->actual_length);
 		if (tpriv->reap_status == LIBUSB_TRANSFER_COMPLETED)
 			tpriv->reap_status = LIBUSB_TRANSFER_OVERFLOW;
 		goto completed;
@@ -2659,11 +2659,11 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	case -EILSEQ:
 	case -ECOMM:
 	case -ENOSR:
-		usbi_dbg(TRANSFER_CTX(transfer), "low-level bus error %d", urb->status);
+		usbi_dbg(usbi_transfer_ctx(transfer), "low-level bus error %d", urb->status);
 		tpriv->reap_action = ERROR;
 		goto cancel_remaining;
 	default:
-		usbi_warn(ITRANSFER_CTX(itransfer), "unrecognised urb status %d", urb->status);
+		usbi_warn(usbi_itransfer_ctx(itransfer), "unrecognised urb status %d", urb->status);
 		tpriv->reap_action = ERROR;
 		goto cancel_remaining;
 	}
@@ -2671,10 +2671,10 @@ static int handle_bulk_completion(struct usbi_transfer *itransfer,
 	/* if we've reaped all urbs or we got less data than requested then we're
 	 * done */
 	if (tpriv->num_retired == tpriv->num_urbs) {
-		usbi_dbg(TRANSFER_CTX(transfer), "all URBs in transfer reaped --> complete!");
+		usbi_dbg(usbi_transfer_ctx(transfer), "all URBs in transfer reaped --> complete!");
 		goto completed;
 	} else if (urb->actual_length < urb->buffer_length) {
-		usbi_dbg(TRANSFER_CTX(transfer), "short transfer %d/%d --> complete!",
+		usbi_dbg(usbi_transfer_ctx(transfer), "short transfer %d/%d --> complete!",
 			 urb->actual_length, urb->buffer_length);
 		if (tpriv->reap_action == NORMAL)
 			tpriv->reap_action = COMPLETED_EARLY;
@@ -2710,7 +2710,7 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	struct usbfs_urb *urb)
 {
 	struct libusb_transfer *transfer =
-		USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+		usbi_transfer_to_libusb_transfer(itransfer);
 	struct linux_transfer_priv *tpriv = (struct linux_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	int num_urbs = tpriv->num_urbs;
 	int urb_idx = 0;
@@ -2725,12 +2725,12 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		}
 	}
 	if (urb_idx == 0) {
-		usbi_err(TRANSFER_CTX(transfer), "could not locate urb!");
+		usbi_err(usbi_transfer_ctx(transfer), "could not locate urb!");
 		usbi_mutex_unlock(&itransfer->lock);
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
-	usbi_dbg(TRANSFER_CTX(transfer), "handling completion status %d of iso urb %d/%d", urb->status,
+	usbi_dbg(usbi_transfer_ctx(transfer), "handling completion status %d of iso urb %d/%d", urb->status,
 		 urb_idx, num_urbs);
 
 	/* copy isochronous results back in */
@@ -2751,15 +2751,15 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 			break;
 		case -ENODEV:
 		case -ESHUTDOWN:
-			usbi_dbg(TRANSFER_CTX(transfer), "packet %d - device removed", i);
+			usbi_dbg(usbi_transfer_ctx(transfer), "packet %d - device removed", i);
 			lib_desc->status = LIBUSB_TRANSFER_NO_DEVICE;
 			break;
 		case -EPIPE:
-			usbi_dbg(TRANSFER_CTX(transfer), "packet %d - detected endpoint stall", i);
+			usbi_dbg(usbi_transfer_ctx(transfer), "packet %d - detected endpoint stall", i);
 			lib_desc->status = LIBUSB_TRANSFER_STALL;
 			break;
 		case -EOVERFLOW:
-			usbi_dbg(TRANSFER_CTX(transfer), "packet %d - overflow error", i);
+			usbi_dbg(usbi_transfer_ctx(transfer), "packet %d - overflow error", i);
 			lib_desc->status = LIBUSB_TRANSFER_OVERFLOW;
 			break;
 		case -ETIME:
@@ -2768,11 +2768,11 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 		case -ECOMM:
 		case -ENOSR:
 		case -EXDEV:
-			usbi_dbg(TRANSFER_CTX(transfer), "packet %d - low-level USB error %d", i, packet_status);
+			usbi_dbg(usbi_transfer_ctx(transfer), "packet %d - low-level USB error %d", i, packet_status);
 			lib_desc->status = LIBUSB_TRANSFER_ERROR;
 			break;
 		default:
-			usbi_warn(TRANSFER_CTX(transfer), "packet %d - unrecognised urb status %d",
+			usbi_warn(usbi_transfer_ctx(transfer), "packet %d - unrecognised urb status %d",
 				  i, packet_status);
 			lib_desc->status = LIBUSB_TRANSFER_ERROR;
 			break;
@@ -2783,10 +2783,10 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	tpriv->num_retired++;
 
 	if (tpriv->reap_action != NORMAL) { /* cancelled or submit_fail */
-		usbi_dbg(TRANSFER_CTX(transfer), "CANCEL: urb status %d", urb->status);
+		usbi_dbg(usbi_transfer_ctx(transfer), "CANCEL: urb status %d", urb->status);
 
 		if (tpriv->num_retired == num_urbs) {
-			usbi_dbg(TRANSFER_CTX(transfer), "CANCEL: last URB handled, reporting");
+			usbi_dbg(usbi_transfer_ctx(transfer), "CANCEL: last URB handled, reporting");
 			free_iso_urbs(tpriv);
 			if (tpriv->reap_action == CANCELLED) {
 				usbi_mutex_unlock(&itransfer->lock);
@@ -2806,18 +2806,18 @@ static int handle_iso_completion(struct usbi_transfer *itransfer,
 	case -ECONNRESET:
 		break;
 	case -ESHUTDOWN:
-		usbi_dbg(TRANSFER_CTX(transfer), "device removed");
+		usbi_dbg(usbi_transfer_ctx(transfer), "device removed");
 		status = LIBUSB_TRANSFER_NO_DEVICE;
 		break;
 	default:
-		usbi_warn(TRANSFER_CTX(transfer), "unrecognised urb status %d", urb->status);
+		usbi_warn(usbi_transfer_ctx(transfer), "unrecognised urb status %d", urb->status);
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	}
 
 	/* if we've reaped all urbs then we're done */
 	if (tpriv->num_retired == num_urbs) {
-		usbi_dbg(TRANSFER_CTX(transfer), "all URBs in transfer reaped --> complete!");
+		usbi_dbg(usbi_transfer_ctx(transfer), "all URBs in transfer reaped --> complete!");
 		free_iso_urbs(tpriv);
 		usbi_mutex_unlock(&itransfer->lock);
 		return usbi_handle_transfer_completion(itransfer, status);
@@ -2835,13 +2835,13 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	int status;
 
 	usbi_mutex_lock(&itransfer->lock);
-	usbi_dbg(ITRANSFER_CTX(itransfer), "handling completion status %d", urb->status);
+	usbi_dbg(usbi_itransfer_ctx(itransfer), "handling completion status %d", urb->status);
 
 	itransfer->transferred += urb->actual_length;
 
 	if (tpriv->reap_action == CANCELLED) {
 		if (urb->status && urb->status != -ENOENT)
-			usbi_warn(ITRANSFER_CTX(itransfer), "cancel: unrecognised urb status %d",
+			usbi_warn(usbi_itransfer_ctx(itransfer), "cancel: unrecognised urb status %d",
 				  urb->status);
 		free(tpriv->urbs);
 		tpriv->urbs = NULL;
@@ -2858,15 +2858,15 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 		break;
 	case -ENODEV:
 	case -ESHUTDOWN:
-		usbi_dbg(ITRANSFER_CTX(itransfer), "device removed");
+		usbi_dbg(usbi_itransfer_ctx(itransfer), "device removed");
 		status = LIBUSB_TRANSFER_NO_DEVICE;
 		break;
 	case -EPIPE:
-		usbi_dbg(ITRANSFER_CTX(itransfer), "unsupported control request");
+		usbi_dbg(usbi_itransfer_ctx(itransfer), "unsupported control request");
 		status = LIBUSB_TRANSFER_STALL;
 		break;
 	case -EOVERFLOW:
-		usbi_dbg(ITRANSFER_CTX(itransfer), "overflow, actual_length=%d", urb->actual_length);
+		usbi_dbg(usbi_itransfer_ctx(itransfer), "overflow, actual_length=%d", urb->actual_length);
 		status = LIBUSB_TRANSFER_OVERFLOW;
 		break;
 	case -ETIME:
@@ -2874,11 +2874,11 @@ static int handle_control_completion(struct usbi_transfer *itransfer,
 	case -EILSEQ:
 	case -ECOMM:
 	case -ENOSR:
-		usbi_dbg(ITRANSFER_CTX(itransfer), "low-level bus error %d", urb->status);
+		usbi_dbg(usbi_itransfer_ctx(itransfer), "low-level bus error %d", urb->status);
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	default:
-		usbi_warn(ITRANSFER_CTX(itransfer), "unrecognised urb status %d", urb->status);
+		usbi_warn(usbi_itransfer_ctx(itransfer), "unrecognised urb status %d", urb->status);
 		status = LIBUSB_TRANSFER_ERROR;
 		break;
 	}
@@ -2904,14 +2904,14 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 		if (errno == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 
-		usbi_err(HANDLE_CTX(handle), "reap failed, errno=%d", errno);
+		usbi_err(usbi_handle_ctx(handle), "reap failed, errno=%d", errno);
 		return LIBUSB_ERROR_IO;
 	}
 
 	itransfer = (struct usbi_transfer *)urb->usercontext;
-	transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
+	transfer = usbi_transfer_to_libusb_transfer(itransfer);
 
-	usbi_dbg(HANDLE_CTX(handle), "urb type=%u status=%d transferred=%d", urb->type, urb->status, urb->actual_length);
+	usbi_dbg(usbi_handle_ctx(handle), "urb type=%u status=%d transferred=%d", urb->type, urb->status, urb->actual_length);
 
 	switch (transfer->type) {
 	case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
@@ -2923,7 +2923,7 @@ static int reap_for_handle(struct libusb_device_handle *handle)
 	case LIBUSB_TRANSFER_TYPE_CONTROL:
 		return handle_control_completion(itransfer, urb);
 	default:
-		usbi_err(HANDLE_CTX(handle), "unrecognised transfer type %u", transfer->type);
+		usbi_err(usbi_handle_ctx(handle), "unrecognised transfer type %u", transfer->type);
 		return LIBUSB_ERROR_OTHER;
 	}
 }
@@ -2962,7 +2962,7 @@ static int op_handle_events(struct libusb_context *ctx,
 			/* remove the fd from the pollfd set so that it doesn't continuously
 			 * trigger an event, and flag that it has been removed so op_close()
 			 * doesn't try to remove it a second time */
-			usbi_remove_event_source(HANDLE_CTX(handle), hpriv->fd);
+			usbi_remove_event_source(usbi_handle_ctx(handle), hpriv->fd);
 			hpriv->fd_removed = 1;
 
 			/* device will still be marked as attached if hotplug monitor thread
