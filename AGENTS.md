@@ -45,6 +45,23 @@ with their own certificate.
 - Branch names should be explicit and brief about what is being done or asked — e.g. `add-commit-attribution`, `fix-win-hang`, etc.
 - Prefer kebab-case.
 
+## Public API and ABI Compatibility
+
+`libusb/libusb.h` is the installed public API header and must be treated as a
+compatibility contract for existing source and binary users.
+
+- Do not change the type, calling convention, parameters, return value, or
+  linkage of an existing public function to fix an internal implementation
+  issue, compiler warning, or refactor. Even an ABI-equivalent type change can
+  break source users, including code with explicitly typed function pointers.
+- Do not remove or incompatibly change public declarations, constants, enum
+  values, structure layouts, or other ABI-visible definitions.
+- Additive public API changes require explicit task scope and a compatibility
+  review. Documentation-only changes remain permitted.
+- If a fix appears to require a breaking change in `libusb/libusb.h`, preserve
+  the existing interface and ask a maintainer for direction instead of making
+  the API or ABI change.
+
 ## PR description content
 
 The `Assisted-by` attribution should be included in the PR description, but no link to the
