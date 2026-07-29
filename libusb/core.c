@@ -2477,18 +2477,45 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	int is_default_context = (NULL == ctx);
 #endif
 
+#if (!defined(__cplusplus) && \
+	(!defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L)) || \
+	(defined(__cplusplus) && __cplusplus <= 202302L)
+#if defined(__cplusplus) && __cplusplus < 201103L
+	/* Pre-C++11 has no static_assert; make a short enum an invalid array bound. */
+	typedef char libusb_option_short_enums_make_va_start_undefined[
+		sizeof(enum libusb_option) >= sizeof(int) ? 1 : -1];
+	(void)sizeof(libusb_option_short_enums_make_va_start_undefined);
+#else
+	static_assert(sizeof(enum libusb_option) >= sizeof(int),
+		"short enums make va_start(ap, option) undefined before C23/C++26");
+#endif
+#endif
+
 	/*
-	 * The public API requires option to remain an enum. Clang warns that an
-	 * enum is subject to default argument promotion when passed to va_start,
-	 * but changing this parameter type would break source compatibility.
+	 * Before C++26, va_start requires its last named parameter to have a type
+	 * compatible with the result of default argument promotion. In C++,
+	 * libusb_option is incompatible with the integer type it promotes to, so
+	 * va_start(ap, option) has undefined behavior and Clang diagnoses it with
+	 * -Wvarargs.
+	 *
+	 * Prefer the parameter-free C23/C++26 form where available. Otherwise,
+	 * use Clang's equivalent builtin, retaining the legacy call as a
+	 * compatibility fallback for older Clang versions.
 	 */
-#if defined(__clang__) && defined(__cplusplus)
+#if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L) || \
+	(defined(__cplusplus) && __cplusplus > 202302L)
+	va_start(ap);
+#elif defined(__clang__) && defined(__cplusplus)
+#if __has_builtin(__builtin_c23_va_start)
+	__builtin_c23_va_start(ap);
+#else
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvarargs"
-#endif
 	va_start(ap, option);
-#if defined(__clang__) && defined(__cplusplus)
 #pragma clang diagnostic pop
+#endif
+#else
+	va_start(ap, option);
 #endif
 
 	if (LIBUSB_OPTION_LOG_LEVEL == option) {
