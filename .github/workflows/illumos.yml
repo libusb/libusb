@@ -1,0 +1,131 @@
+name: illumos
+
+# The sunos backend is shared by illumos distributions and Oracle Solaris, so
+# all three are covered here.
+#
+# The OmniOS and OpenIndiana images do not ship the USB headers that
+# sunos_usb.c includes, so system/header/header-ugen (for
+# sys/usb/clients/ugen/usb_ugen.h) and system/header/header-usb (for
+# sys/usb/usba.h) are installed explicitly. The Solaris image already has them.
+#
+# Run branch pushes only on master; pull requests continue to run against all
+# branches.
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '**'
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  omnios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # Full history + tags are needed by build-aux/gen-describe.sh.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # autoreconf runs on the runner rather than in the guest: it keeps the
+      # guest package set down to a compiler, GNU make and git, which saves
+      # several minutes of emulated-VM time per run.
+      - name: bootstrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends autoconf automake libtool m4
+          ./bootstrap.sh
+
+      - name: build and test in OmniOS
+        uses: vmactions/omnios-vm@v1
+        with:
+          usesh: true
+          cache-after-prepare: true
+          prepare: |
+            pkg install developer/gcc14 developer/build/gnu-make developer/versioning/git \
+              system/header/header-ugen system/header/header-usb
+          run: |
+            set -e
+            PATH=/opt/gcc-14/bin:/usr/gnu/bin:$PATH
+            export PATH
+            uname -a
+            gcc --version | head -1
+            mkdir build && cd build
+            CC=gcc ../configure --enable-examples-build --enable-tests-build \
+              || { cat config.log; exit 1; }
+            gmake -j4
+            gmake check || { cat tests/test-suite.log; exit 1; }
+
+  openindiana:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: bootstrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends autoconf automake libtool m4
+          ./bootstrap.sh
+
+      - name: build and test in OpenIndiana
+        uses: vmactions/openindiana-vm@v1
+        with:
+          usesh: true
+          cache-after-prepare: true
+          prepare: |
+            pkg install developer/gcc-14 developer/build/gnu-make developer/versioning/git \
+              system/header/header-ugen system/header/header-usb
+          run: |
+            set -e
+            PATH=/usr/gnu/bin:$PATH
+            export PATH
+            uname -a
+            gcc --version | head -1
+            mkdir build && cd build
+            CC=gcc ../configure --enable-examples-build --enable-tests-build \
+              || { cat config.log; exit 1; }
+            gmake -j4
+            gmake check || { cat tests/test-suite.log; exit 1; }
+
+  solaris:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: bootstrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends autoconf automake libtool m4
+          ./bootstrap.sh
+
+      - name: build and test in Solaris
+        uses: vmactions/solaris-vm@v1
+        with:
+          usesh: true
+          cache-after-prepare: true
+          prepare: |
+            pkg install developer/gcc developer/build/gnu-make \
+              developer/versioning/git
+          run: |
+            set -e
+            uname -a
+            gcc --version | head -1
+            mkdir build && cd build
+            CC=gcc ../configure --enable-examples-build --enable-tests-build \
+              || { cat config.log; exit 1; }
+            gmake -j4
+            gmake check || { cat tests/test-suite.log; exit 1; }

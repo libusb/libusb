@@ -1,0 +1,52 @@
+name: Haiku
+
+# Run branch pushes only on master; pull requests continue to run against all
+# branches.
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '**'
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # Full history + tags are needed by build-aux/gen-describe.sh.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # autoreconf runs on the runner rather than in the guest. The Haiku image
+      # does ship autotools, but keeping the bootstrap on the runner makes this
+      # workflow behave the same way as the other VM ones.
+      - name: bootstrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends autoconf automake libtool m4
+          ./bootstrap.sh
+
+      # No prepare step: the Haiku image already ships gcc, GNU make and git.
+      - name: build and test in Haiku
+        uses: vmactions/haiku-vm@v1
+        with:
+          usesh: true
+          run: |
+            set -e
+            uname -a
+            gcc --version | head -1
+            mkdir build && cd build
+            ../configure --enable-examples-build --enable-tests-build \
+              || { cat config.log; exit 1; }
+            make -j4
+            # stress_mt is skipped on Haiku via an OS_HAIKU branch in
+            # tests/Makefile.am; see libusb/libusb#1907.
+            make check || { cat tests/test-suite.log; exit 1; }
