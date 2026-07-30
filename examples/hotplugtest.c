@@ -25,6 +25,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+/* Solaris implements FD_ZERO() as a memset() call, so <string.h> is required
+ * even though this file makes no direct use of it. */
+#include <string.h>
 #include <signal.h>
 #include <inttypes.h>
 
