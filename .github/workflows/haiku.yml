@@ -19,13 +19,15 @@ env:
          contains(github.event.pull_request.labels.*.name, 'force_long_tests'))
         && '--enable-testcore' || '' }}
 
+# Isolate unrelated label events from code and force-label CI runs.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: >-
-    ${{ github.event_name == 'pull_request' &&
-        (github.event.action != 'labeled' ||
-         github.event.label.name == 'force_testcore' ||
-         github.event.label.name == 'force_long_tests') }}
+  group: >-
+    ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{
+      github.event.action == 'labeled' &&
+      github.event.label.name != 'force_testcore' &&
+      github.event.label.name != 'force_long_tests' &&
+      github.run_id || 'ci' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
