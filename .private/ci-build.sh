@@ -74,7 +74,11 @@ fi
 
 echo ""
 echo "Configuring ..."
-CFLAGS="${cflags}" CXXFLAGS="${cflags}" ../configure --enable-examples-build --enable-tests-build "$@"
+configure_args=(--enable-examples-build --enable-tests-build)
+if [ -n "${TESTCORE_CONFIGURE_FLAG:-}" ]; then
+	configure_args+=("${TESTCORE_CONFIGURE_FLAG}")
+fi
+CFLAGS="${cflags}" CXXFLAGS="${cflags}" ../configure "${configure_args[@]}" "$@"
 
 echo ""
 echo "Building ..."

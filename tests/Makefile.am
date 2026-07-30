@@ -37,8 +37,17 @@ endif
 
 noinst_HEADERS = libusb_testlib.h
 noinst_PROGRAMS = stress stress_mt set_option init_context testcore
+
+# testcore is an intentionally long-running stress test. CI sets
+# --enable-testcore on master and for explicitly labelled pull requests.
+TESTS = stress stress_mt set_option init_context
+if RUN_TESTCORE
+TESTS += testcore
+endif
+
 if OS_DARWIN
 noinst_PROGRAMS += macos
+TESTS += macos
 endif
 
 if BUILD_UMOCKDEV_TEST
@@ -50,6 +59,5 @@ umockdev_LDFLAGS = -Wl,--push-state,--no-as-needed -Wl,-lumockdev-preload -Wl,--
 umockdev_SOURCES = umockdev.c
 
 noinst_PROGRAMS += umockdev
+TESTS += umockdev
 endif
-
-TESTS=$(noinst_PROGRAMS)

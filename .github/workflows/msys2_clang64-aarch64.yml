@@ -6,6 +6,15 @@ on:
     tags:
       - '**'
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+# Keep the long-running stress test on master unless a PR explicitly opts in.
+env:
+  TESTCORE_CONFIGURE_FLAG: >-
+    ${{ (github.ref == 'refs/heads/master' ||
+         contains(github.event.pull_request.labels.*.name, 'force_testcore') ||
+         contains(github.event.pull_request.labels.*.name, 'force_long_tests'))
+        && '--enable-testcore' || '' }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -13,6 +22,10 @@ concurrency:
 
 jobs:
   build:
+    if: >-
+      github.event.action != 'labeled' ||
+      github.event.label.name == 'force_testcore' ||
+      github.event.label.name == 'force_long_tests'
     runs-on: windows-11-arm
     timeout-minutes: 60
     defaults:
