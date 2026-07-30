@@ -27,8 +27,8 @@ jobs:
   build:
     if: >-
       github.event.action != 'labeled' ||
-      github.event.label.name == 'force_testcore' ||
-      github.event.label.name == 'force_long_tests'
+      contains(github.event.pull_request.labels.*.name, 'force_testcore') ||
+      contains(github.event.pull_request.labels.*.name, 'force_long_tests')
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
