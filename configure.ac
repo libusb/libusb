@@ -240,7 +240,12 @@ linux)
 	fi
 	;;
 sunos)
-	LIBS="${LIBS} -ldevinfo"
+	dnl sunos_usb.c calls nvlist_alloc()/nvlist_add_int32()/nvlist_pack()/
+	dnl nvlist_free() from <sys/nvpair.h>, so libnvpair is a real dependency.
+	dnl The Solaris link editor tolerates undefined symbols when building a
+	dnl shared object, which hid this; a static link (as tests/Makefile.am
+	dnl asks for) fails with "symbol referencing errors".
+	LIBS="${LIBS} -ldevinfo -lnvpair"
 	;;
 windows)
 	AC_CHECK_TYPES([struct timespec], [], [], [[#include <time.h>]])
