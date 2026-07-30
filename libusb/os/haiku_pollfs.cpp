@@ -25,9 +25,15 @@ class WatchedEntry;
    arrival and removal) and by USBRoster::EnumerateInto() (a context being
    created), so that those two paths cannot interleave for the same device.
 
-   Lock order is gInitLock -> gRosterLock -> active_contexts_lock ->
-   ctx->usb_devs_lock. The looper thread never takes gInitLock, which is what
-   makes it safe to hold gInitLock across the blocking RosterLooper::Stop(). */
+   Lock order is gInitLock -> RosterLooper's BLooper lock -> gRosterLock ->
+   active_contexts_lock -> ctx->usb_devs_lock. The BLooper lock sits between
+   the first two on every path that takes both: the looper thread holds it
+   while dispatching device arrival and removal, the initial tree build in the
+   RosterLooper constructor holds it around the WatchedEntry walk, and
+   RosterLooper::Stop() takes it before deleting the tree. Nothing may lock the
+   looper while holding gRosterLock. The looper thread never takes gInitLock,
+   which is what makes it safe to hold gInitLock across the blocking
+   RosterLooper::Stop(). */
 static usbi_mutex_static_t gRosterLock = USBI_MUTEX_INITIALIZER;
 
 /* Every device the roster currently knows about, in discovery order, so that
@@ -49,9 +55,9 @@ public:
 	bool		EntryRemoved(ino_t node);
 	bool		InitCheck();
 
-	/* Called for a single context, with gRosterLock held. */
-	void		AddToContext(struct libusb_context *ctx);
-	void		RemoveFromContext(struct libusb_context *ctx);
+	/* Called for a single context. */
+	void		AddToContext(struct libusb_context *ctx) REQUIRES(gRosterLock);
+	void		RemoveFromContext(struct libusb_context *ctx) REQUIRES(gRosterLock);
 	WatchedEntry*	RegistryLink() const { return fRegistryLink; }
 
 private:
@@ -376,7 +382,18 @@ RosterLooper::RosterLooper(USBRoster *roster)
 		return;
 	}
 
-	Run();
+	/* A failing Run() returns without unlocking the looper and without
+	   setting its fRunCalled, so the constructor's own lock is still held.
+	   Lock() would then nest rather than block and the rest of this would
+	   look like it worked, leaving a roster with no thread behind it and a
+	   looper that only this thread can ever unlock. Give up instead: Start()
+	   takes the object down through Stop(), where Quit() sees fRunCalled
+	   unset and simply deletes it. */
+	if (Run() < B_OK) {
+		usbi_err(NULL, "failed to start the roster looper thread");
+		return;
+	}
+
 	fMessenger = new(std::nothrow) BMessenger(this);
 	if (fMessenger == NULL) {
 		usbi_err(NULL, "error creating BMessenger object");
