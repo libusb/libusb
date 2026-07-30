@@ -21,7 +21,11 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: >-
+    ${{ github.event_name == 'pull_request' &&
+        (github.event.action != 'labeled' ||
+         github.event.label.name == 'force_testcore' ||
+         github.event.label.name == 'force_long_tests') }}
 
 # A workflow run is made up of one or more jobs that can run
 # sequentially or in parallel
@@ -30,8 +34,8 @@ jobs:
   build:
     if: >-
       github.event.action != 'labeled' ||
-      contains(github.event.pull_request.labels.*.name, 'force_testcore') ||
-      contains(github.event.pull_request.labels.*.name, 'force_long_tests')
+      github.event.label.name == 'force_testcore' ||
+      github.event.label.name == 'force_long_tests'
     runs-on: macos-latest
     timeout-minutes: 60
 

@@ -29,14 +29,18 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: >-
+    ${{ github.event_name == 'pull_request' &&
+        (github.event.action != 'labeled' ||
+         github.event.label.name == 'force_testcore' ||
+         github.event.label.name == 'force_long_tests') }}
 
 jobs:
   omnios:
     if: >-
       github.event.action != 'labeled' ||
-      contains(github.event.pull_request.labels.*.name, 'force_testcore') ||
-      contains(github.event.pull_request.labels.*.name, 'force_long_tests')
+      github.event.label.name == 'force_testcore' ||
+      github.event.label.name == 'force_long_tests'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -79,8 +83,8 @@ jobs:
   openindiana:
     if: >-
       github.event.action != 'labeled' ||
-      contains(github.event.pull_request.labels.*.name, 'force_testcore') ||
-      contains(github.event.pull_request.labels.*.name, 'force_long_tests')
+      github.event.label.name == 'force_testcore' ||
+      github.event.label.name == 'force_long_tests'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -119,8 +123,8 @@ jobs:
   solaris:
     if: >-
       github.event.action != 'labeled' ||
-      contains(github.event.pull_request.labels.*.name, 'force_testcore') ||
-      contains(github.event.pull_request.labels.*.name, 'force_long_tests')
+      github.event.label.name == 'force_testcore' ||
+      github.event.label.name == 'force_long_tests'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
