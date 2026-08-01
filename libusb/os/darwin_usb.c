@@ -1786,13 +1786,24 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
     usbi_localize_device_descriptor(&dev->device_descriptor);
     dev->session_data = cached_device->session;
 
-    if (NULL != dev->parent_dev) {
-      libusb_unref_device(dev->parent_dev);
-      dev->parent_dev = NULL;
-    }
+    /* store the new parent before releasing the old one, so the field always
+       holds either NULL or a device we own a reference to. this device is
+       already visible to the application and libusb_get_port_numbers walks
+       the parent chain without a lock, so a concurrent walk sees one parent
+       or the other and never a gap. a walk that already loaded the old
+       pointer can still race; closing that needs a core-level fix. */
+    {
+      struct libusb_device *old_parent = dev->parent_dev;
 
-    if (cached_device->parent_session > 0) {
-      dev->parent_dev = usbi_get_device_by_session_id (ctx, (unsigned long) cached_device->parent_session);
+      if (cached_device->parent_session > 0) {
+        dev->parent_dev = usbi_get_device_by_session_id (ctx, (unsigned long) cached_device->parent_session);
+      } else {
+        dev->parent_dev = NULL;
+      }
+
+      if (NULL != old_parent) {
+        libusb_unref_device(old_parent);
+      }
     }
 
     usb_device_t darwin_device = darwin_active_device_interface (priv->dev);
