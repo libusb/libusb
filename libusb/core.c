@@ -1013,9 +1013,13 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 		return LIBUSB_ERROR_OVERFLOW;
 	}
 
-	/* fill port numbers directly into the correct positions */
+	/* Fill port numbers directly into the correct positions. The parent
+	 * chain is walked without holding a lock, so a backend updating a
+	 * published device can make it longer between the two passes; bound the
+	 * index so a chain that grew cannot write before the start of the
+	 * caller's array. */
 	i = depth;
-	while (dev && dev->port_number != 0) {
+	while (dev && dev->port_number != 0 && i > 0) {
 		port_numbers[--i] = dev->port_number;
 		dev = dev->parent_dev;
 	}
