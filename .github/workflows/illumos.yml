@@ -17,13 +17,32 @@ on:
     tags:
       - '**'
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
 
+# Keep the long-running stress test on master unless a PR explicitly opts in.
+env:
+  TESTCORE_CONFIGURE_FLAG: >-
+    ${{ (github.ref == 'refs/heads/master' ||
+         contains(github.event.pull_request.labels.*.name, 'force_testcore') ||
+         contains(github.event.pull_request.labels.*.name, 'force_long_tests'))
+        && '--enable-testcore' || '' }}
+
+# Isolate unrelated label events from code and force-label CI runs.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: >-
+    ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{
+      github.event.action == 'labeled' &&
+      github.event.label.name != 'force_testcore' &&
+      github.event.label.name != 'force_long_tests' &&
+      github.run_id || 'ci' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   omnios:
+    if: >-
+      github.event.action != 'labeled' ||
+      github.event.label.name == 'force_testcore' ||
+      github.event.label.name == 'force_long_tests'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -58,11 +77,16 @@ jobs:
             gcc --version | head -1
             mkdir build && cd build
             CC=gcc ../configure --enable-examples-build --enable-tests-build \
+              ${{ env.TESTCORE_CONFIGURE_FLAG }} \
               || { cat config.log; exit 1; }
             gmake -j4
             gmake check || { cat tests/test-suite.log; exit 1; }
 
   openindiana:
+    if: >-
+      github.event.action != 'labeled' ||
+      github.event.label.name == 'force_testcore' ||
+      github.event.label.name == 'force_long_tests'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -93,11 +117,16 @@ jobs:
             gcc --version | head -1
             mkdir build && cd build
             CC=gcc ../configure --enable-examples-build --enable-tests-build \
+              ${{ env.TESTCORE_CONFIGURE_FLAG }} \
               || { cat config.log; exit 1; }
             gmake -j4
             gmake check || { cat tests/test-suite.log; exit 1; }
 
   solaris:
+    if: >-
+      github.event.action != 'labeled' ||
+      github.event.label.name == 'force_testcore' ||
+      github.event.label.name == 'force_long_tests'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -126,6 +155,7 @@ jobs:
             gcc --version | head -1
             mkdir build && cd build
             CC=gcc ../configure --enable-examples-build --enable-tests-build \
+              ${{ env.TESTCORE_CONFIGURE_FLAG }} \
               || { cat config.log; exit 1; }
             gmake -j4
             gmake check || { cat tests/test-suite.log; exit 1; }
