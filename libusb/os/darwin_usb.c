@@ -1668,10 +1668,14 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
 
       (*device)->GetLocationID (device, &new_device->location);
       new_device->port = port;
-      new_device->parent_session = parent_sessionID;
 
       usbi_mutex_init(&new_device->lock);
     }
+
+    /* refresh on every path, not just for a freshly allocated cached device:
+       a parent re-enumerated while this device was away has a new session id,
+       and process_new_device needs the current one to resolve the parent. */
+    new_device->parent_session = parent_sessionID;
 
     /* keep track of devices regardless of if we successfully enumerate them to
        prevent them from being enumerated multiple times */
