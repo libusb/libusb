@@ -774,6 +774,8 @@ static void reap_orphaned_requests(struct libusb_context *ctx)
  * application usable next to a wedged device, and to bound the accumulation of
  * orphaned requests such retries can produce, re-initialization of a device
  * that recently caused a timeout is skipped until its backoff expires. The
+ * same window length paces the string descriptor cooldown in
+ * winusb_fetch_string_descriptor(). The
  * backoff is deliberately not cleared on reconnection: a replug cannot cheaply
  * be told apart from a still-wedged device, so a replugged (now healthy)
  * device may stay invisible for up to this many milliseconds - a self-healing
@@ -2690,6 +2692,18 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 		return LIBUSB_ERROR_IO;
 	}
 
+	// Likewise during the cooldown that follows a string request timeout. The
+	// core caches only successful lookups and config/interface strings reach
+	// this helper directly, so without a cooldown a wedged control pipe would
+	// stall every string query by the full request timeout. The cooldown is
+	// per device object rather than the enumeration backoff on purpose: a
+	// device without strings can still be enumerable and usable, so it must
+	// not disappear from the device list.
+	if ((priv->string_backoff_expiry != 0) && (GetTickCount64() < priv->string_backoff_expiry)) {
+		usbi_dbg(ctx, "skipping string descriptor request for '%s' until its cooldown expires", priv->dev_id);
+		return LIBUSB_ERROR_IO;
+	}
+
 	struct winusb_device_priv* hub_priv = (struct winusb_device_priv *)usbi_get_device_priv(dev->parent_dev);
 	// Opened with FILE_FLAG_OVERLAPPED so the descriptor requests issued on this
 	// handle can be bounded by a timeout (see hub_device_io_control())
@@ -2747,10 +2761,19 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 
 	BOOL rv = hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
 		&sd, size, &ret_size);
+	DWORD error = rv ? ERROR_SUCCESS : GetLastError();	// CloseHandle() may clobber it
 	CloseHandle(hub_handle);
 	if (!rv) {
 		usbi_err(ctx, "could not access string descriptor %u for '%s': %s", string_descriptor_idx,
-			priv->dev_id, windows_error_str(0));
+			priv->dev_id, windows_error_str(error));
+		// The control pipe is wedged, pause string requests for a while.
+		// Racing fetchers write near-identical values here, which is as
+		// benign as the langid caching above.
+		if (error == ERROR_SEM_TIMEOUT) {
+			priv->string_backoff_expiry = GetTickCount64() + HUB_IOCTL_RETRY_BACKOFF_MS;
+			usbi_warn(ctx, "not issuing string descriptor requests for '%s' for the next %d ms",
+				priv->dev_id, HUB_IOCTL_RETRY_BACKOFF_MS);
+		}
 		return LIBUSB_ERROR_IO;
 	}
 
