@@ -802,22 +802,23 @@ static struct hub_timeout_backoff *hub_timeout_backoff_find(const char *dev_id)
 	return NULL;
 }
 
-// Whether initialization of this device should be skipped because a recent
-// hub IOCTL timeout put it into its backoff window. Expired entries are
-// dropped, so the next attempt after the window goes through again.
+// Whether requests for this device should be skipped because a recent hub
+// IOCTL timeout put it into its backoff window. Every expired entry seen
+// during the traversal is pruned, since a device that never reappears is
+// never queried again and its entry would otherwise live until backend exit.
 static bool hub_timeout_backoff_active(const char *dev_id)
 {
-	struct hub_timeout_backoff *backoff;
+	struct hub_timeout_backoff *backoff, *next_backoff;
+	ULONGLONG now = GetTickCount64();
 	bool active = false;
 
 	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
-	backoff = hub_timeout_backoff_find(dev_id);
-	if (backoff != NULL) {
-		if (GetTickCount64() < backoff->expiry) {
-			active = true;
-		} else {
+	list_for_each_entry_safe(backoff, next_backoff, &hub_timeout_backoffs, list, struct hub_timeout_backoff) {
+		if (now >= backoff->expiry) {
 			list_del(&backoff->list);
 			free(backoff);
+		} else if (strcmp((const char *)(backoff + 1), dev_id) == 0) {
+			active = true;
 		}
 	}
 	usbi_mutex_static_unlock(&hub_timeout_backoffs_lock);
