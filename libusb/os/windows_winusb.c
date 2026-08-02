@@ -2703,8 +2703,10 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 	// stall every string query by the full request timeout. The cooldown is
 	// per device object rather than the enumeration backoff on purpose: a
 	// device without strings can still be enumerable and usable, so it must
-	// not disappear from the device list.
-	if ((priv->string_backoff_expiry != 0) && (GetTickCount64() < priv->string_backoff_expiry)) {
+	// not disappear from the device list. The deadline is accessed with
+	// interlocked operations: the string getters may run concurrently and a
+	// plain 64-bit access can tear on 32-bit builds.
+	if (GetTickCount64() < (ULONGLONG)InterlockedCompareExchange64(&priv->string_backoff_expiry, 0, 0)) {
 		usbi_dbg(ctx, "skipping string descriptor request for '%s' until its cooldown expires", priv->dev_id);
 		return LIBUSB_ERROR_IO;
 	}
@@ -2771,11 +2773,9 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 	if (!rv) {
 		usbi_err(ctx, "could not access string descriptor %u for '%s': %s", string_descriptor_idx,
 			priv->dev_id, windows_error_str(error));
-		// The control pipe is wedged, pause string requests for a while.
-		// Racing fetchers write near-identical values here, which is as
-		// benign as the langid caching above.
+		// The control pipe is wedged, pause string requests for a while
 		if (error == ERROR_SEM_TIMEOUT) {
-			priv->string_backoff_expiry = GetTickCount64() + HUB_IOCTL_RETRY_BACKOFF_MS;
+			InterlockedExchange64(&priv->string_backoff_expiry, (LONG64)(GetTickCount64() + HUB_IOCTL_RETRY_BACKOFF_MS));
 			usbi_warn(ctx, "not issuing string descriptor requests for '%s' for the next %d ms",
 				priv->dev_id, HUB_IOCTL_RETRY_BACKOFF_MS);
 		}
