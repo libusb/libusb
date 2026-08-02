@@ -754,17 +754,22 @@ static struct list_head orphaned_requests = { &orphaned_requests, &orphaned_requ
 static void reap_orphaned_requests(struct libusb_context *ctx)
 {
 	struct hub_ioctl_request *req, *next_req;
+	int reaped = 0;
 
 	usbi_mutex_static_lock(&orphaned_requests_lock);
 	list_for_each_entry_safe(req, next_req, &orphaned_requests, list, struct hub_ioctl_request) {
 		if (HasOverlappedIoCompleted(&req->overlapped)) {
-			usbi_dbg(ctx, "orphaned hub request %p has completed, freeing it", (void *)req);
 			list_del(&req->list);
 			CloseHandle(req->overlapped.hEvent);
 			free(req);
+			reaped++;
 		}
 	}
 	usbi_mutex_static_unlock(&orphaned_requests_lock);
+
+	// log outside the lock: it is a spinlock and logging does I/O
+	if (reaped != 0)
+		usbi_dbg(ctx, "freed %d completed orphaned hub request(s)", reaped);
 }
 
 /*
