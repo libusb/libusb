@@ -1394,6 +1394,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 		parent_priv = (struct winusb_device_priv *)usbi_get_device_priv(parent_dev);
 		if (parent_priv->apib->id != USB_API_HUB) {
 			usbi_warn(ctx, "parent for device '%s' is not a hub", priv->dev_id);
+			libusb_unref_device(parent_dev);
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
 
@@ -1403,6 +1404,8 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 			tmp_dev = get_ancestor(ctx, devinst, &devinst);
 			if (tmp_dev != parent_dev) {
 				usbi_err(ctx, "program assertion failed - first ancestor is not parent");
+				libusb_unref_device(tmp_dev);
+				libusb_unref_device(parent_dev);
 				return LIBUSB_ERROR_NOT_FOUND;
 			}
 			libusb_unref_device(tmp_dev);
@@ -1411,6 +1414,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 				tmp_dev = get_ancestor(ctx, devinst, &devinst);
 				if (tmp_dev == NULL) {
 					usbi_warn(ctx, "ancestor for device '%s' not found at depth %u", priv->dev_id, depth);
+					libusb_unref_device(parent_dev);
 					return LIBUSB_ERROR_NO_DEVICE;
 				}
 				if (tmp_dev->bus_number != 0) {
@@ -1426,6 +1430,7 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 
 		if (bus_number == 0) {
 			usbi_err(ctx, "program assertion failed - bus number not found for '%s'", priv->dev_id);
+			libusb_unref_device(parent_dev);
 			return LIBUSB_ERROR_NOT_FOUND;
 		}
 
