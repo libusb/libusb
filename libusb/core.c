@@ -2477,20 +2477,6 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	int is_default_context = (NULL == ctx);
 #endif
 
-#if (!defined(__cplusplus) && \
-	(!defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L)) || \
-	(defined(__cplusplus) && __cplusplus <= 202302L)
-#if defined(__cplusplus) && __cplusplus < 201103L
-	/* Pre-C++11 has no static_assert; make a short enum an invalid array bound. */
-	typedef char libusb_option_short_enums_make_va_start_undefined[
-		sizeof(enum libusb_option) >= sizeof(int) ? 1 : -1];
-	(void)sizeof(libusb_option_short_enums_make_va_start_undefined);
-#else
-	static_assert(sizeof(enum libusb_option) >= sizeof(int),
-		"short enums make va_start(ap, option) undefined before C23/C++26");
-#endif
-#endif
-
 	/*
 	 * Before C++26, va_start requires its last named parameter to have a type
 	 * compatible with the result of default argument promotion. In C++,
@@ -2505,7 +2491,18 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 #if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L) || \
 	(defined(__cplusplus) && __cplusplus > 202302L)
 	va_start(ap);
-#elif defined(__clang__) && defined(__cplusplus)
+#else
+#if defined(__cplusplus) && __cplusplus < 201103L
+	/* Pre-C++11 has no static_assert; make a short enum an invalid array bound. */
+	typedef char libusb_option_short_enums_make_va_start_undefined[
+		sizeof(enum libusb_option) >= sizeof(int) ? 1 : -1];
+	(void)sizeof(libusb_option_short_enums_make_va_start_undefined);
+#else
+	static_assert(sizeof(enum libusb_option) >= sizeof(int),
+		"short enums make va_start(ap, option) undefined before C23/C++26");
+#endif
+
+#if defined(__clang__) && defined(__cplusplus)
 #if __has_builtin(__builtin_c23_va_start)
 	__builtin_c23_va_start(ap);
 #else
@@ -2516,6 +2513,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 #endif
 #else
 	va_start(ap, option);
+#endif
 #endif
 
 	if (LIBUSB_OPTION_LOG_LEVEL == option) {
