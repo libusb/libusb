@@ -2488,28 +2488,17 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 	 * use Clang's equivalent builtin, retaining the legacy call as a
 	 * compatibility fallback for older Clang versions.
 	 */
+#if defined(__clang__) && defined(__cplusplus)
+#define USBI_HAVE_C23_VA_START_BUILTIN __has_builtin(__builtin_c23_va_start)
+#else
+#define USBI_HAVE_C23_VA_START_BUILTIN 0
+#endif
+
 #if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L) || \
 	(defined(__cplusplus) && __cplusplus > 202302L)
 	va_start(ap);
-#elif defined(__clang__) && defined(__cplusplus)
-#if __has_builtin(__builtin_c23_va_start)
+#elif USBI_HAVE_C23_VA_START_BUILTIN
 	__builtin_c23_va_start(ap);
-#else
-#if __cplusplus < 201103L
-	/* Pre-C++11 has no static_assert; make a short enum an invalid array bound. */
-	typedef char libusb_option_short_enums_make_va_start_undefined[
-		sizeof(enum libusb_option) >= sizeof(int) ? 1 : -1];
-	(void)sizeof(libusb_option_short_enums_make_va_start_undefined);
-#else
-	static_assert(sizeof(enum libusb_option) >= sizeof(int),
-		"short enums make va_start(ap, option) undefined before C23/C++26");
-#endif
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wvarargs"
-	va_start(ap, option);
-#pragma clang diagnostic pop
-#endif
 #else
 #if defined(__cplusplus) && __cplusplus < 201103L
 	/* Pre-C++11 has no static_assert; make a short enum an invalid array bound. */
@@ -2521,8 +2510,16 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 		"short enums make va_start(ap, option) undefined before C23/C++26");
 #endif
 
-	va_start(ap, option);
+#if defined(__clang__) && defined(__cplusplus)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wvarargs"
 #endif
+	va_start(ap, option);
+#if defined(__clang__) && defined(__cplusplus)
+#pragma clang diagnostic pop
+#endif
+#endif
+#undef USBI_HAVE_C23_VA_START_BUILTIN
 
 	if (LIBUSB_OPTION_LOG_LEVEL == option) {
 		arg = va_arg(ap, int);
