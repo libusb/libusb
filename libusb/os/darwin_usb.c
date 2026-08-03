@@ -463,7 +463,7 @@ uint32_t get_running_version(void) {
 }
 
 /* this function must be called with the darwin_cached_devices_mutex held */
-static void darwin_deref_cached_device(struct darwin_cached_device *cached_dev) REQUIRES(darwin_cached_devices_mutex) {
+static void darwin_unref_cached_device_locked(struct darwin_cached_device *cached_dev) REQUIRES(darwin_cached_devices_mutex) {
   cached_dev->refcount--;
   /* free the device and remove it from the cache */
   if (0 == cached_dev->refcount) {
@@ -487,8 +487,16 @@ static void darwin_deref_cached_device(struct darwin_cached_device *cached_dev) 
 }
 
 /* this function must be called with the darwin_cached_devices_mutex held */
-static void darwin_ref_cached_device(struct darwin_cached_device *cached_dev) REQUIRES(darwin_cached_devices_mutex) {
+static void darwin_ref_cached_device_locked(struct darwin_cached_device *cached_dev) REQUIRES(darwin_cached_devices_mutex) {
   cached_dev->refcount++;
+}
+
+/* releases a reference to a cached device, e.g. one taken by
+   darwin_get_cached_device for its caller */
+static void darwin_unref_cached_device(struct darwin_cached_device *cached_dev) EXCLUDES(darwin_cached_devices_mutex) {
+  usbi_mutex_lock(&darwin_cached_devices_mutex);
+  darwin_unref_cached_device_locked (cached_dev);
+  usbi_mutex_unlock(&darwin_cached_devices_mutex);
 }
 
 /* returns the live device interface for enumeration purposes: while the
@@ -708,6 +716,11 @@ static void darwin_devices_attached (void *ptr, io_iterator_t add_devices) EXCLU
       usbi_dbg (NULL, "cached device in reset state. reset complete...");
     }
 
+    /* release the reference darwin_get_cached_device took for us (only taken
+       when a device was returned) */
+    if (cached_device) {
+      darwin_unref_cached_device (cached_device);
+    }
     IOObjectRelease(service);
   }
 
@@ -736,7 +749,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) EXCLU
     if (!ret)
       continue;
 
-    /* we need to match darwin_ref_cached_device call made in darwin_get_cached_device function
+    /* we need to match darwin_ref_cached_device_locked call made in darwin_get_cached_device function
        otherwise no cached device will ever get freed */
     usbi_mutex_lock(&darwin_cached_devices_mutex);
     list_for_each_entry(old_device, &darwin_cached_devices, list, struct darwin_cached_device) {
@@ -749,7 +762,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) EXCLU
 
           is_reenumerating = true;
         } else {
-          darwin_deref_cached_device (old_device);
+          darwin_unref_cached_device_locked (old_device);
         }
 
         break;
@@ -928,7 +941,7 @@ static void darwin_cleanup_devices(void) REQUIRES(darwin_cached_devices_mutex) {
     if (dev->refcount > 1) {
       usbi_err(NULL, "device still referenced at libusb_exit");
     }
-    darwin_deref_cached_device(dev);
+    darwin_unref_cached_device_locked(dev);
   }
 }
 
@@ -1142,7 +1155,8 @@ static int darwin_fetch_string_descriptor (struct libusb_context *ctx,
   langid = dpriv->langid;
   if (0 == langid) {
     memset (desc, 0, sizeof(desc));
-    req.bmRequestType = USBmakebmRequestType (kUSBIn, kUSBStandard, kUSBDevice);
+    req.bmRequestType = USBmakebmRequestType ((UInt8)kUSBIn,
+      (UInt8)kUSBStandard, (UInt8)kUSBDevice);
     req.bRequest      = kUSBRqGetDescriptor;
     req.wValue        = (UInt16)(LIBUSB_DT_STRING << 8);
     req.wIndex        = 0;
@@ -1159,7 +1173,8 @@ static int darwin_fetch_string_descriptor (struct libusb_context *ctx,
 
   /* Fetch the requested string descriptor. */
   memset (desc, 0, sizeof(desc));
-  req.bmRequestType = USBmakebmRequestType (kUSBIn, kUSBStandard, kUSBDevice);
+  req.bmRequestType = USBmakebmRequestType ((UInt8)kUSBIn,
+    (UInt8)kUSBStandard, (UInt8)kUSBDevice);
   req.bRequest      = kUSBRqGetDescriptor;
   req.wValue        = (UInt16)((LIBUSB_DT_STRING << 8) | string_index);
   req.wIndex        = langid;
@@ -1381,7 +1396,8 @@ static IOReturn darwin_request_descriptor (usb_device_t device, UInt8 desc, UInt
   memset (buffer, 0, buffer_size);
 
   /* Set up request for descriptor/ */
-  req.bmRequestType = USBmakebmRequestType(kUSBIn, kUSBStandard, kUSBDevice);
+  req.bmRequestType = USBmakebmRequestType((UInt8)kUSBIn,
+    (UInt8)kUSBStandard, (UInt8)kUSBDevice);
   req.bRequest      = kUSBRqGetDescriptor;
   req.wValue        = (UInt16)(desc << 8);
   req.wIndex        = desc_index;
@@ -1648,7 +1664,7 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
       (*device)->GetDeviceAddress (device, (USBDeviceAddress *)&new_device->address);
 
       /* keep a reference to this device */
-      darwin_ref_cached_device(new_device);
+      darwin_ref_cached_device_locked(new_device);
 
       (*device)->GetLocationID (device, &new_device->location);
       new_device->port = port;
@@ -1696,6 +1712,15 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
     }
   } while (0);
 
+  /* take a reference for the caller while still holding the mutex: without
+     it, a detach event processed between this unlock and the caller's use of
+     the device could drop the last reference and free the cached device
+     under the caller. the caller must release the reference with
+     darwin_unref_cached_device when done. */
+  if (*cached_out) {
+    darwin_ref_cached_device_locked (*cached_out);
+  }
+
   usbi_mutex_unlock(&darwin_cached_devices_mutex);
 
   assert((ret == LIBUSB_SUCCESS) ? (*cached_out != NULL) : true);
@@ -1738,7 +1763,7 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
 
       priv->dev = cached_device;
       usbi_mutex_lock(&darwin_cached_devices_mutex);
-      darwin_ref_cached_device (priv->dev);
+      darwin_ref_cached_device_locked (priv->dev);
       usbi_mutex_unlock(&darwin_cached_devices_mutex);
       dev->port_number    = cached_device->port;
       /* the location ID encodes the path to the device. the top byte of the location ID contains the bus number
@@ -1827,6 +1852,11 @@ static enum libusb_error darwin_scan_devices(struct libusb_context *ctx) {
       (void) process_new_device (ctx, cached_device, old_session_id);
     }
 
+    /* release the reference darwin_get_cached_device took for us (only taken
+       when a device was returned) */
+    if (cached_device) {
+      darwin_unref_cached_device (cached_device);
+    }
     IOObjectRelease(service);
   }
 
@@ -2745,7 +2775,7 @@ static void darwin_destroy_device(struct libusb_device *dev) EXCLUDES(darwin_cac
   if (dpriv->dev) {
     /* need to hold the lock in case this is the last reference to the device */
     usbi_mutex_lock(&darwin_cached_devices_mutex);
-    darwin_deref_cached_device (dpriv->dev);
+    darwin_unref_cached_device_locked (dpriv->dev);
     dpriv->dev = NULL;
     usbi_mutex_unlock(&darwin_cached_devices_mutex);
   }
