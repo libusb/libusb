@@ -1155,7 +1155,8 @@ static int darwin_fetch_string_descriptor (struct libusb_context *ctx,
   langid = dpriv->langid;
   if (0 == langid) {
     memset (desc, 0, sizeof(desc));
-    req.bmRequestType = USBmakebmRequestType (kUSBIn, kUSBStandard, kUSBDevice);
+    req.bmRequestType = USBmakebmRequestType ((UInt8)kUSBIn,
+      (UInt8)kUSBStandard, (UInt8)kUSBDevice);
     req.bRequest      = kUSBRqGetDescriptor;
     req.wValue        = (UInt16)(LIBUSB_DT_STRING << 8);
     req.wIndex        = 0;
@@ -1172,7 +1173,8 @@ static int darwin_fetch_string_descriptor (struct libusb_context *ctx,
 
   /* Fetch the requested string descriptor. */
   memset (desc, 0, sizeof(desc));
-  req.bmRequestType = USBmakebmRequestType (kUSBIn, kUSBStandard, kUSBDevice);
+  req.bmRequestType = USBmakebmRequestType ((UInt8)kUSBIn,
+    (UInt8)kUSBStandard, (UInt8)kUSBDevice);
   req.bRequest      = kUSBRqGetDescriptor;
   req.wValue        = (UInt16)((LIBUSB_DT_STRING << 8) | string_index);
   req.wIndex        = langid;
@@ -1394,7 +1396,8 @@ static IOReturn darwin_request_descriptor (usb_device_t device, UInt8 desc, UInt
   memset (buffer, 0, buffer_size);
 
   /* Set up request for descriptor/ */
-  req.bmRequestType = USBmakebmRequestType(kUSBIn, kUSBStandard, kUSBDevice);
+  req.bmRequestType = USBmakebmRequestType((UInt8)kUSBIn,
+    (UInt8)kUSBStandard, (UInt8)kUSBDevice);
   req.bRequest      = kUSBRqGetDescriptor;
   req.wValue        = (UInt16)(desc << 8);
   req.wIndex        = desc_index;
