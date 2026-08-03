@@ -2703,12 +2703,19 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 	// stall every string query by the full request timeout. The cooldown is
 	// per device object rather than the enumeration backoff on purpose: a
 	// device without strings can still be enumerable and usable, so it must
-	// not disappear from the device list. The deadline is accessed with
-	// interlocked operations: the string getters may run concurrently and a
-	// plain 64-bit access can tear on 32-bit builds.
-	if (GetTickCount64() < (ULONGLONG)InterlockedCompareExchange64(&priv->string_backoff_expiry, 0, 0)) {
-		usbi_dbg(ctx, "skipping string descriptor request for '%s' until its cooldown expires", priv->dev_id);
-		return LIBUSB_ERROR_IO;
+	// not disappear from the device list. The deadline is a 32-bit tick with
+	// a wrap-safe comparison: device private data is only pointer aligned,
+	// too weak for 64-bit interlocked operands on Win32, while the 32-bit
+	// interlocked accesses used here only need the guaranteed 4 bytes. An
+	// expired deadline is cleared so it cannot come back to life once the
+	// tick counter wraps.
+	LONG deadline = InterlockedCompareExchange(&priv->string_backoff_deadline, 0, 0);
+	if (deadline != 0) {
+		if ((LONG)((DWORD)deadline - GetTickCount()) > 0) {
+			usbi_dbg(ctx, "skipping string descriptor request for '%s' until its cooldown expires", priv->dev_id);
+			return LIBUSB_ERROR_IO;
+		}
+		InterlockedCompareExchange(&priv->string_backoff_deadline, 0, deadline);
 	}
 
 	struct winusb_device_priv* hub_priv = (struct winusb_device_priv *)usbi_get_device_priv(dev->parent_dev);
@@ -2775,7 +2782,10 @@ static int winusb_fetch_string_descriptor(libusb_device *dev,
 			priv->dev_id, windows_error_str(error));
 		// The control pipe is wedged, pause string requests for a while
 		if (error == ERROR_SEM_TIMEOUT) {
-			InterlockedExchange64(&priv->string_backoff_expiry, (LONG64)(GetTickCount64() + HUB_IOCTL_RETRY_BACKOFF_MS));
+			LONG new_deadline = (LONG)(GetTickCount() + HUB_IOCTL_RETRY_BACKOFF_MS);
+			if (new_deadline == 0)	// 0 means unarmed
+				new_deadline = 1;
+			InterlockedExchange(&priv->string_backoff_deadline, new_deadline);
 			usbi_warn(ctx, "not issuing string descriptor requests for '%s' for the next %d ms",
 				priv->dev_id, HUB_IOCTL_RETRY_BACKOFF_MS);
 		}
