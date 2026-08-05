@@ -268,6 +268,11 @@ int main(int argc, const char *argv[])
 	product_id = (argc > 2) ? (int)strtol (argv[2], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
 	class_id   = (argc > 3) ? (int)strtol (argv[3], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
 
+	/* Keep stdout unbuffered so that captured events (to file or pipe)
+	 * interleave correctly with libusb's stderr debug output and nothing
+	 * is lost if the process is terminated externally. */
+	setvbuf(stdout, NULL, _IONBF, 0);
+
 	rc = libusb_init_context(&ctx, /*options=*/NULL, /*num_options=*/0);
 	if (LIBUSB_SUCCESS != rc)
 	{
