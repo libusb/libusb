@@ -1,0 +1,33 @@
+BasedOnStyle: WebKit
+AlignTrailingComments: true
+BraceWrapping:
+  AfterFunction: true
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Custom
+DerivePointerAlignment: true
+MaxEmptyLinesToKeep: 2
+ReflowComments: false
+SortIncludes: false
+TabWidth: 4
+UseTab: ForContinuationAndIndentation
+ForEachMacros: ['for_each_hotplug_cb_safe', 'for_each_device_safe', 'for_each_device', 'for_each_transfer_safe', 'for_each_removed_event_source_safe', 'for_each_transfer', '__for_each_completed_transfer_safe', 'for_each_event_source', 'for_each_hotplug_cb', 'for_each_context', 'for_each_removed_event_source']
+
+#UseTab: Never
+ColumnLimit: 100
+AlignAfterOpenBracket: DontAlign
+AllowShortFunctionsOnASingleLine: None
+AlignOperands: Align
+AllowShortEnumsOnASingleLine: false
+PointerAlignment: Right
+IndentCaseBlocks: true
+IndentGotoLabels: false
+IndentPPDirectives: None
+InsertNewlineAtEOF: true
+BreakStringLiterals: false
+AllowShortCaseExpressionOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+PackConstructorInitializers: Never
+ConstructorInitializerIndentWidth: 0
+Cpp11BracedListStyle: false
+SpaceBeforeCpp11BracedList: true
