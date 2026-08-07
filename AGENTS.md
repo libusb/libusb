@@ -45,6 +45,22 @@ with their own certificate.
 - Branch names should be explicit and brief about what is being done or asked — e.g. `add-commit-attribution`, `fix-win-hang`, etc.
 - Prefer kebab-case.
 
+## Primary C Build and Other Compilation Contexts
+
+libusb is a C project whose primary use and build context is as a C library compiled with a
+C compiler. Its C sources are sometimes used in other contexts, including being compiled with
+a C++ compiler.
+
+When a change is required only for a non-primary context, both the commit message and the PR
+description must:
+
+- Explicitly name the affected context, for example, "building libusb's C sources as C++."
+- Explain why the change is needed in that context.
+- State whether the primary C library build is unaffected.
+
+Do not describe a context-specific change as a general C or libusb build fix unless it also
+affects the primary C library build.
+
 ## Public API and ABI Compatibility
 
 `libusb/libusb.h` is the installed public API header and must be treated as a
