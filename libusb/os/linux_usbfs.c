@@ -36,6 +36,8 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/utsname.h>
 #include <sys/vfs.h>
 #include <unistd.h>
@@ -798,6 +800,69 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 			UINT8_MAX, config);
 }
 
+/* read the bConfigurationValue for a device we only have a usbfs file
+ * descriptor for, i.e. one that came in through libusb_wrap_sys_device().
+ *
+ * Such a device has no priv->sysfs_dir, so the active configuration is
+ * normally asked of the device itself with a GET_CONFIGURATION request. The
+ * kernel already knows the answer and publishes the mapping needed to find
+ * it: a usbfs node is a character device, and /sys/dev/char/<major>:<minor>
+ * is a symlink to the owning device's sysfs directory, whose basename is the
+ * same "1-4" form priv->sysfs_dir holds. The node's device numbers come from
+ * the sysfs "dev" attribute udev read when it created the node, and
+ * linux_get_device_address() already trusts this file descriptor's identity
+ * when it reads the bus number and address out of the node's name, so
+ * resolving the same file descriptor's device numbers through the kernel's
+ * own mapping introduces no new source of trust.
+ *
+ * Any failure at any step is not an error: the caller falls back to asking
+ * the device, which is what it did before. All failures collapse to
+ * LIBUSB_ERROR_NOT_SUPPORTED so no caller is tempted to report one.
+ */
+static int wrapped_fd_get_active_config(struct libusb_device *dev, int fd,
+	int *config)
+{
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	char link[64], target[PATH_MAX], *name;
+	struct stat st;
+	ssize_t len;
+	int active, r;
+
+	if (!sysfs_available)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	if (fstat(fd, &st) < 0 || !S_ISCHR(st.st_mode))
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	snprintf(link, sizeof(link), "/sys/dev/char/%u:%u",
+		major(st.st_rdev), minor(st.st_rdev));
+
+	len = readlink(link, target, sizeof(target) - 1);
+	if (len < 0)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	target[len] = '\0';
+
+	name = strrchr(target, '/');
+	name = name ? name + 1 : target;
+	if (*name == '\0')
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	r = read_sysfs_attr(ctx, name, "bConfigurationValue", UINT8_MAX, &active);
+	if (r < 0)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	/* An unconfigured device leaves the attribute empty, which
+	 * read_sysfs_attr() already reports as -1. Reaching this line with a 0
+	 * means the kernel named configuration 0, so decide it the way the
+	 * request path decides the same answer. */
+	if (active == 0 && !dev_has_config0(dev))
+		active = -1;
+
+	*config = active;
+
+	return LIBUSB_SUCCESS;
+}
+
 int linux_get_device_address(struct libusb_context *ctx, int detached,
 	uint8_t *busnum, uint8_t *devaddr, const char *dev_node,
 	const char *sys_name, int fd)
@@ -1218,6 +1283,23 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	}
 
 	/* cache active config */
+	if (wrapped_fd >= 0) {
+		/* The device came in through libusb_wrap_sys_device(), which
+		 * is documented not to send requests over the bus when the
+		 * kernel can describe the wrapped device. Ask the kernel, and
+		 * only fall back to asking the device if it cannot be. */
+		int active_config;
+
+		if (wrapped_fd_get_active_config(dev, wrapped_fd,
+				&active_config) == LIBUSB_SUCCESS) {
+			usbi_dbg(ctx, "active configuration %d for wrapped device from sysfs",
+				 active_config);
+			priv->active_config = active_config;
+			return LIBUSB_SUCCESS;
+		}
+		usbi_dbg(ctx, "no sysfs answer for wrapped device, asking the device");
+	}
+
 	if (wrapped_fd < 0)
 		fd = get_usbfs_fd(dev, O_RDWR, 1);
 	else
@@ -1675,8 +1757,29 @@ static int op_get_configuration(struct libusb_device_handle *handle,
 		struct linux_device_handle_priv *hpriv = (struct linux_device_handle_priv *)usbi_get_device_handle_priv(handle);
 
 		r = usbfs_get_active_config(handle->dev, hpriv->fd);
-		if (r == LIBUSB_SUCCESS)
+		if (r == LIBUSB_SUCCESS) {
+			int kernel_config;
+
 			active_config = priv->active_config;
+
+			/* The request stays: it is what reports a disconnect,
+			 * and this function is documented to do that. For a
+			 * wrapped descriptor its answer is not the one to keep
+			 * though -- initialize_device() already preferred the
+			 * kernel's, and this call would otherwise write the
+			 * device's answer back over it, which is the cache
+			 * op_get_active_config_descriptor() goes on to use. */
+			if (hpriv->fd_keep &&
+			    wrapped_fd_get_active_config(handle->dev, hpriv->fd,
+					&kernel_config) == LIBUSB_SUCCESS) {
+				if (kernel_config != active_config)
+					usbi_dbg(HANDLE_CTX(handle),
+						 "device reports configuration %d but the kernel reports %d, keeping the kernel's",
+						 active_config, kernel_config);
+				priv->active_config = kernel_config;
+				active_config = kernel_config;
+			}
+		}
 	}
 	if (r < 0)
 		return r;
