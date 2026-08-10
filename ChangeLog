@@ -1,6 +1,7 @@
 For detailed information about the changes below, please see the git log.
 
 202?-??-??: v1.0.31
+* Windows: add LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM, making libusb_claim_interface() exclude other processes for devices driven by the libusbK driver family (libusbK.sys, libusb0.sys), as on Linux and macOS. Off by default, so existing applications are unaffected
 * Add new APIs libusb_get_config_string() and libusb_get_interface_string() to access configuration and interface strings without opening the device
 * LIBUSB_API_VERSION bump to 0x0100010D
 

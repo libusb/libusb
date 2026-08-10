@@ -641,6 +641,13 @@ static int windows_deinitialize_interface(struct libusb_device_handle *dev_handl
 	return priv->backend->deinitialize_interface(dev_handle, interface_number);
 }
 
+static bool exclusive_claim_requested(struct libusb_device_handle *dev_handle)
+{
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+
+	return priv->exclusive_claim;
+}
+
 /*
  * auto-initialization helper functions
  *
@@ -3491,6 +3498,10 @@ cleanup_winusb:
 			// Optional device reset support
 			libusbK_Set(sub_api, ResetDevice, false);
 
+			// Optional: absent from WinUSB and from older libusbK DLLs
+			libusbK_Set(sub_api, ClaimInterface, false);
+			libusbK_Set(sub_api, ReleaseInterface, false);
+
 			WinUSBX[sub_api].hDll = hlibusbK;
 		}
 
@@ -3845,12 +3856,43 @@ static int winusbx_initialize_interface(int sub_api, struct libusb_device_handle
 static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
 {
 	struct libusb_context *ctx = HANDLE_CTX(dev_handle);
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+	HANDLE winusb_handle;
+	bool was_initialized;
 	int r;
 
-	// Nothing here arbitrates a claim; it just makes the interface usable
+	CHECK_WINUSBX_AVAILABLE(sub_api);
+
+	was_initialized = HANDLE_VALID(handle_priv->interface_handle[iface].api_handle);
+
 	r = winusbx_initialize_interface(sub_api, dev_handle, iface);
-	if (r != LIBUSB_SUCCESS)
+	if (r != 0)
 		return r;
+
+	winusb_handle = handle_priv->interface_handle[iface].api_handle;
+
+	if (exclusive_claim_requested(dev_handle)) {
+		if (WinUSBX[sub_api].ClaimInterface) {
+			if (!WinUSBX[sub_api].ClaimInterface(winusb_handle, iface, 0)) {
+				usbi_dbg(ctx, "could not claim interface %u: %s", iface, windows_error_str(0));
+				if (!was_initialized) {
+					WinUSBX[sub_api].Free(winusb_handle);
+					handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
+				}
+				return LIBUSB_ERROR_BUSY;
+			}
+		} else if (sub_api != SUB_API_WINUSB) {
+			// Too old to enforce; do not pretend otherwise
+			usbi_warn(ctx, "libusbK DLL does not support claiming interfaces");
+			if (!was_initialized) {
+				WinUSBX[sub_api].Free(winusb_handle);
+				handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
+			}
+			return LIBUSB_ERROR_NOT_SUPPORTED;
+		}
+		// WinUSB permits a single open, so exclusion is already in force
+	}
 
 	usbi_dbg(ctx, "claimed interface %u", iface);
 
@@ -3886,6 +3928,9 @@ static int winusbx_release_interface(int sub_api, struct libusb_device_handle *d
 	winusb_handle = handle_priv->interface_handle[iface].api_handle;
 	if (!HANDLE_VALID(winusb_handle))
 		return LIBUSB_ERROR_NOT_FOUND;
+
+	if (exclusive_claim_requested(dev_handle) && WinUSBX[sub_api].ReleaseInterface)
+		WinUSBX[sub_api].ReleaseInterface(winusb_handle, iface, 0);
 
 	return winusbx_deinitialize_interface(sub_api, dev_handle, iface);
 }
@@ -5399,6 +5444,12 @@ static int hid_claim_interface(int sub_api, struct libusb_device_handle *dev_han
 	// NB: Disconnection detection is not possible in this function
 	if (priv->usb_interface[iface].path == NULL)
 		return LIBUSB_ERROR_NOT_FOUND; // invalid iface
+
+	// Windows shares HID devices between applications; nothing to claim
+	if (exclusive_claim_requested(dev_handle)) {
+		usbi_warn(HANDLE_CTX(dev_handle), "HID interfaces cannot be claimed exclusively");
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+	}
 
 	// We use dev_handle as a flag for interface claimed
 	if (handle_priv->interface_handle[iface].dev_handle == INTERFACE_CLAIMED)
