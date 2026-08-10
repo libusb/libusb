@@ -390,6 +390,7 @@ enum windows_iocp_state {
 
 struct windows_context_priv {
 	const struct windows_backend *backend;
+	bool exclusive_claim; // LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM
 	HANDLE completion_port;
 	HANDLE completion_port_thread;
 	usbi_atomic_t completion_port_state; // enum windows_iocp_state
