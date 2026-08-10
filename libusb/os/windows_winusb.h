@@ -41,6 +41,8 @@
 #define MAX_KEY_LENGTH		256
 #define LIST_SEPARATOR		';'
 
+// Handle code for HID interface that have been initialized ("dabs")
+#define INTERFACE_INITIALIZED	((HANDLE)(intptr_t)0xDAB5)
 // Handle code for HID interface that have been claimed ("dibs")
 #define INTERFACE_CLAIMED	((HANDLE)(intptr_t)0xD1B5)
 // Additional return code for HID operations that completed synchronously
@@ -80,6 +82,8 @@ struct windows_usb_api_backend {
 	int (*open)(int sub_api, struct libusb_device_handle *dev_handle);
 	void (*close)(int sub_api, struct libusb_device_handle *dev_handle);
 	int (*configure_endpoints)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
+	int (*initialize_interface)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
+	int (*deinitialize_interface)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 	int (*claim_interface)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 	int (*set_interface_altsetting)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting);
 	int (*release_interface)(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
