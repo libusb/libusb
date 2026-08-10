@@ -56,6 +56,8 @@ static void winusbx_exit(void);
 static int winusbx_open(int sub_api, struct libusb_device_handle *dev_handle);
 static void winusbx_close(int sub_api, struct libusb_device_handle *dev_handle);
 static int winusbx_configure_endpoints(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
+static int winusbx_initialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
+static int winusbx_deinitialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 static int winusbx_release_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *itransfer);
@@ -74,6 +76,8 @@ static bool hid_init(struct libusb_context *ctx);
 static void hid_exit(void);
 static int hid_open(int sub_api, struct libusb_device_handle *dev_handle);
 static void hid_close(int sub_api, struct libusb_device_handle *dev_handle);
+static int hid_initialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
+static int hid_deinitialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 static int hid_claim_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 static int hid_release_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 static int hid_set_interface_altsetting(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting);
@@ -85,6 +89,8 @@ static enum libusb_transfer_status hid_copy_transfer_data(int sub_api, struct us
 // Composite API prototypes
 static int composite_open(int sub_api, struct libusb_device_handle *dev_handle);
 static void composite_close(int sub_api, struct libusb_device_handle *dev_handle);
+static int composite_initialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
+static int composite_deinitialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 static int composite_claim_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
 static int composite_set_interface_altsetting(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting);
 static int composite_release_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface);
@@ -99,7 +105,7 @@ static int composite_endpoint_supports_raw_io(int sub_api, struct libusb_device_
 static int composite_endpoint_set_raw_io(int sub_api, struct libusb_device_handle* dev_handle, uint8_t endpoint, int enable);
 static int composite_get_max_raw_io_transfer_size(int sub_api, struct libusb_device_handle* dev_handle, uint8_t endpoint);
 
-static usbi_mutex_t autoclaim_lock;
+static usbi_mutex_t autoinit_lock;
 
 // API globals
 static struct winusb_interface WinUSBX[SUB_API_MAX];
@@ -623,10 +629,31 @@ static int get_sub_api(char *driver, int api)
 	return SUB_API_NOTSET;
 }
 
+static int windows_initialize_interface(struct libusb_device_handle *dev_handle, uint8_t interface_number)
+{
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	return priv->backend->initialize_interface(dev_handle, interface_number);
+}
+
+static int windows_deinitialize_interface(struct libusb_device_handle *dev_handle, uint8_t interface_number)
+{
+	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	return priv->backend->deinitialize_interface(dev_handle, interface_number);
+}
+
 /*
- * auto-claiming and auto-release helper functions
+ * auto-initialization helper functions
+ *
+ * A control transfer issued before any explicit claim needs a handle to
+ * travel on. Initializing must not go through libusb_claim_interface(), or
+ * the interface would enter dev_handle->claimed_interfaces and a later claim
+ * by the application would short-circuit there, never reaching the driver.
+ * autoinit_count[] is the only record of an auto-initialized interface.
+ *
+ * Lock order is autoinit_lock -> interface_lock; nothing held under
+ * autoinit_lock may re-enter the public API.
  */
-static int auto_claim(struct libusb_transfer *transfer, int *interface_number, int api_type)
+static int auto_initialize(struct libusb_transfer *transfer, int *interface_number, int api_type)
 {
 	struct winusb_device_handle_priv *handle_priv =
 		get_winusb_device_handle_priv(transfer->dev_handle);
@@ -642,52 +669,55 @@ static int auto_claim(struct libusb_transfer *transfer, int *interface_number, i
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
 
-	usbi_mutex_lock(&autoclaim_lock);
+	if (!usbi_atomic_load(&transfer->dev_handle->dev->attached))
+		return LIBUSB_ERROR_NO_DEVICE;
+
+	usbi_mutex_lock(&autoinit_lock);
 	if (current_interface < 0) { // No serviceable interface was found
-		// Status of the last claim attempt, returned to the caller when the scan
-		// comes up empty: LIBUSB_ERROR_NO_DEVICE for a device that has been
-		// unplugged or re-enumerated, LIBUSB_ERROR_NOT_FOUND when the device
+		// Status of the last initialization attempt, returned to the caller when
+		// the scan comes up empty: LIBUSB_ERROR_NO_DEVICE for a device that has
+		// been unplugged or re-enumerated, LIBUSB_ERROR_NOT_FOUND when the device
 		// exposes no interface of this API type.
-		int claim_status = LIBUSB_ERROR_NOT_FOUND;
+		int init_status = LIBUSB_ERROR_NOT_FOUND;
 
 		for (current_interface = 0; current_interface < USB_MAXINTERFACES; current_interface++) {
-			// Must claim an interface of the same API type
+			// Must initialize an interface of the same API type
 			if (priv->usb_interface[current_interface].apib->id != api_type)
 				continue;
 
-			claim_status = libusb_claim_interface(transfer->dev_handle, current_interface);
-			if (claim_status == LIBUSB_SUCCESS) {
-				usbi_dbg(TRANSFER_CTX(transfer), "auto-claimed interface %d for control request", current_interface);
-				if (handle_priv->autoclaim_count[current_interface] != 0)
-					usbi_err(TRANSFER_CTX(transfer), "program assertion failed - autoclaim_count was nonzero");
-				handle_priv->autoclaim_count[current_interface]++;
+			init_status = windows_initialize_interface(transfer->dev_handle, (uint8_t)current_interface);
+			if (init_status == LIBUSB_SUCCESS) {
+				usbi_dbg(TRANSFER_CTX(transfer), "auto-initialized interface %d for control request", current_interface);
+				if (handle_priv->autoinit_count[current_interface] != 0)
+					usbi_err(TRANSFER_CTX(transfer), "program assertion failed - autoinit_count was nonzero");
+				handle_priv->autoinit_count[current_interface]++;
 				break;
 			}
 
 			// The device is gone, no other interface is going to fare better
-			if (claim_status == LIBUSB_ERROR_NO_DEVICE) {
+			if (init_status == LIBUSB_ERROR_NO_DEVICE) {
 				current_interface = USB_MAXINTERFACES;
 				break;
 			}
 		}
 		if (current_interface == USB_MAXINTERFACES) {
-			r = claim_status;
-			usbi_err(TRANSFER_CTX(transfer), "could not auto-claim any interface: %s",
+			r = init_status;
+			usbi_err(TRANSFER_CTX(transfer), "could not auto-initialize any interface: %s",
 				libusb_error_name(r));
 		}
 	} else {
-		// If we have a valid interface that was autoclaimed, we must increment
-		// its autoclaim count so that we can prevent an early release.
-		if (handle_priv->autoclaim_count[current_interface] != 0)
-			handle_priv->autoclaim_count[current_interface]++;
+		// If we have a valid interface that was auto-initialized, we must
+		// increment its count so that we can prevent an early teardown.
+		if (handle_priv->autoinit_count[current_interface] != 0)
+			handle_priv->autoinit_count[current_interface]++;
 	}
-	usbi_mutex_unlock(&autoclaim_lock);
+	usbi_mutex_unlock(&autoinit_lock);
 
 	*interface_number = current_interface;
 	return r;
 }
 
-static void auto_release(struct usbi_transfer *itransfer)
+static void auto_deinitialize(struct usbi_transfer *itransfer)
 {
 	struct winusb_transfer_priv *transfer_priv = get_winusb_transfer_priv(itransfer);
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
@@ -695,19 +725,21 @@ static void auto_release(struct usbi_transfer *itransfer)
 	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
 	int r;
 
-	usbi_mutex_lock(&autoclaim_lock);
-	if (handle_priv->autoclaim_count[transfer_priv->interface_number] > 0) {
-		handle_priv->autoclaim_count[transfer_priv->interface_number]--;
-		if (handle_priv->autoclaim_count[transfer_priv->interface_number] == 0) {
-			r = libusb_release_interface(dev_handle, transfer_priv->interface_number);
+	usbi_mutex_lock(&autoinit_lock);
+	if (handle_priv->autoinit_count[transfer_priv->interface_number] > 0) {
+		handle_priv->autoinit_count[transfer_priv->interface_number]--;
+		if (handle_priv->autoinit_count[transfer_priv->interface_number] == 0) {
+			// libusb_release_interface() would reject an interface that
+			// was never claimed.
+			r = windows_deinitialize_interface(dev_handle, transfer_priv->interface_number);
 			if (r == LIBUSB_SUCCESS)
-				usbi_dbg(ITRANSFER_CTX(itransfer), "auto-released interface %d", transfer_priv->interface_number);
+				usbi_dbg(ITRANSFER_CTX(itransfer), "auto-deinitialized interface %d", transfer_priv->interface_number);
 			else
-				usbi_dbg(ITRANSFER_CTX(itransfer), "failed to auto-release interface %d (%s)",
+				usbi_dbg(ITRANSFER_CTX(itransfer), "failed to auto-deinitialize interface %d (%s)",
 					transfer_priv->interface_number, libusb_error_name((enum libusb_error)r));
 		}
 	}
-	usbi_mutex_unlock(&autoclaim_lock);
+	usbi_mutex_unlock(&autoinit_lock);
 }
 
 /*
@@ -730,8 +762,8 @@ static int winusb_init(struct libusb_context *ctx)
 				usb_api_backend[i].designation);
 	}
 
-	// We need a lock for proper auto-release
-	usbi_mutex_init(&autoclaim_lock);
+	// We need a lock for proper auto-deinitialization
+	usbi_mutex_init(&autoinit_lock);
 
 	return LIBUSB_SUCCESS;
 }
@@ -989,7 +1021,7 @@ static void winusb_exit(struct libusb_context *ctx)
 {
 	int i;
 
-	usbi_mutex_destroy(&autoclaim_lock);
+	usbi_mutex_destroy(&autoinit_lock);
 
 	for (i = 0; i < USB_API_MAX; i++) {
 		if (usb_api_backend[i].exit)
@@ -2921,13 +2953,53 @@ static int winusb_set_configuration(struct libusb_device_handle *dev_handle, uin
 	return r;
 }
 
-static int winusb_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface)
+static int winusb_initialize_interface(struct libusb_device_handle *dev_handle, uint8_t iface)
+{
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+	int r;
+
+	CHECK_SUPPORTED_API(priv->apib, initialize_interface);
+
+	usbi_mutex_lock(&priv->interface_lock);
+
+	safe_free(priv->usb_interface[iface].endpoint);
+	priv->usb_interface[iface].nb_endpoints = 0;
+
+	r = priv->apib->initialize_interface(SUB_API_NOTSET, dev_handle, iface);
+
+	if (r == LIBUSB_SUCCESS)
+		r = windows_assign_endpoints(dev_handle, iface, 0);
+
+	usbi_mutex_unlock(&priv->interface_lock);
+
+	return r;
+}
+
+static int winusb_deinitialize_interface(struct libusb_device_handle *dev_handle, uint8_t iface)
 {
 	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev_handle->dev);
 	int r;
 
+	CHECK_SUPPORTED_API(priv->apib, deinitialize_interface);
+
+	usbi_mutex_lock(&priv->interface_lock);
+	r = priv->apib->deinitialize_interface(SUB_API_NOTSET, dev_handle, iface);
+	usbi_mutex_unlock(&priv->interface_lock);
+
+	return r;
+}
+
+static int winusb_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface)
+{
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev_handle->dev);
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
+	int r;
+
 	CHECK_SUPPORTED_API(priv->apib, claim_interface);
 
+	// Serialize against auto_deinitialize() and take over any pending
+	// auto-initialization of this interface.
+	usbi_mutex_lock(&autoinit_lock);
 	usbi_mutex_lock(&priv->interface_lock);
 
 	safe_free(priv->usb_interface[iface].endpoint);
@@ -2938,7 +3010,11 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, uint8
 	if (r == LIBUSB_SUCCESS)
 		r = windows_assign_endpoints(dev_handle, iface, 0);
 
+	if (r == LIBUSB_SUCCESS)
+		handle_priv->autoinit_count[iface] = 0;
+
 	usbi_mutex_unlock(&priv->interface_lock);
+	usbi_mutex_unlock(&autoinit_lock);
 
 	return r;
 }
@@ -3028,8 +3104,8 @@ static void winusb_clear_transfer_priv(struct usbi_transfer *itransfer)
 
 	safe_free(transfer_priv->iso_context);
 
-	// When auto claim is in use, attempt to release the auto-claimed interface
-	auto_release(itransfer);
+	// When auto-initialization is in use, attempt to undo it
+	auto_deinitialize(itransfer);
 }
 
 static int winusb_submit_transfer(struct usbi_transfer *itransfer)
@@ -3145,6 +3221,8 @@ const struct windows_backend winusb_backend = {
 	winusb_get_config_descriptor_by_value,
 	winusb_get_configuration,
 	winusb_set_configuration,
+	winusb_initialize_interface,
+	winusb_deinitialize_interface,
 	winusb_claim_interface,
 	winusb_release_interface,
 	winusb_set_interface_altsetting,
@@ -3205,6 +3283,8 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		NULL,	/* open */
 		NULL,	/* close */
 		NULL,	/* configure_endpoints */
+		NULL,	/* initialize_interface */
+		NULL,	/* deinitialize_interface */
 		NULL,	/* claim_interface */
 		NULL,	/* set_interface_altsetting */
 		NULL,	/* release_interface */
@@ -3229,6 +3309,8 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		composite_open,
 		composite_close,
 		NULL,	/* configure_endpoints */
+		composite_initialize_interface,
+		composite_deinitialize_interface,
 		composite_claim_interface,
 		composite_set_interface_altsetting,
 		composite_release_interface,
@@ -3253,6 +3335,8 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		winusbx_open,
 		winusbx_close,
 		winusbx_configure_endpoints,
+		winusbx_initialize_interface,
+		winusbx_deinitialize_interface,
 		winusbx_claim_interface,
 		winusbx_set_interface_altsetting,
 		winusbx_release_interface,
@@ -3277,6 +3361,8 @@ const struct windows_usb_api_backend usb_api_backend[USB_API_MAX] = {
 		hid_open,
 		hid_close,
 		NULL,	/* configure_endpoints */
+		hid_initialize_interface,
+		hid_deinitialize_interface,
 		hid_claim_interface,
 		hid_set_interface_altsetting,
 		hid_release_interface,
@@ -3612,7 +3698,7 @@ static int winusbx_configure_endpoints(int sub_api, struct libusb_device_handle 
 	return LIBUSB_SUCCESS;
 }
 
-static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
+static int winusbx_initialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
 {
 	struct libusb_context *ctx = HANDLE_CTX(dev_handle);
 	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
@@ -3641,7 +3727,7 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 	    (!is_associated_interface || (iface==priv->usb_interface[iface].first_associated_interface))) {
 		// composite device (independent interfaces) or interface 0
 
-		// This interface may already have been auto-claimed as the first
+		// This interface may already have been auto-initialized as the first
 		// interface while another interface was claimed before it. Calling
 		// Initialize() again on the same handle would overwrite and leak the
 		// existing api_handle (the one any associated interface was derived
@@ -3721,14 +3807,14 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 		// For all other interfaces, use GetAssociatedInterface()
 		winusb_handle = handle_priv->interface_handle[initialized_iface].api_handle;
 		// It is a requirement for multiple interface devices on Windows that, to you
-		// must first claim the first interface before you claim the others
+		// must first initialize the first interface before you initialize the others
 		if (!HANDLE_VALID(winusb_handle)) {
 			file_handle = handle_priv->interface_handle[initialized_iface].dev_handle;
 			if (WinUSBX[sub_api].Initialize(file_handle, &winusb_handle)) {
 				handle_priv->interface_handle[initialized_iface].api_handle = winusb_handle;
-				usbi_warn(ctx, "auto-claimed interface %u (required to claim %u with WinUSB)", initialized_iface, iface);
+				usbi_warn(ctx, "auto-initialized interface %u (required to initialize %u with WinUSB)", initialized_iface, iface);
 			} else {
-				usbi_warn(ctx, "failed to auto-claim interface %u (required to claim %u with WinUSB): %s",
+				usbi_warn(ctx, "failed to auto-initialize interface %u (required to initialize %u with WinUSB): %s",
 						initialized_iface, iface, windows_error_str(0));
 				return LIBUSB_ERROR_ACCESS;
 			}
@@ -3741,17 +3827,50 @@ static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev
 				return LIBUSB_ERROR_NOT_FOUND;
 			case ERROR_BAD_COMMAND:     // The device was disconnected
 				return LIBUSB_ERROR_NO_DEVICE;
-			case ERROR_ALREADY_EXISTS:  // already claimed
+			case ERROR_ALREADY_EXISTS:  // already initialized
 				return LIBUSB_ERROR_BUSY;
 			default:
-				usbi_err(ctx, "could not claim interface %u: %s", iface, windows_error_str(0));
+				usbi_err(ctx, "could not initialize interface %u: %s", iface, windows_error_str(0));
 				return LIBUSB_ERROR_ACCESS;
 			}
 		}
 		handle_priv->interface_handle[iface].dev_handle = handle_priv->interface_handle[initialized_iface].dev_handle;
 	}
+
+	usbi_dbg(ctx, "initialized interface %u", iface);
+
+	return LIBUSB_SUCCESS;
+}
+
+static int winusbx_claim_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
+{
+	struct libusb_context *ctx = HANDLE_CTX(dev_handle);
+	int r;
+
+	// Nothing here arbitrates a claim; it just makes the interface usable
+	r = winusbx_initialize_interface(sub_api, dev_handle, iface);
+	if (r != LIBUSB_SUCCESS)
+		return r;
+
 	usbi_dbg(ctx, "claimed interface %u", iface);
-	handle_priv->active_interface = iface;
+
+	return LIBUSB_SUCCESS;
+}
+
+static int winusbx_deinitialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
+{
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev_handle->dev);
+	HANDLE winusb_handle;
+
+	CHECK_WINUSBX_AVAILABLE(sub_api);
+
+	winusb_handle = handle_priv->interface_handle[iface].api_handle;
+	if (!HANDLE_VALID(winusb_handle))
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	WinUSBX[sub_api].Free(winusb_handle);
+	handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
 
 	return LIBUSB_SUCCESS;
 }
@@ -3768,10 +3887,7 @@ static int winusbx_release_interface(int sub_api, struct libusb_device_handle *d
 	if (!HANDLE_VALID(winusb_handle))
 		return LIBUSB_ERROR_NOT_FOUND;
 
-	WinUSBX[sub_api].Free(winusb_handle);
-	handle_priv->interface_handle[iface].api_handle = INVALID_HANDLE_VALUE;
-
-	return LIBUSB_SUCCESS;
+	return winusbx_deinitialize_interface(sub_api, dev_handle, iface);
 }
 
 /*
@@ -3883,7 +3999,7 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 	else
 		current_interface = get_valid_interface(transfer->dev_handle, USB_API_WINUSBX);
 	if (current_interface < 0) {
-		r = auto_claim(transfer, &current_interface, USB_API_WINUSBX);
+		r = auto_initialize(transfer, &current_interface, USB_API_WINUSBX);
 		if (r != LIBUSB_SUCCESS)
 			return r;
 	}
@@ -5230,6 +5346,48 @@ static void hid_close(int sub_api, struct libusb_device_handle *dev_handle)
 	}
 }
 
+static int hid_initialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
+{
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+
+	UNUSED(sub_api);
+	CHECK_HID_AVAILABLE;
+
+	// NB: Disconnection detection is not possible in this function
+	if (priv->usb_interface[iface].path == NULL)
+		return LIBUSB_ERROR_NOT_FOUND; // invalid iface
+
+	// We use dev_handle as a flag for interface initialized
+	if (handle_priv->interface_handle[iface].dev_handle == INTERFACE_INITIALIZED)
+		return LIBUSB_ERROR_BUSY; // already initialized
+
+	handle_priv->interface_handle[iface].dev_handle = INTERFACE_INITIALIZED;
+
+	usbi_dbg(HANDLE_CTX(dev_handle), "initialized interface %u", iface);
+	
+	return LIBUSB_SUCCESS;
+}
+
+static int hid_deinitialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
+{
+	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev_handle->dev);
+
+	UNUSED(sub_api);
+	CHECK_HID_AVAILABLE;
+
+	if (priv->usb_interface[iface].path == NULL)
+		return LIBUSB_ERROR_NOT_FOUND; // invalid iface
+
+	if (handle_priv->interface_handle[iface].dev_handle != INTERFACE_INITIALIZED)
+		return LIBUSB_ERROR_NOT_FOUND; // not initialized
+
+	handle_priv->interface_handle[iface].dev_handle = INVALID_HANDLE_VALUE;
+
+	return LIBUSB_SUCCESS;
+}
+
 static int hid_claim_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
 {
 	struct winusb_device_handle_priv *handle_priv = get_winusb_device_handle_priv(dev_handle);
@@ -5249,8 +5407,7 @@ static int hid_claim_interface(int sub_api, struct libusb_device_handle *dev_han
 	handle_priv->interface_handle[iface].dev_handle = INTERFACE_CLAIMED;
 
 	usbi_dbg(HANDLE_CTX(dev_handle), "claimed interface %u", iface);
-	handle_priv->active_interface = iface;
-
+	
 	return LIBUSB_SUCCESS;
 }
 
@@ -5315,7 +5472,7 @@ static int hid_submit_control_transfer(int sub_api, struct usbi_transfer *itrans
 
 	current_interface = get_valid_interface(dev_handle, USB_API_HID);
 	if (current_interface < 0) {
-		r = auto_claim(transfer, &current_interface, USB_API_HID);
+		r = auto_initialize(transfer, &current_interface, USB_API_HID);
 		if (r != LIBUSB_SUCCESS)
 			return r;
 	}
@@ -5631,6 +5788,28 @@ static void composite_close(int sub_api, struct libusb_device_handle *dev_handle
 
 	if (available[SUB_API_MAX]) // HID driver
 		hid_close(SUB_API_NOTSET, dev_handle);
+}
+
+static int composite_initialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
+{
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+
+	UNUSED(sub_api);
+	CHECK_SUPPORTED_API(priv->usb_interface[iface].apib, initialize_interface);
+
+	return priv->usb_interface[iface].apib->
+		initialize_interface(priv->usb_interface[iface].sub_api, dev_handle, iface);
+}
+
+static int composite_deinitialize_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)
+{
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev_handle->dev);
+
+	UNUSED(sub_api);
+	CHECK_SUPPORTED_API(priv->usb_interface[iface].apib, deinitialize_interface);
+
+	return priv->usb_interface[iface].apib->
+		deinitialize_interface(priv->usb_interface[iface].sub_api, dev_handle, iface);
 }
 
 static int composite_claim_interface(int sub_api, struct libusb_device_handle *dev_handle, uint8_t iface)

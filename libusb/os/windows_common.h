@@ -303,13 +303,12 @@ enum WINUSB_ZLP {
 };
 
 struct winusb_device_handle_priv {
-	int active_interface;
 	struct {
 		HANDLE dev_handle; // WinUSB needs an extra handle for the file
 		HANDLE api_handle; // used by the API to communicate with the device
 		uint8_t zlp[USB_MAXENDPOINTS]; // Current per-endpoint SHORT_PACKET_TERMINATE status (enum WINUSB_ZLP)
 	} interface_handle[USB_MAXINTERFACES];
-	int autoclaim_count[USB_MAXINTERFACES]; // For auto-release
+	int autoinit_count[USB_MAXINTERFACES]; // For auto-deinitialization
 };
 
 struct usbdk_transfer_priv {
@@ -357,6 +356,8 @@ struct windows_backend {
 		uint8_t bConfigurationValue, void **buffer);
 	int (*get_configuration)(struct libusb_device_handle *dev_handle, uint8_t *config);
 	int (*set_configuration)(struct libusb_device_handle *dev_handle, uint8_t config);
+	int (*initialize_interface)(struct libusb_device_handle *dev_handle, uint8_t interface_number);
+	int (*deinitialize_interface)(struct libusb_device_handle *dev_handle, uint8_t interface_number);
 	int (*claim_interface)(struct libusb_device_handle *dev_handle, uint8_t interface_number);
 	int (*release_interface)(struct libusb_device_handle *dev_handle, uint8_t interface_number);
 	int (*set_interface_altsetting)(struct libusb_device_handle *dev_handle,
