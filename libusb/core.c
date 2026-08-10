@@ -1837,6 +1837,11 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
  *
  * This is a non-blocking function.
  *
+ * \note On Windows, a claim is process-local by default, so several processes
+ * may each believe they hold the same interface. Set
+ * \ref LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM for the cross-process exclusion
+ * that Linux and macOS provide.
+ *
  * \param dev_handle a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the interface you
  * wish to claim
@@ -1844,6 +1849,9 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if the requested interface does not exist
  * \returns \ref LIBUSB_ERROR_BUSY if another program or driver has claimed the
  * interface
+ * \returns \ref LIBUSB_ERROR_NOT_SUPPORTED on Windows if
+ * \ref LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM is set and the driver cannot
+ * enforce the claim (HID, or a libusbK DLL without the claim entry points)
  * \returns \ref LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns a LIBUSB_ERROR code on other failure
  * \see libusb_set_auto_detach_kernel_driver()
@@ -2538,6 +2546,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 			/* Handle all backend-specific options here */
 		case LIBUSB_OPTION_USE_USBDK:
 		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+		case LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM:
 			if (usbi_backend.set_option) {
 				r = usbi_backend.set_option(ctx, option, ap);
 				break;
@@ -2675,6 +2684,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		case LIBUSB_OPTION_LOG_LEVEL:
 		case LIBUSB_OPTION_USE_USBDK:
 		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+		case LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM:
 		case LIBUSB_OPTION_MAX:
 		default:
 			r = libusb_set_option(_ctx, options[i].option, options[i].value.ival);
