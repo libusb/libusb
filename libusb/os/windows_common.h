@@ -247,7 +247,15 @@ struct winusb_device_priv {
 	bool initialized;
 #if defined(LIBUSB_WINDOWS_HOTPLUG)
 	bool seen_during_scan; // set true for each device encountered during windows_get_device_list
-	bool seen_before_scan; // set true for each device encountered before windows_get_device_list
+	// DEVICE_ARRIVED is withheld until a scan proves the device usable, or
+	// proves that nothing usable is coming; the device stays attached so
+	// its child devnodes keep resolving to it (windows_resolve_pending_announcements)
+	bool announce_pending;
+	// Driver stack seen fully settled by an earlier scan: if the next scan
+	// still yields nothing usable, none is coming
+	bool settled_observed;
+	// DEVICE_ARRIVED was fired; DEVICE_LEFT is only fired for announced devices
+	bool announced;
 #endif
 	bool root_hub;
 	uint8_t active_config;
