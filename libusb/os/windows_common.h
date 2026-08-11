@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Windows backend common header for libusb 1.0
  *
@@ -9,6 +10,8 @@
  * With contributions from Michael Plante, Orin Eman et al.
  * Parts of this code adapted from libusb-win32-v1 by Stephan Meyer
  * Major code testing contribution by Xiaofan Chen
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -160,7 +163,7 @@ enum windows_version {
 
 extern enum windows_version windows_version;
 
-#include <pshpack1.h>
+#pragma pack(push, 1)
 
 typedef struct USB_DEVICE_DESCRIPTOR {
 	UCHAR  bLength;
@@ -190,7 +193,7 @@ typedef struct USB_CONFIGURATION_DESCRIPTOR {
 	UCHAR  MaxPower;
 } USB_CONFIGURATION_DESCRIPTOR, *PUSB_CONFIGURATION_DESCRIPTOR;
 
-#include <poppack.h>
+#pragma pack(pop)
 
 #define MAX_DEVICE_ID_LEN	200
 
@@ -249,6 +252,13 @@ struct winusb_device_priv {
 	bool root_hub;
 	uint8_t active_config;
 	uint16_t langid; // cached USB language ID for string descriptor requests
+	bool langid_unavailable; // set once the language ID request has failed, so
+	                         // it is not retried for every string descriptor
+	volatile LONG string_backoff_deadline; // GetTickCount() tick until which string
+	                                       // descriptor requests are skipped, 0 when
+	                                       // unarmed; 32-bit on purpose: private data
+	                                       // is only pointer aligned, too weak for
+	                                       // 64-bit interlocked operands on Win32
 	uint8_t depth; // distance to HCD
 	const struct windows_usb_api_backend *apib;
 	char *dev_id;
@@ -332,6 +342,11 @@ struct windows_backend {
 		struct discovered_devs **discdevs);
 	int (*get_device_string)(libusb_device *dev,
 		enum libusb_device_string_type string_type, char *data, int length);
+	int (*get_config_string)(libusb_device *dev,
+		uint8_t config_value, char *data, int length);
+	int (*get_interface_string)(libusb_device *dev,
+		uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+		char *data, int length);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
 	int (*get_active_config_descriptor)(struct libusb_device *device,
@@ -363,10 +378,20 @@ struct windows_backend {
 		uint8_t endpoint);
 };
 
+// Lifecycle of the I/O completion port thread, tracked in
+// windows_context_priv::completion_port_state. Written and read with the
+// usbi_atomic helpers, see windows_iocp_thread().
+enum windows_iocp_state {
+	WINDOWS_IOCP_INITIALIZING = 0, // windows_init() in progress, the thread uses timed waits
+	WINDOWS_IOCP_RUNNING,          // windows_init() succeeded, the thread blocks indefinitely
+	WINDOWS_IOCP_EXIT_REQUESTED,   // teardown in progress, the thread must exit
+};
+
 struct windows_context_priv {
 	const struct windows_backend *backend;
 	HANDLE completion_port;
 	HANDLE completion_port_thread;
+	usbi_atomic_t completion_port_state; // enum windows_iocp_state
 };
 
 union windows_device_priv {
@@ -394,38 +419,49 @@ struct windows_transfer_priv {
 
 static inline struct usbdk_device_handle_priv *get_usbdk_device_handle_priv(struct libusb_device_handle *dev_handle)
 {
-	struct windows_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
 	return &handle_priv->usbdk_priv;
 }
 
 static inline struct winusb_device_handle_priv *get_winusb_device_handle_priv(struct libusb_device_handle *dev_handle)
 {
-	struct windows_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
 	return &handle_priv->winusb_priv;
 }
 
 static inline OVERLAPPED *get_transfer_priv_overlapped(struct usbi_transfer *itransfer)
 {
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	return &transfer_priv->overlapped;
 }
 
 static inline void set_transfer_priv_handle(struct usbi_transfer *itransfer, HANDLE handle)
 {
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	transfer_priv->handle = handle;
 }
 
 static inline struct usbdk_transfer_priv *get_usbdk_transfer_priv(struct usbi_transfer *itransfer)
 {
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	return &transfer_priv->usbdk_priv;
 }
 
 static inline struct winusb_transfer_priv *get_winusb_transfer_priv(struct usbi_transfer *itransfer)
 {
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	return &transfer_priv->winusb_priv;
+}
+
+/* IsEqualGUID() takes pointers in C but const GUID& references in C++; wrap it
+ * so callers can pass pointers regardless of the language being compiled. */
+static inline bool usbi_guid_equal(const GUID *guid1, const GUID *guid2)
+{
+#ifdef __cplusplus
+	return IsEqualGUID(*guid1, *guid2) != 0;
+#else
+	return IsEqualGUID(guid1, guid2) != 0;
+#endif
 }
 
 extern const struct windows_backend usbdk_backend;

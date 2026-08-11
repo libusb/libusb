@@ -1,5 +1,8 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Copyright © 2019 Pino Toscano <toscano.pino@tiscali.it>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -38,14 +41,14 @@ null_close(struct libusb_device_handle *handle)
 
 static int
 null_get_active_config_descriptor(struct libusb_device *dev,
-    void *buf, size_t len)
+	void *buf, size_t len)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
 static int
 null_get_config_descriptor(struct libusb_device *dev, uint8_t idx,
-    void *buf, size_t len)
+	void *buf, size_t len)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
@@ -70,7 +73,7 @@ null_release_interface(struct libusb_device_handle *handle, uint8_t iface)
 
 static int
 null_set_interface_altsetting(struct libusb_device_handle *handle, uint8_t iface,
-    uint8_t altsetting)
+	uint8_t altsetting)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
@@ -82,7 +85,7 @@ null_clear_halt(struct libusb_device_handle *handle, unsigned char endpoint)
 }
 
 static int
-null_submit_transfer(struct usbi_transfer *itransfer)
+null_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }

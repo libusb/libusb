@@ -1,6 +1,9 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
 * Test suite program based of libusb-0.1-compat testlibusb
 * Copyright (c) 2013 Nathan Hjelm <hjelmn@mac.ccom>
+*
+* SPDX-License-Identifier: LGPL-2.1-or-later
 *
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public
@@ -268,7 +271,7 @@ static int test_wrapped_device(const char *device_name)
 }
 #endif
 
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 {
 	const char *device_name = NULL;
 	libusb_device **devs;

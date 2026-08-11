@@ -1,9 +1,12 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 #ifndef ezusb_H
 #define ezusb_H
 /*
  * Copyright © 2001 Stephen Williams (steve@icarus.com)
  * Copyright © 2002 David Brownell (dbrownell@users.sourceforge.net)
  * Copyright © 2013 Federico Manzan (f.manzan@gmail.com)
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  *    This source code is free software; you can redistribute it
  *    and/or modify it in source code form under the terms of the GNU
@@ -75,7 +78,7 @@ typedef struct {
 /*
  * This function uploads the firmware from the given file into RAM.
  * Stage == 0 means this is a single stage load (or the first of
- * two stages).  Otherwise it's the second of two stages; the 
+ * two stages).  Otherwise it's the second of two stages; the
  * caller having preloaded the second stage loader.
  *
  * The target processor is reset at the end of this upload.

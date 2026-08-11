@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
 * windows UsbDk backend for libusb 1.0
 * Copyright © 2014 Red Hat, Inc.
@@ -5,6 +6,8 @@
 * Authors:
 * Dmitry Fleytman <dmitry@daynix.com>
 * Pavel Gurvich <pavel@daynix.com>
+*
+* SPDX-License-Identifier: LGPL-2.1-or-later
 *
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public

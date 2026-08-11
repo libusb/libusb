@@ -1,0 +1,84 @@
+# This is the top most EditorConfig file.
+root = true
+
+# General defaults: UNIX style newlines, newline ending every file, UTF-8 encoding, no trailing whitespace.
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+
+[*.vcxproj, INSTALL_WIN.txt]
+end_of_line = crlf
+charset = utf-8-bom
+insert_final_newline = false
+
+# Most files in libusb use tabs with size 4.
+indent_style = tab
+indent_size = 4
+
+# exceptions to default spacing: tabs with size 8.
+[examples/hotplugtest.c]
+indent_style = tab
+indent_size = 8
+
+[libusb/core.c]
+indent_style = tab
+indent_size = 8
+
+[libusb/descriptor.c]
+indent_style = tab
+indent_size = 8
+
+[libusb/hotplug.c]
+indent_style = tab
+indent_size = 8
+
+[libusb/io.c]
+indent_style = tab
+indent_size = 8
+
+[libusb/os/linux_netlink.c]
+indent_style = tab
+indent_size = 8
+
+[libusb/os/linux_udev.c]
+indent_style = tab
+indent_size = 8
+
+[libusb/os/linux_usbfs.c]
+indent_style = tab
+indent_size = 8
+
+[libusb/sync.c]
+indent_style = tab
+indent_size = 8
+
+[examples/hotplugtest.c]
+indent_style = tab
+indent_size = 8
+
+# exceptions to default spacing: spaces with size 2.
+[libusb/libusb-1.0.def]
+indent_style = space
+indent_size = 2
+
+[tests/init_context.c]
+indent_style = space
+indent_size = 2
+
+[tests/set_option.c]
+indent_style = space
+indent_size = 2
+
+[tests/macos.c]
+indent_style = space
+indent_size = 2
+
+[os/darwin_usb.c]
+indent_style = space
+indent_size = 2
+
+[os/darwin_usb.h]
+indent_style = space
+indent_size = 2

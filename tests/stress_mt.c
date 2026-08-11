@@ -1,6 +1,9 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb multi-thread test program
  * Copyright 2022-2023 Tormod Volden
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -257,6 +260,15 @@ static int test_multi_init(int enumerate)
 int main(void)
 {
 	int errs = 0;
+
+#if defined(__HAIKU__)
+	/* The enumeration phase reports per-thread device counts that disagree
+	   with each other on Haiku; see libusb/libusb#1907. Report an Automake
+	   skip rather than a failure until the backend is fixed. Remove this
+	   once #1907 is closed. */
+	printf("Skipping on Haiku: per-thread device counts disagree (libusb/libusb#1907)\n");
+	return 77;
+#endif
 
 	printf("Running multithreaded init/exit test...\n");
 	errs += test_multi_init(0);

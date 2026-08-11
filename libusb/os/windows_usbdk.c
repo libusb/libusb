@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * windows UsbDk backend for libusb 1.0
  * Copyright © 2014 Red Hat, Inc.
@@ -5,6 +6,8 @@
  * Authors:
  * Dmitry Fleytman <dmitry@daynix.com>
  * Pavel Gurvich <pavel@daynix.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -246,7 +249,7 @@ static int usbdk_cache_config_descriptors(struct libusb_context *ctx,
 	USB_DK_CONFIG_DESCRIPTOR_REQUEST Request;
 	Request.ID = info->ID;
 
-	priv->config_descriptors = calloc(info->DeviceDescriptor.bNumConfigurations, sizeof(PUSB_CONFIGURATION_DESCRIPTOR));
+	priv->config_descriptors = (PUSB_CONFIGURATION_DESCRIPTOR *)calloc(info->DeviceDescriptor.bNumConfigurations, sizeof(PUSB_CONFIGURATION_DESCRIPTOR));
 	if (priv->config_descriptors == NULL) {
 		usbi_err(ctx, "failed to allocate configuration descriptors holder");
 		return LIBUSB_ERROR_NO_MEM;
@@ -268,7 +271,7 @@ static int usbdk_cache_config_descriptors(struct libusb_context *ctx,
 
 static inline int usbdk_device_priv_init(struct libusb_context *ctx, struct libusb_device *dev, PUSB_DK_DEVICE_INFO info)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev);
 
 	priv->ID = info->ID;
 	priv->active_configuration = 0;
@@ -365,7 +368,7 @@ func_exit:
 
 static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev);
 	PUSB_CONFIGURATION_DESCRIPTOR config_header;
 	size_t size;
 
@@ -379,7 +382,7 @@ static int usbdk_get_config_descriptor(struct libusb_device *dev, uint8_t config
 static int usbdk_get_config_descriptor_by_value(struct libusb_device *dev, uint8_t bConfigurationValue,
 	void **buffer)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev);
 	PUSB_CONFIGURATION_DESCRIPTOR config_header;
 	uint8_t index;
 
@@ -396,7 +399,7 @@ static int usbdk_get_config_descriptor_by_value(struct libusb_device *dev, uint8
 
 static int usbdk_get_active_config_descriptor(struct libusb_device *dev, void *buffer, size_t len)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev);
 
 	return usbdk_get_config_descriptor(dev, priv->active_configuration, buffer, len);
 }
@@ -405,8 +408,8 @@ static int usbdk_open(struct libusb_device_handle *dev_handle)
 {
 	struct libusb_device *dev = dev_handle->dev;
 	struct libusb_context *ctx = DEVICE_CTX(dev);
-	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
-	struct usbdk_device_priv *device_priv = usbi_get_device_priv(dev);
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(ctx);
+	struct usbdk_device_priv *device_priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev);
 
 	device_priv->redirector_handle = usbdk_helper.StartRedirect(&device_priv->ID);
 	if (device_priv->redirector_handle == INVALID_HANDLE_VALUE) {
@@ -430,7 +433,7 @@ static int usbdk_open(struct libusb_device_handle *dev_handle)
 
 static void usbdk_close(struct libusb_device_handle *dev_handle)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev_handle->dev);
 
 	if (!usbdk_helper.StopRedirect(priv->redirector_handle))
 		usbi_err(HANDLE_CTX(dev_handle), "Redirector shutdown failed");
@@ -441,7 +444,7 @@ static void usbdk_close(struct libusb_device_handle *dev_handle)
 
 static int usbdk_get_configuration(struct libusb_device_handle *dev_handle, uint8_t *config)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev_handle->dev);
 
 	*config = priv->active_configuration;
 
@@ -464,7 +467,7 @@ static int usbdk_claim_interface(struct libusb_device_handle *dev_handle, uint8_
 
 static int usbdk_set_interface_altsetting(struct libusb_device_handle *dev_handle, uint8_t iface, uint8_t altsetting)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev_handle->dev);
 
 	if (!usbdk_helper.SetAltsetting(priv->redirector_handle, iface, altsetting)) {
 		usbi_err(HANDLE_CTX(dev_handle), "SetAltsetting failed: %s", windows_error_str(0));
@@ -483,7 +486,7 @@ static int usbdk_release_interface(struct libusb_device_handle *dev_handle, uint
 
 static int usbdk_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev_handle->dev);
 
 	if (!usbdk_helper.ResetPipe(priv->redirector_handle, endpoint)) {
 		usbi_err(HANDLE_CTX(dev_handle), "ResetPipe failed: %s", windows_error_str(0));
@@ -495,7 +498,7 @@ static int usbdk_clear_halt(struct libusb_device_handle *dev_handle, unsigned ch
 
 static int usbdk_reset_device(struct libusb_device_handle *dev_handle)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev_handle->dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev_handle->dev);
 
 	if (!usbdk_helper.ResetDevice(priv->redirector_handle)) {
 		usbi_err(HANDLE_CTX(dev_handle), "ResetDevice failed: %s", windows_error_str(0));
@@ -507,7 +510,7 @@ static int usbdk_reset_device(struct libusb_device_handle *dev_handle)
 
 static void usbdk_destroy_device(struct libusb_device *dev)
 {
-	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(dev);
 
 	if (priv->config_descriptors != NULL)
 		usbdk_release_config_descriptors(priv, dev->device_descriptor.bNumConfigurations);
@@ -527,7 +530,7 @@ static void usbdk_clear_transfer_priv(struct usbi_transfer *itransfer)
 static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct usbdk_device_priv *priv = usbi_get_device_priv(transfer->dev_handle->dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(transfer->dev_handle->dev);
 	struct usbdk_transfer_priv *transfer_priv = get_usbdk_transfer_priv(itransfer);
 	OVERLAPPED *overlapped = get_transfer_priv_overlapped(itransfer);
 	TransferResult transResult;
@@ -560,7 +563,7 @@ static int usbdk_do_control_transfer(struct usbi_transfer *itransfer)
 static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct usbdk_device_priv *priv = usbi_get_device_priv(transfer->dev_handle->dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(transfer->dev_handle->dev);
 	struct usbdk_transfer_priv *transfer_priv = get_usbdk_transfer_priv(itransfer);
 	OVERLAPPED *overlapped = get_transfer_priv_overlapped(itransfer);
 	TransferResult transferRes;
@@ -602,7 +605,7 @@ static int usbdk_do_bulk_transfer(struct usbi_transfer *itransfer)
 static int usbdk_do_iso_transfer(struct usbi_transfer *itransfer)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct usbdk_device_priv *priv = usbi_get_device_priv(transfer->dev_handle->dev);
+	struct usbdk_device_priv *priv = (struct usbdk_device_priv *)usbi_get_device_priv(transfer->dev_handle->dev);
 	struct usbdk_transfer_priv *transfer_priv = get_usbdk_transfer_priv(itransfer);
 	OVERLAPPED *overlapped = get_transfer_priv_overlapped(itransfer);
 	TransferResult transferRes;
@@ -613,14 +616,14 @@ static int usbdk_do_iso_transfer(struct usbi_transfer *itransfer)
 	transfer_priv->request.EndpointAddress = transfer->endpoint;
 	transfer_priv->request.TransferType = IsochronousTransferType;
 	transfer_priv->request.IsochronousPacketsArraySize = transfer->num_iso_packets;
-	transfer_priv->IsochronousPacketsArray = malloc(transfer->num_iso_packets * sizeof(ULONG64));
+	transfer_priv->IsochronousPacketsArray = (PULONG64)malloc(transfer->num_iso_packets * sizeof(ULONG64));
 	transfer_priv->request.IsochronousPacketsArray = (PVOID64)transfer_priv->IsochronousPacketsArray;
 	if (!transfer_priv->IsochronousPacketsArray) {
 		usbi_err(TRANSFER_CTX(transfer), "Allocation of IsochronousPacketsArray failed");
 		return LIBUSB_ERROR_NO_MEM;
 	}
 
-	transfer_priv->IsochronousResultsArray = malloc(transfer->num_iso_packets * sizeof(USB_DK_ISO_TRANSFER_RESULT));
+	transfer_priv->IsochronousResultsArray = (PUSB_DK_ISO_TRANSFER_RESULT)malloc(transfer->num_iso_packets * sizeof(USB_DK_ISO_TRANSFER_RESULT));
 	transfer_priv->request.Result.IsochronousResultsArray = (PVOID64)transfer_priv->IsochronousResultsArray;
 	if (!transfer_priv->IsochronousResultsArray) {
 		usbi_err(TRANSFER_CTX(transfer), "Allocation of isochronousResultsArray failed");
@@ -709,6 +712,8 @@ const struct windows_backend usbdk_backend = {
 	usbdk_exit,
 	usbdk_get_device_list,
 	NULL,  /* usbdk_get_device_string */
+	NULL,  /* usbdk_get_config_string */
+	NULL,  /* usbdk_get_interface_string */
 	usbdk_open,
 	usbdk_close,
 	usbdk_get_active_config_descriptor,

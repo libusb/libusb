@@ -1,5 +1,8 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Copyright © 2011 Martin Pieuchot <mpi@openbsd.org>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -384,7 +387,7 @@ netbsd_destroy_device(struct libusb_device *dev)
 }
 
 int
-netbsd_submit_transfer(struct usbi_transfer *itransfer)
+netbsd_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct libusb_transfer *transfer;
 	int err = 0;

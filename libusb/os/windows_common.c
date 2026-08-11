@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * windows backend for libusb 1.0
  * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
@@ -6,6 +7,8 @@
  * HID Reports IOCTLs inspired from HIDAPI by Alan Ott, Signal 11 Software
  * Hash table functions adapted from glibc, by Ulrich Drepper et al.
  * Major code testing contribution by Xiaofan Chen
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -128,8 +131,8 @@ HMODULE load_system_library(struct libusb_context *ctx, const char *name)
 }
 
 /* Hash table functions - modified From glibc 2.3.2:
-   [Aho,Sethi,Ullman] Compilers: Principles, Techniques and Tools, 1986
-   [Knuth]            The Art of Computer Programming, part 3 (6.4)  */
+	[Aho,Sethi,Ullman] Compilers: Principles, Techniques and Tools, 1986
+	[Knuth]            The Art of Computer Programming, part 3 (6.4)  */
 
 #define HTAB_SIZE 1021UL	// *MUST* be a prime number!!
 
@@ -143,9 +146,9 @@ static usbi_mutex_t htab_mutex;
 static unsigned long htab_filled;
 
 /* Before using the hash table we must allocate memory for it.
-   We allocate one element more as the found prime number says.
-   This is done for more effective indexing as explained in the
-   comment for the hash function.  */
+	We allocate one element more as the found prime number says.
+	This is done for more effective indexing as explained in the
+	comment for the hash function.  */
 static bool htab_create(struct libusb_context *ctx)
 {
 	if (htab_table != NULL) {
@@ -160,7 +163,7 @@ static bool htab_create(struct libusb_context *ctx)
 	htab_filled = 0;
 
 	// allocate memory and zero out.
-	htab_table = calloc(HTAB_SIZE + 1, sizeof(htab_entry));
+	htab_table = (struct htab_entry *)calloc(HTAB_SIZE + 1, sizeof(htab_entry));
 	if (htab_table == NULL) {
 		usbi_err(ctx, "could not allocate space for hash table");
 		return false;
@@ -186,13 +189,13 @@ static void htab_destroy(void)
 }
 
 /* This is the search function. It uses double hashing with open addressing.
-   We use a trick to speed up the lookup. The table is created with one
-   more element available. This enables us to use the index zero special.
-   This index will never be used because we store the first hash index in
-   the field used where zero means not used. Every other value means used.
-   The used field can be used as a first fast comparison for equality of
-   the stored and the parameter value. This helps to prevent unnecessary
-   expensive calls of strcmp.  */
+	We use a trick to speed up the lookup. The table is created with one
+	more element available. This enables us to use the index zero special.
+	This index will never be used because we store the first hash index in
+	the field used where zero means not used. Every other value means used.
+	The used field can be used as a first fast comparison for equality of
+	the stored and the parameter value. This helps to prevent unnecessary
+	expensive calls of strcmp.  */
 unsigned long htab_hash(const char *str)
 {
 	unsigned long hval, hval2;
@@ -299,8 +302,8 @@ enum libusb_transfer_status usbd_status_to_libusb_transfer_status(USBD_STATUS st
 void windows_force_sync_completion(struct usbi_transfer *itransfer, ULONG size)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
-	struct windows_context_priv *priv = usbi_get_context_priv(TRANSFER_CTX(transfer));
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(TRANSFER_CTX(transfer));
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	OVERLAPPED *overlapped = &transfer_priv->overlapped;
 
 	usbi_dbg(TRANSFER_CTX(transfer), "transfer %p, length %lu", transfer, ULONG_CAST(size));
@@ -429,11 +432,17 @@ static enum windows_version get_windows_version(void)
 	return winver;
 }
 
+// While the context is still initializing, the I/O completion port thread
+// waits with this timeout so that it notices an exit request even if posting
+// the exit completion packet failed, see windows_iocp_teardown()
+#define IOCP_INIT_WAIT_TIMEOUT_MS 100
+
 static unsigned __stdcall windows_iocp_thread(void *arg)
 {
-	struct libusb_context *ctx = arg;
-	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
+	struct libusb_context *ctx = (libusb_context *)arg;
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(ctx);
 	HANDLE iocp = priv->completion_port;
+	enum windows_iocp_state state;
 	DWORD num_bytes;
 	ULONG_PTR completion_key;
 	OVERLAPPED *overlapped;
@@ -447,8 +456,21 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 	usbi_dbg(ctx, "I/O completion thread started");
 
 	while (true) {
+		// Until windows_init() has fully succeeded, wait with a finite
+		// timeout so that an exit request from a failed initialization is
+		// noticed even if no exit completion packet could be posted. Once
+		// running, block indefinitely; exit is signaled by a NULL
+		// completion status.
+		state = (enum windows_iocp_state)usbi_atomic_load(&priv->completion_port_state);
 		overlapped = NULL;
-		if (!GetQueuedCompletionStatus(iocp, &num_bytes, &completion_key, &overlapped, INFINITE) && (overlapped == NULL)) {
+		if (!GetQueuedCompletionStatus(iocp, &num_bytes, &completion_key, &overlapped,
+					       (state == WINDOWS_IOCP_RUNNING) ? INFINITE : IOCP_INIT_WAIT_TIMEOUT_MS)
+		    && (overlapped == NULL)) {
+			if (GetLastError() == WAIT_TIMEOUT) {
+				if (usbi_atomic_load(&priv->completion_port_state) == WINDOWS_IOCP_EXIT_REQUESTED)
+					break;
+				continue;
+			}
 			usbi_err(ctx, "GetQueuedCompletionStatus failed: %s", windows_error_str(0));
 			break;
 		}
@@ -473,7 +495,7 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 		usbi_mutex_lock(&ctx->open_devs_lock);
 		for_each_open_device(ctx, opened_device_handle) {
 			if (dev_handle == opened_device_handle) {
-				handle_priv = usbi_get_device_handle_priv(dev_handle);
+				handle_priv = (struct windows_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
 
 				usbi_mutex_lock(&dev_handle->lock);
 				list_for_each_entry(transfer_priv, &handle_priv->active_transfers, list, struct windows_transfer_priv) {
@@ -496,9 +518,11 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 		}
 
 		itransfer = TRANSFER_PRIV_TO_USBI_TRANSFER(transfer_priv);
+#ifdef ENABLE_LOGGING
 		struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 		usbi_dbg(ctx, "transfer %p completed, length %lu",
 			 transfer, ULONG_CAST(num_bytes));
+#endif
 		usbi_signal_transfer_completion(itransfer);
 	}
 
@@ -507,9 +531,39 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 	return 0;
 }
 
+static void windows_iocp_teardown(struct libusb_context *ctx)
+{
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(ctx);
+
+	if (priv->completion_port_thread != NULL) {
+		// Request the thread to exit. While the context is still
+		// initializing the thread waits with a finite timeout and checks
+		// this state, so it exits even if posting the exit completion
+		// packet below fails.
+		usbi_atomic_store(&priv->completion_port_state, WINDOWS_IOCP_EXIT_REQUESTED);
+
+		// A NULL completion status will indicate to the thread that it is time to exit
+		if (!PostQueuedCompletionStatus(priv->completion_port, 0, (ULONG_PTR)ctx, NULL))
+			usbi_err(ctx, "failed to post I/O completion: %s", windows_error_str(0));
+
+		if (WaitForSingleObject(priv->completion_port_thread, INFINITE) == WAIT_FAILED)
+			usbi_err(ctx, "failed to wait for I/O completion port thread: %s", windows_error_str(0));
+
+		CloseHandle(priv->completion_port_thread);
+		priv->completion_port_thread = NULL;
+	}
+
+	// The I/O completion port must stay open until the thread has been
+	// joined, so that the thread never waits on a closed or recycled handle
+	if (priv->completion_port != NULL) {
+		CloseHandle(priv->completion_port);
+		priv->completion_port = NULL;
+	}
+}
+
 static int windows_init(struct libusb_context *ctx)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(ctx);
 	bool winusb_backend_init = false;
 	int r;
 
@@ -559,11 +613,14 @@ static int windows_init(struct libusb_context *ctx)
 		goto init_exit;
 	}
 
-	// And a dedicated thread to wait for I/O completions
+	// And a dedicated thread to wait for I/O completions. The thread starts
+	// in the initializing state and uses timed waits until initialization
+	// has fully succeeded; thread creation orders this store before any
+	// read the thread performs.
+	usbi_atomic_store(&priv->completion_port_state, WINDOWS_IOCP_INITIALIZING);
 	priv->completion_port_thread = (HANDLE)_beginthreadex(NULL, 0, windows_iocp_thread, ctx, 0, NULL);
 	if (priv->completion_port_thread == NULL) {
 		usbi_err(ctx, "failed to create I/O completion port thread");
-		CloseHandle(priv->completion_port);
 		goto init_exit;
 	}
 
@@ -581,15 +638,25 @@ static int windows_init(struct libusb_context *ctx)
 	windows_initial_scan_devices(ctx);
 #endif
 
+	// Initialization has fully succeeded, switch the I/O completion port
+	// thread to indefinite blocking waits
+	usbi_atomic_store(&priv->completion_port_state, WINDOWS_IOCP_RUNNING);
+
 init_exit: // Holds semaphore here
-	if ((init_count == 1) && (r != LIBUSB_SUCCESS)) { // First init failed?
-		if (usbdk_available) {
-			usbdk_backend.exit(ctx);
-			usbdk_available = false;
+	if (r != LIBUSB_SUCCESS) {
+		// Halt the I/O completion port thread and close the I/O completion
+		// port if they were brought up, mirroring windows_exit()
+		windows_iocp_teardown(ctx);
+
+		if (init_count == 1) { // First init failed?
+			if (usbdk_available) {
+				usbdk_backend.exit(ctx);
+				usbdk_available = false;
+			}
+			if (winusb_backend_init)
+				winusb_backend.exit(ctx);
+			htab_destroy();
 		}
-		if (winusb_backend_init)
-			winusb_backend.exit(ctx);
-		htab_destroy();
 		--init_count;
 	}
 
@@ -598,17 +665,7 @@ init_exit: // Holds semaphore here
 
 static void windows_exit(struct libusb_context *ctx)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
-
-	// A NULL completion status will indicate to the thread that it is time to exit
-	if (!PostQueuedCompletionStatus(priv->completion_port, 0, (ULONG_PTR)ctx, NULL))
-		usbi_err(ctx, "failed to post I/O completion: %s", windows_error_str(0));
-
-	if (WaitForSingleObject(priv->completion_port_thread, INFINITE) == WAIT_FAILED)
-		usbi_err(ctx, "failed to wait for I/O completion port thread: %s", windows_error_str(0));
-
-	CloseHandle(priv->completion_port_thread);
-	CloseHandle(priv->completion_port);
+	windows_iocp_teardown(ctx);
 
 	// Only works if exits and inits are balanced exactly
 	if (--init_count == 0) { // Last exit
@@ -626,7 +683,7 @@ static void windows_exit(struct libusb_context *ctx)
 
 static int windows_set_option(struct libusb_context *ctx, enum libusb_option option, va_list ap)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(ctx);
 
 	UNUSED(ap);
 
@@ -646,7 +703,7 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 #if !defined(LIBUSB_WINDOWS_HOTPLUG)
 static int windows_get_device_list(struct libusb_context *ctx, struct discovered_devs **discdevs)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(ctx);
 	return priv->backend->get_device_list(ctx, discdevs);
 }
 #endif
@@ -654,17 +711,39 @@ static int windows_get_device_list(struct libusb_context *ctx, struct discovered
 static int windows_get_device_string(libusb_device *dev,
 	enum libusb_device_string_type string_type, char *data, int length)
 {
-	struct windows_context_priv* priv = usbi_get_context_priv(DEVICE_CTX(dev));
+	struct windows_context_priv* priv = (struct windows_context_priv *)usbi_get_context_priv(DEVICE_CTX(dev));
 	if (NULL != priv->backend->get_device_string) {
 		return priv->backend->get_device_string(dev, string_type, data, length);
 	}
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+static int windows_get_config_string(libusb_device *dev,
+	uint8_t config_value, char *data, int length)
+{
+	struct windows_context_priv* priv = (struct windows_context_priv *)usbi_get_context_priv(DEVICE_CTX(dev));
+	if (NULL != priv->backend->get_config_string) {
+		return priv->backend->get_config_string(dev, config_value, data, length);
+	}
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
+static int windows_get_interface_string(libusb_device *dev,
+	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+	char *data, int length)
+{
+	struct windows_context_priv* priv = (struct windows_context_priv *)usbi_get_context_priv(DEVICE_CTX(dev));
+	if (NULL != priv->backend->get_interface_string) {
+		return priv->backend->get_interface_string(dev, config_value,
+			interface_number, alt_setting, data, length);
+	}
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 static int windows_open(struct libusb_device_handle *dev_handle)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
-	struct windows_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
 
 	list_init(&handle_priv->active_transfers);
 	return priv->backend->open(dev_handle);
@@ -672,40 +751,40 @@ static int windows_open(struct libusb_device_handle *dev_handle)
 
 static void windows_close(struct libusb_device_handle *dev_handle)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	priv->backend->close(dev_handle);
 }
 
 static int windows_get_active_config_descriptor(struct libusb_device *dev,
 	void *buffer, size_t len)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(DEVICE_CTX(dev));
 	return priv->backend->get_active_config_descriptor(dev, buffer, len);
 }
 
 static int windows_get_config_descriptor(struct libusb_device *dev,
 	uint8_t config_index, void *buffer, size_t len)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(DEVICE_CTX(dev));
 	return priv->backend->get_config_descriptor(dev, config_index, buffer, len);
 }
 
 static int windows_get_config_descriptor_by_value(struct libusb_device *dev,
 	uint8_t bConfigurationValue, void **buffer)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(DEVICE_CTX(dev));
 	return priv->backend->get_config_descriptor_by_value(dev, bConfigurationValue, buffer);
 }
 
 static int windows_get_configuration(struct libusb_device_handle *dev_handle, uint8_t *config)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->get_configuration(dev_handle, config);
 }
 
 static int windows_set_configuration(struct libusb_device_handle *dev_handle, int config)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	if (config == -1)
 		config = 0;
 	return priv->backend->set_configuration(dev_handle, (uint8_t)config);
@@ -713,45 +792,45 @@ static int windows_set_configuration(struct libusb_device_handle *dev_handle, in
 
 static int windows_claim_interface(struct libusb_device_handle *dev_handle, uint8_t interface_number)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->claim_interface(dev_handle, interface_number);
 }
 
 static int windows_release_interface(struct libusb_device_handle *dev_handle, uint8_t interface_number)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->release_interface(dev_handle, interface_number);
 }
 
 static int windows_set_interface_altsetting(struct libusb_device_handle *dev_handle,
 	uint8_t interface_number, uint8_t altsetting)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->set_interface_altsetting(dev_handle, interface_number, altsetting);
 }
 
 static int windows_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->clear_halt(dev_handle, endpoint);
 }
 
 static int windows_reset_device(struct libusb_device_handle *dev_handle)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	return priv->backend->reset_device(dev_handle);
 }
 
 static void windows_destroy_device(struct libusb_device *dev)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(DEVICE_CTX(dev));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(DEVICE_CTX(dev));
 	priv->backend->destroy_device(dev);
 }
 
 static int windows_endpoint_supports_raw_io(libusb_device_handle* dev_handle,
 	uint8_t endpoint)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	if (priv->backend->endpoint_supports_raw_io)
 		return priv->backend->endpoint_supports_raw_io(dev_handle, endpoint);
 	return LIBUSB_ERROR_NOT_SUPPORTED;
@@ -760,7 +839,7 @@ static int windows_endpoint_supports_raw_io(libusb_device_handle* dev_handle,
 static int windows_endpoint_set_raw_io(libusb_device_handle* dev_handle,
 	uint8_t endpoint, int enable)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 
 	if (priv->backend->endpoint_supports_raw_io == NULL
 		|| priv->backend->endpoint_supports_raw_io(dev_handle, endpoint) != 1
@@ -773,20 +852,20 @@ static int windows_endpoint_set_raw_io(libusb_device_handle* dev_handle,
 static int windows_get_max_raw_io_transfer_size(struct libusb_device_handle *dev_handle,
 	uint8_t endpoint)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(HANDLE_CTX(dev_handle));
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(HANDLE_CTX(dev_handle));
 	if (priv->backend->get_max_raw_io_transfer_size)
 		return priv->backend->get_max_raw_io_transfer_size(dev_handle, endpoint);
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int windows_submit_transfer(struct usbi_transfer *itransfer)
+static int windows_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	struct libusb_device_handle *dev_handle = transfer->dev_handle;
 	struct libusb_context *ctx = HANDLE_CTX(dev_handle);
-	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
-	struct windows_device_handle_priv *handle_priv = usbi_get_device_handle_priv(dev_handle);
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(ctx);
+	struct windows_device_handle_priv *handle_priv = (struct windows_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	int r;
 
 	switch (transfer->type) {
@@ -836,8 +915,8 @@ static int windows_submit_transfer(struct usbi_transfer *itransfer)
 
 static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 {
-	struct windows_context_priv *priv = usbi_get_context_priv(ITRANSFER_CTX(itransfer));
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(ITRANSFER_CTX(itransfer));
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 
 	// Try CancelIoEx() on the transfer
 	// If that fails, fall back to the backend's cancel_transfer()
@@ -854,12 +933,12 @@ static int windows_cancel_transfer(struct usbi_transfer *itransfer)
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
-static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
+static int windows_handle_transfer_completion(struct usbi_transfer *itransfer) EXCLUDES(itransfer->lock)
 {
 	struct libusb_context *ctx = ITRANSFER_CTX(itransfer);
-	struct windows_context_priv *priv = usbi_get_context_priv(ctx);
+	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(ctx);
 	const struct windows_backend *backend = priv->backend;
-	struct windows_transfer_priv *transfer_priv = usbi_get_transfer_priv(itransfer);
+	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	enum libusb_transfer_status status, istatus;
 	DWORD result, bytes_transferred;
 	HANDLE transfer_handle;
@@ -877,9 +956,11 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer)
 	else
 		result = GetLastError();
 
+#ifdef ENABLE_LOGGING
 	struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	usbi_dbg(ctx, "handling transfer %p completion with errcode %lu, length %lu",
 		 transfer, ULONG_CAST(result), ULONG_CAST(bytes_transferred));
+#endif
 
 	switch (result) {
 	case NO_ERROR:
@@ -967,6 +1048,8 @@ const struct usbi_os_backend usbi_backend = {
 	windows_get_device_list,
 #endif
 	windows_get_device_string,
+	windows_get_config_string,
+	windows_get_interface_string,
 	NULL,	/* hotplug_poll */
 	NULL,	/* wrap_sys_device */
 	windows_open,
