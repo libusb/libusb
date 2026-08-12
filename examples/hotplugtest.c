@@ -228,6 +228,46 @@ static int ask_hotplug_enumerate_flag(void)
 	}
 }
 
+/* When enabled (-o on command line), each arrival is probed for actual usability: 
+ * open the device and try to claim (then immediately release) every interface of the
+ * active configuration, printing the outcome of each call. This makes issues
+ * where DEVICE_ARRIVED fires for a not-yet-usable device directly visible. */
+static bool open_on_arrival = false;
+
+static void open_and_claim(libusb_device *dev)
+{
+	struct libusb_config_descriptor *config;
+	libusb_device_handle *handle;
+	uint8_t i;
+	int rc;
+
+	rc = libusb_open(dev, &handle);
+	printf("    open = %s\n",
+		(LIBUSB_SUCCESS == rc) ? "OK" : libusb_strerror((enum libusb_error)rc));
+	if (LIBUSB_SUCCESS != rc)
+		return;
+
+	rc = libusb_get_active_config_descriptor(dev, &config);
+	if (LIBUSB_SUCCESS != rc) {
+		printf("    get active config = %s\n", libusb_strerror((enum libusb_error)rc));
+		libusb_close(handle);
+		return;
+	}
+
+	for (i = 0; i < config->bNumInterfaces; i++) {
+		const int interface_number = config->interface[i].altsetting[0].bInterfaceNumber;
+
+		rc = libusb_claim_interface(handle, interface_number);
+		printf("    claim interface %d = %s\n", interface_number,
+			(LIBUSB_SUCCESS == rc) ? "OK" : libusb_strerror((enum libusb_error)rc));
+		if (LIBUSB_SUCCESS == rc)
+			libusb_release_interface(handle, interface_number);
+	}
+
+	libusb_free_config_descriptor(config);
+	libusb_close(handle);
+}
+
 static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev, libusb_hotplug_event event, void *user_data)
 {
 	struct hotplug_state *state = (struct hotplug_state *)user_data;
@@ -237,6 +277,9 @@ static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *dev,
 
 	state->arrived++;
 	print_device_event("\nDevice attached", dev, state);
+
+	if (open_on_arrival)
+		open_and_claim(dev);
 
 	return 0;
 }
@@ -254,19 +297,123 @@ static int LIBUSB_CALL hotplug_callback_detach(libusb_context *ctx, libusb_devic
 	return 0;
 }
 
+static void print_usage(FILE *out, const char *program_name)
+{
+	fprintf(out, "Usage: %s [-o] [-c class] [vid[:pid]]\n", program_name);
+	fprintf(out, "  -h        print this help text and exit\n");
+	fprintf(out, "  -o        on each arrival, open the device and try to claim each\n");
+	fprintf(out, "            interface of its active configuration, printing the outcome\n");
+	fprintf(out, "  -c class  only match devices of this class (hexadecimal)\n");
+	fprintf(out, "vid and pid are hexadecimal, e.g. 04b4:8613; vid alone matches any\n");
+	fprintf(out, "product of that vendor. Without filters, all devices are monitored.\n");
+}
+
+/* Parse one id of a rejected command line so that a hint with the new
+ * syntax can be offered when the old "vendor product [class]" form is
+ * used. Base 0 recovers the ids of scripts written against the old
+ * strtol-based parsing; base 16 recovers hex-style ids such as 04b4. */
+static bool parse_id_base(const char *s, int base, long max, long *value)
+{
+	char *end;
+
+	*value = strtol(s, &end, base);
+	return '\0' == *end && 0 <= *value && *value <= max;
+}
+
 int main(int argc, const char *argv[])
 {
 	libusb_context *ctx = NULL;
 	struct hotplug_state state = { 0, 0, 0 };
 	libusb_hotplug_callback_handle hp[2];
 	bool callback_registered[2] = { false, false };
-	int product_id, vendor_id, class_id;
+	int vendor_id = LIBUSB_HOTPLUG_MATCH_ANY;
+	int product_id = LIBUSB_HOTPLUG_MATCH_ANY;
+	int class_id = LIBUSB_HOTPLUG_MATCH_ANY;
 	int arrival_flags;
+	const char *first_positional = NULL;
+	int nb_positional = 0;
+	int arg;
 	int rc;
 
-	vendor_id  = (argc > 1) ? (int)strtol (argv[1], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
-	product_id = (argc > 2) ? (int)strtol (argv[2], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
-	class_id   = (argc > 3) ? (int)strtol (argv[3], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
+	for (arg = 1; arg < argc; arg++) {
+		if (0 == strcmp(argv[arg], "-o")) {
+			open_on_arrival = true;
+		} else if (0 == strcmp(argv[arg], "-h") || 0 == strcmp(argv[arg], "--help") ||
+			   0 == strcmp(argv[arg], "-?")) {
+			print_usage(stdout, argv[0]);
+			return EXIT_SUCCESS;
+		} else if (0 == strcmp(argv[arg], "-c")) {
+			char *end;
+			long value;
+
+			if (arg + 1 >= argc) {
+				fprintf(stderr, "Option -c requires an argument\n");
+				print_usage(stderr, argv[0]);
+				return EXIT_FAILURE;
+			}
+			arg++;
+			value = strtol(argv[arg], &end, 16);
+			if (end == argv[arg] || '\0' != *end || value < 0 || value > 0xff) {
+				fprintf(stderr, "Invalid class: %s\n", argv[arg]);
+				print_usage(stderr, argv[0]);
+				return EXIT_FAILURE;
+			}
+			class_id = (int)value;
+		} else if ('-' == argv[arg][0]) {
+			fprintf(stderr, "Unknown option: %s\n", argv[arg]);
+			print_usage(stderr, argv[0]);
+			return EXIT_FAILURE;
+		} else if (0 == nb_positional) {
+			unsigned int vid, pid;
+			int consumed = 0;
+
+			if (2 == sscanf(argv[arg], "%x:%x%n", &vid, &pid, &consumed) &&
+			    '\0' == argv[arg][consumed] && vid <= 0xffff && pid <= 0xffff) {
+				vendor_id = (int)vid;
+				product_id = (int)pid;
+			} else if (1 == sscanf(argv[arg], "%x%n", &vid, &consumed) &&
+				   '\0' == argv[arg][consumed] && vid <= 0xffff) {
+				vendor_id = (int)vid;
+			} else {
+				fprintf(stderr, "Invalid vid[:pid]: %s\n", argv[arg]);
+				print_usage(stderr, argv[0]);
+				return EXIT_FAILURE;
+			}
+			first_positional = argv[arg];
+			nb_positional++;
+		} else {
+			long id1 = 0, id2 = 0, id3 = 0;
+
+			fprintf(stderr, "Too many arguments: %s\n", argv[arg]);
+			if (NULL != strchr(first_positional, ':')) {
+				if (parse_id_base(argv[arg], 16, 0xff, &id3))
+					fprintf(stderr, "The class must be given with -c; the equivalent is: \"%s -c %lx\"\n",
+						first_positional, id3);
+			} else {
+				/* looks like the old "vendor product [class]" form; use one
+				 * coherent base for all ids when reconstructing the intent */
+				const char *class_str = (arg + 1 < argc) ? argv[arg + 1] : NULL;
+				bool ok = parse_id_base(first_positional, 0, 0xffff, &id1) &&
+					  parse_id_base(argv[arg], 0, 0xffff, &id2) &&
+					  (NULL == class_str || parse_id_base(class_str, 0, 0xff, &id3));
+
+				if (!ok)
+					ok = parse_id_base(first_positional, 16, 0xffff, &id1) &&
+					     parse_id_base(argv[arg], 16, 0xffff, &id2) &&
+					     (NULL == class_str || parse_id_base(class_str, 16, 0xff, &id3));
+
+				if (ok) {
+					fprintf(stderr, "Separate vendor and product ids are no longer accepted; the equivalent is: \"%04lx:%04lx",
+						id1, id2);
+					if (NULL != class_str)
+						fprintf(stderr, " -c %lx", id3);
+					fprintf(stderr, "\"\n");
+				}
+			}
+			print_usage(stderr, argv[0]);
+			return EXIT_FAILURE;
+		}
+	}
 
 	/* Keep stdout unbuffered so that captured events (to file or pipe)
 	 * interleave correctly with libusb's stderr debug output and nothing
