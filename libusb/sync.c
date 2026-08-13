@@ -111,6 +111,8 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 	int completed = 0;
 	int r;
 
+	assert(dev_handle);
+
 	if (usbi_handling_events(usbi_handle_ctx(dev_handle)))
 		return LIBUSB_ERROR_BUSY;
 
@@ -181,6 +183,8 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	struct libusb_transfer *transfer;
 	int completed = 0;
 	int r;
+
+	assert(dev_handle);
 
 	if (usbi_handling_events(usbi_handle_ctx(dev_handle)))
 		return LIBUSB_ERROR_BUSY;
@@ -339,6 +343,7 @@ int API_EXPORTED libusb_interrupt_transfer(libusb_device_handle *dev_handle,
 	unsigned char endpoint, unsigned char *data, int length,
 	int *transferred, unsigned int timeout)
 {
+	assert(dev_handle);
 	return do_sync_bulk_transfer(dev_handle, endpoint, data, length,
 		transferred, timeout, LIBUSB_TRANSFER_TYPE_INTERRUPT);
 }
