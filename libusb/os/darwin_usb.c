@@ -1458,6 +1458,10 @@ static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *
 
     desc->bDescriptorType = LIBUSB_DT_DEVICE;
     desc->bLength = LIBUSB_DT_DEVICE_SIZE;
+
+    if (desc->bNumConfigurations == 0)
+      break;
+
     goto done_desc;
   } while (0);
 
