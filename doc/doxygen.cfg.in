@@ -2378,7 +2378,27 @@ INCLUDE_FILE_PATTERNS  =
 PREDEFINED             = API_EXPORTED= \
                          DEFAULT_VISIBILITY= \
                          LIBUSB_CALL= \
-                         LIBUSB_PACKED=
+                         LIBUSB_PACKED= \
+                         CAPABILITY(x) \
+                         SCOPED_CAPABILITY \
+                         GUARDED_BY(x)= \
+                         PT_GUARDED_BY(x)= \
+                         ACQUIRE_BEFORE(x)= \
+                         ACQUIRE_AFTER(x)= \
+                         REQUIRES(x)= \
+                         REQUIRES_SHARED(x)= \
+                         ACQUIRE(x)= \
+                         ACQUIRE_SHARED(x)= \
+                         RELEASE(x)= \
+                         RELEASE_SHARED(x)= \
+                         RELEASE_GENERIC(x)= \
+                         TRY_ACQUIRE(x,y)= \
+                         TRY_ACQUIRE_SHARED(x,y)= \
+                         EXCLUDES(x)= \
+                         ASSERT_CAPABILITY(x) \
+                         ASSERT_SHARED_CAPABILITY(x) \
+                         RETURN_CAPABILITY(x) \
+                         NO_THREAD_SAFETY_ANALYSIS= \
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
 # tag can be used to specify a list of macro names that should be expanded. The
