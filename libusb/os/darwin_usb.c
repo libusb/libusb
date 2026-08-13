@@ -1412,7 +1412,7 @@ static IOReturn darwin_request_descriptor (usb_device_t device, UInt8 desc, UInt
 /* device and service are passed explicitly because this is called from
    darwin_get_cached_device with darwin_cached_devices_mutex held, before the
    pending replacement (if any) has been adopted into dev->device and dev->service */
-static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *ctx, struct darwin_cached_device *dev, usb_device_t device, io_service_t service) {
+static enum libusb_error darwin_cache_device_descriptor (struct libusb_context *ctx, struct darwin_cached_device *dev, usb_device_t device, io_service_t service) REQUIRES(darwin_cached_devices_mutex) {
   int retries = 1;
   long delay = 30000; /* microseconds */
   int unsuspended = 0, try_unsuspend = 1, try_reconfigure = 1;
