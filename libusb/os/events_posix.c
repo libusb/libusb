@@ -259,6 +259,7 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 {
 	struct pollfd *fds = (struct pollfd *)ctx->event_data;
 	usbi_nfds_t nfds = (usbi_nfds_t)ctx->event_data_cnt;
+	unsigned int internal_fds;
 
 	usbi_dbg(ctx, "poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
 #ifdef __EMSCRIPTEN__
@@ -309,7 +310,7 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 	 * library's internal file descriptors, so we determine how many are
 	 * in use internally for this context and skip these when passing any
 	 * remaining pollfds to the backend. */
-	unsigned int internal_fds = usbi_using_timer(ctx) ? 2 : 1;
+	internal_fds = usbi_using_timer(ctx) ? 2 : 1;
 	fds += internal_fds;
 	nfds -= internal_fds;
 

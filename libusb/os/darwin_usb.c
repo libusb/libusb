@@ -463,7 +463,7 @@ uint32_t get_running_version(void) {
 }
 
 /* this function must be called with the darwin_cached_devices_mutex held */
-static void darwin_deref_cached_device(struct darwin_cached_device *cached_dev) REQUIRES(darwin_cached_devices_mutex) {
+static void darwin_unref_cached_device_locked(struct darwin_cached_device *cached_dev) REQUIRES(darwin_cached_devices_mutex) {
   cached_dev->refcount--;
   /* free the device and remove it from the cache */
   if (0 == cached_dev->refcount) {
@@ -487,8 +487,16 @@ static void darwin_deref_cached_device(struct darwin_cached_device *cached_dev) 
 }
 
 /* this function must be called with the darwin_cached_devices_mutex held */
-static void darwin_ref_cached_device(struct darwin_cached_device *cached_dev) REQUIRES(darwin_cached_devices_mutex) {
+static void darwin_ref_cached_device_locked(struct darwin_cached_device *cached_dev) REQUIRES(darwin_cached_devices_mutex) {
   cached_dev->refcount++;
+}
+
+/* releases a reference to a cached device, e.g. one taken by
+   darwin_get_cached_device for its caller */
+static void darwin_unref_cached_device(struct darwin_cached_device *cached_dev) EXCLUDES(darwin_cached_devices_mutex) {
+  usbi_mutex_lock(&darwin_cached_devices_mutex);
+  darwin_unref_cached_device_locked (cached_dev);
+  usbi_mutex_unlock(&darwin_cached_devices_mutex);
 }
 
 /* returns the live device interface for enumeration purposes: while the
@@ -708,6 +716,11 @@ static void darwin_devices_attached (void *ptr, io_iterator_t add_devices) EXCLU
       usbi_dbg (NULL, "cached device in reset state. reset complete...");
     }
 
+    /* release the reference darwin_get_cached_device took for us (only taken
+       when a device was returned) */
+    if (cached_device) {
+      darwin_unref_cached_device (cached_device);
+    }
     IOObjectRelease(service);
   }
 
@@ -736,7 +749,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) EXCLU
     if (!ret)
       continue;
 
-    /* we need to match darwin_ref_cached_device call made in darwin_get_cached_device function
+    /* we need to match darwin_ref_cached_device_locked call made in darwin_get_cached_device function
        otherwise no cached device will ever get freed */
     usbi_mutex_lock(&darwin_cached_devices_mutex);
     list_for_each_entry(old_device, &darwin_cached_devices, list, struct darwin_cached_device) {
@@ -749,7 +762,7 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) EXCLU
 
           is_reenumerating = true;
         } else {
-          darwin_deref_cached_device (old_device);
+          darwin_unref_cached_device_locked (old_device);
         }
 
         break;
@@ -928,7 +941,7 @@ static void darwin_cleanup_devices(void) REQUIRES(darwin_cached_devices_mutex) {
     if (dev->refcount > 1) {
       usbi_err(NULL, "device still referenced at libusb_exit");
     }
-    darwin_deref_cached_device(dev);
+    darwin_unref_cached_device_locked(dev);
   }
 }
 
@@ -1057,13 +1070,25 @@ static int darwin_get_device_string(struct libusb_device *dev,
 
   switch (string_type) {
     case LIBUSB_DEVICE_STRING_MANUFACTURER:
-      cf = (CFStringRef)IORegistryEntryCreateCFProperty(service, CFSTR(kUSBVendorString), kCFAllocatorDefault, 0);
+      #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
+        cf = (CFStringRef)IORegistryEntryCreateCFProperty(service, CFSTR(kUSBVendorString), kCFAllocatorDefault, 0);
+      #else
+        cf = (CFStringRef)IORegistryEntryCreateCFProperty(service, CFSTR("USB Vendor Name"), kCFAllocatorDefault, 0);
+      #endif
       break;
     case LIBUSB_DEVICE_STRING_PRODUCT:
-      cf = (CFStringRef)IORegistryEntryCreateCFProperty(service, CFSTR(kUSBProductString), kCFAllocatorDefault, 0);
+      #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
+        cf = (CFStringRef)IORegistryEntryCreateCFProperty(service, CFSTR(kUSBProductString), kCFAllocatorDefault, 0);
+      #else
+        cf = (CFStringRef)IORegistryEntryCreateCFProperty(service, CFSTR("USB Product Name"), kCFAllocatorDefault, 0);
+      #endif
       break;
     case LIBUSB_DEVICE_STRING_SERIAL_NUMBER:
-      cf = (CFStringRef)IORegistryEntryCreateCFProperty(service, CFSTR(kUSBSerialNumberString), kCFAllocatorDefault, 0);
+      #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
+        cf = (CFStringRef)IORegistryEntryCreateCFProperty(service, CFSTR(kUSBSerialNumberString), kCFAllocatorDefault, 0);
+      #else
+        cf = NULL;
+      #endif
       break;
     case LIBUSB_DEVICE_STRING_COUNT: /* intentional fall-through, avoid -Wswitch-enum */
     default:
@@ -1130,7 +1155,8 @@ static int darwin_fetch_string_descriptor (struct libusb_context *ctx,
   langid = dpriv->langid;
   if (0 == langid) {
     memset (desc, 0, sizeof(desc));
-    req.bmRequestType = USBmakebmRequestType (kUSBIn, kUSBStandard, kUSBDevice);
+    req.bmRequestType = USBmakebmRequestType ((UInt8)kUSBIn,
+      (UInt8)kUSBStandard, (UInt8)kUSBDevice);
     req.bRequest      = kUSBRqGetDescriptor;
     req.wValue        = (UInt16)(LIBUSB_DT_STRING << 8);
     req.wIndex        = 0;
@@ -1140,14 +1166,15 @@ static int darwin_fetch_string_descriptor (struct libusb_context *ctx,
     req.completionTimeout = 100;
     kresult = (*device)->DeviceRequestTO (device, &req);
     if (kIOReturnSuccess == kresult && req.wLenDone >= 4) {
-      langid = (UInt16)desc[2] | ((UInt16)desc[3] << 8);
+      langid = (UInt16)((UInt16)desc[2] | ((UInt16)desc[3] << 8));
       dpriv->langid = langid;
     }
   }
 
   /* Fetch the requested string descriptor. */
   memset (desc, 0, sizeof(desc));
-  req.bmRequestType = USBmakebmRequestType (kUSBIn, kUSBStandard, kUSBDevice);
+  req.bmRequestType = USBmakebmRequestType ((UInt8)kUSBIn,
+    (UInt8)kUSBStandard, (UInt8)kUSBDevice);
   req.bRequest      = kUSBRqGetDescriptor;
   req.wValue        = (UInt16)((LIBUSB_DT_STRING << 8) | string_index);
   req.wIndex        = langid;
@@ -1369,7 +1396,8 @@ static IOReturn darwin_request_descriptor (usb_device_t device, UInt8 desc, UInt
   memset (buffer, 0, buffer_size);
 
   /* Set up request for descriptor/ */
-  req.bmRequestType = USBmakebmRequestType(kUSBIn, kUSBStandard, kUSBDevice);
+  req.bmRequestType = USBmakebmRequestType((UInt8)kUSBIn,
+    (UInt8)kUSBStandard, (UInt8)kUSBDevice);
   req.bRequest      = kUSBRqGetDescriptor;
   req.wValue        = (UInt16)(desc << 8);
   req.wIndex        = desc_index;
@@ -1636,7 +1664,7 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
       (*device)->GetDeviceAddress (device, (USBDeviceAddress *)&new_device->address);
 
       /* keep a reference to this device */
-      darwin_ref_cached_device(new_device);
+      darwin_ref_cached_device_locked(new_device);
 
       (*device)->GetLocationID (device, &new_device->location);
       new_device->port = port;
@@ -1684,6 +1712,15 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
     }
   } while (0);
 
+  /* take a reference for the caller while still holding the mutex: without
+     it, a detach event processed between this unlock and the caller's use of
+     the device could drop the last reference and free the cached device
+     under the caller. the caller must release the reference with
+     darwin_unref_cached_device when done. */
+  if (*cached_out) {
+    darwin_ref_cached_device_locked (*cached_out);
+  }
+
   usbi_mutex_unlock(&darwin_cached_devices_mutex);
 
   assert((ret == LIBUSB_SUCCESS) ? (*cached_out != NULL) : true);
@@ -1726,7 +1763,7 @@ static enum libusb_error process_new_device (struct libusb_context *ctx, struct 
 
       priv->dev = cached_device;
       usbi_mutex_lock(&darwin_cached_devices_mutex);
-      darwin_ref_cached_device (priv->dev);
+      darwin_ref_cached_device_locked (priv->dev);
       usbi_mutex_unlock(&darwin_cached_devices_mutex);
       dev->port_number    = cached_device->port;
       /* the location ID encodes the path to the device. the top byte of the location ID contains the bus number
@@ -1815,6 +1852,11 @@ static enum libusb_error darwin_scan_devices(struct libusb_context *ctx) {
       (void) process_new_device (ctx, cached_device, old_session_id);
     }
 
+    /* release the reference darwin_get_cached_device took for us (only taken
+       when a device was returned) */
+    if (cached_device) {
+      darwin_unref_cached_device (cached_device);
+    }
     IOObjectRelease(service);
   }
 
@@ -2733,7 +2775,7 @@ static void darwin_destroy_device(struct libusb_device *dev) EXCLUDES(darwin_cac
   if (dpriv->dev) {
     /* need to hold the lock in case this is the last reference to the device */
     usbi_mutex_lock(&darwin_cached_devices_mutex);
-    darwin_deref_cached_device (dpriv->dev);
+    darwin_unref_cached_device_locked (dpriv->dev);
     dpriv->dev = NULL;
     usbi_mutex_unlock(&darwin_cached_devices_mutex);
   }
@@ -2787,8 +2829,15 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
 
   usbi_mutex_unlock(&transfer->dev_handle->lock);
 
-  /* submit the request */
   /* timeouts are unavailable on interrupt endpoints */
+  if (pipe_properties.transfer_type != kUSBInterrupt)
+    itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
+  /* publish the submit-side transfer state to darwin_async_io_callback
+     (see submit_fence in struct usbi_transfer) */
+  usbi_atomic_store(&itransfer->submit_fence, 1);
+
+  /* submit the request */
   if (pipe_properties.transfer_type == kUSBInterrupt) {
     if (IS_XFERIN(transfer))
       ret = (*IOINTERFACE(cInterface))->ReadPipeAsync(IOINTERFACE(cInterface), pipeRef, transfer->buffer,
@@ -2797,8 +2846,6 @@ static int submit_bulk_transfer(struct usbi_transfer *itransfer) REQUIRES(itrans
       ret = (*IOINTERFACE(cInterface))->WritePipeAsync(IOINTERFACE(cInterface), pipeRef, transfer->buffer,
                                                                (UInt32)transfer->length, darwin_async_io_callback, itransfer);
   } else {
-    itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
-
     if (IS_XFERIN(transfer))
       ret = (*IOINTERFACE(cInterface))->ReadPipeAsyncTO(IOINTERFACE(cInterface), pipeRef, transfer->buffer,
                                                                 (UInt32)transfer->length, transfer->timeout, transfer->timeout,
@@ -2852,6 +2899,10 @@ static int submit_stream_transfer(struct usbi_transfer *itransfer) REQUIRES(itra
   }
 
   itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
+  /* publish the submit-side transfer state to darwin_async_io_callback
+     (see submit_fence in struct usbi_transfer) */
+  usbi_atomic_store(&itransfer->submit_fence, 1);
 
   if (IS_XFERIN(transfer))
     ret = (*IOINTERFACE_V(cInterface, 550))->ReadStreamsPipeAsyncTO(IOINTERFACE(cInterface), pipeRef, itransfer->stream_id,
@@ -2935,6 +2986,10 @@ static int submit_iso_transfer(struct usbi_transfer *itransfer) REQUIRES(itransf
   if (cInterface->frames[transfer->endpoint] && frame < cInterface->frames[transfer->endpoint])
     frame = cInterface->frames[transfer->endpoint];
 
+  /* publish the submit-side transfer state to darwin_async_io_callback
+     (see submit_fence in struct usbi_transfer) */
+  usbi_atomic_store(&itransfer->submit_fence, 1);
+
   /* submit the request */
   if (IS_XFERIN(transfer))
     kresult = (*IOINTERFACE(cInterface))->ReadIsochPipeAsync(IOINTERFACE(cInterface), pipeRef, transfer->buffer, frame,
@@ -2985,6 +3040,10 @@ static int submit_control_transfer(struct usbi_transfer *itransfer) REQUIRES(itr
   tpriv->req.noDataTimeout     = transfer->timeout;
 
   itransfer->timeout_flags |= USBI_TRANSFER_OS_HANDLES_TIMEOUT;
+
+  /* publish the submit-side transfer state to darwin_async_io_callback
+     (see submit_fence in struct usbi_transfer) */
+  usbi_atomic_store(&itransfer->submit_fence, 1);
 
   /* all transfers in libusb-1.0 are async */
 
@@ -3115,6 +3174,13 @@ static int darwin_cancel_transfer(struct usbi_transfer *itransfer) REQUIRES(itra
 
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0) {
   struct usbi_transfer *itransfer = (struct usbi_transfer *)refcon;
+
+  /* acquire the submitting thread's writes to the transfer before reading
+     any of its state, including itransfer->priv below. pairs with the
+     usbi_atomic_store in the submit paths; see submit_fence in
+     struct usbi_transfer. */
+  (void)usbi_atomic_load(&itransfer->submit_fence);
+
   struct libusb_transfer *transfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
   struct darwin_transfer_priv *tpriv = (struct darwin_transfer_priv *)usbi_get_transfer_priv(itransfer);
 
