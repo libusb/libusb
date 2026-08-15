@@ -1657,13 +1657,13 @@ static inline bool usbi_is_xferout(const struct libusb_transfer *xfer)
 #define TRANSFER_CTX(transfer) \
 	usbi_transfer_ctx(transfer)
 #define IS_EPIN(ep) \
-	usbi_is_ep_in(ep)
+	usbi_is_epin(ep)
 #define IS_EPOUT(ep) \
-	usbi_is_ep_out(ep)
+	usbi_is_epout(ep)
 #define IS_XFERIN(xfer) \
-	usbi_is_xfer_in(xfer)
+	usbi_is_xferin(xfer)
 #define IS_XFEROUT(xfer) \
-	usbi_is_xfer_out(xfer)
+	usbi_is_xferout(xfer)
 
 
 #define for_each_context(c) \
