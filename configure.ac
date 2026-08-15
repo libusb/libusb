@@ -254,7 +254,13 @@ windows)
 	;;
 emscripten)
 	# Note: LT_LDFLAGS is not enough here because we need link flags for executable.
-	EM_LDFLAGS="--bind -s ASYNCIFY"
+	dnl The WebUSB backend (os/emscripten_webusb.cpp) is C++, so libusb-1.0
+	dnl pulls in the C++ runtime. Emscripten 6.0.6 disabled DEFAULT_TO_CXX,
+	dnl making em++ mandatory for C++ links; without it every C program that
+	dnl links libusb (the examples and tests here, and downstream users
+	dnl building with emcc) fails with undefined std:: symbols. Setting it
+	dnl back restores the pre-6.0.6 behaviour and is a no-op on older SDKs.
+	EM_LDFLAGS="--bind -s ASYNCIFY -s DEFAULT_TO_CXX"
 	AM_LDFLAGS="${AM_LDFLAGS} ${EM_LDFLAGS} -s ASSERTIONS -s ALLOW_MEMORY_GROWTH"
 	LIBS="${LIBS} ${EM_LDFLAGS}"
 	;;
