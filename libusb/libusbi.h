@@ -469,7 +469,7 @@ static inline struct libusb_context *usbi_get_context(struct libusb_context *ctx
 	return ctx;
 }
 
-enum usbi_event_flags {
+enum usbi_event_flags LIBUSB_ENUM_SIZE(unsigned int) {
 	/* The list of event sources has been modified */
 	USBI_EVENT_EVENT_SOURCES_MODIFIED = 1U << 0,
 
@@ -625,7 +625,7 @@ struct usbi_transfer {
 	usbi_atomic_t submit_fence;
 };
 
-enum usbi_transfer_state_flags {
+enum usbi_transfer_state_flags LIBUSB_ENUM_SIZE(unsigned int) {
 	/* Transfer successfully submitted by backend */
 	USBI_TRANSFER_IN_FLIGHT = 1U << 0,
 
