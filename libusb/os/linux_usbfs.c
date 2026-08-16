@@ -693,9 +693,13 @@ static int open_sysfs_attr(struct libusb_context *ctx,
 	const char *sysfs_dir, const char *attr)
 {
 	char filename[256];
-	int fd;
+	int fd, r;
 
-	snprintf(filename, sizeof(filename), SYSFS_DEVICE_PATH "/%s/%s", sysfs_dir, attr);
+	r = snprintf(filename, sizeof(filename), SYSFS_DEVICE_PATH "/%s/%s", sysfs_dir, attr);
+	if (r < 0 || r >= (int)sizeof(filename)) {
+		usbi_err(ctx, "sysfs attribute path %s/%s too long", sysfs_dir, attr);
+		return LIBUSB_ERROR_OTHER;
+	}
 	fd = open(filename, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		if (errno == ENOENT) {
