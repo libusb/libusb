@@ -714,8 +714,7 @@ static int open_sysfs_attr(struct libusb_context *ctx,
 	return fd;
 }
 
-/* Note only suitable for attributes which always read >= 0, < 0 is error.
- * Takes ownership of fd and closes it. */
+/* fd stays open: the caller that opened it also closes it. */
 static int parse_sysfs_attr_fd(struct libusb_context *ctx, int fd,
 	const char *attr, int max_value, int *value_p)
 {
@@ -728,13 +727,11 @@ static int parse_sysfs_attr_fd(struct libusb_context *ctx, int fd,
 	r = read(fd, buf, sizeof(buf) - 1);
 	if (r < 0) {
 		r = errno;
-		close(fd);
 		if (r == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
 		usbi_err(ctx, "attribute %s read failed, errno=%zd", attr, r);
 		return LIBUSB_ERROR_IO;
 	}
-	close(fd);
 
 	if (r == 0) {
 		/* Certain attributes (e.g. bConfigurationValue) are not
@@ -789,13 +786,16 @@ static int parse_sysfs_attr_fd(struct libusb_context *ctx, int fd,
 static int read_sysfs_attr(struct libusb_context *ctx,
 	const char *sysfs_dir, const char *attr, int max_value, int *value_p)
 {
-	int fd;
+	int fd, r;
 
 	fd = open_sysfs_attr(ctx, sysfs_dir, attr);
 	if (fd < 0)
 		return fd;
 
-	return parse_sysfs_attr_fd(ctx, fd, attr, max_value, value_p);
+	r = parse_sysfs_attr_fd(ctx, fd, attr, max_value, value_p);
+	close(fd);
+
+	return r;
 }
 
 static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
@@ -819,33 +819,26 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 			UINT8_MAX, config);
 }
 
-/* read the bConfigurationValue for a device we only have a usbfs file
- * descriptor for, i.e. one that came in through libusb_wrap_sys_device().
+/* Read the sysfs bConfigurationValue of a device that came in through
+ * libusb_wrap_sys_device(). Such a device has no priv->sysfs_dir. A usbfs
+ * node is a character device, so /sys/dev/char/<major>:<minor> links to the
+ * owning device's sysfs directory. Open the attribute through that link,
+ * never through a copy of the directory name: the kernel can give a name
+ * like "1-4" to a new device as soon as this one disconnects.
  *
- * Such a device has no priv->sysfs_dir, so the active configuration is
- * normally asked of the device itself with a GET_CONFIGURATION request. The
- * kernel already knows the answer and publishes the mapping needed to find
- * it: a usbfs node is a character device, and /sys/dev/char/<major>:<minor>
- * is a symlink to the owning device's sysfs directory. The attribute is
- * opened through that link, never through a copy of the directory name: the
- * kernel can give the "1-4" style name to a new device the moment this one
- * disconnects, so the link must be resolved at open time.
+ * Trust the value only if IOCTL_USBFS_GET_CAPABILITIES on the wrapped fd
+ * then answers 0, or ENOTTY, which initialize_handle() already treats as a
+ * kernel without the ioctl; no such kernel was tested here. The ioctl is
+ * issued for that answer, not for the capabilities. Observed here: a live fd
+ * answered 0 with no bus traffic in usbmon, and an fd held open across a
+ * disconnect answered ENODEV, as did every other usbfs ioctl tried on it.
+ * "Anything but ENODEV" would not do: an fd opened without write access
+ * answered EPERM both while the device was attached and after it was gone.
+ * The probe runs after the read, so a value from a recycled link is rejected.
  *
- * The value read is trusted only if USBDEVFS_GET_CAPABILITIES on the
- * wrapped fd then proves the device is still connected. The kernel answers
- * that ioctl from memory, without bus traffic. usbfs checks the connection
- * before it decodes the command, so success is proof, and so is ENOTTY
- * from a kernel that predates the ioctl. Any other result is not: ENODEV
- * means the device is gone, and EPERM means the fd was opened without
- * write access and can prove nothing. A usbfs fd never comes back once its
- * device disconnects, so an fd that is connected after the read was
- * connected throughout it, and the value is its own.
- *
- * Any failure at any step is not an error: the caller falls back to asking
- * the device, which is what it did before, and for a disconnected fd that
- * request path is what reports LIBUSB_ERROR_NO_DEVICE. All failures collapse
- * to LIBUSB_ERROR_NOT_SUPPORTED so no caller is tempted to report one.
- */
+ * Every failure returns LIBUSB_ERROR_NOT_SUPPORTED, never a device error. The
+ * caller then asks the device, and that path reports LIBUSB_ERROR_NO_DEVICE
+ * for a disconnected fd. */
 static int wrapped_fd_get_active_config(struct libusb_device *dev, int fd,
 	int *config)
 {
@@ -861,6 +854,8 @@ static int wrapped_fd_get_active_config(struct libusb_device *dev, int fd,
 	if (fstat(fd, &st) < 0 || !S_ISCHR(st.st_mode))
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 
+	/* No truncation check: the longest path this can build is 55
+	 * characters, two 10-digit numbers included, and path holds 64. */
 	snprintf(path, sizeof(path),
 		SYSFS_MOUNT_PATH "/dev/char/%u:%u/bConfigurationValue",
 		major(st.st_rdev), minor(st.st_rdev));
@@ -871,6 +866,7 @@ static int wrapped_fd_get_active_config(struct libusb_device *dev, int fd,
 
 	r = parse_sysfs_attr_fd(ctx, attr_fd, "bConfigurationValue", UINT8_MAX,
 		&active);
+	close(attr_fd);
 	if (r < 0)
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 
@@ -879,9 +875,8 @@ static int wrapped_fd_get_active_config(struct libusb_device *dev, int fd,
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 
 	/* An unconfigured device leaves the attribute empty, which
-	 * parse_sysfs_attr_fd() already reports as -1. Reaching this line with
-	 * a 0 means the kernel named configuration 0, so decide it the way the
-	 * request path decides the same answer. */
+	 * parse_sysfs_attr_fd() reports as -1. Map a real 0 as
+	 * usbfs_get_active_config() maps it. */
 	if (active == 0 && !dev_has_config0(dev))
 		active = -1;
 
@@ -1311,20 +1306,20 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 
 	/* cache active config */
 	if (wrapped_fd >= 0) {
-		/* The device came in through libusb_wrap_sys_device(), which
-		 * is documented not to send requests over the bus when the
-		 * kernel can describe the wrapped device. Ask the kernel, and
-		 * only fall back to asking the device if it cannot be. */
+		/* libusb_wrap_sys_device() is documented not to send bus
+		 * requests when the kernel can describe the device. Read the
+		 * sysfs bConfigurationValue first; ask the device only if that
+		 * read fails. */
 		int active_config;
 
 		if (wrapped_fd_get_active_config(dev, wrapped_fd,
 				&active_config) == LIBUSB_SUCCESS) {
-			usbi_dbg(ctx, "active configuration %d for wrapped device from sysfs",
+			usbi_dbg(ctx, "active configuration %d for wrapped device from sysfs bConfigurationValue",
 				 active_config);
 			priv->active_config = active_config;
 			return LIBUSB_SUCCESS;
 		}
-		usbi_dbg(ctx, "no sysfs answer for wrapped device, asking the device");
+		usbi_dbg(ctx, "no sysfs bConfigurationValue for wrapped device, asking the device");
 	}
 
 	if (wrapped_fd < 0)
@@ -1789,19 +1784,26 @@ static int op_get_configuration(struct libusb_device_handle *handle,
 
 			active_config = priv->active_config;
 
-			/* The request stays: it is what reports a disconnect,
-			 * and this function is documented to do that. For a
-			 * wrapped descriptor its answer is not the one to keep
-			 * though -- initialize_device() already preferred the
-			 * kernel's, and this call would otherwise write the
-			 * device's answer back over it, which is the cache
-			 * op_get_active_config_descriptor() goes on to use. */
+			/* usbfs_get_active_config() has already written
+			 * priv->active_config: the device's answer, or a
+			 * config_descriptors[0] guess when the request fails
+			 * with anything but ENODEV. This arm overwrites it
+			 * with the sysfs bConfigurationValue; it does not
+			 * prevent the write. priv->active_config is the cache
+			 * op_get_active_config_descriptor() reads.
+			 *
+			 * The request itself stays. It is what reports a
+			 * disconnect, and libusb_get_configuration() is
+			 * documented to return LIBUSB_ERROR_NO_DEVICE when the
+			 * device has been disconnected. */
 			if (hpriv->fd_keep &&
 			    wrapped_fd_get_active_config(handle->dev, hpriv->fd,
 					&kernel_config) == LIBUSB_SUCCESS) {
 				if (kernel_config != active_config)
 					usbi_dbg(usbi_handle_ctx(handle),
-						 "device reports configuration %d but the kernel reports %d, keeping the kernel's",
+						 "device reports active configuration %d, "
+						 "sysfs bConfigurationValue reports %d, "
+						 "keeping the sysfs value",
 						 active_config, kernel_config);
 				priv->active_config = kernel_config;
 				active_config = kernel_config;

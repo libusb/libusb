@@ -1410,11 +1410,11 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
  * available to you through libusb_get_device(). This device is destroyed
  * during libusb_close(). The device shall not be opened through libusb_open().
  *
- * No requests are sent over the bus and the function does not block, with
- * one exception: on Linux, if the active configuration of the wrapped
- * device cannot be read from the kernel, it is asked of the device itself
- * with a single GET_CONFIGURATION control request, sent with a 1000
- * millisecond timeout.
+ * This function does not block and sends no requests over the bus. On Linux
+ * one exception is possible: a single GET_CONFIGURATION control request to
+ * the wrapped device, with a 1000 millisecond timeout. The kernel usually
+ * supplies the active configuration of that device. This request is sent
+ * only when the kernel cannot supply it.
  *
  * Since version 1.0.23, \ref LIBUSB_API_VERSION >= 0x01000107
  *
