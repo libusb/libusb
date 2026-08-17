@@ -25,8 +25,19 @@
 
 #include <emscripten/version.h>
 
-static_assert((__EMSCRIPTEN_major__ * 100 * 100 + __EMSCRIPTEN_minor__ * 100 +
-			   __EMSCRIPTEN_tiny__) >= 30148,
+#if defined(__EMSCRIPTEN_MAJOR__)
+#define USBI_EMSCRIPTEN_MAJOR __EMSCRIPTEN_MAJOR__
+#define USBI_EMSCRIPTEN_MINOR __EMSCRIPTEN_MINOR__
+#define USBI_EMSCRIPTEN_TINY __EMSCRIPTEN_TINY__
+#else
+/* Emscripten 3.1.48 provides only the legacy mixed-case version macros. */
+#define USBI_EMSCRIPTEN_MAJOR __EMSCRIPTEN_major__
+#define USBI_EMSCRIPTEN_MINOR __EMSCRIPTEN_minor__
+#define USBI_EMSCRIPTEN_TINY __EMSCRIPTEN_tiny__
+#endif
+
+static_assert((USBI_EMSCRIPTEN_MAJOR * 100 * 100 + USBI_EMSCRIPTEN_MINOR * 100 +
+			   USBI_EMSCRIPTEN_TINY) >= 30148,
 			  "Emscripten 3.1.48 or newer is required.");
 
 #include <assert.h>
@@ -782,7 +793,7 @@ int em_submit_transfer(usbi_transfer* itransfer) REQUIRES(itransfer->lock) {
 				auto endpoint =
 					transfer->endpoint & LIBUSB_ENDPOINT_ADDRESS_MASK;
 
-				if (usbi_is_xfer_in(transfer)) {
+				if (usbi_is_xferin(transfer)) {
 					transfer_promise = web_usb_device.call<val>(
 						"transferIn", endpoint, transfer->length);
 				} else {
