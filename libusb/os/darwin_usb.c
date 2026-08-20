@@ -2099,6 +2099,7 @@ static int darwin_get_configuration(struct libusb_device_handle *dev_handle, uin
 static int darwin_set_configuration_locked(struct libusb_device_handle *dev_handle, int config) REQUIRES(dev_handle->lock) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   IOReturn kresult;
+  int ret = LIBUSB_SUCCESS;
   uint8_t i;
 
   if (config == -1)
@@ -2115,13 +2116,23 @@ static int darwin_set_configuration_locked(struct libusb_device_handle *dev_hand
     return darwin_to_libusb (kresult);
 
   /* Reclaim any interfaces. */
-  for (i = 0 ; i < USB_MAXINTERFACES ; i++)
-    if (dev_handle->claimed_interfaces & (1U << i))
-      darwin_claim_interface (dev_handle, i);
+  for (i = 0 ; i < USB_MAXINTERFACES ; i++) {
+    if (dev_handle->claimed_interfaces & (1U << i)) {
+      int claim_ret = darwin_claim_interface (dev_handle, i);
+      if (LIBUSB_SUCCESS != claim_ret) {
+        /* leave the bit set: the core's close path releases the interface and
+           reattaches the kernel driver */
+        darwin_release_interface (dev_handle, i);
+        usbi_err (usbi_handle_ctx (dev_handle), "could not reclaim interface %u: %d", i, claim_ret);
+        if (LIBUSB_SUCCESS == ret)
+          ret = claim_ret;
+      }
+    }
+  }
 
   atomic_store_explicit(&dpriv->active_config, (UInt8)config, memory_order_relaxed);
 
-  return LIBUSB_SUCCESS;
+  return ret;
 }
 
 static int darwin_set_configuration(struct libusb_device_handle *dev_handle, int config) EXCLUDES(dev_handle->lock) {
