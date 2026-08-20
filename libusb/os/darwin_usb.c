@@ -104,8 +104,8 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, uin
 static int darwin_reenumerate_device(struct libusb_device_handle *dev_handle, bool capture) REQUIRES(dev_handle->lock);
 static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned char endpoint) EXCLUDES(dev_handle->lock);
 static int darwin_clear_halt_locked(struct libusb_device_handle *dev_handle, unsigned char endpoint) REQUIRES(dev_handle->lock);
-static int darwin_reset_device(struct libusb_device_handle *dev_handle) REQUIRES(dev_handle->lock);
-static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock);
+static int darwin_reset_device(struct libusb_device_handle *dev_handle) EXCLUDES(dev_handle->lock);
+static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) EXCLUDES(dev_handle->lock);
 static int darwin_detach_kernel_driver_locked (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock);
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0);
 
@@ -937,7 +937,7 @@ static void *darwin_event_thread_main (void *arg0) EXCLUDES(libusb_darwin_at_mut
 static void darwin_cleanup_devices(void) REQUIRES(darwin_cached_devices_mutex) {
   struct darwin_cached_device *dev, *next;
 
-  list_for_each_entry_safe(dev, next, &darwin_cached_devices, list, struct darwin_cached_device) {
+  list_for_each_entry_safe(dev, next, darwin_cached_devices, list, struct darwin_cached_device) {
     if (dev->refcount > 1) {
       usbi_err(NULL, "device still referenced at libusb_exit");
     }
