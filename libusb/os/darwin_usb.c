@@ -2556,6 +2556,16 @@ static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
   return ret;
 }
 
+/* releases the interfaces the caller had claimed */
+static void darwin_restore_state_unwind (struct libusb_device_handle *dev_handle,
+                                         unsigned long claimed_interfaces) REQUIRES(dev_handle->lock) {
+  for (uint8_t iface = 0 ; iface < USB_MAXINTERFACES ; ++iface) {
+    if (claimed_interfaces & (1U << iface)) {
+      darwin_release_interface (dev_handle, iface);
+    }
+  }
+}
+
 /* must be called while holding dev_handle->lock (protects the
    claimed_interfaces bits cleared and rebuilt here) and dpriv->lock */
 static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_handle, uint8_t active_config,
@@ -2574,7 +2584,6 @@ static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_
   priv->is_open = false;
   dpriv->open_count = 1;
 
-  /* clean up open interfaces */
   darwin_close_locked (dev_handle);
 
   /* re-open the device */
@@ -2582,6 +2591,7 @@ static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_
   dpriv->open_count = open_count;
   if (LIBUSB_SUCCESS != ret) {
     /* could not restore configuration */
+    darwin_restore_state_unwind (dev_handle, claimed_interfaces);
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
@@ -2591,6 +2601,7 @@ static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_
     ret = darwin_set_configuration_locked (dev_handle, active_config);
     if (LIBUSB_SUCCESS != ret) {
       usbi_dbg (ctx, "darwin/restore_state: could not restore configuration");
+      darwin_restore_state_unwind (dev_handle, claimed_interfaces);
       return LIBUSB_ERROR_NOT_FOUND;
     }
   }
@@ -2607,14 +2618,8 @@ static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_
 
       ret = darwin_claim_interface (dev_handle, iface);
       if (LIBUSB_SUCCESS != ret) {
-        /* the bits of the interfaces not claimed again are clear, so close
-           skips them: release them here */
-        for (uint8_t i = iface ; i < USB_MAXINTERFACES ; ++i) {
-          if (claimed_interfaces & (1U << i)) {
-            darwin_release_interface (dev_handle, i);
-          }
-        }
         usbi_dbg (ctx, "darwin/restore_state: could not claim interface %u", iface);
+        darwin_restore_state_unwind (dev_handle, claimed_interfaces);
         return LIBUSB_ERROR_NOT_FOUND;
       }
 
