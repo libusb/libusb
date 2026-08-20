@@ -431,14 +431,25 @@ AC_ARG_ENABLE([tests-build],
 	[build_tests=$enableval],
 	[build_tests=no])
 
+dnl Fuzz targets build
+AC_ARG_ENABLE([fuzzers],
+	[AS_HELP_STRING([--enable-fuzzers], [build fuzz targets, needs a fuzzing engine in LIB_FUZZING_ENGINE [default=no]])],
+	[build_fuzzers=$enableval],
+	[build_fuzzers=no])
+
 dnl Long-running testcore stress test
 AC_ARG_ENABLE([testcore],
 	[AS_HELP_STRING([--enable-testcore], [include the testcore stress test in make check [default=no]])],
 	[run_testcore=$enableval],
 	[run_testcore=no])
 
+dnl The fuzz targets live in tests/fuzz, so building them means descending into
+dnl the tests directory.
+AS_IF([test "x$build_fuzzers" != xno], [build_tests=yes])
+
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != xno])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != xno])
+AM_CONDITIONAL([BUILD_FUZZERS], [test "x$build_fuzzers" != xno])
 AM_CONDITIONAL([RUN_TESTCORE], [test "x$run_testcore" = xyes])
 AM_CONDITIONAL([BUILD_MAN_PAGES], [test "x$build_man_pages" = xyes])
 AM_CONDITIONAL([BUILD_UMOCKDEV_TEST], [test "x$ac_have_umockdev" = xyes -a "x$log_enabled" != xno -a "x$debug_log_enabled" != xyes])
@@ -513,6 +524,7 @@ AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([libusb/Makefile])
 AC_CONFIG_FILES([examples/Makefile])
 AC_CONFIG_FILES([tests/Makefile])
+AC_CONFIG_FILES([tests/fuzz/Makefile])
 AC_CONFIG_FILES([doc/Makefile])
 AC_CONFIG_FILES([doc/doxygen.cfg])
 AC_OUTPUT

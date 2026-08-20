@@ -44,6 +44,10 @@ int libusb_control_transfer(libusb_device_handle *dev_handle,
     return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 
+/* libusb builds with -Werror=missing-prototypes, so the entry point
+ * needs a declaration of its own. */
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
+
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /* The limit of 8192 is comfortably above practical cases and
      * still keeping libFuzzer iterations fast and the corpus small */
