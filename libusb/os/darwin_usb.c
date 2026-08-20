@@ -2314,6 +2314,10 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
     return LIBUSB_ERROR_NOT_FOUND;
   }
 
+  /* release any interface still held here, or the QueryInterface below
+     overwrites the plug-in and it is never closed */
+  darwin_release_interface (dev_handle, iface);
+
   /* Do the actual claim */
   kresult = (*plugInInterface)->QueryInterface(plugInInterface,
                                                CFUUIDGetUUIDBytes(get_interface_interface_id()),
@@ -2345,10 +2349,6 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
     usbi_err (ctx, "could not build endpoint table");
     return ret;
   }
-
-  /* a re-claim still holds the previous source: remove it, or it stays in the
-     run loop */
-  darwin_interface_release_event_source (cInterface);
 
   cInterface->runloop = darwin_retain_event_runloop ();
   if (NULL == cInterface->runloop) {
