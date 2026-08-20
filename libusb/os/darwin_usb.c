@@ -2567,7 +2567,7 @@ static int darwin_clear_halt(struct libusb_device_handle *dev_handle, unsigned c
   return ret;
 }
 
-/* releases the interfaces the caller had claimed */
+/* releases the interfaces the caller had claimed and restores the claim bits */
 static void darwin_restore_state_unwind (struct libusb_device_handle *dev_handle,
                                          unsigned long claimed_interfaces) REQUIRES(dev_handle->lock) {
   for (uint8_t iface = 0 ; iface < USB_MAXINTERFACES ; ++iface) {
@@ -2575,6 +2575,10 @@ static void darwin_restore_state_unwind (struct libusb_device_handle *dev_handle
       darwin_release_interface (dev_handle, iface);
     }
   }
+
+  /* the core's close path releases each claimed interface, which drains
+     capture_count and reattaches the kernel driver */
+  dev_handle->claimed_interfaces = claimed_interfaces;
 }
 
 /* must be called while holding dev_handle->lock (protects the
