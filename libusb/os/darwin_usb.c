@@ -3664,6 +3664,10 @@ static int darwin_capture_release_interface(struct libusb_device_handle *dev_han
     return ret;
   }
 
+  /* clear the bit before the reattach below: it re-enumerates the device, and
+     the restore claims every interface still marked claimed */
+  dev_handle->claimed_interfaces &= ~(1U << iface);
+
   usbi_mutex_lock(&dpriv->lock);
   if (dev_handle->auto_detach_kernel_driver && dpriv->capture_count > 0) {
     ret = darwin_attach_kernel_driver_locked (dev_handle, iface);
