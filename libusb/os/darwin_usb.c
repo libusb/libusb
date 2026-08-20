@@ -1968,7 +1968,7 @@ static void darwin_close_locked (struct libusb_device_handle *dev_handle) {
   if (0 == dpriv->open_count) {
     /* delete the device's async event source */
     if (priv->cfSource) {
-      CFRunLoopRemoveSource (libusb_darwin_acfl, priv->cfSource, kCFRunLoopDefaultMode);
+      CFRunLoopRemoveSource (libusb_darwin_acfl, priv->cfSource, kCFRunLoopCommonModes);
       CFRelease (priv->cfSource);
       priv->cfSource = NULL;
       CFRelease (libusb_darwin_acfl);
