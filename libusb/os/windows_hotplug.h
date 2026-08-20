@@ -28,4 +28,18 @@ int windows_stop_event_monitor(void);
 
 void windows_initial_scan_devices(struct libusb_context *ctx);
 
+// Whether announcements may be withheld; temporarily false while the scan
+// forced by the settle-retry ceiling runs, so no device is withheld forever
+bool windows_hotplug_defer_arrivals(void);
+
+// Called for each device left announce-pending: wakes the event thread so a
+// retry scan runs even without further device tree broadcasts
+void windows_hotplug_arrival_deferred(void);
+
+// Implemented by the WinUSB backend: whether the last scan materialized at
+// least one interface path for the device, and whether its driver stack is
+// fully settled per live PnP state
+bool windows_hotplug_device_usable(struct libusb_device *dev);
+bool windows_hotplug_device_settled(struct libusb_device *dev);
+
 #endif

@@ -37,6 +37,10 @@
 #include "libusbi.h"
 #include "windows_winusb.h"
 
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+#include "windows_hotplug.h"
+#endif
+
 #define HANDLE_VALID(h) (((h) != NULL) && ((h) != INVALID_HANDLE_VALUE))
 
 // The below macro is used in conjunction with safe loops.
@@ -191,6 +195,9 @@ static bool init_dlls(struct libusb_context *ctx)
 	DLL_GET_HANDLE(ctx, Cfgmgr32);
 	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Parent, true);
 	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Child, true);
+	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_Sibling, true);
+	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_DevNode_Status, true);
+	DLL_LOAD_FUNC(Cfgmgr32, CM_Get_DevNode_Registry_PropertyA, true);
 
 	// Prefixed to avoid conflict with header files
 	DLL_GET_HANDLE(ctx, AdvAPI32);
@@ -474,6 +481,99 @@ static struct libusb_device *get_ancestor(struct libusb_context *ctx,
 
 	return dev;
 }
+
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+/*
+ * Whether Windows has finished bringing up a devnode's driver stack.
+ *
+ * A devnode is final once started (DN_STARTED) or once Windows gave up on
+ * it (DN_HAS_PROBLEM): waiting longer cannot help then, so such a device
+ * gets announced as-is. usbccgp and HidUsb expose their functionality
+ * through child devnodes they create asynchronously after starting, so the
+ * walk recurses through those, and only those: a hub's children are
+ * independent devices with their own lifecycle.
+ */
+static bool windows_devnode_settled(struct libusb_context *ctx, struct winusb_device_priv *priv,
+	DEVINST devinst, unsigned int depth)
+{
+	ULONG status, problem;
+	char service[64];
+	ULONG size = sizeof(service);
+	ULONG reg_type;
+	DEVINST child_devinst;
+	CONFIGRET cr;
+	bool is_hidusb;
+
+	if (depth > 4)
+		return true; // Never seen on USB; do not let a cyclic tree hang us
+
+	cr = CM_Get_DevNode_Status(&status, &problem, devinst, 0);
+	if (cr != CR_SUCCESS) {
+		usbi_warn(ctx, "could not get devnode status for device '%s' (CR error %lu), assuming settled",
+			priv->dev_id, ULONG_CAST(cr));
+		return true;
+	}
+
+	if (status & DN_HAS_PROBLEM)
+		return true;
+
+	if (!(status & DN_STARTED))
+		return false;
+
+	if (CM_Get_DevNode_Registry_PropertyA(devinst, CM_DRP_SERVICE, &reg_type, service, &size, 0) != CR_SUCCESS)
+		return true;
+
+	is_hidusb = (_stricmp(service, "HidUsb") == 0);
+	if (!is_hidusb && (_stricmp(service, "usbccgp") != 0))
+		return true;
+
+	if (CM_Get_Child(&child_devinst, devinst, 0) != CR_SUCCESS)
+		return false; // the expected child devnodes have not been created yet
+
+	do {
+		if (!windows_devnode_settled(ctx, priv, child_devinst, depth + 1))
+			return false;
+	} while (CM_Get_Sibling(&child_devinst, child_devinst, 0) == CR_SUCCESS);
+
+	return true;
+}
+
+// The device's session id is its DEVINST (see the GEN pass)
+bool windows_hotplug_device_settled(struct libusb_device *dev)
+{
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+
+	return windows_devnode_settled(DEVICE_CTX(dev), priv, (DEVINST)dev->session_data, 0);
+}
+
+// Judged from what the scans actually materialized (the same state
+// libusb_open will use), not from live PnP state, which can disagree with
+// the device interface snapshot a scan enumerates.
+bool windows_hotplug_device_usable(struct libusb_device *dev)
+{
+	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	int i;
+
+	if (priv->path == NULL)
+		return false;
+
+	switch (priv->apib->id) {
+	case USB_API_COMPOSITE:
+	case USB_API_HID:
+		for (i = 0; i < USB_MAXINTERFACES; i++) {
+			if (priv->usb_interface[i].path != NULL)
+				return true;
+		}
+		return false;
+	case USB_API_HUB:
+	case USB_API_UNSUPPORTED:
+		return false;
+	default:
+		// WinUSB-like APIs operate on the device path itself
+		return true;
+	}
+}
+#endif
 
 /*
  * Determine which interface the given endpoint address belongs to
@@ -2399,6 +2499,12 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 						usbi_warn(ctx, "could not retrieve port number for device '%s': %s", dev_id, windows_error_str(0));
 					r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_info_data.DevInst);
 					usbi_mutex_unlock(&priv->interface_lock);
+#if defined(LIBUSB_WINDOWS_HOTPLUG)
+					// Withhold DEVICE_ARRIVED until the scan proves the
+					// device usable (windows_resolve_pending_announcements)
+					if (r == LIBUSB_SUCCESS)
+						priv->announce_pending = true;
+#endif
 				}
 				if (r == LIBUSB_SUCCESS) {
 					// Append device to the list of discovered devices
