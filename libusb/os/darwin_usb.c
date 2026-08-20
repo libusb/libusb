@@ -60,10 +60,15 @@ static const mach_port_t darwin_default_master_port = 0;
 static usbi_mutex_static_t libusb_darwin_at_mutex = USBI_MUTEX_INITIALIZER;
 static usbi_cond_t libusb_darwin_at_cond = USBI_COND_INITIALIZER;
 
+/* not defined in SDKs before macOS 10.7 */
+#ifndef CF_RETURNS_RETAINED
+#define CF_RETURNS_RETAINED
+#endif
+
 #define LIBUSB_DARWIN_STARTUP_FAILURE ((CFRunLoopRef) -1)
 
-static CFRunLoopRef libusb_darwin_acfl = NULL; /* event cf loop */
-static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for event cf loop */
+static CFRunLoopRef libusb_darwin_acfl GUARDED_BY(libusb_darwin_at_mutex); /* event cf loop */
+static CFRunLoopSourceRef libusb_darwin_acfls GUARDED_BY(libusb_darwin_at_mutex); /* shutdown signal for event cf loop */
 
 /* Lock ordering: the per-device lock (struct darwin_cached_device, dpriv->lock)
    may be held when acquiring darwin_cached_devices_mutex (e.g. via
@@ -77,7 +82,9 @@ static CFRunLoopSourceRef libusb_darwin_acfls = NULL; /* shutdown signal for eve
    before dpriv->lock. Consequently, code holding dpriv->lock must not call
    public libusb_* functions that take locks (e.g. libusb_release_interface).
    Lock-free ones such as libusb_get_active_config_descriptor are tolerated
-   but discouraged. */
+   but discouraged. libusb_darwin_at_mutex is the innermost lock. darwin_exit
+   holds it across pthread_join, so the event thread must not take it after it
+   signals shutdown. */
 static usbi_mutex_t darwin_cached_devices_mutex = USBI_MUTEX_INITIALIZER;
 static struct list_head darwin_cached_devices GUARDED_BY(darwin_cached_devices_mutex);
 static int init_count GUARDED_BY(darwin_cached_devices_mutex);
@@ -107,6 +114,9 @@ static int darwin_clear_halt_locked(struct libusb_device_handle *dev_handle, uns
 static int darwin_reset_device(struct libusb_device_handle *dev_handle) REQUIRES(dev_handle->lock);
 static int darwin_detach_kernel_driver (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock);
 static int darwin_detach_kernel_driver_locked (struct libusb_device_handle *dev_handle, uint8_t interface) REQUIRES(dev_handle->lock);
+#if MAX_INTERFACE_VERSION >= 700
+static int darwin_capture_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface) REQUIRES(dev_handle->lock);
+#endif
 static void darwin_async_io_callback (void *refcon, IOReturn result, void *arg0);
 
 static enum libusb_error darwin_scan_devices(struct libusb_context *ctx);
@@ -1880,6 +1890,50 @@ static enum libusb_error darwin_scan_devices(struct libusb_context *ctx) {
   return LIBUSB_SUCCESS;
 }
 
+static void darwin_device_release_event_source (struct darwin_device_handle_priv *priv) {
+  if (priv->cfSource) {
+    CFRunLoopRemoveSource (priv->runloop, priv->cfSource, kCFRunLoopCommonModes);
+    CFRelease (priv->cfSource);
+    priv->cfSource = NULL;
+  }
+  if (priv->runloop) {
+    CFRelease (priv->runloop);
+    priv->runloop = NULL;
+  }
+}
+
+static void darwin_interface_release_event_source (struct darwin_interface *cInterface) {
+  if (cInterface->cfSource) {
+    CFRunLoopRemoveSource (cInterface->runloop, cInterface->cfSource, kCFRunLoopDefaultMode);
+    CFRelease (cInterface->cfSource);
+    cInterface->cfSource = NULL;
+  }
+  if (cInterface->runloop) {
+    CFRelease (cInterface->runloop);
+    cInterface->runloop = NULL;
+  }
+}
+
+/* Returns NULL if the event thread published no run loop. Callers keep the
+   reference for as long as their source is registered, because libusb_exit
+   can clear the global at any time. The run loop stays valid, but it does not
+   stay running: a source added during libusb_exit may never run. */
+static CFRunLoopRef darwin_retain_event_runloop (void) CF_RETURNS_RETAINED EXCLUDES(libusb_darwin_at_mutex) {
+  CFRunLoopRef runloop;
+
+  usbi_mutex_lock (&libusb_darwin_at_mutex);
+  runloop = libusb_darwin_acfl;
+  if (LIBUSB_DARWIN_STARTUP_FAILURE == runloop) {
+    runloop = NULL;
+  }
+  if (runloop) {
+    CFRetain (runloop);
+  }
+  usbi_mutex_unlock (&libusb_darwin_at_mutex);
+
+  return runloop;
+}
+
 /* must be called while holding dpriv->lock */
 static int darwin_open_locked (struct libusb_device_handle *dev_handle) {
   struct darwin_device_handle_priv *priv = (struct darwin_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
@@ -1906,11 +1960,29 @@ static int darwin_open_locked (struct libusb_device_handle *dev_handle) {
       priv->is_open = true;
     }
 
+    priv->runloop = darwin_retain_event_runloop ();
+    if (NULL == priv->runloop) {
+      usbi_err (usbi_handle_ctx (dev_handle), "no event thread run loop, cannot open device");
+
+      if (priv->is_open) {
+        (*dpriv->device)->USBDeviceClose (dpriv->device);
+      }
+
+      priv->is_open = false;
+
+      return LIBUSB_ERROR_OTHER;
+    }
+
     /* create async event source */
     kresult = (*dpriv->device)->CreateDeviceAsyncEventSource (dpriv->device,
                                                                                 &priv->cfSource);
     if (kresult != kIOReturnSuccess) {
       usbi_err (usbi_handle_ctx (dev_handle), "CreateDeviceAsyncEventSource: %s", darwin_error_str(kresult));
+
+      /* the handle can still be closed, so leave no source behind */
+      priv->cfSource = NULL;
+      CFRelease (priv->runloop);
+      priv->runloop = NULL;
 
       if (priv->is_open) {
         (*dpriv->device)->USBDeviceClose (dpriv->device);
@@ -1921,10 +1993,8 @@ static int darwin_open_locked (struct libusb_device_handle *dev_handle) {
       return darwin_to_libusb (kresult);
     }
 
-    CFRetain (libusb_darwin_acfl);
-
     /* add the cfSource to the async run loop */
-    CFRunLoopAddSource(libusb_darwin_acfl, priv->cfSource, kCFRunLoopCommonModes);
+    CFRunLoopAddSource(priv->runloop, priv->cfSource, kCFRunLoopCommonModes);
   }
 
   /* device opened successfully */
@@ -1962,17 +2032,16 @@ static void darwin_close_locked (struct libusb_device_handle *dev_handle) {
   dpriv->open_count--;
   if (NULL == dpriv->device) {
     usbi_warn (usbi_handle_ctx (dev_handle), "darwin_close device missing IOService");
+
+    /* the core frees the handle after close returns, so remove the source and
+       decrement the run loop reference count here */
+    darwin_device_release_event_source (priv);
     return;
   }
 
   if (0 == dpriv->open_count) {
     /* delete the device's async event source */
-    if (priv->cfSource) {
-      CFRunLoopRemoveSource (libusb_darwin_acfl, priv->cfSource, kCFRunLoopCommonModes);
-      CFRelease (priv->cfSource);
-      priv->cfSource = NULL;
-      CFRelease (libusb_darwin_acfl);
-    }
+    darwin_device_release_event_source (priv);
 
     if (priv->is_open) {
       /* close the device */
@@ -2277,12 +2346,27 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
     return ret;
   }
 
-  cInterface->cfSource = NULL;
+  /* a re-claim still holds the previous source: remove it, or it stays in the
+     run loop */
+  darwin_interface_release_event_source (cInterface);
+
+  cInterface->runloop = darwin_retain_event_runloop ();
+  if (NULL == cInterface->runloop) {
+    usbi_err (ctx, "no event thread run loop, cannot claim interface");
+
+    /* can't continue without an async event source */
+    (void)darwin_release_interface (dev_handle, iface);
+
+    return LIBUSB_ERROR_OTHER;
+  }
 
   /* create async event source */
   kresult = (*IOINTERFACE(cInterface))->CreateInterfaceAsyncEventSource (IOINTERFACE(cInterface), &cInterface->cfSource);
   if (kresult != kIOReturnSuccess) {
     usbi_err (ctx, "could not create async event source");
+
+    /* the release below must not use a source that was never created */
+    cInterface->cfSource = NULL;
 
     /* can't continue without an async event source */
     (void)darwin_release_interface (dev_handle, iface);
@@ -2291,7 +2375,7 @@ static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8
   }
 
   /* add the cfSource to the async thread's run loop */
-  CFRunLoopAddSource(libusb_darwin_acfl, cInterface->cfSource, kCFRunLoopDefaultMode);
+  CFRunLoopAddSource(cInterface->runloop, cInterface->cfSource, kCFRunLoopDefaultMode);
 
   usbi_dbg (ctx, "interface opened");
 
@@ -2305,6 +2389,10 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, uin
   /* current interface */
   struct darwin_interface *cInterface = &priv->interfaces[iface];
 
+  /* do this before the check below: a failed re-claim can leave a source with
+     no interface to close */
+  darwin_interface_release_event_source (cInterface);
+
   /* Check to see if an interface is open */
   if (!IOINTERFACE(cInterface)) {
     return LIBUSB_SUCCESS;
@@ -2312,13 +2400,6 @@ static int darwin_release_interface(struct libusb_device_handle *dev_handle, uin
 
   /* clean up endpoint data */
   cInterface->num_endpoints = 0;
-
-  /* delete the interface's async event source */
-  if (cInterface->cfSource) {
-    CFRunLoopRemoveSource (libusb_darwin_acfl, cInterface->cfSource, kCFRunLoopDefaultMode);
-    CFRelease (cInterface->cfSource);
-    cInterface->cfSource = NULL;
-  }
 
   kresult = (*IOINTERFACE(cInterface))->USBInterfaceClose(IOINTERFACE(cInterface));
   if (kresult != kIOReturnSuccess)
@@ -2413,8 +2494,19 @@ static int darwin_set_interface_altsetting_locked(struct libusb_device_handle *d
     /* For some reason we need to reclaim the interface after the pipe error with some versions of macOS */
     ret = darwin_claim_interface (dev_handle, iface);
     if (LIBUSB_SUCCESS != ret) {
+      /* clear the bit first: the release below can re-enumerate the device,
+         and the restore re-claims every interface still marked claimed */
+      dev_handle->claimed_interfaces &= ~(1U << iface);
+
+      /* release as the public API does, so an auto-detached kernel driver is
+         attached again */
+#if MAX_INTERFACE_VERSION >= 700
+      darwin_capture_release_interface (dev_handle, iface);
+#else
       darwin_release_interface (dev_handle, iface);
-      usbi_err (usbi_handle_ctx (dev_handle), "could not reclaim interface: %s", darwin_error_str(kresult));
+#endif
+      usbi_err (usbi_handle_ctx (dev_handle), "could not reclaim interface: %d", ret);
+      return ret;
     }
     ret = check_alt_setting_and_clear_halt(dev_handle, altsetting, cInterface);
   }
@@ -2515,6 +2607,13 @@ static enum libusb_error darwin_restore_state (struct libusb_device_handle *dev_
 
       ret = darwin_claim_interface (dev_handle, iface);
       if (LIBUSB_SUCCESS != ret) {
+        /* the bits of the interfaces not claimed again are clear, so close
+           skips them: release them here */
+        for (uint8_t i = iface ; i < USB_MAXINTERFACES ; ++i) {
+          if (claimed_interfaces & (1U << i)) {
+            darwin_release_interface (dev_handle, i);
+          }
+        }
         usbi_dbg (ctx, "darwin/restore_state: could not claim interface %u", iface);
         return LIBUSB_ERROR_NOT_FOUND;
       }
