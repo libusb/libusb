@@ -2470,19 +2470,14 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 	return r;
 }
 
-#ifdef _MSC_VER
-#pragma pack(push, 1)
-#endif
-
+LIBUSB_PACKED_PUSH
 struct string_descriptor_s {
 	UCHAR bLength;
 	UCHAR bDescriptorType;
 	uint8_t bString[252];  // UTF-16LE, must be even length
-} LIBUSB_PACKED;
-
-#ifdef _MSC_VER
-#pragma pack(pop)
-#endif
+};
+LIBUSB_PACKED_POP
+static_assert(sizeof(struct usbi_string_descriptor) == 254, "struct packing failed");
 
 struct string_descriptor_req_s {
 	USB_DESCRIPTOR_REQUEST req;
