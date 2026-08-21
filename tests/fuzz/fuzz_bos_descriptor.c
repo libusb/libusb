@@ -10,6 +10,10 @@
    We construct a valid BOS dev-cap header (3 bytes) + variable payload.
    No hardware needed; ctx=NULL is fine. */
 
+/* libusb builds with -Werror=missing-prototypes, so the entry point
+ * needs a declaration of its own. */
+int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
+
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   if (!data) return 0;
 
