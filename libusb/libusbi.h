@@ -492,16 +492,19 @@ enum usbi_event_flags {
 /* Macros for managing event handling state */
 static inline int usbi_handling_events(struct libusb_context *ctx)
 {
+	assert(ctx);
 	return usbi_tls_key_get(ctx->event_handling_key) != NULL;
 }
 
 static inline void usbi_start_event_handling(struct libusb_context *ctx)
 {
+	assert(ctx);
 	usbi_tls_key_set(ctx->event_handling_key, ctx);
 }
 
 static inline void usbi_end_event_handling(struct libusb_context *ctx)
 {
+	assert(ctx);
 	usbi_tls_key_set(ctx->event_handling_key, NULL);
 }
 

@@ -1829,7 +1829,7 @@ int usbi_get_interface_string_index(libusb_device *dev,
  *   active one; otherwise \ref LIBUSB_ERROR_NOT_SUPPORTED is returned even
  *   though the requested configuration is valid.  In that case the string
  *   can still be read by opening the device and calling
- *   \ref libusb_get_string_descriptor() with the iConfiguration index.
+ *   \ref libusb_get_string_descriptor with the iConfiguration index.
  * - Backends that do not implement this function always return
  *   \ref LIBUSB_ERROR_NOT_SUPPORTED.
  */
@@ -1902,7 +1902,7 @@ int API_EXPORTED libusb_get_config_string(libusb_device *dev,
  *   index) with the current one; otherwise \ref LIBUSB_ERROR_NOT_SUPPORTED
  *   is returned even though the requested combination is valid.  In that
  *   case the string can still be read by opening the device and calling
- *   \ref libusb_get_string_descriptor() with the iInterface index.
+ *   \ref libusb_get_string_descriptor with the iInterface index.
  * - Backends that do not implement this function always return
  *   \ref LIBUSB_ERROR_NOT_SUPPORTED.
  */
