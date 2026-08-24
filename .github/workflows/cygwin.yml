@@ -7,9 +7,10 @@ on:
     tags:
       - '**'
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
 
-# Keep the long-running stress test on master unless a PR explicitly opts in.
+# Keep the long-running stress test on master unless a PR opts in with a
+# force_testcore or force_long_tests label. Labels are read from the event
+# payload, so a newly added label takes effect on the next push or reopen.
 env:
   TESTCORE_CONFIGURE_FLAG: >-
     ${{ (github.ref == 'refs/heads/master' ||
@@ -17,22 +18,12 @@ env:
          contains(github.event.pull_request.labels.*.name, 'force_long_tests'))
         && '--enable-testcore' || '' }}
 
-# Isolate unrelated label events from code and force-label CI runs.
 concurrency:
-  group: >-
-    ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{
-      github.event.action == 'labeled' &&
-      github.event.label.name != 'force_testcore' &&
-      github.event.label.name != 'force_long_tests' &&
-      github.run_id || 'ci' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
-    if: >-
-      github.event.action != 'labeled' ||
-      github.event.label.name == 'force_testcore' ||
-      github.event.label.name == 'force_long_tests'
     name: ${{ matrix.architecture }}
     runs-on: windows-2022
     timeout-minutes: 60
