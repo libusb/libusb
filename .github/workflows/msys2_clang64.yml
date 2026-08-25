@@ -7,6 +7,16 @@ on:
       - '**'
   pull_request:
 
+# Keep the long-running stress test on master unless a PR opts in with a
+# force_testcore or force_long_tests label. Labels are read from the event
+# payload, so a newly added label takes effect on the next push or reopen.
+env:
+  TESTCORE_CONFIGURE_FLAG: >-
+    ${{ (github.ref == 'refs/heads/master' ||
+         contains(github.event.pull_request.labels.*.name, 'force_testcore') ||
+         contains(github.event.pull_request.labels.*.name, 'force_long_tests'))
+        && '--enable-testcore' || '' }}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
