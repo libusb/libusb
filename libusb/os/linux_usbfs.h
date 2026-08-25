@@ -1,7 +1,10 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * usbfs header structures
  * Copyright © 2007 Daniel Drake <dsd@gentoo.org>
  * Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -174,7 +177,17 @@ static inline int linux_start_event_monitor(void)
 {
 #if defined(HAVE_LIBUDEV)
 	return linux_udev_start_event_monitor();
-#elif !defined(__ANDROID__)
+/*
+* __ANDROID__: preprocessor macro defined automatically by GCC for all Android
+*              targets (i.e. both Android native applications, and Android OS-level
+*              services)
+*
+* ANDROID_OS: compilation flag that should be set for using libusb from programs
+*             running on Android at OS level (e.g. Android platform services).
+*             The programs using libusb built with the ANDROID_OS flag must have
+*             permission to access netlink sockets.
+*/
+#elif !defined(__ANDROID__) || defined(ANDROID_OS)
 	return linux_netlink_start_event_monitor();
 #else
 	return LIBUSB_SUCCESS;
@@ -185,7 +198,7 @@ static inline void linux_stop_event_monitor(void)
 {
 #if defined(HAVE_LIBUDEV)
 	linux_udev_stop_event_monitor();
-#elif !defined(__ANDROID__)
+#elif !defined(__ANDROID__) || defined(ANDROID_OS)
 	linux_netlink_stop_event_monitor();
 #endif
 }
@@ -194,7 +207,7 @@ static inline void linux_hotplug_poll(void)
 {
 #if defined(HAVE_LIBUDEV)
 	linux_udev_hotplug_poll();
-#elif !defined(__ANDROID__)
+#elif !defined(__ANDROID__) || defined(ANDROID_OS)
 	linux_netlink_hotplug_poll();
 #endif
 }

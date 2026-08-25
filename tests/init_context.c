@@ -4,6 +4,8 @@
  * Copyright © 2023 Nathan Hjelm <hjelmn@cs.unm.edu>
  * Copyright © 2023 Google, LLC. All rights reserved.
  *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -33,12 +35,6 @@
 static int unsetenv(const char *env) {
   return _putenv_s(env, "");
 }
-
-static int setenv(const char *env, const char *value, int overwrite) {
-  if (getenv(env) && !overwrite)
-    return 0;
-  return _putenv_s(env, value);
-}
 #endif
 
 #define LIBUSB_TEST_CLEAN_EXIT(code) \
@@ -64,7 +60,7 @@ static int setenv(const char *env, const char *value, int overwrite) {
   } while (0)
 
 /**
- * Use relational operatator to compare two values and fail the test if the
+ * Use relational operator to compare two values and fail the test if the
  * comparison is false. Intended to compare integer or pointer types.
  *
  * Example: LIBUSB_EXPECT(==, 0, 1) -> fail, LIBUSB_EXPECT(==, 0, 0) -> ok.
@@ -109,15 +105,15 @@ static libusb_testlib_result test_init_context_log_level(void) {
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, options,
                                                   /*num_options=*/1));
 
-#ifndef ENABLE_DEBUG_LOGGING
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
   LIBUSB_EXPECT(==, test_ctx->debug, LIBUSB_LOG_LEVEL_ERROR);
 #endif
 
   LIBUSB_TEST_CLEAN_EXIT(TEST_STATUS_SUCCESS);
 }
 
-static void test_log_cb(libusb_context *ctx, enum libusb_log_level level,
-                        const char *str) {
+static void LIBUSB_CALL test_log_cb(libusb_context *ctx, enum libusb_log_level level,
+                                    const char *str) {
   UNUSED(ctx);
   UNUSED(level);
   UNUSED(str);
@@ -139,7 +135,7 @@ static libusb_testlib_result test_init_context_log_cb(void) {
   LIBUSB_TEST_RETURN_ON_ERROR(libusb_init_context(&test_ctx, options,
                                                   /*num_options=*/1));
 
-#ifndef ENABLE_DEBUG_LOGGING
+#if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
   LIBUSB_EXPECT(==, test_ctx->log_handler, test_log_cb);
 #endif
 
@@ -153,7 +149,7 @@ static const libusb_testlib_test tests[] = {
   LIBUSB_NULL_TEST
 };
 
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 {
   return libusb_testlib_run_tests(argc, argv, tests);
 }

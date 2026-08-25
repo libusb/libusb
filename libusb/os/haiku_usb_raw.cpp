@@ -1,6 +1,9 @@
+/* -*- Mode: C++; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Haiku Backend for libusb
  * Copyright © 2014 Akshay Jaggi <akshay1994.leo@gmail.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -137,7 +140,7 @@ haiku_release_interface(struct libusb_device_handle *dev_handle, uint8_t interfa
 }
 
 static int
-haiku_submit_transfer(struct usbi_transfer *itransfer)
+haiku_submit_transfer(struct usbi_transfer *itransfer) REQUIRES(itransfer->lock)
 {
 	struct libusb_transfer *fLibusbTransfer = USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer);
 	USBDeviceHandle *fDeviceHandle = *((USBDeviceHandle **)usbi_get_device_handle_priv(fLibusbTransfer->dev_handle));
@@ -186,6 +189,9 @@ const struct usbi_os_backend usbi_backend = {
 	/*.exit =*/ haiku_exit,
 	/*.set_option =*/ NULL,
 	/*.get_device_list =*/ NULL,
+	/*.get_device_string =*/ NULL,
+	/*.get_config_string =*/ NULL,
+	/*.get_interface_string =*/ NULL,
 	/*.hotplug_poll =*/ NULL,
 	/*.wrap_sys_device =*/ NULL,
 	/*.open =*/ haiku_open,
@@ -214,6 +220,9 @@ const struct usbi_os_backend usbi_backend = {
 	/*.kernel_driver_active =*/ NULL,
 	/*.detach_kernel_driver =*/ NULL,
 	/*.attach_kernel_driver =*/ NULL,
+	/*.endpoint_supports_raw_io =*/ NULL,
+	/*.endpoint_set_raw_io =*/ NULL,
+	/*.get_max_raw_io_transfer_size =*/ NULL,
 
 	/*.destroy_device =*/ NULL,
 

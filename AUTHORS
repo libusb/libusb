@@ -13,15 +13,20 @@ Copyright © 2013-2018 Chris Dickens <christopher.a.dickens@gmail.com>
 Other contributors:
 Aaron Luft
 Adam Korcz
+Addison Crump
 Adrian Bunk
+Adrien Bertrand
 Adrien Destugues
 Akshay Jaggi
 Alan Ott
 Alan Stern
 Aleksandr Mezin
+Alexander Mot
 Alexander Pyhalov
 Alexander Schlarb
 Alexander Stein
+Alex Birkett
+Alex Feinman
 Alex Vatchenko
 Andrew Aldridge
 Andrew Fernandes
@@ -32,6 +37,7 @@ Angus Gratton
 Anil Nair
 Ankur Verma
 Anthony Clay
+Antoine Moreau
 Antonio Ospite
 Artem Egorkine
 Aurelien Jarno
@@ -44,6 +50,7 @@ Bence Csokas
 Benjamin Berg
 Benjamin Dobell
 Bohdan Tymkiv
+Brad Smith
 Brent Rector
 Bruno Harbulot
 Carl Karsten
@@ -59,15 +66,19 @@ David Moore
 Dmitry Fleytman
 Dmitry Kostjuchenko
 Dmitry Zakablukov
+Dominik Boehi
 Doug Johnston
+Edgar Fuß
 Evan Hunter
 Evan Miller
+Fabien Sanglard
 Fabrice Fontaine
 Federico Manzan
 Felipe Balbi
 Florian Albrechtskirchinger
 Francesco Montorsi
 Francisco Facioni
+Francis Hart
 Frank Li
 Frederik Carlier
 Freek Dijkstra
@@ -76,28 +87,34 @@ Graeme Gill
 Greg Kroah-Hartman
 Gustavo Zacarias
 Haidong Zheng
+Hannes Franke
 Hans Ulrich Niedermann
 Harry Mallon
+Hartwig Wiesmann
 Hector Martin
 Hoi-Ho Chan
 Ido Yariv
 Igor Anokhin
 Ihor Dutchak
 Ilya Konstantinov
+Ingvar Stepanyan
 Jakub Klama
 James Hanko
 Jeffrey Nichols
+Jesse Taube
 Jie Zhang
 Jim Chen
 Johann Richard
 John Keeping
 John Sheu
+Jon Beniston
 Jonas Malaco
 Jonathon Jongsma
 Joost Muller
 Josh Gao
 Joshua Blake
 Joshua Hou
+Joshua M. Clulow
 Juan Cruz Viotti
 Julian Scheel
 Justin Bischoff
@@ -112,20 +129,27 @@ Lars Wirzenius
 Lei Chen
 Léo Lam
 Liang Yunwang
+Logan Gallois
+Lonnie Abelbeck
 Luca Longinotti
 Luz Paz
+Łukasz Bartosik
 Mac Wang
 Marco Trevisan (Treviño)
 Marcus Meissner
+Mario Kleiner
 Mark Kuo
+Mark Lee
 Markus Heidelberg
 Martin Ettl
 Martin Koegler
 Martin Ling
 Martin Thierer
 Mathias Hjärtström
+Matt Liberty
 Matthew Stapleton
 Matthias Bolte
+Matthijs Lavrijsen
 Michael Dickens
 Michel Zou
 Mike Frysinger
@@ -136,20 +160,30 @@ Moritz Fischer
 Nancy Li
 Nia Alarie
 Nicholas Corgan
+Nicolas Bats
+Niklas Gürtler
+Ole André Vadla Ravnås
+Oleksand Radovenchyk
 Omri Iluz
+Orhan aib Kavrakoglu
 Orin Eman
 Ozkan Sezer
+Pablo Prietz
 Patrick Stewart
 Paul Cercueil
 Paul Fertser
 Paul Qureshi
 Pekka Nikander
+Petr Pazourek
 Philémon Favrod
 Pino Toscano
+Radu Vele
 Rob Walker
 Romain Vimont
 Roman Kalashnikov
+Rosen Penev
 Ryan Hileman
+Ryan Metcalfe
 Ryan Schmidt
 Saleem Rashid
 Sameeh Jubran
@@ -158,6 +192,7 @@ Sebastian Pipping
 Sebastian von Ohr
 Sergey Serb
 Shawn Hoffman
+Simon Chan
 Simon Haggett
 Simon Newton
 Slash Gordon
@@ -165,7 +200,9 @@ Stefan Agner
 Stefan Tauner
 Steinar H. Gunderson
 Stephen Groat
+Sylvain Fasel
 Theo Buehler
+Theodor Engøy
 Thomas Röfer
 Tim Hutt
 Tim Roberts
@@ -175,6 +212,7 @@ Tormod Volden
 Trygve Laugstøl
 Uri Lublin
 Uwe Bonnes
+Vadim Mikhailov
 Vasily Khoruzhick
 Vegard Storheil Eriksen
 Venkatesh Shukla
@@ -183,10 +221,13 @@ Victor Toso
 Vinicius Tinti
 Vitali Lovich
 Vladimir Beloborodov
+Vladimir Gladkov
 William Orr
 William Skellenger
 Xiaofan Chen
 Yegor Yefremov
+Yiwei Lin
+Zeng Guang
 Zhiqiang Liu
 Zoltán Kovács
 Сергей Валерьевич
@@ -199,4 +240,6 @@ parafin
 RipleyTom
 Seneral
 saur0n
+SomeAlphabetGuy
 winterrace
+xloem

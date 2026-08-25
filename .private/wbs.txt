@@ -39,5 +39,5 @@ o Additional information:
     http://windows.libusb.info/#Driver_Installation
   - The MinGW and MS generated DLLs are fully interchangeable, provided that you
     use the import libs provided or generate one from the .def also provided.
-  - If you find any issue, please visit http://libusb.info/ and check the
+  - If you find any issue, please visit https://libusb.info/ and check the
     Support section

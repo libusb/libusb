@@ -1,7 +1,10 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb synchronization on Microsoft Windows
  *
  * Copyright © 2010 Michael Plante <michael.plante@gmail.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -50,7 +53,8 @@ static inline void usbi_mutex_unlock(usbi_mutex_t *mutex)
 }
 static inline int usbi_mutex_trylock(usbi_mutex_t *mutex)
 {
-	return TryEnterCriticalSection(mutex) != 0;
+    int mutexIsLocked = TryEnterCriticalSection(mutex) != 0;
+    return mutexIsLocked;
 }
 static inline void usbi_mutex_destroy(usbi_mutex_t *mutex)
 {
@@ -105,9 +109,9 @@ static inline void usbi_tls_key_delete(usbi_tls_key_t key)
 	WINAPI_CHECK(TlsFree(key));
 }
 
-static inline unsigned int usbi_get_tid(void)
+static inline unsigned long usbi_get_tid(void)
 {
-	return (unsigned int)GetCurrentThreadId();
+	return (unsigned long)GetCurrentThreadId();
 }
 
 #endif /* LIBUSB_THREADS_WINDOWS_H */

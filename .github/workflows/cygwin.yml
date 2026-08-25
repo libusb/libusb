@@ -1,0 +1,84 @@
+name: Cygwin
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '**'
+  pull_request:
+
+# Keep the long-running stress test on master unless a PR opts in with a
+# force_testcore or force_long_tests label. Labels are read from the event
+# payload, so a newly added label takes effect on the next push or reopen.
+env:
+  TESTCORE_CONFIGURE_FLAG: >-
+    ${{ (github.ref == 'refs/heads/master' ||
+         contains(github.event.pull_request.labels.*.name, 'force_testcore') ||
+         contains(github.event.pull_request.labels.*.name, 'force_long_tests'))
+        && '--enable-testcore' || '' }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: ${{ matrix.architecture }}
+    runs-on: windows-2022
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: x86
+            architecture: Win32
+            build_dir: build-cygwin-Win32
+            install_dir: libusb-cygwin-Win32
+          - platform: x86_64
+            architecture: x64
+            build_dir: build-cygwin-x64
+            install_dir: libusb-cygwin-x64
+
+    steps:
+      # Keep shell scripts usable by Cygwin after checkout.
+      - name: Configure Git line endings
+        run: git config --global core.autocrlf input
+      - uses: actions/checkout@v6
+        with:
+          # Full history + tags for build-aux/gen-describe.sh.
+          fetch-depth: 0
+      - uses: cygwin/cygwin-install-action@v6
+        with:
+          platform: ${{ matrix.platform }}
+          packages: >-
+            autoconf automake gcc-core gcc-g++ git libtool make pkg-config
+      - name: bootstrap
+        run: bash -eo pipefail ./bootstrap.sh
+      - name: Build, test and install
+        run: >-
+          bash -eo pipefail -c
+          'workspace=$(cygpath -u "$GITHUB_WORKSPACE") &&
+          ./.private/ci-build.sh
+          --build-dir ${{ matrix.build_dir }}
+          --install
+          --no-asan
+          --
+          "--prefix=$workspace/${{ matrix.install_dir }}"'
+      - name: Upload installed tree
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.install_dir }}
+          path: ${{ matrix.install_dir }}
+          if-no-files-found: error
+      # The autotools test driver buffers each test's output into its own
+      # tests/<test>.log; keep them (and config.log) when something goes wrong.
+      - name: Upload test logs
+        uses: actions/upload-artifact@v7
+        if: failure() || cancelled()
+        with:
+          name: test-logs-cygwin-${{ matrix.architecture }}
+          path: |
+            build*/config.log
+            build*/tests/*.log
+          if-no-files-found: ignore

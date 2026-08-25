@@ -29,7 +29,12 @@ apt-get install -y eatmydata
 eatmydata apt-get -y --purge dist-upgrade
 
 # install build and test dependencies
-eatmydata apt-get install -y make libtool libudev-dev pkg-config umockdev libumockdev-dev
+# 'git' is required by build-aux/gen-describe.sh to populate the
+# LIBUSB_DESCRIBE string at configure/build time when .git is present.
+# (NOTE: this comment intentionally avoids backticks around 'git' because
+# the surrounding heredoc is unquoted; backticks would trigger command
+# substitution by the outer shell and splat git's output into the body.)
+eatmydata apt-get install -y make libtool libudev-dev pkg-config umockdev libumockdev-dev git
 
 # run build as user
 useradd build
@@ -50,6 +55,8 @@ CFLAGS+=" -Wredundant-decls"
 CFLAGS+=" -Wswitch-enum"
 export CFLAGS
 
+export CXXFLAGS="\${CFLAGS}"
+
 echo ""
 echo "Configuring ..."
 /source/configure --enable-examples-build --enable-tests-build
@@ -61,11 +68,5 @@ make -j4 -k
 echo ""
 echo "Running umockdev tests ..."
 tests/umockdev
-
-echo "Running stress tests ..."
-tests/stress
-tests/stress_mt
 EOG
 EOF
-
-

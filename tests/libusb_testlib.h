@@ -1,6 +1,9 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb test library helper functions
  * Copyright © 2012 Toby Gray <toby.gray@realvnc.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -70,7 +73,7 @@ typedef struct {
  * \param tests A NULL_TEST terminated array of tests
  * \return 0 on success, non-zero on failure
  */
-int libusb_testlib_run_tests(int argc, char *argv[],
+int libusb_testlib_run_tests(int argc, const char *argv[],
 	const libusb_testlib_test *tests);
 
 #endif //LIBUSB_TESTLIB_H

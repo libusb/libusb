@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="ProjectConfigurations.Base.props" />
   <PropertyGroup Label="Globals">
@@ -16,8 +16,9 @@
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <PreprocessorDefinitions>HAVE_STRING_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <DisableSpecificWarnings>4100;4131;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>.\getopt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_GL_UNUSED=;HAVE_STRING_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4100;4131;4702;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -25,7 +26,13 @@
     <ClCompile Include=".\getopt\getopt1.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include=".\getopt\bits\getopt_core.h" />
+    <ClInclude Include=".\getopt\bits\getopt_ext.h" />
+    <ClInclude Include=".\getopt\features.h" />
+    <ClInclude Include=".\getopt\gettext.h" />
     <ClInclude Include=".\getopt\getopt.h" />
+    <ClInclude Include=".\getopt\getopt_int.h" />
+    <ClInclude Include=".\getopt\unistd.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,6 +1,9 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
 * Test suite program based of libusb-0.1-compat testlibusb
 * Copyright (c) 2013 Nathan Hjelm <hjelmn@mac.ccom>
+*
+* SPDX-License-Identifier: LGPL-2.1-or-later
 *
 * This library is free software; you can redistribute it and/or
 * modify it under the terms of the GNU Lesser General Public
@@ -174,6 +177,7 @@ static void print_device(libusb_device *dev, libusb_device_handle *handle)
 	case LIBUSB_SPEED_HIGH:		speed = "480M"; break;
 	case LIBUSB_SPEED_SUPER:	speed = "5G"; break;
 	case LIBUSB_SPEED_SUPER_PLUS:	speed = "10G"; break;
+	case LIBUSB_SPEED_SUPER_PLUS_X2:	speed = "20G"; break;
 	default:			speed = "Unknown";
 	}
 
@@ -267,7 +271,7 @@ static int test_wrapped_device(const char *device_name)
 }
 #endif
 
-int main(int argc, char *argv[])
+int main(int argc, const char *argv[])
 {
 	const char *device_name = NULL;
 	libusb_device **devs;

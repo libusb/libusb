@@ -1,7 +1,10 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * xusb: Generic USB test program
  * Copyright © 2009-2012 Pete Batard <pete@akeo.ie>
  * Contributions to Mass Storage by Alan Stern.
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -31,11 +34,20 @@
 #if defined(_MSC_VER)
 #define snprintf _snprintf
 #define putenv _putenv
+/* Disable: warning C5287: operands are different enum types */
+#if (_MSC_VER > 1800)
+/* Disable: warning C5287: operands are different enum types, supported after Visual Studio 2013 */
+#pragma warning(disable:5287)
+#endif
 #endif
 
 // Future versions of libusb will use usb_interface instead of interface
 // in libusb_config_descriptor => catter for that
 #define usb_interface interface
+
+#ifndef ARRAYSIZE
+#define ARRAYSIZE(array) (sizeof(array) / sizeof(array[0]))
+#endif
 
 // Global variables
 static bool binary_dump = false;
@@ -62,12 +74,11 @@ static void perr(char const *format, ...)
 	va_end(args);
 }
 
-#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)errcode)); return -1; } while (0)
+#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)(errcode))); return -1; } while (0)
 #define CALL_CHECK(fcall) do { int _r=fcall; if (_r < 0) ERR_EXIT(_r); } while (0)
 #define CALL_CHECK_CLOSE(fcall, hdl) do { int _r=fcall; if (_r < 0) { libusb_close(hdl); ERR_EXIT(_r); } } while (0)
 #define B(x) (((x)!=0)?1:0)
-#define be_to_int32(buf) (((buf)[0]<<24)|((buf)[1]<<16)|((buf)[2]<<8)|(buf)[3])
-
+#define be_to_int32(buf) ((uint32_t)((((uint32_t)(buf)[0])<<24) | (((uint32_t)(buf)[1])<<16) | (((uint32_t)(buf)[2])<<8) | ((uint32_t)(buf)[3])))
 #define RETRY_MAX                     5
 #define REQUEST_SENSE_LENGTH          0x12
 #define INQUIRY_LENGTH                0x24
@@ -314,7 +325,7 @@ static int set_xbox_actuators(libusb_device_handle *handle, uint8_t left, uint8_
 }
 
 static int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpoint, uint8_t lun,
-	uint8_t *cdb, uint8_t direction, int data_length, uint32_t *ret_tag)
+	uint8_t *cdb, uint8_t direction, uint32_t data_length, uint32_t *ret_tag)
 {
 	static uint32_t tag = 1;
 	uint8_t cdb_len;
@@ -461,7 +472,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	double device_size;
 	uint8_t cdb[16];	// SCSI Command Descriptor Block
 	uint8_t buffer[64];
-	char vid[9], pid[9], rev[5];
+	unsigned char vid[9], pid[9], rev[5];
 	unsigned char *data;
 	FILE *fd;
 
@@ -494,7 +505,7 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	for (i=0; i<8; i++) {
 		vid[i] = buffer[8+i];
 		pid[i] = buffer[16+i];
-		rev[i/2] = buffer[32+i/2];	// instead of another loop
+		rev[i/2] = buffer[32+(i/2)];	// instead of another loop
 	}
 	vid[8] = 0;
 	pid[8] = 0;
@@ -536,17 +547,20 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 	cdb[8] = 0x01;	// 1 block
 
 	send_mass_storage_command(handle, endpoint_out, lun, cdb, LIBUSB_ENDPOINT_IN, block_size, &expected_tag);
-	libusb_bulk_transfer(handle, endpoint_in, data, block_size, &size, 5000);
+	libusb_bulk_transfer(handle, endpoint_in, data, (int)block_size, &size, 5000);
 	printf("   READ: received %d bytes\n", size);
 	if (get_mass_storage_status(handle, endpoint_in, expected_tag) == -2) {
 		get_sense(handle, endpoint_in, endpoint_out);
 	} else {
-		display_buffer_hex(data, size);
-		if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-			if (fwrite(data, 1, (size_t)size, fd) != (unsigned int)size) {
-				perr("   unable to write binary data\n");
+		display_buffer_hex(data, (unsigned int)size);
+		if (binary_dump) {
+			fd = fopen(binary_name, "w");
+			if (fd != NULL) {
+				if (fwrite(data, 1, (size_t)size, fd) != (unsigned int)size) {
+					perr("   unable to write binary data\n");
+				}
+				fclose(fd);
 			}
-			fclose(fd);
 		}
 	}
 	free(data);
@@ -555,16 +569,16 @@ static int test_mass_storage(libusb_device_handle *handle, uint8_t endpoint_in, 
 }
 
 // HID
-static int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int type)
+static int get_hid_record_size(const uint8_t *hid_report_descriptor, int size, int type)
 {
-	uint8_t i, j = 0;
+	uint8_t j = 0;
 	uint8_t offset;
 	int record_size[3] = {0, 0, 0};
-	int nb_bits = 0, nb_items = 0;
+	unsigned int nb_bits = 0, nb_items = 0;
 	bool found_record_marker;
 
 	found_record_marker = false;
-	for (i = hid_report_descriptor[0]+1; i < size; i += offset) {
+	for (int i = hid_report_descriptor[0]+1; i < size; i += offset) {
 		offset = (hid_report_descriptor[i]&0x03) + 1;
 		if (offset == 4)
 			offset = 5;
@@ -575,7 +589,7 @@ static int get_hid_record_size(uint8_t *hid_report_descriptor, int size, int typ
 		case 0x94:	// count
 			nb_items = 0;
 			for (j=1; j<offset; j++) {
-				nb_items = ((uint32_t)hid_report_descriptor[i+j]) << (8*(j-1));
+				nb_items = ((unsigned int)hid_report_descriptor[i+j]) << (8U*(j-1U));
 			}
 			break;
 		case 0x80:	// input
@@ -623,19 +637,24 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		printf("   Failed\n");
 		return -1;
 	}
-	display_buffer_hex(hid_report_descriptor, descriptor_size);
-	if ((binary_dump) && ((fd = fopen(binary_name, "w")) != NULL)) {
-		if (fwrite(hid_report_descriptor, 1, descriptor_size, fd) != (size_t)descriptor_size) {
-			printf("   Error writing descriptor to file\n");
+	display_buffer_hex(hid_report_descriptor, (unsigned int)descriptor_size);
+	if (binary_dump) {
+		fd = fopen(binary_name, "w");
+		if (fd != NULL) {
+			if (fwrite(hid_report_descriptor, 1, (size_t)descriptor_size, fd) != (size_t)descriptor_size) {
+				printf("   Error writing descriptor to file\n");
+			}
+			fclose(fd);
 		}
-		fclose(fd);
 	}
 
 	size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_FEATURE);
 	if (size <= 0) {
 		printf("\nSkipping Feature Report readout (None detected)\n");
+	} else if (size > UINT16_MAX) {
+		printf("\nSkipping Feature Report readout (bigger than UINT16_MAX)\n");
 	} else {
-		report_buffer = (uint8_t*) calloc(size, 1);
+		report_buffer = (uint8_t*) calloc(1, (size_t)size);
 		if (report_buffer == NULL) {
 			return -1;
 		}
@@ -644,7 +663,7 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
 			HID_GET_REPORT, (HID_REPORT_TYPE_FEATURE<<8)|0, 0, report_buffer, (uint16_t)size, 5000);
 		if (r >= 0) {
-			display_buffer_hex(report_buffer, size);
+			display_buffer_hex(report_buffer, (unsigned int)size);
 		} else {
 			switch(r) {
 			case LIBUSB_ERROR_NOT_FOUND:
@@ -665,8 +684,10 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 	size = get_hid_record_size(hid_report_descriptor, descriptor_size, HID_REPORT_TYPE_INPUT);
 	if (size <= 0) {
 		printf("\nSkipping Input Report readout (None detected)\n");
+	} else if (size > UINT16_MAX) {
+		printf("\nSkipping Input Report readout (bigger than UINT16_MAX)\n");
 	} else {
-		report_buffer = (uint8_t*) calloc(size, 1);
+		report_buffer = (uint8_t*) calloc(1, (size_t)size);
 		if (report_buffer == NULL) {
 			return -1;
 		}
@@ -675,7 +696,7 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		r = libusb_control_transfer(handle, LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE,
 			HID_GET_REPORT, (HID_REPORT_TYPE_INPUT<<8)|0x00, 0, report_buffer, (uint16_t)size, 5000);
 		if (r >= 0) {
-			display_buffer_hex(report_buffer, size);
+			display_buffer_hex(report_buffer, (unsigned int)size);
 		} else {
 			switch(r) {
 			case LIBUSB_ERROR_TIMEOUT:
@@ -695,7 +716,7 @@ static int test_hid(libusb_device_handle *handle, uint8_t endpoint_in)
 		printf("\nTesting interrupt read using endpoint %02X...\n", endpoint_in);
 		r = libusb_interrupt_transfer(handle, endpoint_in, report_buffer, size, &size, 5000);
 		if (r >= 0) {
-			display_buffer_hex(report_buffer, size);
+			display_buffer_hex(report_buffer, (unsigned int)size);
 		} else {
 			printf("   %s\n", libusb_strerror((enum libusb_error)r));
 		}
@@ -753,9 +774,20 @@ static void read_ms_winsub_feature_descriptors(libusb_device_handle *handle, uin
 			perr("   Failed: %s", libusb_strerror((enum libusb_error)r));
 			return;
 		} else {
-			display_buffer_hex(os_desc, r);
+			display_buffer_hex(os_desc, (unsigned int)r);
 		}
 	}
+}
+
+static void print_sublink_speed_attribute(struct libusb_ssplus_sublink_attribute* ss_attr) {
+	static const char exponent[] = " KMG";
+	printf("                  id=%u speed=%u%cbs %s %s SuperSpeed%s",
+		ss_attr->ssid,
+		ss_attr->mantissa,
+		(exponent[ss_attr->exponent]),
+		(ss_attr->type == LIBUSB_SSPLUS_ATTR_TYPE_ASYM)? "Asym" : "Sym",
+		(ss_attr->direction == LIBUSB_SSPLUS_ATTR_DIR_TX)? "TX" : "RX",
+		(ss_attr->protocol == LIBUSB_SSPLUS_ATTR_PROT_SSPLUS)? "Plus": "" );
 }
 
 static void print_device_cap(struct libusb_bos_dev_capability_descriptor *dev_cap)
@@ -806,6 +838,25 @@ static void print_device_cap(struct libusb_bos_dev_capability_descriptor *dev_ca
 		break;
 
 	}
+	case LIBUSB_BT_SUPERSPEED_PLUS_CAPABILITY: {
+		struct libusb_ssplus_usb_device_capability_descriptor *ssplus_usb_device_cap = NULL;
+		libusb_get_ssplus_usb_device_capability_descriptor(NULL, dev_cap, &ssplus_usb_device_cap);
+		if (ssplus_usb_device_cap) {
+			printf("    USB 3.1 capabilities:\n");
+			printf("      num speed IDs: %d\n", ssplus_usb_device_cap->numSublinkSpeedIDs);
+			printf("      minLaneSpeed: %d\n", ssplus_usb_device_cap->ssid);
+			printf("      minRXLanes: %d\n", ssplus_usb_device_cap->minRxLaneCount);
+			printf("      minTXLanes: %d\n", ssplus_usb_device_cap->minTxLaneCount);
+
+			printf("      num speed attribute IDs: %d\n", ssplus_usb_device_cap->numSublinkSpeedAttributes);
+			for(uint8_t i=0 ; i < ssplus_usb_device_cap->numSublinkSpeedAttributes ; i++) {
+				print_sublink_speed_attribute(&ssplus_usb_device_cap->sublinkSpeedAttributes[i]);
+				printf("\n");
+			}
+			libusb_free_ssplus_usb_device_capability_descriptor(ssplus_usb_device_cap);
+		}
+		break;
+	}
 	default:
 		printf("    Unknown BOS device capability %02x:\n", dev_cap->bDevCapabilityType);
 	}
@@ -816,15 +867,15 @@ static int test_device(uint16_t vid, uint16_t pid)
 	libusb_device_handle *handle;
 	libusb_device *dev;
 	uint8_t bus, port_path[8];
-	struct libusb_bos_descriptor *bos_desc;
 	struct libusb_config_descriptor *conf_desc;
 	const struct libusb_endpoint_descriptor *endpoint;
 	int i, j, k, r;
 	int iface, nb_ifaces, first_iface = -1;
 	struct libusb_device_descriptor dev_desc;
-	const char* const speed_name[6] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
-		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)", "10000 Mbit/s (USB SuperSpeedPlus)" };
-	char string[128];
+	const char* const speed_name[] = { "Unknown", "1.5 Mbit/s (USB LowSpeed)", "12 Mbit/s (USB FullSpeed)",
+		"480 Mbit/s (USB HighSpeed)", "5000 Mbit/s (USB SuperSpeed)", "10000 Mbit/s (USB SuperSpeedPlus)",
+		"20000 Mbit/s (USB SuperSpeedPlus x2)" };
+	unsigned char string[128];
 	uint8_t string_index[3];	// indexes of the string descriptors
 	uint8_t endpoint_in = 0, endpoint_out = 0;	// default IN and OUT endpoints
 
@@ -850,7 +901,8 @@ static int test_device(uint16_t vid, uint16_t pid)
 			printf(" (from root hub)\n");
 		}
 		r = libusb_get_device_speed(dev);
-		if ((r<0) || (r>5)) r=0;
+		if ((r < 0) || ((size_t)r >= ARRAYSIZE(speed_name)))
+			r = 0;
 		printf("             speed: %s\n", speed_name[r]);
 	}
 
@@ -868,14 +920,18 @@ static int test_device(uint16_t vid, uint16_t pid)
 	string_index[1] = dev_desc.iProduct;
 	string_index[2] = dev_desc.iSerialNumber;
 
-	printf("\nReading BOS descriptor: ");
-	if (libusb_get_bos_descriptor(handle, &bos_desc) == LIBUSB_SUCCESS) {
-		printf("%d caps\n", bos_desc->bNumDeviceCaps);
-		for (i = 0; i < bos_desc->bNumDeviceCaps; i++)
-			print_device_cap(bos_desc->dev_capability[i]);
-		libusb_free_bos_descriptor(bos_desc);
-	} else {
-		printf("no descriptor\n");
+	if (dev_desc.bcdUSB >= 0x0201) {
+		struct libusb_bos_descriptor *bos_desc;
+
+		printf("\nReading BOS descriptor: ");
+		if (libusb_get_bos_descriptor(handle, &bos_desc) == LIBUSB_SUCCESS) {
+			printf("%d caps\n", bos_desc->bNumDeviceCaps);
+			for (i = 0; i < bos_desc->bNumDeviceCaps; i++)
+				print_device_cap(bos_desc->dev_capability[i]);
+			libusb_free_bos_descriptor(bos_desc);
+		} else {
+			printf("no descriptor\n");
+		}
 	}
 
 	printf("\nReading first configuration descriptor:\n");
@@ -933,25 +989,23 @@ static int test_device(uint16_t vid, uint16_t pid)
 	libusb_set_auto_detach_kernel_driver(handle, 1);
 	for (iface = 0; iface < nb_ifaces; iface++)
 	{
-		int ret;
-
 		printf("\nKernel driver attached for interface %d: ", iface);
-		ret = libusb_kernel_driver_active(handle, iface);
-		if (ret == 0)
+		r = libusb_kernel_driver_active(handle, iface);
+		if (r == 0)
 			printf("none\n");
-		else if (ret == 1)
+		else if (r == 1)
 			printf("yes\n");
-		else if (ret == LIBUSB_ERROR_NOT_SUPPORTED)
+		else if (r == LIBUSB_ERROR_NOT_SUPPORTED)
 			printf("(not supported)\n");
 		else
-			perr("\n   Failed (error %d) %s\n", ret,
-			     libusb_strerror((enum libusb_error) ret));
+			perr("\n   Failed (error %d) %s\n", r,
+			     libusb_strerror((enum libusb_error) r));
 
 		printf("\nClaiming interface %d...\n", iface);
 		r = libusb_claim_interface(handle, iface);
 		if (r != LIBUSB_SUCCESS) {
-			perr("   Failed (error %d) %s\n", ret,
-			     libusb_strerror((enum libusb_error) ret));
+			perr("   Failed (error %d) %s\n", r,
+			     libusb_strerror((enum libusb_error) r));
 		}
 	}
 
@@ -960,13 +1014,13 @@ static int test_device(uint16_t vid, uint16_t pid)
 		if (string_index[i] == 0) {
 			continue;
 		}
-		if (libusb_get_string_descriptor_ascii(handle, string_index[i], (unsigned char*)string, sizeof(string)) > 0) {
+		if (libusb_get_string_descriptor_ascii(handle, string_index[i], string, sizeof(string)) > 0) {
 			printf("   String (0x%02X): \"%s\"\n", string_index[i], string);
 		}
 	}
 
 	printf("\nReading OS string descriptor:");
-	r = libusb_get_string_descriptor(handle, MS_OS_DESC_STRING_INDEX, 0, (unsigned char*)string, MS_OS_DESC_STRING_LENGTH);
+	r = libusb_get_string_descriptor(handle, MS_OS_DESC_STRING_INDEX, 0, string, MS_OS_DESC_STRING_LENGTH);
 	if (r == MS_OS_DESC_STRING_LENGTH && memcmp(ms_os_desc_string, string, sizeof(ms_os_desc_string)) == 0) {
 		// If this is a Microsoft OS String Descriptor,
 		// attempt to read the WinUSB extended Feature Descriptors
@@ -991,7 +1045,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 			printf("          bFunctionSubClass: %02X\n", iad->bFunctionSubClass);
 			printf("          bFunctionProtocol: %02X\n", iad->bFunctionProtocol);
 			if (iad->iFunction) {
-				if (libusb_get_string_descriptor_ascii(handle, iad->iFunction, (unsigned char*)string, sizeof(string)) > 0)
+				if (libusb_get_string_descriptor_ascii(handle, iad->iFunction, string, sizeof(string)) > 0)
 					printf("                  iFunction: %u (%s)\n", iad->iFunction, string);
 				else
 					printf("                  iFunction: %u (libusb_get_string_descriptor_ascii failed!)\n", iad->iFunction);
@@ -1017,6 +1071,7 @@ static int test_device(uint16_t vid, uint16_t pid)
 		break;
 	case USE_SCSI:
 		CALL_CHECK_CLOSE(test_mass_storage(handle, endpoint_in, endpoint_out), handle);
+		break;
 	case USE_GENERIC:
 		break;
 	}
@@ -1033,17 +1088,33 @@ static int test_device(uint16_t vid, uint16_t pid)
 	return 0;
 }
 
-int main(int argc, char** argv)
+static void display_help(const char *progname)
 {
-	static char debug_env_str[] = "LIBUSB_DEBUG=4";	// LIBUSB_LOG_LEVEL_DEBUG
-	bool show_help = false;
+	printf("usage: %s [-h] [-d] [-i] [-k] [-b file] [-l lang] [-j] [-x] [-s] [-p] [-w] [vid:pid]\n", progname);
+	printf("   -h      : display usage\n");
+	printf("   -d      : enable debug output\n");
+	printf("   -i      : print topology and speed info\n");
+	printf("   -j      : test composite FTDI based JTAG device\n");
+	printf("   -k      : test Mass Storage device\n");
+	printf("   -b file : dump Mass Storage data to file 'file'\n");
+	printf("   -p      : test Sony PS3 SixAxis controller\n");
+	printf("   -s      : test Microsoft Sidewinder Precision Pro (HID)\n");
+	printf("   -x      : test Microsoft XBox Controller Type S\n");
+	printf("   -l lang : language to report errors in (ISO 639-1)\n");
+	printf("   -w      : force the use of device requests when querying WCID descriptors\n");
+	printf("If only the vid:pid is provided, xusb attempts to run the most appropriate test\n");
+}
+
+int main(int argc, const char* argv[])
+{
 	bool debug_mode = false;
 	const struct libusb_version* version;
 	int j, r;
 	size_t i, arglen;
 	unsigned tmp_vid, tmp_pid;
 	uint16_t endian_test = 0xBE00;
-	char *error_lang = NULL, *old_dbg_str = NULL, str[256];
+	const char *error_lang = NULL;
+	char *old_dbg_str = NULL, str[256];
 
 	// Default to generic, expecting VID:PID
 	VID = 0;
@@ -1053,7 +1124,12 @@ int main(int argc, char** argv)
 	if (((uint8_t*)&endian_test)[0] == 0xBE) {
 		printf("Despite their natural superiority for end users, big endian\n"
 			"CPUs are not supported with this program, sorry.\n");
-		return 0;
+		return EXIT_FAILURE;
+	}
+
+	if ((argc == 1) || (argc > 7)) {
+		display_help(argv[0]);
+		return EXIT_FAILURE;
 	}
 
 	if (argc >= 2) {
@@ -1074,7 +1150,7 @@ int main(int argc, char** argv)
 				case 'b':
 					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
 						printf("   Option -b requires a file name\n");
-						return 1;
+						return EXIT_FAILURE;
 					}
 					binary_name = argv[++j];
 					binary_dump = true;
@@ -1082,7 +1158,7 @@ int main(int argc, char** argv)
 				case 'l':
 					if ((j+1 >= argc) || (argv[j+1][0] == '-') || (argv[j+1][0] == '/')) {
 						printf("   Option -l requires an ISO 639-1 language parameter\n");
-						return 1;
+						return EXIT_FAILURE;
 					}
 					error_lang = argv[++j];
 					break;
@@ -1119,9 +1195,12 @@ int main(int argc, char** argv)
 					PID = 0x0289;
 					test_mode = USE_XBOX;
 					break;
+				case 'h':
+					display_help(argv[0]);
+					return EXIT_SUCCESS;
 				default:
-					show_help = true;
-					break;
+					display_help(argv[0]);
+					return EXIT_FAILURE;
 				}
 			} else {
 				for (i=0; i<arglen; i++) {
@@ -1131,47 +1210,31 @@ int main(int argc, char** argv)
 				if (i != arglen) {
 					if (sscanf(argv[j], "%x:%x" , &tmp_vid, &tmp_pid) != 2) {
 						printf("   Please specify VID & PID as \"vid:pid\" in hexadecimal format\n");
-						return 1;
+						return EXIT_FAILURE;
 					}
 					VID = (uint16_t)tmp_vid;
 					PID = (uint16_t)tmp_pid;
 				} else {
-					show_help = true;
+					display_help(argv[0]);
+					return EXIT_FAILURE;
 				}
 			}
 		}
 	}
 
-	if ((show_help) || (argc == 1) || (argc > 7)) {
-		printf("usage: %s [-h] [-d] [-i] [-k] [-b file] [-l lang] [-j] [-x] [-s] [-p] [-w] [vid:pid]\n", argv[0]);
-		printf("   -h      : display usage\n");
-		printf("   -d      : enable debug output\n");
-		printf("   -i      : print topology and speed info\n");
-		printf("   -j      : test composite FTDI based JTAG device\n");
-		printf("   -k      : test Mass Storage device\n");
-		printf("   -b file : dump Mass Storage data to file 'file'\n");
-		printf("   -p      : test Sony PS3 SixAxis controller\n");
-		printf("   -s      : test Microsoft Sidewinder Precision Pro (HID)\n");
-		printf("   -x      : test Microsoft XBox Controller Type S\n");
-		printf("   -l lang : language to report errors in (ISO 639-1)\n");
-		printf("   -w      : force the use of device requests when querying WCID descriptors\n");
-		printf("If only the vid:pid is provided, xusb attempts to run the most appropriate test\n");
-		return 0;
-	}
-
-	// xusb is commonly used as a debug tool, so it's convenient to have debug output during libusb_init(),
-	// but since we can't call on libusb_set_option() before libusb_init(), we use the env variable method
-	old_dbg_str = getenv("LIBUSB_DEBUG");
-	if (debug_mode) {
-		if (putenv(debug_env_str) != 0)
-			printf("Unable to set debug level\n");
-	}
-
 	version = libusb_get_version();
 	printf("Using libusb v%d.%d.%d.%d\n\n", version->major, version->minor, version->micro, version->nano);
-	r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
+
+	// xusb is commonly used as a debug tool, so it's convenient to have debug output during libusb_init_context().
+	if (debug_mode) {
+		const struct libusb_init_option options = {.option = LIBUSB_OPTION_LOG_LEVEL, .value = {.ival = LIBUSB_LOG_LEVEL_DEBUG}};
+		r = libusb_init_context(/*ctx=*/NULL, /*options=*/&options, /*num_options=*/1);
+	} else {
+		r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
+	}
+
 	if (r < 0)
-		return r;
+		return EXIT_FAILURE;
 
 	// If not set externally, and no debug option was given, use info log level
 	if ((old_dbg_str == NULL) && (!debug_mode))
@@ -1182,14 +1245,18 @@ int main(int argc, char** argv)
 			printf("Invalid or unsupported locale '%s': %s\n", error_lang, libusb_strerror((enum libusb_error)r));
 	}
 
-	test_device(VID, PID);
+	r = test_device(VID, PID);
 
 	libusb_exit(NULL);
+
+	if (r < 0)
+		return EXIT_FAILURE;
+
 
 	if (debug_mode) {
 		snprintf(str, sizeof(str), "LIBUSB_DEBUG=%s", (old_dbg_str == NULL)?"":old_dbg_str);
 		str[sizeof(str) - 1] = 0;	// Windows may not NUL terminate the string
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }

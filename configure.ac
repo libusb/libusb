@@ -16,7 +16,7 @@ LU_DEFINE_VERSION_ATOM([LIBUSB_MICRO])
 LU_DEFINE_VERSION_RC_ATOM([LIBUSB_RC])
 
 AC_PREREQ([2.69])
-AC_INIT([libusb-1.0], [LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO[]LIBUSB_RC], [libusb-devel@lists.sourceforge.net], [libusb-1.0], [http://libusb.info])
+AC_INIT([libusb-1.0], [LIBUSB_MAJOR[.]LIBUSB_MINOR[.]LIBUSB_MICRO[]LIBUSB_RC], [libusb-devel@lists.sourceforge.net], [libusb-1.0], [https://libusb.info])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_SRCDIR([libusb/core.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -27,13 +27,28 @@ AM_INIT_AUTOMAKE
 LT_INIT
 LT_LANG([Windows Resource])
 
+dnl Source identification: the LIBUSB_DESCRIBE string baked into
+dnl libusb_version::describe is generated at build time by
+dnl build-aux/gen-describe.sh, which is the single source of truth for
+dnl the classification. We invoke its --classify mode here only to fail
+dnl early at configure time (e.g. when .git exists but git is missing)
+dnl and to surface the source kind in the configure log.
+LIBUSB_DESCRIBE_SOURCE=`$SHELL "$srcdir/build-aux/gen-describe.sh" --classify "$srcdir"` || \
+	AC_MSG_ERROR([gen-describe.sh failed to classify source; see error above])
+AC_MSG_CHECKING([source identification for LIBUSB_DESCRIBE])
+AC_MSG_RESULT([$LIBUSB_DESCRIBE_SOURCE])
+AS_IF([test "x$LIBUSB_DESCRIBE_SOURCE" = "xunknown"], [
+	AC_MSG_WARN([source is neither a git checkout nor a release tarball; LIBUSB_DESCRIBE will be marked "Unknown source ..."])
+])
+AC_SUBST([LIBUSB_DESCRIBE_SOURCE])
+
 dnl Library versioning
 dnl These numbers should be tweaked on every release. Read carefully:
 dnl http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 dnl http://sourceware.org/autobook/autobook/autobook_91.html
-lt_current=3
+lt_current=6
 lt_revision=0
-lt_age=3
+lt_age=6
 LT_LDFLAGS="-version-info ${lt_current}:${lt_revision}:${lt_age} -no-undefined"
 
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
@@ -83,10 +98,16 @@ case $host in
 	backend=haiku
 	platform=posix
 	;;
-wasm32-**)
+wasm*-emscripten)
 	AC_MSG_RESULT([Emscripten])
 	backend=emscripten
 	platform=posix
+	;;
+wasm*-unknown-none)
+	AC_MSG_ERROR([
+--host=$host_alias is not accepted as it might become ambiguous in the future.
+Please use an explicit --host=$host_cpu-emscripten instead.
+	])
 	;;
 *-linux* | *-uclinux*)
 	dnl on Android Linux, some functions are in different places
@@ -219,7 +240,12 @@ linux)
 	fi
 	;;
 sunos)
-	LIBS="${LIBS} -ldevinfo"
+	dnl sunos_usb.c calls nvlist_alloc()/nvlist_add_int32()/nvlist_pack()/
+	dnl nvlist_free() from <sys/nvpair.h>, so libnvpair is a real dependency.
+	dnl The Solaris link editor tolerates undefined symbols when building a
+	dnl shared object, which hid this; a static link (as tests/Makefile.am
+	dnl asks for) fails with "symbol referencing errors".
+	LIBS="${LIBS} -ldevinfo -lnvpair"
 	;;
 windows)
 	AC_CHECK_TYPES([struct timespec], [], [], [[#include <time.h>]])
@@ -227,9 +253,16 @@ windows)
 	LT_LDFLAGS="${LT_LDFLAGS} -avoid-version"
 	;;
 emscripten)
-	AC_SUBST(EXEEXT, [.html])
 	# Note: LT_LDFLAGS is not enough here because we need link flags for executable.
-	AM_LDFLAGS="${AM_LDFLAGS} --bind -s ASYNCIFY -s ASSERTIONS -s ALLOW_MEMORY_GROWTH -s INVOKE_RUN=0 -s EXPORTED_RUNTIME_METHODS=['callMain']"
+	dnl The WebUSB backend (os/emscripten_webusb.cpp) is C++, so libusb-1.0
+	dnl pulls in the C++ runtime. Emscripten 6.0.6 disabled DEFAULT_TO_CXX,
+	dnl making em++ mandatory for C++ links; without it every C program that
+	dnl links libusb (the examples and tests here, and downstream users
+	dnl building with emcc) fails with undefined std:: symbols. Setting it
+	dnl back restores the pre-6.0.6 behaviour and is a no-op on older SDKs.
+	EM_LDFLAGS="--bind -s ASYNCIFY -s DEFAULT_TO_CXX"
+	AM_LDFLAGS="${AM_LDFLAGS} ${EM_LDFLAGS} -s ASSERTIONS -s ALLOW_MEMORY_GROWTH"
+	LIBS="${LIBS} ${EM_LDFLAGS}"
 	;;
 *)
 	dnl no special handling required
@@ -362,6 +395,30 @@ if test "x$system_log_enabled" != xno; then
 	fi
 fi
 
+dnl Man page generation; also locate doxygen for the HTML docs target
+AC_ARG_ENABLE([man-pages],
+	[AS_HELP_STRING([--enable-man-pages], [generate and install man pages (requires doxygen) [default=auto]])],
+	[build_man_pages=$enableval],
+	[build_man_pages=auto])
+AC_PATH_PROG([DOXYGEN], [doxygen])
+if test "x$build_man_pages" != xno; then
+	if test "x$DOXYGEN" = x; then
+		if test "x$build_man_pages" = xyes; then
+			AC_MSG_ERROR([doxygen is required for man page generation])
+		fi
+		build_man_pages=no
+	else
+		build_man_pages=yes
+	fi
+fi
+if test "x$build_man_pages" = xyes; then
+	AC_SUBST([GENERATE_MAN], [YES])
+	AC_SUBST([MAN_LINKS], [NO])
+else
+	AC_SUBST([GENERATE_MAN], [NO])
+	AC_SUBST([MAN_LINKS], [NO])
+fi
+
 dnl Examples build
 AC_ARG_ENABLE([examples-build],
 	[AS_HELP_STRING([--enable-examples-build], [build example applications [default=no]])],
@@ -374,9 +431,17 @@ AC_ARG_ENABLE([tests-build],
 	[build_tests=$enableval],
 	[build_tests=no])
 
+dnl Long-running testcore stress test
+AC_ARG_ENABLE([testcore],
+	[AS_HELP_STRING([--enable-testcore], [include the testcore stress test in make check [default=no]])],
+	[run_testcore=$enableval],
+	[run_testcore=no])
+
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != xno])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != xno])
-AM_CONDITIONAL([BUILD_UMOCKDEV_TEST], [test "x$ac_have_umockdev" = xyes -a "x$log_enabled" != xno])
+AM_CONDITIONAL([RUN_TESTCORE], [test "x$run_testcore" = xyes])
+AM_CONDITIONAL([BUILD_MAN_PAGES], [test "x$build_man_pages" = xyes])
+AM_CONDITIONAL([BUILD_UMOCKDEV_TEST], [test "x$ac_have_umockdev" = xyes -a "x$log_enabled" != xno -a "x$debug_log_enabled" != xyes])
 AM_CONDITIONAL([CREATE_IMPORT_LIB], [test "x$create_import_lib" = xyes])
 AM_CONDITIONAL([OS_DARWIN], [test "x$backend" = xdarwin])
 AM_CONDITIONAL([OS_HAIKU], [test "x$backend" = xhaiku])
@@ -390,10 +455,20 @@ AM_CONDITIONAL([OS_EMSCRIPTEN], [test "x$backend" = xemscripten])
 AM_CONDITIONAL([PLATFORM_POSIX], [test "x$platform" = xposix])
 AM_CONDITIONAL([PLATFORM_WINDOWS], [test "x$platform" = xwindows])
 AM_CONDITIONAL([USE_UDEV], [test "x$use_udev" = xyes])
+AM_CONDITIONAL([LIBUSB_WINDOWS_HOTPLUG], [test "x$enable_windows_hotplug" = xyes])
 
 dnl The -Wcast-function-type warning causes a flurry of warnings when compiling
 dnl Windows with GCC 8 or later because of dynamically loaded functions
 if test "x$backend" = xwindows; then
+	AC_ARG_ENABLE([windows-hotplug],
+	AS_HELP_STRING([--enable-windows-hotplug], [Enable Windows hotplug support]),
+	[enable_windows_hotplug="$enableval"],
+	[enable_windows_hotplug=no])
+
+	if test "x$enable_windows_hotplug" = "xyes"; then
+		AC_DEFINE([LIBUSB_WINDOWS_HOTPLUG], [1], [Define to enable Windows hotplug support])
+	fi
+
 	saved_CFLAGS="${CFLAGS}"
 	CFLAGS="-Werror -Wcast-function-type"
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])],

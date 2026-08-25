@@ -1,9 +1,12 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Copyright © 2001 Stephen Williams (steve@icarus.com)
  * Copyright © 2001-2002 David Brownell (dbrownell@users.sourceforge.net)
  * Copyright © 2008 Roger Williams (rawqux@users.sourceforge.net)
  * Copyright © 2012 Pete Batard (pete@akeo.ie)
  * Copyright © 2013 Federico Manzan (f.manzan@gmail.com)
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  *    This source code is free software; you can redistribute it
  *    and/or modify it in source code form under the terms of the GNU
@@ -38,7 +41,9 @@
 #include <syslog.h>
 static bool dosyslog = false;
 #include <strings.h>
-#define _stricmp strcasecmp
+#define libusb_strcasecmp strcasecmp
+#else
+#define libusb_strcasecmp _stricmp
 #endif
 
 #ifndef FXLOAD_VERSION
@@ -89,7 +94,6 @@ int main(int argc, char*argv[])
 	const char *ext, *img_name[] = IMG_TYPE_NAMES;
 	int fx_type = FX_TYPE_UNDEFINED, img_type[ARRAYSIZE(path)];
 	int opt, status;
-	unsigned int i, j;
 	unsigned vid = 0, pid = 0;
 	unsigned busnum = 0, devaddr = 0, _busnum, _devaddr;
 	libusb_device *dev, **devs;
@@ -159,6 +163,7 @@ int main(int argc, char*argv[])
 
 	/* determine the target type */
 	if (type != NULL) {
+		int i;
 		for (i=0; i<FX_TYPE_MAX; i++) {
 			if (strcmp(type, fx_name[i]) == 0) {
 				fx_type = i;
@@ -185,7 +190,7 @@ int main(int argc, char*argv[])
 			logerror("libusb_get_device_list() failed: %s\n", libusb_error_name(status));
 			goto err;
 		}
-		for (i=0; (dev=devs[i]) != NULL; i++) {
+		for (unsigned int i=0; (dev=devs[i]) != NULL; i++) {
 			_busnum = libusb_get_bus_number(dev);
 			_devaddr = libusb_get_device_address(dev);
 			if ((type != NULL) && (device_path != NULL)) {
@@ -195,6 +200,7 @@ int main(int argc, char*argv[])
 			} else {
 				status = libusb_get_device_descriptor(dev, &desc);
 				if (status >= 0) {
+					unsigned int j;
 					if (verbose >= 3) {
 						logerror("examining %04x:%04x (%d,%d)\n",
 							desc.idVendor, desc.idProduct, _busnum, _devaddr);
@@ -260,16 +266,16 @@ int main(int argc, char*argv[])
 	if (verbose)
 		logerror("microcontroller type: %s\n", fx_name[fx_type]);
 
-	for (i=0; i<ARRAYSIZE(path); i++) {
+	for (unsigned int i=0; i<ARRAYSIZE(path); i++) {
 		if (path[i] != NULL) {
 			ext = path[i] + strlen(path[i]) - 4;
-			if ((_stricmp(ext, ".hex") == 0) || (strcmp(ext, ".ihx") == 0))
+			if ((libusb_strcasecmp(ext, ".hex") == 0) || (libusb_strcasecmp(ext, ".ihx") == 0))
 				img_type[i] = IMG_TYPE_HEX;
-			else if (_stricmp(ext, ".iic") == 0)
+			else if (libusb_strcasecmp(ext, ".iic") == 0)
 				img_type[i] = IMG_TYPE_IIC;
-			else if (_stricmp(ext, ".bix") == 0)
+			else if (libusb_strcasecmp(ext, ".bix") == 0)
 				img_type[i] = IMG_TYPE_BIX;
-			else if (_stricmp(ext, ".img") == 0)
+			else if (libusb_strcasecmp(ext, ".img") == 0)
 				img_type[i] = IMG_TYPE_IMG;
 			else {
 				logerror("%s is not a recognized image type\n", path[i]);

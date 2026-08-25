@@ -1,0 +1,50 @@
+{
+  "name": "webusb-test-runner",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "webusb-test-runner",
+      "version": "1.0.0",
+      "license": "ISC",
+      "dependencies": {
+        "usb": "^2.11.0"
+      }
+    },
+    "node_modules/@types/w3c-web-usb": {
+      "version": "1.0.10",
+      "resolved": "https://registry.npmjs.org/@types/w3c-web-usb/-/w3c-web-usb-1.0.10.tgz",
+      "integrity": "sha512-CHgUI5kTc/QLMP8hODUHhge0D4vx+9UiAwIGiT0sTy/B2XpdX1U5rJt6JSISgr6ikRT7vxV9EVAFeYZqUnl1gQ=="
+    },
+    "node_modules/node-addon-api": {
+      "version": "7.0.0",
+      "resolved": "https://registry.npmjs.org/node-addon-api/-/node-addon-api-7.0.0.tgz",
+      "integrity": "sha512-vgbBJTS4m5/KkE16t5Ly0WW9hz46swAstv0hYYwMtbG7AznRhNyfLRe8HZAiWIpcHzoO7HxhLuBQj9rJ/Ho0ZA=="
+    },
+    "node_modules/node-gyp-build": {
+      "version": "4.7.0",
+      "resolved": "https://registry.npmjs.org/node-gyp-build/-/node-gyp-build-4.7.0.tgz",
+      "integrity": "sha512-PbZERfeFdrHQOOXiAKOY0VPbykZy90ndPKk0d+CFDegTKmWp1VgOTz2xACVbr1BjCWxrQp68CXtvNsveFhqDJg==",
+      "bin": {
+        "node-gyp-build": "bin.js",
+        "node-gyp-build-optional": "optional.js",
+        "node-gyp-build-test": "build-test.js"
+      }
+    },
+    "node_modules/usb": {
+      "version": "2.11.0",
+      "resolved": "https://registry.npmjs.org/usb/-/usb-2.11.0.tgz",
+      "integrity": "sha512-u5+NZ6DtoW8TIBtuSArQGAZZ/K15i3lYvZBAYmcgI+RcDS9G50/KPrUd3CrU8M92ahyCvg5e0gc8BDvr5Hwejg==",
+      "hasInstallScript": true,
+      "dependencies": {
+        "@types/w3c-web-usb": "^1.0.6",
+        "node-addon-api": "^7.0.0",
+        "node-gyp-build": "^4.5.0"
+      },
+      "engines": {
+        "node": ">=12.22.0 <13.0 || >=14.17.0"
+      }
+    }
+  }
+}

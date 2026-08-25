@@ -1,3 +1,4 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * Internal header for libusb
  * Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
@@ -5,6 +6,8 @@
  * Copyright © 2019 Nathan Hjelm <hjelmn@cs.umm.edu>
  * Copyright © 2019-2020 Google LLC. All rights reserved.
  * Copyright © 2020 Chris Dickens <christopher.a.dickens@gmail.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,6 +32,7 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #ifdef HAVE_SYS_TIME_H
@@ -39,10 +43,14 @@
 
 /* Not all C standard library headers define static_assert in assert.h
  * Additionally, Visual Studio treats static_assert as a keyword.
+ * Additionally, starting with C23, static_assert must always be present.
  */
-#if !defined(__cplusplus) && !defined(static_assert) && !defined(_MSC_VER)
+#if !(defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)) && \
+    !defined(__cplusplus) && !defined(static_assert) && !defined(_MSC_VER)
 #define static_assert(cond, msg) _Static_assert(cond, msg)
 #endif
+
+#include "clang_thread_safety.h"
 
 #ifdef NDEBUG
 #define ASSERT_EQ(expression, value)	(void)expression
@@ -53,7 +61,7 @@
 #endif
 
 #define container_of(ptr, type, member) \
-	((type *)((uintptr_t)(ptr) - (uintptr_t)offsetof(type, member)))
+	((type *)((char*)(ptr) - offsetof(type, member)))
 
 #ifndef ARRAYSIZE
 #define ARRAYSIZE(array) (sizeof(array) / sizeof(array[0]))
@@ -73,7 +81,7 @@
 #endif
 
 /* The following is used to silence warnings for unused variables */
-#if defined(UNREFERENCED_PARAMETER)
+#if defined(UNREFERENCED_PARAMETER) && !defined(__GNUC__)
 #define UNUSED(var)	UNREFERENCED_PARAMETER(var)
 #else
 #define UNUSED(var)	do { (void)(var); } while(0)
@@ -98,10 +106,22 @@
  */
 #ifdef _MSC_VER
 typedef volatile LONG usbi_atomic_t;
-#define usbi_atomic_load(a)	(*(a))
-#define usbi_atomic_store(a, v)	(*(a)) = (v)
+#define usbi_atomic_load(a)	InterlockedCompareExchange((a), 0, 0)
+#define usbi_atomic_store(a, v)	((void)InterlockedExchange((a), (v)))
 #define usbi_atomic_inc(a)	InterlockedIncrement((a))
 #define usbi_atomic_dec(a)	InterlockedDecrement((a))
+#else
+#if defined(__GNUC__) && !defined(__clang__) && (defined(__cplusplus) || defined(__HAIKU__))
+/* GCC's <stdatomic.h> relies on the C-only _Atomic keyword and so fails to
+ * compile as C++ (GCC only added C++ support for it in C++23). This was first
+ * hit by the Haiku port, which builds some libusb files as C++ with GCC. The
+ * GCC __atomic builtins work in both C and every C++ version, so use them for
+ * any GCC C++ build rather than maintaining a separate C++23 path. */
+typedef long usbi_atomic_t;
+#define usbi_atomic_load(a)    __atomic_load_n((a), __ATOMIC_SEQ_CST)
+#define usbi_atomic_store(a, v)        __atomic_store_n((a), (v), __ATOMIC_SEQ_CST)
+#define usbi_atomic_inc(a)     __atomic_add_fetch((a), 1, __ATOMIC_SEQ_CST)
+#define usbi_atomic_dec(a)     __atomic_sub_fetch((a), 1, __ATOMIC_SEQ_CST)
 #else
 #include <stdatomic.h>
 typedef atomic_long usbi_atomic_t;
@@ -109,6 +129,7 @@ typedef atomic_long usbi_atomic_t;
 #define usbi_atomic_store(a, v)	atomic_store((a), (v))
 #define usbi_atomic_inc(a)	(atomic_fetch_add((a), 1) + 1)
 #define usbi_atomic_dec(a)	(atomic_fetch_add((a), -1) - 1)
+#endif
 #endif
 
 /* Internal abstractions for event handling and thread synchronization */
@@ -251,7 +272,7 @@ static inline void *usbi_reallocf(void *ptr, size_t size)
 {
 	void *ret = realloc(ptr, size);
 
-	if (!ret)
+	if (!ret && size != 0)
 		free(ptr);
 	return ret;
 }
@@ -329,18 +350,6 @@ void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 
 #endif /* ENABLE_LOGGING */
 
-#define DEVICE_CTX(dev)		((dev)->ctx)
-#define HANDLE_CTX(handle)	((handle) ? DEVICE_CTX((handle)->dev) : NULL)
-#define ITRANSFER_CTX(itransfer) \
-	((itransfer)->dev ? DEVICE_CTX((itransfer)->dev) : NULL)
-#define TRANSFER_CTX(transfer) \
-	(ITRANSFER_CTX(LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)))
-
-#define IS_EPIN(ep)		(0 != ((ep) & LIBUSB_ENDPOINT_IN))
-#define IS_EPOUT(ep)		(!IS_EPIN(ep))
-#define IS_XFERIN(xfer)		(0 != ((xfer)->endpoint & LIBUSB_ENDPOINT_IN))
-#define IS_XFEROUT(xfer)	(!IS_XFERIN(xfer))
-
 struct libusb_context {
 #if defined(ENABLE_LOGGING) && !defined(ENABLE_DEBUG_LOGGING)
 	enum libusb_log_level debug;
@@ -357,30 +366,31 @@ struct libusb_context {
 	usbi_timer_t timer;
 #endif
 
-	struct list_head usb_devs;
 	usbi_mutex_t usb_devs_lock;
+	struct list_head usb_devs GUARDED_BY(usb_devs_lock);
 
 	/* A list of open handles. Backends are free to traverse this if required.
 	 */
-	struct list_head open_devs;
 	usbi_mutex_t open_devs_lock;
+	struct list_head open_devs GUARDED_BY(open_devs_lock);
 
 	/* A list of registered hotplug callbacks */
-	struct list_head hotplug_cbs;
-	libusb_hotplug_callback_handle next_hotplug_cb_handle;
 	usbi_mutex_t hotplug_cbs_lock;
+	struct list_head hotplug_cbs GUARDED_BY(hotplug_cbs_lock);
+	struct list_head* dummy GUARDED_BY(hotplug_cbs_lock);
+	libusb_hotplug_callback_handle next_hotplug_cb_handle GUARDED_BY(hotplug_cbs_lock);
 
 	/* A flag to indicate that the context is ready for hotplug notifications */
 	usbi_atomic_t hotplug_ready;
 
+	/* Note paths taking both this and usbi_transfer->lock must always
+	 * take this lock first */
+	usbi_mutex_t flying_transfers_lock;
 	/* this is a list of in-flight transfer handles, sorted by timeout
 	 * expiration. URBs to timeout the soonest are placed at the beginning of
 	 * the list, URBs that will time out later are placed after, and urbs with
 	 * infinite timeout are always placed at the very end. */
-	struct list_head flying_transfers;
-	/* Note paths taking both this and usbi_transfer->lock must always
-	 * take this lock first */
-	usbi_mutex_t flying_transfers_lock;
+	struct list_head flying_transfers GUARDED_BY(flying_transfers_lock);
 
 #if !defined(PLATFORM_WINDOWS)
 	/* user callbacks for pollfd changes */
@@ -393,7 +403,7 @@ struct libusb_context {
 	usbi_mutex_t events_lock;
 
 	/* used to see if there is an active thread doing event handling */
-	int event_handler_active;
+	int event_handler_active GUARDED_BY(events_lock);
 
 	/* A thread-local storage key to track which thread is performing event
 	 * handling */
@@ -409,18 +419,18 @@ struct libusb_context {
 
 	/* A bitmask of flags that are set to indicate specific events that need to
 	 * be handled. Protected by event_data_lock. */
-	unsigned int event_flags;
+	unsigned int event_flags GUARDED_BY(event_data_lock);
 
 	/* A counter that is set when we want to interrupt and prevent event handling,
 	 * in order to safely close a device. Protected by event_data_lock. */
-	unsigned int device_close;
+	unsigned int device_close GUARDED_BY(event_data_lock);
 
 	/* A list of currently active event sources. Protected by event_data_lock. */
-	struct list_head event_sources;
+	struct list_head event_sources GUARDED_BY(event_data_lock);
 
 	/* A list of event sources that have been removed since the last time
 	 * event sources were waited on. Protected by event_data_lock. */
-	struct list_head removed_event_sources;
+	struct list_head removed_event_sources GUARDED_BY(event_data_lock);
 
 	/* A pointer and count to platform-specific data used for monitoring event
 	 * sources. Only accessed during event handling. */
@@ -428,10 +438,10 @@ struct libusb_context {
 	unsigned int event_data_cnt;
 
 	/* A list of pending hotplug messages. Protected by event_data_lock. */
-	struct list_head hotplug_msgs;
+	struct list_head hotplug_msgs GUARDED_BY(event_data_lock);
 
 	/* A list of pending completed transfers. Protected by event_data_lock. */
-	struct list_head completed_transfers;
+	struct list_head completed_transfers GUARDED_BY(event_data_lock);
 
 	struct list_head list;
 };
@@ -439,8 +449,8 @@ struct libusb_context {
 extern struct libusb_context *usbi_default_context;
 extern struct libusb_context *usbi_fallback_context;
 
-extern struct list_head active_contexts_list;
 extern usbi_mutex_static_t active_contexts_lock;
+extern struct list_head active_contexts_list GUARDED_BY(active_contexts_lock);
 
 static inline struct libusb_context *usbi_get_context(struct libusb_context *ctx)
 {
@@ -482,16 +492,19 @@ enum usbi_event_flags {
 /* Macros for managing event handling state */
 static inline int usbi_handling_events(struct libusb_context *ctx)
 {
+	assert(ctx);
 	return usbi_tls_key_get(ctx->event_handling_key) != NULL;
 }
 
 static inline void usbi_start_event_handling(struct libusb_context *ctx)
 {
+	assert(ctx);
 	usbi_tls_key_set(ctx->event_handling_key, ctx);
 }
 
 static inline void usbi_end_event_handling(struct libusb_context *ctx)
 {
+	assert(ctx);
 	usbi_tls_key_set(ctx->event_handling_key, NULL);
 }
 
@@ -511,12 +524,14 @@ struct libusb_device {
 
 	struct libusb_device_descriptor device_descriptor;
 	usbi_atomic_t attached;
+
+	char * device_strings_utf8[LIBUSB_DEVICE_STRING_COUNT];
 };
 
 struct libusb_device_handle {
 	/* lock protects claimed_interfaces */
 	usbi_mutex_t lock;
-	unsigned long claimed_interfaces;
+	unsigned long claimed_interfaces GUARDED_BY(lock);
 
 	struct list_head list;
 	struct libusb_device *dev;
@@ -563,24 +578,14 @@ void usbi_get_real_time(struct timespec *tp);
  * 2. struct usbi_transfer
  * 3. struct libusb_transfer (which includes iso packets) [variable size]
  *
- * from a libusb_transfer, you can get the usbi_transfer by rewinding the
- * appropriate number of bytes.
+ * You can convert between them with the functions:
+ *  usbi_transfer_priv_to_usbi_transfer
+ *  usbi_transfer_to_transfer_priv
+ *  usbi_transfer_to_libusb_transfer
+ *  usbi_libusb_transfer_to_usbi_transfer
  */
 
 struct usbi_transfer {
-	int num_iso_packets;
-	struct list_head list;
-	struct list_head completed_list;
-	struct timespec timeout;
-	int transferred;
-	uint32_t stream_id;
-	uint32_t state_flags;   /* Protected by usbi_transfer->lock */
-	uint32_t timeout_flags; /* Protected by the flying_stransfers_lock */
-
-	/* The device reference is held until destruction for logging
-	 * even after dev_handle is set to NULL.  */
-	struct libusb_device *dev;
-
 	/* this lock is held during libusb_submit_transfer() and
 	 * libusb_cancel_transfer() (allowing the OS backend to prevent duplicate
 	 * cancellation, submission-during-cancellation, etc). the OS backend
@@ -592,7 +597,35 @@ struct usbi_transfer {
 	 * always take the flying_transfers_lock first */
 	usbi_mutex_t lock;
 
+	struct list_head list;
+	struct list_head completed_list;
+	struct timespec timeout;
+	int transferred;
+	uint32_t stream_id;
+	uint32_t state_flags GUARDED_BY(lock);   /* Protected by usbi_transfer->lock */
+	uint32_t timeout_flags; /* Protected by the flying_transfers_lock */
+
+	/* The device reference is held until destruction for logging
+	 * even after dev_handle is set to NULL.  */
+	struct libusb_device *dev;
+
 	void *priv;
+
+	/* Publication fence for backends whose completion callback is invoked
+	 * directly by the OS on another thread (e.g. the darwin CFRunLoop event
+	 * thread). The kernel guarantees the callback only runs after the async
+	 * submission call that registered it, but that ordering is invisible to
+	 * the C11 memory model and to ThreadSanitizer. The backend stores 1 here
+	 * (usbi_atomic_store) after the last submit-side write to any transfer
+	 * state the callback reads and immediately before the async
+	 * registration; the callback loads it (usbi_atomic_load) before
+	 * touching any transfer state. Allocation-time state (priv above, the
+	 * lock) is covered transitively: handing the transfer from the
+	 * allocating thread to the submitting thread already requires
+	 * synchronization under the documented threading rules, so those writes
+	 * happen-before the store. Zeroed by the transfer allocation; the
+	 * loaded value is unused, only the ordering matters. */
+	usbi_atomic_t submit_fence;
 };
 
 enum usbi_transfer_state_flags {
@@ -616,15 +649,6 @@ enum usbi_transfer_timeout_flags {
 	/* The transfer timeout was successfully processed */
 	USBI_TRANSFER_TIMED_OUT = 1U << 2,
 };
-
-#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer)	\
-	((struct libusb_transfer *)			\
-	 ((unsigned char *)(itransfer)			\
-	  + PTR_ALIGN(sizeof(struct usbi_transfer))))
-#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer)	\
-	((struct usbi_transfer *)			\
-	 ((unsigned char *)(transfer)			\
-	  - PTR_ALIGN(sizeof(struct usbi_transfer))))
 
 #ifdef _MSC_VER
 #pragma pack(push, 1)
@@ -679,7 +703,7 @@ struct usbi_interface_descriptor {
 struct usbi_string_descriptor {
 	uint8_t  bLength;
 	uint8_t  bDescriptorType;
-	uint16_t wData[ZERO_SIZED_ARRAY];
+	uint16_t wData[LIBUSB_FLEXIBLE_ARRAY];
 } LIBUSB_PACKED;
 
 struct usbi_bos_descriptor {
@@ -694,21 +718,21 @@ struct usbi_bos_descriptor {
 #endif
 
 union usbi_config_desc_buf {
-        struct usbi_configuration_descriptor desc;
-        uint8_t buf[LIBUSB_DT_CONFIG_SIZE];
-        uint16_t align;         /* Force 2-byte alignment */
+	struct usbi_configuration_descriptor desc;
+	uint8_t buf[LIBUSB_DT_CONFIG_SIZE];
+	uint16_t align;         /* Force 2-byte alignment */
 };
 
 union usbi_string_desc_buf {
-        struct usbi_string_descriptor desc;
-        uint8_t buf[255];       /* Some devices choke on size > 255 */
-        uint16_t align;         /* Force 2-byte alignment */
+	struct usbi_string_descriptor desc;
+	uint8_t buf[255];       /* Some devices choke on size > 255 */
+	uint16_t align;         /* Force 2-byte alignment */
 };
 
 union usbi_bos_desc_buf {
-        struct usbi_bos_descriptor desc;
-        uint8_t buf[LIBUSB_DT_BOS_SIZE];
-        uint16_t align;         /* Force 2-byte alignment */
+	struct usbi_bos_descriptor desc;
+	uint8_t buf[LIBUSB_DT_BOS_SIZE];
+	uint16_t align;         /* Force 2-byte alignment */
 };
 
 enum usbi_hotplug_flags {
@@ -787,22 +811,27 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	unsigned long session_id);
 struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	unsigned long session_id);
-int usbi_sanitize_device(struct libusb_device *dev);
-void usbi_handle_disconnect(struct libusb_device_handle *dev_handle);
+enum libusb_error usbi_sanitize_device(struct libusb_device *dev);
+void usbi_handle_disconnect(struct libusb_context *ctx, struct libusb_device_handle *dev_handle);
 
 int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	enum libusb_transfer_status status);
 int usbi_handle_transfer_cancellation(struct usbi_transfer *itransfer);
 void usbi_signal_transfer_completion(struct usbi_transfer *itransfer);
 
+void usbi_attach_device(struct libusb_device *dev);
+void usbi_detach_device(struct libusb_device *dev);
+
 void usbi_connect_device(struct libusb_device *dev);
 void usbi_disconnect_device(struct libusb_device *dev);
 
+struct usbi_event_source_data {
+	usbi_os_handle_t os_handle;
+	short poll_events;
+};
+
 struct usbi_event_source {
-	struct usbi_event_source_data {
-		usbi_os_handle_t os_handle;
-		short poll_events;
-	} data;
+	struct usbi_event_source_data data;
 	struct list_head list;
 };
 
@@ -811,11 +840,11 @@ int usbi_add_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle
 void usbi_remove_event_source(struct libusb_context *ctx, usbi_os_handle_t os_handle);
 
 struct usbi_option {
-  int is_set;
-  union {
-    int ival;
-    libusb_log_cb log_cbval;
-  } arg;
+	int is_set;
+	union {
+		int ival;
+		libusb_log_cb log_cbval;
+	} arg;
 };
 
 /* OS event abstraction */
@@ -893,7 +922,7 @@ static inline void *usbi_get_transfer_priv(struct usbi_transfer *itransfer)
 struct discovered_devs {
 	size_t len;
 	size_t capacity;
-	struct libusb_device *devices[ZERO_SIZED_ARRAY];
+	struct libusb_device *devices[LIBUSB_FLEXIBLE_ARRAY];
 };
 
 struct discovered_devs *discovered_devs_append(
@@ -969,7 +998,9 @@ struct usbi_os_backend {
 	 * this point, you should be ready to provide device descriptors and so
 	 * on through the get_*_descriptor functions. Finally, call
 	 * usbi_sanitize_device() to perform some final sanity checks on the
-	 * device. Assuming all of the above succeeded, we can now continue.
+	 * device. Assuming all of the above succeeded, call
+	 * usbi_connect_device() to add the device to the context's device list
+	 * and make it discoverable by usbi_get_device_by_session_id().
 	 * If any of the above failed, remember to unreference the device that
 	 * was returned by usbi_alloc_device().
 	 *
@@ -994,6 +1025,52 @@ struct usbi_os_backend {
 	 */
 	int (*get_device_list)(struct libusb_context *ctx,
 		struct discovered_devs **discdevs);
+
+	/* Retrieve a device string without needing to open the device.
+	 *
+	 * The string should be retrieved without opening the device
+	 * and ideally without performing USB transactions to the device.
+	 * Most operating systems read and cache the common string
+	 * descriptors.  Use the OS-specific calls to retrieve these strings.
+	 *
+	 * Since the USB string descriptor could be processed by the OS,
+	 * this function returns a UTF-8 encoded string.
+	 *
+	 * The string will be returned untranslated or in the default OS language
+	 * when supported by the OS and USB device.
+	 *
+	 * This function must not write more than length bytes into data,
+	 * including the null terminator.
+	 *
+	 * Return:
+	 * - The actual length in bytes including the null terminator on success.
+	 * - LIBUSB_ERROR_NO_DEVICE if device not found.
+	 * - LIBUSB_ERROR_INVALID_PARAM if any parameter is invalid.
+	 * - another LIBUSB_ERROR code on other failure
+	 */
+	int (*get_device_string)(libusb_device *dev,
+		enum libusb_device_string_type string_type, char *data, int length);
+
+	/* Retrieve a configuration string (iConfiguration) without opening the
+	 * device.  config_value is the bConfigurationValue, or 0 for the active
+	 * configuration.  The same return values as get_device_string apply.
+	 * The core always passes a valid scratch buffer (data is non-NULL and
+	 * length > 0), so backends assert rather than validate it.  Optional.
+	 */
+	int (*get_config_string)(libusb_device *dev,
+		uint8_t config_value, char *data, int length);
+
+	/* Retrieve an interface string (iInterface) without opening the device.
+	 * config_value is the bConfigurationValue, or 0 for the active
+	 * configuration.  interface_number and alt_setting identify the
+	 * interface alternate setting.  The same return values as
+	 * get_device_string apply.  The core always passes a valid scratch
+	 * buffer (data is non-NULL and length > 0), so backends need not
+	 * validate data/length.  Optional.
+	 */
+	int (*get_interface_string)(libusb_device *dev,
+		uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+		char *data, int length);
 
 	/* Apps which were written before hotplug support, may listen for
 	 * hotplug events on their own and call libusb_get_device_list on
@@ -1182,6 +1259,8 @@ struct usbi_os_backend {
 	 * claiming, no other drivers/applications can use the interface because
 	 * we now "own" it.
 	 *
+	 * This function gets called with dev_handle->lock locked!
+	 *
 	 * Return:
 	 * - 0 on success
 	 * - LIBUSB_ERROR_NOT_FOUND if the interface does not exist
@@ -1200,6 +1279,8 @@ struct usbi_os_backend {
 	 *
 	 * You will only ever be asked to release an interface which was
 	 * successfully claimed earlier.
+	 *
+	 * This function gets called with dev_handle->lock locked!
 	 *
 	 * Return:
 	 * - 0 on success
@@ -1323,6 +1404,37 @@ struct usbi_os_backend {
 	int (*attach_kernel_driver)(struct libusb_device_handle *dev_handle,
 		uint8_t interface_number);
 
+	/** Check if RAW_IO is supported by an endpoint.
+	 *
+	 * Return:
+	 * - 1 if yes
+	 * - 0 if no
+	 * - a LIBUSB_ERROR code on failure
+	 */
+	int (*endpoint_supports_raw_io)(struct libusb_device_handle* dev_handle,
+		uint8_t endpoint);
+
+	/** Enable/disable RAW_IO for an endpoint.
+	 *
+	 * Return:
+	 * - 0 on success
+	 * - LIBUSB_ERROR_NOT_SUPPORTED if RAW_IO is not supported by the endpoint
+	 * - another LIBUSB_ERROR code on other failure
+	 */
+	int (*endpoint_set_raw_io)(struct libusb_device_handle* dev_handle,
+		uint8_t endpoint, int enable);
+
+	/* Retrieve the maximum transfer size in bytes supported for WinUSB RAW_IO
+	 * for an inbound bulk or interrupt endpoint on an open device. Optional.
+	 *
+	 * Return:
+	 * - a positive maximum transfer size on success
+	 * - a LIBUSB_ERROR code on failure
+	 */
+	int (*get_max_raw_io_transfer_size)(
+		struct libusb_device_handle *dev_handle,
+		uint8_t endpoint);
+
 	/* Destroy a device. Optional.
 	 *
 	 * This function is called when the last reference to a device is
@@ -1337,7 +1449,7 @@ struct usbi_os_backend {
 	 *
 	 * This function must not block.
 	 *
-	 * This function gets called with the flying_transfers_lock locked!
+	 * This function gets called with itransfer->lock locked!
 	 *
 	 * Return:
 	 * - 0 on success
@@ -1351,6 +1463,8 @@ struct usbi_os_backend {
 	 * This function must not block. The transfer cancellation must complete
 	 * later, resulting in a call to usbi_handle_transfer_cancellation()
 	 * from the context of handle_events.
+	 *
+	 * This function gets called with itransfer->lock locked!
 	 */
 	int (*cancel_transfer)(struct usbi_transfer *itransfer);
 
@@ -1453,6 +1567,107 @@ struct usbi_os_backend {
 };
 
 extern const struct usbi_os_backend usbi_backend;
+
+/* Resolve the string descriptor index (iConfiguration / iInterface) for a
+ * configuration or interface alternate setting, without opening the device.
+ * config_value is the bConfigurationValue, or 0 for the active configuration.
+ * Used by backends that fetch strings by descriptor index. */
+int usbi_get_config_string_index(libusb_device *dev,
+	uint8_t config_value, uint8_t *index_out);
+int usbi_get_interface_string_index(libusb_device *dev,
+	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+	uint8_t *index_out);
+
+static inline struct usbi_transfer *usbi_transfer_priv_to_usbi_transfer(void *transfer_priv)
+{
+	return (struct usbi_transfer *)((unsigned char *)(transfer_priv) + PTR_ALIGN(usbi_backend.transfer_priv_size));
+}
+
+static inline void *usbi_transfer_to_transfer_priv(const struct usbi_transfer *itransfer)
+{
+	return (void *)((unsigned char *)(itransfer) - PTR_ALIGN(usbi_backend.transfer_priv_size));
+}
+
+static inline struct libusb_transfer *usbi_transfer_to_libusb_transfer(const struct usbi_transfer *itransfer)
+{
+	return (struct libusb_transfer *)((unsigned char *)(itransfer) + PTR_ALIGN(sizeof(struct usbi_transfer)));
+}
+
+static inline struct usbi_transfer *usbi_libusb_transfer_to_usbi_transfer(const struct libusb_transfer *transfer)
+{
+	return (struct usbi_transfer *)((unsigned char *)(transfer) - PTR_ALIGN(sizeof(struct usbi_transfer)));
+}
+
+static inline struct libusb_context *usbi_device_ctx(const struct libusb_device *dev)
+{
+	return dev->ctx;
+}
+
+static inline struct libusb_context *usbi_handle_ctx(const struct libusb_device_handle *handle)
+{
+	return handle ? usbi_device_ctx(handle->dev) : NULL;
+}
+
+static inline struct libusb_context *usbi_itransfer_ctx(const struct usbi_transfer *itransfer)
+{
+	return itransfer->dev ? usbi_device_ctx(itransfer->dev) : NULL;
+}
+
+static inline struct libusb_context *usbi_transfer_ctx(const struct libusb_transfer *transfer)
+{
+	return usbi_itransfer_ctx(usbi_libusb_transfer_to_usbi_transfer(transfer));
+}
+
+static inline bool usbi_is_epin(uint8_t ep)
+{
+	return (0 != (ep & LIBUSB_ENDPOINT_IN));
+}
+
+static inline bool usbi_is_epout(uint8_t ep)
+{
+	return !usbi_is_epin(ep);
+}
+
+static inline bool usbi_is_xferin(const struct libusb_transfer *xfer)
+{
+	return (0 != (xfer->endpoint & LIBUSB_ENDPOINT_IN));
+}
+
+static inline bool usbi_is_xferout(const struct libusb_transfer *xfer)
+{
+	return !usbi_is_xferin(xfer);
+}
+
+/* DEPRECATED: backwards compatible macros.
+ * Starting with libusb 1.0.31 several macros where changes to proper
+ * functions and renamed to be lowercase. These macros provide the old
+ * spelling for backwards compatibility.
+ */
+#define TRANSFER_PRIV_TO_USBI_TRANSFER(transfer_priv) \
+	usbi_transfer_priv_to_usbi_transfer(transfer_priv)
+#define USBI_TRANSFER_TO_TRANSFER_PRIV(itransfer) \
+	usbi_transfer_to_transfer_priv(itransfer)
+#define USBI_TRANSFER_TO_LIBUSB_TRANSFER(itransfer) \
+	usbi_transfer_to_libusb_transfer(itransfer)
+#define LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer) \
+	usbi_libusb_transfer_to_usbi_transfer(transfer)
+#define DEVICE_CTX(dev) \
+	usbi_device_ctx(dev)
+#define HANDLE_CTX(handle) \
+	usbi_handle_ctx(handle)
+#define ITRANSFER_CTX(itransfer) \
+	usbi_itransfer_ctx(itransfer)
+#define TRANSFER_CTX(transfer) \
+	usbi_transfer_ctx(transfer)
+#define IS_EPIN(ep) \
+	usbi_is_epin(ep)
+#define IS_EPOUT(ep) \
+	usbi_is_epout(ep)
+#define IS_XFERIN(xfer) \
+	usbi_is_xferin(xfer)
+#define IS_XFEROUT(xfer) \
+	usbi_is_xferout(xfer)
+
 
 #define for_each_context(c) \
 	for_each_helper(c, &active_contexts_list, struct libusb_context)

@@ -1,6 +1,9 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb test library helper functions
  * Copyright © 2012 Toby Gray <toby.gray@realvnc.com>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -71,7 +74,7 @@ void libusb_testlib_logf(const char *fmt, ...)
 	fflush(stdout);
 }
 
-int libusb_testlib_run_tests(int argc, char *argv[],
+int libusb_testlib_run_tests(int argc, const char *argv[],
 	const libusb_testlib_test *tests)
 {
 	int run_count = 0;
@@ -82,7 +85,7 @@ int libusb_testlib_run_tests(int argc, char *argv[],
 	int skip_count = 0;
 
 	/* Setup default mode of operation */
-	char **test_names = NULL;
+	const char **test_names = NULL;
 	int test_count = 0;
 	bool list_tests = false;
 	bool verbose = false;
@@ -180,5 +183,5 @@ int libusb_testlib_run_tests(int argc, char *argv[],
 	libusb_testlib_logf("Error in %d tests", error_count);
 	libusb_testlib_logf("Skipped %d tests", skip_count);
 
-	return pass_count != run_count;
+	return fail_count + error_count;
 }

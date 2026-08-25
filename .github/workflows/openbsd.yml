@@ -1,0 +1,63 @@
+name: OpenBSD
+
+# Run branch pushes only on master; pull requests continue to run against all
+# branches.
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '**'
+  pull_request:
+
+# Keep the long-running stress test on master unless a PR opts in with a
+# force_testcore or force_long_tests label. Labels are read from the event
+# payload, so a newly added label takes effect on the next push or reopen.
+env:
+  TESTCORE_CONFIGURE_FLAG: >-
+    ${{ (github.ref == 'refs/heads/master' ||
+         contains(github.event.pull_request.labels.*.name, 'force_testcore') ||
+         contains(github.event.pull_request.labels.*.name, 'force_long_tests'))
+        && '--enable-testcore' || '' }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # Full history + tags are needed by build-aux/gen-describe.sh.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # autoreconf runs on the runner rather than in the guest: it keeps the
+      # guest package set down to a compiler, GNU make and git, which saves
+      # several minutes of emulated-VM time per run.
+      - name: bootstrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends autoconf automake libtool m4
+          ./bootstrap.sh
+
+      - name: build and test in OpenBSD
+        uses: vmactions/openbsd-vm@v1
+        with:
+          usesh: true
+          cache-after-prepare: true
+          prepare: |
+            pkg_add -I git gmake
+          run: |
+            set -e
+            uname -a
+            cc --version | head -1
+            mkdir build && cd build
+            ../configure --enable-examples-build --enable-tests-build \
+              ${{ env.TESTCORE_CONFIGURE_FLAG }} \
+              || { cat config.log; exit 1; }
+            gmake -j4
+            gmake check || { cat tests/test-suite.log; exit 1; }

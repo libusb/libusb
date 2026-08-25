@@ -8,13 +8,25 @@
     <ClCompile Condition="'$(Configuration)'=='Debug'">
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
+	<ClCompile Condition="'$(Configuration)'=='Debug-Hotplug'">
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
 	<ClCompile Condition="'$(Configuration)'=='Debug-MT'">
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+    </ClCompile>
+	<ClCompile Condition="'$(Configuration)'=='Debug-Hotplug-MT'">
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <ClCompile Condition="'$(Configuration)'=='Release'">
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
+	<ClCompile Condition="'$(Configuration)'=='Release-Hotplug'">
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
 	<ClCompile Condition="'$(Configuration)'=='Release-MT'">
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+	<ClCompile Condition="'$(Configuration)'=='Release-Hotplug-MT'">
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>

@@ -3,7 +3,11 @@
 set -e
 
 builddir=
+scriptdir=$(dirname $(readlink -f "$0"))
 install=no
+test=yes
+asan=yes
+docs=no
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -17,6 +21,22 @@ while [ $# -gt 0 ]; do
 		;;
 	--install)
 		install=yes
+		shift
+		;;
+	--no-test)
+		test=no
+		shift
+		;;
+	--no-asan)
+		asan=no
+		shift
+		;;
+	--werror)
+		cflags+=" -Werror"
+		shift
+		;;
+	--build-docs)
+		docs=yes
 		shift
 		;;
 	--)
@@ -42,7 +62,7 @@ fi
 mkdir "${builddir}"
 cd "${builddir}"
 
-cflags="-O2"
+cflags+=" -O2"
 
 # enable extra warnings
 cflags+=" -Winline"
@@ -52,13 +72,35 @@ cflags+=" -Wpointer-arith"
 cflags+=" -Wredundant-decls"
 cflags+=" -Wswitch-enum"
 
+# enable address sanitizer
+if [ "${asan}" = "yes" ]; then
+	cflags+=" -fsanitize=address"
+fi
+
 echo ""
 echo "Configuring ..."
-CFLAGS="${cflags}" ../configure --enable-examples-build --enable-tests-build "$@"
+configure_args=(--enable-examples-build --enable-tests-build)
+if [ -n "${TESTCORE_CONFIGURE_FLAG:-}" ]; then
+	configure_args+=("${TESTCORE_CONFIGURE_FLAG}")
+fi
+CFLAGS="${cflags}" CXXFLAGS="${cflags}" ../configure "${configure_args[@]}" "$@"
 
 echo ""
 echo "Building ..."
 make -j4 -k
+
+if [ "${docs}" = "yes" ]; then
+	make -C doc
+fi
+
+if [ "${test}" = "yes" ]; then
+	# Load custom shim for WebUSB tests that simulates Web environment.
+	export NODE_OPTIONS="--require ${scriptdir}/../tests/webusb-test-shim/"
+	if ! make check ; then
+	    cat tests/test-suite.log
+	    exit 1
+	fi
+fi
 
 if [ "${install}" = "yes" ]; then
 	echo ""

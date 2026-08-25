@@ -1,7 +1,10 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb synchronization using POSIX Threads
  *
  * Copyright © 2010 Peter Stuge <peter@stuge.se>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,46 +29,52 @@
 #define PTHREAD_CHECK(expression)	ASSERT_EQ(expression, 0)
 
 #define USBI_MUTEX_INITIALIZER	PTHREAD_MUTEX_INITIALIZER
-typedef pthread_mutex_t usbi_mutex_static_t;
-static inline void usbi_mutex_static_lock(usbi_mutex_static_t *mutex)
+CAPABILITY("mutex") typedef pthread_mutex_t usbi_mutex_static_t;
+static inline void usbi_mutex_static_lock(usbi_mutex_static_t *mutex) ACQUIRE(*mutex) NO_THREAD_SAFETY_ANALYSIS
 {
 	PTHREAD_CHECK(pthread_mutex_lock(mutex));
 }
-static inline void usbi_mutex_static_unlock(usbi_mutex_static_t *mutex)
+static inline void usbi_mutex_static_unlock(usbi_mutex_static_t *mutex) RELEASE(*mutex) NO_THREAD_SAFETY_ANALYSIS
 {
 	PTHREAD_CHECK(pthread_mutex_unlock(mutex));
 }
 
-typedef pthread_mutex_t usbi_mutex_t;
-static inline void usbi_mutex_init(usbi_mutex_t *mutex)
+CAPABILITY("mutex") typedef pthread_mutex_t usbi_mutex_t;
+static inline void usbi_mutex_init(usbi_mutex_t *mutex) EXCLUDES(*mutex)
 {
 	PTHREAD_CHECK(pthread_mutex_init(mutex, NULL));
 }
-static inline void usbi_mutex_lock(usbi_mutex_t *mutex)
+static inline void usbi_mutex_lock(usbi_mutex_t *mutex) ACQUIRE(*mutex) NO_THREAD_SAFETY_ANALYSIS
 {
 	PTHREAD_CHECK(pthread_mutex_lock(mutex));
 }
-static inline void usbi_mutex_unlock(usbi_mutex_t *mutex)
+static inline void usbi_mutex_unlock(usbi_mutex_t *mutex) RELEASE(*mutex) NO_THREAD_SAFETY_ANALYSIS
 {
 	PTHREAD_CHECK(pthread_mutex_unlock(mutex));
 }
-static inline int usbi_mutex_trylock(usbi_mutex_t *mutex)
+static inline int usbi_mutex_trylock(usbi_mutex_t *mutex) TRY_ACQUIRE(1, *mutex)
 {
-	return pthread_mutex_trylock(mutex) == 0;
+	int mutexIsLocked = pthread_mutex_trylock(mutex) == 0;
+	return mutexIsLocked;
 }
-static inline void usbi_mutex_destroy(usbi_mutex_t *mutex)
+static inline void usbi_mutex_destroy(usbi_mutex_t *mutex) EXCLUDES(*mutex)
 {
 	PTHREAD_CHECK(pthread_mutex_destroy(mutex));
 }
 
+#define USBI_COND_INITIALIZER	PTHREAD_COND_INITIALIZER
 typedef pthread_cond_t usbi_cond_t;
-void usbi_cond_init(pthread_cond_t *cond);
-static inline void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex)
+void usbi_cond_init(usbi_cond_t *cond);
+static inline void usbi_cond_wait(usbi_cond_t *cond, usbi_mutex_t *mutex) REQUIRES(*mutex)
 {
 	PTHREAD_CHECK(pthread_cond_wait(cond, mutex));
 }
 int usbi_cond_timedwait(usbi_cond_t *cond,
 	usbi_mutex_t *mutex, const struct timeval *tv);
+static inline void usbi_cond_signal(usbi_cond_t *cond)
+{
+	PTHREAD_CHECK(pthread_cond_signal(cond));
+}
 static inline void usbi_cond_broadcast(usbi_cond_t *cond)
 {
 	PTHREAD_CHECK(pthread_cond_broadcast(cond));
@@ -93,6 +102,6 @@ static inline void usbi_tls_key_delete(usbi_tls_key_t key)
 	PTHREAD_CHECK(pthread_key_delete(key));
 }
 
-unsigned int usbi_get_tid(void);
+unsigned long usbi_get_tid(void);
 
 #endif /* LIBUSB_THREADS_POSIX_H */

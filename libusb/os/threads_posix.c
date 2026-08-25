@@ -1,8 +1,11 @@
+/* -*- Mode: C; indent-tabs-mode:t ; c-basic-offset:4 -*- */
 /*
  * libusb synchronization using POSIX Threads
  *
  * Copyright © 2011 Vitali Lovich <vlovich@aliph.com>
  * Copyright © 2011 Peter Stuge <peter@stuge.se>
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,6 +25,7 @@
 #include "libusbi.h"
 
 #include <errno.h>
+#include <limits.h>
 #if defined(__ANDROID__)
 # include <unistd.h>
 #elif defined(__HAIKU__)
@@ -37,7 +41,7 @@
 # include <sys/lwp.h>
 #endif
 
-void usbi_cond_init(pthread_cond_t *cond)
+void usbi_cond_init(usbi_cond_t *cond)
 {
 #ifdef HAVE_PTHREAD_CONDATTR_SETCLOCK
 	pthread_condattr_t condattr;
@@ -51,8 +55,8 @@ void usbi_cond_init(pthread_cond_t *cond)
 #endif
 }
 
-int usbi_cond_timedwait(pthread_cond_t *cond,
-	pthread_mutex_t *mutex, const struct timeval *tv)
+int usbi_cond_timedwait(usbi_cond_t *cond,
+	usbi_mutex_t *mutex, const struct timeval *tv) REQUIRES(*mutex)
 {
 	struct timespec timeout;
 	int r;
@@ -79,47 +83,54 @@ int usbi_cond_timedwait(pthread_cond_t *cond,
 		return LIBUSB_ERROR_OTHER;
 }
 
-unsigned int usbi_get_tid(void)
+/* C uses _Thread_local; C++ uses the thread_local keyword. */
+#if defined(__cplusplus)
+#define USBI_THREAD_LOCAL thread_local
+#else
+#define USBI_THREAD_LOCAL _Thread_local
+#endif
+
+unsigned long usbi_get_tid(void)
 {
-	static _Thread_local unsigned int tl_tid;
-	int tid;
+	static USBI_THREAD_LOCAL unsigned long tl_tid;
+	unsigned long tid;
 
 	if (tl_tid)
 		return tl_tid;
 
 #if defined(__ANDROID__)
-	tid = gettid();
+	tid = (unsigned long)gettid();
 #elif defined(__APPLE__)
 #ifdef HAVE_PTHREAD_THREADID_NP
 	uint64_t thread_id;
 
 	if (pthread_threadid_np(NULL, &thread_id) == 0)
-		tid = (int)thread_id;
+		tid = (unsigned long)thread_id;
 	else
-		tid = -1;
+		tid = ULONG_MAX;
 #else
-	tid = (int)pthread_mach_thread_np(pthread_self());
+	tid = (unsigned long)pthread_mach_thread_np(pthread_self());
 #endif
 #elif defined(__HAIKU__)
-	tid = get_pthread_thread_id(pthread_self());
+	tid = (unsigned long)get_pthread_thread_id(pthread_self());
 #elif defined(__linux__)
-	tid = (int)syscall(SYS_gettid);
+	tid = (unsigned long)syscall(SYS_gettid);
 #elif defined(__NetBSD__)
-	tid = _lwp_self();
+	tid = (unsigned long)_lwp_self();
 #elif defined(__OpenBSD__)
-	tid = getthrid();
+	tid = (unsigned long)getthrid();
 #elif defined(__sun__)
-	tid = _lwp_self();
+	tid = (unsigned long)_lwp_self();
 #else
-	tid = -1;
+	tid = ULONG_MAX;
 #endif
 
-	if (tid == -1) {
+	if (tid == ULONG_MAX) {
 		/* If we don't have a thread ID, at least return a unique
 		 * value that can be used to distinguish individual
 		 * threads. */
-		tid = (int)(intptr_t)pthread_self();
+		tid = (unsigned long)(uintptr_t)pthread_self();
 	}
 
-	return tl_tid = (unsigned int)tid;
+	return tl_tid = tid;
 }
