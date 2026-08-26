@@ -2378,6 +2378,7 @@ INCLUDE_FILE_PATTERNS  =
 PREDEFINED             = API_EXPORTED= \
                          DEFAULT_VISIBILITY= \
                          LIBUSB_CALL= \
+                         LIBUSB_ENUM_SIZE(x)= \
                          LIBUSB_PACKED= \
                          CAPABILITY(x) \
                          SCOPED_CAPABILITY \
