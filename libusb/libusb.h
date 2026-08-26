@@ -1731,11 +1731,12 @@ typedef void (LIBUSB_CALL *libusb_log_cb)(libusb_context *ctx,
 struct libusb_init_option {
 	/** Which option to set */
 	enum libusb_option option;
-	/** An integer value used by the option (if applicable). */
 	union {
+		/** An integer value used by the option. */
 		int ival;
+		/** A log callback used by the option. */
 		libusb_log_cb log_cbval;
-	} value;
+	} value; /**< The value used by the option (if applicable). */
 };
 
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
@@ -2380,7 +2381,8 @@ typedef enum {
 
 	/** A device has left and is no longer available.
 	 * It is the user's responsibility to call libusb_close on any handle associated with a disconnected device.
-	 * It is safe to call libusb_get_device_descriptor on a device that has left */
+	 * See \ref libusb_hotplug for the set of libusb functions that are safe to call
+	 * from within a LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT callback. */
 	LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT = (1 << 1)
 } libusb_hotplug_event;
 

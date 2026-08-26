@@ -254,6 +254,11 @@ struct winusb_device_priv {
 	uint16_t langid; // cached USB language ID for string descriptor requests
 	bool langid_unavailable; // set once the language ID request has failed, so
 	                         // it is not retried for every string descriptor
+	volatile LONG string_backoff_deadline; // GetTickCount() tick until which string
+	                                       // descriptor requests are skipped, 0 when
+	                                       // unarmed; 32-bit on purpose: private data
+	                                       // is only pointer aligned, too weak for
+	                                       // 64-bit interlocked operands on Win32
 	uint8_t depth; // distance to HCD
 	const struct windows_usb_api_backend *apib;
 	char *dev_id;
