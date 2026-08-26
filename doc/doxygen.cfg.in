@@ -2169,6 +2169,7 @@ INCLUDE_FILE_PATTERNS  =
 PREDEFINED             = API_EXPORTED= \
                          DEFAULT_VISIBILITY= \
                          LIBUSB_CALL= \
+                         LIBUSB_ENUM_SIZE(x)= \
                          LIBUSB_PACKED=
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
