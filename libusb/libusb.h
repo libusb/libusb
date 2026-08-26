@@ -195,9 +195,10 @@ typedef SSIZE_T ssize_t;
  * <li>libusb version 1.0.28: LIBUSB_API_VERSION = 0x0100010A
  * <li>libusb version 1.0.29: LIBUSB_API_VERSION = 0x0100010B
  * <li>libusb version 1.0.30: LIBUSB_API_VERSION = 0x0100010C
+ * <li>libusb version 1.0.31: LIBUSB_API_VERSION = 0x0100010D
  * </ul>
  */
-#define LIBUSB_API_VERSION 0x0100010C
+#define LIBUSB_API_VERSION 0x0100010D
 
 /** \def LIBUSBX_API_VERSION
  * \ingroup libusb_misc
@@ -1753,11 +1754,12 @@ typedef void (LIBUSB_CALL *libusb_log_cb)(libusb_context *ctx,
 struct libusb_init_option {
 	/** Which option to set */
 	enum libusb_option option;
-	/** An integer value used by the option (if applicable). */
 	union {
+		/** An integer value used by the option. */
 		int ival;
+		/** A log callback used by the option. */
 		libusb_log_cb log_cbval;
-	} value;
+	} value; /**< The value used by the option (if applicable). */
 };
 
 int LIBUSB_CALL libusb_init(libusb_context **ctx);
@@ -1781,6 +1783,11 @@ void LIBUSB_CALL libusb_unref_device(libusb_device *dev);
 
 int LIBUSB_CALL libusb_get_device_string(libusb_device *dev,
 	enum libusb_device_string_type string_type, char *data, int length);
+int LIBUSB_CALL libusb_get_config_string(libusb_device *dev,
+	uint8_t config_value, char *data, int length);
+int LIBUSB_CALL libusb_get_interface_string(libusb_device *dev,
+	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+	char *data, int length);
 int LIBUSB_CALL libusb_get_configuration(libusb_device_handle *dev,
 	int *config);
 int LIBUSB_CALL libusb_get_device_descriptor(libusb_device *dev,
@@ -2397,7 +2404,8 @@ typedef enum {
 
 	/** A device has left and is no longer available.
 	 * It is the user's responsibility to call libusb_close on any handle associated with a disconnected device.
-	 * It is safe to call libusb_get_device_descriptor on a device that has left */
+	 * See \ref libusb_hotplug for the set of libusb functions that are safe to call
+	 * from within a LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT callback. */
 	LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT = (1 << 1)
 } libusb_hotplug_event;
 

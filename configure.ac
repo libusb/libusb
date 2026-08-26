@@ -251,7 +251,12 @@ linux)
 	fi
 	;;
 sunos)
-	LIBS="${LIBS} -ldevinfo"
+	dnl sunos_usb.c calls nvlist_alloc()/nvlist_add_int32()/nvlist_pack()/
+	dnl nvlist_free() from <sys/nvpair.h>, so libnvpair is a real dependency.
+	dnl The Solaris link editor tolerates undefined symbols when building a
+	dnl shared object, which hid this; a static link (as tests/Makefile.am
+	dnl asks for) fails with "symbol referencing errors".
+	LIBS="${LIBS} -ldevinfo -lnvpair"
 	;;
 windows)
 	AC_CHECK_TYPES([struct timespec], [], [], [[#include <time.h>]])
@@ -260,7 +265,13 @@ windows)
 	;;
 emscripten)
 	# Note: LT_LDFLAGS is not enough here because we need link flags for executable.
-	EM_LDFLAGS="--bind -s ASYNCIFY"
+	dnl The WebUSB backend (os/emscripten_webusb.cpp) is C++, so libusb-1.0
+	dnl pulls in the C++ runtime. Emscripten 6.0.6 disabled DEFAULT_TO_CXX,
+	dnl making em++ mandatory for C++ links; without it every C program that
+	dnl links libusb (the examples and tests here, and downstream users
+	dnl building with emcc) fails with undefined std:: symbols. Setting it
+	dnl back restores the pre-6.0.6 behaviour and is a no-op on older SDKs.
+	EM_LDFLAGS="--bind -s ASYNCIFY -s DEFAULT_TO_CXX"
 	AM_LDFLAGS="${AM_LDFLAGS} ${EM_LDFLAGS} -s ASSERTIONS -s ALLOW_MEMORY_GROWTH"
 	LIBS="${LIBS} ${EM_LDFLAGS}"
 	;;
@@ -431,8 +442,15 @@ AC_ARG_ENABLE([tests-build],
 	[build_tests=$enableval],
 	[build_tests=no])
 
+dnl Long-running testcore stress test
+AC_ARG_ENABLE([testcore],
+	[AS_HELP_STRING([--enable-testcore], [include the testcore stress test in make check [default=no]])],
+	[run_testcore=$enableval],
+	[run_testcore=no])
+
 AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" != xno])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$build_tests" != xno])
+AM_CONDITIONAL([RUN_TESTCORE], [test "x$run_testcore" = xyes])
 AM_CONDITIONAL([BUILD_MAN_PAGES], [test "x$build_man_pages" = xyes])
 AM_CONDITIONAL([BUILD_UMOCKDEV_TEST], [test "x$ac_have_umockdev" = xyes -a "x$log_enabled" != xno -a "x$debug_log_enabled" != xyes])
 AM_CONDITIONAL([CREATE_IMPORT_LIB], [test "x$create_import_lib" = xyes])

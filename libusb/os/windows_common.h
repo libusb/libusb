@@ -252,6 +252,13 @@ struct winusb_device_priv {
 	bool root_hub;
 	uint8_t active_config;
 	uint16_t langid; // cached USB language ID for string descriptor requests
+	bool langid_unavailable; // set once the language ID request has failed, so
+	                         // it is not retried for every string descriptor
+	volatile LONG string_backoff_deadline; // GetTickCount() tick until which string
+	                                       // descriptor requests are skipped, 0 when
+	                                       // unarmed; 32-bit on purpose: private data
+	                                       // is only pointer aligned, too weak for
+	                                       // 64-bit interlocked operands on Win32
 	uint8_t depth; // distance to HCD
 	const struct windows_usb_api_backend *apib;
 	char *dev_id;
@@ -335,6 +342,11 @@ struct windows_backend {
 		struct discovered_devs **discdevs);
 	int (*get_device_string)(libusb_device *dev,
 		enum libusb_device_string_type string_type, char *data, int length);
+	int (*get_config_string)(libusb_device *dev,
+		uint8_t config_value, char *data, int length);
+	int (*get_interface_string)(libusb_device *dev,
+		uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
+		char *data, int length);
 	int (*open)(struct libusb_device_handle *dev_handle);
 	void (*close)(struct libusb_device_handle *dev_handle);
 	int (*get_active_config_descriptor)(struct libusb_device *device,
@@ -366,10 +378,20 @@ struct windows_backend {
 		uint8_t endpoint);
 };
 
+// Lifecycle of the I/O completion port thread, tracked in
+// windows_context_priv::completion_port_state. Written and read with the
+// usbi_atomic helpers, see windows_iocp_thread().
+enum windows_iocp_state {
+	WINDOWS_IOCP_INITIALIZING = 0, // windows_init() in progress, the thread uses timed waits
+	WINDOWS_IOCP_RUNNING,          // windows_init() succeeded, the thread blocks indefinitely
+	WINDOWS_IOCP_EXIT_REQUESTED,   // teardown in progress, the thread must exit
+};
+
 struct windows_context_priv {
 	const struct windows_backend *backend;
 	HANDLE completion_port;
 	HANDLE completion_port_thread;
+	usbi_atomic_t completion_port_state; // enum windows_iocp_state
 };
 
 union windows_device_priv {
