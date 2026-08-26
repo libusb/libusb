@@ -88,9 +88,12 @@ AC_ARG_ENABLE([enum-size],
 	[AS_HELP_STRING([--enable-enum-size], [enable fixed enum underlying types when supported [default=no]])],
 	[enum_size_enabled=$enableval],
 	[enum_size_enabled=no])
+LIBUSB_ENUM_SIZE_CFLAGS=
 if test "x$enum_size_enabled" != xno; then
 	AC_DEFINE([LIBUSB_ENABLE_ENUM_SIZE], [1], [Define to 1 to enable fixed enum underlying types when supported.])
+	LIBUSB_ENUM_SIZE_CFLAGS="-DLIBUSB_ENABLE_ENUM_SIZE=1"
 fi
+AC_SUBST([LIBUSB_ENUM_SIZE_CFLAGS])
 
 create_import_lib=
 is_android_linux=

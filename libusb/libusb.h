@@ -61,12 +61,23 @@ typedef SSIZE_T ssize_t;
 
 /* Fixed underlying enum types can alter the ABI, so only enable them when
  * explicitly requested by the build configuration and supported by the
- * compiler. C23 and C++ provide this syntax, and clang supports it as an
- * extension in earlier versions of C. */
-#if defined(LIBUSB_ENABLE_ENUM_SIZE) && \
-    ((defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)) || \
-     defined(__cplusplus) || defined(__clang__))
+ * compiler. C23 and C++11 or later provide this syntax, and Clang supports it
+ * as an extension in earlier versions of C. Reject unsupported consumers so
+ * that they cannot silently use a different ABI. */
+#if defined(LIBUSB_ENABLE_ENUM_SIZE)
+#if defined(__cplusplus)
+#if (__cplusplus >= 201103L) || \
+    (defined(_MSVC_LANG) && (_MSVC_LANG >= 201103L))
 #define LIBUSB_ENUM_SIZE(x) : x
+#else
+#error "LIBUSB_ENABLE_ENUM_SIZE requires C++11 or later"
+#endif
+#elif (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)) || \
+      defined(__clang__)
+#define LIBUSB_ENUM_SIZE(x) : x
+#else
+#error "LIBUSB_ENABLE_ENUM_SIZE requires C23 or Clang fixed enum support"
+#endif
 #else
 #define LIBUSB_ENUM_SIZE(x)
 #endif
