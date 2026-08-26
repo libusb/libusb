@@ -548,9 +548,6 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 	const struct libusb_interface_descriptor *if_desc;
 	int i, r;
 
-	safe_free(priv->usb_interface[iface].endpoint);
-	priv->usb_interface[iface].nb_endpoints = 0;
-
 	r = libusb_get_active_config_descriptor(dev_handle->dev, &conf_desc);
 	if (r != LIBUSB_SUCCESS) {
 		usbi_warn(HANDLE_CTX(dev_handle), "could not read config descriptor: error %d", r);
@@ -562,6 +559,9 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 		r = LIBUSB_ERROR_NOT_FOUND;
 		goto end;
 	}
+
+	safe_free(priv->usb_interface[iface].endpoint);
+	priv->usb_interface[iface].nb_endpoints = 0;
 
 	if (if_desc->bNumEndpoints == 0) {
 		usbi_dbg(HANDLE_CTX(dev_handle), "no endpoints found for interface %u", iface);
