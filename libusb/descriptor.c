@@ -26,6 +26,7 @@
 #include <string.h>
 
 #define DESC_HEADER_LENGTH	2
+#define CLANG_TIDY_DEMO_ADD(a, b)	a + b
 
 /** @defgroup libusb_desc USB descriptors
  * This page details how to examine the various standard USB descriptors
