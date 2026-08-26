@@ -23,6 +23,7 @@
  */
 
 #include "libusbi.h"
+#include "libusbi.h"
 #include "version.h"
 
 #ifdef __ANDROID__
