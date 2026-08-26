@@ -10,22 +10,29 @@ def safe_path:
   (index("\u0000") == null) and
   (split("/") | all(. != "" and . != "." and . != ".."));
 
+def diagnostic_body:
+  split("\n")[0] | rtrimstr("\r");
+
 def valid_comment:
   type == "object" and
   ((.body | type) == "string") and
   ((.body | length) > 0 and (.body | length) <= 65536) and
+  ((.body | diagnostic_body | length) > 0 and
+   (.body | diagnostic_body | length) <= 4096) and
   (.path | safe_path) and
   (.line | positive_integer) and
   ((has("start_line") | not) or
    ((.start_line | positive_integer) and .start_line <= .line));
 
 def canonical_comment:
-  {body, path, line, side: "RIGHT"} +
-  (if has("start_line") then
-     {start_line, start_side: "RIGHT"}
-   else
-     {}
-   end);
+  # The action calculates fix text with character offsets, but clang-tidy
+  # reports byte offsets. Do not pass potentially corrupt fix blocks on.
+  {
+    body: (.body | diagnostic_body),
+    path,
+    line: (.start_line // .line),
+    side: "RIGHT"
+  };
 
 if . == null then
   null
@@ -39,7 +46,7 @@ elif (all(.comments[]; valid_comment) | not) then
   error("review contains an invalid comment")
 else
   {
-    body: "clang-tidy made some suggestions",
+    body: "clang-tidy reported warnings",
     event: "COMMENT",
     comments: [.comments[] | canonical_comment]
   }
