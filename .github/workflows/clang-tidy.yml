@@ -1,0 +1,182 @@
+name: clang-tidy
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  CLANG_TIDY_BUILD_DIR: build-clang-tidy
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  review:
+    name: changed lines
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake bear clang-18 jq libtool libudev-dev \
+            libumockdev-dev m4 pkg-config umockdev
+
+      - name: configure
+        run: |
+          ./bootstrap.sh
+          mkdir "$CLANG_TIDY_BUILD_DIR-udev" "$CLANG_TIDY_BUILD_DIR-netlink"
+          cd "$CLANG_TIDY_BUILD_DIR-udev"
+          CC=clang-18 CXX=clang++-18 ../configure \
+            --enable-examples-build \
+            --enable-tests-build \
+            --enable-udev
+          cd "../$CLANG_TIDY_BUILD_DIR-netlink"
+          CC=clang-18 CXX=clang++-18 ../configure \
+            --enable-examples-build \
+            --enable-tests-build \
+            --disable-udev
+
+      - name: generate compilation database
+        run: |
+          bear --output "$CLANG_TIDY_BUILD_DIR-udev/compile_commands.json" -- \
+            make -C "$CLANG_TIDY_BUILD_DIR-udev" -j"$(nproc)"
+          bear --output "$CLANG_TIDY_BUILD_DIR-netlink/compile_commands.json" -- \
+            make -C "$CLANG_TIDY_BUILD_DIR-netlink" -j"$(nproc)"
+          bear --append \
+            --output "$CLANG_TIDY_BUILD_DIR-udev/compile_commands.json" -- \
+            clang-18 -std=c99 -D_GNU_SOURCE \
+              -I"$GITHUB_WORKSPACE/$CLANG_TIDY_BUILD_DIR-udev" \
+              -I"$GITHUB_WORKSPACE/libusb" \
+              -c tests/fuzz/fuzz_bos_descriptor.c \
+              -o "$CLANG_TIDY_BUILD_DIR-udev/fuzz_bos_descriptor.o"
+          bear --append \
+            --output "$CLANG_TIDY_BUILD_DIR-udev/compile_commands.json" -- \
+            clang-18 -std=c99 -D_GNU_SOURCE -Wno-macro-redefined \
+              -I"$GITHUB_WORKSPACE/$CLANG_TIDY_BUILD_DIR-udev" \
+              -I"$GITHUB_WORKSPACE/libusb" \
+              -c tests/fuzz/fuzz_descriptor_parsers.c \
+              -o "$CLANG_TIDY_BUILD_DIR-udev/fuzz_descriptor_parsers.o"
+          for build_dir in \
+            "$CLANG_TIDY_BUILD_DIR-udev" \
+            "$CLANG_TIDY_BUILD_DIR-netlink"; do
+            jq 'unique_by(.file)' "$build_dir/compile_commands.json" \
+              > "$build_dir/compile_commands.tmp"
+            mv "$build_dir/compile_commands.tmp" \
+              "$build_dir/compile_commands.json"
+          done
+          mkdir "$CLANG_TIDY_BUILD_DIR"
+          jq -s 'add | unique_by(.file)' \
+            "$CLANG_TIDY_BUILD_DIR-udev/compile_commands.json" \
+            "$CLANG_TIDY_BUILD_DIR-netlink/compile_commands.json" \
+            > "$CLANG_TIDY_BUILD_DIR/compile_commands.json"
+
+      - name: review changed lines
+        uses: ZedThree/clang-tidy-review@v0.21.0
+        with:
+          build_dir: ${{ env.CLANG_TIDY_BUILD_DIR }}
+          clang_tidy_version: '18'
+          config_file: .clang-tidy
+          # Internal headers need translation-unit context. The full scan checks them.
+          include: '*.c,libusb/libusb.h'
+          exclude: 'android/*,msvc/*,tests/macos.c,libusb/os/darwin_*,libusb/os/emscripten_*,libusb/os/haiku_*,libusb/os/netbsd_*,libusb/os/null_*,libusb/os/openbsd_*,libusb/os/sunos_*,libusb/os/*windows*'
+          apt_packages: libudev-dev,libumockdev-dev,umockdev
+          parallel: '2'
+          split_workflow: true
+
+      - name: upload review data
+        uses: actions/upload-artifact@v7
+        with:
+          name: clang-tidy-review
+          path: |
+            clang-tidy-review-output.json
+            clang-tidy-review-metadata.json
+            clang_tidy_review.yaml
+          if-no-files-found: error
+          retention-days: 7
+
+  full:
+    name: full Linux source set
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: master
+
+      - name: setup prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake bear clang-18 clang-tidy-18 jq \
+            libtool libudev-dev libumockdev-dev m4 pkg-config umockdev
+
+      - name: configure
+        run: |
+          ./bootstrap.sh
+          mkdir "$CLANG_TIDY_BUILD_DIR-udev" "$CLANG_TIDY_BUILD_DIR-netlink"
+          cd "$CLANG_TIDY_BUILD_DIR-udev"
+          CC=clang-18 CXX=clang++-18 ../configure \
+            --enable-examples-build \
+            --enable-tests-build \
+            --enable-udev
+          cd "../$CLANG_TIDY_BUILD_DIR-netlink"
+          CC=clang-18 CXX=clang++-18 ../configure \
+            --enable-examples-build \
+            --enable-tests-build \
+            --disable-udev
+
+      - name: generate compilation database
+        run: |
+          bear --output "$CLANG_TIDY_BUILD_DIR-udev/compile_commands.json" -- \
+            make -C "$CLANG_TIDY_BUILD_DIR-udev" -j"$(nproc)"
+          bear --output "$CLANG_TIDY_BUILD_DIR-netlink/compile_commands.json" -- \
+            make -C "$CLANG_TIDY_BUILD_DIR-netlink" -j"$(nproc)"
+          bear --append \
+            --output "$CLANG_TIDY_BUILD_DIR-udev/compile_commands.json" -- \
+            clang-18 -std=c99 -D_GNU_SOURCE \
+              -I"$GITHUB_WORKSPACE/$CLANG_TIDY_BUILD_DIR-udev" \
+              -I"$GITHUB_WORKSPACE/libusb" \
+              -c tests/fuzz/fuzz_bos_descriptor.c \
+              -o "$CLANG_TIDY_BUILD_DIR-udev/fuzz_bos_descriptor.o"
+          bear --append \
+            --output "$CLANG_TIDY_BUILD_DIR-udev/compile_commands.json" -- \
+            clang-18 -std=c99 -D_GNU_SOURCE -Wno-macro-redefined \
+              -I"$GITHUB_WORKSPACE/$CLANG_TIDY_BUILD_DIR-udev" \
+              -I"$GITHUB_WORKSPACE/libusb" \
+              -c tests/fuzz/fuzz_descriptor_parsers.c \
+              -o "$CLANG_TIDY_BUILD_DIR-udev/fuzz_descriptor_parsers.o"
+
+      - name: check all compiled sources
+        run: |
+          status=0
+          run-clang-tidy-18 \
+            -p "$CLANG_TIDY_BUILD_DIR-udev" \
+            -j 2 \
+            -config-file="$GITHUB_WORKSPACE/.clang-tidy" \
+            -header-filter='^.*/(libusb|examples|tests)/.*' \
+            -warnings-as-errors='*' || status=$?
+          run-clang-tidy-18 \
+            -p "$CLANG_TIDY_BUILD_DIR-netlink" \
+            -j 2 \
+            -config-file="$GITHUB_WORKSPACE/.clang-tidy" \
+            -header-filter='^.*/(libusb|examples|tests)/.*' \
+            -warnings-as-errors='*' || status=$?
+          exit "$status"

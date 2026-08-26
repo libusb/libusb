@@ -1,0 +1,78 @@
+name: post clang-tidy review
+
+on:
+  workflow_run:
+    workflows:
+      - clang-tidy
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+jobs:
+  post:
+    name: review comments
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: download review data
+        uses: actions/download-artifact@v8
+        with:
+          name: clang-tidy-review
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: validate review data
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          pull_requests=$(gh api -X GET "repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=open \
+            -f base=master \
+            -f head="$HEAD_OWNER:$HEAD_BRANCH")
+          expected_pr=$(jq -er --arg head_sha "$HEAD_SHA" '
+            [.[] | select(.head.sha == $head_sha)] |
+            unique_by(.number) |
+            if length == 1 then .[0].number else empty end
+          ' <<< "$pull_requests")
+          actual_pr=$(jq -er \
+            'select(keys == ["pr_number"]) | .pr_number | numbers' \
+            clang-tidy-review-metadata.json)
+          test "$actual_pr" = "$expected_pr"
+          jq -e '
+            . == null or
+            ((keys | sort) == ["body", "comments", "event"] and
+             (.body | type) == "string" and
+             .event == "COMMENT" and
+             (.comments | type) == "array" and
+             ((.comments | length) == 0 or
+              .body == "clang-tidy made some suggestions") and
+             all(.comments[];
+               ((keys - ["body", "line", "path", "side",
+                         "start_line", "start_side"]) | length) == 0 and
+               (.path | type) == "string" and
+               (.path | startswith("/") | not) and
+               (.path | contains("..") | not) and
+               (.body | type) == "string" and
+               .side == "RIGHT" and
+               (.line | type) == "number" and .line >= 1 and
+               ((has("start_side") | not) or .start_side == "RIGHT") and
+               ((has("start_line") | not) or
+                ((.start_line | type) == "number" and .start_line >= 1))))
+          ' clang-tidy-review-output.json
+
+      - name: post review comments
+        uses: ZedThree/clang-tidy-review/post@v0.21.0
+        with:
+          lgtm_comment_body: ''
+          max_comments: '25'
+          num_comments_as_exitcode: 'false'
