@@ -21,54 +21,59 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          ref: master
+
+      - name: find source pull request
+        id: pull-request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
+          HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # workflow_run.pull_requests can be empty, so use trusted head data.
+          pull_requests=$(gh api -X GET "repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=open \
+            -f base=master \
+            -f head="$HEAD_OWNER:$HEAD_BRANCH" \
+            -f per_page=100)
+          number=$(jq -er \
+            --arg head_repository "$HEAD_REPOSITORY" \
+            --arg head_sha "$HEAD_SHA" '
+            [.[] |
+             select(.head.repo.full_name == $head_repository and
+                    .head.sha == $head_sha)] |
+            unique_by(.number) |
+            if length == 1 then .[0].number else empty end
+          ' <<< "$pull_requests")
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
       - name: download review data
         uses: actions/download-artifact@v8
         with:
           name: clang-tidy-review
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
+          path: ${{ runner.temp }}/clang-tidy-review
 
-      - name: validate review data
+      - name: prepare advisory review
         env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
-          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          ARTIFACT_DIR: ${{ runner.temp }}/clang-tidy-review
+          EXPECTED_PR: ${{ steps.pull-request.outputs.number }}
         run: |
-          pull_requests=$(gh api -X GET "repos/$GITHUB_REPOSITORY/pulls" \
-            -f state=open \
-            -f base=master \
-            -f head="$HEAD_OWNER:$HEAD_BRANCH")
-          expected_pr=$(jq -er --arg head_sha "$HEAD_SHA" '
-            [.[] | select(.head.sha == $head_sha)] |
-            unique_by(.number) |
-            if length == 1 then .[0].number else empty end
-          ' <<< "$pull_requests")
-          actual_pr=$(jq -er \
-            'select(keys == ["pr_number"]) | .pr_number | numbers' \
-            clang-tidy-review-metadata.json)
-          test "$actual_pr" = "$expected_pr"
-          jq -e '
-            . == null or
-            ((keys | sort) == ["body", "comments", "event"] and
-             (.body | type) == "string" and
-             .event == "COMMENT" and
-             (.comments | type) == "array" and
-             ((.comments | length) == 0 or
-              .body == "clang-tidy made some suggestions") and
-             all(.comments[];
-               ((keys - ["body", "line", "path", "side",
-                         "start_line", "start_side"]) | length) == 0 and
-               (.path | type) == "string" and
-               (.path | startswith("/") | not) and
-               (.path | contains("..") | not) and
-               (.body | type) == "string" and
-               .side == "RIGHT" and
-               (.line | type) == "number" and .line >= 1 and
-               ((has("start_side") | not) or .start_side == "RIGHT") and
-               ((has("start_line") | not) or
-                ((.start_line | type) == "number" and .start_line >= 1))))
-          ' clang-tidy-review-output.json
+          review_file="$ARTIFACT_DIR/clang-tidy-review-output.json"
+          test -f "$review_file"
+          test ! -L "$review_file"
+          test "$(stat -c %s "$review_file")" -le 1048576
+          # Rebuild control fields instead of trusting the fork artifact.
+          jq -f .github/scripts/prepare-clang-tidy-review.jq \
+            "$review_file" > clang-tidy-review-output.json
+          jq -n --argjson pr_number "$EXPECTED_PR" \
+            '{pr_number: $pr_number}' > clang-tidy-review-metadata.json
 
       - name: post review comments
         uses: ZedThree/clang-tidy-review/post@v0.21.0

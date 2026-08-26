@@ -86,15 +86,27 @@ jobs:
             "$CLANG_TIDY_BUILD_DIR-netlink/compile_commands.json" \
             > "$CLANG_TIDY_BUILD_DIR/compile_commands.json"
 
+      - name: select compiled review sources
+        id: review-sources
+        run: |
+          sources=$(jq -er --arg root "$GITHUB_WORKSPACE/" '
+            [.[].file |
+             if startswith($root) then ltrimstr($root)
+             else error("source outside the workspace: \(.)")
+             end] |
+            unique |
+            if length > 0 then join(",") else empty end
+          ' "$CLANG_TIDY_BUILD_DIR/compile_commands.json")
+          # Internal headers need translation-unit context. The full scan checks them.
+          printf 'include=%s,libusb/libusb.h\n' "$sources" >> "$GITHUB_OUTPUT"
+
       - name: review changed lines
         uses: ZedThree/clang-tidy-review@v0.21.0
         with:
           build_dir: ${{ env.CLANG_TIDY_BUILD_DIR }}
           clang_tidy_version: '18'
           config_file: .clang-tidy
-          # Internal headers need translation-unit context. The full scan checks them.
-          include: '*.c,libusb/libusb.h'
-          exclude: 'android/*,msvc/*,tests/macos.c,libusb/os/darwin_*,libusb/os/emscripten_*,libusb/os/haiku_*,libusb/os/netbsd_*,libusb/os/null_*,libusb/os/openbsd_*,libusb/os/sunos_*,libusb/os/*windows*'
+          include: ${{ steps.review-sources.outputs.include }}
           apt_packages: libudev-dev,libumockdev-dev,umockdev
           parallel: '2'
           split_workflow: true
@@ -103,10 +115,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: clang-tidy-review
-          path: |
-            clang-tidy-review-output.json
-            clang-tidy-review-metadata.json
-            clang_tidy_review.yaml
+          path: clang-tidy-review-output.json
           if-no-files-found: error
           retention-days: 7
 
