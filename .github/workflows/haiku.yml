@@ -58,6 +58,9 @@ jobs:
               ${{ env.TESTCORE_CONFIGURE_FLAG }} \
               || { cat config.log; exit 1; }
             make -j4
-            # stress_mt is skipped on Haiku via an OS_HAIKU branch in
-            # tests/Makefile.am; see libusb/libusb#1907.
+            # stress_mt only compares the per-thread device counts against
+            # each other, so it passes vacuously when the guest publishes no
+            # USB device at all. Fail loudly instead of testing nothing.
+            ./examples/listdevs | tee listdevs.out
+            test -s listdevs.out || { echo "no USB devices in the guest"; exit 1; }
             make check || { cat tests/test-suite.log; exit 1; }
