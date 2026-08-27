@@ -26,6 +26,9 @@ GCC_C_LANGUAGE_STANDARD = c11
 // - in C++23 there are various compiler errors with _Atomic usage
 CLANG_CXX_LANGUAGE_STANDARD = c++17
 
+//
+ENABLE_C_BOUNDS_SAFETY = YES
+
 // Don't search user paths with <> style #includes.
 ALWAYS_SEARCH_USER_PATHS = NO
 

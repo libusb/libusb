@@ -1308,6 +1308,7 @@ struct libusb_transfer * LIBUSB_CALL libusb_alloc_transfer(
 	itransfer->priv = ptr;
 	usbi_mutex_init(&itransfer->lock);
 	struct libusb_transfer *transfer = usbi_transfer_to_libusb_transfer(itransfer);
+	itransfer->transfer = transfer;
 
 	return transfer;
 }
@@ -1344,7 +1345,6 @@ void API_EXPORTED libusb_free_transfer(struct libusb_transfer *transfer)
 		libusb_unref_device(itransfer->dev);
 
 	unsigned char *ptr = usbi_transfer_to_transfer_priv(itransfer);
-	assert(ptr == itransfer->priv);
 	free(ptr);
 }
 
