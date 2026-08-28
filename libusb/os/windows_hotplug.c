@@ -40,8 +40,13 @@
  *    has proven them usable, or proven that they never will be, because
  *    Windows makes devices visible before their driver stack is up (see
  *    windows_resolve_pending_announcements). A retry timer re-examines
- *    still-pending devices, and after HOTPLUG_SETTLE_MAX_WAIT_MS one scan
- *    runs with deferral disabled so nothing stays unannounced forever.
+ *    still-pending devices, and a device withheld for more than
+ *    HOTPLUG_SETTLE_MAX_WAIT_MS is announced as-is, so nothing stays
+ *    unannounced forever.
+ *
+ * All of this bookkeeping lives in struct winusb_device_priv, so it only runs
+ * for contexts served by the WinUSB backend: a context that selected UsbDk
+ * stores a different structure in the same memory (see #1920, item 4).
  */
 
 #define HOTPLUG_DEBOUNCE_TIMER_ID       1
@@ -52,14 +57,14 @@
 #define HOTPLUG_SETTLE_RETRY_MS         500
 #define HOTPLUG_SETTLE_MAX_WAIT_MS      5000
 
-// Posted to the notification window (possibly from another thread) when a
-// device stays announce-pending, so the event thread schedules a retry scan
-#define WM_LIBUSB_SETTLE_KICK           (WM_APP + 0)
+// libusb_init must not return while a device is still withheld: the
+// application enumerates the device list right after, and a device announced
+// later would be reported twice. Devices present at startup are settled long
+// ago, so this only bounds the rare case of one arriving at the same moment.
+#define HOTPLUG_INITIAL_SETTLE_MAX_MS   500
+#define HOTPLUG_INITIAL_SETTLE_POLL_MS  100
 
 static ULONGLONG first_debounce_tick;
-static ULONGLONG settle_wait_start_tick;
-static volatile LONG scan_deferred_count;
-static volatile LONG defer_arrivals = 1;
 static HWND windows_event_hwnd;
 static HANDLE windows_event_thread_handle;
 static DWORD WINAPI windows_event_thread_main(LPVOID lpParam);
@@ -178,11 +183,23 @@ static int windows_get_device_list(struct libusb_context *ctx)
 	return ((struct windows_context_priv *)usbi_get_context_priv(ctx))->backend->get_device_list(ctx, NULL);
 }
 
+// Whether this context is served by the WinUSB backend, i.e. whether its
+// devices carry the struct winusb_device_priv this file reads and writes.
+// A UsbDk context stores struct usbdk_device_priv in the same memory, where
+// these fields would land in the middle of a device ID.
+static bool ctx_uses_winusb(struct libusb_context *ctx)
+{
+	return ((struct windows_context_priv *)usbi_get_context_priv(ctx))->backend == &winusb_backend;
+}
+
 // Resolve withheld announcements once a scan has run all of its passes.
-// kick_if_pending schedules a retry scan for every device left pending: the
-// first of the two initial-scan resolves passes false, since it only exists
-// to record settled_observed for the immediately following second resolve.
-static void windows_resolve_pending_announcements(struct libusb_context *ctx, bool kick_if_pending)
+//
+// A withheld device stays attached, so libusb_get_device_list still lists it:
+// that is what lets its child devnodes resolve to it while the driver stack
+// comes up. libusb_init therefore completes this decision before returning
+// (see windows_initial_scan_devices), so that the enumeration performed by
+// LIBUSB_HOTPLUG_ENUMERATE never races it.
+static void windows_resolve_pending_announcements(struct libusb_context *ctx)
 {
 	struct libusb_device *dev;
 
@@ -195,7 +212,7 @@ static void windows_resolve_pending_announcements(struct libusb_context *ctx, bo
 			continue;
 		}
 
-		if (!windows_hotplug_defer_arrivals() || windows_hotplug_device_usable(dev))
+		if (windows_hotplug_device_usable(dev))
 		{
 			priv->announce_pending = false;
 		}
@@ -204,6 +221,14 @@ static void windows_resolve_pending_announcements(struct libusb_context *ctx, bo
 			// Was already settled before this scan and still yields nothing
 			// usable: nothing is coming, announce the device as-is
 			usbi_dbg(ctx, "device '%s' settled without becoming usable, announcing it as-is", priv->dev_id);
+			priv->announce_pending = false;
+		}
+		else if (GetTickCount64() - priv->pending_since >= HOTPLUG_SETTLE_MAX_WAIT_MS)
+		{
+			// Counted per device: a device that just started waiting must not
+			// inherit the deadline of one that has been waiting for seconds.
+			usbi_warn(ctx, "device '%s' did not become usable within %d ms, announcing it as-is",
+				priv->dev_id, HOTPLUG_SETTLE_MAX_WAIT_MS);
 			priv->announce_pending = false;
 		}
 		else
@@ -215,13 +240,26 @@ static void windows_resolve_pending_announcements(struct libusb_context *ctx, bo
 				// snapshot postdates this observation, decide usability
 				priv->settled_observed = true;
 			}
-			if (kick_if_pending)
-			{
-				usbi_dbg(ctx, "deferring arrival of device '%s' until its driver stack has settled", priv->dev_id);
-				windows_hotplug_arrival_deferred();
-			}
+			usbi_dbg(ctx, "deferring arrival of device '%s' until its driver stack has settled", priv->dev_id);
 		}
 	}
+}
+
+static bool ctx_has_pending_announcement(struct libusb_context *ctx)
+{
+	struct libusb_device *dev;
+
+	for_each_device(ctx, dev)
+	{
+		const struct winusb_device_priv *priv = (const struct winusb_device_priv *)usbi_get_device_priv(dev);
+
+		if (priv->initialized && priv->announce_pending)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void windows_initial_scan_devices(struct libusb_context *ctx)
@@ -230,27 +268,66 @@ void windows_initial_scan_devices(struct libusb_context *ctx)
 
 	usbi_mutex_static_lock(&active_contexts_lock);
 
-	const int ret =  windows_get_device_list(ctx);
+	int ret = windows_get_device_list(ctx);
 	if (ret != LIBUSB_SUCCESS)
 	{
 		usbi_err(ctx, "hotplug failed to retrieve initial list with error: %s", libusb_error_name(ret));
 	}
 
-	// Resolve twice: devices present at initialization have long been stable,
-	// so a settled-without-usable observation can be acted upon immediately.
-	// Only devices genuinely mid-bring-up stay pending.
-	windows_resolve_pending_announcements(ctx, false);
-	windows_resolve_pending_announcements(ctx, true);
-
-	// Devices present at initialization are delivered through
-	// LIBUSB_HOTPLUG_ENUMERATE: mark them announced so the first refresh
-	// does not re-announce them
-	for_each_device(ctx, dev)
+	if (ctx_uses_winusb(ctx))
 	{
-		struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
-		if (priv->initialized && !priv->announce_pending)
+		// These devices reach the application through LIBUSB_HOTPLUG_ENUMERATE,
+		// which simply lists what is attached. The announcement decision must
+		// therefore be complete before returning: a device left pending would
+		// be enumerated while still unusable, then announced a second time by
+		// the scan that releases it.
+		const ULONGLONG deadline = GetTickCount64() + HOTPLUG_INITIAL_SETTLE_MAX_MS;
+
+		for (;;)
 		{
-			priv->announced = true;
+			// Devices present at startup settled long ago, so the second pass
+			// releases them at once, acting on what the first observed.
+			windows_resolve_pending_announcements(ctx);
+			windows_resolve_pending_announcements(ctx);
+
+			if (!ctx_has_pending_announcement(ctx))
+			{
+				break;
+			}
+
+			if (GetTickCount64() >= deadline)
+			{
+				usbi_dbg(ctx, "some devices were still coming up after %d ms, listing them as they are",
+					HOTPLUG_INITIAL_SETTLE_MAX_MS);
+				break;
+			}
+
+			// Give the driver stack time to progress, then look again: the
+			// interface paths of a device being brought up appear in a later
+			// scan, not in the snapshot this one has already taken. This is
+			// the only place that waits while holding active_contexts_lock,
+			// and only for a device that is arriving as libusb starts.
+			Sleep(HOTPLUG_INITIAL_SETTLE_POLL_MS);
+
+			ret = windows_get_device_list(ctx);
+			if (ret != LIBUSB_SUCCESS)
+			{
+				usbi_err(ctx, "hotplug failed to refresh the initial list with error: %s", libusb_error_name(ret));
+				break;
+			}
+		}
+
+		for_each_device(ctx, dev)
+		{
+			struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
+
+			if (priv->initialized)
+			{
+				// Part of the list the application enumerates, whether or not
+				// it settled in time: no DEVICE_ARRIVED for it later.
+				priv->announce_pending = false;
+				priv->announced = true;
+			}
 		}
 	}
 
@@ -260,6 +337,22 @@ void windows_initial_scan_devices(struct libusb_context *ctx)
 static void windows_refresh_device_list(struct libusb_context *ctx)
 {
 	struct libusb_device *dev, *next_dev;
+
+	if (!ctx_uses_winusb(ctx))
+	{
+		// Every field used below belongs to struct winusb_device_priv, and a
+		// UsbDk context stores something else there: reading them would
+		// interpret a device ID as flags and pointers, and writing them would
+		// corrupt that ID. Keep the device list current (the UsbDk backend
+		// announces its own arrivals through usbi_connect_device) and leave
+		// hotplug support for that backend to #1920, item 4.
+		const int usbdk_ret = windows_get_device_list(ctx);
+		if (usbdk_ret != LIBUSB_SUCCESS)
+		{
+			usbi_err(ctx, "hotplug failed to retrieve current list with error: %s", libusb_error_name(usbdk_ret));
+		}
+		return;
+	}
 
 	// Step 1: clear seen_during_scan so the scan can mark which devices are
 	// still physically present.
@@ -280,7 +373,7 @@ static void windows_refresh_device_list(struct libusb_context *ctx)
 	}
 
 	// Step 2.5: decide which withheld announcements can be released
-	windows_resolve_pending_announcements(ctx, true);
+	windows_resolve_pending_announcements(ctx);
 
 	// Step 3: diff old vs new.
 	for_each_device_safe(ctx, dev, next_dev)
@@ -310,51 +403,42 @@ static void windows_refresh_device_list(struct libusb_context *ctx)
 	}
 }
 
-static void windows_refresh_device_list_for_all_ctx(void)
+// Returns true when at least one device is still waiting to be announced.
+static bool windows_refresh_device_list_for_all_ctx(void)
 {
+	bool pending = false;
+
 	usbi_mutex_static_lock(&active_contexts_lock);
 
 	struct libusb_context *ctx;
 	for_each_context(ctx)
 	{
 		windows_refresh_device_list(ctx);
+
+		if (ctx_uses_winusb(ctx) && ctx_has_pending_announcement(ctx))
+		{
+			pending = true;
+		}
 	}
 
 	usbi_mutex_static_unlock(&active_contexts_lock);
+
+	return pending;
 }
 
-bool windows_hotplug_defer_arrivals(void)
-{
-	return InterlockedCompareExchange(&defer_arrivals, 0, 0) != 0;
-}
-
-void windows_hotplug_arrival_deferred(void)
-{
-	InterlockedIncrement(&scan_deferred_count);
-
-	// The window exists by the time a scan can run; be defensive during
-	// monitor teardown, a missed kick only delays the re-examination
-	const HWND hwnd = windows_event_hwnd;
-	if (hwnd != NULL)
-	{
-		PostMessage(hwnd, WM_LIBUSB_SETTLE_KICK, 0, 0);
-	}
-}
-
-// Run a scan and maintain the settle-wait state accordingly. Event thread only.
+// Run a scan and keep the retry timer in step with it. Event thread only.
 static void windows_scan_for_hotplug_events(HWND hwnd)
 {
-	InterlockedExchange(&scan_deferred_count, 0);
-
-	windows_refresh_device_list_for_all_ctx();
-
-	if (InterlockedCompareExchange(&scan_deferred_count, 0, 0) == 0)
+	// Whether to retry is decided by the device list itself, not by what this
+	// scan did: a scan that failed leaves its devices pending and therefore
+	// keeps the timer armed, instead of silently dropping the retry.
+	if (windows_refresh_device_list_for_all_ctx())
 	{
-		// Nothing deferred: end the settle-wait window. Otherwise the
-		// posted WM_LIBUSB_SETTLE_KICK messages (re)arm the retry timer,
-		// or give up once the wait ceiling is reached.
+		SetTimer(hwnd, HOTPLUG_SETTLE_TIMER_ID, HOTPLUG_SETTLE_RETRY_MS, NULL);
+	}
+	else
+	{
 		KillTimer(hwnd, HOTPLUG_SETTLE_TIMER_ID);
-		settle_wait_start_tick = 0;
 	}
 }
 
@@ -531,41 +615,10 @@ static LRESULT CALLBACK windows_proc_callback(
 		}
 		return DefWindowProc(hwnd, message, wParam, lParam);
 
-	case WM_LIBUSB_SETTLE_KICK:
-	{
-		const ULONGLONG now = GetTickCount64();
-
-		if (settle_wait_start_tick == 0)
-		{
-			settle_wait_start_tick = now;
-		}
-
-		if (now - settle_wait_start_tick >= HOTPLUG_SETTLE_MAX_WAIT_MS)
-		{
-			// Wait ceiling reached: run one scan with deferral disabled,
-			// announcing everything as-is so nothing stays unannounced
-			// forever. Announced devices are never deferred again, so
-			// this cannot loop.
-			KillTimer(hwnd, HOTPLUG_SETTLE_TIMER_ID);
-			settle_wait_start_tick = 0;
-			InterlockedExchange(&defer_arrivals, 0);
-			windows_scan_for_hotplug_events(hwnd);
-			InterlockedExchange(&defer_arrivals, 1);
-		}
-		else
-		{
-			// The retry timer guarantees a re-examination even if the
-			// settling generates no further device tree broadcast
-			SetTimer(hwnd, HOTPLUG_SETTLE_TIMER_ID, HOTPLUG_SETTLE_RETRY_MS, NULL);
-		}
-		return 0;
-	}
-
 	case WM_CLOSE:
 		KillTimer(hwnd, HOTPLUG_DEBOUNCE_TIMER_ID);
 		KillTimer(hwnd, HOTPLUG_SETTLE_TIMER_ID);
 		first_debounce_tick = 0;
-		settle_wait_start_tick = 0;
 		if (!DestroyWindow(hwnd))
 		{
 			log_error("DestroyWindow");

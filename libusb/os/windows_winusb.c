@@ -541,7 +541,7 @@ static bool windows_devnode_settled(struct libusb_context *ctx, struct winusb_de
 // The device's session id is its DEVINST (see the GEN pass)
 bool windows_hotplug_device_settled(struct libusb_device *dev)
 {
-	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
 
 	return windows_devnode_settled(DEVICE_CTX(dev), priv, (DEVINST)dev->session_data, 0);
 }
@@ -551,7 +551,7 @@ bool windows_hotplug_device_settled(struct libusb_device *dev)
 // the device interface snapshot a scan enumerates.
 bool windows_hotplug_device_usable(struct libusb_device *dev)
 {
-	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
 	int i;
 
 	if (priv->path == NULL)
@@ -2502,8 +2502,10 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 #if defined(LIBUSB_WINDOWS_HOTPLUG)
 					// Withhold DEVICE_ARRIVED until the scan proves the
 					// device usable (windows_resolve_pending_announcements)
-					if (r == LIBUSB_SUCCESS)
+					if (r == LIBUSB_SUCCESS) {
 						priv->announce_pending = true;
+						priv->pending_since = GetTickCount64();
+					}
 #endif
 				}
 				if (r == LIBUSB_SUCCESS) {
