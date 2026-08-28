@@ -98,6 +98,8 @@ static enum libusb_transfer_status composite_copy_transfer_data(int sub_api, str
 static int composite_endpoint_supports_raw_io(int sub_api, struct libusb_device_handle* dev_handle, uint8_t endpoint);
 static int composite_endpoint_set_raw_io(int sub_api, struct libusb_device_handle* dev_handle, uint8_t endpoint, int enable);
 static int composite_get_max_raw_io_transfer_size(int sub_api, struct libusb_device_handle* dev_handle, uint8_t endpoint);
+// Other prototypes
+static bool find_dev_port_number_by_descriptor(struct libusb_device *dev, struct libusb_device *parent_dev, DWORD hint_port, DWORD *port_nr);
 
 static usbi_mutex_t autoclaim_lock;
 
@@ -1578,13 +1580,14 @@ static int init_device(struct libusb_device *dev, struct libusb_device *parent_d
 	return LIBUSB_SUCCESS;
 }
 
-static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, DWORD *port_nr)
+static bool get_dev_port_number(struct libusb_device *dev, HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, struct libusb_device *parent_dev, DWORD *port_nr)
 {
 	char buffer[MAX_KEY_LENGTH];
 	DWORD size;
 	const char *start = NULL;
 	char *end = NULL;
 	long long port;
+	bool address_is_port;
 
 	// First try SPDRP_LOCATION_INFORMATION, which returns a REG_SZ. The string *may* have a format
 	// similar to "Port_#0002.Hub_#000D", in which case we can extract the port number. However, we
@@ -1628,11 +1631,20 @@ static bool get_dev_port_number(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_dat
 		}
 	}
 
-	// Lastly, try SPDRP_ADDRESS, which returns a REG_DWORD. The address *may* be the port number,
-	// which is true for the Microsoft driver but may not be true for other drivers. However, we
-	// have no other options here but to accept what it returns.
-	return pSetupDiGetDeviceRegistryPropertyA(dev_info, dev_info_data, SPDRP_ADDRESS,
+	// Next try SPDRP_ADDRESS, which returns a REG_DWORD. The address *may* be the port number,
+	// which is true for the Microsoft driver but may not be true for other drivers.
+	address_is_port = pSetupDiGetDeviceRegistryPropertyA(dev_info, dev_info_data, SPDRP_ADDRESS,
 			NULL, (PBYTE)port_nr, sizeof(*port_nr), &size) && (size == sizeof(*port_nr));
+
+	// Lastly, ask the parent hub which of its ports carries this device. Some hub drivers
+	// (notably virtual ones) store an unrelated instance number in SPDRP_ADDRESS, so prefer
+	// a positive descriptor match over it when we can get one. SPDRP_ADDRESS is unreliable
+	// rather than useless, so hand it over as the first port to check.
+	if (parent_dev != NULL && find_dev_port_number_by_descriptor(dev, parent_dev,
+			address_is_port ? *port_nr : 0, port_nr))
+		return true;
+
+	return address_is_port;
 }
 
 static int enumerate_hcd_root_hub(struct libusb_context *ctx, const char *dev_id,
@@ -2344,7 +2356,9 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 				case USB_API_HUB:
 					parent_dev = get_ancestor(ctx, dev_info_data.DevInst, NULL);
 					if (parent_dev == NULL) {
-						if (!get_dev_port_number(*dev_info, &dev_info_data, &hub_port_nr) || hub_port_nr == 0) {
+						// parent_dev is NULL here, so this is a registry-only lookup:
+						// with no parent hub to interrogate there is nothing to match against.
+						if (!get_dev_port_number(dev, *dev_info, &dev_info_data, NULL, &hub_port_nr) || hub_port_nr == 0) {
 							if (bus_number == UINT8_MAX) {
 								usbi_warn(ctx, "program assertion failed - found more than %u buses, skipping the rest", UINT8_MAX);
 								break;
@@ -2395,7 +2409,7 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 					libusb_unref_device(parent_dev);
 					r = LIBUSB_SUCCESS;
 				} else {
-					if (!get_dev_port_number(*dev_info, &dev_info_data, &port_nr))
+					if (!get_dev_port_number(dev, *dev_info, &dev_info_data, parent_dev, &port_nr))
 						usbi_warn(ctx, "could not retrieve port number for device '%s': %s", dev_id, windows_error_str(0));
 					r = init_device(dev, parent_dev, (uint8_t)port_nr, dev_info_data.DevInst);
 					usbi_mutex_unlock(&priv->interface_lock);
@@ -2601,6 +2615,371 @@ static int usbi_utf16le_to_utf8(uint8_t const *src, int src_length, char *dst, i
     }
 
     return count;
+}
+
+/*
+ * Read the serial number of the device sitting on connection_index of an already
+ * open hub, converted to UTF-8. Returns false if the device has no serial number
+ * or does not answer the requests.
+ *
+ * This deliberately goes through the hub rather than through the device itself,
+ * so it works whatever driver is bound to the device and needs no open handle.
+ *
+ * These requests reach the device on its control pipe and can therefore time out.
+ * *timed_out is set in that case so the caller can abandon the port scan instead
+ * of paying the timeout once per remaining port.
+ */
+static bool get_port_serial_number(struct libusb_context *ctx, HANDLE hub_handle,
+	ULONG connection_index, uint8_t string_idx, char *serial, int serial_len,
+	bool *timed_out)
+{
+	struct string_descriptor_req_s sd;
+	const DWORD size = (DWORD)sizeof(sd);
+	DWORD ret_size;
+	uint16_t langid;
+	int str_len;
+
+	if (string_idx == 0 || serial_len <= 0)
+		return false;
+
+	// String descriptor 0 with wIndex 0 returns the supported language table
+	// (USB 2.0 spec section 9.6.7); the first entry is the primary LANGID.
+	memset(&sd, 0, sizeof(sd));
+	sd.req.ConnectionIndex = connection_index;
+	sd.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
+	sd.req.SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
+	sd.req.SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | 0;
+	sd.req.SetupPacket.wIndex = 0;
+	sd.req.SetupPacket.wLength = (USHORT)sizeof(sd.desc);
+
+	if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
+		&sd, size, &ret_size)) {
+		*timed_out = (GetLastError() == ERROR_SEM_TIMEOUT);
+		return false;
+	}
+
+	if (sd.desc.bDescriptorType != LIBUSB_DT_STRING || sd.desc.bLength < 4)
+		return false;
+
+	langid = (uint16_t)sd.desc.bString[0] | ((uint16_t)sd.desc.bString[1] << 8);
+
+	memset(&sd, 0, sizeof(sd));
+	sd.req.ConnectionIndex = connection_index;
+	sd.req.SetupPacket.bmRequest = LIBUSB_ENDPOINT_IN;
+	sd.req.SetupPacket.bRequest = LIBUSB_REQUEST_GET_DESCRIPTOR;
+	sd.req.SetupPacket.wValue = (LIBUSB_DT_STRING << 8) | string_idx;
+	sd.req.SetupPacket.wIndex = langid;
+	sd.req.SetupPacket.wLength = (USHORT)sizeof(sd.desc);
+
+	if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION, &sd, size,
+		&sd, size, &ret_size)) {
+		*timed_out = (GetLastError() == ERROR_SEM_TIMEOUT);
+		return false;
+	}
+
+	if (sd.desc.bDescriptorType != LIBUSB_DT_STRING || sd.desc.bLength <= 2)
+		return false;
+
+	// bLength is a UCHAR and so can claim more than bString can hold; clamp it, and to
+	// what the hub actually returned, before handing the payload to the converter.
+	str_len = sd.desc.bLength - 2;
+	if (str_len > (int)sizeof(sd.desc.bString))
+		str_len = (int)sizeof(sd.desc.bString);
+	if (ret_size >= offsetof(struct string_descriptor_req_s, desc.bString)
+		&& str_len > (int)(ret_size - offsetof(struct string_descriptor_req_s, desc.bString)))
+		str_len = (int)(ret_size - offsetof(struct string_descriptor_req_s, desc.bString));
+	if (str_len <= 0)
+		return false;
+
+	usbi_utf16le_to_utf8(sd.desc.bString, str_len, serial, serial_len);
+
+	// usbi_utf16le_to_utf8() only writes a terminator when the converted string
+	// is strictly shorter than the buffer: filling it exactly leaves both its
+	// terminating and its truncating branch unreached. Do not rely on it for one.
+	serial[serial_len - 1] = '\0';
+
+	// An empty serial number tells devices apart no better than none at all.
+	return serial[0] != '\0';
+}
+
+/*
+ * Fetch the connection information for one port of an already open hub.
+ *
+ * *timed_out reports whether a failure was a timeout, which lets the caller give
+ * up on the remaining ports instead of paying the timeout once for each of them.
+ */
+static bool get_port_connection_info(struct libusb_context *ctx, HANDLE hub_handle,
+	ULONG connection_index, USB_NODE_CONNECTION_INFORMATION_EX *conn_info, bool *timed_out)
+{
+	DWORD size;
+
+	memset(conn_info, 0, sizeof(*conn_info));
+	conn_info->ConnectionIndex = connection_index;
+	// coverity[tainted_data_argument]
+	if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX,
+		conn_info, sizeof(*conn_info), conn_info, sizeof(*conn_info), &size)) {
+		*timed_out = (GetLastError() == ERROR_SEM_TIMEOUT);
+		return false;
+	}
+
+	return true;
+}
+
+// True when a device is connected to this port and reports the given VID/PID.
+static bool port_carries_ids(const USB_NODE_CONNECTION_INFORMATION_EX *conn_info,
+	uint16_t vid, uint16_t pid)
+{
+	return (conn_info->ConnectionStatus == DeviceConnected)
+		&& (conn_info->DeviceDescriptor.bLength == LIBUSB_DT_DEVICE_SIZE)
+		&& (conn_info->DeviceDescriptor.bDescriptorType == LIBUSB_DT_DEVICE)
+		&& (conn_info->DeviceDescriptor.idVendor == vid)
+		&& (conn_info->DeviceDescriptor.idProduct == pid);
+}
+
+/*
+ * Determine the hub port number of a device by asking its parent hub what is
+ * connected to each of its ports, and matching that against the VID/PID (and,
+ * when several ports carry the same VID/PID, the serial number) encoded in the
+ * device instance ID.
+ *
+ * This is the last resort of get_dev_port_number(): SPDRP_ADDRESS only holds the
+ * port number for the Microsoft hub driver, and some third-party (notably
+ * virtual) hub drivers report an unrelated instance number there instead.
+ *
+ * Everything here goes through the parent hub's handle, so no device has to be
+ * opened: the caller holds priv->interface_lock, while auto_claim() takes the
+ * global autoclaim_lock before interface_lock, so opening the device here would
+ * invert that lock order and risk a deadlock.
+ *
+ * The scan walks every port of the hub, so it also queries devices other than the
+ * one being enumerated, any of which may have a wedged control pipe. Each request
+ * is bounded by hub_device_io_control(), and the first timeout abandons the scan
+ * so the cost stays at one timeout rather than one per remaining port.
+ *
+ * hint_port is the port SPDRP_ADDRESS reported, or 0 when it reported nothing
+ * usable. It is checked before the sweep, since it is usually correct.
+ *
+ * *port_nr is only written when an unambiguous match is found, in which case
+ * true is returned. Neither dev nor parent_dev is modified.
+ */
+static bool find_dev_port_number_by_descriptor(struct libusb_device *dev,
+	struct libusb_device *parent_dev, DWORD hint_port, DWORD *port_nr)
+{
+	struct libusb_context *ctx = DEVICE_CTX(dev);
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
+	struct winusb_device_priv *parent_priv = (struct winusb_device_priv *)usbi_get_device_priv(parent_dev);
+	USB_NODE_CONNECTION_INFORMATION_EX conn_info;
+	USB_NODE_INFORMATION hub_info;
+	HANDLE hub_handle;
+	const char *str;
+	const char *dev_id_serial;
+	unsigned long vid, pid;
+	unsigned int port, num_ports;
+	unsigned int vid_pid_matches = 0;
+	DWORD vid_pid_port = 0;
+	DWORD serial_port = 0;
+	DWORD size;
+	bool serial_matched = false;
+	bool scan_incomplete = false;
+	bool unidentified_port_seen = false;
+
+	// Only a hub can be asked about its ports.
+	if (parent_priv->apib->id != USB_API_HUB)
+		return false;
+
+	// A device whose hub IOCTLs recently timed out will be skipped by init_device()
+	// anyway, so scanning the whole hub on its behalf would be wasted work - and the
+	// scan is far more expensive than the single request that armed the backoff.
+	if (hub_timeout_backoff_active(priv->dev_id))
+		return false;
+
+	// Extract the IDs the device is known by, e.g. "USB\VID_046D&PID_C52B\...".
+	str = strstr(priv->dev_id, "VID_");
+	if (str == NULL)
+		return false;
+	vid = strtoul(str + 4, NULL, 16);
+
+	str = strstr(priv->dev_id, "PID_");
+	if (str == NULL)
+		return false;
+	pid = strtoul(str + 4, NULL, 16);
+
+	if (vid == 0 || vid > UINT16_MAX || pid > UINT16_MAX)
+		return false;
+
+	// The instance ID ends with the serial number when the device reports one,
+	// e.g. "USB\VID_0403&PID_6001\A6008isP". When it does not, Windows synthesises
+	// an ID containing '&', which can never match a real serial number.
+	dev_id_serial = strrchr(priv->dev_id, '\\');
+	if (dev_id_serial != NULL) {
+		dev_id_serial++;
+		if (*dev_id_serial == '\0' || strchr(dev_id_serial, '&') != NULL)
+			dev_id_serial = NULL;
+	}
+
+	// Opened with FILE_FLAG_OVERLAPPED so the requests issued on this handle can be
+	// bounded by a timeout (see hub_device_io_control())
+	hub_handle = CreateFileA(parent_priv->path, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	if (hub_handle == INVALID_HANDLE_VALUE) {
+		usbi_info(ctx, "could not open hub %s: %s", parent_priv->path, windows_error_str(0));
+		return false;
+	}
+
+	memset(&hub_info, 0, sizeof(hub_info));
+	if (!hub_device_io_control(ctx, hub_handle, IOCTL_USB_GET_NODE_INFORMATION, NULL, 0,
+		&hub_info, sizeof(hub_info), &size)) {
+		usbi_info(ctx, "could not get node information for hub %s: %s",
+			parent_priv->path, windows_error_str(0));
+		CloseHandle(hub_handle);
+		return false;
+	}
+
+	if (hub_info.NodeType != UsbHub) {
+		CloseHandle(hub_handle);
+		return false;
+	}
+
+	num_ports = hub_info.u.HubInformation.HubDescriptor.bNumberOfPorts;
+
+	// SPDRP_ADDRESS is unreliable, not useless: when it does hold the port number,
+	// checking it first settles the lookup in two requests instead of one per port,
+	// and correspondingly narrows the window in which an unrelated device on this
+	// hub can stall the enumeration of this one.
+	//
+	// Accepting a VID/PID match here is only sound when the instance ID carries no
+	// serial number. A single port cannot establish uniqueness, but where nothing
+	// can tell identical devices apart the sweep would end up keeping this very
+	// value anyway. With a serial number in hand the sweep could legitimately
+	// prefer a different port, so the shortcut then has to match on the serial.
+	if (hint_port != 0 && hint_port <= num_ports) {
+		bool timed_out = false;
+
+		if (get_port_connection_info(ctx, hub_handle, (ULONG)hint_port, &conn_info, &timed_out)
+			&& port_carries_ids(&conn_info, (uint16_t)vid, (uint16_t)pid)) {
+			bool confirmed = (dev_id_serial == NULL);
+
+			if (!confirmed) {
+				char serial[MAX_USB_STRING_LENGTH];
+
+				confirmed = get_port_serial_number(ctx, hub_handle, (ULONG)hint_port,
+						conn_info.DeviceDescriptor.iSerialNumber, serial,
+						(int)sizeof(serial), &timed_out)
+					&& _stricmp(serial, dev_id_serial) == 0;
+			}
+
+			if (confirmed) {
+				*port_nr = hint_port;
+				CloseHandle(hub_handle);
+				usbi_dbg(ctx, "confirmed device '%s' on port %lu of hub %s reported by SPDRP_ADDRESS",
+					priv->dev_id, (unsigned long)hint_port, parent_priv->path);
+				return true;
+			}
+		}
+
+		// A wedged port here would only wedge again during the sweep.
+		if (timed_out) {
+			usbi_warn(ctx, "port %lu of hub %s timed out, not scanning for '%s'",
+				(unsigned long)hint_port, parent_priv->path, priv->dev_id);
+			CloseHandle(hub_handle);
+			return false;
+		}
+	}
+
+	for (port = 1; port <= num_ports; port++) {
+		bool timed_out = false;
+
+		if (!get_port_connection_info(ctx, hub_handle, (ULONG)port, &conn_info, &timed_out)) {
+			if (timed_out) {
+				usbi_warn(ctx, "port %u of hub %s timed out, abandoning the scan for '%s'",
+					port, parent_priv->path, priv->dev_id);
+				scan_incomplete = true;
+				break;
+			}
+			continue;
+		}
+
+		// A port stuck in a failure state may be hiding this very device: nothing
+		// usable can be read from it, so it cannot take part in the match, and its
+		// existence means the ports that did match are not necessarily the only
+		// candidates. DeviceEnumerating and DeviceReset are excluded on purpose:
+		// the hub is still working on those and will have settled by the next scan,
+		// whereas treating them as suspect would refuse a match during any ordinary
+		// hotplug and fall back on the very value this lookup exists to distrust.
+		if ((conn_info.ConnectionStatus != DeviceConnected)
+			&& (conn_info.ConnectionStatus != NoDeviceConnected)
+			&& (conn_info.ConnectionStatus != DeviceEnumerating)
+			&& (conn_info.ConnectionStatus != DeviceReset))
+			unidentified_port_seen = true;
+
+		if (!port_carries_ids(&conn_info, (uint16_t)vid, (uint16_t)pid))
+			continue;
+
+		vid_pid_matches++;
+		vid_pid_port = (DWORD)port;
+
+		// Several ports can carry the same VID/PID, so when the instance ID gives us a
+		// serial number, use it to single out the right one. Not every device answers a
+		// string descriptor request through its hub, so treat this as a bonus rather
+		// than a requirement and keep counting VID/PID matches either way.
+		if (dev_id_serial != NULL && !serial_matched) {
+			char serial[MAX_USB_STRING_LENGTH];
+
+			if (get_port_serial_number(ctx, hub_handle, (ULONG)port,
+					conn_info.DeviceDescriptor.iSerialNumber, serial, (int)sizeof(serial),
+					&timed_out)
+				&& _stricmp(serial, dev_id_serial) == 0) {
+				serial_port = (DWORD)port;
+				serial_matched = true;
+			} else if (timed_out) {
+				usbi_warn(ctx, "serial number request on port %u of hub %s timed out, abandoning the scan for '%s'",
+					port, parent_priv->path, priv->dev_id);
+				scan_incomplete = true;
+				break;
+			}
+		}
+	}
+
+	CloseHandle(hub_handle);
+
+	// A serial number is unique among otherwise identical devices, so it identifies the
+	// device on its own and stays trustworthy even if the scan was cut short.
+	if (serial_matched) {
+		*port_nr = serial_port;
+		usbi_dbg(ctx, "matched device '%s' to port %lu of hub %s by serial number",
+			priv->dev_id, (unsigned long)serial_port, parent_priv->path);
+		return true;
+	}
+
+	// Uniqueness, on the other hand, is only meaningful over a complete scan: a port
+	// that was never reached could hold the same VID/PID.
+	if (scan_incomplete)
+		return false;
+
+	// A single VID/PID match is unambiguous only if every port could be identified. 
+	// A port in a failure state may hold this device while the lone match is an
+	// identical twin elsewhere on the hub, and taking it would hand back the twin's port.
+	// Where the instance ID carries a serial number the two could have been told apart,
+	// so not having matched it is a failure here rather than a reason to fall back on the count.
+	if (vid_pid_matches == 1 && !(dev_id_serial != NULL && unidentified_port_seen)) {
+		*port_nr = vid_pid_port;
+		usbi_dbg(ctx, "matched device '%s' to port %lu of hub %s by VID/PID",
+			priv->dev_id, (unsigned long)vid_pid_port, parent_priv->path);
+		return true;
+	}
+
+	if (vid_pid_matches == 1)
+		usbi_dbg(ctx, "not trusting the lone VID/PID match for device '%s' on hub %s: "
+			"a port that could not be identified may be holding it",
+			priv->dev_id, parent_priv->path);
+
+	// Two identical devices on the same hub with no usable serial number are
+	// indistinguishable. Rather than guess, leave *port_nr alone and let the caller
+	// fall back to SPDRP_ADDRESS.
+	if (vid_pid_matches > 1)
+		usbi_dbg(ctx, "found %u ports matching device '%s' on hub %s, cannot tell them apart",
+			vid_pid_matches, priv->dev_id, parent_priv->path);
+
+	return false;
 }
 
 /*
