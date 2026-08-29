@@ -254,6 +254,13 @@ struct winusb_device_priv {
 	// Driver stack seen fully settled by an earlier scan: if the next scan
 	// still yields nothing usable, none is coming
 	bool settled_observed;
+	// GetTickCount() tick at which this device's announcement was first
+	// withheld: the give-up ceiling is counted per device, not for the
+	// monitor as a whole. A 32-bit tick because usbi_get_device_priv() only
+	// guarantees pointer alignment, so a 64-bit field can straddle an 8-byte
+	// boundary on Win32. Only read while announce_pending is set, which is
+	// where it is written, so it needs no unarmed value.
+	DWORD pending_since;
 	// DEVICE_ARRIVED was fired; DEVICE_LEFT is only fired for announced devices
 	bool announced;
 #endif

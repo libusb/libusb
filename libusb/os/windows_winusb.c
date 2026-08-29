@@ -541,7 +541,7 @@ static bool windows_devnode_settled(struct libusb_context *ctx, struct winusb_de
 // The device's session id is its DEVINST (see the GEN pass)
 bool windows_hotplug_device_settled(struct libusb_device *dev)
 {
-	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
 
 	return windows_devnode_settled(DEVICE_CTX(dev), priv, (DEVINST)dev->session_data, 0);
 }
@@ -549,28 +549,33 @@ bool windows_hotplug_device_settled(struct libusb_device *dev)
 // Judged from what the scans actually materialized (the same state
 // libusb_open will use), not from live PnP state, which can disagree with
 // the device interface snapshot a scan enumerates.
-bool windows_hotplug_device_usable(struct libusb_device *dev)
+enum windows_hotplug_usability windows_hotplug_device_usability(struct libusb_device *dev)
 {
-	struct winusb_device_priv *priv = usbi_get_device_priv(dev);
+	struct winusb_device_priv *priv = (struct winusb_device_priv *)usbi_get_device_priv(dev);
 	int i;
 
+	// apib stays USB_API_UNSUPPORTED until the HUB or DEV pass finds the
+	// device interface, which Windows only registers once the driver starts
 	if (priv->path == NULL)
-		return false;
+		return WINDOWS_HOTPLUG_DEVICE_NOT_YET;
 
 	switch (priv->apib->id) {
-	case USB_API_COMPOSITE:
-	case USB_API_HID:
-		for (i = 0; i < USB_MAXINTERFACES; i++) {
-			if (priv->usb_interface[i].path != NULL)
-				return true;
-		}
-		return false;
 	case USB_API_HUB:
 	case USB_API_UNSUPPORTED:
-		return false;
+		// Nothing for libusb to open here, whatever the driver stack does
+		// next: waiting for an interface path would never end
+		return WINDOWS_HOTPLUG_DEVICE_NEVER_USABLE;
+	case USB_API_COMPOSITE:
+	case USB_API_HID:
+		// These expose their functions through per-interface paths
+		for (i = 0; i < USB_MAXINTERFACES; i++) {
+			if (priv->usb_interface[i].path != NULL)
+				return WINDOWS_HOTPLUG_DEVICE_USABLE;
+		}
+		return WINDOWS_HOTPLUG_DEVICE_NOT_YET;
 	default:
 		// WinUSB-like APIs operate on the device path itself
-		return true;
+		return WINDOWS_HOTPLUG_DEVICE_USABLE;
 	}
 }
 #endif
@@ -2502,8 +2507,10 @@ static int winusb_get_device_list(struct libusb_context *ctx, struct discovered_
 #if defined(LIBUSB_WINDOWS_HOTPLUG)
 					// Withhold DEVICE_ARRIVED until the scan proves the
 					// device usable (windows_resolve_pending_announcements)
-					if (r == LIBUSB_SUCCESS)
+					if (r == LIBUSB_SUCCESS) {
 						priv->announce_pending = true;
+						priv->pending_since = GetTickCount();
+					}
 #endif
 				}
 				if (r == LIBUSB_SUCCESS) {
