@@ -42,6 +42,9 @@ option(LIBUSB_ENABLE_SYSTEM_LOGGING "Send log messages to the systemwide log" OF
 option(LIBUSB_ENABLE_UDEV "Use udev for device enumeration/hotplug on Linux (netlink is used otherwise)" ON)
 option(LIBUSB_ENABLE_WINDOWS_HOTPLUG "Enable hotplug support on Windows" OFF)
 option(LIBUSB_INSTALL "Generate install rules for libusb" ${_libusb_default_install})
+option(LIBUSB_BUILD_EXAMPLES "Build the libusb example programs (examples/)" OFF)
+option(LIBUSB_BUILD_TESTS "Build the libusb test suite (tests/) and register it with ctest" OFF)
+option(LIBUSB_ENABLE_TESTCORE "Register the long-running testcore stress test with ctest" OFF)
 
 # ---------------------------------------------------------------------------
 # Backend selection - mirrors the `case $host in` block in configure.ac.
@@ -252,8 +255,11 @@ add_custom_target(libusb_version_describe
 
 # ---------------------------------------------------------------------------
 # libusb/config.h - the private, per-platform feature header every source
-# file pulls in via `#include <config.h>`.
+# file pulls in via `#include <config.h>`. examples/ and tests/ need this
+# directory too: several of their sources (testlib.c, umockdev.c, ezusb.c,
+# ...) include <config.h> directly, matching their AM_CPPFLAGS in Makefile.am.
 # ---------------------------------------------------------------------------
+set(LIBUSB_CONFIG_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libusb_config")
 if(MSVC)
   set(LIBUSB_DEFAULT_VISIBILITY_ATTR "/**/")
   set(LIBUSB_PRINTF_FORMAT_ATTR "/**/")
@@ -284,7 +290,7 @@ set(HAVE_ASM_TYPES_H ${LIBUSB_HAVE_ASM_TYPES_H})
 set(HAVE_IOKIT_USB_IOUSBHOSTFAMILYDEFINITIONS_H ${LIBUSB_HAVE_IOKIT_USB_IOUSBHOSTFAMILYDEFINITIONS_H})
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.h.in"
-                "${CMAKE_CURRENT_BINARY_DIR}/libusb_config/config.h" @ONLY)
+                "${LIBUSB_CONFIG_INCLUDE_DIR}/config.h" @ONLY)
 
 # eventfd/timerfd signalling: only wired up for the linux and sunos backends
 # (configure.ac guards these the same way), each independently optional.
@@ -333,7 +339,7 @@ endif()
 
 target_link_libraries(libusb PRIVATE ${LIBUSB_PRIVATE_LIBRARIES})
 target_include_directories(libusb PRIVATE
-  "${CMAKE_CURRENT_BINARY_DIR}/libusb_config"
+  "${LIBUSB_CONFIG_INCLUDE_DIR}"
   "${CMAKE_CURRENT_BINARY_DIR}/libusb"
 )
 target_include_directories(libusb PUBLIC
@@ -434,4 +440,18 @@ if(LIBUSB_INSTALL)
     "${CMAKE_CURRENT_BINARY_DIR}/libusbConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/libusbConfigVersion.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libusb)
+endif()
+
+# ---------------------------------------------------------------------------
+# examples/ and tests/ - both off by default (matching configure.ac's
+# --enable-examples-build/--enable-tests-build, also both no by default).
+# Neither directory's programs are installed (noinst_PROGRAMS upstream).
+# ---------------------------------------------------------------------------
+if(LIBUSB_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
+
+if(LIBUSB_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
 endif()
