@@ -1,0 +1,22 @@
+@PACKAGE_INIT@
+
+# libusb::libusb is a static library by default, so CMake's export machinery
+# records its PRIVATE dependencies as transitive link requirements (a static
+# archive doesn't resolve its own symbols; the final consumer's link step
+# does). Re-resolve the same imported targets libusbTargets.cmake references,
+# using the same conditions CMakeLists.txt used to decide whether to link
+# them in the first place.
+include(CMakeFindDependencyMacro)
+
+if(@LIBUSB_PLATFORM_POSIX@)
+  set(THREADS_PREFER_PTHREAD_FLAG ON)
+  find_dependency(Threads)
+endif()
+
+if(@LIBUSB_HAVE_LIBUDEV@)
+  find_dependency(PkgConfig)
+  pkg_check_modules(LIBUDEV REQUIRED IMPORTED_TARGET libudev)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/libusbTargets.cmake")
+check_required_components(libusb)
