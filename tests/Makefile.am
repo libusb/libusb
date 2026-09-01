@@ -1,4 +1,8 @@
-SUBDIRS = fuzz
+SUBDIRS =
+
+if BUILD_FUZZERS
+SUBDIRS += fuzz
+endif
 
 AM_CPPFLAGS = -I$(top_srcdir)/libusb
 LDADD = ../libusb/libusb-1.0.la

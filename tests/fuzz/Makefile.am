@@ -1,19 +1,15 @@
 # Fuzz targets for OSS-Fuzz.
 #
-# Nothing here is built unless configure was given --enable-fuzzers. A fuzz
-# target has to link against a fuzzing engine, which a normal build does not
-# have, so the default is off.
+# The parent Makefile.am adds this directory to SUBDIRS only if configure was
+# given --enable-fuzzers. A fuzz target has to link against a fuzzing engine,
+# which a normal build does not have, so the default is off.
 #
 #   ./configure --enable-fuzzers
 #   make
 #
 # LIB_FUZZING_ENGINE comes from the environment and names the engine to link.
 
-# Assigned outside the conditional on purpose: configure AC_SUBSTs AM_CPPFLAGS,
-# and a conditional assignment here is overridden by that substituted default.
 AM_CPPFLAGS = -I$(top_srcdir)/libusb
-
-if BUILD_FUZZERS
 
 noinst_PROGRAMS = \
 	fuzz_bos_descriptor \
@@ -35,5 +31,3 @@ fuzz_control_setup_LDADD = $(top_builddir)/libusb/libusb-1.0.la $(LIB_FUZZING_EN
 nodist_EXTRA_fuzz_bos_descriptor_SOURCES = dummy.cxx
 nodist_EXTRA_fuzz_control_setup_SOURCES = dummy.cxx
 nodist_EXTRA_fuzz_descriptor_parsers_SOURCES = dummy.cxx
-
-endif
