@@ -1072,9 +1072,9 @@ printf("completed!\n");
  * thread is doing event handling?
  *
  * There are 2 situations in which this may happen.
- * -# libusb_open() will add another file descriptor to the poll set,
- *    therefore it is desirable to interrupt the event handler so that it
- *    restarts, picking up the new descriptor.
+ * -# libusb_open() may add another file descriptor to the poll set (via the
+ *    backend), therefore it is desirable to interrupt the event handler so
+ *    that it restarts, picking up the new descriptor.
  * -# libusb_close() will remove a file descriptor from the poll set. There
  *    are all kinds of race conditions that could arise here, so it is
  *    important that nobody is doing event handling at this time.
@@ -1114,21 +1114,12 @@ printf("completed!\n");
  *    again. One of them will succeed; it will then re-obtain the list of poll
  *    descriptors, and USB I/O will then continue as normal.
  *
- * libusb_open() is similar, and is actually a more simplistic case. Upon a
- * call to libusb_open():
- *
- * -# The device is opened and a file descriptor is added to the poll set.
- * -# libusb sends some dummy data on the event pipe, and records that it
- *    is trying to modify the poll descriptor set.
- * -# The event handler is interrupted, and the same behaviour change as for
- *    libusb_close() takes effect, causing all event handling threads to become
- *    event waiters.
- * -# The libusb_open() implementation takes its free ride to the events lock.
- * -# Happy that it has successfully paused the events handler, libusb_open()
- *    releases the events lock.
- * -# The event waiter threads are all woken up and compete to become event
- *    handlers again. The one that succeeds will obtain the list of poll
- *    descriptors again, which will include the addition of the new device.
+ * libusb_open() is a simpler case. Since libusb 1.0.21 (commit 7ede4b76),
+ * libusb_open() no longer needs to acquire the events lock. It simply opens
+ * the device via the backend and adds a new device handle to the open device
+ * list. No event handler interruption is needed because the new file
+ * descriptor is managed by the backend and will be picked up on the next
+ * poll cycle by the event handler.
  *
  * \subsection concl Closing remarks
  *
