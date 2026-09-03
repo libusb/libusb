@@ -20,20 +20,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ENABLE_LOGGING affects only printf-like macros we don't care about. */
-#define ENABLE_LOGGING 0
-
 #include "config.h"
 #include "libusbi.h"
 #include "../../libusb/descriptor.c"
 
 /* Stubs for symbols that descriptor.c references but the parsers we fuzz
- * never reach (logging sink, backend dispatch, control-transfer wrapper). */
+ * never reach (logging sink, backend dispatch, control-transfer wrapper).
+ * The logging sink is needed only when config.h enables logging. With
+ * --disable-log the usbi_*() macros expand to nothing and libusbi.h declares
+ * no prototype, which -Werror=missing-prototypes rejects. */
 const struct usbi_os_backend usbi_backend = {0};
+#ifdef ENABLE_LOGGING
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
               const char *function, const char *format, ...) {
     (void)ctx; (void)level; (void)function; (void)format;
 }
+#endif
 int libusb_control_transfer(libusb_device_handle *dev_handle,
                             uint8_t bmRequestType, uint8_t bRequest,
                             uint16_t wValue, uint16_t wIndex,

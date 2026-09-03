@@ -31,3 +31,13 @@ fuzz_control_setup_LDADD = $(top_builddir)/libusb/libusb-1.0.la $(LIB_FUZZING_EN
 nodist_EXTRA_fuzz_bos_descriptor_SOURCES = dummy.cxx
 nodist_EXTRA_fuzz_control_setup_SOURCES = dummy.cxx
 nodist_EXTRA_fuzz_descriptor_parsers_SOURCES = dummy.cxx
+
+# Seed inputs are data, not build inputs, so EXTRA_DIST is what puts them in a
+# release archive. `make dist` recurses into this directory through
+# DIST_SUBDIRS even when --enable-fuzzers was not given, so the seeds ship
+# either way.
+EXTRA_DIST = \
+	corpus/bos/min.bos \
+	corpus/descriptor_parsers/min_valid_config.bin \
+	corpus/descriptor_parsers/regression_bug_a_endpoint_null.bin \
+	corpus/descriptor_parsers/regression_bug_b_iad_oob.bin
