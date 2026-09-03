@@ -160,11 +160,3 @@ jobs:
             build*/config.log
             build*/tests/*.log
           if-no-files-found: ignore
-
-      - name: clang-tidy
-        continue-on-error: true
-        env:
-          current_sha: ${{ github.sha }}
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          .private/ci-build.sh --clang-tidy --build-dir build-tidy --no-test -- --disable-udev

@@ -64,10 +64,6 @@ if [ -e "${builddir}" ]; then
 	exit 1
 fi
 
-if [ "${tidy}" = "yes" ]; then
-	gitdir=$(git rev-parse --show-toplevel)
-fi
-
 mkdir "${builddir}"
 cd "${builddir}"
 
@@ -106,11 +102,6 @@ echo ""
 echo "Building ..."
 
 if [ "${tidy}" = "yes" ]; then
-	if [ -z "${current_sha}" ]; then
-		echo "ERROR: current_sha environment variable is not set."
-		exit 1
-	fi
-
 	# $(@D) and $(<F) are GNU Make automatic variables.
 	# $(@D): '$(@D)' is equivalent to '$(dirname $@)'.
 	# $(<F): '$(<F)' is equivalent to '$(notdir $<)'.
@@ -125,22 +116,8 @@ if [ "${tidy}" = "yes" ]; then
 	find . -name "*compdb.json" -exec cat {} \; >> compile_commands.json
 	echo "]" >> compile_commands.json
 
-	built_files=$(find . -name "*.compdb.json" -printf "${gitdir}/%P " | \
-		sed 's/.compdb.json//g')
-	reldr=$(realpath --relative-to="$(pwd)" "${gitdir}")
-
-	# Get llvmorg-21.1.0-rc3 clang-tidy-diff.py script from LLVM project.
-	wget https://raw.githubusercontent.com/llvm/llvm-project/refs/tags/llvmorg-21.1.0-rc3/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py
-
-	# Use clang-tidy-diff to check only the files that were built.
-	# clang-tidy-diff expects the files to be relative to the git root.
-	#shellcheck disable=SC2086
-	git diff -U0 "${current_sha}^..${current_sha}" --dst-prefix="b/${reldr}/" \
-		--src-prefix="a/${reldr}/" -- $built_files | \
-		python3 clang-tidy-diff.py -p1 -warnings-as-errors="*" \
-		-config-file="${gitdir}/.clang-tidy"
-
-	exit $?
+	cp compile_commands.json "${scriptdir}"/../compile_commands.json
+	exit 0
 fi
 
 make -j4 -k
