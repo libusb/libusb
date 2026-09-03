@@ -1,0 +1,23 @@
+name: clang-tidy-review
+on: [pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ZedThree/clang-tidy-review@v0.23.1
+        with:
+          apt_packages: libudev-dev,libumockdev-dev,umockdev,autoconf,automake,libtool,pkg-config
+          split_workflow: true
+          config_file: '/github/workspace/.clang-tidy'
+          clang_tidy_version: 21
+          install_commands: >-
+            /github/workspace/bootstrap.sh &&
+            /github/workspace/.private/ci-build.sh
+            --clang-tidy --build-dir build-tidy
+            --no-test -- --disable-udev
+      - uses: ZedThree/clang-tidy-review/upload@v0.23.1

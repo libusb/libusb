@@ -8,6 +8,7 @@ install=no
 test=yes
 asan=yes
 docs=no
+tidy=no
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -37,6 +38,10 @@ while [ $# -gt 0 ]; do
 		;;
 	--build-docs)
 		docs=yes
+		shift
+		;;
+	--clang-tidy)
+		tidy=yes
 		shift
 		;;
 	--)
@@ -80,13 +85,41 @@ fi
 echo ""
 echo "Configuring ..."
 configure_args=(--enable-examples-build --enable-tests-build)
+configure_env=(CFLAGS="${cflags}" CXXFLAGS="${cflags}")
+
 if [ -n "${TESTCORE_CONFIGURE_FLAG:-}" ]; then
 	configure_args+=("${TESTCORE_CONFIGURE_FLAG}")
 fi
-CFLAGS="${cflags}" CXXFLAGS="${cflags}" ../configure "${configure_args[@]}" "$@"
+
+if [ "${tidy}" = "yes" ]; then
+	# Clang-Tidy needs to be run with Clang compiler
+	configure_env+=(CC="clang" CXX="clang++")
+fi
+
+env "${configure_env[@]}" ../configure "${configure_args[@]}" "$@"
 
 echo ""
 echo "Building ..."
+
+if [ "${tidy}" = "yes" ]; then
+	# $(@D) and $(<F) are GNU Make automatic variables.
+	# $(@D): '$(@D)' is equivalent to '$(dirname $@)'.
+	# $(<F): '$(<F)' is equivalent to '$(notdir $<)'.
+	# example: 'src/foo.c' -> 'builddir/src/foo.c.compdb.json'
+	# More info: https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html
+	# add CFLAGS here as automake escapes them
+	cflags+=" -MJ \$(@D)/\$(<F).compdb.json"
+	make -j4 -k CFLAGS="${cflags}" CXXFLAGS="${cflags}"
+
+	# Create compile_commands.json from all the .compdb.json files.
+	echo "[" > compile_commands.json
+	find . -name "*compdb.json" -exec cat {} \; >> compile_commands.json
+	echo "]" >> compile_commands.json
+
+	cp compile_commands.json "${scriptdir}"/../compile_commands.json
+	exit 0
+fi
+
 make -j4 -k
 
 if [ "${docs}" = "yes" ]; then

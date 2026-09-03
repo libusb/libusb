@@ -1,0 +1,21 @@
+name: clang-tidy-post
+
+on:
+  workflow_run:
+    workflows: ["clang-tidy-review"]
+    types:
+      - completed
+
+permissions:
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ZedThree/clang-tidy-review/post@v0.23.1
+        with:
+          lgtm_comment_body: '' # An empty string means it won't post a LGTM message
+          annotations: false
+          max_comments: 10
+          num_comments_as_exitcode: 'false'
