@@ -55,7 +55,6 @@
 
 #define HOTPLUG_SETTLE_TIMER_ID         2
 #define HOTPLUG_SETTLE_RETRY_MS         500
-#define HOTPLUG_SETTLE_MAX_WAIT_MS      5000
 
 // libusb_init must not return while a device is still withheld: the
 // application enumerates the device list right after, and a device announced
@@ -192,6 +191,43 @@ static bool ctx_uses_winusb(struct libusb_context *ctx)
 	return ((struct windows_context_priv *)usbi_get_context_priv(ctx))->backend == &winusb_backend;
 }
 
+enum windows_hotplug_action windows_hotplug_decide(const struct windows_hotplug_state *state,
+	bool *observe_settled)
+{
+	*observe_settled = false;
+
+	if (state->usability == WINDOWS_HOTPLUG_DEVICE_USABLE)
+	{
+		return WINDOWS_HOTPLUG_ANNOUNCE_USABLE;
+	}
+
+	if (state->usability == WINDOWS_HOTPLUG_DEVICE_NEVER_USABLE)
+	{
+		// A hub, or a device with no matching libusb API: there is no
+		// interface path to wait for
+		return WINDOWS_HOTPLUG_ANNOUNCE_NOTHING_COMING;
+	}
+
+	if (state->settled_before_scan)
+	{
+		// The driver stack was already settled when an earlier scan ran, and
+		// the scan that just finished, whose snapshot was taken after that
+		// observation, still produced nothing: nothing is coming
+		return WINDOWS_HOTPLUG_ANNOUNCE_NOTHING_COMING;
+	}
+
+	if (state->waited_ms >= HOTPLUG_SETTLE_MAX_WAIT_MS)
+	{
+		return WINDOWS_HOTPLUG_ANNOUNCE_TIMED_OUT;
+	}
+
+	// A live observation is not evidence on its own: only a scan started
+	// after it can tell whether an interface path was going to appear
+	*observe_settled = state->settled_now;
+
+	return WINDOWS_HOTPLUG_WITHHOLD;
+}
+
 // Resolve withheld announcements once a scan has run all of its passes.
 //
 // A withheld device stays attached, so libusb_get_device_list still lists it:
@@ -212,45 +248,39 @@ static void windows_resolve_pending_announcements(struct libusb_context *ctx)
 			continue;
 		}
 
-		const enum windows_hotplug_usability usability = windows_hotplug_device_usability(dev);
+		struct windows_hotplug_state state;
+		bool observe_settled = false;
 
-		if (usability == WINDOWS_HOTPLUG_DEVICE_USABLE)
+		state.usability = windows_hotplug_device_usability(dev);
+		state.settled_before_scan = priv->settled_observed;
+		state.waited_ms = (DWORD)(GetTickCount() - priv->pending_since);
+		// Only worth asking Windows while the answer can still change the
+		// outcome, and the unsigned difference above stays correct when the
+		// tick counter wraps.
+		state.settled_now = (state.usability == WINDOWS_HOTPLUG_DEVICE_NOT_YET && !priv->settled_observed)
+			? windows_hotplug_device_settled(dev) : false;
+
+		switch (windows_hotplug_decide(&state, &observe_settled))
 		{
+		case WINDOWS_HOTPLUG_ANNOUNCE_USABLE:
+		case WINDOWS_HOTPLUG_ANNOUNCE_NOTHING_COMING:
+			if (state.usability == WINDOWS_HOTPLUG_DEVICE_NOT_YET)
+			{
+				usbi_dbg(ctx, "device '%s' settled without becoming usable, announcing it as-is", priv->dev_id);
+			}
 			priv->announce_pending = false;
-		}
-		else if (usability == WINDOWS_HOTPLUG_DEVICE_NEVER_USABLE)
-		{
-			// A hub, or a device libusb has no API for: no interface path is
-			// ever going to appear, so there is nothing to wait for
-			priv->announce_pending = false;
-		}
-		else if (priv->settled_observed)
-		{
-			// Its driver stack was already settled when an earlier scan ran,
-			// and this scan, whose snapshot was taken after that, still found
-			// nothing: nothing is coming, announce the device as-is
-			usbi_dbg(ctx, "device '%s' settled without becoming usable, announcing it as-is", priv->dev_id);
-			priv->announce_pending = false;
-		}
-		else if ((DWORD)(GetTickCount() - priv->pending_since) >= HOTPLUG_SETTLE_MAX_WAIT_MS)
-		{
-			// Counted per device: a device that just started waiting must not
-			// inherit the deadline of one that has been waiting for seconds.
-			// The unsigned difference stays correct when the tick wraps.
+			break;
+
+		case WINDOWS_HOTPLUG_ANNOUNCE_TIMED_OUT:
 			usbi_warn(ctx, "device '%s' did not become usable within %d ms, announcing it as-is",
 				priv->dev_id, HOTPLUG_SETTLE_MAX_WAIT_MS);
 			priv->announce_pending = false;
-		}
-		else
-		{
-			if (windows_hotplug_device_settled(dev))
-			{
-				// Settled per live PnP state, which this scan's interface
-				// snapshot may predate: only a scan started after this
-				// observation can conclude that nothing is coming
-				priv->settled_observed = true;
-			}
+			break;
+
+		default:
+			priv->settled_observed = priv->settled_observed || observe_settled;
 			usbi_dbg(ctx, "deferring arrival of device '%s' until its driver stack has settled", priv->dev_id);
+			break;
 		}
 	}
 }

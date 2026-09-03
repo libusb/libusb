@@ -22,6 +22,7 @@ stress_mt_SOURCES = stress_mt.c
 set_option_SOURCES = set_option.c testlib.c
 init_context_SOURCES = init_context.c testlib.c
 macos_SOURCES = macos.c testlib.c
+hotplug_rules_SOURCES = hotplug_rules.c testlib.c
 testcore_SOURCES = testcore.c
 
 stress_mt_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
@@ -54,6 +55,11 @@ endif
 if OS_DARWIN
 noinst_PROGRAMS += macos
 TESTS += macos
+endif
+
+if OS_WINDOWS
+noinst_PROGRAMS += hotplug_rules
+TESTS += hotplug_rules
 endif
 
 if BUILD_UMOCKDEV_TEST

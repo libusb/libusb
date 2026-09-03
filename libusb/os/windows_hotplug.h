@@ -42,4 +42,32 @@ enum windows_hotplug_usability {
 enum windows_hotplug_usability windows_hotplug_device_usability(struct libusb_device *dev);
 bool windows_hotplug_device_settled(struct libusb_device *dev);
 
+// How long a device may keep its announcement withheld before it is announced
+// as it is. Counted per device, from the moment it was first withheld.
+#define HOTPLUG_SETTLE_MAX_WAIT_MS	5000
+
+// What to do with a device whose announcement is currently withheld.
+enum windows_hotplug_action {
+	WINDOWS_HOTPLUG_WITHHOLD,		// look again after the next scan
+	WINDOWS_HOTPLUG_ANNOUNCE_USABLE,	// the scan produced what libusb_open needs
+	WINDOWS_HOTPLUG_ANNOUNCE_NOTHING_COMING,// no interface path is ever going to appear
+	WINDOWS_HOTPLUG_ANNOUNCE_TIMED_OUT	// this device waited long enough
+};
+
+// Everything the decision depends on, gathered by the caller.
+struct windows_hotplug_state {
+	enum windows_hotplug_usability usability;	// what the last scan produced
+	bool settled_before_scan;			// an earlier scan already saw the driver stack settled
+	bool settled_now;				// live PnP state, read after that scan
+	DWORD waited_ms;				// since this device was first withheld
+};
+
+// The rules deciding when a withheld announcement may be released, kept free
+// of libusb and Windows state so that they can be exercised on their own
+// (tests/hotplug_rules.c). observe_settled, when set on return, asks the
+// caller to remember settled_now for the next scan: a live observation only
+// becomes usable evidence once a scan started after it has produced nothing.
+enum windows_hotplug_action windows_hotplug_decide(const struct windows_hotplug_state *state,
+	bool *observe_settled);
+
 #endif
