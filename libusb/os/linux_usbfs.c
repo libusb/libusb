@@ -134,6 +134,8 @@ struct linux_device_priv {
 	size_t descriptors_len;
 	struct config_descriptor *config_descriptors;
 	int active_config; /* cache val for !sysfs_available  */
+	uint8_t *ports;
+	int num_ports;
 };
 
 struct linux_device_handle_priv {
@@ -1011,6 +1013,26 @@ static int op_get_config_descriptor_by_value(struct libusb_device *dev,
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
+static int op_get_port_numbers(struct libusb_device *dev,
+	uint8_t *port_numbers, int port_numbers_len)
+{
+	struct linux_device_priv *priv;
+
+	assert(dev);
+	assert(port_numbers);
+	assert(port_numbers_len > 0);
+
+	priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
+	if (!priv->ports)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	if (priv->num_ports > port_numbers_len)
+		return LIBUSB_ERROR_OVERFLOW;
+
+	memcpy(port_numbers, priv->ports, (size_t)priv->num_ports);
+	return priv->num_ports;
+}
+
 static int op_get_active_config_descriptor(struct libusb_device *dev,
 	void *buffer, size_t len)
 {
@@ -1124,6 +1146,107 @@ static enum libusb_speed usbfs_get_speed(struct libusb_context *ctx, int fd)
 	return LIBUSB_SPEED_UNKNOWN;
 }
 
+static enum libusb_speed speed_from_kernel(struct libusb_context *ctx, uint32_t speed)
+{
+	switch (speed) {
+	case USBFS_SPEED_LOW:        return LIBUSB_SPEED_LOW;
+	case USBFS_SPEED_FULL:       return LIBUSB_SPEED_FULL;
+	case USBFS_SPEED_HIGH:       return LIBUSB_SPEED_HIGH;
+	case USBFS_SPEED_WIRELESS:   return LIBUSB_SPEED_HIGH; /* 480 Mbit/s */
+	case USBFS_SPEED_SUPER:      return LIBUSB_SPEED_SUPER;
+	case USBFS_SPEED_SUPER_PLUS: return LIBUSB_SPEED_SUPER_PLUS;
+	default:
+		usbi_warn(ctx, "unknown kernel device speed: %u", speed);
+		return LIBUSB_SPEED_UNKNOWN;
+	}
+}
+
+static int cache_ports_from_sysfs(struct libusb_context *ctx,
+	struct linux_device_priv *priv, const char *sysfs_dir)
+{
+	char buf[LINE_MAX];
+	char *end, *port, *rest;
+	size_t count = 1;
+	int fd;
+	FILE *f;
+
+	fd = open_sysfs_attr(ctx, sysfs_dir, "devpath");
+	if (fd < 0)
+		return fd;
+
+	f = fdopen(fd, "r");
+	if (!f) {
+		usbi_err(ctx, "fdopen failed, errno=%d", errno);
+		close(fd);
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	if (!fgets(buf, sizeof(buf), f)) {
+		fclose(f);
+		return LIBUSB_ERROR_IO;
+	}
+	fclose(f);
+
+	for (size_t i = 0; i < sizeof(buf) && buf[i] != '\0'; i++) {
+		if (buf[i] == '.')
+			count++;
+	}
+	if (count > UINT8_MAX)
+		return LIBUSB_ERROR_OVERFLOW;
+
+	priv->ports = malloc(count);
+	if (!priv->ports)
+		return LIBUSB_ERROR_NO_MEM;
+
+	for (port = strtok_r(buf, ".\n", &rest); port; port = strtok_r(NULL, ".\n", &rest)) {
+		long value = strtol(port, &end, 10);
+		if (value <= 0 || value > UINT8_MAX || *end) {
+			free(priv->ports);
+			priv->ports = NULL;
+			priv->num_ports = 0;
+			return LIBUSB_ERROR_IO;
+		}
+		priv->ports[priv->num_ports++] = (uint8_t)value;
+	}
+
+	return priv->num_ports ? LIBUSB_SUCCESS : LIBUSB_ERROR_IO;
+}
+
+static int cache_conninfo(struct libusb_device *dev, int fd)
+{
+	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
+	struct libusb_context *ctx = usbi_device_ctx(dev);
+	struct usbfs_conninfo_ex ci = { 0 };
+	uint32_t caps;
+
+	if (ioctl(fd, IOCTL_USBFS_GET_CAPABILITIES, &caps) < 0 ||
+			!(caps & USBFS_CAP_CONNINFO_EX) ||
+			ioctl(fd, IOCTL_USBFS_CONNINFO_EX(sizeof(ci)), &ci) < 0 ||
+			ci.size < sizeof(ci))
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	if (ci.busnum > UINT8_MAX || ci.devnum > UINT8_MAX) {
+		usbi_warn(ctx, "USB device address is out of range: bus=%u device=%u",
+			ci.busnum, ci.devnum);
+		return LIBUSB_ERROR_OVERFLOW;
+	}
+
+	dev->bus_number = (uint8_t)ci.busnum;
+	dev->device_address = (uint8_t)ci.devnum;
+	dev->speed = speed_from_kernel(ctx, ci.speed);
+
+	if (ci.num_ports > 0 && ci.num_ports <= sizeof(ci.ports)) {
+		priv->ports = malloc(ci.num_ports);
+		if (!priv->ports)
+			return LIBUSB_ERROR_NO_MEM;
+		priv->num_ports = ci.num_ports;
+		memcpy(priv->ports, ci.ports, ci.num_ports);
+		dev->port_number = ci.ports[ci.num_ports - 1];
+	}
+
+	return LIBUSB_SUCCESS;
+}
+
 static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 	uint8_t devaddr, const char *sysfs_dir, int wrapped_fd)
 {
@@ -1155,8 +1278,13 @@ static int initialize_device(struct libusb_device *dev, uint8_t busnum,
 				usbi_warn(ctx, "unknown device speed: %d Mbps", speed);
 			}
 		}
+		(void)cache_ports_from_sysfs(ctx, priv, sysfs_dir);
 	} else if (wrapped_fd >= 0) {
-		dev->speed = usbfs_get_speed(ctx, wrapped_fd);
+		r = cache_conninfo(dev, wrapped_fd);
+		if (r == LIBUSB_ERROR_NOT_SUPPORTED)
+			dev->speed = usbfs_get_speed(ctx, wrapped_fd);
+		else if (r < 0)
+			return r;
 	}
 
 	/* cache descriptors in memory */
@@ -2084,6 +2212,7 @@ static void op_destroy_device(struct libusb_device *dev)
 {
 	struct linux_device_priv *priv = (struct linux_device_priv *)usbi_get_device_priv(dev);
 
+	free(priv->ports);
 	free(priv->config_descriptors);
 	free(priv->descriptors);
 	free(priv->sysfs_dir);
@@ -3021,6 +3150,7 @@ const struct usbi_os_backend usbi_backend = {
 	.get_active_config_descriptor = op_get_active_config_descriptor,
 	.get_config_descriptor = op_get_config_descriptor,
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
+	.get_port_numbers = op_get_port_numbers,
 	.get_configuration = op_get_configuration,
 	.set_configuration = op_set_configuration,
 	.claim_interface = op_claim_interface,
