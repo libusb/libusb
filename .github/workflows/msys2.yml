@@ -53,6 +53,15 @@ jobs:
           msystem: ${{ matrix.msystem }}
           update: true
           install: ${{ matrix.packages }}
+      # Syntax-only check of the public header's include contract; needs the
+      # source tree only. -Werror matters here: mingw-w64 reports a wrong
+      # winsock order with #warning, not an error.
+      - name: Check public header include order
+        run: >-
+          gcc -fsyntax-only -Wall -Wextra -Werror -Ilibusb
+          .private/win32-header-check.c &&
+          gcc -fsyntax-only -Wall -Wextra -Werror -DWIN32_LEAN_AND_MEAN -Ilibusb
+          .private/win32-header-check.c
       - name: bootstrap
         run: ./bootstrap.sh
       - name: Build, test and install
