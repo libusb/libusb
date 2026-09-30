@@ -1,0 +1,83 @@
+name: post clang-tidy review
+
+on:
+  workflow_run:
+    workflows:
+      - clang-tidy
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+jobs:
+  post:
+    name: review comments
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          ref: master
+
+      - name: find source pull request
+        id: pull-request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
+          HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # workflow_run.pull_requests can be empty, so use trusted head data.
+          pull_requests=$(gh api -X GET "repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=open \
+            -f base=master \
+            -f head="$HEAD_OWNER:$HEAD_BRANCH" \
+            -f per_page=100)
+          number=$(jq -er \
+            --arg head_repository "$HEAD_REPOSITORY" \
+            --arg head_sha "$HEAD_SHA" '
+            [.[] |
+             select(.head.repo.full_name == $head_repository and
+                    .head.sha == $head_sha)] |
+            unique_by(.number) |
+            if length == 1 then .[0].number else empty end
+          ' <<< "$pull_requests")
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: download review data
+        uses: actions/download-artifact@v8
+        with:
+          name: clang-tidy-review
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: ${{ runner.temp }}/clang-tidy-review
+
+      - name: prepare advisory review
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/clang-tidy-review
+          EXPECTED_PR: ${{ steps.pull-request.outputs.number }}
+        run: |
+          review_file="$ARTIFACT_DIR/clang-tidy-review-output.json"
+          test -f "$review_file"
+          test ! -L "$review_file"
+          test "$(stat -c %s "$review_file")" -le 1048576
+          # Rebuild control fields instead of trusting the fork artifact.
+          jq -f .github/scripts/prepare-clang-tidy-review.jq \
+            "$review_file" > clang-tidy-review-output.json
+          jq -n --argjson pr_number "$EXPECTED_PR" \
+            '{pr_number: $pr_number}' > clang-tidy-review-metadata.json
+
+      - name: post review comments
+        uses: ZedThree/clang-tidy-review/post@v0.21.0
+        with:
+          lgtm_comment_body: ''
+          max_comments: '25'
+          num_comments_as_exitcode: 'false'
