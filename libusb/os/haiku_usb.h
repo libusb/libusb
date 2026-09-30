@@ -109,8 +109,11 @@ class USBRoster {
 public:
 			USBRoster();
 	virtual		~USBRoster();
+	int		Init(struct libusb_context *ctx);
+	void		Exit(struct libusb_context *ctx);
+private:
 	int		Start();
 	void		Stop();
-private:
+	void		EnumerateInto(struct libusb_context *ctx);
 	void*		fLooper;
 };

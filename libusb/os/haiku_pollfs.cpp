@@ -18,6 +18,35 @@
 #include <Path.h>
 #include <cstring>
 
+class WatchedEntry;
+
+/* Guards gDeviceRegistry and, with it, the transitions that add a device to a
+   context or take it away again. Held by the roster looper thread (device
+   arrival and removal) and by USBRoster::EnumerateInto() (a context being
+   created), so that those two paths cannot interleave for the same device.
+
+   Lock order is gInitLock -> RosterLooper's BLooper lock -> gRosterLock ->
+   active_contexts_lock -> ctx->usb_devs_lock. The BLooper lock sits between
+   the first two on every path that takes both: the looper thread holds it
+   while dispatching device arrival and removal, the initial tree build in the
+   RosterLooper constructor holds it around the WatchedEntry walk, and
+   RosterLooper::Stop() takes it before deleting the tree. Nothing may lock the
+   looper while holding gRosterLock. The looper thread never takes gInitLock,
+   which is what makes it safe to hold gInitLock across the blocking
+   RosterLooper::Stop(). */
+static usbi_mutex_static_t gRosterLock = USBI_MUTEX_INITIALIZER;
+
+/* Every device the roster currently knows about, in discovery order, so that
+   a context populated from the registry ends up with the same device order as
+   one populated by the constructor loop below. */
+static WatchedEntry *gDeviceRegistry GUARDED_BY(gRosterLock) = NULL;
+
+/* Guards the roster reference count and USBRoster::fLooper. Never taken by
+   the looper thread; see the lock order above. */
+static usbi_mutex_static_t gInitLock = USBI_MUTEX_INITIALIZER;
+static int gInitCount GUARDED_BY(gInitLock) = 0;
+
+
 class WatchedEntry {
 public:
 			WatchedEntry(BMessenger *, entry_ref *);
@@ -26,13 +55,25 @@ public:
 	bool		EntryRemoved(ino_t node);
 	bool		InitCheck();
 
+	/* Called for a single context. */
+	void		AddToContext(struct libusb_context *ctx) REQUIRES(gRosterLock);
+	void		RemoveFromContext(struct libusb_context *ctx) REQUIRES(gRosterLock);
+	WatchedEntry*	RegistryLink() const { return fRegistryLink; }
+
 private:
+	void		Register() REQUIRES(gRosterLock);
+	void		Unregister() REQUIRES(gRosterLock);
+
 	BMessenger*	fMessenger;
 	node_ref	fNode;
 	bool		fIsDirectory;
 	USBDevice*	fDevice;
+	unsigned long	fSessionID;
+	uint8		fBusNumber;
+	uint8		fDeviceAddress;
 	WatchedEntry*	fEntries;
 	WatchedEntry*	fLink;
+	WatchedEntry*	fRegistryLink;
 	bool		fInitCheck;
 };
 
@@ -52,12 +93,102 @@ private:
 };
 
 
+void
+WatchedEntry::Register()
+{
+	WatchedEntry **tail = &gDeviceRegistry;
+	while (*tail != NULL)
+		tail = &(*tail)->fRegistryLink;
+	*tail = this;
+}
+
+
+void
+WatchedEntry::Unregister()
+{
+	WatchedEntry **link = &gDeviceRegistry;
+	while (*link != NULL && *link != this)
+		link = &(*link)->fRegistryLink;
+	if (*link == this)
+		*link = fRegistryLink;
+	fRegistryLink = NULL;
+}
+
+
+void
+WatchedEntry::AddToContext(struct libusb_context *ctx)
+{
+	struct libusb_device *dev = usbi_get_device_by_session_id(ctx, fSessionID);
+	if (dev != NULL) {
+		usbi_dbg(ctx, "using previously allocated device with location %lu", fSessionID);
+		libusb_unref_device(dev);
+		return;
+	}
+
+	usbi_dbg(ctx, "allocating new device with location %lu", fSessionID);
+	dev = usbi_alloc_device(ctx, fSessionID);
+	if (dev == NULL) {
+		/* Logged as an error rather than debug: a context that silently
+		   ends up with fewer devices than its siblings is exactly the
+		   symptom this backend used to have. */
+		usbi_err(ctx, "device allocation failed");
+		return;
+	}
+
+	*((USBDevice **)usbi_get_device_priv(dev)) = fDevice;
+	dev->bus_number = fBusNumber;
+	dev->device_address = fDeviceAddress;
+
+	static_assert(sizeof(dev->device_descriptor) == sizeof(usb_device_descriptor),
+		      "mismatch between libusb and OS device descriptor sizes");
+	memcpy(&dev->device_descriptor, fDevice->Descriptor(), LIBUSB_DT_DEVICE_SIZE);
+	usbi_localize_device_descriptor(&dev->device_descriptor);
+
+	if (usbi_sanitize_device(dev) < 0) {
+		usbi_err(ctx, "device sanitization failed");
+		libusb_unref_device(dev);
+		return;
+	}
+
+	usbi_connect_device(dev);
+}
+
+
+void
+WatchedEntry::RemoveFromContext(struct libusb_context *ctx)
+{
+	struct libusb_device *dev = usbi_get_device_by_session_id(ctx, fSessionID);
+	if (dev == NULL) {
+		usbi_dbg(ctx, "device with location %lu not found", fSessionID);
+		return;
+	}
+
+	if (usbi_atomic_load(&ctx->hotplug_ready)) {
+		/* The device-left message takes over the reference held by the
+		   context's device list. */
+		usbi_disconnect_device(dev);
+	} else {
+		/* A context is only enumerated but not yet hotplug-ready while
+		   it is inside libusb_init_context(); no message is posted
+		   there, so nothing would inherit that reference. */
+		usbi_detach_device(dev);
+		libusb_unref_device(dev);
+	}
+
+	libusb_unref_device(dev);
+}
+
+
 WatchedEntry::WatchedEntry(BMessenger *messenger, entry_ref *ref)
 	:	fMessenger(messenger),
 		fIsDirectory(false),
 		fDevice(NULL),
+		fSessionID(0),
+		fBusNumber(0),
+		fDeviceAddress(0),
 		fEntries(NULL),
 		fLink(NULL),
+		fRegistryLink(NULL),
 		fInitCheck(false)
 {
 	BEntry entry(ref);
@@ -92,62 +223,52 @@ WatchedEntry::WatchedEntry(BMessenger *messenger, entry_ref *ref)
 		BPath path, parent_path;
 		entry.GetPath(&path);
 		fDevice = new(std::nothrow) USBDevice(path.Path());
-		if (fDevice != NULL && fDevice->InitCheck() == true) {
-			// Add this new device to each active context's device list
-			struct libusb_context *ctx;
-			unsigned long session_id = (unsigned long)&fDevice;
-
-			usbi_mutex_lock(&active_contexts_lock);
-			for_each_context(ctx) {
-				struct libusb_device *dev = usbi_get_device_by_session_id(ctx, session_id);
-				if (dev) {
-					usbi_dbg(NULL, "using previously allocated device with location %lu", session_id);
-					libusb_unref_device(dev);
-					continue;
-				}
-				usbi_dbg(NULL, "allocating new device with location %lu", session_id);
-				dev = usbi_alloc_device(ctx, session_id);
-				if (!dev) {
-					usbi_dbg(NULL, "device allocation failed");
-					continue;
-				}
-				*((USBDevice **)usbi_get_device_priv(dev)) = fDevice;
-
-				// Calculate pseudo-device-address
-				int addr, tmp;
-				if (strcmp(path.Leaf(), "hub") == 0)
-					tmp = 100;	//Random Number
-				else
-					sscanf(path.Leaf(), "%d", &tmp);
-				addr = tmp + 1;
-				path.GetParent(&parent_path);
-				while (strcmp(parent_path.Leaf(), "usb") != 0) {
-					sscanf(parent_path.Leaf(), "%d", &tmp);
-					addr += tmp + 1;
-					parent_path.GetParent(&parent_path);
-				}
-				sscanf(path.Path(), "/dev/bus/usb/%hhu", &dev->bus_number);
-				dev->device_address = addr - (dev->bus_number + 1);
-
-				static_assert(sizeof(dev->device_descriptor) == sizeof(usb_device_descriptor),
-					      "mismatch between libusb and OS device descriptor sizes");
-				memcpy(&dev->device_descriptor, fDevice->Descriptor(), LIBUSB_DT_DEVICE_SIZE);
-				usbi_localize_device_descriptor(&dev->device_descriptor);
-
-				if (usbi_sanitize_device(dev) < 0) {
-					usbi_dbg(NULL, "device sanitization failed");
-					libusb_unref_device(dev);
-					continue;
-				}
-				usbi_connect_device(dev);
-			}
-			usbi_mutex_unlock(&active_contexts_lock);
-		}
-		else if (fDevice) {
+		if (fDevice == NULL)
+			return;
+		if (fDevice->InitCheck() == false) {
+			/* Loud, because a device dropped here is invisible to
+			   every context for as long as the roster lives. */
+			usbi_err(NULL, "failed to read descriptors of %s", path.Path());
 			delete fDevice;
 			fDevice = NULL;
 			return;
 		}
+
+		/* The session id only has to be unique among the devices that
+		   exist at the same time and stable for as long as this entry
+		   does; the USBDevice this entry owns is both. */
+		fSessionID = (unsigned long)fDevice;
+
+		// Calculate pseudo-device-address
+		int addr, tmp;
+		if (strcmp(path.Leaf(), "hub") == 0)
+			tmp = 100;	//Random Number
+		else
+			sscanf(path.Leaf(), "%d", &tmp);
+		addr = tmp + 1;
+		path.GetParent(&parent_path);
+		while (strcmp(parent_path.Leaf(), "usb") != 0) {
+			sscanf(parent_path.Leaf(), "%d", &tmp);
+			addr += tmp + 1;
+			parent_path.GetParent(&parent_path);
+		}
+		sscanf(path.Path(), "/dev/bus/usb/%hhu", &fBusNumber);
+		fDeviceAddress = (uint8)(addr - (fBusNumber + 1));
+
+		/* Publish the device to the contexts that exist right now. A
+		   context created later picks it up from the registry, in
+		   USBRoster::EnumerateInto(). active_contexts_lock is held
+		   across the whole loop so that a context cannot be unlinked
+		   half way through it. */
+		struct libusb_context *ctx;
+
+		usbi_mutex_static_lock(&gRosterLock);
+		Register();
+		usbi_mutex_static_lock(&active_contexts_lock);
+		for_each_context(ctx)
+			AddToContext(ctx);
+		usbi_mutex_static_unlock(&active_contexts_lock);
+		usbi_mutex_static_unlock(&gRosterLock);
 	}
 	fInitCheck = true;
 }
@@ -167,22 +288,18 @@ WatchedEntry::~WatchedEntry()
 	}
 
 	if (fDevice) {
-		// Remove this device from each active context's device list
+		// Remove this device from the registry and from each active
+		// context's device list
 		struct libusb_context *ctx;
-		struct libusb_device *dev;
-		unsigned long session_id = (unsigned long)&fDevice;
 
-		usbi_mutex_lock(&active_contexts_lock);
-		for_each_context(ctx) {
-			dev = usbi_get_device_by_session_id(ctx, session_id);
-			if (dev != NULL) {
-				usbi_disconnect_device(dev);
-				libusb_unref_device(dev);
-			} else {
-				usbi_dbg(ctx, "device with location %lu not found", session_id);
-			}
-		}
+		usbi_mutex_static_lock(&gRosterLock);
+		Unregister();
+		usbi_mutex_static_lock(&active_contexts_lock);
+		for_each_context(ctx)
+			RemoveFromContext(ctx);
 		usbi_mutex_static_unlock(&active_contexts_lock);
+		usbi_mutex_static_unlock(&gRosterLock);
+
 		delete fDevice;
 	}
 }
@@ -207,6 +324,10 @@ WatchedEntry::EntryCreated(entry_ref *ref)
 	WatchedEntry *child = new(std::nothrow) WatchedEntry(fMessenger, ref);
 	if (child == NULL)
 		return false;
+	if (child->InitCheck() == false) {
+		delete child;
+		return false;
+	}
 	child->fLink = fEntries;
 	fEntries = child;
 	return true;
@@ -261,7 +382,18 @@ RosterLooper::RosterLooper(USBRoster *roster)
 		return;
 	}
 
-	Run();
+	/* A failing Run() returns without unlocking the looper and without
+	   setting its fRunCalled, so the constructor's own lock is still held.
+	   Lock() would then nest rather than block and the rest of this would
+	   look like it worked, leaving a roster with no thread behind it and a
+	   looper that only this thread can ever unlock. Give up instead: Start()
+	   takes the object down through Stop(), where Quit() sees fRunCalled
+	   unset and simply deletes it. */
+	if (Run() < B_OK) {
+		usbi_err(NULL, "failed to start the roster looper thread");
+		return;
+	}
+
 	fMessenger = new(std::nothrow) BMessenger(this);
 	if (fMessenger == NULL) {
 		usbi_err(NULL, "error creating BMessenger object");
@@ -280,18 +412,32 @@ RosterLooper::RosterLooper(USBRoster *roster)
 			fRoot = NULL;
 			return;
 		}
+		fInitCheck = true;
 	}
-	fInitCheck = true;
 }
 
 
 void
 RosterLooper::Stop()
 {
-	Lock();
-	delete fRoot;
-	delete fMessenger;
+	if (!Lock()) {
+		usbi_err(NULL, "failed to lock the roster looper");
+		return;
+	}
+
+	/* Tear the tree down while this looper is still alive: ~WatchedEntry
+	   deregisters its node monitors through fMessenger, whose target is
+	   this looper. Clearing fRoot first keeps the messages that Quit()
+	   still dispatches away from a partially destroyed tree. */
+	WatchedEntry *root = fRoot;
+	fRoot = NULL;
+	delete root;
+
+	/* Quit() deletes this looper, so nothing may touch a member after it. */
+	BMessenger *messenger = fMessenger;
+	fMessenger = NULL;
 	Quit();
+	delete messenger;
 }
 
 
@@ -300,6 +446,11 @@ RosterLooper::MessageReceived(BMessage *message)
 {
 	int32 opcode;
 	if (message->FindInt32("opcode", &opcode) < B_OK)
+		return;
+
+	/* Stop() clears fRoot under the looper lock, but Quit() still
+	   dispatches whatever was already queued. */
+	if (fRoot == NULL)
 		return;
 
 	switch (opcode) {
@@ -344,21 +495,81 @@ USBRoster::USBRoster()
 
 USBRoster::~USBRoster()
 {
+	usbi_mutex_static_lock(&gInitLock);
+	if (gInitCount > 0)
+		usbi_warn(NULL, "%d context(s) not deinitialized at exit", gInitCount);
+	gInitCount = 0;
 	Stop();
+	usbi_mutex_static_unlock(&gInitLock);
+}
+
+
+int
+USBRoster::Init(struct libusb_context *ctx)
+{
+	int status = LIBUSB_SUCCESS;
+
+	usbi_mutex_static_lock(&gInitLock);
+	if (gInitCount == 0)
+		status = Start();
+	if (status == LIBUSB_SUCCESS) {
+		/* Counted only on success, so that a roster that failed to
+		   start is retried by the next context instead of leaving
+		   every later context permanently empty. */
+		gInitCount++;
+
+		/* Every context has to be given the devices that are already
+		   present, not just the one that happened to start the roster.
+		   Devices showing up later are added by the roster itself. */
+		EnumerateInto(ctx);
+	}
+	usbi_mutex_static_unlock(&gInitLock);
+
+	return status;
+}
+
+
+void
+USBRoster::Exit(struct libusb_context *ctx)
+{
+	UNUSED(ctx);
+
+	usbi_mutex_static_lock(&gInitLock);
+	if (gInitCount > 0 && --gInitCount == 0)
+		Stop();
+	usbi_mutex_static_unlock(&gInitLock);
+}
+
+
+void
+USBRoster::EnumerateInto(struct libusb_context *ctx)
+{
+	usbi_mutex_static_lock(&gRosterLock);
+	for (WatchedEntry *entry = gDeviceRegistry; entry != NULL;
+	     entry = entry->RegistryLink())
+		entry->AddToContext(ctx);
+	usbi_mutex_static_unlock(&gRosterLock);
 }
 
 
 int
 USBRoster::Start()
 {
-	if (fLooper == NULL) {
-		fLooper = new(std::nothrow) RosterLooper(this);
-		if (fLooper == NULL || ((RosterLooper *)fLooper)->InitCheck() == false) {
-			if (fLooper)
-				fLooper = NULL;
-			return LIBUSB_ERROR_OTHER;
-		}
+	if (fLooper != NULL)
+		return LIBUSB_SUCCESS;
+
+	RosterLooper *looper = new(std::nothrow) RosterLooper(this);
+	if (looper == NULL)
+		return LIBUSB_ERROR_NO_MEM;
+	if (looper->InitCheck() == false) {
+		/* Run() is called early in the constructor, so the looper
+		   thread may already be alive; it has to be taken down through
+		   Stop() rather than simply dropped. */
+		looper->Stop();
+		return LIBUSB_ERROR_OTHER;
 	}
+
+	fLooper = looper;
 	return LIBUSB_SUCCESS;
 }
 
@@ -366,8 +577,10 @@ USBRoster::Start()
 void
 USBRoster::Stop()
 {
-	if (fLooper) {
-		((RosterLooper *)fLooper)->Stop();
-		fLooper = NULL;
-	}
+	if (fLooper == NULL)
+		return;
+
+	RosterLooper *looper = (RosterLooper *)fLooper;
+	fLooper = NULL;
+	looper->Stop();
 }
