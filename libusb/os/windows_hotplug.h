@@ -28,4 +28,10 @@ int windows_stop_event_monitor(void);
 
 void windows_initial_scan_devices(struct libusb_context *ctx);
 
+// Implemented by the WinUSB backend: whether the last scan materialized at
+// least one interface path for the device, and whether its driver stack is
+// fully settled per live PnP state
+bool windows_hotplug_device_usable(struct libusb_device *dev);
+bool windows_hotplug_device_settled(struct libusb_device *dev);
+
 #endif
