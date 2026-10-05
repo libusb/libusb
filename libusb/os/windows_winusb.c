@@ -5434,7 +5434,7 @@ static int hid_submit_bulk_transfer(int sub_api, struct usbi_transfer *itransfer
 	if (transfer_priv->hid_buffer == NULL)
 		return LIBUSB_ERROR_NO_MEM;
 
-	transfer_priv->hid_expected_size = length;
+	transfer_priv->hid_expected_size = transfer->length;
 
 	if (direction_in) {
 		transfer_priv->hid_dest = transfer->buffer;
@@ -5522,18 +5522,24 @@ static enum libusb_transfer_status hid_copy_transfer_data(int sub_api, struct us
 		// If we have a valid hid_buffer, it means the transfer was async
 		if (transfer_priv->hid_dest != NULL) { // Data readout
 			if (length > 0) {
-				// First, check for overflow
+				const uint8_t *src = transfer_priv->hid_buffer;
+
+				// Skip the null report ID prefix. ReadFile counts it
+				// in length, the HID IOCTLs do not.
+				if (src[0] == 0) {
+					src++;
+					if (transfer->type != LIBUSB_TRANSFER_TYPE_CONTROL)
+						length--;
+				}
+
+				// hid_expected_size is the room in hid_dest
 				if ((size_t)length > transfer_priv->hid_expected_size) {
 					usbi_err(usbi_transfer_ctx(transfer), "OVERFLOW!");
 					length = (DWORD)transfer_priv->hid_expected_size;
 					r = LIBUSB_TRANSFER_OVERFLOW;
 				}
 
-				if (transfer_priv->hid_buffer[0] == 0) {
-					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer + 1, length);
-				} else {
-					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer, length);
-				}
+				memcpy(transfer_priv->hid_dest, src, length);
 			}
 			transfer_priv->hid_dest = NULL;
 		}
