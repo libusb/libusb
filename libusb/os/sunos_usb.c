@@ -1054,6 +1054,7 @@ sunos_get_active_config_descriptor(struct libusb_device *dev,
 	di_fini(node);
 
 	cfg = (struct libusb_config_descriptor *)dpriv->raw_cfgdescr;
+	len = MIN(len, (size_t)proplen);
 	len = MIN(len, libusb_le16_to_cpu(cfg->wTotalLength));
 	memcpy(buf, dpriv->raw_cfgdescr, len);
 	usbi_dbg(usbi_device_ctx(dev), "path:%s len %zu", dpriv->phypath, len);
