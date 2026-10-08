@@ -3951,7 +3951,10 @@ static void WINAPI winusbx_native_iso_transfer_continue_stream_callback(struct l
 	struct winusb_transfer_priv *transfer_priv =
 		get_winusb_transfer_priv(usbi_libusb_transfer_to_usbi_transfer(transfer));
 	bool fallback = (transfer->status != LIBUSB_TRANSFER_COMPLETED);
-	int idx;
+	bool terminal = (transfer->status == LIBUSB_TRANSFER_CANCELLED ||
+		transfer->status == LIBUSB_TRANSFER_TIMED_OUT ||
+		transfer->status == LIBUSB_TRANSFER_NO_DEVICE);
+	int idx, r;
 
 	// Restore the user callback
 	transfer->callback = transfer_priv->iso_user_callback;
@@ -3961,15 +3964,27 @@ static void WINAPI winusbx_native_iso_transfer_continue_stream_callback(struct l
 			fallback = true;
 	}
 
-	if (!fallback) {
-		// If the transfer was successful, we restore the user callback and call it.
+	if (!fallback || terminal) {
+		// Cancellation, timeout and disconnect must not restart the stream.
 		if (transfer->callback)
 			transfer->callback(transfer);
 	} else {
 		// If the transfer wasn't successful we reschedule the transfer while forcing it
 		// not to continue the stream. This might results in a 5-ms delay.
 		transfer_priv->iso_break_stream = TRUE;
-		libusb_submit_transfer(transfer);
+		r = libusb_submit_transfer(transfer);
+		if (r != LIBUSB_SUCCESS) {
+			// A failed submission will not produce another completion callback.
+			transfer->status = (r == LIBUSB_ERROR_NO_DEVICE) ?
+				LIBUSB_TRANSFER_NO_DEVICE : LIBUSB_TRANSFER_ERROR;
+			transfer->actual_length = 0;
+			for (idx = 0; idx < transfer->num_iso_packets; idx++) {
+				transfer->iso_packet_desc[idx].actual_length = 0;
+				transfer->iso_packet_desc[idx].status = transfer->status;
+			}
+			if (transfer->callback)
+				transfer->callback(transfer);
+		}
 	}
 }
 static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itransfer)
