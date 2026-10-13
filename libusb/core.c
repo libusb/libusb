@@ -731,6 +731,8 @@ struct discovered_devs *discovered_devs_append(
 struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	unsigned long session_id)
 {
+	assert(ctx); // TODO: not sure, does NULL mean default context here? Seems like the dev->ctx is probably required though...???
+
 	size_t priv_size = usbi_backend.device_priv_size;
 	struct libusb_device *dev = (struct libusb_device *)calloc(1, PTR_ALIGN(sizeof(*dev)) + priv_size);
 
