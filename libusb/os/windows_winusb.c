@@ -4749,10 +4749,11 @@ static int _hid_get_string_descriptor(struct hid_device_priv *hid_priv, int _ind
 	if (tmp_size < *size)
 		*size = tmp_size;
 
-	// 2 byte header
-	((uint8_t *)data)[0] = (uint8_t)*size;
-	((uint8_t *)data)[1] = LIBUSB_DT_STRING;
-	memcpy((uint8_t *)data + 2, tmp, *size - 2);
+	// 2 byte header; a request shorter than that only gets part of it
+	uint8_t header[2] = { (uint8_t)*size, LIBUSB_DT_STRING };
+	memcpy(data, header, MIN(*size, sizeof(header)));
+	if (*size > sizeof(header))
+		memcpy((uint8_t *)data + sizeof(header), tmp, *size - sizeof(header));
 
 	return LIBUSB_COMPLETED;
 }
