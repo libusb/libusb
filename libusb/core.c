@@ -1008,7 +1008,7 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
  * \param port_numbers_len the maximum length of the array. As per the USB 3.0
  * specs, the current maximum limit for the depth is 7.
  * \returns the number of elements filled
- * \returns \ref LIBUSB_ERROR_OVERFLOW if the array is too small
+ * \returns \ref LIBUSB_ERROR_INVALID_PARAM if port_numbers is NULL or port_numbers_len is non-positive. \ref LIBUSB_ERROR_OVERFLOW if the array is too small
  */
 int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 	uint8_t *port_numbers, int port_numbers_len)
@@ -1018,7 +1018,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 	struct libusb_device *iter;
 	struct libusb_context *ctx = usbi_device_ctx(dev);
 
-	if (port_numbers_len <= 0)
+	if (port_numbers_len <= 0 || !port_numbers)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	/* count the port depth first to avoid modifying the buffer on overflow.
