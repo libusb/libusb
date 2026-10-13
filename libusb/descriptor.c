@@ -484,6 +484,7 @@ err:
 static int raw_desc_to_config(struct libusb_context *ctx,
 	const uint8_t *buf, int size, struct libusb_config_descriptor **config)
 {
+	assert(config);
 	struct libusb_config_descriptor *_config = (struct libusb_config_descriptor *)calloc(1, sizeof(*_config));
 	int r;
 
@@ -506,6 +507,7 @@ static int raw_desc_to_config(struct libusb_context *ctx,
 static int get_active_config_descriptor(struct libusb_device *dev,
 	uint8_t *buffer, size_t size)
 {
+	assert(dev);
 	int r = usbi_backend.get_active_config_descriptor(dev, buffer, size);
 
 	if (r < 0)
@@ -581,6 +583,8 @@ int API_EXPORTED libusb_get_device_descriptor(libusb_device *dev,
 int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 	struct libusb_config_descriptor **config)
 {
+	assert(dev);
+	assert(config);
 	union usbi_config_desc_buf _config;
 	uint16_t config_len;
 	uint8_t *buf;
@@ -622,6 +626,8 @@ int API_EXPORTED libusb_get_active_config_descriptor(libusb_device *dev,
 int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 	uint8_t config_index, struct libusb_config_descriptor **config)
 {
+	assert(dev);
+	assert(config);
 	union usbi_config_desc_buf _config;
 	uint16_t config_len;
 	uint8_t *buf;
@@ -668,6 +674,8 @@ int API_EXPORTED libusb_get_config_descriptor(libusb_device *dev,
 int API_EXPORTED libusb_get_config_descriptor_by_value(libusb_device *dev,
 	uint8_t bConfigurationValue, struct libusb_config_descriptor **config)
 {
+	assert(dev);
+	assert(config);
 	uint8_t idx;
 	int r;
 
@@ -733,6 +741,8 @@ int API_EXPORTED libusb_get_ss_endpoint_companion_descriptor(
 	const struct libusb_endpoint_descriptor *endpoint,
 	struct libusb_ss_endpoint_companion_descriptor **ep_comp)
 {
+	assert(endpoint);
+	assert(ep_comp);
 	const struct usbi_descriptor_header *header;
 	const uint8_t *buffer = endpoint->extra;
 	int size = endpoint->extra_length;
@@ -791,6 +801,9 @@ static int parse_bos(struct libusb_context *ctx,
 	struct libusb_bos_descriptor **bos,
 	const uint8_t *buffer, int size)
 {
+	assert(bos);
+	assert(buffer);
+	assert(size >= 0);
 	struct libusb_bos_descriptor *_bos;
 	const struct usbi_bos_descriptor *bos_desc;
 	const struct usbi_descriptor_header *header;
@@ -879,6 +892,8 @@ static int parse_bos(struct libusb_context *ctx,
 int API_EXPORTED libusb_get_bos_descriptor(libusb_device_handle *dev_handle,
 	struct libusb_bos_descriptor **bos)
 {
+	assert(dev_handle);
+	assert(bos);
 	union usbi_bos_desc_buf _bos;
 	uint16_t bos_len;
 	uint8_t *bos_data;
@@ -956,6 +971,8 @@ int API_EXPORTED libusb_get_usb_2_0_extension_descriptor(
 	struct libusb_bos_dev_capability_descriptor *dev_cap,
 	struct libusb_usb_2_0_extension_descriptor **usb_2_0_extension)
 {
+	assert(dev_cap);
+	assert(usb_2_0_extension);
 	struct libusb_usb_2_0_extension_descriptor *_usb_2_0_extension;
 
 	if (dev_cap->bDevCapabilityType != LIBUSB_BT_USB_2_0_EXTENSION) {
@@ -1014,6 +1031,8 @@ int API_EXPORTED libusb_get_ss_usb_device_capability_descriptor(
 	struct libusb_bos_dev_capability_descriptor *dev_cap,
 	struct libusb_ss_usb_device_capability_descriptor **ss_usb_device_cap)
 {
+	assert(dev_cap);
+	assert(ss_usb_device_cap);
 	struct libusb_ss_usb_device_capability_descriptor *_ss_usb_device_cap;
 
 	if (dev_cap->bDevCapabilityType != LIBUSB_BT_SS_USB_DEVICE_CAPABILITY) {
@@ -1094,6 +1113,8 @@ int API_EXPORTED libusb_get_ssplus_usb_device_capability_descriptor(
 	struct libusb_bos_dev_capability_descriptor *dev_cap,
 	struct libusb_ssplus_usb_device_capability_descriptor **ssplus_usb_device_cap)
 {
+	assert(dev_cap);
+	assert(ssplus_usb_device_cap);
 	struct libusb_ssplus_usb_device_capability_descriptor *_ssplus_cap;
 
 	/* Use a private struct to reuse our descriptor parsing system. */
@@ -1208,6 +1229,8 @@ int API_EXPORTED libusb_get_container_id_descriptor(libusb_context *ctx,
 	struct libusb_bos_dev_capability_descriptor *dev_cap,
 	struct libusb_container_id_descriptor **container_id)
 {
+	assert(dev_cap);
+	assert(container_id);
 	struct libusb_container_id_descriptor *_container_id;
 
 	if (dev_cap->bDevCapabilityType != LIBUSB_BT_CONTAINER_ID) {
@@ -1268,6 +1291,8 @@ int API_EXPORTED libusb_get_platform_descriptor(libusb_context *ctx,
 	struct libusb_bos_dev_capability_descriptor *dev_cap,
 	struct libusb_platform_descriptor **platform_descriptor)
 {
+	assert(dev_cap);
+	assert(platform_descriptor);
 	struct libusb_platform_descriptor *_platform_descriptor;
 
 	if (dev_cap->bDevCapabilityType != LIBUSB_BT_PLATFORM_DESCRIPTOR) {
@@ -1325,13 +1350,14 @@ void API_EXPORTED libusb_free_platform_descriptor(
  *
  * \param dev_handle a device handle
  * \param desc_index the index of the descriptor to retrieve
- * \param data output buffer for ASCII string descriptor
+ * \param data output buffer for ASCII string descriptor (NULL termination will be added)
  * \param length size of data buffer
  * \returns number of bytes returned in data, or LIBUSB_ERROR code on failure
  */
 int API_EXPORTED libusb_get_string_descriptor_ascii(libusb_device_handle *dev_handle,
 	uint8_t desc_index, unsigned char *data, int length)
 {
+	assert(dev_handle);
 	union usbi_string_desc_buf str;
 	int r;
 	uint16_t langid, wdata;
@@ -1392,6 +1418,9 @@ static int parse_iad_array(struct libusb_context *ctx,
 	struct libusb_interface_association_descriptor_array *iad_array,
 	const uint8_t *buffer, int size)
 {
+	assert(iad_array);
+	assert(buffer);
+	assert(size >= 0);
 	uint8_t i;
 	struct usbi_descriptor_header header;
 	int consumed = 0;
@@ -1468,6 +1497,9 @@ static int parse_iad_array(struct libusb_context *ctx,
 static int raw_desc_to_iad_array(struct libusb_context *ctx, const uint8_t *buf,
 		int size, struct libusb_interface_association_descriptor_array **iad_array)
 {
+	assert(iad_array);
+	assert(buf);
+	assert(size >= 0);
 	struct libusb_interface_association_descriptor_array *_iad_array
 		= (struct libusb_interface_association_descriptor_array *)calloc(1, sizeof(*_iad_array));
 	int r;
@@ -1495,7 +1527,8 @@ static int raw_desc_to_iad_array(struct libusb_context *ctx, const uint8_t *buf,
  * \param dev a device
  * \param config_index the index of the configuration you wish to retrieve the
  * IADs for.
- * \param iad_array output location for the array of IADs. Only valid if 0 was
+ * \param iad_array output location for the array of IADs. If NULL,
+ * LIBUSB_ERROR_INVALID_PARAM is returned. Returned address is only valid if 0 was
  * returned. Must be freed with libusb_free_interface_association_descriptors()
  * after use. It's possible that a given configuration contains no IADs. In this
  * case the iad_array is still output, but will have 'length' field set to 0, and
@@ -1508,6 +1541,7 @@ static int raw_desc_to_iad_array(struct libusb_context *ctx, const uint8_t *buf,
 int API_EXPORTED libusb_get_interface_association_descriptors(libusb_device *dev,
 	uint8_t config_index, struct libusb_interface_association_descriptor_array **iad_array)
 {
+	assert(dev);
 	union usbi_config_desc_buf _config;
 	uint16_t config_len;
 	uint8_t *buf;
@@ -1544,7 +1578,8 @@ int API_EXPORTED libusb_get_interface_association_descriptors(libusb_device *dev
  * sent to the device.
  *
  * \param dev a device
- * \param iad_array output location for the array of IADs. Only valid if 0 was
+ * \param iad_array output location for the array of IADs. If NULL,
+ * LIBUSB_ERROR_INVALID_PARAM is returned. Returned address is only valid if 0 was
  * returned. Must be freed with libusb_free_interface_association_descriptors()
  * after use. It's possible that a given configuration contains no IADs. In this
  * case the iad_array is still output, but will have 'length' field set to 0, and
@@ -1557,6 +1592,7 @@ int API_EXPORTED libusb_get_interface_association_descriptors(libusb_device *dev
 int API_EXPORTED libusb_get_active_interface_association_descriptors(libusb_device *dev,
 	struct libusb_interface_association_descriptor_array **iad_array)
 {
+	assert(dev);
 	union usbi_config_desc_buf _config;
 	uint16_t config_len;
 	uint8_t *buf;
@@ -1660,7 +1696,7 @@ static int usbi_utf8_copy(char *tgt, char const *src, int tgt_size) {
  *
  * Since version v1.0.30 \ref LIBUSB_API_VERSION >= 0x0100010C
  *
- * \param dev the target device
+ * \param dev the target device. If NULL, LIBUSB_ERROR_INVALID_PARAM is returned.
  * \param string_type the string type to retrieve
  * \param data the data buffer for the UTF-8 encoded string.
  * \param length the size of the data buffer in bytes.
@@ -1740,6 +1776,8 @@ int API_EXPORTED libusb_get_device_string(libusb_device *dev,
 static int get_config_descriptor_for_value(libusb_device *dev,
 	uint8_t config_value, struct libusb_config_descriptor **config)
 {
+	assert(dev);
+	assert(config);
 	if (config_value == 0)
 		return libusb_get_active_config_descriptor(dev, config);
 	return libusb_get_config_descriptor_by_value(dev, config_value, config);
@@ -1750,6 +1788,8 @@ static int get_config_descriptor_for_value(libusb_device *dev,
 int usbi_get_config_string_index(libusb_device *dev,
 	uint8_t config_value, uint8_t *index_out)
 {
+	assert(dev);
+	assert(index_out);
 	struct libusb_config_descriptor *config = NULL;
 	int r;
 
@@ -1769,6 +1809,8 @@ int usbi_get_interface_string_index(libusb_device *dev,
 	uint8_t config_value, uint8_t interface_number, uint8_t alt_setting,
 	uint8_t *index_out)
 {
+	assert(dev);
+	assert(index_out);
 	struct libusb_config_descriptor *config = NULL;
 	int r, i, j;
 
@@ -1802,7 +1844,7 @@ int usbi_get_interface_string_index(libusb_device *dev,
  *
  * Since version 1.0.31, \ref LIBUSB_API_VERSION >= 0x0100010D
  *
- * \param dev the target device
+ * \param dev the target device. If NULL, returns LIBUSB_ERROR_INVALID_PARAM.
  * \param config_value the bConfigurationValue of the configuration, or 0 to
  *      select the device's currently active configuration.
  * \param data the data buffer for the UTF-8 encoded string, or NULL to only
@@ -1867,7 +1909,7 @@ int API_EXPORTED libusb_get_config_string(libusb_device *dev,
  *
  * Since version 1.0.31, \ref LIBUSB_API_VERSION >= 0x0100010D
  *
- * \param dev the target device
+ * \param dev the target device. If NULL, returns LIBUSB_ERROR_INVALID_PARAM.
  * \param config_value the bConfigurationValue of the configuration the
  *      interface belongs to, or 0 to select the device's currently active
  *      configuration.

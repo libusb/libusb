@@ -894,21 +894,25 @@ int usbi_wait_for_events(struct libusb_context *ctx,
 
 static inline void *usbi_get_context_priv(struct libusb_context *ctx)
 {
+	assert(ctx);
 	return (unsigned char *)ctx + PTR_ALIGN(sizeof(*ctx));
 }
 
 static inline void *usbi_get_device_priv(struct libusb_device *dev)
 {
+	assert(dev);
 	return (unsigned char *)dev + PTR_ALIGN(sizeof(*dev));
 }
 
 static inline void *usbi_get_device_handle_priv(struct libusb_device_handle *dev_handle)
 {
+	assert(dev_handle);
 	return (unsigned char *)dev_handle + PTR_ALIGN(sizeof(*dev_handle));
 }
 
 static inline void *usbi_get_transfer_priv(struct usbi_transfer *itransfer)
 {
+	assert(itransfer);
 	return itransfer->priv;
 }
 
@@ -1580,26 +1584,31 @@ int usbi_get_interface_string_index(libusb_device *dev,
 
 static inline struct usbi_transfer *usbi_transfer_priv_to_usbi_transfer(void *transfer_priv)
 {
+	assert(transfer_priv);
 	return (struct usbi_transfer *)((unsigned char *)(transfer_priv) + PTR_ALIGN(usbi_backend.transfer_priv_size));
 }
 
 static inline void *usbi_transfer_to_transfer_priv(const struct usbi_transfer *itransfer)
 {
+	assert(itransfer);
 	return (void *)((unsigned char *)(itransfer) - PTR_ALIGN(usbi_backend.transfer_priv_size));
 }
 
 static inline struct libusb_transfer *usbi_transfer_to_libusb_transfer(const struct usbi_transfer *itransfer)
 {
+	assert(itransfer);
 	return (struct libusb_transfer *)((unsigned char *)(itransfer) + PTR_ALIGN(sizeof(struct usbi_transfer)));
 }
 
 static inline struct usbi_transfer *usbi_libusb_transfer_to_usbi_transfer(const struct libusb_transfer *transfer)
 {
+	assert(transfer);
 	return (struct usbi_transfer *)((unsigned char *)(transfer) - PTR_ALIGN(sizeof(struct usbi_transfer)));
 }
 
 static inline struct libusb_context *usbi_device_ctx(const struct libusb_device *dev)
 {
+	assert(dev);
 	return dev->ctx;
 }
 
