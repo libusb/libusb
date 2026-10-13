@@ -1698,12 +1698,16 @@ static int usbi_utf8_copy(char *tgt, char const *src, int tgt_size) {
  *
  * \param dev the target device. If NULL, LIBUSB_ERROR_INVALID_PARAM is returned.
  * \param string_type the string type to retrieve
- * \param data the data buffer for the UTF-8 encoded string.
+ * \param data the data buffer for the UTF-8 encoded string. If NULL and length=0,
+ * then this function returns the required buffer size for a subsequent
+ * call to this function.
  * \param length the size of the data buffer in bytes.
  *      USB string descriptors cannot be longer than
  *      LIBUSB_DEVICE_STRING_BYTES_MAX.
+ *      If 0 and buffer=NULL, then this function returns the required buffer
+ *      size for a subsequent call to this function.
  * \returns a negative error code or
- *      the actual string length in bytes including the null terminator.
+ *      the actual buffer length in bytes including the null terminator.
  * \see libusb_get_string_descriptor()
  * \see libusb_get_string_descriptor_ascii()
  *
@@ -1726,6 +1730,17 @@ static int usbi_utf8_copy(char *tgt, char const *src, int tgt_size) {
  *         // handle error
  *     }
  *
+ * Another is to call it once to know how big a buffer is needed, then call
+ * it again with a right-sized buffer:
+ *
+ *     int ret = libusb_get_device_string(dev, LIBUSB_DEVICE_STRING_SERIAL_NUMBER, NULL, 0);
+ *     if (ret <= 0) {
+ *         // handle error
+ *     } else {
+ *         char* buffer = (char*)malloc(ret);
+ *         ret = libusb_get_device_string(dev, LIBUSB_DEVICE_STRING_SERIAL_NUMBER, buffer, ret);
+ *     }
+ *
  * This function is commonly used to get the serial number to allow
  * for device selection before opening the selected device.
  */
@@ -1738,13 +1753,19 @@ int API_EXPORTED libusb_get_device_string(libusb_device *dev,
 	if ((string_type < 0) || (string_type >= LIBUSB_DEVICE_STRING_COUNT)) {
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-	if (length <= 0) {
+	if (length < 0) {
 		return LIBUSB_ERROR_INVALID_PARAM;
 	}
-	if (NULL == data) {
-		length = 0;
-		data = NULL;
-	} else if (length > 0) {
+
+	/* We allow either an actual buffer with an actual size, or both NULL/0. */
+	if (!data && length > 0) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	if (data && length == 0) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+
+	if (length > 0) {
 		*data = 0;  // return an empty string on errors when possible
 	}
 
@@ -1848,7 +1869,7 @@ int usbi_get_interface_string_index(libusb_device *dev,
  * \param config_value the bConfigurationValue of the configuration, or 0 to
  *      select the device's currently active configuration.
  * \param data the data buffer for the UTF-8 encoded string, or NULL to only
- *      determine the required buffer size (length must still be non-zero).
+ *      determine the required buffer size.
  * \param length the size of the data buffer in bytes.
  *      USB string descriptors cannot be longer than
  *      LIBUSB_DEVICE_STRING_BYTES_MAX.
@@ -1883,8 +1904,16 @@ int API_EXPORTED libusb_get_config_string(libusb_device *dev,
 
 	if (NULL == dev)
 		return LIBUSB_ERROR_INVALID_PARAM;
-	if (length <= 0)
+	if (length < 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
+
+	/* We allow either an actual buffer with an actual size, or both NULL/0. */
+	if (!data && length > 0) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	if (data && length == 0) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
 
 	/* as in libusb_get_device_string(), data may be NULL to query the
 	 * required buffer size */
@@ -1916,7 +1945,7 @@ int API_EXPORTED libusb_get_config_string(libusb_device *dev,
  * \param interface_number the bInterfaceNumber of the interface
  * \param alt_setting the bAlternateSetting of the interface
  * \param data the data buffer for the UTF-8 encoded string, or NULL to only
- *      determine the required buffer size (length must still be non-zero).
+ *      determine the required buffer size.
  * \param length the size of the data buffer in bytes.
  *      USB string descriptors cannot be longer than
  *      LIBUSB_DEVICE_STRING_BYTES_MAX.
@@ -1957,8 +1986,16 @@ int API_EXPORTED libusb_get_interface_string(libusb_device *dev,
 
 	if (NULL == dev)
 		return LIBUSB_ERROR_INVALID_PARAM;
-	if (length <= 0)
+	if (length < 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
+
+	/* We allow either an actual buffer with an actual size, or both NULL/0. */
+	if (!data && length > 0) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
+	if (data && length == 0) {
+		return LIBUSB_ERROR_INVALID_PARAM;
+	}
 
 	/* as in libusb_get_device_string(), data may be NULL to query the
 	 * required buffer size */
