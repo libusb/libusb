@@ -45,6 +45,7 @@ typedef SSIZE_T ssize_t;
 #endif /* _SSIZE_T_DEFINED */
 #endif /* _MSC_VER */
 
+#include <assert.h>
 #include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -2257,6 +2258,10 @@ int LIBUSB_CALL libusb_interrupt_transfer(libusb_device_handle *dev_handle,
 static inline int libusb_get_descriptor(libusb_device_handle *dev_handle,
 	uint8_t desc_type, uint8_t desc_index, unsigned char *data, int length)
 {
+	assert(dev_handle);
+	assert(data);
+	assert(length >= 0);
+	assert(length <= UINT16_MAX);
 	return libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_IN,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, (uint16_t) ((desc_type << 8) | desc_index),
 		0, data, (uint16_t) length, 1000);
@@ -2279,6 +2284,10 @@ static inline int libusb_get_descriptor(libusb_device_handle *dev_handle,
 static inline int libusb_get_string_descriptor(libusb_device_handle *dev_handle,
 	uint8_t desc_index, uint16_t langid, unsigned char *data, int length)
 {
+	assert(dev_handle);
+	assert(data);
+	assert(length >= 0);
+	assert(length <= UINT16_MAX);
 	return libusb_control_transfer(dev_handle, LIBUSB_ENDPOINT_IN,
 		LIBUSB_REQUEST_GET_DESCRIPTOR, (uint16_t)((LIBUSB_DT_STRING << 8) | desc_index),
 		langid, data, (uint16_t) length, 1000);

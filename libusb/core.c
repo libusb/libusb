@@ -677,6 +677,8 @@ static struct discovered_devs *discovered_devs_alloc(void)
 
 static void discovered_devs_free(struct discovered_devs *discdevs)
 {
+	assert(discdevs);
+
 	size_t i;
 
 	for (i = 0; i < discdevs->len; i++)
@@ -690,6 +692,9 @@ static void discovered_devs_free(struct discovered_devs *discdevs)
 struct discovered_devs *discovered_devs_append(
 	struct discovered_devs *discdevs, struct libusb_device *dev)
 {
+	assert(discdevs);
+	assert(dev);
+
 	size_t len = discdevs->len;
 	size_t capacity;
 	struct discovered_devs *new_discdevs;
@@ -726,6 +731,8 @@ struct discovered_devs *discovered_devs_append(
 struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 	unsigned long session_id)
 {
+	assert(ctx); // TODO: not sure, does NULL mean default context here? Seems like the dev->ctx is probably required though...???
+
 	size_t priv_size = usbi_backend.device_priv_size;
 	struct libusb_device *dev = (struct libusb_device *)calloc(1, PTR_ALIGN(sizeof(*dev)) + priv_size);
 
@@ -749,6 +756,8 @@ struct libusb_device *usbi_alloc_device(struct libusb_context *ctx,
 
 void usbi_attach_device(struct libusb_device *dev)
 {
+	assert(dev);
+
 	struct libusb_context *ctx = usbi_device_ctx(dev);
 
 	usbi_atomic_store(&dev->attached, 1);
@@ -760,12 +769,14 @@ void usbi_attach_device(struct libusb_device *dev)
 
 void usbi_connect_device(struct libusb_device *dev)
 {
+	assert(dev);
 	usbi_attach_device(dev);
 	usbi_hotplug_notification(usbi_device_ctx(dev), dev, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
 }
 
 void usbi_detach_device(struct libusb_device *dev)
 {
+	assert(dev);
 	struct libusb_context *ctx = usbi_device_ctx(dev);
 
 	usbi_atomic_store(&dev->attached, 0);
@@ -777,6 +788,7 @@ void usbi_detach_device(struct libusb_device *dev)
 
 void usbi_disconnect_device(struct libusb_device *dev)
 {
+	assert(dev);
 	usbi_detach_device(dev);
 	usbi_hotplug_notification(usbi_device_ctx(dev), dev, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT);
 }
@@ -786,6 +798,7 @@ void usbi_disconnect_device(struct libusb_device *dev)
  * to the discovered device list. */
 enum libusb_error usbi_sanitize_device(struct libusb_device *dev)
 {
+	assert(dev);
 	uint8_t num_configurations;
 
 	if (dev->device_descriptor.bLength != LIBUSB_DT_DEVICE_SIZE ||
@@ -811,6 +824,7 @@ enum libusb_error usbi_sanitize_device(struct libusb_device *dev)
 struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 	unsigned long session_id)
 {
+	assert(ctx);
 	struct libusb_device *dev;
 	struct libusb_device *ret = NULL;
 
@@ -849,6 +863,7 @@ struct libusb_device *usbi_get_device_by_session_id(struct libusb_context *ctx,
 ssize_t API_EXPORTED libusb_get_device_list(libusb_context *ctx,
 	libusb_device ***list)
 {
+	assert(list);
 	struct discovered_devs *discdevs = discovered_devs_alloc();
 	struct libusb_device **ret;
 	int r = 0;
@@ -949,6 +964,7 @@ void API_EXPORTED libusb_free_device_list(libusb_device **list,
  */
 unsigned long API_EXPORTED libusb_get_session_data(libusb_device *dev)
 {
+	assert(dev);
 	return dev->session_data;
 }
 
@@ -959,6 +975,7 @@ unsigned long API_EXPORTED libusb_get_session_data(libusb_device *dev)
  */
 uint8_t API_EXPORTED libusb_get_bus_number(libusb_device *dev)
 {
+	assert(dev);
 	return dev->bus_number;
 }
 
@@ -978,6 +995,7 @@ uint8_t API_EXPORTED libusb_get_bus_number(libusb_device *dev)
  */
 uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
 {
+	assert(dev);
 	return dev->port_number;
 }
 
@@ -990,16 +1008,17 @@ uint8_t API_EXPORTED libusb_get_port_number(libusb_device *dev)
  * \param port_numbers_len the maximum length of the array. As per the USB 3.0
  * specs, the current maximum limit for the depth is 7.
  * \returns the number of elements filled
- * \returns \ref LIBUSB_ERROR_OVERFLOW if the array is too small
+ * \returns \ref LIBUSB_ERROR_INVALID_PARAM if port_numbers is NULL or port_numbers_len is non-positive. \ref LIBUSB_ERROR_OVERFLOW if the array is too small
  */
 int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 	uint8_t *port_numbers, int port_numbers_len)
 {
+	assert(dev);
 	int depth, i;
 	struct libusb_device *iter;
 	struct libusb_context *ctx = usbi_device_ctx(dev);
 
-	if (port_numbers_len <= 0)
+	if (port_numbers_len <= 0 || !port_numbers)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
 	/* count the port depth first to avoid modifying the buffer on overflow.
@@ -1033,6 +1052,7 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
 	uint8_t *port_numbers, uint8_t port_numbers_len)
 {
+	assert(dev);
 	UNUSED(ctx);
 
 	return libusb_get_port_numbers(dev, port_numbers, port_numbers_len);
@@ -1052,6 +1072,7 @@ int API_EXPORTED libusb_get_port_path(libusb_context *ctx, libusb_device *dev,
 DEFAULT_VISIBILITY
 libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev)
 {
+	assert(dev);
 	return dev->parent_dev;
 }
 
@@ -1062,6 +1083,7 @@ libusb_device * LIBUSB_CALL libusb_get_parent(libusb_device *dev)
  */
 uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 {
+	assert(dev);
 	return dev->device_address;
 }
 
@@ -1073,12 +1095,14 @@ uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
  */
 int API_EXPORTED libusb_get_device_speed(libusb_device *dev)
 {
+	assert(dev);
 	return (int)(dev->speed);
 }
 
 static const struct libusb_endpoint_descriptor *find_endpoint(
 	struct libusb_config_descriptor *config, unsigned char endpoint)
 {
+	assert(config);
 	int iface_idx;
 	for (iface_idx = 0; iface_idx < config->bNumInterfaces; iface_idx++) {
 		const struct libusb_interface *iface = &config->interface[iface_idx];
@@ -1148,6 +1172,9 @@ static const struct libusb_endpoint_descriptor *find_alt_endpoint(
 	struct libusb_config_descriptor *config,
 	int iface_idx, int altsetting_idx, unsigned char endpoint)
 {
+	assert(config);
+	assert(iface_idx >= 0);
+	assert(altsetting_idx >= 0);
 	if (iface_idx >= config->bNumInterfaces) {
 		return NULL;
 	}
@@ -1174,6 +1201,7 @@ static const struct libusb_endpoint_descriptor *find_alt_endpoint(
 static int get_endpoint_max_packet_size(libusb_device *dev,
 	const struct libusb_endpoint_descriptor *ep)
 {
+	assert(dev);
 	struct libusb_ss_endpoint_companion_descriptor *ss_ep_cmp;
 	enum libusb_endpoint_transfer_type ep_type;
 	uint16_t val;
@@ -1204,7 +1232,7 @@ static int get_endpoint_max_packet_size(libusb_device *dev,
 }
 
 /** \ingroup libusb_dev
- * Calculate the maximum packet size which a specific endpoint is capable is
+ * Calculate the maximum packet size which a specific endpoint is capable of
  * sending or receiving in the duration of 1 microframe
  *
  * Only the active configuration is examined. The calculation is based on the
@@ -1214,8 +1242,8 @@ static int get_endpoint_max_packet_size(libusb_device *dev,
  * If acting on an isochronous or interrupt endpoint, this function will
  * multiply the value found in bits 0:10 by the number of transactions per
  * microframe (determined by bits 11:12). Otherwise, this function just
- * returns the numeric value found in bits 0:10. For USB 3.0 device, it
- * will attempts to retrieve the Endpoint Companion Descriptor to return
+ * returns the numeric value found in bits 0:10. For a USB 3.0 device, it
+ * will attempt to retrieve the Endpoint Companion Descriptor to return
  * wBytesPerInterval.
  *
  * This function is useful for setting up isochronous transfers, for example
@@ -1239,6 +1267,7 @@ static int get_endpoint_max_packet_size(libusb_device *dev,
 int API_EXPORTED libusb_get_max_iso_packet_size(libusb_device *dev,
 	unsigned char endpoint)
 {
+	assert(dev);
 	struct libusb_config_descriptor *config;
 	const struct libusb_endpoint_descriptor *ep;
 	int r;
@@ -1298,6 +1327,7 @@ out:
 int API_EXPORTED libusb_get_max_alt_packet_size(libusb_device *dev,
 	int interface_number, int alternate_setting, unsigned char endpoint)
 {
+	assert(dev);
 	struct libusb_config_descriptor *config;
 	const struct libusb_endpoint_descriptor *ep;
 	int r;
@@ -1331,6 +1361,7 @@ out:
 DEFAULT_VISIBILITY
 libusb_device * LIBUSB_CALL libusb_ref_device(libusb_device *dev)
 {
+	assert(dev);
 	long refcnt;
 
 	refcnt = usbi_atomic_inc(&dev->refcnt);
@@ -1428,6 +1459,7 @@ void API_EXPORTED libusb_unref_device(libusb_device *dev)
 int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
 	libusb_device_handle **dev_handle)
 {
+	assert(dev_handle);
 	struct libusb_device_handle *_dev_handle;
 	size_t priv_size = usbi_backend.device_handle_priv_size;
 	int r;
@@ -1483,6 +1515,8 @@ int API_EXPORTED libusb_wrap_sys_device(libusb_context *ctx, intptr_t sys_dev,
 int API_EXPORTED libusb_open(libusb_device *dev,
 	libusb_device_handle **dev_handle)
 {
+	assert(dev);
+	assert(dev_handle);
 	struct libusb_context *ctx = usbi_device_ctx(dev);
 	struct libusb_device_handle *_dev_handle;
 	size_t priv_size = usbi_backend.device_handle_priv_size;
@@ -1635,7 +1669,7 @@ static void do_close(struct libusb_context *ctx,
  *
  * This is a non-blocking function; no requests are sent over the bus.
  *
- * \param dev_handle the device handle to close
+ * \param dev_handle the device handle to close. If NULL, this function does nothing.
  */
 void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 {
@@ -1701,6 +1735,7 @@ void API_EXPORTED libusb_close(libusb_device_handle *dev_handle)
 DEFAULT_VISIBILITY
 libusb_device * LIBUSB_CALL libusb_get_device(libusb_device_handle *dev_handle)
 {
+	assert(dev_handle);
 	return dev_handle->dev;
 }
 
@@ -1851,6 +1886,7 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
 int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
 	int interface_number) EXCLUDES(dev_handle->lock)
 {
+	assert(dev_handle);
 	int r = 0;
 
 	usbi_dbg(usbi_handle_ctx(dev_handle), "interface %d", interface_number);
@@ -1900,6 +1936,7 @@ out:
 int API_EXPORTED libusb_release_interface(libusb_device_handle *dev_handle,
 	int interface_number) EXCLUDES(dev_handle->lock)
 {
+	assert(dev_handle);
 	int r;
 
 	usbi_dbg(usbi_handle_ctx(dev_handle), "interface %d", interface_number);
@@ -2895,6 +2932,7 @@ int usbi_vsnprintf(char *str, size_t size, const char *format, va_list args)
 
 static void log_str(enum libusb_log_level level, const char *str)
 {
+	assert(str);
 #if defined(USE_SYSTEM_LOGGING_FACILITY)
 #if defined(__ANDROID__)
 	int priority;
@@ -2938,6 +2976,9 @@ static void log_str(enum libusb_log_level level, const char *str)
 static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, va_list args)
 {
+	assert(function);
+	assert(format);
+
 	const char *prefix = NULL;
 	char buf[USBI_MAX_LOG_LEN];
 	int global_debug, header_len, text_len;
@@ -3046,6 +3087,9 @@ static void log_v(struct libusb_context *ctx, enum libusb_log_level level,
 void usbi_log(struct libusb_context *ctx, enum libusb_log_level level,
 	const char *function, const char *format, ...)
 {
+	assert(function);
+	assert(format);
+
 	va_list args;
 
 	va_start(args, format);
