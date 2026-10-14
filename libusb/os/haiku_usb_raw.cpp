@@ -30,7 +30,6 @@
 #include "haiku_usb.h"
 
 USBRoster gUsbRoster;
-int32 gInitCount = 0;
 
 static int haiku_get_config_descriptor(struct libusb_device *, uint8_t,
     void *, size_t);
@@ -38,18 +37,13 @@ static int haiku_get_config_descriptor(struct libusb_device *, uint8_t,
 static int
 haiku_init(struct libusb_context *ctx)
 {
-	UNUSED(ctx);
-	if (atomic_add(&gInitCount, 1) == 0)
-		return gUsbRoster.Start();
-	return LIBUSB_SUCCESS;
+	return gUsbRoster.Init(ctx);
 }
 
 static void
 haiku_exit(struct libusb_context *ctx)
 {
-	UNUSED(ctx);
-	if (atomic_add(&gInitCount, -1) == 1)
-		gUsbRoster.Stop();
+	gUsbRoster.Exit(ctx);
 }
 
 static int
