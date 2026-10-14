@@ -586,6 +586,15 @@ private:
 			auto& config = configurations.emplace_back(
 				(usbi_configuration_descriptor*)::operator new(configLen));
 			copyFromDataView(config.get(), configVal);
+
+			// The full descriptor carries its own wTotalLength, read from the
+			// device a second time, independent of the header read that sized
+			// the allocation above. copyConfigDescriptor() bounds its copy by
+			// that field, so a value larger than configLen would read past the
+			// buffer. Reject the mismatch, as the WinUSB backend does.
+			if (libusb_le16_to_cpu(config->wTotalLength) != config_total_length) {
+				co_return LIBUSB_ERROR_IO;
+			}
 		}
 
 		co_return (int) LIBUSB_SUCCESS;
