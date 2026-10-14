@@ -1038,7 +1038,10 @@ sunos_get_active_config_descriptor(struct libusb_device *dev,
 	}
 	proplen = di_prop_lookup_bytes(DDI_DEV_T_ANY, node,
 	    "usb-raw-cfg-descriptors", &rdata);
-	if (proplen <= 0) {
+	/* The property must hold at least a complete config descriptor
+	 * header, or the bConfigurationValue and wTotalLength reads below
+	 * run past the buffer. */
+	if (proplen < LIBUSB_DT_CONFIG_SIZE) {
 		usbi_dbg(usbi_device_ctx(dev), "can't find raw config descriptors");
 
 		return (LIBUSB_ERROR_IO);
