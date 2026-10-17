@@ -1681,19 +1681,13 @@ static inline bool usbi_is_xferout(const struct libusb_transfer *xfer)
 #define for_each_open_device(ctx, h) \
 	for_each_helper(h, (ctx)->open_devs, struct libusb_device_handle)
 
-#define __for_each_transfer(list, t) \
-	for_each_helper(t, (list), struct usbi_transfer)
-
 #define for_each_transfer(ctx, t) \
-	__for_each_transfer((ctx)->flying_transfers, t)
-
-#define __for_each_transfer_safe(list, t, n) \
-	for_each_safe_helper(t, n, (list), struct usbi_transfer)
+	for_each_helper(t, (ctx)->flying_transfers, struct usbi_transfer)
 
 #define for_each_transfer_safe(ctx, t, n) \
-	__for_each_transfer_safe((ctx)->flying_transfers, t, n)
+	for_each_safe_helper(t, n, (ctx)->flying_transfers, struct usbi_transfer)
 
-#define __for_each_completed_transfer_safe(list, t, n) \
+#define for_each_completed_transfer_safe(list, t, n) \
 	list_for_each_entry_safe(t, n, (list), completed_list, struct usbi_transfer)
 
 #define for_each_event_source(ctx, e) \
