@@ -818,7 +818,7 @@ static struct hub_timeout_backoff *hub_timeout_backoff_find(const char *dev_id)
 {
 	struct hub_timeout_backoff *backoff;
 
-	list_for_each_entry(backoff, &hub_timeout_backoffs, list, struct hub_timeout_backoff) {
+	list_for_each_entry(backoff, hub_timeout_backoffs, list, struct hub_timeout_backoff) {
 		if (strcmp((const char *)(backoff + 1), dev_id) == 0)
 			return backoff;
 	}
