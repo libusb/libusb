@@ -468,7 +468,7 @@ sunos_fill_in_dev_info(di_node_t node, struct libusb_device *dev)
 	/* Device descriptors */
 	proplen = di_prop_lookup_bytes(DDI_DEV_T_ANY, node,
 	    "usb-dev-descriptor", &rdata);
-	if (proplen <= 0) {
+	if (proplen < LIBUSB_DT_DEVICE_SIZE) {
 		return (LIBUSB_ERROR_IO);
 	}
 	bcopy(rdata, &dev->device_descriptor, LIBUSB_DT_DEVICE_SIZE);
@@ -476,7 +476,7 @@ sunos_fill_in_dev_info(di_node_t node, struct libusb_device *dev)
 	/* Raw configuration descriptors */
 	proplen = di_prop_lookup_bytes(DDI_DEV_T_ANY, node,
 	    "usb-raw-cfg-descriptors", &rdata);
-	if (proplen <= 0) {
+	if (proplen < LIBUSB_DT_CONFIG_SIZE) {
 		usbi_dbg(usbi_device_ctx(dev), "can't find raw config descriptors");
 
 		return (LIBUSB_ERROR_IO);
