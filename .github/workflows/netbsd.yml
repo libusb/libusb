@@ -50,7 +50,7 @@ jobs:
           usesh: true
           cache-after-prepare: true
           prepare: |
-            /usr/sbin/pkg_add gmake git-base
+            /usr/sbin/pkg_add -u gmake git-base
           run: |
             set -e
             uname -a
