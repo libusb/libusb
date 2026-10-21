@@ -1263,6 +1263,7 @@ static int darwin_get_interface_string (struct libusb_device *dev,
 }
 
 static int get_configuration_index (struct libusb_device *dev, UInt8 config_value) {
+  assert(dev);
   struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
   UInt8 i, numConfig;
   IOUSBConfigurationDescriptorPtr desc;
