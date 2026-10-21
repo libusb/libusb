@@ -1114,21 +1114,18 @@ printf("completed!\n");
  *    again. One of them will succeed; it will then re-obtain the list of poll
  *    descriptors, and USB I/O will then continue as normal.
  *
- * libusb_open() is similar, and is actually a more simplistic case. Upon a
- * call to libusb_open():
+ * libusb_open() is simpler. Upon a call to libusb_open():
  *
- * -# The device is opened and a file descriptor is added to the poll set.
- * -# libusb sends some dummy data on the event pipe, and records that it
- *    is trying to modify the poll descriptor set.
- * -# The event handler is interrupted, and the same behaviour change as for
- *    libusb_close() takes effect, causing all event handling threads to become
- *    event waiters.
- * -# The libusb_open() implementation takes its free ride to the events lock.
- * -# Happy that it has successfully paused the events handler, libusb_open()
- *    releases the events lock.
- * -# The event waiter threads are all woken up and compete to become event
- *    handlers again. The one that succeeds will obtain the list of poll
- *    descriptors again, which will include the addition of the new device.
+ * -# The backend opens the device and adds any new event source to the
+ *    context's event-source list.
+ * -# libusb records the event-source change while holding the event-data lock
+ *    and ensures that the event handler is notified.
+ * -# The event handler notices the change, rebuilds its event-source list, and
+ *    resumes polling with the new source.
+ *
+ * Unlike libusb_close(), this path does not acquire the events lock. Adding an
+ * event source only requires interrupting the current poll; it does not require
+ * pausing all event handlers.
  *
  * \subsection concl Closing remarks
  *
