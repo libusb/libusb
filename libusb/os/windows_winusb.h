@@ -233,10 +233,20 @@ typedef RETURN_TYPE CONFIGRET;
 
 #define CR_SUCCESS	0x00000000
 
+/* Devnode status flags (from cfg.h) */
+#define DN_STARTED	0x00000008	// Is currently configured
+#define DN_HAS_PROBLEM	0x00000400	// Need device installer
+
+/* Devnode registry properties (from cfgmgr32.h) */
+#define CM_DRP_SERVICE	0x00000005
+
 /* Cfgmgr32 dependencies */
 DLL_DECLARE_HANDLE(Cfgmgr32);
 DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_Parent, (PDEVINST, DEVINST, ULONG));
 DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_Child, (PDEVINST, DEVINST, ULONG));
+DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_Sibling, (PDEVINST, DEVINST, ULONG));
+DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_DevNode_Status, (PULONG, PULONG, DEVINST, ULONG));
+DLL_DECLARE_FUNC(WINAPI, CONFIGRET, CM_Get_DevNode_Registry_PropertyA, (DEVINST, ULONG, PULONG, PVOID, PULONG, ULONG));
 
 /* AdvAPI32 dependencies */
 DLL_DECLARE_HANDLE(AdvAPI32);
