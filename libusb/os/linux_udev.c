@@ -241,7 +241,7 @@ static void udev_hotplug_event(struct udev_device *udev_dev)
 			break;
 		}
 
-		detached = !strncmp(udev_action, "remove", 6);
+		detached = !strcmp(udev_action, "remove");
 
 		r = udev_device_info(NULL, detached, udev_dev, &busnum, &devaddr, &sys_name);
 		if (LIBUSB_SUCCESS != r) {
@@ -250,11 +250,13 @@ static void udev_hotplug_event(struct udev_device *udev_dev)
 
 		usbi_dbg(NULL, "udev hotplug event. action: %s.", udev_action);
 
-		if (strncmp(udev_action, "add", 3) == 0) {
+		if (strcmp(udev_action, "add") == 0) {
 			linux_hotplug_enumerate(busnum, devaddr, sys_name);
 		} else if (detached) {
 			linux_device_disconnected(busnum, devaddr);
-		} else if (strncmp(udev_action, "bind", 4) == 0) {
+		} else if (strcmp(udev_action, "bind") == 0 ||
+		           strcmp(udev_action, "unbind") == 0 ||
+		           strcmp(udev_action, "change") == 0) {
 			/* silently ignore "known unhandled" action */
 		} else {
 			usbi_err(NULL, "ignoring udev action %s", udev_action);
