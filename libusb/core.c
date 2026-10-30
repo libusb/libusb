@@ -388,6 +388,7 @@ if (cfg != desired)
  * - libusb_control_transfer_get_setup()
  * - libusb_cpu_to_le16()
  * - libusb_detach_kernel_driver()
+ * - libusb_device_connected()
  * - libusb_dev_mem_alloc()
  * - libusb_dev_mem_free()
  * - libusb_endpoint_set_raw_io()
@@ -1516,6 +1517,28 @@ int API_EXPORTED libusb_open(libusb_device *dev,
 	*dev_handle = _dev_handle;
 
 	return 0;
+}
+
+/** \ingroup libusb_dev
+ * Checks if a device is still connected to the system. Note that the connection
+ * status of the device may change between calls to this function and subsequent
+ * function calls. Always check the return value of subsequent function calls to
+ * determine if the device connection status has changed.
+ *
+ * This is a non-blocking function; no requests are sent over the bus.
+ *
+ * \param dev device to be checked.
+ * \returns 0 if the device is disconnected
+ * \returns 1 if the device is connected
+ * \returns \ref LIBUSB_ERROR_NOT_SUPPORTED if the platform does not support hotplug
+ */
+int API_EXPORTED libusb_device_connected(libusb_device *dev)
+{
+	/* Device connection can not be checked unless hotplug is supported */
+	if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG))
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	return usbi_atomic_load(&dev->attached) != 0;
 }
 
 /** \ingroup libusb_dev
