@@ -1564,6 +1564,15 @@ struct usbi_os_backend {
 	 * usbi_get_transfer_priv() on the usbi_transfer instance.
 	 */
 	size_t transfer_priv_size;
+
+	/* Get the list of all port numbers from root for the specified device.
+	 *
+	 * Optional. If unavailable, the core traverses the device tree instead.
+	 *
+	 * Returns the number of entries, LIBUSB_ERROR_OVERFLOW if the array is
+	 * too small, or LIBUSB_ERROR_NOT_FOUND if the backend has no port data. */
+	int (*get_port_numbers)(struct libusb_device *device,
+		uint8_t *port_numbers, int port_numbers_len);
 };
 
 extern const struct usbi_os_backend usbi_backend;

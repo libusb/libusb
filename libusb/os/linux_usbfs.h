@@ -102,6 +102,15 @@ struct usbfs_connectinfo {
 	unsigned char slow;
 };
 
+struct usbfs_conninfo_ex {
+	uint32_t size;
+	uint32_t busnum;
+	uint32_t devnum;
+	uint32_t speed;
+	uint8_t num_ports;
+	uint8_t ports[7];
+};
+
 struct usbfs_ioctl {
 	int ifno;	/* interface 0..N ; negative numbers reserved */
 	int ioctl_code;	/* MUST encode size + direction of data so the
@@ -114,6 +123,7 @@ struct usbfs_ioctl {
 #define USBFS_CAP_NO_PACKET_SIZE_LIM		0x04
 #define USBFS_CAP_BULK_SCATTER_GATHER		0x08
 #define USBFS_CAP_REAP_AFTER_DISCONNECT		0x10
+#define USBFS_CAP_CONNINFO_EX			0x80
 
 #define USBFS_DISCONNECT_CLAIM_IF_DRIVER	0x01
 #define USBFS_DISCONNECT_CLAIM_EXCEPT_DRIVER	0x02
@@ -159,6 +169,7 @@ struct usbfs_streams {
 #define IOCTL_USBFS_FREE_STREAMS	_IOR('U', 29, struct usbfs_streams)
 #define IOCTL_USBFS_DROP_PRIVILEGES	_IOW('U', 30, __u32)
 #define IOCTL_USBFS_GET_SPEED		_IO('U', 31)
+#define IOCTL_USBFS_CONNINFO_EX(len)	_IOC(_IOC_READ, 'U', 32, len)
 
 extern usbi_mutex_static_t linux_hotplug_lock;
 
