@@ -23,7 +23,7 @@
 #ifndef LIBUSB_TESTLIB_H
 #define LIBUSB_TESTLIB_H
 
-#include <config.h>
+#include <libusb.h>
 
 /** Values returned from a test function to indicate test result */
 typedef enum {
@@ -41,7 +41,7 @@ typedef enum {
 /**
  * Logs some test information or state
  */
-void libusb_testlib_logf(const char *fmt, ...) PRINTF_FORMAT(1, 2);
+void libusb_testlib_logf(const char *fmt, ...) LIBUSB_PRINTF_FORMAT(1, 2);
 
 /**
  * Structure holding a test description.

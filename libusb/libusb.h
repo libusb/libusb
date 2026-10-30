@@ -89,6 +89,13 @@ typedef SSIZE_T ssize_t;
 #define LIBUSB_PACKED
 #endif /* __GNUC__ */
 
+/* Allows compiler checks on printf-like functions. */
+#if defined(__GNUC__)
+#define LIBUSB_PRINTF_FORMAT(a, b) __attribute__ ((__format__ (__printf__, a, b)))
+#else
+#define LIBUSB_PRINTF_FORMAT(a, b) /**/
+#endif
+
 /** \def LIBUSB_CALL
  * \ingroup libusb_misc
  * libusb's Windows calling convention.
