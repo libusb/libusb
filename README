@@ -15,10 +15,10 @@ libusb homepage:
 https://libusb.info/
 
 Developers will wish to consult the API documentation:
-http://api.libusb.info
+https://libusb.sourceforge.io/api-1.0/index.html
 
 Use the mailing list for questions, comments, etc:
-http://mailing-list.libusb.info
+https://sourceforge.net/projects/libusb/lists/libusb-devel
 
 - Tormod Volden
 - Sylvain Fasel
