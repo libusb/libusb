@@ -5530,6 +5530,16 @@ static enum libusb_transfer_status hid_copy_transfer_data(int sub_api, struct us
 				}
 
 				if (transfer_priv->hid_buffer[0] == 0) {
+					// Interrupt/bulk IN transfers: the length reported by the OS
+					// includes the implicit report ID prefix byte that was added
+					// at submit time (see hid_submit_bulk_transfer), so it must
+					// be dropped from both the data copied to the caller's
+					// buffer and the number of bytes reported as transferred.
+					// Control GET_REPORT transfers: the length reported by the
+					// OS already excludes the implicit prefix (see the comment
+					// in _hid_get_report), so no adjustment is needed.
+					if (transfer->type != LIBUSB_TRANSFER_TYPE_CONTROL)
+						length--;
 					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer + 1, length);
 				} else {
 					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer, length);
