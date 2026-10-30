@@ -261,15 +261,6 @@ int main(void)
 {
 	int errs = 0;
 
-#if defined(__HAIKU__)
-	/* The enumeration phase reports per-thread device counts that disagree
-	   with each other on Haiku; see libusb/libusb#1907. Report an Automake
-	   skip rather than a failure until the backend is fixed. Remove this
-	   once #1907 is closed. */
-	printf("Skipping on Haiku: per-thread device counts disagree (libusb/libusb#1907)\n");
-	return 77;
-#endif
-
 	printf("Running multithreaded init/exit test...\n");
 	errs += test_multi_init(0);
 	printf("Running multithreaded init/exit test with enumeration...\n");
