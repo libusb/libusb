@@ -1603,7 +1603,7 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
  *   \ref libusb_reset_device.
  *
  * \param transfer the transfer to cancel
- * \returns 0 on success
+ * \returns \ref LIBUSB_SUCCESS on success
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if the transfer is not in progress,
  * already complete, or already cancelled.
  * \returns a LIBUSB_ERROR code on failure
