@@ -100,7 +100,7 @@ endif
 endif
 
 libusb_1_0_la_LDFLAGS = $(LT_LDFLAGS) $(EXTRA_LDFLAGS)
-libusb_1_0_la_SOURCES = libusbi.h version.h version_nano.h \
+libusb_1_0_la_SOURCES = libusbi.h clang_thread_safety.h version.h version_nano.h \
 	core.c descriptor.c hotplug.c io.c strerror.c sync.c \
 	$(PLATFORM_SRC) $(OS_SRC)
 
