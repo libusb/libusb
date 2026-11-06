@@ -1,5 +1,4 @@
 SUBDIRS =
-EXTRA_DIST = test_windows_version.py
 
 if BUILD_FUZZERS
 SUBDIRS += fuzz

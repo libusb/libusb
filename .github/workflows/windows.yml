@@ -13,6 +13,37 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  source-archive:
+    name: W-2022 | VS 2022 | x64 | Source archive without Git/sh
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: microsoft/setup-msbuild@v3
+
+      - name: Prepare source archive
+        timeout-minutes: 1
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory build/source | Out-Null
+          git archive --format=tar --output=build/source.tar HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          tar -xf build/source.tar -C build/source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build source archive without Git/sh
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          $msbuild = (Get-Command msbuild).Source
+          $env:PATH = "$env:WINDIR\System32\WindowsPowerShell\v1.0"
+          if (Get-Command git.exe,sh.exe,bash.exe,cygpath.exe,wsl.exe -CommandType Application -ErrorAction SilentlyContinue) {
+            throw 'The archive build environment contains Git or a POSIX shell'
+          }
+          & $msbuild build/source/msvc/libusb.sln /m:2 /nr:false `
+            -property:Configuration=Release -property:Platform=x64 -property:PlatformToolset=v143
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   build:
     name: >-
       ${{ matrix.compiler.job_label }} |

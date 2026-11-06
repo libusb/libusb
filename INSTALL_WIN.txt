@@ -53,13 +53,6 @@ default library paths for your project points to the relevant directories.
 If needed, these libraries can be obtained by installing the latest Windows
 SDK.
 
-Version-generation regression tests require Windows PowerShell and Python 3.13:
-  python tests/test_windows_version.py --git-root "<git-installation-root>"
-Add --sourcetree when the root is <profile>/Atlassian/SourceTree/git_local to
-test discovery without Git on PATH. Add --mingit to check that the package has
-neither bash.exe nor cygpath.exe. Add --msbuild "<path-to-MSBuild.exe>" and
---tarball "<release-tarball>" to test static/DLL builds and Windows version resources.
-
 Links
 *****
 
