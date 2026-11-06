@@ -1784,7 +1784,7 @@ static int op_set_interface(struct libusb_device_handle *handle, uint8_t interfa
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	return 0;
+	return LIBUSB_SUCCESS;
 }
 
 static int op_clear_halt(struct libusb_device_handle *handle,
@@ -1805,14 +1805,14 @@ static int op_clear_halt(struct libusb_device_handle *handle,
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	return 0;
+	return LIBUSB_SUCCESS;
 }
 
 static int op_reset_device(struct libusb_device_handle *handle)
 {
 	struct linux_device_handle_priv *hpriv = (struct linux_device_handle_priv *)usbi_get_device_handle_priv(handle);
 	int fd = hpriv->fd;
-	int r, ret = 0;
+	int r, ret = LIBUSB_SUCCESS;
 	uint8_t i;
 
 	/* Doing a device reset will cause the usbfs driver to get unbound
@@ -2100,7 +2100,7 @@ static int discard_urbs(struct usbi_transfer *itransfer, int first, int last_plu
 	struct linux_transfer_priv *tpriv = (struct linux_transfer_priv *)usbi_get_transfer_priv(itransfer);
 	struct linux_device_handle_priv *hpriv =
 		(struct linux_device_handle_priv *)usbi_get_device_handle_priv(transfer->dev_handle);
-	int i, ret = 0;
+	int i, ret = LIBUSB_SUCCESS;
 	struct usbfs_urb *urb;
 
 	for (i = last_plus_one - 1; i >= first; i--) {
@@ -2124,6 +2124,7 @@ static int discard_urbs(struct usbi_transfer *itransfer, int first, int last_plu
 			ret = LIBUSB_ERROR_OTHER;
 		}
 	}
+
 	return ret;
 }
 
@@ -2532,7 +2533,7 @@ static int op_cancel_transfer(struct usbi_transfer *itransfer)
 		return LIBUSB_ERROR_NOT_FOUND;
 
 	r = discard_urbs(itransfer, 0, tpriv->num_urbs);
-	if (r != 0)
+	if (r != LIBUSB_SUCCESS)
 		return r;
 
 	switch (transfer->type) {
@@ -2545,7 +2546,7 @@ static int op_cancel_transfer(struct usbi_transfer *itransfer)
 		tpriv->reap_action = CANCELLED;
 	}
 
-	return 0;
+	return LIBUSB_SUCCESS;
 }
 
 static void op_clear_transfer_priv(struct usbi_transfer *itransfer)
