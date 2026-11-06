@@ -110,7 +110,14 @@ function Find-Tools {
             $cygpath = $helperDirs | ForEach-Object { Join-Path $_ 'cygpath.exe' } |
                 Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
             $pathDirs = @()
-            if ($git) { $pathDirs += Split-Path -Parent $git }
+            if ($git) {
+                $pathDirs += Split-Path -Parent $git
+                # Git's shell maps Git/bin to /bin, which has no git.exe.
+                $gitCmd = Join-Path (Get-InstallRoot $git) 'cmd'
+                if (Test-Path -LiteralPath (Join-Path $gitCmd 'git.exe') -PathType Leaf) {
+                    $pathDirs += $gitCmd
+                }
+            }
             $pathDirs += $helperDirs
             $pathDirs += (Join-Path $env:WINDIR 'System32'), $env:WINDIR
             return @{ Git = $git; Shell = $shell; Cygpath = $cygpath; Path = ($pathDirs -join ';') }
