@@ -11,6 +11,8 @@ If you are using Microsoft Visual Studio:
 - Select your configuration and compile the project.
 - Release tarballs include a frozen version header and need neither Git nor a
   POSIX shell. Other source archives use an "Unknown source" version.
+- The build removes the download mark from build-aux/gen-describe.ps1 before
+  running it, including when Group Policy enforces Unrestricted execution.
 - Git checkouts need Git and its POSIX shell and helper tools. The build finds
   Git on PATH or in SourceTree's embedded installation. Git for Windows and
   MinGit are supported; bash.exe is not required.
