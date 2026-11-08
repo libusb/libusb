@@ -6,9 +6,10 @@ on:
     tags:
       - '**'
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
 
-# Keep the long-running stress test on master unless a PR explicitly opts in.
+# Keep the long-running stress test on master unless a PR opts in with a
+# force_testcore or force_long_tests label. Labels are read from the event
+# payload, so a newly added label takes effect on the next push or reopen.
 env:
   TESTCORE_CONFIGURE_FLAG: >-
     ${{ (github.ref == 'refs/heads/master' ||
@@ -16,24 +17,29 @@ env:
          contains(github.event.pull_request.labels.*.name, 'force_long_tests'))
         && '--enable-testcore' || '' }}
 
-# Isolate unrelated label events from code and force-label CI runs.
 concurrency:
-  group: >-
-    ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{
-      github.event.action == 'labeled' &&
-      github.event.label.name != 'force_testcore' &&
-      github.event.label.name != 'force_long_tests' &&
-      github.run_id || 'ci' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
-    if: >-
-      github.event.action != 'labeled' ||
-      github.event.label.name == 'force_testcore' ||
-      github.event.label.name == 'force_long_tests'
+    name: ${{ matrix.msystem }} | ${{ matrix.architecture }}
     runs-on: windows-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - msystem: MINGW32
+            architecture: Win32
+            packages: git mingw-w64-i686-cc mingw-w64-i686-autotools
+            build_dir: build-MinGW-Win32
+            install_dir: libusb-MinGW-Win32
+          - msystem: MINGW64
+            architecture: x64
+            packages: git mingw-w64-x86_64-cc mingw-w64-x86_64-autotools
+            build_dir: build-MinGW-x64
+            install_dir: libusb-MinGW-x64
     defaults:
       run:
         shell: msys2 {0}
@@ -44,23 +50,46 @@ jobs:
           fetch-depth: 0
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: ${{ matrix.msystem }}
           update: true
-          install: git mingw-w64-x86_64-cc mingw-w64-x86_64-autotools
+          install: ${{ matrix.packages }}
+      # Syntax-only check of the public header's include contract; needs the
+      # source tree only. -Werror matters here: mingw-w64 reports a wrong
+      # winsock order with #warning, not an error.
+      - name: Check public header include order
+        run: >-
+          gcc -fsyntax-only -Wall -Wextra -Werror -Ilibusb
+          .private/win32-header-check.c &&
+          gcc -fsyntax-only -Wall -Wextra -Werror -DWIN32_LEAN_AND_MEAN -Ilibusb
+          .private/win32-header-check.c
       - name: bootstrap
         run: ./bootstrap.sh
-      - name: Build
+      - name: Build, test and install
         # GCC on MSYS2 doesn't have ASAN support (but Clang does).
-        run: ./.private/ci-build.sh --build-dir build-msys2 --no-asan
+        run: >-
+          workspace=$(cygpath -u "$GITHUB_WORKSPACE") &&
+          ./.private/ci-build.sh
+          --build-dir ${{ matrix.build_dir }}
+          --install
+          --no-asan
+          --
+          "--prefix=$workspace/${{ matrix.install_dir }}"
       - name: Build with logging disabled
-        run: ./.private/ci-build.sh --build-dir build-msys2-nolog --no-asan -- --disable-log
+        if: ${{ matrix.msystem == 'MINGW64' }}
+        run: ./.private/ci-build.sh --build-dir ${{ matrix.build_dir }}-nolog --no-asan -- --disable-log
+      - name: Upload installed tree
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.install_dir }}
+          path: ${{ matrix.install_dir }}
+          if-no-files-found: error
       # The autotools test driver buffers each test's output into its own
       # tests/<test>.log; keep them (and config.log) when something goes wrong.
       - name: Upload test logs
         uses: actions/upload-artifact@v7
         if: failure() || cancelled()
         with:
-          name: test-logs-msys2
+          name: test-logs-${{ matrix.msystem }}
           path: |
             build*/config.log
             build*/tests/*.log

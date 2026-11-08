@@ -9,6 +9,13 @@ that use a dedicated file load these same rules from here — `.claude/CLAUDE.md
 import it, and `.github/copilot-instructions.md` points to it — so there is only ever one copy
 to maintain.
 
+## Communication
+
+Use ASD-STE100 Simplified Technical English for all user-facing messages in
+this repository. Put the result first. Use short, direct sentences. Use one
+term for one concept. Avoid idioms, slang, and ambiguous pronouns. Explain a
+technical term when the user might not know it.
+
 ## Commit Authorship
 
 Every commit in this repository must be authored by a human (the contributor). No AI agent
@@ -77,6 +84,37 @@ compatibility contract for existing source and binary users.
 - If a fix appears to require a breaking change in `libusb/libusb.h`, preserve
   the existing interface and ask a maintainer for direction instead of making
   the API or ABI change.
+
+## Comments
+
+An implementation comment should explain information that the code alone does
+not express, such as a constraint, invariant, concurrency assumption, platform
+or protocol quirk, or why an obvious alternative was rejected. Do not add
+comments that only restate the implementation in English.
+
+- Keep implementation comments concise. Use one line when practical, and match
+  the touched file's existing comment format and density. Do not comment every
+  statement or block.
+- File or module introductions, Doxygen API documentation, function contract
+  comments, and concise section labels are permitted. State the contract,
+  context, and edge cases instead of narrating the implementation.
+- Example and tutorial code may use short step comments when they help readers
+  follow the intended use of the API.
+- Do not remove or rewrite comments outside the change's scope only to enforce
+  these rules.
+
+## Concise Writing
+
+Signal over noise in all agent-written prose -- documentation, commit messages,
+PR descriptions, and README sections. Every word must carry information.
+
+- No filler ("It's important to note", "Additionally") and no restating what
+  the code or the previous paragraph already says.
+- Use active voice and present tense: "Run tests", not "You should run the
+  tests".
+- Prefer bullets to paragraphs unless prose is genuinely clearer.
+- Assume a competent reader. Expand only on genuinely non-obvious trade-offs
+  and edge cases.
 
 ## PR description content
 

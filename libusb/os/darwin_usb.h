@@ -147,6 +147,7 @@ struct darwin_device_priv {
 struct darwin_interface {
   usb_interface_t      interface;
   uint8_t              num_endpoints;
+  CFRunLoopRef         runloop;  /* retained run loop cfSource is registered on */
   CFRunLoopSourceRef   cfSource;
   uint64_t             frames[256];
   uint8_t              endpoint_addrs[USB_MAXENDPOINTS];
@@ -154,6 +155,7 @@ struct darwin_interface {
 
 struct darwin_device_handle_priv {
   bool                 is_open;
+  CFRunLoopRef         runloop;  /* retained run loop cfSource is registered on */
   CFRunLoopSourceRef   cfSource;
 
   struct darwin_interface interfaces[USB_MAXINTERFACES];

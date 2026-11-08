@@ -860,7 +860,7 @@
 		008FBF281628B79300BC5BE2 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 1120;
+				LastUpgradeCheck = 2630;
 				ORGANIZATIONNAME = libusb;
 				TargetAttributes = {
 					006AD41B1C8C5A90007F8C6A = {
