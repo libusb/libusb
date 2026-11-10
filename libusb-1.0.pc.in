@@ -8,4 +8,4 @@ Description: C API for USB device access from Linux, Mac OS X, Windows, OpenBSD/
 Version: @VERSION@
 Libs: -L${libdir} -lusb-1.0
 Libs.private: @LIBS@
-Cflags: -I${includedir}/libusb-1.0
+Cflags: -I${includedir}/libusb-1.0 @LIBUSB_ENUM_SIZE_CFLAGS@
