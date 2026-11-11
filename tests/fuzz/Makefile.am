@@ -9,12 +9,13 @@
 #
 # LIB_FUZZING_ENGINE comes from the environment and names the engine to link.
 
-AM_CPPFLAGS = -I$(top_srcdir)/libusb
+AM_CPPFLAGS = -I$(top_srcdir)/libusb -I$(top_builddir)/libusb
 
 noinst_PROGRAMS = \
 	fuzz_bos_descriptor \
 	fuzz_control_setup \
-	fuzz_descriptor_parsers
+	fuzz_descriptor_parsers \
+	fuzz_mock_backend
 
 fuzz_descriptor_parsers_SOURCES = fuzz_descriptor_parsers.c
 fuzz_descriptor_parsers_LDADD = $(LIB_FUZZING_ENGINE)
@@ -25,12 +26,16 @@ fuzz_bos_descriptor_LDADD = $(top_builddir)/libusb/libusb-1.0.la $(LIB_FUZZING_E
 fuzz_control_setup_SOURCES = fuzz_control_setup.c
 fuzz_control_setup_LDADD = $(top_builddir)/libusb/libusb-1.0.la $(LIB_FUZZING_ENGINE)
 
+fuzz_mock_backend_SOURCES = fuzz_mock_backend.c
+fuzz_mock_backend_LDADD = $(LIB_FUZZING_ENGINE)
+
 # Every target here is C, but a fuzzing engine is a C++ archive, so the C++
 # linker has to be used. Naming a C++ source that is never compiled is the
 # automake way to select it.
 nodist_EXTRA_fuzz_bos_descriptor_SOURCES = dummy.cxx
 nodist_EXTRA_fuzz_control_setup_SOURCES = dummy.cxx
 nodist_EXTRA_fuzz_descriptor_parsers_SOURCES = dummy.cxx
+nodist_EXTRA_fuzz_mock_backend_SOURCES = dummy.cxx
 
 # Seed inputs are data, not build inputs, so EXTRA_DIST is what puts them in a
 # release archive. `make dist` recurses into this directory through
@@ -40,4 +45,14 @@ EXTRA_DIST = \
 	corpus/bos/min.bos \
 	corpus/descriptor_parsers/min_valid_config.bin \
 	corpus/descriptor_parsers/regression_bug_a_endpoint_null.bin \
-	corpus/descriptor_parsers/regression_bug_b_iad_oob.bin
+	corpus/descriptor_parsers/regression_bug_b_iad_oob.bin \
+	corpus/mock_backend/mock-ok.bin \
+	corpus/mock_backend/mock-ok-nolen.bin \
+	corpus/mock_backend/mock-cfgval2.bin \
+	corpus/mock_backend/mock-nocfg.bin \
+	corpus/mock_backend/mock-badtype.bin \
+	corpus/mock_backend/mock-trunc.bin \
+	corpus/mock_backend/mock-usb3.bin \
+	corpus/mock_backend/mock-ctrl-getdesc.bin \
+	corpus/mock_backend/mock-bulk-timeout.bin \
+	corpus/mock_backend/mock-nocfg-bulk.bin
