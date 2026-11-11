@@ -100,16 +100,22 @@
  *   usbi_atomic_store() - Atomically write a new value value to a variable
  *   usbi_atomic_inc() - Atomically increment a variable's value and return the new value
  *   usbi_atomic_dec() - Atomically decrement a variable's value and return the new value
+ *   usbi_atomic_load_acquire() - Atomically read a variable's value with acquire ordering
+ *   usbi_atomic_store_release() - Atomically write a new value to a variable with release ordering
  *
- * All of these operations are ordered with each other, thus the effects of
- * any one operation is guaranteed to be seen by any other operation.
+ * Except for the acquire/release variants, all of these operations are ordered
+ * with each other, thus the effects of any one operation is guaranteed to be
+ * seen by any other operation.
  */
 #ifdef _MSC_VER
 typedef volatile LONG usbi_atomic_t;
+typedef volatile LONG usbi_atomic_int_t; // the win functions expect LONG volatile *, but it's still 32 bits by LLP64 so all good
 #define usbi_atomic_load(a)	InterlockedCompareExchange((a), 0, 0)
 #define usbi_atomic_store(a, v)	((void)InterlockedExchange((a), (v)))
 #define usbi_atomic_inc(a)	InterlockedIncrement((a))
 #define usbi_atomic_dec(a)	InterlockedDecrement((a))
+#define usbi_atomic_load_acquire(a)	ReadAcquire((a))
+#define usbi_atomic_store_release(a, v)	WriteRelease((a), (v))
 #else
 #if defined(__GNUC__) && !defined(__clang__) && (defined(__cplusplus) || defined(__HAIKU__))
 /* GCC's <stdatomic.h> relies on the C-only _Atomic keyword and so fails to
@@ -118,17 +124,23 @@ typedef volatile LONG usbi_atomic_t;
  * GCC __atomic builtins work in both C and every C++ version, so use them for
  * any GCC C++ build rather than maintaining a separate C++23 path. */
 typedef long usbi_atomic_t;
+typedef int usbi_atomic_int_t;
 #define usbi_atomic_load(a)    __atomic_load_n((a), __ATOMIC_SEQ_CST)
 #define usbi_atomic_store(a, v)        __atomic_store_n((a), (v), __ATOMIC_SEQ_CST)
 #define usbi_atomic_inc(a)     __atomic_add_fetch((a), 1, __ATOMIC_SEQ_CST)
 #define usbi_atomic_dec(a)     __atomic_sub_fetch((a), 1, __ATOMIC_SEQ_CST)
+#define usbi_atomic_load_acquire(a)    __atomic_load_n((a), __ATOMIC_ACQUIRE)
+#define usbi_atomic_store_release(a, v)        __atomic_store_n((a), (v), __ATOMIC_RELEASE)
 #else
 #include <stdatomic.h>
 typedef atomic_long usbi_atomic_t;
+typedef atomic_int usbi_atomic_int_t;
 #define usbi_atomic_load(a)	atomic_load((a))
 #define usbi_atomic_store(a, v)	atomic_store((a), (v))
 #define usbi_atomic_inc(a)	(atomic_fetch_add((a), 1) + 1)
 #define usbi_atomic_dec(a)	(atomic_fetch_add((a), -1) - 1)
+#define usbi_atomic_load_acquire(a)	atomic_load_explicit((a), memory_order_acquire)
+#define usbi_atomic_store_release(a, v)	atomic_store_explicit((a), (v), memory_order_release)
 #endif
 #endif
 

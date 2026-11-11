@@ -39,8 +39,8 @@ static void LIBUSB_CALL sync_transfer_cb(struct libusb_transfer *transfer)
 {
 	usbi_dbg(usbi_transfer_ctx(transfer), "actual_length=%d", transfer->actual_length);
 
-	int *completed = (int *)transfer->user_data;
-	*completed = 1;
+	usbi_atomic_int_t *completed = (usbi_atomic_int_t *)transfer->user_data;
+	usbi_atomic_store_release(completed, 1);
 	/*
 	 * Right after setting 'completed', another thread might free the transfer, so don't
 	 * access it beyond this point. The instantiating thread (not necessarily the
@@ -50,11 +50,12 @@ static void LIBUSB_CALL sync_transfer_cb(struct libusb_transfer *transfer)
 
 static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
 {
-	int r, *completed = (int *)transfer->user_data;
+	int r;
+	usbi_atomic_int_t *completed = (usbi_atomic_int_t *)transfer->user_data;
 	struct libusb_context *ctx = usbi_handle_ctx(transfer->dev_handle);
 
-	while (!*completed) {
-		r = libusb_handle_events_completed(ctx, completed);
+	while (!usbi_atomic_load_acquire(completed)) {
+		r = libusb_handle_events_completed(ctx, (int *)completed);
 		if (r < 0) {
 			if (r == LIBUSB_ERROR_INTERRUPTED)
 				continue;
@@ -66,7 +67,7 @@ static void sync_transfer_wait_for_completion(struct libusb_transfer *transfer)
 		if (NULL == transfer->dev_handle) {
 			/* transfer completion after libusb_close() */
 			transfer->status = LIBUSB_TRANSFER_NO_DEVICE;
-			*completed = 1;
+			usbi_atomic_store_release(completed, 1);
 		}
 	}
 }
@@ -108,7 +109,7 @@ int API_EXPORTED libusb_control_transfer(libusb_device_handle *dev_handle,
 {
 	struct libusb_transfer *transfer;
 	unsigned char *buffer;
-	int completed = 0;
+	usbi_atomic_int_t completed = 0;
 	int r;
 
 	assert(dev_handle);
@@ -181,7 +182,7 @@ static int do_sync_bulk_transfer(struct libusb_device_handle *dev_handle,
 	int *transferred, unsigned int timeout, unsigned char type)
 {
 	struct libusb_transfer *transfer;
-	int completed = 0;
+	usbi_atomic_int_t completed = 0;
 	int r;
 
 	assert(dev_handle);
