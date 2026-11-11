@@ -498,7 +498,7 @@ static unsigned __stdcall windows_iocp_thread(void *arg)
 				handle_priv = (struct windows_device_handle_priv *)usbi_get_device_handle_priv(dev_handle);
 
 				usbi_mutex_lock(&dev_handle->lock);
-				list_for_each_entry(transfer_priv, &handle_priv->active_transfers, list, struct windows_transfer_priv) {
+				list_for_each_entry(transfer_priv, handle_priv->active_transfers, list, struct windows_transfer_priv) {
 					if (overlapped == &transfer_priv->overlapped) {
 						// This OVERLAPPED belongs to us, remove the transfer from the device handle's list
 						list_del(&transfer_priv->list);

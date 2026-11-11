@@ -773,7 +773,7 @@ static void reap_orphaned_requests(struct libusb_context *ctx)
 	int reaped = 0;
 
 	usbi_mutex_static_lock(&orphaned_requests_lock);
-	list_for_each_entry_safe(req, next_req, &orphaned_requests, list, struct hub_ioctl_request) {
+	list_for_each_entry_safe(req, next_req, orphaned_requests, list, struct hub_ioctl_request) {
 		if (HasOverlappedIoCompleted(&req->overlapped)) {
 			list_del(&req->list);
 			CloseHandle(req->overlapped.hEvent);
@@ -818,7 +818,7 @@ static struct hub_timeout_backoff *hub_timeout_backoff_find(const char *dev_id)
 {
 	struct hub_timeout_backoff *backoff;
 
-	list_for_each_entry(backoff, &hub_timeout_backoffs, list, struct hub_timeout_backoff) {
+	list_for_each_entry(backoff, hub_timeout_backoffs, list, struct hub_timeout_backoff) {
 		if (strcmp((const char *)(backoff + 1), dev_id) == 0)
 			return backoff;
 	}
@@ -836,7 +836,7 @@ static bool hub_timeout_backoff_active(const char *dev_id)
 	bool active = false;
 
 	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
-	list_for_each_entry_safe(backoff, next_backoff, &hub_timeout_backoffs, list, struct hub_timeout_backoff) {
+	list_for_each_entry_safe(backoff, next_backoff, hub_timeout_backoffs, list, struct hub_timeout_backoff) {
 		if (now >= backoff->expiry) {
 			list_del(&backoff->list);
 			free(backoff);
@@ -1010,7 +1010,7 @@ static void winusb_exit(struct libusb_context *ctx)
 	// Recorded re-initialization backoffs, however, can simply be dropped
 	usbi_mutex_static_lock(&hub_timeout_backoffs_lock);
 	while (!list_empty(&hub_timeout_backoffs)) {
-		struct hub_timeout_backoff *backoff = list_first_entry(&hub_timeout_backoffs, struct hub_timeout_backoff, list);
+		struct hub_timeout_backoff *backoff = list_first_entry(hub_timeout_backoffs, struct hub_timeout_backoff, list);
 		list_del(&backoff->list);
 		free(backoff);
 	}
