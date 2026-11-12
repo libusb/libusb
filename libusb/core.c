@@ -1802,7 +1802,7 @@ int API_EXPORTED libusb_get_configuration(libusb_device_handle *dev_handle,
  * \param configuration the bConfigurationValue of the configuration you
  * wish to activate, or -1 if you wish to put the device in an unconfigured
  * state
- * \returns 0 on success
+ * \returns \ref LIBUSB_SUCCESS on success
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if the requested configuration does not exist
  * \returns \ref LIBUSB_ERROR_BUSY if interfaces are currently claimed
  * \returns \ref LIBUSB_ERROR_NOT_SUPPORTED if setting or changing the configuration
@@ -1944,7 +1944,7 @@ out:
  * previously-claimed interface
  * \param alternate_setting the <tt>bAlternateSetting</tt> of the alternate
  * setting to activate
- * \returns 0 on success
+ * \returns \ref LIBUSB_SUCCESS on success
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if the interface was not claimed, or the
  * requested alternate setting does not exist
  * \returns \ref LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
@@ -1986,7 +1986,7 @@ int API_EXPORTED libusb_set_interface_alt_setting(libusb_device_handle *dev_hand
  *
  * \param dev_handle a device handle
  * \param endpoint the endpoint to clear halt status
- * \returns 0 on success
+ * \returns \ref LIBUSB_SUCCESS on success
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
  * \returns \ref LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
@@ -2015,7 +2015,7 @@ int API_EXPORTED libusb_clear_halt(libusb_device_handle *dev_handle,
  * This is a blocking function which usually incurs a noticeable delay.
  *
  * \param dev_handle a handle of the device to reset
- * \returns 0 on success
+ * \returns \ref LIBUSB_SUCCESS on success
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if re-enumeration is required, or if the
  * device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure

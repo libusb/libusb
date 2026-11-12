@@ -1240,7 +1240,7 @@ struct usbi_os_backend {
 	 * This function can block.
 	 *
 	 * Return:
-	 * - 0 on success
+	 * - LIBUSB_SUCCESS on success
 	 * - LIBUSB_ERROR_NOT_FOUND if the configuration does not exist
 	 * - LIBUSB_ERROR_BUSY if interfaces are currently claimed (and hence
 	 *   configuration cannot be changed)
@@ -1298,7 +1298,7 @@ struct usbi_os_backend {
 	 * It's OK for this function to block.
 	 *
 	 * Return:
-	 * - 0 on success
+	 * - LIBUSB_SUCCESS on success
 	 * - LIBUSB_ERROR_NOT_FOUND if the alternate setting does not exist
 	 * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected since it
 	 *   was opened
@@ -1312,7 +1312,7 @@ struct usbi_os_backend {
 	 * It's OK for this function to block.
 	 *
 	 * Return:
-	 * - 0 on success
+	 * - LIBUSB_SUCCESS on success
 	 * - LIBUSB_ERROR_NOT_FOUND if the endpoint does not exist
 	 * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected since it
 	 *   was opened
@@ -1332,7 +1332,7 @@ struct usbi_os_backend {
 	 * to close the old handle and re-enumerate the device.
 	 *
 	 * Return:
-	 * - 0 on success
+	 * - LIBUSB_SUCCESS on success
 	 * - LIBUSB_ERROR_NOT_FOUND if re-enumeration is required, or if the device
 	 *   has been disconnected since it was opened
 	 * - another LIBUSB_ERROR code on other failure
