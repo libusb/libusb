@@ -20,7 +20,10 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <PreBuildEvent>
-      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(SolutionDir)..\build-aux\gen-describe.ps1" "$(SolutionDir).." "$(SolutionDir)..\libusb\version_describe.h"</Command>
+      <Command>set "LIBUSB_VERSION_SCRIPT=$(SolutionDir)..\build-aux\gen-describe.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Unblock-File -LiteralPath $env:LIBUSB_VERSION_SCRIPT -ErrorAction Stop"
+if errorlevel 1 exit /b 1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%LIBUSB_VERSION_SCRIPT%" "$(SolutionDir).." "$(SolutionDir)..\libusb\version_describe.h"</Command>
       <Message>Generating version_describe.h</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>

@@ -2,7 +2,8 @@ AUTOMAKE_OPTIONS = dist-bzip2 no-dist-gzip
 ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = INSTALL_WIN.txt PORTING doc/libusb.png \
 	     android msvc Xcode \
-	     build-aux/gen-describe.sh build-aux/gen-describe.ps1
+	     build-aux/gen-describe.sh build-aux/gen-describe.ps1 \
+	     build-aux/version-describe-unknown.h
 SUBDIRS = libusb
 
 if BUILD_EXAMPLES
@@ -39,6 +40,7 @@ endif
 #   3) Freeze the git-describe output into .tarball-version so that builds
 #      from the resulting tarball produce a stable, reproducible
 #      LIBUSB_DESCRIBE string without needing git at build time.
+#   4) Include a frozen header for Windows builds without a POSIX shell.
 dist-hook:
 	chmod u+w $(distdir)/README $(distdir)/msvc
 	$(SED) -i.orig -e '/Build Status/d' $(distdir)/README
@@ -46,13 +48,14 @@ dist-hook:
 	$(SED) -i.orig -e 's/\[\([A-Z]*\)\](\1)/\1/' $(distdir)/README
 	rm -f $(distdir)/README.orig
 	rm -f $(distdir)/msvc/.gitattributes
-	@if test -e "$(top_srcdir)/.git"; then \
+	@set -e; if test -e "$(top_srcdir)/.git"; then \
 		git -C "$(top_srcdir)" describe --tags --always --dirty \
-			> $(distdir)/.tarball-version || \
-			rm -f $(distdir)/.tarball-version; \
+			> "$(distdir)/.tarball-version"; \
 	elif test -f "$(top_srcdir)/.tarball-version"; then \
-		cp "$(top_srcdir)/.tarball-version" $(distdir)/.tarball-version; \
+		cp "$(top_srcdir)/.tarball-version" "$(distdir)/.tarball-version"; \
 	fi
+	$(SHELL) "$(top_srcdir)/build-aux/gen-describe.sh" "$(distdir)" \
+		"$(distdir)/build-aux/version-describe-dist.h"
 
 reldir = .release/$(distdir)
 sfurl = frs.sourceforge.net:/home/frs/project/libusb/libusb-1.0
