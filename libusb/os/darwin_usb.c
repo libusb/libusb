@@ -3395,18 +3395,24 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
 
   usbi_dbg (ctx, "handling transfer completion type %s with kernel status %d", transfer_types[transfer->type], tpriv->result);
 
-  if (kIOReturnSuccess == tpriv->result || kIOReturnUnderrun == tpriv->result || kIOUSBTransactionTimeout == tpriv->result) {
-    if (is_isoc && tpriv->isoc_framelist) {
-      /* copy isochronous results back */
+  if (is_isoc && tpriv->isoc_framelist &&
+      (kIOReturnSuccess == tpriv->result || kIOReturnUnderrun == tpriv->result || kIOUSBTransactionTimeout == tpriv->result)) {
+    /* copy isochronous results back. Each frame carries its own frStatus/frActCount
+       from the controller's frame list, independently of the pipe's overall result,
+       so these remain meaningful even when the pipe as a whole timed out. */
 
-      for (int i = 0; i < transfer->num_iso_packets ; i++) {
-        struct libusb_iso_packet_descriptor *lib_desc = &transfer->iso_packet_desc[i];
-        lib_desc->status = darwin_transfer_status (itransfer, tpriv->isoc_framelist[i].frStatus);
-        lib_desc->actual_length = tpriv->isoc_framelist[i].frActCount;
-      }
-    } else if (!is_isoc) {
-      itransfer->transferred += tpriv->size;
+    for (int i = 0; i < transfer->num_iso_packets ; i++) {
+      struct libusb_iso_packet_descriptor *lib_desc = &transfer->iso_packet_desc[i];
+      lib_desc->status = darwin_transfer_status (itransfer, tpriv->isoc_framelist[i].frStatus);
+      lib_desc->actual_length = tpriv->isoc_framelist[i].frActCount;
     }
+  } else if (!is_isoc && (kIOReturnSuccess == tpriv->result || kIOReturnUnderrun == tpriv->result)) {
+    /* IOUSBLib.h says this for ReadPipeAsyncTO/WritePipeAsyncTO:
+       "If an error is returned, the size parameter is not updated and the buffer
+       will NOT contain any valid data." kIOUSBTransactionTimeout is such an error,
+       so tpriv->size (the callback's arg0) is not a trustworthy byte count here,
+       and the transfer buffer may still hold whatever it held before submission. */
+    itransfer->transferred += tpriv->size;
   }
 
   /* it is ok to handle cancelled transfers without calling usbi_handle_transfer_cancellation (we catch timeout transfers) */
