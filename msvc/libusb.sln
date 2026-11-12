@@ -34,6 +34,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "set_option", "set_option.vc
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "testcore", "testcore.vcxproj", "{57BDB9C3-DC00-49FA-B27B-73805699E846}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hotplug_rules", "hotplug_rules.vcxproj", "{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -829,6 +831,54 @@ Global
 		{57BDB9C3-DC00-49FA-B27B-73805699E846}.Release-MT|Win32.Build.0 = Release-MT|Win32
 		{57BDB9C3-DC00-49FA-B27B-73805699E846}.Release-MT|x64.ActiveCfg = Release-MT|x64
 		{57BDB9C3-DC00-49FA-B27B-73805699E846}.Release-MT|x64.Build.0 = Release-MT|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug|ARM64.Build.0 = Debug|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug|Win32.ActiveCfg = Debug|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug|Win32.Build.0 = Debug|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug|x64.ActiveCfg = Debug|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug|x64.Build.0 = Debug|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug|ARM64.ActiveCfg = Debug-Hotplug|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug|ARM64.Build.0 = Debug-Hotplug|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug|Win32.ActiveCfg = Debug-Hotplug|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug|Win32.Build.0 = Debug-Hotplug|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug|x64.ActiveCfg = Debug-Hotplug|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug|x64.Build.0 = Debug-Hotplug|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug-MT|ARM64.ActiveCfg = Debug-Hotplug-MT|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug-MT|ARM64.Build.0 = Debug-Hotplug-MT|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug-MT|Win32.ActiveCfg = Debug-Hotplug-MT|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug-MT|Win32.Build.0 = Debug-Hotplug-MT|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug-MT|x64.ActiveCfg = Debug-Hotplug-MT|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-Hotplug-MT|x64.Build.0 = Debug-Hotplug-MT|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-MT|ARM64.ActiveCfg = Debug-MT|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-MT|ARM64.Build.0 = Debug-MT|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-MT|Win32.ActiveCfg = Debug-MT|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-MT|Win32.Build.0 = Debug-MT|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-MT|x64.ActiveCfg = Debug-MT|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Debug-MT|x64.Build.0 = Debug-MT|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release|ARM64.ActiveCfg = Release|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release|ARM64.Build.0 = Release|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release|Win32.ActiveCfg = Release|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release|Win32.Build.0 = Release|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release|x64.ActiveCfg = Release|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release|x64.Build.0 = Release|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug|ARM64.ActiveCfg = Release-Hotplug|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug|ARM64.Build.0 = Release-Hotplug|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug|Win32.ActiveCfg = Release-Hotplug|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug|Win32.Build.0 = Release-Hotplug|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug|x64.ActiveCfg = Release-Hotplug|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug|x64.Build.0 = Release-Hotplug|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug-MT|ARM64.ActiveCfg = Release-Hotplug-MT|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug-MT|ARM64.Build.0 = Release-Hotplug-MT|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug-MT|Win32.ActiveCfg = Release-Hotplug-MT|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug-MT|Win32.Build.0 = Release-Hotplug-MT|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug-MT|x64.ActiveCfg = Release-Hotplug-MT|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-Hotplug-MT|x64.Build.0 = Release-Hotplug-MT|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-MT|ARM64.ActiveCfg = Release-MT|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-MT|ARM64.Build.0 = Release-MT|ARM64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-MT|Win32.ActiveCfg = Release-MT|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-MT|Win32.Build.0 = Release-MT|Win32
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-MT|x64.ActiveCfg = Release-MT|x64
+		{DA1F8F96-DA03-46C4-8452-F25FB0737AFD}.Release-MT|x64.Build.0 = Release-MT|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
