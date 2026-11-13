@@ -10,6 +10,8 @@ EXPORTS
   libusb_bulk_transfer@24 = libusb_bulk_transfer
   libusb_cancel_transfer
   libusb_cancel_transfer@4 = libusb_cancel_transfer
+  libusb_check_connected
+  libusb_check_connected@4 = libusb_check_connected
   libusb_claim_interface
   libusb_claim_interface@8 = libusb_claim_interface
   libusb_clear_halt
