@@ -765,11 +765,12 @@ static void darwin_devices_detached (void *ptr, io_iterator_t rem_devices) EXCLU
     list_for_each_entry(old_device, &darwin_cached_devices, list, struct darwin_cached_device) {
       if (old_device->session == session) {
         if (atomic_load(&old_device->in_reenumerate)) {
-          /* device is re-enumerating. do not dereference the device at this time. libusb_reset_device()
-           * will deref if needed. */
+          /* device is re-enumerating. do not dereference the device at this time. if the device does
+           * not come back, darwin_reenumerate_device completes the detach. */
           usbi_dbg (NULL, "detected device detached due to re-enumeration. sessionID: 0x%" PRIx64
                           ", locationID: 0x%" PRIx32, session, locationID);
 
+          old_device->detached_while_reenumerating = true;
           is_reenumerating = true;
         } else {
           darwin_unref_cached_device_locked (old_device);
@@ -1693,6 +1694,8 @@ static enum libusb_error darwin_get_cached_device(struct libusb_context *ctx, io
 
     new_device->session = sessionID;
     if (*old_session_id) {
+      /* the device came back: the old session is replaced, not removed */
+      new_device->detached_while_reenumerating = false;
       /* the device is being re-enumerated: the re-enumerating thread may
          still be using device and service, so do not touch them here. stash
          the replacements instead; darwin_reenumerate_device adopts them (and
@@ -2676,6 +2679,44 @@ static void darwin_adopt_pending_device (struct darwin_cached_device *dpriv) EXC
   usbi_mutex_unlock(&darwin_cached_devices_mutex);
 }
 
+/* complete the detach that darwin_devices_detached deferred for a device that
+   did not come back from re-enumeration. without this the old session stays in
+   every context's device list. the re-enumerating handle holds a reference to
+   the cached device, so dropping the cache reference here cannot free it.
+   taking active_contexts_lock with dpriv->lock held is safe: the hotplug
+   callbacks hold active_contexts_lock but never take dpriv->lock. */
+static void darwin_complete_deferred_detach (struct darwin_cached_device *dpriv) EXCLUDES(active_contexts_lock) EXCLUDES(darwin_cached_devices_mutex) {
+  struct libusb_context *ctx;
+  struct libusb_device *dev;
+  bool detached;
+  UInt64 session;
+
+  usbi_mutex_lock(&active_contexts_lock);
+
+  usbi_mutex_lock(&darwin_cached_devices_mutex);
+  detached = dpriv->detached_while_reenumerating;
+  dpriv->detached_while_reenumerating = false;
+  session = dpriv->session;
+  if (detached) {
+    darwin_unref_cached_device_locked (dpriv);
+  }
+  usbi_mutex_unlock(&darwin_cached_devices_mutex);
+
+  if (detached) {
+    for_each_context(ctx) {
+      usbi_dbg (ctx, "notifying context %p of deferred device disconnect", ctx);
+
+      dev = usbi_get_device_by_session_id(ctx, (unsigned long) session);
+      if (dev) {
+        usbi_disconnect_device(dev);
+        libusb_unref_device(dev);
+      }
+    }
+  }
+
+  usbi_mutex_unlock(&active_contexts_lock);
+}
+
 /* must be called while holding dev_handle->lock and dpriv->lock. both locks
    are held during the wait for re-enumeration to complete, which serializes
    open/close/capture operations on the device while it is being reset. the
@@ -2773,6 +2814,7 @@ static int darwin_reenumerate_device (struct libusb_device_handle *dev_handle, b
     if (elapsed_us >= DARWIN_REENUMERATE_TIMEOUT_US) {
       usbi_err (ctx, "darwin/reenumerate_device: timeout waiting for reenumerate");
       atomic_store(&dpriv->in_reenumerate, false);
+      darwin_complete_deferred_detach (dpriv);
       return LIBUSB_ERROR_TIMEOUT;
     }
   }
