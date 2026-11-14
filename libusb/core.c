@@ -1002,6 +1002,13 @@ int API_EXPORTED libusb_get_port_numbers(libusb_device *dev,
 	if (port_numbers_len <= 0)
 		return LIBUSB_ERROR_INVALID_PARAM;
 
+	if (usbi_backend.get_port_numbers) {
+		int ret = usbi_backend.get_port_numbers(dev, port_numbers,
+			port_numbers_len);
+		if (ret != LIBUSB_ERROR_NOT_FOUND)
+			return ret;
+	}
+
 	/* count the port depth first to avoid modifying the buffer on overflow.
 	 * HCDs can be listed as devices with port #0 */
 	depth = 0;
