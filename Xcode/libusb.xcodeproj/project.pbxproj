@@ -49,7 +49,6 @@
 		008FBFA51628B84200BC5BE2 /* config.h in Headers */ = {isa = PBXBuildFile; fileRef = 008FBFA41628B84200BC5BE2 /* config.h */; };
 		008FBFA71628B87000BC5BE2 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBFA61628B87000BC5BE2 /* CoreFoundation.framework */; };
 		008FBFA91628B88000BC5BE2 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBFA81628B88000BC5BE2 /* IOKit.framework */; };
-		008FBFAB1628B8CB00BC5BE2 /* libobjc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 008FBFAA1628B8CB00BC5BE2 /* libobjc.dylib */; };
 		008FBFEF1628BA3500BC5BE2 /* xusb.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBFED1628BA0E00BC5BE2 /* xusb.c */; };
 		008FBFFF1628BB9600BC5BE2 /* dpfp.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBFD71628BA0E00BC5BE2 /* dpfp.c */; };
 		008FC01F1628BC1500BC5BE2 /* fxload.c in Sources */ = {isa = PBXBuildFile; fileRef = 008FBFE11628BA0E00BC5BE2 /* fxload.c */; };
@@ -345,7 +344,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				008FBFAB1628B8CB00BC5BE2 /* libobjc.dylib in Frameworks */,
 				008FBFA91628B88000BC5BE2 /* IOKit.framework in Frameworks */,
 				CEA45DFB2634CDFA002FA97D /* Security.framework in Frameworks */,
 				008FBFA71628B87000BC5BE2 /* CoreFoundation.framework in Frameworks */,
