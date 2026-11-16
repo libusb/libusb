@@ -50,6 +50,7 @@
 #endif
 
 #include "darwin_usb.h"
+#include "darwin_timeout.h"
 
 /* Both kIOMasterPortDefault or kIOMainPortDefault are synonyms for 0. */
 static const mach_port_t darwin_default_master_port = 0;
@@ -3406,13 +3407,13 @@ static int darwin_handle_transfer_completion (struct usbi_transfer *itransfer) {
       lib_desc->status = darwin_transfer_status (itransfer, tpriv->isoc_framelist[i].frStatus);
       lib_desc->actual_length = tpriv->isoc_framelist[i].frActCount;
     }
-  } else if (!is_isoc && (kIOReturnSuccess == tpriv->result || kIOReturnUnderrun == tpriv->result)) {
-    /* IOUSBLib.h says this for ReadPipeAsyncTO/WritePipeAsyncTO:
-       "If an error is returned, the size parameter is not updated and the buffer
-       will NOT contain any valid data." kIOUSBTransactionTimeout is such an error,
-       so tpriv->size (the callback's arg0) is not a trustworthy byte count here,
-       and the transfer buffer may still hold whatever it held before submission. */
-    itransfer->transferred += tpriv->size;
+  } else if (!is_isoc &&
+             (kIOReturnSuccess == tpriv->result || kIOReturnUnderrun == tpriv->result ||
+              kIOUSBTransactionTimeout == tpriv->result)) {
+    /* Timeout byte counts are valid unless this is the stale full-length bulk IN case. */
+    itransfer->transferred += darwin_timeout_transferred (
+        kIOUSBTransactionTimeout == tpriv->result, transfer->type, transfer->endpoint,
+        tpriv->size, (uint32_t) transfer->length);
   }
 
   /* it is ok to handle cancelled transfers without calling usbi_handle_transfer_cancellation (we catch timeout transfers) */
