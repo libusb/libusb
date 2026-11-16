@@ -1,0 +1,107 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, labeled]
+  schedule:
+    - cron: '33 19 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: CodeQL (${{ matrix.platform }})
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'ci-codeql') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'ci-codeql'))
+    runs-on: ${{ matrix.os }}
+    concurrency:
+      group: codeql-${{ matrix.platform }}-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      # Manual C/C++ builds require a full database rather than an overlay.
+      CODEQL_OVERLAY_DATABASE_MODE: none
+      # CodeQL's Windows path resolver loads a JNI native library.
+      JDK_JAVA_OPTIONS: --enable-native-access=ALL-UNNAMED
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-24.04
+          - platform: windows
+            os: windows-2022
+          - platform: macos
+            # CodeQL tracing requires macOS and Xcode earlier than version 27.
+            os: macos-15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The version header uses git describe with tags.
+          fetch-depth: 0
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        timeout-minutes: 5
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool libudev-dev pkg-config
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        run: brew install autoconf automake libtool
+      - name: Select macOS toolchain
+        if: runner.os == 'macOS'
+        run: echo "DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Set up MSBuild
+        if: runner.os == 'Windows'
+        uses: microsoft/setup-msbuild@v3
+      - name: Configure Unix library
+        if: runner.os != 'Windows'
+        timeout-minutes: 5
+        run: |
+          ./bootstrap.sh
+          mkdir build-codeql
+          cd build-codeql
+          ../configure --disable-shared
+      - name: Configure Linux netlink backend
+        if: runner.os == 'Linux'
+        timeout-minutes: 5
+        run: |
+          mkdir build-codeql-netlink
+          cd build-codeql-netlink
+          ../configure --disable-shared --disable-udev
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        timeout-minutes: 5
+        with:
+          languages: c-cpp
+          build-mode: manual
+      - name: Build Unix library
+        if: runner.os != 'Windows'
+        timeout-minutes: 5
+        run: make -C build-codeql/libusb -j2
+      - name: Build Linux netlink backend
+        if: runner.os == 'Linux'
+        timeout-minutes: 5
+        run: make -C build-codeql-netlink/libusb -j2
+      - name: Build Windows library
+        if: runner.os == 'Windows'
+        timeout-minutes: 5
+        run: >-
+          msbuild msvc/libusb.sln /m /t:libusb_static
+          /p:Configuration=Release-Hotplug /p:Platform=x64 /p:PlatformToolset=v143
+      - name: Analyze CodeQL
+        uses: github/codeql-action/analyze@v4
+        timeout-minutes: 10
+        with:
+          category: /language:c-cpp/os:${{ matrix.platform }}
