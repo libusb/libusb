@@ -21,7 +21,7 @@ else
 PLATFORM_SRC = $(WINDOWS_PLATFORM_SRC)
 endif
 
-OS_DARWIN_SRC = os/darwin_usb.h os/darwin_usb.c
+OS_DARWIN_SRC = os/darwin_timeout.h os/darwin_usb.h os/darwin_usb.c
 OS_HAIKU_SRC = os/haiku_usb.h os/haiku_usb_backend.cpp \
 	       os/haiku_pollfs.cpp os/haiku_usb_raw.h os/haiku_usb_raw.cpp
 OS_LINUX_SRC = os/linux_usbfs.h os/linux_usbfs.c

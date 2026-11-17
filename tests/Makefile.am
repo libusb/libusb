@@ -21,7 +21,7 @@ stress_SOURCES = stress.c testlib.c
 stress_mt_SOURCES = stress_mt.c
 set_option_SOURCES = set_option.c testlib.c
 init_context_SOURCES = init_context.c testlib.c
-macos_SOURCES = macos.c testlib.c
+macos_SOURCES = macos.c darwin_timeout.c testlib.c
 testcore_SOURCES = testcore.c
 
 stress_mt_CFLAGS = $(AM_CFLAGS) $(THREAD_CFLAGS)
