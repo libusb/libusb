@@ -138,6 +138,9 @@ struct darwin_cached_device {
   int                   can_enumerate;
   int                   refcount;
   atomic_bool           in_reenumerate;
+  /* the old session detached during re-enumeration and its detach was
+     deferred to darwin_reenumerate_device. GUARDED_BY(darwin_cached_devices_mutex) */
+  bool                  detached_while_reenumerating;
 };
 
 struct darwin_device_priv {
