@@ -567,6 +567,7 @@ static int windows_assign_endpoints(struct libusb_device_handle *dev_handle, uin
 	}
 
 	safe_free(priv->usb_interface[iface].endpoint);
+	priv->usb_interface[iface].nb_endpoints = 0;
 
 	if (if_desc->bNumEndpoints == 0) {
 		usbi_dbg(usbi_handle_ctx(dev_handle), "no endpoints found for interface %u", iface);
@@ -3009,9 +3010,6 @@ static int winusb_claim_interface(struct libusb_device_handle *dev_handle, uint8
 	usbi_mutex_lock(&autoinit_lock);
 	usbi_mutex_lock(&priv->interface_lock);
 
-	safe_free(priv->usb_interface[iface].endpoint);
-	priv->usb_interface[iface].nb_endpoints = 0;
-
 	r = priv->apib->claim_interface(SUB_API_NOTSET, dev_handle, iface);
 
 	if (r == LIBUSB_SUCCESS)
@@ -3034,9 +3032,6 @@ static int winusb_set_interface_altsetting(struct libusb_device_handle *dev_hand
 	CHECK_SUPPORTED_API(priv->apib, set_interface_altsetting);
 
 	usbi_mutex_lock(&priv->interface_lock);
-
-	safe_free(priv->usb_interface[iface].endpoint);
-	priv->usb_interface[iface].nb_endpoints = 0;
 
 	r = priv->apib->set_interface_altsetting(SUB_API_NOTSET, dev_handle, iface, altsetting);
 
