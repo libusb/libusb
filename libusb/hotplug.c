@@ -214,14 +214,17 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 		return;
 
 	/* free all registered hotplug callbacks */
+	usbi_mutex_lock(&ctx->hotplug_cbs_lock);
 	for_each_hotplug_cb_safe(ctx, hotplug_cb, next_cb) {
 		list_del(&hotplug_cb->list);
 		free(hotplug_cb);
 	}
+	usbi_mutex_unlock(&ctx->hotplug_cbs_lock);
 
 	/* free all pending hotplug messages */
+	usbi_mutex_lock(&ctx->event_data_lock);
 	while (!list_empty(&ctx->hotplug_msgs)) {
-		msg = list_first_entry(&ctx->hotplug_msgs, struct usbi_hotplug_message, list);
+		msg = list_first_entry(ctx->hotplug_msgs, struct usbi_hotplug_message, list);
 
 		/* if the device left, the message holds a reference
 		 * and we must drop it */
@@ -231,6 +234,7 @@ void usbi_hotplug_exit(struct libusb_context *ctx)
 		list_del(&msg->list);
 		free(msg);
 	}
+	usbi_mutex_unlock(&ctx->event_data_lock);
 
 	usbi_mutex_lock(&ctx->usb_devs_lock); /* hotplug thread might still be processing an already triggered event, possibly accessing this list as well */
 	/* free all discovered devices */
@@ -318,7 +322,7 @@ void usbi_hotplug_process(struct libusb_context *ctx, struct list_head *hotplug_
 
 	/* dispatch all pending hotplug messages */
 	while (!list_empty(hotplug_msgs)) {
-		msg = list_first_entry(hotplug_msgs, struct usbi_hotplug_message, list);
+		msg = list_first_entry(*hotplug_msgs, struct usbi_hotplug_message, list);
 
 		for_each_hotplug_cb_safe(ctx, hotplug_cb, next_cb) {
 			/* skip callbacks that have unregistered */
