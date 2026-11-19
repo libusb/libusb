@@ -947,6 +947,7 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer) E
 	struct windows_context_priv *priv = (struct windows_context_priv *)usbi_get_context_priv(ctx);
 	const struct windows_backend *backend = priv->backend;
 	struct windows_transfer_priv *transfer_priv = (struct windows_transfer_priv *)usbi_get_transfer_priv(itransfer);
+	struct libusb_transfer *transfer = usbi_transfer_to_libusb_transfer(itransfer);
 	enum libusb_transfer_status status, istatus;
 	DWORD result, bytes_transferred;
 	HANDLE transfer_handle;
@@ -964,17 +965,32 @@ static int windows_handle_transfer_completion(struct usbi_transfer *itransfer) E
 	else
 		result = GetLastError();
 
-#ifdef ENABLE_LOGGING
-	struct libusb_transfer *transfer = usbi_transfer_to_libusb_transfer(itransfer);
 	usbi_dbg(ctx, "handling transfer %p completion with errcode %lu, length %lu",
 		 transfer, ULONG_CAST(result), ULONG_CAST(bytes_transferred));
-#endif
 
 	switch (result) {
 	case NO_ERROR:
 		status = backend->copy_transfer_data(itransfer, bytes_transferred);
 		break;
 	case ERROR_GEN_FAILURE:
+		if (transfer->type == LIBUSB_TRANSFER_TYPE_ISOCHRONOUS) {
+			/*
+			 * An isochronous endpoint cannot stall (no handshake phase). The USB
+			 * stack fails a whole isochronous request this way when every packet
+			 * in it failed or it could not be scheduled; the endpoint keeps
+			 * running and no data was transferred. The driver may leave its
+			 * packet results unwritten, so they are not read here.
+			 */
+			for (int i = 0; i < transfer->num_iso_packets; i++) {
+				transfer->iso_packet_desc[i].actual_length = 0;
+				transfer->iso_packet_desc[i].status = LIBUSB_TRANSFER_ERROR;
+			}
+
+			usbi_dbg(ctx, "detected isochronous request failure");
+			status = LIBUSB_TRANSFER_ERROR;
+			break;
+		}
+
 		usbi_dbg(ctx, "detected endpoint stall");
 		status = LIBUSB_TRANSFER_STALL;
 		break;
