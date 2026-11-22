@@ -21,6 +21,8 @@ stress_SOURCES = stress.c testlib.c
 stress_mt_SOURCES = stress_mt.c
 set_option_SOURCES = set_option.c testlib.c
 init_context_SOURCES = init_context.c testlib.c
+iad_SOURCES = iad.c
+iad_LDADD =
 macos_SOURCES = macos.c testlib.c
 testcore_SOURCES = testcore.c
 
@@ -43,10 +45,11 @@ endif
 
 noinst_HEADERS = libusb_testlib.h
 noinst_PROGRAMS = stress stress_mt set_option init_context testcore
+check_PROGRAMS = iad
 
 # testcore is an intentionally long-running stress test. CI sets
 # --enable-testcore on master and for explicitly labelled pull requests.
-TESTS = stress stress_mt set_option init_context
+TESTS = stress stress_mt set_option init_context iad
 if RUN_TESTCORE
 TESTS += testcore
 endif

@@ -1422,8 +1422,13 @@ static int parse_iad_array(struct libusb_context *ctx,
 					  size - consumed, header.bLength);
 			return LIBUSB_ERROR_IO;
 		}
-		if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION)
+		if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION) {
+			if (header.bLength < LIBUSB_DT_INTERFACE_ASSOCIATION_SIZE) {
+				usbi_err(ctx, "short interface association descriptor (%u bytes)", header.bLength);
+				return LIBUSB_ERROR_IO;
+			}
 			iad_length++;
+		}
 		buf += header.bLength;
 		consumed += header.bLength;
 	}
@@ -1441,7 +1446,7 @@ static int parse_iad_array(struct libusb_context *ctx,
 		do {
 			header.bLength = buffer[0];
 			header.bDescriptorType = buffer[1];
-			if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION && (size >= LIBUSB_DT_INTERFACE_ASSOCIATION_SIZE)) {
+			if (header.bDescriptorType == LIBUSB_DT_INTERFACE_ASSOCIATION) {
 				iad[i].bLength = buffer[0];
 				iad[i].bDescriptorType = buffer[1];
 				iad[i].bFirstInterface = buffer[2];
