@@ -3945,8 +3945,8 @@ static void WINAPI winusbx_native_iso_transfer_continue_stream_callback(struct l
 {
 	// If this callback is invoked, this means that we attempted to set ContinueStream
 	// to TRUE when calling Read/WriteIsochPipeAsap in winusbx_submit_iso_transfer().
-	// The role of this callback is to fallback to ContinueStream = FALSE if the transfer
-	// did not succeed.
+	// Retry with ContinueStream = FALSE if the transfer failed, unless the failure
+	// is terminal or libusb will free the transfer after this callback returns.
 
 	struct winusb_transfer_priv *transfer_priv =
 		get_winusb_transfer_priv(usbi_libusb_transfer_to_usbi_transfer(transfer));
@@ -3954,6 +3954,9 @@ static void WINAPI winusbx_native_iso_transfer_continue_stream_callback(struct l
 	bool terminal = (transfer->status == LIBUSB_TRANSFER_CANCELLED ||
 		transfer->status == LIBUSB_TRANSFER_TIMED_OUT ||
 		transfer->status == LIBUSB_TRANSFER_NO_DEVICE);
+	// libusb frees transfers with FREE_TRANSFER set after the callback returns,
+	// so such transfers must not be resubmitted here.
+	bool can_retry = !terminal && !(transfer->flags & LIBUSB_TRANSFER_FREE_TRANSFER);
 	int idx, r;
 
 	// Restore the user callback
@@ -3964,8 +3967,7 @@ static void WINAPI winusbx_native_iso_transfer_continue_stream_callback(struct l
 			fallback = true;
 	}
 
-	if (!fallback || terminal) {
-		// Cancellation, timeout and disconnect must not restart the stream.
+	if (!fallback || !can_retry) {
 		if (transfer->callback)
 			transfer->callback(transfer);
 	} else {
@@ -4158,9 +4160,9 @@ static int winusbx_submit_iso_transfer(int sub_api, struct usbi_transfer *itrans
 		// stream must be continued or if the WinUSB driver can schedule the transfer at its convenience. Profiling subsequent transfers
 		// with ContinueStream = FALSE showed that 5 frames, i.e. about 5 milliseconds, were left empty between each transfer. This
 		// is critical as this greatly diminish the achievable isochronous bandwidth. We solved the problem using the following strategy:
-		// - Transfers are first scheduled with ContinueStream = TRUE and with winusbx_iso_transfer_continue_stream_callback as user callback.
-		// - If the transfer succeeds, winusbx_iso_transfer_continue_stream_callback restore the user callback and calls its.
-		// - If the transfer fails, winusbx_iso_transfer_continue_stream_callback reschedule the transfer and force ContinueStream = FALSE.
+		// - Submit with ContinueStream = TRUE. The wrapper restores the user callback on completion.
+		// - Skip the retry on cancellation, timeout, disconnect, or if LIBUSB_TRANSFER_FREE_TRANSFER is set.
+		// - Retry other transfer or packet failures with ContinueStream = FALSE.
 		if (!transfer_priv->iso_break_stream) {
 			transfer_priv->iso_user_callback = transfer->callback;
 			transfer->callback = winusbx_native_iso_transfer_continue_stream_callback;
