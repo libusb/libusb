@@ -254,7 +254,9 @@ static void udev_hotplug_event(struct udev_device *udev_dev)
 			linux_hotplug_enumerate(busnum, devaddr, sys_name);
 		} else if (detached) {
 			linux_device_disconnected(busnum, devaddr);
-		} else if (strncmp(udev_action, "bind", 4) == 0) {
+		} else if (strncmp(udev_action, "bind", 4) == 0 ||
+		           strncmp(udev_action, "unbind", 6) == 0 ||
+		           strncmp(udev_action, "change", 6) == 0) {
 			/* silently ignore "known unhandled" action */
 		} else {
 			usbi_err(NULL, "ignoring udev action %s", udev_action);

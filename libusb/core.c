@@ -1837,13 +1837,21 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
  *
  * This is a non-blocking function.
  *
+ * \note On Windows, a claim is process-local by default, so several processes
+ * may each believe they hold the same interface. Set
+ * \ref LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM for the cross-process exclusion
+ * that Linux and macOS provide.
+ *
  * \param dev_handle a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the interface you
  * wish to claim
- * \returns 0 on success
+ * \returns \ref LIBUSB_SUCCESS on success
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if the requested interface does not exist
  * \returns \ref LIBUSB_ERROR_BUSY if another program or driver has claimed the
  * interface
+ * \returns \ref LIBUSB_ERROR_NOT_SUPPORTED on Windows if
+ * \ref LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM is set and the driver cannot
+ * enforce the claim (HID, or a libusbK DLL without the claim entry points)
  * \returns \ref LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns a LIBUSB_ERROR code on other failure
  * \see libusb_set_auto_detach_kernel_driver()
@@ -1851,7 +1859,7 @@ int API_EXPORTED libusb_set_configuration(libusb_device_handle *dev_handle,
 int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
 	int interface_number) EXCLUDES(dev_handle->lock)
 {
-	int r = 0;
+	int r = LIBUSB_SUCCESS;
 
 	usbi_dbg(usbi_handle_ctx(dev_handle), "interface %d", interface_number);
 	if (interface_number < 0 || interface_number >= USB_MAXINTERFACES)
@@ -1865,7 +1873,7 @@ int API_EXPORTED libusb_claim_interface(libusb_device_handle *dev_handle,
 		goto out;
 
 	r = usbi_backend.claim_interface(dev_handle, (uint8_t)interface_number);
-	if (r == 0)
+	if (r == LIBUSB_SUCCESS)
 		dev_handle->claimed_interfaces |= 1U << interface_number;
 
 out:
@@ -1891,7 +1899,7 @@ out:
  * \param dev_handle a device handle
  * \param interface_number the <tt>bInterfaceNumber</tt> of the
  * previously-claimed interface
- * \returns 0 on success
+ * \returns \ref LIBUSB_SUCCESS on success
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if the interface was not claimed
  * \returns \ref LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
  * \returns another LIBUSB_ERROR code on other failure
@@ -1913,7 +1921,7 @@ int API_EXPORTED libusb_release_interface(libusb_device_handle *dev_handle,
 	}
 
 	r = usbi_backend.release_interface(dev_handle, (uint8_t)interface_number);
-	if (r == 0)
+	if (r == LIBUSB_SUCCESS)
 		dev_handle->claimed_interfaces &= ~(1U << interface_number);
 
 out:
@@ -2193,7 +2201,7 @@ int API_EXPORTED libusb_kernel_driver_active(libusb_device_handle *dev_handle,
  *
  * \param dev_handle a device handle
  * \param interface_number the interface to detach the driver from
- * \returns 0 on success
+ * \returns \ref LIBUSB_SUCCESS on success
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
  * \returns \ref LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
  * \returns \ref LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
@@ -2227,7 +2235,7 @@ int API_EXPORTED libusb_detach_kernel_driver(libusb_device_handle *dev_handle,
  *
  * \param dev_handle a device handle
  * \param interface_number the interface to attach the driver from
- * \returns 0 on success
+ * \returns \ref LIBUSB_SUCCESS on success
  * \returns \ref LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
  * \returns \ref LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
  * \returns \ref LIBUSB_ERROR_NO_DEVICE if the device has been disconnected
@@ -2538,6 +2546,7 @@ int API_EXPORTEDV libusb_set_option(libusb_context *ctx,
 			/* Handle all backend-specific options here */
 		case LIBUSB_OPTION_USE_USBDK:
 		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+		case LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM:
 			if (usbi_backend.set_option) {
 				r = usbi_backend.set_option(ctx, option, ap);
 				break;
@@ -2675,6 +2684,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 		case LIBUSB_OPTION_LOG_LEVEL:
 		case LIBUSB_OPTION_USE_USBDK:
 		case LIBUSB_OPTION_NO_DEVICE_DISCOVERY:
+		case LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM:
 		case LIBUSB_OPTION_MAX:
 		default:
 			r = libusb_set_option(_ctx, options[i].option, options[i].value.ival);
@@ -3108,7 +3118,7 @@ DEFAULT_VISIBILITY const char * LIBUSB_CALL libusb_error_name(int error_code)
 	case LIBUSB_TRANSFER_OVERFLOW:
 		return "LIBUSB_TRANSFER_OVERFLOW";
 
-	case 0:
+	case LIBUSB_SUCCESS:
 		return "LIBUSB_SUCCESS / LIBUSB_TRANSFER_COMPLETED";
 	default:
 		return "**UNKNOWN**";

@@ -90,6 +90,18 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v3
 
+      # Syntax-only, so this needs no build. WIN32_LEAN_AND_MEAN makes windows.h
+      # skip winsock.h, which is the case that regressed in 1.0.30.
+      - name: Check public header include order
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set "VSDIR=%%i"
+          call "%VSDIR%\VC\Auxiliary\Build\vcvarsall.bat" x64
+          if errorlevel 1 exit /b 1
+          cl /nologo /W4 /WX /Zs /I libusb .private\win32-header-check.c
+          if errorlevel 1 exit /b 1
+          cl /nologo /W4 /WX /Zs /I libusb /D WIN32_LEAN_AND_MEAN .private\win32-header-check.c
+
       - name: Build ${{ matrix.configuration_family.first }}
         id: first_build
         continue-on-error: true

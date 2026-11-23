@@ -1742,7 +1742,8 @@ static int claim_interface(struct libusb_device_handle *handle, unsigned int ifa
 		usbi_err(usbi_handle_ctx(handle), "claim interface failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
-	return 0;
+
+	return LIBUSB_SUCCESS;
 }
 
 static int release_interface(struct libusb_device_handle *handle, unsigned int iface)
@@ -1758,7 +1759,8 @@ static int release_interface(struct libusb_device_handle *handle, unsigned int i
 		usbi_err(usbi_handle_ctx(handle), "release interface failed, errno=%d", errno);
 		return LIBUSB_ERROR_OTHER;
 	}
-	return 0;
+
+	return LIBUSB_SUCCESS;
 }
 
 static int op_set_interface(struct libusb_device_handle *handle, uint8_t interface,
@@ -1987,7 +1989,7 @@ static int op_detach_kernel_driver(struct libusb_device_handle *handle,
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	return 0;
+	return LIBUSB_SUCCESS;
 }
 
 static int op_attach_kernel_driver(struct libusb_device_handle *handle,
@@ -2019,7 +2021,7 @@ static int op_attach_kernel_driver(struct libusb_device_handle *handle,
 		return LIBUSB_ERROR_NOT_FOUND;
 	}
 
-	return 0;
+	return LIBUSB_SUCCESS;
 }
 
 static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
@@ -2034,7 +2036,8 @@ static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
 	dc.flags = USBFS_DISCONNECT_CLAIM_EXCEPT_DRIVER;
 	r = ioctl(fd, IOCTL_USBFS_DISCONNECT_CLAIM, &dc);
 	if (r == 0)
-		return 0;
+		return LIBUSB_SUCCESS;
+
 	switch (errno) {
 	case ENOTTY:
 		break;
@@ -2052,7 +2055,7 @@ static int detach_kernel_driver_and_claim(struct libusb_device_handle *handle,
 	/* Fallback code for kernels which don't support the
 	   disconnect-and-claim ioctl */
 	r = op_detach_kernel_driver(handle, interface);
-	if (r != 0 && r != LIBUSB_ERROR_NOT_FOUND)
+	if (r != LIBUSB_SUCCESS && r != LIBUSB_ERROR_NOT_FOUND)
 		return r;
 
 	return claim_interface(handle, interface);
@@ -2077,7 +2080,7 @@ static int op_release_interface(struct libusb_device_handle *handle, uint8_t int
 	if (handle->auto_detach_kernel_driver)
 		op_attach_kernel_driver(handle, interface);
 
-	return 0;
+	return LIBUSB_SUCCESS;
 }
 
 static void op_destroy_device(struct libusb_device *dev)

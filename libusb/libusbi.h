@@ -1262,7 +1262,7 @@ struct usbi_os_backend {
 	 * This function gets called with dev_handle->lock locked!
 	 *
 	 * Return:
-	 * - 0 on success
+	 * - LIBUSB_SUCCESS on success
 	 * - LIBUSB_ERROR_NOT_FOUND if the interface does not exist
 	 * - LIBUSB_ERROR_BUSY if the interface is in use by another driver/app
 	 * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected since it
@@ -1283,7 +1283,7 @@ struct usbi_os_backend {
 	 * This function gets called with dev_handle->lock locked!
 	 *
 	 * Return:
-	 * - 0 on success
+	 * - LIBUSB_SUCCESS on success
 	 * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected since it
 	 *   was opened
 	 * - another LIBUSB_ERROR code on other failure
@@ -1377,7 +1377,7 @@ struct usbi_os_backend {
 	 * for claim.
 	 *
 	 * Return:
-	 * - 0 on success
+	 * - LIBUSB_SUCCESS on success
 	 * - LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
 	 * - LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
 	 * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected since it
@@ -1392,7 +1392,7 @@ struct usbi_os_backend {
 	 * Reattach a kernel driver to the device.
 	 *
 	 * Return:
-	 * - 0 on success
+	 * - LIBUSB_SUCCESS on success
 	 * - LIBUSB_ERROR_NOT_FOUND if no kernel driver was active
 	 * - LIBUSB_ERROR_INVALID_PARAM if the interface does not exist
 	 * - LIBUSB_ERROR_NO_DEVICE if the device has been disconnected since it
