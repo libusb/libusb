@@ -1085,6 +1085,9 @@ test_hotplug_add_remove(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 
 	/* Either the thread has picked it up already, or we do so now. */
 	g_assert_cmpint(libusb_get_device_list(fixture->ctx, &devs), ==, 1);
+
+	/* Verify the device reports connected */
+	g_assert_cmpint(libush_check_device(devs[0]), ==, 1);
 	libusb_free_device_list(devs, TRUE);
 
 	/* The hotplug event is pending now, but has not yet fired. */
@@ -1101,6 +1104,9 @@ test_hotplug_add_remove(UMockdevTestbedFixture * fixture, UNUSED_DATA)
 
 	/* Either the thread has picked it up already, or we do so now. */
 	g_assert_cmpint(libusb_get_device_list(fixture->ctx, &devs), ==, 0);
+
+	/* Verify the device reports disconnected */
+	g_assert_cmpint(libush_check_device(devs[0]), ==, 0);
 	libusb_free_device_list(devs, TRUE);
 
 	/* The hotplug event is pending now, but has not yet fired. */
