@@ -697,6 +697,14 @@ static int windows_set_option(struct libusb_context *ctx, enum libusb_option opt
 		return LIBUSB_SUCCESS;
 	}
 
+	if (option == LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM) {
+		// Options are applied before the backend is initialized, so nothing
+		// is known yet about the drivers involved; the claim path decides.
+		usbi_dbg(ctx, "context %p will claim interfaces exclusively", ctx);
+		priv->exclusive_claim = true;
+		return LIBUSB_SUCCESS;
+	}
+
 	return LIBUSB_ERROR_NOT_SUPPORTED;
 }
 

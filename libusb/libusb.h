@@ -65,6 +65,12 @@ typedef SSIZE_T ssize_t;
  * As this can be problematic if you include windows.h after libusb.h
  * in your sources, we force windows.h to be included first. */
 #if defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(__CYGWIN__) && !defined(_WINSOCKAPI_)
+/* struct timeval comes from winsock. Include Winsock v2 first, because
+ * windows.h would otherwise pull in the incompatible v1 winsock.h. Skipped
+ * when winsock is already included, to keep the includer's choice. */
+#include <winsock2.h>
+#endif
 #include <windows.h>
 #if defined(interface)
 #undef interface
@@ -1684,7 +1690,36 @@ enum libusb_option {
 	 */
 	LIBUSB_OPTION_LOG_CB = 3,
 
-	LIBUSB_OPTION_MAX = 4
+	/** Enforce libusb_claim_interface() against other processes.
+	 *
+	 * Up to and including 1.0.30, claiming an interface on Windows is local
+	 * to the calling process: several processes may each hold what they
+	 * believe is an exclusive claim on the same interface. With this option
+	 * set, the claim is pushed down to the driver, so a claim held by one
+	 * process makes libusb_claim_interface() return \ref LIBUSB_ERROR_BUSY
+	 * in every other process that also set this option, as on Linux and
+	 * macOS. A process that did not set it is neither blocked nor blocking.
+	 *
+	 * Only the libusbK driver family (libusbK.sys and libusb0.sys, reached
+	 * through libusbK.dll) can arbitrate a claim. WinUSB devices are
+	 * unaffected, since WinUSB permits a single open of the device and so
+	 * already excludes other processes. Where exclusion can be neither
+	 * enforced nor substituted, libusb_claim_interface() returns
+	 * \ref LIBUSB_ERROR_NOT_SUPPORTED rather than granting a claim it cannot
+	 * back: that is the case for HID, which Windows shares between
+	 * applications by design, and for a libusbK DLL too old to expose the
+	 * claim entry points. Control transfers are never affected.
+	 *
+	 * This option takes no argument, and cannot be unset once set. It should
+	 * be set at initialization with libusb_init_context(), otherwise
+	 * unspecified behavior may occur.
+	 *
+	 * Only valid on Windows; returns \ref LIBUSB_ERROR_NOT_SUPPORTED on all
+	 * other platforms, where claiming already excludes other processes.
+	 */
+	LIBUSB_OPTION_WINDOWS_EXCLUSIVE_CLAIM = 4,
+
+	LIBUSB_OPTION_MAX = 5
 };
 
 /** \ingroup libusb_desc
