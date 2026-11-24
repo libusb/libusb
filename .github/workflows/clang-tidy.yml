@@ -1,0 +1,71 @@
+name: clang-tidy
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  CLANG_TIDY_BUILD_DIR: build-clang-tidy
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: ${{ github.event_name == 'pull_request' && 'changed lines' || 'full Linux source set' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.ref || 'master' }}
+
+      - name: setup prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake bear clang-18 clang-tidy-18 jq libtool libudev-dev \
+            libumockdev-dev m4 pkg-config umockdev
+
+      - name: build compilation databases
+        run: .private/ci-clang-tidy.sh build
+
+      - name: prepare review compilation database
+        if: github.event_name == 'pull_request'
+        id: review-sources
+        run: .private/ci-clang-tidy.sh prepare-review --github-output "$GITHUB_OUTPUT"
+
+      - name: review changed lines
+        if: github.event_name == 'pull_request'
+        uses: ZedThree/clang-tidy-review@v0.21.0
+        with:
+          build_dir: ${{ env.CLANG_TIDY_BUILD_DIR }}
+          clang_tidy_version: '18'
+          config_file: .clang-tidy
+          include: ${{ steps.review-sources.outputs.include }}
+          apt_packages: libudev-dev,libumockdev-dev,umockdev
+          parallel: '2'
+          split_workflow: true
+
+      - name: upload review data
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: clang-tidy-review
+          path: clang-tidy-review-output.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: check all compiled sources
+        if: github.event_name != 'pull_request'
+        run: .private/ci-clang-tidy.sh check-full
