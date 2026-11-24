@@ -1822,6 +1822,11 @@ static int set_composite_interface(struct libusb_context *ctx, struct libusb_dev
 				priv->usb_interface[interface_number].num_associated_interfaces = iad->bInterfaceCount;
 				priv->usb_interface[interface_number].first_associated_interface = iad->bFirstInterface;
 				for (iadintfi = 1; iadintfi < iad->bInterfaceCount; iadintfi++) {
+					if (interface_number + iadintfi >= USB_MAXINTERFACES) {
+						usbi_warn(ctx, "IAD bInterfaceCount %u from interface %d exceeds USB_MAXINTERFACES",
+							  iad->bInterfaceCount, interface_number);
+						break;
+					}
 					usbi_dbg(ctx, "interface[%d] is associated with interface[%d]",
 							      interface_number + iadintfi, interface_number);
 					priv->usb_interface[interface_number + iadintfi].apib = &usb_api_backend[api];
@@ -5735,7 +5740,7 @@ static enum libusb_transfer_status hid_copy_transfer_data(int sub_api, struct us
 				}
 
 				if (transfer_priv->hid_buffer[0] == 0) {
-					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer + 1, length);
+					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer + 1, length > 0 ? length - 1 : 0);
 				} else {
 					memcpy(transfer_priv->hid_dest, transfer_priv->hid_buffer, length);
 				}
