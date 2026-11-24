@@ -77,6 +77,8 @@ extern uint32_t libusb_testonly_using_running_interface_version;
 extern uint32_t libusb_testonly_using_running_device_version;
 extern bool libusb_testonly_clear_running_version_cache;
 
+libusb_testlib_result test_darwin_timeout(void);
+
 static libusb_testlib_result test_macos_version_fallback(void) {
   libusb_context *test_ctx = NULL;
   libusb_testonly_fake_running_version = 100001;
@@ -123,6 +125,7 @@ static libusb_testlib_result test_macos_version_fallback(void) {
 
 static const libusb_testlib_test tests[] = {
   { "test_macos_version_fallback", &test_macos_version_fallback },
+  { "test_darwin_timeout", &test_darwin_timeout },
   LIBUSB_NULL_TEST
 };
 
