@@ -73,7 +73,7 @@ struct list_head active_contexts_list GUARDED_BY(active_contexts_lock);
  * This documentation is aimed at application developers wishing to
  * communicate with USB peripherals from their own software. After reviewing
  * this documentation, feedback and questions can be sent to the
- * <a href="https://mailing-list.libusb.info">libusb-devel mailing list</a>.
+ * <a href="https://sourceforge.net/projects/libusb/lists/libusb-devel">libusb-devel mailing list</a>.
  *
  * This documentation assumes knowledge of how to operate USB devices from
  * a software standpoint (descriptors, configurations, interfaces, endpoints,
