@@ -228,7 +228,7 @@ static int ask_hotplug_enumerate_flag(void)
 	}
 }
 
-/* When enabled (-o on command line), each arrival is probed for actual usability: 
+/* When enabled (-o on command line), each arrival is probed for actual usability:
  * open the device and try to claim (then immediately release) every interface of the
  * active configuration, printing the outcome of each call. This makes issues
  * where DEVICE_ARRIVED fires for a not-yet-usable device directly visible. */

@@ -5407,7 +5407,7 @@ static int hid_initialize_interface(int sub_api, struct libusb_device_handle *de
 	handle_priv->interface_handle[iface].dev_handle = INTERFACE_INITIALIZED;
 
 	usbi_dbg(usbi_handle_ctx(dev_handle), "initialized interface %u", iface);
-	
+
 	return LIBUSB_SUCCESS;
 }
 
