@@ -57,13 +57,11 @@ EXTRA_CPPFLAGS=
 EXTRA_CFLAGS=
 
 dnl check for -std=gnu11 compiler support (optional)
-dnl note that we don't just check if the compiler accepts '-std=x11'
-dnl but also that it supports the _Thread_local keyword because some compilers
-dnl (e.g. gcc 4.8) accept the command line option but do not implement TLS
+dnl check a C11 feature because some compilers accept '-std=x11' without C11 support
 saved_CFLAGS="${CFLAGS}"
 CFLAGS="-std=gnu11"
 AC_MSG_CHECKING([if $CC supports -std=gnu11])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([_Thread_local int x;], [x = 42;])],
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([_Atomic int x;], [x = 42;])],
 	[AC_MSG_RESULT([yes])
 	 c_dialect=gnu],
 	[AC_MSG_RESULT([no])
@@ -72,12 +70,22 @@ if test "x$c_dialect" != xgnu; then
 	dnl fallback check for -std=c11 compiler support (required)
 	CFLAGS="-std=c11"
 	AC_MSG_CHECKING([if $CC supports -std=c11])
-	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([_Thread_local int x;], [x = 42;])],
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([_Atomic int x;], [x = 42;])],
 		[AC_MSG_RESULT([yes])],
 		[AC_MSG_RESULT([no])
 		 AC_MSG_ERROR([compiler with C11 support is required to build libusb])])
 	c_dialect=c
 fi
+CFLAGS="${saved_CFLAGS}"
+
+dnl Thread-local storage is optional; older macOS targets cannot link it.
+saved_CFLAGS="${CFLAGS}"
+CFLAGS="-std=${c_dialect}11"
+AC_MSG_CHECKING([whether $CC supports thread-local storage])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([_Thread_local int x;], [x = 42; return x;])],
+	[AC_MSG_RESULT([yes])
+	 AC_DEFINE([HAVE_THREAD_LOCAL], [1], [Define to 1 if thread-local storage is available.])],
+	[AC_MSG_RESULT([no])])
 CFLAGS="${saved_CFLAGS}"
 
 AC_DEFINE([_GNU_SOURCE], [1], [Enable GNU extensions.])

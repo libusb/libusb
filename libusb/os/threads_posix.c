@@ -92,11 +92,15 @@ int usbi_cond_timedwait(usbi_cond_t *cond,
 
 unsigned long usbi_get_tid(void)
 {
+#ifdef HAVE_THREAD_LOCAL
 	static USBI_THREAD_LOCAL unsigned long tl_tid;
+#endif
 	unsigned long tid;
 
+#ifdef HAVE_THREAD_LOCAL
 	if (tl_tid)
 		return tl_tid;
+#endif
 
 #if defined(__ANDROID__)
 	tid = (unsigned long)gettid();
@@ -132,5 +136,9 @@ unsigned long usbi_get_tid(void)
 		tid = (unsigned long)(uintptr_t)pthread_self();
 	}
 
+#ifdef HAVE_THREAD_LOCAL
 	return tl_tid = tid;
+#else
+	return tid;
+#endif
 }
