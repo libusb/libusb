@@ -9,6 +9,16 @@ If you are using Microsoft Visual Studio:
 - If you want to debug the library, uncomment the ENABLE_DEBUG_LOGGING define
   in msvc/config.h
 - Select your configuration and compile the project.
+- Release tarballs include a frozen version header and need neither Git nor a
+  POSIX shell. Other source archives use an "Unknown source" version.
+- The build removes the download mark from build-aux/gen-describe.ps1 before
+  running it, including when Group Policy enforces Unrestricted execution.
+- Git checkouts need Git and its POSIX shell and helper tools. The build finds
+  Git on PATH or in SourceTree's embedded installation. Git for Windows and
+  MinGit are supported; bash.exe is not required.
+- For a custom installation, set LIBUSB_GIT to the full path of git.exe.
+  Set LIBUSB_SH to the full path of sh.exe or bash.exe to override shell selection.
+  Keep the shell's helper tools in their original installation directories.
 - To target a specific toolset (previous version of Visual Studio), either
   edit PlatformToolset in /msvc/Configuration.Base.props, or supply the value
   to msbuild on the command line.
