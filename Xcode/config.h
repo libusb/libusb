@@ -8,6 +8,11 @@
 /* Define to 1 to enable message logging. */
 #define ENABLE_LOGGING 1
 
+/* OS X 10.6 does not support compiler thread-local storage. */
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+#define HAVE_THREAD_LOCAL 1
+#endif
+
 /* On 10.6 and later, use newly available pthread_threadid_np() function */
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 /* Define to 1 if you have the 'pthread_threadid_np' function. */
